@@ -1,0 +1,54 @@
+{
+  "name": "binary-hub-functions",
+  "version": "1.0.0",
+  "description": "Firebase Functions for Binary Hub",
+  "main": "lib/index.js",
+  "scripts": {
+    "lint": "eslint src --ext .js,.ts",
+    "build": "tsc",
+    "build:watch": "tsc --watch",
+    "serve": "npm run build && firebase emulators:start --only functions",
+    "shell": "npm run build && firebase functions:shell",
+    "start": "npm run shell",
+    "deploy": "firebase deploy --only functions",
+    "logs": "firebase functions:log",
+    "test": "jest",
+    "test:watch": "jest --watch"
+  },
+  "engines": {
+    "node": "18"
+  },
+  "dependencies": {
+    "firebase-admin": "^11.8.0",
+    "firebase-functions": "^4.3.1",
+    "express": "^4.18.2",
+    "cors": "^2.8.5",
+    "helmet": "^7.0.0",
+    "express-rate-limit": "^6.7.0",
+    "joi": "^17.9.0",
+    "date-fns": "^2.30.0",
+    "csv-parser": "^3.0.0",
+    "csv-writer": "^1.6.0",
+    "openai": "^4.20.0",
+    "pdf-lib": "^1.17.1",
+    "multer": "^1.4.5-lts.1",
+    "uuid": "^9.0.0",
+    "lodash": "^4.17.21"
+  },
+  "devDependencies": {
+    "@typescript-eslint/eslint-plugin": "^5.12.0",
+    "@typescript-eslint/parser": "^5.12.0",
+    "@types/cors": "^2.8.13",
+    "@types/express": "^4.17.17",
+    "@types/jest": "^29.5.0",
+    "@types/lodash": "^4.14.195",
+    "@types/multer": "^1.4.7",
+    "@types/uuid": "^9.0.0",
+    "eslint": "^8.9.0",
+    "eslint-plugin-import": "^2.25.4",
+    "jest": "^29.5.0",
+    "ts-jest": "^29.1.0",
+    "typescript": "^4.9.0"
+  },
+  "private": true
+} 

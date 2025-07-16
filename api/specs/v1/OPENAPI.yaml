@@ -1,0 +1,296 @@
+openapi: 3.0.3
+info:
+  title: Binary Hub BFF API (MVP)
+  version: 0.1.0
+  description: >-
+    RESTful backend‑for‑frontend that serves the Binary Hub web‑client.
+    All endpoints are authenticated via Firebase ID Token (Bearer) unless
+    explicitly marked as public.
+servers:
+  - url: https://api.binaryhub.app
+    description: Production
+  - url: https://staging-api.binaryhub.app
+    description: Staging
+
+security:
+  - FirebaseAuth: []
+
+paths:
+  /auth/exchange-token:
+    post:
+      summary: Exchange Firebase ID token for short‑lived JWT signed by BFF.
+      tags: [Auth]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                firebaseIdToken:
+                  type: string
+              required: [firebaseIdToken]
+      responses:
+        "200":
+          description: JWT issued.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JWT'
+
+  /trades:
+    get:
+      summary: List trades for current user.
+      tags: [Trades]
+      parameters:
+        - in: query
+          name: start
+          schema:
+            type: string
+            format: date-time
+          description: ISO start date filter.
+        - in: query
+          name: end
+          schema:
+            type: string
+            format: date-time
+          description: ISO end date filter.
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 100
+      responses:
+        "200":
+          description: List of Trade objects.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Trade'
+    post:
+      summary: Create a trade manually.
+      tags: [Trades]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TradeInput'
+      responses:
+        "201":
+          description: Trade stored.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Trade'
+
+  /trades/import:
+    post:
+      summary: Import CSV exported from Ebinex.
+      tags: [Trades]
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        "202":
+          description: File accepted for processing.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ImportSummary'
+
+  /dashboard/kpi:
+    get:
+      summary: Return computed KPIs for dashboard cards.
+      tags: [Dashboard]
+      responses:
+        "200":
+          description: KPI object.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/KPI'
+
+  /rules:
+    get:
+      summary: List user rules.
+      tags: [Rules]
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Rule'
+    post:
+      summary: Create or update a rule.
+      tags: [Rules]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RuleInput'
+      responses:
+        "201":
+          description: Rule stored.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Rule'
+
+  /insights:
+    get:
+      summary: List weekly AI insights.
+      tags: [Insights]
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Insight'
+
+  /export/pdf:
+    post:
+      summary: Generate PDF report for selected period.
+      tags: [Export]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                start:
+                  type: string
+                  format: date
+                end:
+                  type: string
+                  format: date
+              required: [start, end]
+      responses:
+        "202":
+          description: Export job queued; returns download URL when ready.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExportJob'
+
+components:
+  securitySchemes:
+    FirebaseAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    JWT:
+      type: object
+      properties:
+        token:
+          type: string
+          description: Short‑lived JWT.
+    Trade:
+      type: object
+      properties:
+        tradeId:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+        asset:
+          type: string
+        timeframe:
+          type: string
+        direction:
+          type: string
+          enum: [BUY, SELL]
+        stake:
+          type: number
+        openPrice:
+          type: number
+        closePrice:
+          type: number
+        result:
+          type: string
+          enum: [WIN, LOSS]
+        pnl:
+          type: number
+    TradeInput:
+      allOf:
+        - $ref: '#/components/schemas/Trade'
+      required: [timestamp, asset, direction, stake]
+    ImportSummary:
+      type: object
+      properties:
+        totalRows:
+          type: integer
+        imported:
+          type: integer
+        skipped:
+          type: integer
+        errors:
+          type: array
+          items:
+            type: string
+    KPI:
+      type: object
+      properties:
+        winRate:
+          type: number
+        streakMax:
+          type: integer
+        totalTrades:
+          type: integer
+        avgPnl:
+          type: number
+    Rule:
+      type: object
+      properties:
+        ruleId:
+          type: string
+        text:
+          type: string
+        active:
+          type: boolean
+        brokenCount:
+          type: integer
+    RuleInput:
+      allOf:
+        - $ref: '#/components/schemas/Rule'
+      required: [text]
+    Insight:
+      type: object
+      properties:
+        insightId:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        text:
+          type: string
+        kpiReference:
+          type: array
+          items:
+            type: string
+    ExportJob:
+      type: object
+      properties:
+        jobId:
+          type: string
+        status:
+          type: string
+          enum: [QUEUED, PROCESSING, DONE]
+        downloadUrl:
+          type: string
