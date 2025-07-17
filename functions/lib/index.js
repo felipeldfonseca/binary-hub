@@ -32,6 +32,15 @@ app.use((0, express_rate_limit_1.default)({
     windowMs: 15 * 60 * 1000,
     max: 100 // limit each IP to 100 requests per windowMs
 }));
+// Add health check endpoint
+app.get('/health', (_, res) => {
+    res.status(200).send('OK');
+});
+// Configure the Express.js server to listen on the Cloud Functions port
+const port = process.env.PORT || 8080;
+app.listen(port, () => {
+    firebase_functions_1.logger.log(`Server listening on port ${port}`);
+});
 // Express middleware
 app.use((0, helmet_1.default)());
 app.use((0, cors_1.default)({ origin: true }));

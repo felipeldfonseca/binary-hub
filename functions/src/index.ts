@@ -40,14 +40,8 @@ app.use(rateLimit({
 }));
 
 // Add health check endpoint
-app.get('/health', (_, res) => {
+app.get('/_health', (_, res) => {
   res.status(200).send('OK');
-});
-
-// Configure the Express.js server to listen on the Cloud Functions port
-const port = process.env.PORT || 8080;
-app.listen(port, () => {
-  logger.log(`Server listening on port ${port}`);
 });
 
 // Express middleware
