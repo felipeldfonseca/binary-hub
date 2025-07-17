@@ -24,6 +24,14 @@ const auth = (0, auth_1.getAuth)();
 const storage = (0, storage_1.getStorage)();
 // Create Express app
 const app = (0, express_1.default)();
+// Configure middleware
+app.use((0, cors_1.default)());
+app.use((0, helmet_1.default)());
+app.use(express_1.default.json());
+app.use((0, express_rate_limit_1.default)({
+    windowMs: 15 * 60 * 1000,
+    max: 100 // limit each IP to 100 requests per windowMs
+}));
 // Express middleware
 app.use((0, helmet_1.default)());
 app.use((0, cors_1.default)({ origin: true }));
@@ -504,11 +512,20 @@ app.post('/trades/validate-csv', authenticate, async (req, res) => {
 // Export the API
 // Configure HTTPS function with options
 exports.api = (0, https_1.onRequest)({
+    cors: true,
     maxInstances: 10,
+    minInstances: 0,
+    memory: '1GiB',
     timeoutSeconds: 120,
-}, (req, res) => app(req, res));
+    region: 'us-central1',
+}, app);
 // Background functions
-exports.processCSVUpload = (0, firestore_1.onDocumentCreated)('uploads/{userId}/files/{fileId}', async (event) => {
+exports.processCSVUpload = (0, firestore_1.onDocumentCreated)({
+    document: 'uploads/{userId}/files/{fileId}',
+    memory: '1GiB',
+    timeoutSeconds: 540,
+    region: 'us-central1',
+}, async (event) => {
     var _a;
     const { userId, fileId } = event.params;
     const data = (_a = event.data) === null || _a === void 0 ? void 0 : _a.data();
@@ -545,7 +562,13 @@ exports.processCSVUpload = (0, firestore_1.onDocumentCreated)('uploads/{userId}/
     }
 });
 // Scheduled function to generate weekly insights
-exports.generateWeeklyInsights = (0, scheduler_1.onSchedule)('0 8 * * 1', async () => {
+exports.generateWeeklyInsights = (0, scheduler_1.onSchedule)({
+    schedule: '0 8 * * 1',
+    memory: '1GiB',
+    timeoutSeconds: 540,
+    region: 'us-central1',
+    retryCount: 3
+}, async () => {
     firebase_functions_1.logger.log('Generating weekly insights for all users');
     try {
         // Get all users with recent trades
@@ -630,7 +653,13 @@ exports.generateWeeklyInsights = (0, scheduler_1.onSchedule)('0 8 * * 1', async 
     }
 });
 // Cleanup function for old data
-exports.cleanupOldData = (0, scheduler_1.onSchedule)('0 2 * * *', async () => {
+exports.cleanupOldData = (0, scheduler_1.onSchedule)({
+    schedule: '0 2 * * *',
+    memory: '1GiB',
+    timeoutSeconds: 540,
+    region: 'us-central1',
+    retryCount: 3
+}, async () => {
     firebase_functions_1.logger.log('Running daily cleanup');
     try {
         // Clean up old uploads (older than 30 days)
