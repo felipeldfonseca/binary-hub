@@ -1,8 +1,11 @@
 import OpenAI from 'openai';
-import { logger, config as functionsConfig } from 'firebase-functions';
+import { logger } from 'firebase-functions';
 
 // Initialize OpenAI client
 function getOpenAIClient() {
+  if (!process.env.OPENAI_API_KEY) {
+    throw new Error('OPENAI_API_KEY environment variable is required');
+  }
   return new OpenAI({
     apiKey: process.env.OPENAI_API_KEY,
   });

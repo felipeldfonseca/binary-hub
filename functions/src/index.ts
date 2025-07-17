@@ -680,7 +680,8 @@ export const generateWeeklyInsights = onSchedule({
   memory: '1GiB',
   timeoutSeconds: 540,
   region: 'us-central1',
-  retryCount: 3
+  retryCount: 3,
+  secrets: ['OPENAI_API_KEY']
 }, async () => {
   logger.log('Generating weekly insights for all users');
   
