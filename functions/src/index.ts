@@ -39,15 +39,13 @@ app.use(rateLimit({
   max: 100 // limit each IP to 100 requests per windowMs
 }));
 
-// Add health check endpoint
-app.get('/health', (_, res) => {
+// Add health check endpoints for Cloud Run
+app.get('/_ah/warmup', (_, res) => {
   res.status(200).send('OK');
 });
 
-// Configure the Express.js server to listen on the Cloud Functions port
-const port = process.env.PORT || 8080;
-app.listen(port, () => {
-  logger.log(`Server listening on port ${port}`);
+app.get('/health', (_, res) => {
+  res.status(200).send('OK');
 });
 
 // Express middleware
@@ -625,12 +623,7 @@ app.post('/trades/validate-csv', authenticate, async (req: AuthenticatedRequest,
 // Export the API
 // Configure HTTPS function with options
 export const api = onRequest({
-  cors: true,
-  maxInstances: 10,
-  minInstances: 0,
-  memory: '1GiB',
-  timeoutSeconds: 120,
-  region: 'us-central1',
+  secrets: ['OPENAI_API_KEY']
 }, app);
 
 // Background functions
