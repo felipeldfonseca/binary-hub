@@ -499,7 +499,7 @@ app.post('/trades/validate-csv', authenticate, async (req, res) => {
 // Export the API
 exports.api = (0, https_1.onRequest)(app);
 // Background functions
-exports.processCSVUpload = (0, firestore_1.onDocumentCreated)("uploads/{userId}/files/{fileId}", async (event) => {
+exports.processCSVUpload = (0, firestore_1.onDocumentCreated)('uploads/{userId}/files/{fileId}', async (event) => {
     var _a;
     const { userId, fileId } = event.params;
     const data = (_a = event.data) === null || _a === void 0 ? void 0 : _a.data();
@@ -536,7 +536,7 @@ exports.processCSVUpload = (0, firestore_1.onDocumentCreated)("uploads/{userId}/
     }
 });
 // Scheduled function to generate weekly insights
-exports.generateWeeklyInsights = (0, scheduler_1.onSchedule)("0 8 * * 1", async () => {
+exports.generateWeeklyInsights = (0, scheduler_1.onSchedule)('0 8 * * 1', async () => {
     firebase_functions_1.logger.log('Generating weekly insights for all users');
     try {
         // Get all users with recent trades
@@ -621,7 +621,7 @@ exports.generateWeeklyInsights = (0, scheduler_1.onSchedule)("0 8 * * 1", async 
     }
 });
 // Cleanup function for old data
-exports.cleanupOldData = (0, scheduler_1.onSchedule)("0 2 * * *", async () => {
+exports.cleanupOldData = (0, scheduler_1.onSchedule)('0 2 * * *', async () => {
     firebase_functions_1.logger.log('Running daily cleanup');
     try {
         // Clean up old uploads (older than 30 days)

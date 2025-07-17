@@ -24,7 +24,7 @@ DISCLAIMER: Isto não é recomendação de investimento.`;
                 avgStake: data.kpi.avgStake,
                 lossStreak: data.kpi.lossStreak
             },
-            ruleBrokenMost: data.ruleBrokenMost || "Nenhuma regra quebrada identificada"
+            ruleBrokenMost: data.ruleBrokenMost || 'Nenhuma regra quebrada identificada'
         });
         const response = await openai.chat.completions.create({
             model: 'gpt-4o-mini',
@@ -61,7 +61,7 @@ DISCLAIMER: Isto não é recomendação de investimento.`;
                 winRate: data.kpi.winRate,
                 lossStreak: data.kpi.lossStreak
             },
-            acao: "Mantenha o foco na gestão de risco e siga suas regras de trading."
+            acao: 'Mantenha o foco na gestão de risco e siga suas regras de trading.'
         };
     }
 }
