@@ -49,3 +49,4 @@ yarn-error.log*
 Thumbs.db
 firebase-debug.log
 node_modules/
+.vercel
