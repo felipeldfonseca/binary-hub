@@ -39,8 +39,21 @@ app.use(rateLimit({
   max: 100 // limit each IP to 100 requests per windowMs
 }));
 
+// Configure middleware
+app.use(helmet());
+app.use(cors({ origin: true }));
+app.use(express.json());
+app.use(rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100 // limit each IP to 100 requests per windowMs
+}));
+
 // Add health check endpoints for Cloud Run
 app.get('/_ah/warmup', (_, res) => {
+  res.status(200).send('OK');
+});
+
+app.get('/_health', (_, res) => {
   res.status(200).send('OK');
 });
 
