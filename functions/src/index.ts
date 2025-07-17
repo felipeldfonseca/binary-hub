@@ -604,14 +604,28 @@ app.post('/trades/validate-csv', authenticate, async (req: AuthenticatedRequest,
 
 // Export the API
 // Configure HTTPS function with options
-export const api = onRequest({
-  maxInstances: 10,
-  timeoutSeconds: 120,
-}, app);
+export const api = onRequest(
+  {
+    memory: "512MiB",
+    region: "us-central1",
+    minInstances: 0,
+    maxInstances: 10,
+    timeoutSeconds: 120,
+  },
+  async (req, res) => {
+    app(req, res);
+  }
+);
 
 // Background functions
 export const processCSVUpload = onDocumentCreated(
-  'uploads/{userId}/files/{fileId}',
+  {
+    document: 'uploads/{userId}/files/{fileId}',
+    memory: "512MiB",
+    region: "us-central1",
+    timeoutSeconds: 540,
+    maxInstances: 10
+  },
   async (event) => {
     const { userId, fileId } = event.params;
     const data = event.data?.data();
@@ -656,7 +670,15 @@ export const processCSVUpload = onDocumentCreated(
 );
 
 // Scheduled function to generate weekly insights
-export const generateWeeklyInsights = onSchedule('0 8 * * 1', async () => {
+export const generateWeeklyInsights = onSchedule(
+  {
+    schedule: '0 8 * * 1',
+    memory: "512MiB",
+    region: "us-central1",
+    retryCount: 3,
+    timeoutSeconds: 540,
+  },
+  async () => {
   logger.log('Generating weekly insights for all users');
   
   try {
@@ -754,7 +776,15 @@ export const generateWeeklyInsights = onSchedule('0 8 * * 1', async () => {
 });
 
 // Cleanup function for old data
-export const cleanupOldData = onSchedule('0 2 * * *', async () => {
+export const cleanupOldData = onSchedule(
+  {
+    schedule: '0 2 * * *',
+    memory: "512MiB",
+    region: "us-central1",
+    retryCount: 3,
+    timeoutSeconds: 540,
+  },
+  async () => {
   logger.log('Running daily cleanup');
   
   try {
