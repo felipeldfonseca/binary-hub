@@ -1,16 +1,16 @@
-import { onRequest } from "firebase-functions/v2/https";
-import { onDocumentCreated } from "firebase-functions/v2/firestore";
-import { onSchedule } from "firebase-functions/v2/scheduler";
-import { logger } from "firebase-functions";
-import { initializeApp } from "firebase-admin/app";
-import { getFirestore } from "firebase-admin/firestore";
-import { getAuth } from "firebase-admin/auth";
-import { getStorage } from "firebase-admin/storage";
-import express, { Request, Response, NextFunction } from "express";
-import cors from "cors";
-import helmet from "helmet";
-import rateLimit from "express-rate-limit";
-import { generateInsight, generateTradeCoach, checkTradeRules, validateCSVHeaders } from "./services/openai";
+import { onRequest } from 'firebase-functions/v2/https';
+import { onDocumentCreated } from 'firebase-functions/v2/firestore';
+import { onSchedule } from 'firebase-functions/v2/scheduler';
+import { logger } from 'firebase-functions';
+import { initializeApp } from 'firebase-admin/app';
+import { getFirestore } from 'firebase-admin/firestore';
+import { getAuth } from 'firebase-admin/auth';
+import { getStorage } from 'firebase-admin/storage';
+import express, { Request, Response, NextFunction } from 'express';
+import cors from 'cors';
+import helmet from 'helmet';
+import rateLimit from 'express-rate-limit';
+import { generateInsight, generateTradeCoach, checkTradeRules, validateCSVHeaders } from './services/openai';
 
 // Extend Express Request to include user property
 interface AuthenticatedRequest extends Request {
@@ -602,7 +602,7 @@ export const api = onRequest(app);
 
 // Background functions
 export const processCSVUpload = onDocumentCreated(
-  "uploads/{userId}/files/{fileId}",
+  'uploads/{userId}/files/{fileId}',
   async (event) => {
     const { userId, fileId } = event.params;
     const data = event.data?.data();
@@ -647,7 +647,7 @@ export const processCSVUpload = onDocumentCreated(
 );
 
 // Scheduled function to generate weekly insights
-export const generateWeeklyInsights = onSchedule("0 8 * * 1", async () => {
+export const generateWeeklyInsights = onSchedule('0 8 * * 1', async () => {
   logger.log('Generating weekly insights for all users');
   
   try {
@@ -745,7 +745,7 @@ export const generateWeeklyInsights = onSchedule("0 8 * * 1", async () => {
 });
 
 // Cleanup function for old data
-export const cleanupOldData = onSchedule("0 2 * * *", async () => {
+export const cleanupOldData = onSchedule('0 2 * * *', async () => {
   logger.log('Running daily cleanup');
   
   try {
