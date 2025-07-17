@@ -1,10 +1,15 @@
 import OpenAI from 'openai';
-import { logger, config as functionsConfig } from 'firebase-functions';
+import { logger } from 'firebase-functions';
 
 // Initialize OpenAI client
-const openai = new OpenAI({
-  apiKey: functionsConfig().openai.apikey,
-});
+function getOpenAIClient() {
+  if (!process.env.OPENAI_API_KEY) {
+    throw new Error('OPENAI_API_KEY environment variable is required');
+  }
+  return new OpenAI({
+    apiKey: process.env.OPENAI_API_KEY,
+  });
+}
 
 // Types for LLM responses
 export interface InsightResponse {
@@ -63,6 +68,7 @@ DISCLAIMER: Isto não é recomendação de investimento.`;
       ruleBrokenMost: data.ruleBrokenMost || 'Nenhuma regra quebrada identificada'
     });
 
+    const openai = getOpenAIClient();
     const response = await openai.chat.completions.create({
       model: 'gpt-4o-mini',
       temperature: 0.4,
@@ -121,6 +127,7 @@ DISCLAIMER: Isto não é recomendação de investimento.`;
     const userPrompt = `Nome: ${data.firstName}
 Situação: ${data.situation}`;
 
+    const openai = getOpenAIClient();
     const response = await openai.chat.completions.create({
       model: 'gpt-3.5-turbo',
       temperature: 0.7,
@@ -174,6 +181,7 @@ DISCLAIMER: Isto não é recomendação de investimento.`;
     const userPrompt = `Trade: ${JSON.stringify(data.trade)}
 Rules: ${JSON.stringify(data.rules)}`;
 
+    const openai = getOpenAIClient();
     const response = await openai.chat.completions.create({
       model: 'gpt-3.5-turbo',
       temperature: 0.2,
@@ -222,6 +230,7 @@ DISCLAIMER: Isto não é recomendação de investimento.`;
     const userPrompt = `Cabeçalho recebido: ${JSON.stringify(data.receivedHeaders)}
 Cabeçalho esperado: ${JSON.stringify(data.expectedHeaders)}`;
 
+    const openai = getOpenAIClient();
     const response = await openai.chat.completions.create({
       model: 'gpt-3.5-turbo',
       temperature: 0.0,
