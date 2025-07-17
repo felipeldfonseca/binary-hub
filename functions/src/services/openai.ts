@@ -1,9 +1,9 @@
 import OpenAI from 'openai';
-import { logger } from 'firebase-functions';
+import { logger, config as functionsConfig } from 'firebase-functions';
 
 // Initialize OpenAI client
 const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
+  apiKey: functionsConfig().openai.apikey,
 });
 
 // Types for LLM responses
