@@ -8,7 +8,7 @@ const openai_1 = __importDefault(require("openai"));
 const firebase_functions_1 = require("firebase-functions");
 // Initialize OpenAI client
 const openai = new openai_1.default({
-    apiKey: process.env.OPENAI_API_KEY,
+    apiKey: (0, firebase_functions_1.config)().openai.apikey,
 });
 // InsightGenerator - Weekly analysis
 async function generateInsight(data) {

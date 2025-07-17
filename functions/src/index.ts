@@ -30,9 +30,14 @@ const storage = getStorage();
 // Create Express app
 const app = express();
 
-// Middleware
+// Express middleware
 app.use(helmet());
 app.use(cors({ origin: true }));
+app.use(express.json());
+app.use(rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100 // limit each IP to 100 requests per windowMs
+}));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
@@ -598,7 +603,11 @@ app.post('/trades/validate-csv', authenticate, async (req: AuthenticatedRequest,
 });
 
 // Export the API
-export const api = onRequest(app);
+// Configure HTTPS function with options
+export const api = onRequest({
+  maxInstances: 10,
+  timeoutSeconds: 120,
+}, app);
 
 // Background functions
 export const processCSVUpload = onDocumentCreated(
