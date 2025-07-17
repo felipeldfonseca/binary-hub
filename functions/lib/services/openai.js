@@ -7,9 +7,11 @@ exports.validateCSVHeaders = exports.checkTradeRules = exports.generateTradeCoac
 const openai_1 = __importDefault(require("openai"));
 const firebase_functions_1 = require("firebase-functions");
 // Initialize OpenAI client
-const openai = new openai_1.default({
-    apiKey: (0, firebase_functions_1.config)().openai.apikey,
-});
+function getOpenAIClient() {
+    return new openai_1.default({
+        apiKey: process.env.OPENAI_API_KEY,
+    });
+}
 // InsightGenerator - Weekly analysis
 async function generateInsight(data) {
     var _a, _b;
@@ -26,6 +28,7 @@ DISCLAIMER: Isto não é recomendação de investimento.`;
             },
             ruleBrokenMost: data.ruleBrokenMost || 'Nenhuma regra quebrada identificada'
         });
+        const openai = getOpenAIClient();
         const response = await openai.chat.completions.create({
             model: 'gpt-4o-mini',
             temperature: 0.4,
@@ -75,6 +78,7 @@ async function generateTradeCoach(data) {
 DISCLAIMER: Isto não é recomendação de investimento.`;
         const userPrompt = `Nome: ${data.firstName}
 Situação: ${data.situation}`;
+        const openai = getOpenAIClient();
         const response = await openai.chat.completions.create({
             model: 'gpt-3.5-turbo',
             temperature: 0.7,
@@ -119,6 +123,7 @@ async function checkTradeRules(data) {
 DISCLAIMER: Isto não é recomendação de investimento.`;
         const userPrompt = `Trade: ${JSON.stringify(data.trade)}
 Rules: ${JSON.stringify(data.rules)}`;
+        const openai = getOpenAIClient();
         const response = await openai.chat.completions.create({
             model: 'gpt-3.5-turbo',
             temperature: 0.2,
@@ -160,6 +165,7 @@ async function validateCSVHeaders(data) {
 DISCLAIMER: Isto não é recomendação de investimento.`;
         const userPrompt = `Cabeçalho recebido: ${JSON.stringify(data.receivedHeaders)}
 Cabeçalho esperado: ${JSON.stringify(data.expectedHeaders)}`;
+        const openai = getOpenAIClient();
         const response = await openai.chat.completions.create({
             model: 'gpt-3.5-turbo',
             temperature: 0.0,

@@ -25,21 +25,25 @@ const storage = (0, storage_1.getStorage)();
 // Create Express app
 const app = (0, express_1.default)();
 // Configure middleware
-app.use((0, cors_1.default)());
-app.use((0, helmet_1.default)());
-app.use(express_1.default.json());
-app.use((0, express_rate_limit_1.default)({
-    windowMs: 15 * 60 * 1000,
-    max: 100 // limit each IP to 100 requests per windowMs
-}));
-// Express middleware
 app.use((0, helmet_1.default)());
 app.use((0, cors_1.default)({ origin: true }));
-app.use(express_1.default.json());
+app.use(express_1.default.json({ limit: '10mb' }));
+app.use(express_1.default.urlencoded({ extended: true }));
 app.use((0, express_rate_limit_1.default)({
     windowMs: 15 * 60 * 1000,
     max: 100 // limit each IP to 100 requests per windowMs
 }));
+// Add health check endpoints for Cloud Run
+app.get('/_ah/warmup', (_, res) => {
+    res.status(200).send('OK');
+});
+app.get('/_health', (_, res) => {
+    res.status(200).send('OK');
+});
+app.get('/health', (req, res) => {
+    res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+// Configure additional middleware
 app.use(express_1.default.json({ limit: '10mb' }));
 app.use(express_1.default.urlencoded({ extended: true }));
 // Rate limiting
@@ -512,12 +516,7 @@ app.post('/trades/validate-csv', authenticate, async (req, res) => {
 // Export the API
 // Configure HTTPS function with options
 exports.api = (0, https_1.onRequest)({
-    cors: true,
-    maxInstances: 10,
-    minInstances: 0,
-    memory: '1GiB',
-    timeoutSeconds: 120,
-    region: 'us-central1',
+    secrets: ['OPENAI_API_KEY']
 }, app);
 // Background functions
 exports.processCSVUpload = (0, firestore_1.onDocumentCreated)({
