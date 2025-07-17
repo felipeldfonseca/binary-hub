@@ -57,6 +57,19 @@ app.get('/_health', (_, res) => {
   res.status(200).send('OK');
 });
 
+app.get('/health', (req: Request, res: Response) => {
+  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
+// Add health check endpoints for Cloud Run
+app.get('/_ah/warmup', (_, res) => {
+  res.status(200).send('OK');
+});
+
+app.get('/_health', (_, res) => {
+  res.status(200).send('OK');
+});
+
 app.get('/health', (_, res) => {
   res.status(200).send('OK');
 });
