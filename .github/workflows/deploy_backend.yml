@@ -44,6 +44,16 @@ jobs:
         working-directory: ./functions
         run: npm ci
       
+      - name: Fix Linting Issues
+        working-directory: ./functions
+        run: |
+          echo "Fixing linting issues..."
+          npm run lint -- --fix || true
+          git config --global user.email "github-actions@github.com"
+          git config --global user.name "GitHub Actions"
+          git add .
+          git commit -m "style: auto-fix linting issues" || true
+      
       - name: Build Functions
         working-directory: ./functions
         run: npm run build
@@ -54,4 +64,4 @@ jobs:
           FIREBASE_PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}
         run: |
           echo "Deploying to Firebase project: $FIREBASE_PROJECT_ID"
-          firebase deploy --only functions --project $FIREBASE_PROJECT_ID --token $FIREBASE_TOKEN --json
+          firebase deploy --only functions --project $FIREBASE_PROJECT_ID --token $FIREBASE_TOKEN --force
