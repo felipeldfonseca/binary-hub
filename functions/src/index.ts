@@ -9,16 +9,8 @@ import { getStorage } from 'firebase-admin/storage';
 import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
-import rateLimit from 'express-rate-limi// Export the API
-// Configure HTTPS function with options
-export const api = onRequest({
-  cors: true,
-  maxInstances: 10,
-  minInstances: 0,
-  memory: '1GiB',
-  timeoutSeconds: 120,
-  region: 'us-central1',
-}, app);rt { generateInsight, generateTradeCoach, checkTradeRules, validateCSVHeaders } from './services/openai';
+import rateLimit from 'express-rate-limit';
+import { generateInsight, generateTradeCoach, checkTradeRules, validateCSVHeaders } from './services/openai';
 
 // Extend Express Request to include user property
 interface AuthenticatedRequest extends Request {
@@ -37,6 +29,15 @@ const storage = getStorage();
 
 // Create Express app
 const app = express();
+
+// Configure middleware
+app.use(cors());
+app.use(helmet());
+app.use(express.json());
+app.use(rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100 // limit each IP to 100 requests per windowMs
+}));
 
 // Express middleware
 app.use(helmet());
