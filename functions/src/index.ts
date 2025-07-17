@@ -9,8 +9,16 @@ import { getStorage } from 'firebase-admin/storage';
 import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
-import rateLimit from 'express-rate-limit';
-import { generateInsight, generateTradeCoach, checkTradeRules, validateCSVHeaders } from './services/openai';
+import rateLimit from 'express-rate-limi// Export the API
+// Configure HTTPS function with options
+export const api = onRequest({
+  cors: true,
+  maxInstances: 10,
+  minInstances: 0,
+  memory: '1GiB',
+  timeoutSeconds: 120,
+  region: 'us-central1',
+}, app);rt { generateInsight, generateTradeCoach, checkTradeRules, validateCSVHeaders } from './services/openai';
 
 // Extend Express Request to include user property
 interface AuthenticatedRequest extends Request {
@@ -604,16 +612,22 @@ app.post('/trades/validate-csv', authenticate, async (req: AuthenticatedRequest,
 
 // Export the API
 // Configure HTTPS function with options
-export const api = onRequest(
-  {
-    maxInstances: 10,
-    timeoutSeconds: 120,
-  },
-  (req, res) => app(req, res)
-);
+export const api = onRequest({
+  cors: true,
+  maxInstances: 10,
+  minInstances: 0,
+  memory: '1GiB',
+  timeoutSeconds: 120,
+  region: 'us-central1',
+}, app);
 
 // Background functions
-export const processCSVUpload = onDocumentCreated('uploads/{userId}/files/{fileId}',
+export const processCSVUpload = onDocumentCreated({
+  document: 'uploads/{userId}/files/{fileId}',
+  memory: '1GiB',
+  timeoutSeconds: 540,
+  region: 'us-central1',
+},
   async (event) => {
     const { userId, fileId } = event.params;
     const data = event.data?.data();
@@ -658,7 +672,13 @@ export const processCSVUpload = onDocumentCreated('uploads/{userId}/files/{fileI
 );
 
 // Scheduled function to generate weekly insights
-export const generateWeeklyInsights = onSchedule('0 8 * * 1', async () => {
+export const generateWeeklyInsights = onSchedule({
+  schedule: '0 8 * * 1',
+  memory: '1GiB',
+  timeoutSeconds: 540,
+  region: 'us-central1',
+  retryCount: 3
+}, async () => {
   logger.log('Generating weekly insights for all users');
   
   try {
@@ -756,7 +776,13 @@ export const generateWeeklyInsights = onSchedule('0 8 * * 1', async () => {
 });
 
 // Cleanup function for old data
-export const cleanupOldData = onSchedule('0 2 * * *', async () => {
+export const cleanupOldData = onSchedule({
+  schedule: '0 2 * * *',
+  memory: '1GiB',
+  timeoutSeconds: 540,
+  region: 'us-central1',
+  retryCount: 3
+}, async () => {
   logger.log('Running daily cleanup');
   
   try {
