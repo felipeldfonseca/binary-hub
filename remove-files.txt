@@ -1,0 +1,8 @@
+app/node_modules
+.next
+app/.next
+next-swc
+*.node
+build
+dist
+coverage
