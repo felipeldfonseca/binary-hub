@@ -2,21 +2,38 @@ title: "FirebaseMinimalDeploy"
 description: "Minimal role for deploying Firebase functions with Secret Manager access"
 stage: "GA"
 includedPermissions:
-  - cloudfunctions.functions.create
-  - cloudfunctions.functions.get
-  - cloudfunctions.functions.update
-  - cloudfunctions.operations.get
-  - cloudbuild.builds.create
-  - cloudbuild.builds.get
-  - artifactregistry.repositories.downloadArtifacts
-  - firebase.projects.get
-  - iam.serviceAccounts.actAs
-  - iam.serviceAccounts.getAccessToken
-  - serviceusage.services.use
-  - secretmanager.versions.access
-  - storage.objects.get
-  - storage.objects.create
-  - storage.objects.delete
-  - pubsub.topics.attachSubscription
-  - pubsub.subscriptions.get
-  - pubsub.topics.publish
+  # Cloud Functions permissions
+  - cloudfunctions.functions.create               # Deploy new functions
+  - cloudfunctions.functions.get                  # Retrieve function configuration/details
+  - cloudfunctions.functions.update               # Update existing functions
+  - cloudfunctions.operations.get                 # Check deployment operation status
+
+  # Cloud Build permissions
+  - cloudbuild.builds.create                      # Trigger build jobs used during deploy
+  - cloudbuild.builds.get                         # Read build job status and logs
+
+  # Artifact Registry
+  - artifactregistry.repositories.downloadArtifacts  # Required for pulling build artifacts
+
+  # Firebase project access
+  - firebase.projects.get                         # Access Firebase project metadata
+
+  # IAM service account permissions
+  - iam.serviceAccounts.actAs                     # Allow impersonating the deployer service account
+  - iam.serviceAccounts.getAccessToken            # Needed to generate temporary credentials
+
+  # Enable/consume Google APIs
+  - serviceusage.services.use                     # Use enabled APIs during deploy (e.g., cloudfunctions)
+
+  # Secret Manager
+  - secretmanager.versions.access                 # Read secrets from Secret Manager (e.g., API keys)
+
+  # Cloud Storage
+  - storage.objects.get                           # Read function source code packages
+  - storage.objects.create                        # Upload function code
+  - storage.objects.delete                        # Delete uploaded packages if needed
+
+  # Pub/Sub
+  - pubsub.topics.attachSubscription              # Wire up function triggers to topics
+  - pubsub.subscriptions.get                      # Read Pub/Sub subscription metadata
+  - pubsub.topics.publish                         # Trigger functions via topic publishing
