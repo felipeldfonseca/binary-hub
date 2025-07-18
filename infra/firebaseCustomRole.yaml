@@ -1,0 +1,22 @@
+title: "FirebaseMinimalDeploy"
+description: "Minimal role for deploying Firebase functions with Secret Manager access"
+stage: "GA"
+includedPermissions:
+  - cloudfunctions.functions.create
+  - cloudfunctions.functions.get
+  - cloudfunctions.functions.update
+  - cloudfunctions.operations.get
+  - cloudbuild.builds.create
+  - cloudbuild.builds.get
+  - artifactregistry.repositories.downloadArtifacts
+  - firebase.projects.get
+  - iam.serviceAccounts.actAs
+  - iam.serviceAccounts.getAccessToken
+  - serviceusage.services.use
+  - secretmanager.versions.access
+  - storage.objects.get
+  - storage.objects.create
+  - storage.objects.delete
+  - pubsub.topics.attachSubscription
+  - pubsub.subscriptions.get
+  - pubsub.topics.publish
