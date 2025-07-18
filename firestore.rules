@@ -1,0 +1,101 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Helper function to check if user is authenticated
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    // Helper function to check if user owns the document
+    function isOwner(uid) {
+      return request.auth != null && request.auth.uid == uid;
+    }
+    
+    // Helper function to check if user is accessing their own data
+    function isUserData(uid) {
+      return request.auth != null && request.auth.uid == uid;
+    }
+    
+    // USERS - Users can only access their own profile
+    match /users/{uid} {
+      allow read, update, delete: if isOwner(uid);
+      allow create: if isAuthenticated() && request.auth.uid == uid;
+      
+      // Validate user data on create/update
+      allow write: if isOwner(uid) && 
+        request.resource.data.keys().hasAll(['uid', 'email', 'plan', 'tz', 'createdAt']) &&
+        request.resource.data.plan in ['free', 'pro'] &&
+        request.resource.data.uid == uid;
+    }
+    
+    // TRADES - Users can only access their own trades
+    match /trades/{uid}/{tradeId} {
+      allow read, write: if isUserData(uid);
+      
+      // Validate trade data on create/update
+      allow write: if isUserData(uid) &&
+        request.resource.data.keys().hasAll(['tradeId', 'timestamp', 'asset', 'timeframe', 'direction', 'stake', 'result']) &&
+        request.resource.data.direction in ['BUY', 'SELL'] &&
+        request.resource.data.result in ['WIN', 'LOSS'] &&
+        request.resource.data.stake is number &&
+        request.resource.data.stake > 0 &&
+        request.resource.data.tradeId == tradeId;
+    }
+    
+    // RULES - Users can only access their own trading rules
+    match /rules/{uid}/{ruleId} {
+      allow read, write: if isUserData(uid);
+      
+      // Validate rule data on create/update
+      allow write: if isUserData(uid) &&
+        request.resource.data.keys().hasAll(['ruleId', 'text', 'active', 'createdAt']) &&
+        request.resource.data.active is bool &&
+        request.resource.data.text is string &&
+        request.resource.data.text.size() > 0 &&
+        request.resource.data.ruleId == ruleId;
+    }
+    
+    // INSIGHTS - Read-only for users, write-only for backend
+    match /insights/{uid}/{insightId} {
+      allow get, list: if isUserData(uid);
+      allow create, update, delete: if false; // Only backend can write
+    }
+    
+    // UPLOADS - Users can only access their own uploads
+    match /uploads/{uid}/{uploadId} {
+      allow read, write: if isUserData(uid);
+      
+      // Validate upload data on create/update
+      allow write: if isUserData(uid) &&
+        request.resource.data.keys().hasAll(['uploadId', 'fileName', 'mimeType', 'size', 'createdAt']) &&
+        request.resource.data.uploadId == uploadId &&
+        request.resource.data.size is number &&
+        request.resource.data.size > 0 &&
+        request.resource.data.size <= 26214400; // 25 MB limit
+    }
+    
+    // AUDIT - Read-only for users, write-only for backend
+    match /audit/{uid}/{auditId} {
+      allow get, list: if isUserData(uid);
+      allow write: if false; // Only backend can write
+    }
+    
+    // SUBSCRIPTIONS - Read-only for users, write-only for backend (Stripe webhooks)
+    match /subscriptions/{uid} {
+      allow get: if isUserData(uid);
+      allow write: if false; // Only backend can write via Stripe webhooks
+    }
+    
+    // ADMIN - Only for admin users (future implementation)
+    match /admin/{document=**} {
+      allow read, write: if false; // Disabled for now
+    }
+    
+    // Deny all other paths
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+} 

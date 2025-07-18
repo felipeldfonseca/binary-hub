@@ -1,0 +1,8 @@
+{
+  "rewrites": [
+    {
+      "source": "/api/(.*)",
+      "destination": "https://us-central1-$NEXT_PUBLIC_FIREBASE_PROJECT_ID.cloudfunctions.net/api/$1"
+    }
+  ]
+}
