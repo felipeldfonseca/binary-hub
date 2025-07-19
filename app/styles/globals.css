@@ -430,4 +430,18 @@ select:focus {
 
 ::-webkit-scrollbar-thumb:hover {
   background: linear-gradient(135deg, #C8E6C0 0%, #B0D4A8 100%);
+}
+
+/* Scroll-based navigation animation */
+.navbar-scroll-hidden {
+  transform: translateY(-100%);
+}
+
+.navbar-scroll-visible {
+  transform: translateY(0);
+}
+
+/* Smooth transition for navbar */
+.navbar-transition {
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 } 

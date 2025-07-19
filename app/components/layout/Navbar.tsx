@@ -24,6 +24,10 @@ export default function Navbar() {
   const [selectedLanguage, setSelectedLanguage] = useState('Language')
   const [selectedTheme, setSelectedTheme] = useState('dark') // Current page is dark mode
   
+  // Scroll-based navigation visibility
+  const [isNavVisible, setIsNavVisible] = useState(true)
+  const [lastScrollY, setLastScrollY] = useState(0)
+  
   // Different navigation items for landing page vs dashboard
   const landingNavItems: NavItem[] = [
     { href: '/', label: 'Home' },
@@ -83,6 +87,35 @@ export default function Navbar() {
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
 
+  // Scroll-based navigation visibility
+  useEffect(() => {
+    let ticking = false
+
+    const handleScroll = () => {
+      if (!ticking) {
+        requestAnimationFrame(() => {
+          const currentScrollY = window.scrollY
+          
+          // Show navbar when scrolling up or at the top
+          if (currentScrollY < lastScrollY || currentScrollY < 25) {
+            setIsNavVisible(true)
+          } 
+          // Hide navbar when scrolling down (but not at the very top)
+          else if (currentScrollY > lastScrollY && currentScrollY > 25) {
+            setIsNavVisible(false)
+          }
+          
+          setLastScrollY(currentScrollY)
+          ticking = false
+        })
+        ticking = true
+      }
+    }
+
+    window.addEventListener('scroll', handleScroll, { passive: true })
+    return () => window.removeEventListener('scroll', handleScroll)
+  }, [lastScrollY])
+
   const handleSettingsClick = (e: React.MouseEvent) => {
     e.preventDefault()
     e.stopPropagation()
@@ -120,7 +153,9 @@ export default function Navbar() {
   }
 
   return (
-    <header className="fixed top-0 left-0 right-0 z-50 bg-transparent pt-4">
+    <header className={`fixed top-0 left-0 right-0 z-50 bg-transparent pt-4 navbar-transition ${
+      isNavVisible ? 'navbar-scroll-visible' : 'navbar-scroll-hidden'
+    }`}>
       <div className="container mx-auto px-4 sm:px-8 lg:px-12 py-4 md:py-6">
         <nav className="flex items-center justify-between">
           {/* Mobile Hamburger Menu */}
