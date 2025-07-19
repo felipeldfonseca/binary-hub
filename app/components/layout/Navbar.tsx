@@ -173,7 +173,7 @@ export default function Navbar() {
                         {item.label}
                       </button>
                       {/* Settings Dropdown - positioned relative to Settings button */}
-                      {isSettingsOpen && pathname === '/' && (
+                      {isSettingsOpen && !user && (
                         <div className="settings-dropdown absolute top-full mt-2 right-0 w-64 bg-white rounded-lg shadow-lg border border-gray-200 z-50">
                           <div className="p-4">
                             {/* Theme Toggle */}
