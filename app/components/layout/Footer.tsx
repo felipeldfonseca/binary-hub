@@ -61,10 +61,14 @@ export default function Footer() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
           {/* Logo and Description */}
           <div className="space-y-4">
-            <Link href="/dashboard" className="flex items-center space-x-2">
-              <div className="font-heading text-xl font-bold">
-                <span className="text-primary">binary</span>
-                <span className="bg-primary text-text px-2 py-1 rounded-full ml-1 text-sm">hub</span>
+            <Link href="/dashboard" className="flex items-center space-x-1">
+              <div className="flex items-center space-x-1">
+                <div className="logo-poly font-normal text-primary">
+                  binary
+                </div>
+                <div className="bg-primary text-dark-background px-2 py-0.5 rounded-15px font-poly text-dark-background font-normal" style={{fontSize: '23px'}}>
+                  hub
+                </div>
               </div>
             </Link>
             <p className="text-gray-600 text-sm">
