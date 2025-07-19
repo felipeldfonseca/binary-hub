@@ -58,10 +58,10 @@ export default function SignUpPage() {
         {/* Logo */}
         <Link href="/" className="flex items-center">
           <div className="flex items-center space-x-1">
-            <div className="logo-poly font-normal text-primary text-2xl">
+            <div className="logo-poly font-normal text-primary">
               binary
             </div>
-            <div className="bg-primary text-dark-background px-2 py-0.5 rounded-15px font-poly text-dark-background font-normal text-2xl">
+            <div className="bg-primary text-dark-background px-2 py-0.5 rounded-15px font-poly text-dark-background font-normal" style={{fontSize: '23px'}}>
               hub
             </div>
           </div>
