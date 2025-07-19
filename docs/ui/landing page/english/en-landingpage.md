@@ -31,7 +31,7 @@ Know your trading like never before.*
 | 2    | `BarChart`| **Analyze your trades** – Automatic KPIs and charts adjusted to your period. |
 | 3    | `Brain`   | **Improve** – AI reveals patterns and sends comprehensive reports.           |
 
-> Layout: 3 equal cards, centered; Montserrat Light 300.
+> Layout: 3 equal cards, centered; Aave-style.
 
 ---
 
@@ -45,7 +45,7 @@ Link: **[Learn more]( /about )**
 
 ## 4. Key Feature Highlight  `#key-feature`
 
-| ![mock-screenshot](/img/ai-report-mock.png) | **Your Daily Report by the most powerful AI in the world**  <br> • Performance overview  <br> • Strategy analysis  <br> • Pattern detection |
+| Icon | **Your Daily Report by the most powerful AI in the world**  <br> • Performance overview  <br> • Strategy analysis  <br> • Pattern detection |
 |--------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------|
 
 CTA secondary → **See how it works**

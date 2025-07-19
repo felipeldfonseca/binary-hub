@@ -4,6 +4,7 @@ import HeroSection from '@/components/dashboard/HeroSection'
 import HowItWorksSection from '@/components/layout/HowItWorksSection'
 import MissionSection from '@/components/layout/MissionSection'
 import KeyFeatureSection from '@/components/layout/KeyFeatureSection'
+import PlansComparisonSection from '@/components/layout/PlansComparisonSection'
 import PublicRoute from '@/components/auth/PublicRoute'
 
 export default function HomePage() {
@@ -24,6 +25,9 @@ export default function HomePage() {
           
           {/* Key Feature Section */}
           <KeyFeatureSection />
+          
+          {/* Plans Comparison Section */}
+          <PlansComparisonSection />
 
       {/* CTA Section */}
       <section className="py-20 bg-primary">
