@@ -33,10 +33,10 @@ export default function ProtectedRoute({
             {/* Binary Hub Logo */}
             <div className="flex items-center justify-center mb-8">
               <div className="flex items-center space-x-1">
-                <div className="logo-poly font-normal text-primary text-3xl">
+                <div className="logo-poly font-normal text-primary">
                   binary
                 </div>
-                <div className="bg-primary text-dark-background px-2 py-1 rounded-15px font-poly text-dark-background font-normal text-3xl">
+                <div className="bg-primary text-dark-background px-2 py-0.5 rounded-15px font-poly text-dark-background font-normal" style={{fontSize: '23px'}}>
                   hub
                 </div>
               </div>

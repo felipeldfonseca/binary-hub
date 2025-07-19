@@ -83,9 +83,13 @@ export default function HomePage() {
         <div className="container mx-auto px-4 py-8">
           <div className="flex flex-col md:flex-row justify-between items-center">
             <div className="flex items-center space-x-2 mb-4 md:mb-0">
-              <div className="font-heading text-xl font-bold">
-                <span className="text-primary">binary</span>
-                <span className="bg-primary text-text px-2 py-1 rounded-full ml-1 text-sm">hub</span>
+              <div className="flex items-center space-x-1">
+                <div className="logo-poly font-normal text-primary">
+                  binary
+                </div>
+                <div className="bg-primary text-dark-background px-2 py-0.5 rounded-15px font-poly text-dark-background font-normal" style={{fontSize: '23px'}}>
+                  hub
+                </div>
               </div>
             </div>
             <div className="flex space-x-6 text-sm text-gray-600">
