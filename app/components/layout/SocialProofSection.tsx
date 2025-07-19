@@ -66,7 +66,7 @@ export default function SocialProofSection() {
       <div className="container mx-auto px-4 text-center">
         {/* Section Title */}
         <h2 className="font-poly text-4xl font-bold text-white mb-16">
-          Real Traders. Real Wins.
+          Real Traders. <span className="text-primary">Real Wins.</span>
         </h2>
 
         {/* Testimonial Carousel */}
