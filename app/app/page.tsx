@@ -12,53 +12,58 @@ export default function HomePage() {
         <main className="relative">
           {/* Hero Section (copied from dashboard) */}
           <HeroSection />
-      {/* Features Section */}
-      <section id="features" className="py-20">
-        <div className="container mx-auto px-4">
-          <h2 className="font-heading text-3xl font-bold text-center mb-12">
-            Funcionalidades Principais
-          </h2>
-          <div className="grid md:grid-cols-3 gap-8">
-            <div className="card text-center">
-              <div className="w-16 h-16 bg-primary rounded-lg flex items-center justify-center mx-auto mb-4">
-                <svg className="w-8 h-8 text-text" fill="currentColor" viewBox="0 0 20 20">
-                  <path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z"></path>
-                  <path fillRule="evenodd" d="M4 5a2 2 0 012-2v1a1 1 0 001 1h6a1 1 0 001-1V3a2 2 0 012 2v6a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm3 4a1 1 0 000 2h.01a1 1 0 100-2H7zm3 0a1 1 0 000 2h3a1 1 0 100-2h-3zm-3 4a1 1 0 000 2h.01a1 1 0 100-2H7zm3 0a1 1 0 000 2h3a1 1 0 100-2h-3z" clipRule="evenodd"></path>
-                </svg>
+          
+          {/* How It Works Section */}
+          <section id="how-it-works" className="py-20">
+            <div className="container mx-auto px-4">
+              <div className="max-w-4xl mx-auto space-y-6">
+                {/* Card 1: Connect & Import */}
+                <div className="bg-gray-50 rounded-lg p-6 flex items-start space-x-4">
+                  <div className="flex-shrink-0">
+                    <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
+                      <svg className="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                      </svg>
+                    </div>
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-gray-900 text-lg mb-1">Connect & Import</h3>
+                    <p className="text-gray-600 text-sm">Upload a CSV or record trades in seconds.</p>
+                  </div>
+                </div>
+
+                {/* Card 2: Analyze your trades */}
+                <div className="bg-gray-50 rounded-lg p-6 flex items-start space-x-4">
+                  <div className="flex-shrink-0">
+                    <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
+                      <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                      </svg>
+                    </div>
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-gray-900 text-lg mb-1">Analyze your trades</h3>
+                    <p className="text-gray-600 text-sm">Automatic KPIs and charts adjusted to your period.</p>
+                  </div>
+                </div>
+
+                {/* Card 3: Improve */}
+                <div className="bg-gray-50 rounded-lg p-6 flex items-start space-x-4">
+                  <div className="flex-shrink-0">
+                    <div className="w-12 h-12 bg-teal-100 rounded-lg flex items-center justify-center">
+                      <svg className="w-6 h-6 text-teal-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                      </svg>
+                    </div>
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-gray-900 text-lg mb-1">Improve</h3>
+                    <p className="text-gray-600 text-sm">AI reveals patterns and sends comprehensive reports.</p>
+                  </div>
+                </div>
               </div>
-              <h3 className="font-heading text-xl font-semibold mb-2">Log Manual & CSV</h3>
-              <p className="text-gray-600">
-                Registre trades manualmente ou importe CSV da sua corretora. 
-                Processo rápido e intuitivo.
-              </p>
             </div>
-            <div className="card text-center">
-              <div className="w-16 h-16 bg-primary rounded-lg flex items-center justify-center mx-auto mb-4">
-                <svg className="w-8 h-8 text-text" fill="currentColor" viewBox="0 0 20 20">
-                  <path d="M2 11a1 1 0 011-1h2a1 1 0 011 1v5a1 1 0 01-1 1H3a1 1 0 01-1-1v-5zM8 7a1 1 0 011-1h2a1 1 0 011 1v9a1 1 0 01-1 1H9a1 1 0 01-1-1V7zM14 4a1 1 0 011-1h2a1 1 0 011 1v12a1 1 0 01-1 1h-2a1 1 0 01-1-1V4z"></path>
-                </svg>
-              </div>
-              <h3 className="font-heading text-xl font-semibold mb-2">Dashboard & KPIs</h3>
-              <p className="text-gray-600">
-                Win Rate, P&L, streaks e métricas essenciais em um dashboard 
-                limpo e focado nos dados.
-              </p>
-            </div>
-            <div className="card text-center">
-              <div className="w-16 h-16 bg-primary rounded-lg flex items-center justify-center mx-auto mb-4">
-                <svg className="w-8 h-8 text-text" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clipRule="evenodd"></path>
-                </svg>
-              </div>
-              <h3 className="font-heading text-xl font-semibold mb-2">Calendário Heat-Map</h3>
-              <p className="text-gray-600">
-                Visualize sua performance diária com cores que indicam 
-                lucro/prejuízo de forma intuitiva.
-              </p>
-            </div>
-          </div>
-        </div>
-      </section>
+          </section>
 
       {/* CTA Section */}
       <section className="py-20 bg-primary">
