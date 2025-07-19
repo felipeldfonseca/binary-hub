@@ -140,7 +140,7 @@ export default function Navbar() {
           </button>
 
           {/* Logo */}
-          <Link href="/dashboard" className="flex items-center">
+          <Link href={user ? "/dashboard" : "/"} className="flex items-center">
             <div className="flex items-center space-x-1">
               <div className="logo-poly font-normal text-primary">
                 binary
