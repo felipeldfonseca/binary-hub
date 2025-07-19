@@ -6,6 +6,7 @@ import MissionSection from '@/components/layout/MissionSection'
 import KeyFeatureSection from '@/components/layout/KeyFeatureSection'
 import PlansComparisonSection from '@/components/layout/PlansComparisonSection'
 import SocialProofSection from '@/components/layout/SocialProofSection'
+import FAQSection from '@/components/layout/FAQSection'
 import PublicRoute from '@/components/auth/PublicRoute'
 
 export default function HomePage() {
@@ -33,20 +34,23 @@ export default function HomePage() {
           {/* Social Proof Section */}
           <SocialProofSection />
 
+          {/* FAQ Section */}
+          <FAQSection />
+
       {/* CTA Section */}
       <section className="py-20 bg-primary">
         <div className="container mx-auto px-4 text-center">
-          <h2 className="font-heading text-3xl font-bold text-text mb-6">
-            Pronto para elevar sua disciplina?
+          <h2 className="font-poly text-3xl font-bold text-gray-600 mb-2">
+            Stop guessing.
           </h2>
-          <p className="text-xl text-text mb-8 max-w-2xl mx-auto">
-            Junte-se a traders que já estão usando dados para tomar decisões mais inteligentes.
-          </p>
+          <h2 className="font-poly text-3xl font-bold text-gray-600 mb-8">
+            Start trading with data.
+          </h2>
           <Link 
             href="/auth/register" 
-            className="bg-text text-primary px-8 py-3 text-lg font-medium rounded-lg hover:bg-gray-800 transition-colors"
+            className="bg-gray-800 text-primary px-8 py-3 text-lg font-normal rounded-full hover:bg-gray-700 transition-colors font-montserrat"
           >
-            Começar Grátis Agora
+            Register today for free
           </Link>
         </div>
       </section>
