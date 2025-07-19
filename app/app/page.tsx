@@ -2,6 +2,7 @@ import Link from 'next/link'
 import Navbar from '@/components/layout/Navbar'
 import HeroSection from '@/components/dashboard/HeroSection'
 import HowItWorksSection from '@/components/layout/HowItWorksSection'
+import MissionSection from '@/components/layout/MissionSection'
 import PublicRoute from '@/components/auth/PublicRoute'
 
 export default function HomePage() {
@@ -16,6 +17,9 @@ export default function HomePage() {
           
           {/* How It Works Section */}
           <HowItWorksSection />
+          
+          {/* Mission Section */}
+          <MissionSection />
 
       {/* CTA Section */}
       <section className="py-20 bg-primary">
