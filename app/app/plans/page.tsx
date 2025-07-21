@@ -14,11 +14,11 @@ export default function PlansPage() {
             <div className="max-w-6xl mx-auto">
               {/* Hero Section */}
               <div className="text-center mb-16">
-                <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-white mb-6">
-                  Choose Your <span className="text-primary">Plan</span>
+                <h1 className="text-3xl md:text-4xl lg:text-5xl font-poly font-bold text-white mb-6">
+                  Choose the plan that fits <span className="text-primary">your trading journey</span>
                 </h1>
-                <p className="text-xl text-gray-300 max-w-3xl mx-auto">
-                  Start your trading journey with the perfect plan for your needs
+                <p className="text-xl font-montserrat font-semibold text-white max-w-3xl mx-auto">
+                  <span className="text-primary">Start for free.</span> Unlock premium analytics whenever you’re ready.
                 </p>
               </div>
 
@@ -149,6 +149,9 @@ export default function PlansPage() {
                   </button>
                 </div>
               </div>
+              <p className="text-base font-montserrat font-normal text-white text-center mb-12">
+                Cancel anytime • No hidden fees
+              </p>
 
               {/* FAQ Section */}
               <section className="text-center">
