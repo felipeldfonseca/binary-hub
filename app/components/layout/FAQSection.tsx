@@ -79,7 +79,7 @@ export default function FAQSection() {
                   }`}
                 >
                   <div className="overflow-hidden">
-                    <div className="pt-4 pb-6 text-gray-400">
+                    <div className="pt-4 pb-6 text-white">
                       {faq.answer}
                     </div>
                   </div>
