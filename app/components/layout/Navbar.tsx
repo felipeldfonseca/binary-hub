@@ -44,7 +44,7 @@ export default function Navbar() {
     { href: '/analytics', label: 'Analytics' },
     { href: '/events', label: 'Events' },
     { href: '/ai', label: 'AI' },
-    { href: '/plans', label: 'Plans' },
+    { href: '/dashboard/plans', label: 'Plans' },
   ]
 
   const navItems = user ? dashboardNavItems : landingNavItems
