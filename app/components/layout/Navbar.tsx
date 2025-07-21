@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useState, useEffect } from 'react'
 import { useAuth } from '../../lib/contexts/AuthContext'
+import { useRouter } from 'next/navigation'
 
 interface NavItem {
   href: string
@@ -152,6 +153,8 @@ export default function Navbar() {
     }
   }
 
+  const router = useRouter();
+
   return (
     <>
       <header className={`fixed top-0 left-0 right-0 z-50 bg-transparent pt-4 navbar-transition ${
@@ -256,13 +259,19 @@ export default function Navbar() {
                                 {isLanguageOpen && (
                                   <div className="absolute top-full mt-1 left-0 right-0 bg-white rounded-md shadow-lg border border-gray-200 z-50">
                                     <button
-                                      onClick={() => handleLanguageSelect('en', 'English')}
+                                      onClick={() => {
+                                        setIsLanguageOpen(false);
+                                        router.push('/');
+                                      }}
                                       className="w-full px-3 py-2 text-sm text-left text-gray-700 hover:bg-gray-50 transition-colors first:rounded-t-md"
                                     >
                                       English
                                     </button>
                                     <button
-                                      onClick={() => handleLanguageSelect('pt', 'Português')}
+                                      onClick={() => {
+                                        setIsLanguageOpen(false);
+                                        router.push('/pt');
+                                      }}
                                       className="w-full px-3 py-2 text-sm text-left text-gray-700 hover:bg-gray-50 transition-colors last:rounded-b-md"
                                     >
                                       Português
@@ -426,13 +435,21 @@ export default function Navbar() {
                           {isLanguageOpen && (
                             <div className="absolute top-full mt-1 left-0 right-0 bg-gray-700 rounded shadow-lg border border-gray-600 z-[70]">
                               <button
-                                onClick={() => handleLanguageSelect('en', 'English')}
+                                onClick={() => {
+                                  setIsLanguageOpen(false);
+                                  setIsMobileMenuOpen(false);
+                                  router.push('/');
+                                }}
                                 className="w-full px-2 py-1 text-xs text-left text-white hover:bg-gray-600 transition-colors first:rounded-t"
                               >
                                 English
                               </button>
                               <button
-                                onClick={() => handleLanguageSelect('pt', 'Português')}
+                                onClick={() => {
+                                  setIsLanguageOpen(false);
+                                  setIsMobileMenuOpen(false);
+                                  router.push('/pt');
+                                }}
                                 className="w-full px-2 py-1 text-xs text-left text-white hover:bg-gray-600 transition-colors last:rounded-b"
                               >
                                 Português
