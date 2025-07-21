@@ -10,16 +10,32 @@ interface FAQItem {
 
 const faqs = [
   {
-    question: "Is Binary Hub free?",
-    answer: "Yes, our Free plan lets you track up to 100 trades per month with core KPIs.",
+    question: "Is my payment and data secure?",
+    answer: "Absolutely. Binary Hub never stores your card details. Payments are processed via Stripe/PayPal with PCI-DSS encryption, and your trade data is encrypted at rest and in transit.",
   },
   {
-    question: "Do I need to connect my broker?",
-    answer: "No. You can simply upload a CSV export or enter trades manually.",
+    question: "Which payment methods do you accept?",
+    answer: "All major credit cards, PayPal, Apple Pay, and cryptocurrency.",
   },
   {
-    question: "Are binary options legal in my country?",
-    answer: "Regulations vary. Please check local laws and trade responsibly.",
+    question: "Can I pay with crypto?",
+    answer: "Yes. Choose \"Crypto\" on the checkout screen and follow the on-screen instructions for monthly or annual plans.",
+  },
+  {
+    question: "Is there a free trial?",
+    answer: "Yes—14 days on the Premium plan. Cancel anytime during the trial and you won't be charged.",
+  },
+  {
+    question: "Can I cancel or change plans anytime?",
+    answer: "Yes. Upgrade, downgrade, or cancel whenever you like. Downgrades/prorates apply instantly; cancellations stop auto-renew and your paid features stay active until the end of the current term.",
+  },
+  {
+    question: "Will my data be deleted if I cancel?",
+    answer: "Your account reverts to the Free plan; data stays preserved for 90 days. You can request permanent deletion at any time under Settings > Privacy.",
+  },
+  {
+    question: "Do you offer refunds?",
+    answer: "Monthly plans are non-refundable after the billing date. Annual plans have a 14-day cooling-off period. Contact support within that window for a full refund.",
   },
 ];
 

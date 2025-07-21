@@ -1,5 +1,6 @@
 import PublicRoute from '../../components/auth/PublicRoute'
 import Navbar from '../../components/layout/Navbar'
+import FAQSection from '@/components/layout/FAQSection'
 
 export default function PlansPage() {
   return (
@@ -378,35 +379,7 @@ export default function PlansPage() {
               </p>
 
               {/* FAQ Section */}
-              <section className="text-center">
-                <h2 className="text-3xl font-bold text-white mb-8">Frequently Asked Questions</h2>
-                <div className="grid md:grid-cols-2 gap-8 text-left">
-                  <div>
-                    <h3 className="text-xl font-semibold text-primary mb-4">Can I change plans anytime?</h3>
-                    <p className="text-gray-300">
-                      Yes, you can upgrade or downgrade your plan at any time. Changes take effect immediately.
-                    </p>
-                  </div>
-                  <div>
-                    <h3 className="text-xl font-semibold text-primary mb-4">Is there a free trial?</h3>
-                    <p className="text-gray-300">
-                      Yes, we offer a 14-day free trial for the Premium plan. No credit card required to start.
-                    </p>
-                  </div>
-                  <div>
-                    <h3 className="text-xl font-semibold text-primary mb-4">What payment methods do you accept?</h3>
-                    <p className="text-gray-300">
-                      We accept all major credit cards, PayPal, and bank transfers for enterprise plans.
-                    </p>
-                  </div>
-                  <div>
-                    <h3 className="text-xl font-semibold text-primary mb-4">Can I cancel anytime?</h3>
-                    <p className="text-gray-300">
-                      Absolutely. You can cancel your subscription at any time with no cancellation fees.
-                    </p>
-                  </div>
-                </div>
-              </section>
+              <FAQSection />
             </div>
           </div>
         </main>
