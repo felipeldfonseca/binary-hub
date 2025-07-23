@@ -15,9 +15,9 @@ export default function PlansPage() {
             <div className="max-w-6xl mx-auto">
               {/* Hero Section */}
               <div className="text-center mb-16">
-                <h1 className="text-3xl md:text-4xl lg:text-5xl font-poly font-bold text-white mb-6">
-                  Choose the plan that fits <span className="text-primary">your trading journey</span>
-                </h1>
+                              <h1 className="text-3xl md:text-4xl lg:text-5xl font-poly font-bold text-white mb-6">
+                Choose the plan that fuels <span className="text-primary">your trading journey</span>
+              </h1>
                 <p className="text-xl font-montserrat font-semibold text-white max-w-3xl mx-auto">
                   <span className="text-primary">Start for free.</span> Unlock premium analytics whenever you're ready.
                 </p>
