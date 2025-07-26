@@ -1,5 +1,6 @@
 import PublicRoute from '../../components/auth/PublicRoute'
 import Navbar from '../../components/layout/Navbar'
+import Footer from '@/components/layout/Footer'
 
 export default function AboutPage() {
   return (
@@ -83,6 +84,7 @@ export default function AboutPage() {
             </div>
           </div>
         </main>
+        <Footer />
       </div>
     </PublicRoute>
   )

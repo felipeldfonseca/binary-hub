@@ -1,11 +1,18 @@
+'use client'
+
 import Link from 'next/link'
+import { usePathname } from 'next/navigation'
+import { useAuth } from '@/lib/contexts/AuthContext'
 
 export default function Footer() {
+  const pathname = usePathname()
+  const { user } = useAuth()
+  
   const institutionalLinks = [
     { href: '/about', label: 'About us' },
-    { href: '/docs', label: 'Docs' },
     { href: '/plans', label: 'Plans' },
-    { href: '/faqs', label: 'FAQs' },
+    { href: '/docs', label: 'Docs' },
+    { href: '#faqs', label: 'FAQs', isFAQ: true },
   ]
 
   const socialLinks = [
@@ -15,6 +22,28 @@ export default function Footer() {
     { href: 'https://instagram.com', label: 'Instagram', icon: 'instagram' },
     { href: 'https://youtube.com', label: 'YouTube', icon: 'youtube' },
   ]
+
+  const handleFAQClick = (e: React.MouseEvent) => {
+    e.preventDefault()
+    
+    // Remove focus from the button to prevent it from staying selected
+    const button = e.currentTarget as HTMLButtonElement
+    button.blur()
+    
+    // Check if current page has FAQs section
+    const hasFAQsOnPage = pathname === '/' || pathname === '/plans'
+    
+    if (hasFAQsOnPage) {
+      // Scroll to FAQs section on current page
+      const faqsSection = document.getElementById('faqs')
+      if (faqsSection) {
+        faqsSection.scrollIntoView({ behavior: 'smooth' })
+      }
+    } else {
+      // Navigate to plans page FAQs section
+      window.location.href = '/plans#faqs'
+    }
+  }
 
   const getSocialIcon = (icon: string) => {
     const iconClass = "w-5 h-5"
@@ -57,11 +86,11 @@ export default function Footer() {
 
   return (
     <footer className="border-t border-border bg-background">
-      <div className="container mx-auto px-4 py-16">
+      <div className="container mx-auto px-4 pt-20 pb-16" style={{ paddingTop: '5rem', paddingBottom: '4rem' }}>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
           {/* Logo and Description */}
           <div className="space-y-6">
-            <Link href="/dashboard" className="flex items-center space-x-1">
+            <Link href={user ? "/dashboard" : "/"} className="flex items-center space-x-1">
               <div className="flex items-center space-x-1">
                 <div className="logo-poly font-normal text-primary">
                   binary
@@ -71,23 +100,32 @@ export default function Footer() {
                 </div>
               </div>
             </Link>
-            <p className="text-gray-600 text-sm">
-              Discipline. Data. Domination. Track your trading performance and improve your results.
-            </p>
           </div>
 
           {/* Institutional Links */}
           <div>
             <h3 className="font-semibold text-text mb-4">Company</h3>
             <nav className="space-y-2">
-              {institutionalLinks.map((link) => (
-                <Link
-                  key={link.href}
-                  href={link.href}
-                  className="block text-sm text-gray-600 hover:text-primary transition-colors"
-                >
-                  {link.label}
-                </Link>
+              {institutionalLinks
+                .filter(link => !(link.isFAQ && pathname === '/about'))
+                .map((link) => (
+                link.isFAQ ? (
+                  <button
+                    key={link.href}
+                    onClick={handleFAQClick}
+                    className="block text-sm text-white hover:text-primary transition-colors text-left w-full focus:outline-none focus:ring-0 focus:border-0"
+                  >
+                    {link.label}
+                  </button>
+                ) : (
+                  <Link
+                    key={link.href}
+                    href={link.href}
+                    className="block text-sm text-white hover:text-primary transition-colors"
+                  >
+                    {link.label}
+                  </Link>
+                )
               ))}
             </nav>
           </div>
@@ -102,7 +140,7 @@ export default function Footer() {
                   href={link.href}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-gray-600 hover:text-primary transition-colors"
+                  className="text-white hover:text-primary transition-colors"
                   aria-label={link.label}
                 >
                   {getSocialIcon(link.icon)}
@@ -112,7 +150,7 @@ export default function Footer() {
           </div>
         </div>
 
-        <div className="mt-8 pt-8 border-t border-border text-center text-sm text-gray-600">
+        <div className="mt-8 pt-8 border-t border-border text-center text-sm text-white">
           <p>&copy; 2025 Binary Hub. All rights reserved.</p>
         </div>
       </div>

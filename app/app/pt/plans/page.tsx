@@ -3,6 +3,7 @@ import Navbar from '../../../components/layout/Navbar'
 import FAQSection from '@/components/layout/FAQSection'
 import CheckIcon from '@/components/icons/CheckIcon'
 import XIcon from '@/components/icons/XIcon'
+import FooterPT from '@/components/layout/FooterPT'
 
 export default function PlansPagePT() {
   return (
@@ -10,7 +11,7 @@ export default function PlansPagePT() {
       <div className="min-h-screen bg-background">
         {/* Navbar */}
         <Navbar />
-        
+
         {/* Main Content */}
         <main className="pt-32 pb-16">
           <div className="container mx-auto px-4 sm:px-8 lg:px-12">
@@ -72,10 +73,10 @@ export default function PlansPagePT() {
                       <CheckIcon className="w-5 h-5 mr-3 flex-shrink-0" />
                       Suporte prioritário: Comunidade
                     </li>
-                    
+
                     {/* Divider */}
                     <div className="border-t border-gray-600 my-4"></div>
-                    
+
                     {/* Unavailable Features */}
                     <li className="flex items-center text-gray-500">
                       <XIcon className="w-5 h-5 mr-3 flex-shrink-0" />
@@ -178,10 +179,10 @@ export default function PlansPagePT() {
                       <CheckIcon className="w-5 h-5 mr-3 flex-shrink-0" />
                       Teste gratuito: 14 dias
                     </li>
-                    
+
                     {/* Divider */}
                     <div className="border-t border-gray-600 my-4"></div>
-                    
+
                     {/* Unavailable Features */}
                     <li className="flex items-center text-gray-500">
                       <XIcon className="w-5 h-5 mr-3 flex-shrink-0" />
@@ -229,7 +230,7 @@ export default function PlansPagePT() {
                     </li>
                     <li className="flex items-center text-gray-300">
                       <CheckIcon className="w-5 h-5 mr-3 flex-shrink-0" />
-                      KPIs de estratégia 
+                      KPIs de estratégia
                     </li>
                     <li className="flex items-center text-gray-300">
                       <CheckIcon className="w-5 h-5 mr-3 flex-shrink-0" />
@@ -290,6 +291,7 @@ export default function PlansPagePT() {
             </div>
           </div>
         </main>
+        <FooterPT />
       </div>
     </PublicRoute>
   )

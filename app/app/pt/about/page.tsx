@@ -1,5 +1,6 @@
 import PublicRoute from '../../../components/auth/PublicRoute'
 import Navbar from '../../../components/layout/Navbar'
+import FooterPT from '@/components/layout/FooterPT'
 
 export default function AboutPagePT() {
   return (
@@ -83,6 +84,7 @@ export default function AboutPagePT() {
             </div>
           </div>
         </main>
+        <FooterPT />
       </div>
     </PublicRoute>
   )

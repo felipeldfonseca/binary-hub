@@ -3,6 +3,7 @@ import Navbar from '../../components/layout/Navbar'
 import FAQSection from '@/components/layout/FAQSection'
 import CheckIcon from '@/components/icons/CheckIcon'
 import XIcon from '@/components/icons/XIcon'
+import Footer from '@/components/layout/Footer'
 
 export default function PlansPage() {
   return (
@@ -10,7 +11,7 @@ export default function PlansPage() {
       <div className="min-h-screen bg-background">
         {/* Navbar */}
         <Navbar />
-        
+
         {/* Main Content */}
         <main className="pt-32 pb-16">
           <div className="container mx-auto px-4 sm:px-8 lg:px-12">
@@ -72,10 +73,10 @@ export default function PlansPage() {
                       <CheckIcon className="w-5 h-5 mr-3 flex-shrink-0" />
                       Priority support: Community
                     </li>
-                    
+
                     {/* Divider */}
                     <div className="border-t border-gray-600 my-4"></div>
-                    
+
                     {/* Unavailable Features */}
                     <li className="flex items-center text-gray-500">
                       <XIcon className="w-5 h-5 mr-3 flex-shrink-0" />
@@ -177,10 +178,10 @@ export default function PlansPage() {
                       <CheckIcon className="w-5 h-5 mr-3 flex-shrink-0" />
                       Free trial: 14 days
                     </li>
-                    
+
                     {/* Divider */}
                     <div className="border-t border-gray-600 my-4"></div>
-                    
+
                     {/* Unavailable Features */}
                     <li className="flex items-center text-gray-500">
                       <XIcon className="w-5 h-5 mr-3 flex-shrink-0" />
@@ -227,7 +228,7 @@ export default function PlansPage() {
                     </li>
                     <li className="flex items-center text-gray-300">
                       <CheckIcon className="w-5 h-5 mr-3 flex-shrink-0" />
-                      Strategy KPIs 
+                      Strategy KPIs
                     </li>
                     <li className="flex items-center text-gray-300">
                       <CheckIcon className="w-5 h-5 mr-3 flex-shrink-0" />
@@ -288,6 +289,7 @@ export default function PlansPage() {
             </div>
           </div>
         </main>
+        <Footer />
       </div>
     </PublicRoute>
   )

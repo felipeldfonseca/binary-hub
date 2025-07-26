@@ -211,7 +211,7 @@ export default function Navbar() {
                       <>
                         <button
                           onClick={handleSettingsClick}
-                          className={`settings-button nav-link ${navButtonSpacing} py-1 rounded-full text-sm transition-all duration-300 ${
+                          className={`settings-button nav-link ${navButtonSpacing} py-1 rounded-full text-sm transition-all duration-300 font-montserrat font-bold ${
                             isSettingsOpen 
                               ? 'active bg-black/20 text-black font-medium' 
                               : 'text-gray-800 hover:bg-black/10 hover:text-black'
@@ -294,17 +294,17 @@ export default function Navbar() {
                         href={item.url}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className={`nav-link ${navButtonSpacing} py-1 rounded-full text-sm transition-all duration-300 text-gray-800 hover:bg-black/10 hover:text-black`}
+                        className={`nav-link ${navButtonSpacing} py-1 rounded-full text-sm transition-all duration-300 text-gray-800 hover:bg-black/10 hover:text-black font-montserrat font-bold`}
                       >
                         {item.label}
                       </a>
                     ) : (
                   <Link
                     href={item.href}
-                    className={`nav-link ${navButtonSpacing} py-1 rounded-full text-sm transition-all duration-300 ${
+                    className={`nav-link ${navButtonSpacing} py-1 rounded-full text-sm transition-all duration-300 text-gray-800 hover:bg-black/10 hover:text-black font-montserrat font-bold ${
                       pathname === item.href 
                         ? 'active bg-black/20 text-black font-medium' 
-                        : 'text-gray-800 hover:bg-black/10 hover:text-black'
+                        : ''
                     }`}
                   >
                     {item.label}
@@ -321,13 +321,13 @@ export default function Navbar() {
                 <>
                   <Link
                     href="/auth/login"
-                    className="px-6 py-2 rounded-full border border-primary text-primary bg-transparent font-medium text-sm mr-2 transition-all duration-200 hover:bg-primary/10"
+                    className="px-6 py-2 rounded-full border border-primary text-primary bg-transparent font-montserrat font-bold text-sm mr-2 transition-all duration-200 hover:bg-primary/10"
                   >
                     {isPortuguese ? 'Entrar' : 'Sign In'}
                   </Link>
                   <Link
                     href="/auth/register"
-                    className="px-6 py-2 rounded-full bg-primary text-dark-background font-medium text-sm transition-all duration-200 hover:scale-105"
+                    className="px-6 py-2 rounded-full bg-primary text-dark-background font-montserrat font-bold text-sm transition-all duration-200 hover:scale-105"
                   >
                     {isPortuguese ? 'Cadastrar' : 'Sign Up'}
                   </Link>
@@ -399,7 +399,7 @@ export default function Navbar() {
                   <div>
                     <button
                       onClick={handleSettingsClick}
-                      className="settings-button nav-link block px-4 py-3 rounded-lg text-base transition-all duration-300 text-green-400 hover:bg-primary/10 w-full text-left"
+                      className="settings-button nav-link block px-4 py-3 rounded-lg text-base transition-all duration-300 text-green-400 hover:bg-primary/10 w-full text-left font-montserrat font-bold"
                     >
                       {item.label}
                     </button>
@@ -468,7 +468,7 @@ export default function Navbar() {
                     target="_blank"
                     rel="noopener noreferrer"
                     onClick={() => setIsMobileMenuOpen(false)}
-                    className="nav-link block px-4 py-3 rounded-lg text-base transition-all duration-300 text-green-400 hover:bg-primary/10"
+                    className="nav-link block px-4 py-3 rounded-lg text-base transition-all duration-300 text-green-400 hover:bg-primary/10 font-montserrat font-bold"
                   >
                     {item.label}
                   </a>
@@ -476,7 +476,7 @@ export default function Navbar() {
               <Link
                 href={item.href}
                 onClick={() => setIsMobileMenuOpen(false)}
-                className={`nav-link block px-4 py-3 rounded-lg text-base transition-all duration-300 ${
+                className={`nav-link block px-4 py-3 rounded-lg text-base transition-all duration-300 font-montserrat font-bold ${
                   pathname === item.href 
                     ? 'bg-primary/20 text-green-400 font-medium' 
                     : 'text-green-400 hover:bg-primary/10'
@@ -500,20 +500,20 @@ export default function Navbar() {
                 <Link
                   href="/profile"
                   onClick={() => setIsMobileMenuOpen(false)}
-                  className="nav-link block px-4 py-3 rounded-lg text-base transition-all duration-300 text-green-400 hover:bg-primary/10"
+                  className="nav-link block px-4 py-3 rounded-lg text-base transition-all duration-300 text-green-400 hover:bg-primary/10 font-montserrat font-bold"
                 >
                   Your Profile
                 </Link>
                 <Link
                   href="/settings"
                   onClick={() => setIsMobileMenuOpen(false)}
-                  className="nav-link block px-4 py-3 rounded-lg text-base transition-all duration-300 text-green-400 hover:bg-primary/10"
+                  className="nav-link block px-4 py-3 rounded-lg text-base transition-all duration-300 text-green-400 hover:bg-primary/10 font-montserrat font-bold"
                 >
                   Settings
                 </Link>
                 <button
                   onClick={handleLogout}
-                  className="w-full text-left px-4 py-3 rounded-lg text-base transition-all duration-300 text-red-400 hover:bg-red-500/10"
+                  className="w-full text-left px-4 py-3 rounded-lg text-base transition-all duration-300 text-red-400 hover:bg-red-500/10 font-montserrat font-bold"
                 >
                   Sign Out
                 </button>
