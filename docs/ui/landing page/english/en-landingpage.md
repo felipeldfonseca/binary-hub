@@ -57,7 +57,7 @@ CTA secondary → **See how it works**
 | Feature / Plan          | **Free**            | **Premium**         |
 |-------------------------|---------------------|---------------------|
 | Trade import            | ✔ Manual, CSV & API | ✔ Manual, CSV & API |
-| Basic KPIs              | ✔                   | ✔                   |
+| Basic KPIs              | ✔                   | ✔ + Strategy KPIs   |
 | AI Reports              | **Weekly**          | **Daily**           |
 | Trade limit             | 100 imports / month | ∞ (unlimited)       |
 | Price                   | **$0**              | **$19 / month**     |

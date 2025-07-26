@@ -13,13 +13,13 @@ Save it as `docs/ui/landing_page.pt.md`.
 
 ```
 
-Domine sua vantagem.
-Negocie como um profissional.
+Domine suas estratégias.
+Opere como um profissional.
 
 ```
 
 *Acompanhe todas as métricas essenciais em um só lugar.  
-Conheça seu trading como nunca antes.*
+Conheça seu operacional como nunca antes.*
 
 [ **Conheça nossos planos premium** ]( /plans ) ▸ *rounded-full, fundo verde*
 
@@ -27,11 +27,13 @@ Conheça seu trading como nunca antes.*
 
 ## 2. Como Funciona  `#como-funciona`
 
+Titulo: "Do Caos à Clareza."
+
 | Passo | Ícone      | Título & Descrição                                                               |
 |-------|-----------|----------------------------------------------------------------------------------|
-| 1     | `Upload`  | **Conecte & Importe** – Envie um CSV ou registre operações em segundos.           |
+| 1     | `Upload`  | **Conecte & Importe** – Envie um CSV para registrar suas operações em segundos.           |
 | 2     | `BarChart`| **Analise suas operações** – KPIs e gráficos automáticos, ajustados ao período.    |
-| 3     | `Brain`   | **Evolua** – A IA revela padrões e envia relatórios completos diariamente.        |
+| 3     | `Brain`   | **Evolua mais rápido** – A IA revela padrões e envia relatórios completos diariamente.        |
 
 > Layout: 3 cards iguais, centralizados; fonte Montserrat Light 300.
 
@@ -39,18 +41,16 @@ Conheça seu trading como nunca antes.*
 
 ## 3. Nossa Missão (resumida)  `#missao`
 
-> *“Empoderar cada trader de opções binárias a operar com a mesma ciência de dados disponível aos grandes players do mercado tradicional.”*
+> *“Binary Hub capacita todos os negociadores de opções binárias a operar com a mesma ciência de dados disponível para grandes players nos mercados tradicionais.”*
 
 Link: **[Saiba mais]( /about )**
 
 ---
 
-## 4. Destaque de Funcionalidade-chave  `#funcionalidade-chave`
+## 4. Destaque de Funcionalidade-chave `#funcionalidade-chave`
 
-| ![mock-screenshot](/img/ai-report-mock.png) | **Seu Relatório Diário com a IA mais poderosa do mercado**  <br> • Visão completa de performance  <br> • Análise de estratégia  <br> • Detecção de padrões |
+| ![mock-screenshot](/img/ai-report-mock.png) | **Seu relatório diário feito com a IA mais poderosa do mundo.**  <br> • Análise de Estratégias  <br> • Detecção de Padrões  <br> • Visão Geral do Desempenho |
 |--------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------|
-
-CTA secundário → **Veja como funciona**
 
 ---
 
@@ -60,9 +60,11 @@ CTA secundário → **Veja como funciona**
 |----------------------------|---------------------------|----------------------------|
 | Importação de trades       | ✔ Manual, CSV & API       | ✔ Manual, CSV & API        |
 | KPIs básicos               | ✔                         | ✔                          |
+| KPIs de estratégia         |                           | ✔                          |
 | Relatórios de IA           | Semanais                  | **Diários**                |
-| Limite de trades           | 100 registros / mês       | ∞ (ilimitado)              |
-| Preço                      | **R$ 0**                  | **a partir de R$ 97 / mês**|
+| Limite de trades           | 100 registros / mês       | Ilimitado                  |
+| Teste gratuito             |                           | Teste gratuito por 14 dias |
+| Preço                      | **R$ 0**                  | **R$ 97 / mês**            |
 
 [ **Ver planos completos** ]( /plans )
 
@@ -70,20 +72,22 @@ CTA secundário → **Veja como funciona**
 
 ## 6. Carrossel de Depoimentos  `#depoimentos`
 
+Título: "Onde o foco no processo compensa."
+
 ```text
 “Finalmente entendi por que estava perdendo dinheiro.” — @traderJP
 “Minha win rate subiu 12 % em duas semanas.” — @anaOptions
-…outros depoimentos em rotação
+"Os insights de dados que recebo mudaram completamente minha assertividade." - @cryptoTrader
+"Finalmente tenho clareza sobre meu desempenho nas negociações." — @dayTraderPro
+"Esta ferramenta me ajudou a identificar minhas maiores fraquezas." — @swingTrader
 ```
-
-Implementado com Swiper.js (autoplay 6 s, loop).
 
 ---
 
 ## 7. Chamada de Alto Impacto + CTA  `#cta-final`
 
 ```
-Pare de adivinhar.  
+Pare de tentar adivinhar.  
 Comece a operar com dados.
 ```
 
