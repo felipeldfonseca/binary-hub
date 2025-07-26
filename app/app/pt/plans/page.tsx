@@ -18,9 +18,9 @@ export default function PlansPagePT() {
               {/* Hero Section */}
               <div className="text-center mb-16">
                               <h1 className="text-3xl md:text-4xl lg:text-5xl font-poly font-bold text-white mb-6">
-                Escolha o plano que impulsiona <span className="text-primary">sua jornada de trading</span>
-              </h1>
-                <p className="text-xl font-montserrat font-semibold text-white max-w-3xl mx-auto">
+                  Escolha o plano que impulsiona sua <span className="text-primary">jornada como trader</span>
+                </h1>
+                <p className="text-xl font-montserrat font-normal text-white">
                   <span className="text-primary">Comece grátis.</span> Desbloqueie análises premium quando estiver pronto.
                 </p>
               </div>

@@ -13,31 +13,25 @@ export default function AboutPage() {
           <div className="container mx-auto px-4 sm:px-8 lg:px-12">
             <div className="max-w-4xl mx-auto">
               {/* Hero Section */}
-              <div className="text-center mb-16">
-                <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-white mb-6">
+              <div className="text-left mb-16">
+                <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-white mb-6 font-poly">
                   About <span className="text-primary">Binary Hub</span>
                 </h1>
-                <p className="text-xl text-gray-300 max-w-3xl mx-auto">
-                  Empowering traders with intelligent insights and comprehensive journaling tools
-                </p>
               </div>
 
               {/* Content Sections */}
               <div className="space-y-16">
                 {/* Mission Section */}
                 <section>
-                  <h2 className="text-3xl font-bold text-white mb-8">Our Mission</h2>
+                  <h2 className="text-3xl font-bold text-white mb-8 font-poly">Our Mission</h2>
                   <p className="text-lg text-gray-300 leading-relaxed">
-                    Binary Hub was created with a simple mission: to help traders make better decisions 
-                    through comprehensive journaling, advanced analytics, and AI-powered insights. 
-                    We believe that successful trading is not just about making the right trades, 
-                    but about understanding your patterns, learning from your mistakes, and continuously improving.
+                    To empower binary options traders to make better, more consistent decisions through professional portfolio management tools, comprehensive journaling, advanced analytics, and AI-driven insights. We believe that sustainable performance depends not only on successful entries, but also on understanding your patterns, learning from your mistakes, and continually evolving. Our goal is to transform data into clarity, discipline, and constant improvement, helping you structure your routine, measure what matters, and improve your results trade after trade.
                   </p>
                 </section>
 
                 {/* Features Section */}
                 <section>
-                  <h2 className="text-3xl font-bold text-white mb-8">What We Offer</h2>
+                  <h2 className="text-3xl font-bold text-white mb-8 font-poly">What We Offer</h2>
                   <div className="grid md:grid-cols-2 gap-8">
                     <div className="bg-gray-800/50 p-6 rounded-lg">
                       <h3 className="text-xl font-semibold text-primary mb-4">Smart Journaling</h3>
@@ -72,7 +66,7 @@ export default function AboutPage() {
 
                 {/* Team Section */}
                 <section>
-                  <h2 className="text-3xl font-bold text-white mb-8">Our Team</h2>
+                  <h2 className="text-3xl font-bold text-white mb-8 font-poly">Our Team</h2>
                   <p className="text-lg text-gray-300 leading-relaxed">
                     Binary Hub is built by traders, for traders. Our team combines years of 
                     trading experience with cutting-edge technology to create tools that actually 

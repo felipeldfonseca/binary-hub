@@ -13,31 +13,25 @@ export default function AboutPagePT() {
           <div className="container mx-auto px-4 sm:px-8 lg:px-12">
             <div className="max-w-4xl mx-auto">
               {/* Hero Section */}
-              <div className="text-center mb-16">
-                <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-white mb-6">
+              <div className="text-left mb-16">
+                <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-white mb-6 font-poly">
                   Sobre o <span className="text-primary">Binary Hub</span>
                 </h1>
-                <p className="text-xl text-gray-300 max-w-3xl mx-auto">
-                  Capacitando traders com insights inteligentes e ferramentas abrangentes de journaling
-                </p>
               </div>
 
               {/* Content Sections */}
               <div className="space-y-16">
                 {/* Mission Section */}
                 <section>
-                  <h2 className="text-3xl font-bold text-white mb-8">Nossa Missão</h2>
-                  <p className="text-lg text-gray-300 leading-relaxed">
-                    O Binary Hub foi criado com uma missão simples: ajudar traders a tomar melhores decisões 
-                    através de journaling abrangente, análises avançadas e insights alimentados por IA. 
-                    Acreditamos que o trading bem-sucedido não é apenas sobre fazer os trades certos, 
-                    mas sobre entender seus padrões, aprender com seus erros e melhorar continuamente.
+                  <h2 className="text-3xl font-bold text-white mb-8 font-poly">Nossa Missão</h2>
+                  <p className="text-lg text-white leading-relaxed">
+                    Capacitar traders de opções binárias a tomarem decisões melhores e consistentes por meio de ferramentas profissionais de gerenciamento de portfólio, journaling abrangente, análises avançadas e insights impulsionados por IA. Acreditamos que performance sustentável não depende apenas de acertar entradas, mas de entender seus padrões, aprender com os erros e evoluir continuamente. Nosso objetivo é transformar dados em clareza, disciplina e melhoria constante, ajudando você a estruturar sua rotina, medir o que importa e elevar seu resultado trade após trade.
                   </p>
                 </section>
 
                 {/* Features Section */}
                 <section>
-                  <h2 className="text-3xl font-bold text-white mb-8">O Que Oferecemos</h2>
+                  <h2 className="text-3xl font-bold text-white mb-8 font-poly">O Que Oferecemos</h2>
                   <div className="grid md:grid-cols-2 gap-8">
                     <div className="bg-gray-800/50 p-6 rounded-lg">
                       <h3 className="text-xl font-semibold text-primary mb-4">Journaling Inteligente</h3>
@@ -72,8 +66,8 @@ export default function AboutPagePT() {
 
                 {/* Team Section */}
                 <section>
-                  <h2 className="text-3xl font-bold text-white mb-8">Nossa Equipe</h2>
-                  <p className="text-lg text-gray-300 leading-relaxed">
+                  <h2 className="text-3xl font-bold text-white mb-8 font-poly">Nossa Equipe</h2>
+                  <p className="text-lg text-white leading-relaxed">
                     O Binary Hub é construído por traders, para traders. Nossa equipe combina anos de 
                     experiência em trading com tecnologia de ponta para criar ferramentas que realmente 
                     ajudam você a melhorar seu desempenho de trading.
