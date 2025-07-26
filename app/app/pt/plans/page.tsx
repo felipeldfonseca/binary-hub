@@ -24,7 +24,7 @@ export default function PlansPagePT() {
               </div>
 
               {/* Pricing Cards */}
-              <div className="grid md:grid-cols-3 gap-8 mb-16">
+              <div className="grid lg:grid-cols-3 gap-8 mb-16">
                 {/* Free Plan */}
                 <div className="bg-gray-800/50 p-8 rounded-lg border border-gray-700 flex flex-col h-full">
                   <div className="text-center mb-8">
@@ -32,7 +32,7 @@ export default function PlansPagePT() {
                     <div className="text-4xl font-bold text-primary mb-2">R$0</div>
                     <p className="text-gray-400">Sempre grátis</p>
                   </div>
-                  <ul className="space-y-4 mb-8 flex-1">
+                  <ul className="space-y-4 mb-8 flex-1 ml-4 mr-4">
                     {/* Available Features */}
                                     <li className="flex items-center text-gray-300">
                   <svg className="w-5 h-5 text-primary mr-3" fill="currentColor" viewBox="0 0 20 20">
@@ -148,7 +148,7 @@ export default function PlansPagePT() {
                     <div className="text-4xl font-bold text-primary mb-2">R$97</div>
                     <p className="text-gray-400">por mês</p>
                   </div>
-                  <ul className="space-y-4 mb-8 flex-1">
+                  <ul className="space-y-4 mb-8 flex-1 ml-4 mr-4">
                     {/* Available Features */}
                     <li className="flex items-center text-gray-300">
                       <svg className="w-5 h-5 text-primary mr-3" fill="currentColor" viewBox="0 0 20 20">
@@ -261,10 +261,10 @@ export default function PlansPagePT() {
                 <div className="bg-gray-800/50 p-8 rounded-lg border border-gray-700 flex flex-col h-full">
                   <div className="text-center mb-8">
                     <h3 className="text-2xl font-bold text-white mb-4 font-poly">Empresarial</h3>
-                    <div className="text-4xl font-bold text-primary mb-2">Personalizado</div>
+                    <div className="text-2xl font-bold text-primary mb-2">Personalizado</div>
                     <p className="text-gray-400">Entre em Contato</p>
                   </div>
-                  <ul className="space-y-4 mb-8 flex-1">
+                  <ul className="space-y-4 mb-8 flex-1 ml-4 mr-4">
                     {/* All Features Available */}
                     <li className="flex items-center text-gray-300">
                       <svg className="w-5 h-5 text-primary mr-3" fill="currentColor" viewBox="0 0 20 20">
