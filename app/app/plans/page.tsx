@@ -37,39 +37,39 @@ export default function PlansPage() {
                   <ul className="space-y-4 mb-8 flex-1 ml-4 mr-4">
                     {/* Available Features */}
                     <li className="flex items-center text-gray-300">
-                      <CheckIcon className="w-5 h-5 mr-3" />
+                      <CheckIcon className="w-5 h-5 mr-3 flex-shrink-0" />
                       Record 100 trades / month
                     </li>
                     <li className="flex items-center text-gray-300">
-                      <CheckIcon className="w-5 h-5 mr-3" />
+                      <CheckIcon className="w-5 h-5 mr-3 flex-shrink-0" />
                       Manual journaling
                     </li>
                     <li className="flex items-center text-gray-300">
-                      <CheckIcon className="w-5 h-5 mr-3" />
+                      <CheckIcon className="w-5 h-5 mr-3 flex-shrink-0" />
                       CSV import (Ebinex)
                     </li>
                     <li className="flex items-center text-gray-300">
-                      <CheckIcon className="w-5 h-5 mr-3" />
+                      <CheckIcon className="w-5 h-5 mr-3 flex-shrink-0" />
                       Basic KPIs (Win Rate, Net P&L, Result)
                     </li>
                     <li className="flex items-center text-gray-300">
-                      <CheckIcon className="w-5 h-5 mr-3" />
+                      <CheckIcon className="w-5 h-5 mr-3 flex-shrink-0" />
                       Performance Heatmap
                     </li>
                     <li className="flex items-center text-gray-300">
-                      <CheckIcon className="w-5 h-5 mr-3" />
+                      <CheckIcon className="w-5 h-5 mr-3 flex-shrink-0" />
                       Weekly AI insights
                     </li>
                     <li className="flex items-center text-gray-300">
-                      <CheckIcon className="w-5 h-5 mr-3" />
+                      <CheckIcon className="w-5 h-5 mr-3 flex-shrink-0" />
                       Economic calendar: High-impact events
                     </li>
                     <li className="flex items-center text-gray-300">
-                      <CheckIcon className="w-5 h-5 mr-3" />
+                      <CheckIcon className="w-5 h-5 mr-3 flex-shrink-0" />
                       Data export: CSV
                     </li>
                     <li className="flex items-center text-gray-300">
-                      <CheckIcon className="w-5 h-5 mr-3" />
+                      <CheckIcon className="w-5 h-5 mr-3 flex-shrink-0" />
                       Priority support: Community
                     </li>
                     
@@ -78,27 +78,27 @@ export default function PlansPage() {
                     
                     {/* Unavailable Features */}
                     <li className="flex items-center text-gray-500">
-                      <XIcon className="w-5 h-5 mr-3" />
+                      <XIcon className="w-5 h-5 mr-3 flex-shrink-0" />
                       API integrations
                     </li>
                     <li className="flex items-center text-gray-500">
-                      <XIcon className="w-5 h-5 mr-3" />
+                      <XIcon className="w-5 h-5 mr-3 flex-shrink-0" />
                       Advanced analytics
                     </li>
                     <li className="flex items-center text-gray-500">
-                      <XIcon className="w-5 h-5 mr-3" />
+                      <XIcon className="w-5 h-5 mr-3 flex-shrink-0" />
                       Strategy KPIs
                     </li>
                     <li className="flex items-center text-gray-500">
-                      <XIcon className="w-5 h-5 mr-3" />
+                      <XIcon className="w-5 h-5 mr-3 flex-shrink-0" />
                       Edge Report PDF
                     </li>
                     <li className="flex items-center text-gray-500">
-                      <XIcon className="w-5 h-5 mr-3" />
+                      <XIcon className="w-5 h-5 mr-3 flex-shrink-0" />
                       Custom dashboards
                     </li>
                     <li className="flex items-center text-gray-500">
-                      <XIcon className="w-5 h-5 mr-3" />
+                      <XIcon className="w-5 h-5 mr-3 flex-shrink-0" />
                       Team management
                     </li>
                   </ul>
@@ -122,59 +122,59 @@ export default function PlansPage() {
                   <ul className="space-y-4 mb-8 flex-1 ml-4 mr-4">
                     {/* Available Features */}
                     <li className="flex items-center text-gray-300">
-                      <CheckIcon className="w-5 h-5 mr-3" />
+                      <CheckIcon className="w-5 h-5 mr-3 flex-shrink-0" />
                       Unlimited
                     </li>
                     <li className="flex items-center text-gray-300">
-                      <CheckIcon className="w-5 h-5 mr-3" />
+                      <CheckIcon className="w-5 h-5 mr-3 flex-shrink-0" />
                       Manual journaling
                     </li>
                     <li className="flex items-center text-gray-300">
-                      <CheckIcon className="w-5 h-5 mr-3" />
+                      <CheckIcon className="w-5 h-5 mr-3 flex-shrink-0" />
                       CSV import (Ebinex)
                     </li>
                     <li className="flex items-center text-gray-300">
-                      <CheckIcon className="w-5 h-5 mr-3" />
+                      <CheckIcon className="w-5 h-5 mr-3 flex-shrink-0" />
                       Basic KPIs (Win Rate, Net P&L, Result)
                     </li>
                     <li className="flex items-center text-gray-300">
-                      <CheckIcon className="w-5 h-5 mr-3" />
+                      <CheckIcon className="w-5 h-5 mr-3 flex-shrink-0" />
                       Advanced analytics
                     </li>
                     <li className="flex items-center text-gray-300">
-                      <CheckIcon className="w-5 h-5 mr-3" />
+                      <CheckIcon className="w-5 h-5 mr-3 flex-shrink-0" />
                       Strategy KPIs
                     </li>
                     <li className="flex items-center text-gray-300">
-                      <CheckIcon className="w-5 h-5 mr-3" />
+                      <CheckIcon className="w-5 h-5 mr-3 flex-shrink-0" />
                       Performance Heatmap
                     </li>
                     <li className="flex items-center text-gray-300">
-                      <CheckIcon className="w-5 h-5 mr-3" />
+                      <CheckIcon className="w-5 h-5 mr-3 flex-shrink-0" />
                       Daily AI insights
                     </li>
                     <li className="flex items-center text-gray-300">
-                      <CheckIcon className="w-5 h-5 mr-3" />
+                      <CheckIcon className="w-5 h-5 mr-3 flex-shrink-0" />
                       Edge Report PDF
                     </li>
                     <li className="flex items-center text-gray-300">
-                      <CheckIcon className="w-5 h-5 mr-3" />
+                      <CheckIcon className="w-5 h-5 mr-3 flex-shrink-0" />
                       Economic calendar: All events + filters
                     </li>
                     <li className="flex items-center text-gray-300">
-                      <CheckIcon className="w-5 h-5 mr-3" />
+                      <CheckIcon className="w-5 h-5 mr-3 flex-shrink-0" />
                       Custom dashboards: 2
                     </li>
                     <li className="flex items-center text-gray-300">
-                      <CheckIcon className="w-5 h-5 mr-3" />
+                      <CheckIcon className="w-5 h-5 mr-3 flex-shrink-0" />
                       Data export: CSV · Excel · JSON
                     </li>
                     <li className="flex items-center text-gray-300">
-                      <CheckIcon className="w-5 h-5 mr-3" />
+                      <CheckIcon className="w-5 h-5 mr-3 flex-shrink-0" />
                       Priority support: Within 24h
                     </li>
                     <li className="flex items-center text-gray-300">
-                      <CheckIcon className="w-5 h-5 mr-3" />
+                      <CheckIcon className="w-5 h-5 mr-3 flex-shrink-0" />
                       Free trial: 14 days
                     </li>
                     
@@ -183,11 +183,11 @@ export default function PlansPage() {
                     
                     {/* Unavailable Features */}
                     <li className="flex items-center text-gray-500">
-                      <XIcon className="w-5 h-5 mr-3" />
+                      <XIcon className="w-5 h-5 mr-3 flex-shrink-0" />
                       API integrations
                     </li>
                     <li className="flex items-center text-gray-500">
-                      <XIcon className="w-5 h-5 mr-3" />
+                      <XIcon className="w-5 h-5 mr-3 flex-shrink-0" />
                       Team management
                     </li>
                   </ul>
@@ -206,71 +206,71 @@ export default function PlansPage() {
                   <ul className="space-y-4 mb-8 flex-1 ml-4 mr-4">
                     {/* All Features Available */}
                     <li className="flex items-center text-gray-300">
-                      <CheckIcon className="w-5 h-5 mr-3" />
+                      <CheckIcon className="w-5 h-5 mr-3 flex-shrink-0" />
                       Unlimited + auto-sync
                     </li>
                     <li className="flex items-center text-gray-300">
-                      <CheckIcon className="w-5 h-5 mr-3" />
+                      <CheckIcon className="w-5 h-5 mr-3 flex-shrink-0" />
                       Manual journaling
                     </li>
                     <li className="flex items-center text-gray-300">
-                      <CheckIcon className="w-5 h-5 mr-3" />
+                      <CheckIcon className="w-5 h-5 mr-3 flex-shrink-0" />
                       CSV import (Ebinex)
                     </li>
                     <li className="flex items-center text-gray-300">
-                      <CheckIcon className="w-5 h-5 mr-3" />
+                      <CheckIcon className="w-5 h-5 mr-3 flex-shrink-0" />
                       Basic KPIs (Win Rate, Net P&L, Result)
                     </li>
                     <li className="flex items-center text-gray-300">
-                      <CheckIcon className="w-5 h-5 mr-3" />
+                      <CheckIcon className="w-5 h-5 mr-3 flex-shrink-0" />
                       Advanced analytics
                     </li>
                     <li className="flex items-center text-gray-300">
-                      <CheckIcon className="w-5 h-5 mr-3" />
+                      <CheckIcon className="w-5 h-5 mr-3 flex-shrink-0" />
                       Strategy KPIs
                     </li>
                     <li className="flex items-center text-gray-300">
-                      <CheckIcon className="w-5 h-5 mr-3" />
+                      <CheckIcon className="w-5 h-5 mr-3 flex-shrink-0" />
                       Performance Heatmap
                     </li>
                     <li className="flex items-center text-gray-300">
-                      <CheckIcon className="w-5 h-5 mr-3" />
+                      <CheckIcon className="w-5 h-5 mr-3 flex-shrink-0" />
                       Real-time AI insights
                     </li>
                     <li className="flex items-center text-gray-300">
-                      <CheckIcon className="w-5 h-5 mr-3" />
+                      <CheckIcon className="w-5 h-5 mr-3 flex-shrink-0" />
                       Edge Report PDF (white-label)
                     </li>
                     <li className="flex items-center text-gray-300">
-                      <CheckIcon className="w-5 h-5 mr-3" />
+                      <CheckIcon className="w-5 h-5 mr-3 flex-shrink-0" />
                       Economic calendar: All + team alerts
                     </li>
                     <li className="flex items-center text-gray-300">
-                      <CheckIcon className="w-5 h-5 mr-3" />
+                      <CheckIcon className="w-5 h-5 mr-3 flex-shrink-0" />
                       Custom dashboards: Unlimited
                     </li>
                     <li className="flex items-center text-gray-300">
-                      <CheckIcon className="w-5 h-5 mr-3" />
+                      <CheckIcon className="w-5 h-5 mr-3 flex-shrink-0" />
                       Team management (10+ users)
                     </li>
                     <li className="flex items-center text-gray-300">
-                      <CheckIcon className="w-5 h-5 mr-3" />
+                      <CheckIcon className="w-5 h-5 mr-3 flex-shrink-0" />
                       API integrations: All brokers + custom
                     </li>
                     <li className="flex items-center text-gray-300">
-                      <CheckIcon className="w-5 h-5 mr-3" />
+                      <CheckIcon className="w-5 h-5 mr-3 flex-shrink-0" />
                       Data export: API & Webhooks
                     </li>
                     <li className="flex items-center text-gray-300">
-                      <CheckIcon className="w-5 h-5 mr-3" />
+                      <CheckIcon className="w-5 h-5 mr-3 flex-shrink-0" />
                       Priority support: Dedicated CSM
                     </li>
                     <li className="flex items-center text-gray-300">
-                      <CheckIcon className="w-5 h-5 mr-3" />
+                      <CheckIcon className="w-5 h-5 mr-3 flex-shrink-0" />
                       Branding: Custom logo & colors
                     </li>
                     <li className="flex items-center text-gray-300">
-                      <CheckIcon className="w-5 h-5 mr-3" />
+                      <CheckIcon className="w-5 h-5 mr-3 flex-shrink-0" />
                       Free trial: Pilot project
                     </li>
                   </ul>

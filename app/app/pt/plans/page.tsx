@@ -37,39 +37,39 @@ export default function PlansPagePT() {
                   <ul className="space-y-4 mb-8 flex-1 ml-4 mr-4">
                     {/* Available Features */}
                                     <li className="flex items-center text-gray-300">
-                  <CheckIcon className="w-5 h-5 mr-3" />
+                  <CheckIcon className="w-5 h-5 mr-3 flex-shrink-0" />
                   Registre 100 trades / mês
                 </li>
                     <li className="flex items-center text-gray-300">
-                      <CheckIcon className="w-5 h-5 mr-3" />
+                      <CheckIcon className="w-5 h-5 mr-3 flex-shrink-0" />
                       Diário manual
                     </li>
                     <li className="flex items-center text-gray-300">
-                      <CheckIcon className="w-5 h-5 mr-3" />
+                      <CheckIcon className="w-5 h-5 mr-3 flex-shrink-0" />
                       Importação CSV (Ebinex)
                     </li>
                     <li className="flex items-center text-gray-300">
-                      <CheckIcon className="w-5 h-5 mr-3" />
+                      <CheckIcon className="w-5 h-5 mr-3 flex-shrink-0" />
                       KPIs básicos (Taxa de Acerto, P&L Líquido, Resultado)
                     </li>
                     <li className="flex items-center text-gray-300">
-                      <CheckIcon className="w-5 h-5 mr-3" />
+                      <CheckIcon className="w-5 h-5 mr-3 flex-shrink-0" />
                       Mapa de Calor de Performance
                     </li>
                     <li className="flex items-center text-gray-300">
-                      <CheckIcon className="w-5 h-5 mr-3" />
+                      <CheckIcon className="w-5 h-5 mr-3 flex-shrink-0" />
                       Insights de IA Semanais
                     </li>
                     <li className="flex items-center text-gray-300">
-                      <CheckIcon className="w-5 h-5 mr-3" />
+                      <CheckIcon className="w-5 h-5 mr-3 flex-shrink-0" />
                       Calendário econômico: Eventos de alto impacto
                     </li>
                     <li className="flex items-center text-gray-300">
-                      <CheckIcon className="w-5 h-5 mr-3" />
+                      <CheckIcon className="w-5 h-5 mr-3 flex-shrink-0" />
                       Exportação de dados: CSV
                     </li>
                     <li className="flex items-center text-gray-300">
-                      <CheckIcon className="w-5 h-5 mr-3" />
+                      <CheckIcon className="w-5 h-5 mr-3 flex-shrink-0" />
                       Suporte prioritário: Comunidade
                     </li>
                     
@@ -78,27 +78,27 @@ export default function PlansPagePT() {
                     
                     {/* Unavailable Features */}
                     <li className="flex items-center text-gray-500">
-                      <XIcon className="w-5 h-5 mr-3" />
+                      <XIcon className="w-5 h-5 mr-3 flex-shrink-0" />
                       Integrações API
                     </li>
                     <li className="flex items-center text-gray-500">
-                      <XIcon className="w-5 h-5 mr-3" />
+                      <XIcon className="w-5 h-5 mr-3 flex-shrink-0" />
                       Análises avançadas
                     </li>
                     <li className="flex items-center text-gray-500">
-                      <XIcon className="w-5 h-5 mr-3" />
+                      <XIcon className="w-5 h-5 mr-3 flex-shrink-0" />
                       KPIs de estratégia
                     </li>
                     <li className="flex items-center text-gray-500">
-                      <XIcon className="w-5 h-5 mr-3" />
+                      <XIcon className="w-5 h-5 mr-3 flex-shrink-0" />
                       Relatório Edge PDF
                     </li>
                     <li className="flex items-center text-gray-500">
-                      <XIcon className="w-5 h-5 mr-3" />
+                      <XIcon className="w-5 h-5 mr-3 flex-shrink-0" />
                       Dashboards personalizados
                     </li>
                     <li className="flex items-center text-gray-500">
-                      <XIcon className="w-5 h-5 mr-3" />
+                      <XIcon className="w-5 h-5 mr-3 flex-shrink-0" />
                       Gerenciamento de equipe
                     </li>
 
@@ -123,59 +123,59 @@ export default function PlansPagePT() {
                   <ul className="space-y-4 mb-8 flex-1 ml-4 mr-4">
                     {/* Available Features */}
                     <li className="flex items-center text-gray-300">
-                      <CheckIcon className="w-5 h-5 mr-3" />
+                      <CheckIcon className="w-5 h-5 mr-3 flex-shrink-0" />
                       Ilimitado
                     </li>
                     <li className="flex items-center text-gray-300">
-                      <CheckIcon className="w-5 h-5 mr-3" />
+                      <CheckIcon className="w-5 h-5 mr-3 flex-shrink-0" />
                       Diário manual
                     </li>
                     <li className="flex items-center text-gray-300">
-                      <CheckIcon className="w-5 h-5 mr-3" />
+                      <CheckIcon className="w-5 h-5 mr-3 flex-shrink-0" />
                       Importação CSV (Ebinex)
                     </li>
                     <li className="flex items-center text-gray-300">
-                      <CheckIcon className="w-5 h-5 mr-3" />
+                      <CheckIcon className="w-5 h-5 mr-3 flex-shrink-0" />
                       KPIs básicos (Taxa de Acerto, P&L Líquido, Resultado)
                     </li>
                     <li className="flex items-center text-gray-300">
-                      <CheckIcon className="w-5 h-5 mr-3" />
+                      <CheckIcon className="w-5 h-5 mr-3 flex-shrink-0" />
                       Análises avançadas
                     </li>
                     <li className="flex items-center text-gray-300">
-                      <CheckIcon className="w-5 h-5 mr-3" />
+                      <CheckIcon className="w-5 h-5 mr-3 flex-shrink-0" />
                       KPIs de estratégia
                     </li>
                     <li className="flex items-center text-gray-300">
-                      <CheckIcon className="w-5 h-5 mr-3" />
+                      <CheckIcon className="w-5 h-5 mr-3 flex-shrink-0" />
                       Mapa de Calor de Performance
                     </li>
                     <li className="flex items-center text-gray-300">
-                      <CheckIcon className="w-5 h-5 mr-3" />
+                      <CheckIcon className="w-5 h-5 mr-3 flex-shrink-0" />
                       Insights de IA Diários
                     </li>
                     <li className="flex items-center text-gray-300">
-                      <CheckIcon className="w-5 h-5 mr-3" />
+                      <CheckIcon className="w-5 h-5 mr-3 flex-shrink-0" />
                       Relatório Edge PDF
                     </li>
                     <li className="flex items-center text-gray-300">
-                      <CheckIcon className="w-5 h-5 mr-3" />
+                      <CheckIcon className="w-5 h-5 mr-3 flex-shrink-0" />
                       Calendário econômico: Todos os eventos + filtros
                     </li>
                     <li className="flex items-center text-gray-300">
-                      <CheckIcon className="w-5 h-5 mr-3" />
+                      <CheckIcon className="w-5 h-5 mr-3 flex-shrink-0" />
                       Dashboards personalizados: 2
                     </li>
                     <li className="flex items-center text-gray-300">
-                      <CheckIcon className="w-5 h-5 mr-3" />
+                      <CheckIcon className="w-5 h-5 mr-3 flex-shrink-0" />
                       Exportação de dados: CSV · Excel · JSON
                     </li>
                     <li className="flex items-center text-gray-300">
-                      <CheckIcon className="w-5 h-5 mr-3" />
+                      <CheckIcon className="w-5 h-5 mr-3 flex-shrink-0" />
                       Suporte prioritário: Em até 24h
                     </li>
                     <li className="flex items-center text-gray-300">
-                      <CheckIcon className="w-5 h-5 mr-3" />
+                      <CheckIcon className="w-5 h-5 mr-3 flex-shrink-0" />
                       Teste gratuito: 14 dias
                     </li>
                     
@@ -184,11 +184,11 @@ export default function PlansPagePT() {
                     
                     {/* Unavailable Features */}
                     <li className="flex items-center text-gray-500">
-                      <XIcon className="w-5 h-5 mr-3" />
+                      <XIcon className="w-5 h-5 mr-3 flex-shrink-0" />
                       Integrações API
                     </li>
                     <li className="flex items-center text-gray-500">
-                      <XIcon className="w-5 h-5 mr-3" />
+                      <XIcon className="w-5 h-5 mr-3 flex-shrink-0" />
                       Gerenciamento de equipe
                     </li>
                   </ul>
@@ -207,72 +207,72 @@ export default function PlansPagePT() {
                   <ul className="space-y-4 mb-8 flex-1 ml-4 mr-4">
                     {/* All Features Available */}
                     <li className="flex items-center text-gray-300">
-                      <CheckIcon className="w-5 h-5 mr-3" />
+                      <CheckIcon className="w-5 h-5 mr-3 flex-shrink-0" />
                       Ilimitado + sincronização automática
                     </li>
                     <li className="flex items-center text-gray-300">
-                      <CheckIcon className="w-5 h-5 mr-3" />
+                      <CheckIcon className="w-5 h-5 mr-3 flex-shrink-0" />
                       Diário manual
                     </li>
                     <li className="flex items-center text-gray-300">
-                      <CheckIcon className="w-5 h-5 mr-3" />
+                      <CheckIcon className="w-5 h-5 mr-3 flex-shrink-0" />
                       Importação CSV (Ebinex)
                     </li>
 
                     <li className="flex items-center text-gray-300">
-                      <CheckIcon className="w-5 h-5 mr-3" />
+                      <CheckIcon className="w-5 h-5 mr-3 flex-shrink-0" />
                       KPIs básicos (Taxa de Acerto, P&L Líquido, Resultado)
                     </li>
                     <li className="flex items-center text-gray-300">
-                      <CheckIcon className="w-5 h-5 mr-3" />
+                      <CheckIcon className="w-5 h-5 mr-3 flex-shrink-0" />
                       Análises avançadas
                     </li>
                     <li className="flex items-center text-gray-300">
-                      <CheckIcon className="w-5 h-5 mr-3" />
+                      <CheckIcon className="w-5 h-5 mr-3 flex-shrink-0" />
                       KPIs de estratégia 
                     </li>
                     <li className="flex items-center text-gray-300">
-                      <CheckIcon className="w-5 h-5 mr-3" />
+                      <CheckIcon className="w-5 h-5 mr-3 flex-shrink-0" />
                       Mapa de Calor de Performance
                     </li>
                     <li className="flex items-center text-gray-300">
-                      <CheckIcon className="w-5 h-5 mr-3" />
+                      <CheckIcon className="w-5 h-5 mr-3 flex-shrink-0" />
                       Insights de IA em tempo real
                     </li>
                     <li className="flex items-center text-gray-300">
-                      <CheckIcon className="w-5 h-5 mr-3" />
+                      <CheckIcon className="w-5 h-5 mr-3 flex-shrink-0" />
                       Relatório Edge PDF (white-label)
                     </li>
                     <li className="flex items-center text-gray-300">
-                      <CheckIcon className="w-5 h-5 mr-3" />
+                      <CheckIcon className="w-5 h-5 mr-3 flex-shrink-0" />
                       Calendário econômico: Todos + alertas da equipe
                     </li>
                     <li className="flex items-center text-gray-300">
-                      <CheckIcon className="w-5 h-5 mr-3" />
+                      <CheckIcon className="w-5 h-5 mr-3 flex-shrink-0" />
                       Dashboards personalizados: Ilimitados
                     </li>
                     <li className="flex items-center text-gray-300">
-                      <CheckIcon className="w-5 h-5 mr-3" />
+                      <CheckIcon className="w-5 h-5 mr-3 flex-shrink-0" />
                       Gerenciamento de equipe (10+ usuários)
                     </li>
                     <li className="flex items-center text-gray-300">
-                      <CheckIcon className="w-5 h-5 mr-3" />
+                      <CheckIcon className="w-5 h-5 mr-3 flex-shrink-0" />
                       Integrações API: Todas as corretoras + personalizadas
                     </li>
                     <li className="flex items-center text-gray-300">
-                      <CheckIcon className="w-5 h-5 mr-3" />
+                      <CheckIcon className="w-5 h-5 mr-3 flex-shrink-0" />
                       Exportação de dados: API & Webhooks
                     </li>
                     <li className="flex items-center text-gray-300">
-                      <CheckIcon className="w-5 h-5 mr-3" />
+                      <CheckIcon className="w-5 h-5 mr-3 flex-shrink-0" />
                       Suporte prioritário: CSM dedicado
                     </li>
                     <li className="flex items-center text-gray-300">
-                      <CheckIcon className="w-5 h-5 mr-3" />
+                      <CheckIcon className="w-5 h-5 mr-3 flex-shrink-0" />
                       Branding: Logo e cores personalizadas
                     </li>
                     <li className="flex items-center text-gray-300">
-                      <CheckIcon className="w-5 h-5 mr-3" />
+                      <CheckIcon className="w-5 h-5 mr-3 flex-shrink-0" />
                       Teste gratuito: Projeto piloto
                     </li>
                   </ul>

@@ -27,20 +27,24 @@ export default function PlansComparisonSectionPT() {
               </div>
               <ul className="space-y-4 mb-8">
                 <li className="flex items-center text-gray-300">
-                  <CheckIcon className="w-5 h-5 mr-3" />
+                  <CheckIcon className="w-5 h-5 mr-3 flex-shrink-0" />
                   Importação Manual & CSV
                 </li>
                 <li className="flex items-center text-gray-300">
-                  <CheckIcon className="w-5 h-5 mr-3" />
-                  Métricas Básicas
+                  <CheckIcon className="w-5 h-5 mr-3 flex-shrink-0" />
+                  KPIs Básicos
                 </li>
                 <li className="flex items-center text-gray-300">
-                  <CheckIcon className="w-5 h-5 mr-3" />
-                  Relatórios de IA Semanais
+                  <CheckIcon className="w-5 h-5 mr-3 flex-shrink-0" />
+                  Insights de IA Semanais
                 </li>
                 <li className="flex items-center text-gray-300">
-                  <CheckIcon className="w-5 h-5 mr-3" />
-                  100 Importações / mês
+                  <CheckIcon className="w-5 h-5 mr-3 flex-shrink-0" />
+                  Calendário Econômico
+                </li>
+                <li className="flex items-center text-gray-300">
+                  <CheckIcon className="w-5 h-5 mr-3 flex-shrink-0" />
+                  Eventos da Comunidade
                 </li>
               </ul>
             </div>
@@ -59,28 +63,36 @@ export default function PlansComparisonSectionPT() {
               </div>
               <ul className="space-y-4 mb-8">
                 <li className="flex items-center text-gray-300">
-                  <CheckIcon className="w-5 h-5 mr-3" />
+                  <CheckIcon className="w-5 h-5 mr-3 flex-shrink-0" />
                   Importação Manual & CSV
                 </li>
                 <li className="flex items-center text-gray-300">
-                  <CheckIcon className="w-5 h-5 mr-3" />
-                  Métricas Básicas
+                  <CheckIcon className="w-5 h-5 mr-3 flex-shrink-0" />
+                  KPIs Avançados
                 </li>
                 <li className="flex items-center text-gray-300">
-                  <CheckIcon className="w-5 h-5 mr-3" />
-                  Métricas de Estratégias
+                  <CheckIcon className="w-5 h-5 mr-3 flex-shrink-0" />
+                  Insights de IA Diários
                 </li>
                 <li className="flex items-center text-gray-300">
-                  <CheckIcon className="w-5 h-5 mr-3" />
-                  Relatórios de IA Diários
+                  <CheckIcon className="w-5 h-5 mr-3 flex-shrink-0" />
+                  Calendário Econômico Completo
                 </li>
                 <li className="flex items-center text-gray-300">
-                  <CheckIcon className="w-5 h-5 mr-3" />
-                  Importações Ilimitadas
+                  <CheckIcon className="w-5 h-5 mr-3 flex-shrink-0" />
+                  Dashboards Personalizados
                 </li>
                 <li className="flex items-center text-gray-300">
-                  <CheckIcon className="w-5 h-5 mr-3" />
-                  14 dias de teste grátis
+                  <CheckIcon className="w-5 h-5 mr-3 flex-shrink-0" />
+                  Exportação de Dados
+                </li>
+                <li className="flex items-center text-gray-300">
+                  <CheckIcon className="w-5 h-5 mr-3 flex-shrink-0" />
+                  Suporte Prioritário
+                </li>
+                <li className="flex items-center text-gray-300">
+                  <CheckIcon className="w-5 h-5 mr-3 flex-shrink-0" />
+                  Teste Gratuito de 14 Dias
                 </li>
               </ul>
             </div>
