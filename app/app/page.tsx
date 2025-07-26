@@ -35,7 +35,7 @@ export default function HomePage() {
           <SocialProofSection />
 
           {/* FAQ Section */}
-          <FAQSection />
+          <FAQSection variant="landing" />
 
       {/* CTA Section */}
       <section className="py-20 bg-primary">

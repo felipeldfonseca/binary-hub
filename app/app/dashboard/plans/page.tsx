@@ -382,7 +382,7 @@ export default function DashboardPlansPage() {
               </p>
 
               {/* FAQ Section */}
-              <FAQSection />
+              <FAQSection variant="plans" />
             </div>
           </div>
         </main>

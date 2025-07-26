@@ -32,7 +32,7 @@ export default function Navbar() {
   // Different navigation items for landing page vs dashboard
   const landingNavItems: NavItem[] = [
     { href: '/', label: 'Home' },
-    { href: '/about', label: 'About us' },
+    { href: '/about', label: 'About' },
     { href: '/plans', label: 'Plans' },
     { href: '/docs', label: 'Docs', external: true, url: 'https://github.com/your-repo' },
     { href: '#', label: 'Settings', isDropdown: true },

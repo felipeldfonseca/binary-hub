@@ -12,7 +12,7 @@ A página de planos em português é implementada em duas versões:
 **Componente**: Seção hero com título, descrição e informações adicionais
 
 #### Título
-- **Texto**: "Escolha o plano que impulsiona sua jornada de trading"
+- **Texto**: "Escolha o plano que impulsiona sua jornada como trader"
 - **Estilização**: 
   - Fonte: `font-poly` (família de fontes Poly)
   - Tamanho: `text-3xl md:text-4xl lg:text-5xl` (tamanho responsivo)

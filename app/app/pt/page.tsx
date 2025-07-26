@@ -6,7 +6,7 @@ import MissionSectionPT from '@/components/layout/MissionSectionPT'
 import KeyFeatureSectionPT from '@/components/layout/KeyFeatureSectionPT'
 import PlansComparisonSectionPT from '@/components/layout/PlansComparisonSectionPT'
 import SocialProofSectionPT from '@/components/layout/SocialProofSectionPT'
-import FAQSectionPT from '@/components/layout/FAQSectionPT'
+import FAQSection from '@/components/layout/FAQSection'
 import CTASectionPT from '@/components/layout/CTASectionPT'
 import FooterPT from '@/components/layout/FooterPT'
 import PublicRoute from '@/components/auth/PublicRoute'
@@ -23,7 +23,7 @@ export default function HomePagePT() {
           <KeyFeatureSectionPT />
           <PlansComparisonSectionPT />
           <SocialProofSectionPT />
-          <FAQSectionPT />
+          <FAQSection variant="landing" />
           <CTASectionPT />
         </main>
         <FooterPT />

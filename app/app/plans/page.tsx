@@ -380,7 +380,7 @@ export default function PlansPage() {
               </p>
 
               {/* FAQ Section */}
-              <FAQSection />
+              <FAQSection variant="plans" />
             </div>
           </div>
         </main>
