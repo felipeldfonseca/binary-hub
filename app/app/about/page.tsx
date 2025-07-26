@@ -24,7 +24,7 @@ export default function AboutPage() {
                 {/* Mission Section */}
                 <section>
                   <h2 className="text-3xl font-bold text-white mb-8 font-poly">Our Mission</h2>
-                  <p className="text-lg text-gray-300 leading-relaxed">
+                  <p className="text-lg text-white leading-relaxed">
                     To empower binary options traders to make better, more consistent decisions through professional portfolio management tools, comprehensive journaling, advanced analytics, and AI-driven insights. We believe that sustainable performance depends not only on successful entries, but also on understanding your patterns, learning from your mistakes, and continually evolving. Our goal is to transform data into clarity, discipline, and constant improvement, helping you structure your routine, measure what matters, and improve your results trade after trade.
                   </p>
                 </section>
@@ -67,7 +67,7 @@ export default function AboutPage() {
                 {/* Team Section */}
                 <section>
                   <h2 className="text-3xl font-bold text-white mb-8 font-poly">Our Team</h2>
-                  <p className="text-lg text-gray-300 leading-relaxed">
+                  <p className="text-lg text-white leading-relaxed">
                     Binary Hub is built by traders, for traders. Our team combines years of 
                     trading experience with cutting-edge technology to create tools that actually 
                     help you improve your trading performance.
