@@ -14,7 +14,7 @@ export default function AboutPage() {
             <div className="max-w-4xl mx-auto">
               {/* Hero Section */}
               <div className="text-left mb-16">
-                <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-white mb-6 font-poly">
+                <h1 className="hero-title text-4xl md:text-5xl lg:text-6xl font-bold text-white mb-6 font-poly">
                   About <span className="text-primary">Binary Hub</span>
                 </h1>
               </div>
@@ -24,8 +24,14 @@ export default function AboutPage() {
                 {/* Mission Section */}
                 <section>
                   <h2 className="text-3xl font-bold text-white mb-8 font-poly">Our Mission</h2>
+                  <p className="text-lg text-white leading-relaxed mb-6">
+                    To empower binary options traders to make better, more consistent decisions through professional portfolio management tools, comprehensive journaling, advanced analytics, and AI-driven insights.
+                  </p>
+                  <p className="text-lg text-white leading-relaxed mb-6">
+                    Our goal is to transform data into clarity, discipline, and constant improvement, helping you structure your routine, measure what matters, and improve your results trade after trade.
+                  </p>
                   <p className="text-lg text-white leading-relaxed">
-                    To empower binary options traders to make better, more consistent decisions through professional portfolio management tools, comprehensive journaling, advanced analytics, and AI-driven insights. We believe that sustainable performance depends not only on successful entries, but also on understanding your patterns, learning from your mistakes, and continually evolving. Our goal is to transform data into clarity, discipline, and constant improvement, helping you structure your routine, measure what matters, and improve your results trade after trade.
+                    We believe that sustainable performance depends not only on successful entries, but also on understanding your patterns, learning from your mistakes, and continually evolving.
                   </p>
                 </section>
 

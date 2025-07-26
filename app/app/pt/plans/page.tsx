@@ -17,7 +17,7 @@ export default function PlansPagePT() {
             <div className="max-w-6xl mx-auto">
               {/* Hero Section */}
               <div className="text-center mb-16">
-                              <h1 className="text-3xl md:text-4xl lg:text-5xl font-poly font-bold text-white mb-6">
+                              <h1 className="hero-title text-3xl md:text-4xl lg:text-5xl font-poly font-bold text-white mb-6">
                   Escolha o plano que impulsiona sua <span className="text-primary">jornada como trader</span>
                 </h1>
                 <p className="text-xl font-montserrat font-normal text-white">

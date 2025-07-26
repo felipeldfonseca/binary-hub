@@ -14,7 +14,7 @@ export default function AboutPagePT() {
             <div className="max-w-4xl mx-auto">
               {/* Hero Section */}
               <div className="text-left mb-16">
-                <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-white mb-6 font-poly">
+                <h1 className="hero-title text-4xl md:text-5xl lg:text-6xl font-bold text-white mb-6 font-poly">
                   Sobre o <span className="text-primary">Binary Hub</span>
                 </h1>
               </div>
@@ -24,8 +24,14 @@ export default function AboutPagePT() {
                 {/* Mission Section */}
                 <section>
                   <h2 className="text-3xl font-bold text-white mb-8 font-poly">Nossa Missão</h2>
+                  <p className="text-lg text-white leading-relaxed mb-6">
+                    Capacitar traders de opções binárias a tomarem decisões melhores e consistentes por meio de ferramentas profissionais de gerenciamento de portfólio, journaling abrangente, análises avançadas e insights impulsionados por IA.
+                  </p>
+                  <p className="text-lg text-white leading-relaxed mb-6">
+                    Nosso objetivo é transformar dados em clareza, disciplina e melhoria constante, ajudando você a estruturar sua rotina, medir o que importa e elevar seu resultado trade após trade.
+                  </p>
                   <p className="text-lg text-white leading-relaxed">
-                    Capacitar traders de opções binárias a tomarem decisões melhores e consistentes por meio de ferramentas profissionais de gerenciamento de portfólio, journaling abrangente, análises avançadas e insights impulsionados por IA. Acreditamos que performance sustentável não depende apenas de acertar entradas, mas de entender seus padrões, aprender com os erros e evoluir continuamente. Nosso objetivo é transformar dados em clareza, disciplina e melhoria constante, ajudando você a estruturar sua rotina, medir o que importa e elevar seu resultado trade após trade.
+                    Acreditamos que performance sustentável não depende apenas de acertar entradas, mas de entender seus padrões, aprender com os erros e evoluir continuamente.
                   </p>
                 </section>
 
