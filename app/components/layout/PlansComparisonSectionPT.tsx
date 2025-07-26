@@ -1,52 +1,45 @@
 import Link from 'next/link'
+import CheckIcon from '@/components/icons/CheckIcon'
 
 export default function PlansComparisonSectionPT() {
   return (
     <section className="py-20">
-      <div className="container mx-auto px-4">
-        <div className="max-w-4xl mx-auto">
-          {/* Title */}
-          <div className="text-center mb-12">
-            <h2 className="font-poly text-3xl font-bold text-text mb-4">
-              Escolha seu <span className="text-primary">Plano</span>
+      <div className="container mx-auto px-4 sm:px-8 lg:px-12">
+        <div className="max-w-6xl mx-auto">
+          {/* Section Header */}
+          <div className="text-center mb-16">
+            <h2 className="text-3xl md:text-4xl lg:text-5xl font-poly font-bold text-white mb-6">
+              Compare nossos <span className="text-primary">planos</span>
             </h2>
-            <p className="text-primary text-lg font-medium">
-              Comece sua jornada com o plano ideal para você
+            <p className="text-xl font-montserrat font-semibold text-white max-w-3xl mx-auto">
+              Escolha o plano que melhor se adapta às suas necessidades de trading
             </p>
           </div>
 
-          {/* Pricing Cards */}
+          {/* Plans Comparison */}
           <div className="grid md:grid-cols-2 gap-8 mb-12">
             {/* Free Plan */}
             <div className="bg-gray-800/50 p-8 rounded-lg border border-gray-700">
               <div className="text-center mb-8">
-                <h3 className="font-poly text-2xl font-bold text-white mb-4">Gratuito</h3>
+                <h3 className="font-poly text-2xl font-bold text-white mb-4">Grátis</h3>
                 <div className="text-4xl font-bold text-primary mb-2">R$ 0</div>
-                <p className="text-gray-400">Grátis para sempre</p>
+                <p className="text-gray-400">Sempre grátis</p>
               </div>
               <ul className="space-y-4 mb-8">
                 <li className="flex items-center text-gray-300">
-                  <svg className="w-5 h-5 text-primary mr-3" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                  </svg>
+                  <CheckIcon className="w-5 h-5 mr-3" />
                   Importação Manual & CSV
                 </li>
                 <li className="flex items-center text-gray-300">
-                  <svg className="w-5 h-5 text-primary mr-3" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                  </svg>
+                  <CheckIcon className="w-5 h-5 mr-3" />
                   Métricas Básicas
                 </li>
                 <li className="flex items-center text-gray-300">
-                  <svg className="w-5 h-5 text-primary mr-3" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                  </svg>
+                  <CheckIcon className="w-5 h-5 mr-3" />
                   Relatórios de IA Semanais
                 </li>
                 <li className="flex items-center text-gray-300">
-                  <svg className="w-5 h-5 text-primary mr-3" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                  </svg>
+                  <CheckIcon className="w-5 h-5 mr-3" />
                   100 Importações / mês
                 </li>
               </ul>
@@ -66,39 +59,27 @@ export default function PlansComparisonSectionPT() {
               </div>
               <ul className="space-y-4 mb-8">
                 <li className="flex items-center text-gray-300">
-                  <svg className="w-5 h-5 text-primary mr-3" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                  </svg>
+                  <CheckIcon className="w-5 h-5 mr-3" />
                   Importação Manual & CSV
                 </li>
                 <li className="flex items-center text-gray-300">
-                  <svg className="w-5 h-5 text-primary mr-3" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                  </svg>
+                  <CheckIcon className="w-5 h-5 mr-3" />
                   Métricas Básicas
                 </li>
                 <li className="flex items-center text-gray-300">
-                  <svg className="w-5 h-5 text-primary mr-3" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                  </svg>
+                  <CheckIcon className="w-5 h-5 mr-3" />
                   Métricas de Estratégias
                 </li>
                 <li className="flex items-center text-gray-300">
-                  <svg className="w-5 h-5 text-primary mr-3" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                  </svg>
+                  <CheckIcon className="w-5 h-5 mr-3" />
                   Relatórios de IA Diários
                 </li>
                 <li className="flex items-center text-gray-300">
-                  <svg className="w-5 h-5 text-primary mr-3" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                  </svg>
+                  <CheckIcon className="w-5 h-5 mr-3" />
                   Importações Ilimitadas
                 </li>
                 <li className="flex items-center text-gray-300">
-                  <svg className="w-5 h-5 text-primary mr-3" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                  </svg>
+                  <CheckIcon className="w-5 h-5 mr-3" />
                   14 dias de teste grátis
                 </li>
               </ul>

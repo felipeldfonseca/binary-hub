@@ -1,6 +1,8 @@
 import PublicRoute from '../../components/auth/PublicRoute'
 import Navbar from '../../components/layout/Navbar'
 import FAQSection from '@/components/layout/FAQSection'
+import CheckIcon from '@/components/icons/CheckIcon'
+import XIcon from '@/components/icons/XIcon'
 
 export default function PlansPage() {
   return (
@@ -15,11 +17,11 @@ export default function PlansPage() {
             <div className="max-w-6xl mx-auto">
               {/* Hero Section */}
               <div className="text-center mb-16">
-                              <h1 className="text-3xl md:text-4xl lg:text-5xl font-poly font-bold text-white mb-6">
-                Choose the plan that fuels <span className="text-primary">your trading journey</span>
-              </h1>
+                <h1 className="text-3xl md:text-4xl lg:text-5xl font-poly font-bold text-white mb-6">
+                  Choose the plan that powers your <span className="text-primary">trading journey</span>
+                </h1>
                 <p className="text-xl font-montserrat font-semibold text-white max-w-3xl mx-auto">
-                  <span className="text-primary">Start for free.</span> Unlock premium analytics whenever you're ready.
+                  <span className="text-primary">Start free.</span> Unlock premium insights when you're ready.
                 </p>
               </div>
 
@@ -34,58 +36,40 @@ export default function PlansPage() {
                   </div>
                   <ul className="space-y-4 mb-8 flex-1 ml-4 mr-4">
                     {/* Available Features */}
-                                    <li className="flex items-center text-gray-300">
-                  <svg className="w-5 h-5 text-primary mr-3" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                  </svg>
-                  Log 100 trades / month
-                </li>
                     <li className="flex items-center text-gray-300">
-                      <svg className="w-5 h-5 text-primary mr-3" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                      </svg>
-                      Manual journal
+                      <CheckIcon className="w-5 h-5 mr-3" />
+                      Record 100 trades / month
                     </li>
                     <li className="flex items-center text-gray-300">
-                      <svg className="w-5 h-5 text-primary mr-3" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                      </svg>
+                      <CheckIcon className="w-5 h-5 mr-3" />
+                      Manual journaling
+                    </li>
+                    <li className="flex items-center text-gray-300">
+                      <CheckIcon className="w-5 h-5 mr-3" />
                       CSV import (Ebinex)
                     </li>
                     <li className="flex items-center text-gray-300">
-                      <svg className="w-5 h-5 text-primary mr-3" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                      </svg>
+                      <CheckIcon className="w-5 h-5 mr-3" />
                       Basic KPIs (Win Rate, Net P&L, Result)
                     </li>
                     <li className="flex items-center text-gray-300">
-                      <svg className="w-5 h-5 text-primary mr-3" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                      </svg>
+                      <CheckIcon className="w-5 h-5 mr-3" />
                       Performance Heatmap
                     </li>
                     <li className="flex items-center text-gray-300">
-                      <svg className="w-5 h-5 text-primary mr-3" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                      </svg>
-                      Weekly AI Insights
+                      <CheckIcon className="w-5 h-5 mr-3" />
+                      Weekly AI insights
                     </li>
                     <li className="flex items-center text-gray-300">
-                      <svg className="w-5 h-5 text-primary mr-3" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                      </svg>
+                      <CheckIcon className="w-5 h-5 mr-3" />
                       Economic calendar: High-impact events
                     </li>
                     <li className="flex items-center text-gray-300">
-                      <svg className="w-5 h-5 text-primary mr-3" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                      </svg>
+                      <CheckIcon className="w-5 h-5 mr-3" />
                       Data export: CSV
                     </li>
                     <li className="flex items-center text-gray-300">
-                      <svg className="w-5 h-5 text-primary mr-3" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                      </svg>
+                      <CheckIcon className="w-5 h-5 mr-3" />
                       Priority support: Community
                     </li>
                     
@@ -94,42 +78,29 @@ export default function PlansPage() {
                     
                     {/* Unavailable Features */}
                     <li className="flex items-center text-gray-500">
-                      <svg className="w-5 h-5 text-gray-500 mr-3" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
-                      </svg>
+                      <XIcon className="w-5 h-5 mr-3" />
                       API integrations
                     </li>
                     <li className="flex items-center text-gray-500">
-                      <svg className="w-5 h-5 text-gray-500 mr-3" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
-                      </svg>
+                      <XIcon className="w-5 h-5 mr-3" />
                       Advanced analytics
                     </li>
                     <li className="flex items-center text-gray-500">
-                      <svg className="w-5 h-5 text-gray-500 mr-3" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
-                      </svg>
+                      <XIcon className="w-5 h-5 mr-3" />
                       Strategy KPIs
                     </li>
                     <li className="flex items-center text-gray-500">
-                      <svg className="w-5 h-5 text-gray-500 mr-3" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
-                      </svg>
+                      <XIcon className="w-5 h-5 mr-3" />
                       Edge Report PDF
                     </li>
                     <li className="flex items-center text-gray-500">
-                      <svg className="w-5 h-5 text-gray-500 mr-3" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
-                      </svg>
+                      <XIcon className="w-5 h-5 mr-3" />
                       Custom dashboards
                     </li>
                     <li className="flex items-center text-gray-500">
-                      <svg className="w-5 h-5 text-gray-500 mr-3" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
-                      </svg>
+                      <XIcon className="w-5 h-5 mr-3" />
                       Team management
                     </li>
-
                   </ul>
                   <button className="w-full py-3 px-6 border border-primary text-primary rounded-full hover:bg-primary hover:text-dark-background transition-all duration-200 mt-auto">
                     Get Started
@@ -145,93 +116,65 @@ export default function PlansPage() {
                   </div>
                   <div className="text-center mb-8">
                     <h3 className="text-2xl font-bold text-white mb-4 font-poly">Premium</h3>
-                    <div className="text-4xl font-bold text-primary mb-2">$19</div>
+                    <div className="text-4xl font-bold text-primary mb-2">$97</div>
                     <p className="text-gray-400">per month</p>
                   </div>
                   <ul className="space-y-4 mb-8 flex-1 ml-4 mr-4">
                     {/* Available Features */}
                     <li className="flex items-center text-gray-300">
-                      <svg className="w-5 h-5 text-primary mr-3" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                      </svg>
+                      <CheckIcon className="w-5 h-5 mr-3" />
                       Unlimited
                     </li>
                     <li className="flex items-center text-gray-300">
-                      <svg className="w-5 h-5 text-primary mr-3" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                      </svg>
-                      Manual journal
+                      <CheckIcon className="w-5 h-5 mr-3" />
+                      Manual journaling
                     </li>
                     <li className="flex items-center text-gray-300">
-                      <svg className="w-5 h-5 text-primary mr-3" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                      </svg>
+                      <CheckIcon className="w-5 h-5 mr-3" />
                       CSV import (Ebinex)
                     </li>
                     <li className="flex items-center text-gray-300">
-                      <svg className="w-5 h-5 text-primary mr-3" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                      </svg>
+                      <CheckIcon className="w-5 h-5 mr-3" />
                       Basic KPIs (Win Rate, Net P&L, Result)
                     </li>
                     <li className="flex items-center text-gray-300">
-                      <svg className="w-5 h-5 text-primary mr-3" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                      </svg>
+                      <CheckIcon className="w-5 h-5 mr-3" />
                       Advanced analytics
                     </li>
                     <li className="flex items-center text-gray-300">
-                      <svg className="w-5 h-5 text-primary mr-3" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                      </svg>
+                      <CheckIcon className="w-5 h-5 mr-3" />
                       Strategy KPIs
                     </li>
                     <li className="flex items-center text-gray-300">
-                      <svg className="w-5 h-5 text-primary mr-3" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                      </svg>
+                      <CheckIcon className="w-5 h-5 mr-3" />
                       Performance Heatmap
                     </li>
                     <li className="flex items-center text-gray-300">
-                      <svg className="w-5 h-5 text-primary mr-3" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                      </svg>
-                      Daily AI Insights
+                      <CheckIcon className="w-5 h-5 mr-3" />
+                      Daily AI insights
                     </li>
                     <li className="flex items-center text-gray-300">
-                      <svg className="w-5 h-5 text-primary mr-3" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                      </svg>
+                      <CheckIcon className="w-5 h-5 mr-3" />
                       Edge Report PDF
                     </li>
                     <li className="flex items-center text-gray-300">
-                      <svg className="w-5 h-5 text-primary mr-3" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                      </svg>
+                      <CheckIcon className="w-5 h-5 mr-3" />
                       Economic calendar: All events + filters
                     </li>
                     <li className="flex items-center text-gray-300">
-                      <svg className="w-5 h-5 text-primary mr-3" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                      </svg>
+                      <CheckIcon className="w-5 h-5 mr-3" />
                       Custom dashboards: 2
                     </li>
                     <li className="flex items-center text-gray-300">
-                      <svg className="w-5 h-5 text-primary mr-3" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                      </svg>
+                      <CheckIcon className="w-5 h-5 mr-3" />
                       Data export: CSV · Excel · JSON
                     </li>
                     <li className="flex items-center text-gray-300">
-                      <svg className="w-5 h-5 text-primary mr-3" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                      </svg>
-                      Priority support: Within 24 h
+                      <CheckIcon className="w-5 h-5 mr-3" />
+                      Priority support: Within 24h
                     </li>
                     <li className="flex items-center text-gray-300">
-                      <svg className="w-5 h-5 text-primary mr-3" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                      </svg>
+                      <CheckIcon className="w-5 h-5 mr-3" />
                       Free trial: 14 days
                     </li>
                     
@@ -240,15 +183,11 @@ export default function PlansPage() {
                     
                     {/* Unavailable Features */}
                     <li className="flex items-center text-gray-500">
-                      <svg className="w-5 h-5 text-gray-500 mr-3" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
-                      </svg>
+                      <XIcon className="w-5 h-5 mr-3" />
                       API integrations
                     </li>
                     <li className="flex items-center text-gray-500">
-                      <svg className="w-5 h-5 text-gray-500 mr-3" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
-                      </svg>
+                      <XIcon className="w-5 h-5 mr-3" />
                       Team management
                     </li>
                   </ul>
@@ -262,116 +201,81 @@ export default function PlansPage() {
                   <div className="text-center mb-8">
                     <h3 className="text-2xl font-bold text-white mb-4 font-poly">Enterprise</h3>
                     <div className="text-4xl font-bold text-primary mb-2">Custom</div>
-                    <p className="text-gray-400">Contact Sales</p>
+                    <p className="text-gray-400">Contact Us</p>
                   </div>
                   <ul className="space-y-4 mb-8 flex-1 ml-4 mr-4">
                     {/* All Features Available */}
                     <li className="flex items-center text-gray-300">
-                      <svg className="w-5 h-5 text-primary mr-3" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                      </svg>
-                      Unlimited + auto sync
+                      <CheckIcon className="w-5 h-5 mr-3" />
+                      Unlimited + auto-sync
                     </li>
                     <li className="flex items-center text-gray-300">
-                      <svg className="w-5 h-5 text-primary mr-3" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                      </svg>
-                      Manual journal
+                      <CheckIcon className="w-5 h-5 mr-3" />
+                      Manual journaling
                     </li>
                     <li className="flex items-center text-gray-300">
-                      <svg className="w-5 h-5 text-primary mr-3" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                      </svg>
+                      <CheckIcon className="w-5 h-5 mr-3" />
                       CSV import (Ebinex)
                     </li>
-
                     <li className="flex items-center text-gray-300">
-                      <svg className="w-5 h-5 text-primary mr-3" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                      </svg>
+                      <CheckIcon className="w-5 h-5 mr-3" />
                       Basic KPIs (Win Rate, Net P&L, Result)
                     </li>
                     <li className="flex items-center text-gray-300">
-                      <svg className="w-5 h-5 text-primary mr-3" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                      </svg>
+                      <CheckIcon className="w-5 h-5 mr-3" />
                       Advanced analytics
                     </li>
                     <li className="flex items-center text-gray-300">
-                      <svg className="w-5 h-5 text-primary mr-3" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                      </svg>
-                      Strategy KPIs 
+                      <CheckIcon className="w-5 h-5 mr-3" />
+                      Strategy KPIs
                     </li>
                     <li className="flex items-center text-gray-300">
-                      <svg className="w-5 h-5 text-primary mr-3" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                      </svg>
+                      <CheckIcon className="w-5 h-5 mr-3" />
                       Performance Heatmap
                     </li>
                     <li className="flex items-center text-gray-300">
-                      <svg className="w-5 h-5 text-primary mr-3" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                      </svg>
-                      Real-time AI Insights
+                      <CheckIcon className="w-5 h-5 mr-3" />
+                      Real-time AI insights
                     </li>
                     <li className="flex items-center text-gray-300">
-                      <svg className="w-5 h-5 text-primary mr-3" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                      </svg>
+                      <CheckIcon className="w-5 h-5 mr-3" />
                       Edge Report PDF (white-label)
                     </li>
                     <li className="flex items-center text-gray-300">
-                      <svg className="w-5 h-5 text-primary mr-3" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                      </svg>
+                      <CheckIcon className="w-5 h-5 mr-3" />
                       Economic calendar: All + team alerts
                     </li>
                     <li className="flex items-center text-gray-300">
-                      <svg className="w-5 h-5 text-primary mr-3" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                      </svg>
+                      <CheckIcon className="w-5 h-5 mr-3" />
                       Custom dashboards: Unlimited
                     </li>
                     <li className="flex items-center text-gray-300">
-                      <svg className="w-5 h-5 text-primary mr-3" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                      </svg>
-                      Team management (10+ seats)
+                      <CheckIcon className="w-5 h-5 mr-3" />
+                      Team management (10+ users)
                     </li>
                     <li className="flex items-center text-gray-300">
-                      <svg className="w-5 h-5 text-primary mr-3" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                      </svg>
+                      <CheckIcon className="w-5 h-5 mr-3" />
                       API integrations: All brokers + custom
                     </li>
                     <li className="flex items-center text-gray-300">
-                      <svg className="w-5 h-5 text-primary mr-3" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                      </svg>
+                      <CheckIcon className="w-5 h-5 mr-3" />
                       Data export: API & Webhooks
                     </li>
                     <li className="flex items-center text-gray-300">
-                      <svg className="w-5 h-5 text-primary mr-3" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                      </svg>
+                      <CheckIcon className="w-5 h-5 mr-3" />
                       Priority support: Dedicated CSM
                     </li>
                     <li className="flex items-center text-gray-300">
-                      <svg className="w-5 h-5 text-primary mr-3" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                      </svg>
+                      <CheckIcon className="w-5 h-5 mr-3" />
                       Branding: Custom logo & colors
                     </li>
                     <li className="flex items-center text-gray-300">
-                      <svg className="w-5 h-5 text-primary mr-3" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                      </svg>
+                      <CheckIcon className="w-5 h-5 mr-3" />
                       Free trial: Pilot project
                     </li>
                   </ul>
                   <button className="w-full py-3 px-6 border border-primary text-primary rounded-full hover:bg-primary hover:text-dark-background transition-all duration-200 mt-auto">
-                    Contact Sales
+                    Contact Us
                   </button>
                 </div>
               </div>
