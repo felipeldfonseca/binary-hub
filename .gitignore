@@ -73,3 +73,7 @@ ui-debug.log
 
 # Local development
 .local/
+
+# Service account files
+service-account.json
+*.json.key
