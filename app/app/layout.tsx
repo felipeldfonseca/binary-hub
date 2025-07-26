@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
 import '../styles/globals.css'
 import { AuthProvider } from '../lib/contexts/AuthContext'
+import { LanguageProvider } from '../lib/contexts/LanguageContext'
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -107,7 +108,9 @@ export default function RootLayout({
       >
         <div id="root" className="min-h-screen bg-background text-text">
           <AuthProvider>
-          {children}
+            <LanguageProvider>
+              {children}
+            </LanguageProvider>
           </AuthProvider>
         </div>
         <div id="modal-root" />

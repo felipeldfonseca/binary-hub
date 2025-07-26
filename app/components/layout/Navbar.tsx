@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useState, useEffect } from 'react'
 import { useAuth } from '../../lib/contexts/AuthContext'
+import { useLanguage } from '../../lib/contexts/LanguageContext'
 import { useRouter } from 'next/navigation'
 
 interface NavItem {
@@ -17,6 +18,7 @@ interface NavItem {
 export default function Navbar() {
   const pathname = usePathname()
   const { user, logout } = useAuth()
+  const { language, setLanguage, isPortuguese } = useLanguage()
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const [isMobile, setIsMobile] = useState(false)
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
@@ -29,13 +31,13 @@ export default function Navbar() {
   const [isNavVisible, setIsNavVisible] = useState(true)
   const [lastScrollY, setLastScrollY] = useState(0)
   
-  // Different navigation items for landing page vs dashboard
-  const landingNavItems: NavItem[] = [
-    { href: '/', label: 'Home' },
-    { href: '/about', label: 'About' },
-    { href: '/plans', label: 'Plans' },
+  // Language-aware navigation items
+  const getLandingNavItems = (): NavItem[] => [
+    { href: isPortuguese ? '/pt' : '/', label: isPortuguese ? 'Início' : 'Home' },
+    { href: isPortuguese ? '/pt/about' : '/about', label: isPortuguese ? 'Sobre' : 'About' },
+    { href: isPortuguese ? '/pt/plans' : '/plans', label: isPortuguese ? 'Planos' : 'Plans' },
     { href: '/docs', label: 'Docs', external: true, url: 'https://github.com/your-repo' },
-    { href: '#', label: 'Settings', isDropdown: true },
+    { href: '#', label: isPortuguese ? 'Configurações' : 'Settings', isDropdown: true },
   ]
   
   const dashboardNavItems: NavItem[] = [
@@ -47,9 +49,14 @@ export default function Navbar() {
     { href: '/dashboard/plans', label: 'Plans' },
   ]
 
-  const navItems = user ? dashboardNavItems : landingNavItems
+  const navItems = user ? dashboardNavItems : getLandingNavItems()
   const isLandingPage = !user
   const navButtonSpacing = isLandingPage ? 'px-3' : 'px-4' // Reduced spacing for landing page
+
+  // Update selected language display
+  useEffect(() => {
+    setSelectedLanguage(isPortuguese ? 'Português' : 'English')
+  }, [isPortuguese])
 
   useEffect(() => {
     const checkScreenSize = () => {
@@ -130,9 +137,10 @@ export default function Navbar() {
     setIsLanguageOpen(!isLanguageOpen)
   }
 
-  const handleLanguageSelect = (language: string, label: string) => {
-    setSelectedLanguage(label)
+  const handleLanguageSelect = (newLanguage: 'en' | 'pt') => {
+    setLanguage(newLanguage)
     setIsLanguageOpen(false)
+    setIsMobileMenuOpen(false)
   }
 
   const handleThemeSelect = (theme: string) => {
@@ -260,8 +268,7 @@ export default function Navbar() {
                                   <div className="absolute top-full mt-1 left-0 right-0 bg-white rounded-md shadow-lg border border-gray-200 z-50">
                                     <button
                                       onClick={() => {
-                                        setIsLanguageOpen(false);
-                                        router.push('/');
+                                        handleLanguageSelect('en');
                                       }}
                                       className="w-full px-3 py-2 text-sm text-left text-gray-700 hover:bg-gray-50 transition-colors first:rounded-t-md"
                                     >
@@ -269,8 +276,7 @@ export default function Navbar() {
                                     </button>
                                     <button
                                       onClick={() => {
-                                        setIsLanguageOpen(false);
-                                        router.push('/pt');
+                                        handleLanguageSelect('pt');
                                       }}
                                       className="w-full px-3 py-2 text-sm text-left text-gray-700 hover:bg-gray-50 transition-colors last:rounded-b-md"
                                     >
@@ -317,13 +323,13 @@ export default function Navbar() {
                     href="/auth/login"
                     className="px-6 py-2 rounded-full border border-primary text-primary bg-transparent font-medium text-sm mr-2 transition-all duration-200 hover:bg-primary/10"
                   >
-                    Sign In
+                    {isPortuguese ? 'Entrar' : 'Sign In'}
                   </Link>
                   <Link
                     href="/auth/register"
                     className="px-6 py-2 rounded-full bg-primary text-dark-background font-medium text-sm transition-all duration-200 hover:scale-105"
                   >
-                    Sign Up
+                    {isPortuguese ? 'Cadastrar' : 'Sign Up'}
                   </Link>
                 </>
               ) : (
@@ -436,9 +442,7 @@ export default function Navbar() {
                             <div className="absolute top-full mt-1 left-0 right-0 bg-gray-700 rounded shadow-lg border border-gray-600 z-[70]">
                               <button
                                 onClick={() => {
-                                  setIsLanguageOpen(false);
-                                  setIsMobileMenuOpen(false);
-                                  router.push('/');
+                                  handleLanguageSelect('en');
                                 }}
                                 className="w-full px-2 py-1 text-xs text-left text-white hover:bg-gray-600 transition-colors first:rounded-t"
                               >
@@ -446,9 +450,7 @@ export default function Navbar() {
                               </button>
                               <button
                                 onClick={() => {
-                                  setIsLanguageOpen(false);
-                                  setIsMobileMenuOpen(false);
-                                  router.push('/pt');
+                                  handleLanguageSelect('pt');
                                 }}
                                 className="w-full px-2 py-1 text-xs text-left text-white hover:bg-gray-600 transition-colors last:rounded-b"
                               >
