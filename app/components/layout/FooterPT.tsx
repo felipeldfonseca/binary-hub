@@ -87,7 +87,7 @@ export default function FooterPT() {
   return (
     <footer className="border-t border-border bg-background">
       <div className="container mx-auto px-4 pt-20 pb-16" style={{ paddingTop: '5rem', paddingBottom: '4rem' }}>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+        <div className="flex justify-between items-start">
           {/* Logo and Description */}
           <div className="space-y-6">
             <Link href={user ? "/dashboard" : "/pt"} className="flex items-center space-x-1">
@@ -103,7 +103,7 @@ export default function FooterPT() {
           </div>
 
           {/* Institutional Links */}
-          <div>
+          <div className="text-center">
             <h3 className="font-semibold text-text mb-4">Empresa</h3>
             <nav className="space-y-2">
               {institutionalLinks
@@ -113,7 +113,7 @@ export default function FooterPT() {
                   <button
                     key={link.href}
                     onClick={handleFAQClick}
-                    className="block text-sm text-white hover:text-primary transition-colors text-left w-full focus:outline-none focus:ring-0 focus:border-0"
+                    className="block text-sm text-white hover:text-primary transition-colors text-center w-full focus:outline-none focus:ring-0 focus:border-0"
                   >
                     {link.label}
                   </button>
@@ -121,7 +121,7 @@ export default function FooterPT() {
                   <Link
                     key={link.href}
                     href={link.href}
-                    className="block text-sm text-white hover:text-primary transition-colors"
+                    className="block text-sm text-white hover:text-primary transition-colors text-center"
                   >
                     {link.label}
                   </Link>
@@ -132,7 +132,7 @@ export default function FooterPT() {
 
           {/* Social Links */}
           <div>
-            <h3 className="font-semibold text-text mb-4">Siga-nos</h3>
+            <h3 className="font-semibold text-text mb-4 text-center">Siga-nos</h3>
             <div className="flex space-x-4">
               {socialLinks.map((link) => (
                 <a
