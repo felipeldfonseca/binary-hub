@@ -109,7 +109,7 @@ export default function PlansComparisonSection() {
           <div className="text-center">
             <Link
               href="/plans"
-              className="btn-primary font-montserrat font-bold transition-all duration-300 hover:scale-105 text-lg px-8 py-4 max-xl:text-base max-xl:px-6 max-xl:py-3 max-md:text-sm max-md:px-4 max-md:py-2"
+              className="btn-primary font-comfortaa font-bold transition-all duration-300 hover:scale-105 text-lg px-8 py-4 max-xl:text-base max-xl:px-6 max-xl:py-3 max-md:text-sm max-md:px-4 max-md:py-2"
             >
               View Full Plans
             </Link>

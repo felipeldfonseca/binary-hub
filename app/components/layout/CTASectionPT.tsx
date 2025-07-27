@@ -12,7 +12,7 @@ export default function CTASectionPT() {
         </h2>
         <Link 
           href="/auth/register" 
-          className="bg-gray-800 text-primary px-8 py-3 text-lg font-montserrat font-bold rounded-full hover:bg-gray-700 transition-colors"
+          className="bg-gray-800 text-primary px-8 py-3 text-lg font-comfortaa font-bold rounded-full hover:bg-gray-700 transition-colors"
         >
           Cadastre-se grátis hoje
         </Link>

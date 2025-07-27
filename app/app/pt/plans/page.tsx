@@ -21,7 +21,7 @@ export default function PlansPagePT() {
                               <h1 className="hero-title text-3xl md:text-4xl lg:text-5xl font-poly font-bold text-white mb-6">
                   Escolha o plano que impulsiona sua <span className="text-primary">jornada como trader</span>
                 </h1>
-                <p className="text-xl font-montserrat font-normal text-white">
+                <p className="text-xl font-comfortaa font-normal text-white">
                   <span className="text-primary">Comece grátis.</span> Desbloqueie análises premium quando estiver pronto.
                 </p>
               </div>
@@ -282,7 +282,7 @@ export default function PlansPagePT() {
                   </button>
                 </div>
               </div>
-              <p className="text-base font-montserrat font-normal text-white text-center mb-12">
+              <p className="text-base font-comfortaa font-normal text-white text-center mb-12">
                 Cancele a qualquer momento • Sem taxas ocultas
               </p>
 

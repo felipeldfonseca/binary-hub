@@ -21,8 +21,8 @@ export default function PlansPage() {
                 <h1 className="hero-title text-3xl md:text-4xl lg:text-5xl font-poly font-bold text-white mb-6">
                   Choose the plan that powers your <span className="text-primary">trading journey</span>
                 </h1>
-                <p className="text-xl font-montserrat font-normal text-white max-w-3xl mx-auto">
-                  <span className="text-primary">Start free.</span> Unlock premium insights when you're ready.
+                <p className="text-xl font-comfortaa font-normal text-white max-w-3xl mx-auto">
+                  Start free. Unlock premium insights when you're ready.
                 </p>
               </div>
 
@@ -280,7 +280,7 @@ export default function PlansPage() {
                   </button>
                 </div>
               </div>
-              <p className="text-base font-montserrat font-normal text-white text-center mb-12">
+              <p className="text-base font-comfortaa font-normal text-white text-center mb-12">
                 Cancel anytime • No hidden fees
               </p>
 
