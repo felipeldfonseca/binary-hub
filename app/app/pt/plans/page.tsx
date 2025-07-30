@@ -3,7 +3,7 @@ import Navbar from '../../../components/layout/Navbar'
 import FAQSection from '@/components/layout/FAQSection'
 import CheckIcon from '@/components/icons/CheckIcon'
 import XIcon from '@/components/icons/XIcon'
-import FooterPT from '@/components/layout/FooterPT'
+import Footer from '@/components/layout/Footer'
 
 export default function PlansPagePT() {
   return (
@@ -291,7 +291,7 @@ export default function PlansPagePT() {
             </div>
           </div>
         </main>
-        <FooterPT />
+        <Footer />
       </div>
     </PublicRoute>
   )

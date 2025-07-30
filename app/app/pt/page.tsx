@@ -8,7 +8,7 @@ import PlansComparisonSectionPT from '@/components/layout/PlansComparisonSection
 import SocialProofSectionPT from '@/components/layout/SocialProofSectionPT'
 import FAQSection from '@/components/layout/FAQSection'
 import CTASectionPT from '@/components/layout/CTASectionPT'
-import FooterPT from '@/components/layout/FooterPT'
+import Footer from '@/components/layout/Footer'
 import PublicRoute from '@/components/auth/PublicRoute'
 
 export default function HomePagePT() {
@@ -26,7 +26,7 @@ export default function HomePagePT() {
           <FAQSection variant="landing" />
           <CTASectionPT />
         </main>
-        <FooterPT />
+        <Footer />
     </div>
     </PublicRoute>
   )

@@ -15,7 +15,7 @@ import SocialProofSection from '@/components/layout/SocialProofSection'
 import SocialProofSectionPT from '@/components/layout/SocialProofSectionPT'
 import FAQSection from '@/components/layout/FAQSection'
 import Footer from '@/components/layout/Footer'
-import FooterPT from '@/components/layout/FooterPT'
+
 import PublicRoute from '@/components/auth/PublicRoute'
 import { useLanguage } from '@/lib/contexts/LanguageContext'
 
@@ -67,7 +67,7 @@ export default function HomePage() {
         </div>
       </section>
         </main>
-        {isPortuguese ? <FooterPT /> : <Footer />}
+        <Footer />
     </div>
     </PublicRoute>
   )

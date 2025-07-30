@@ -5,7 +5,7 @@ import FAQSection from '@/components/layout/FAQSection'
 import CheckIcon from '@/components/icons/CheckIcon'
 import XIcon from '@/components/icons/XIcon'
 import Footer from '@/components/layout/Footer'
-import FooterPT from '@/components/layout/FooterPT'
+
 import { useLanguage } from '@/lib/contexts/LanguageContext'
 
 export default function PlansPage() {
@@ -316,7 +316,7 @@ export default function PlansPage() {
             </div>
           </div>
         </main>
-        {isPortuguese ? <FooterPT /> : <Footer />}
+        <Footer />
       </div>
     </PublicRoute>
   )

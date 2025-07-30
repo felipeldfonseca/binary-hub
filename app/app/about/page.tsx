@@ -2,7 +2,7 @@
 import PublicRoute from '../../components/auth/PublicRoute'
 import Navbar from '../../components/layout/Navbar'
 import Footer from '@/components/layout/Footer'
-import FooterPT from '@/components/layout/FooterPT'
+
 import { useLanguage } from '@/lib/contexts/LanguageContext'
 
 export default function AboutPage() {
@@ -121,7 +121,7 @@ export default function AboutPage() {
             </div>
           </div>
         </main>
-        {isPortuguese ? <FooterPT /> : <Footer />}
+        <Footer />
       </div>
     </PublicRoute>
   )

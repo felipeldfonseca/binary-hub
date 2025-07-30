@@ -7,7 +7,7 @@ import PerformanceSection from '@/components/dashboard/PerformanceSection'
 import CalendarSection from '@/components/dashboard/CalendarSection'
 import EventsSection from '@/components/dashboard/EventsSection'
 import Footer from '@/components/layout/Footer'
-import FooterPT from '@/components/layout/FooterPT'
+
 import { useLanguage } from '@/lib/contexts/LanguageContext'
 
 export default function DashboardPage() {
@@ -22,7 +22,7 @@ export default function DashboardPage() {
         <CalendarSection />
         <EventsSection />
       </main>
-      {isPortuguese ? <FooterPT /> : <Footer />}
+              <Footer />
     </div>
   )
 } 

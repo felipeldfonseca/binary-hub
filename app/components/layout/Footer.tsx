@@ -3,14 +3,16 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useAuth } from '@/lib/contexts/AuthContext'
+import { useLanguage } from '@/lib/contexts/LanguageContext'
 
 export default function Footer() {
   const pathname = usePathname()
   const { user } = useAuth()
+  const { isPortuguese } = useLanguage()
   
   const institutionalLinks = [
-    { href: '/about', label: 'About us' },
-    { href: '/plans', label: 'Plans' },
+    { href: isPortuguese ? '/about?lang=pt' : '/about', label: isPortuguese ? 'Sobre nós' : 'About us' },
+    { href: isPortuguese ? '/plans?lang=pt' : '/plans', label: isPortuguese ? 'Planos' : 'Plans' },
     { href: '/docs', label: 'Docs' },
     { href: '#faqs', label: 'FAQs', isFAQ: true },
   ]
@@ -31,7 +33,7 @@ export default function Footer() {
     button.blur()
     
     // Check if current page has FAQs section
-    const hasFAQsOnPage = pathname === '/' || pathname === '/plans'
+    const hasFAQsOnPage = pathname === '/' || pathname === '/plans' || pathname.startsWith('/?') || pathname.startsWith('/plans?')
     
     if (hasFAQsOnPage) {
       // Scroll to FAQs section on current page
@@ -41,7 +43,8 @@ export default function Footer() {
       }
     } else {
       // Navigate to plans page FAQs section
-      window.location.href = '/plans#faqs'
+      const plansUrl = isPortuguese ? '/plans?lang=pt#faqs' : '/plans#faqs'
+      window.location.href = plansUrl
     }
   }
 
@@ -90,7 +93,7 @@ export default function Footer() {
         <div className="flex justify-between items-start">
           {/* Logo and Description */}
           <div className="space-y-6">
-            <Link href={user ? "/dashboard" : "/"} className="flex items-center space-x-1">
+            <Link href={user ? (isPortuguese ? "/dashboard?lang=pt" : "/dashboard") : (isPortuguese ? "/?lang=pt" : "/")} className="flex items-center space-x-1">
               <div className="flex items-center space-x-1">
                 <div className="logo-poly font-normal text-primary">
                   binary
