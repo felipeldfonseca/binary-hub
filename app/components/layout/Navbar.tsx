@@ -33,20 +33,20 @@ export default function Navbar() {
   
   // Language-aware navigation items
   const getLandingNavItems = (): NavItem[] => [
-    { href: isPortuguese ? '/pt' : '/', label: isPortuguese ? 'Início' : 'Home' },
-    { href: isPortuguese ? '/pt/about' : '/about', label: isPortuguese ? 'Sobre' : 'About' },
-    { href: isPortuguese ? '/pt/plans' : '/plans', label: isPortuguese ? 'Planos' : 'Plans' },
+    { href: isPortuguese ? '/?lang=pt' : '/', label: isPortuguese ? 'Início' : 'Home' },
+    { href: isPortuguese ? '/about?lang=pt' : '/about', label: isPortuguese ? 'Sobre' : 'About' },
+    { href: isPortuguese ? '/plans?lang=pt' : '/plans', label: isPortuguese ? 'Planos' : 'Plans' },
     { href: '/docs', label: 'Docs', external: true, url: 'https://github.com/your-repo' },
     { href: '#', label: isPortuguese ? 'Configurações' : 'Settings', isDropdown: true },
   ]
   
   const getDashboardNavItems = (): NavItem[] => [
-    { href: '/dashboard', label: isPortuguese ? 'Início' : 'Home' },
+    { href: isPortuguese ? '/dashboard?lang=pt' : '/dashboard', label: isPortuguese ? 'Início' : 'Home' },
     { href: '/trades', label: isPortuguese ? 'Operações' : 'Trades' },
     { href: '/analytics', label: isPortuguese ? 'Análises' : 'Analytics' },
     { href: '/events', label: isPortuguese ? 'Eventos' : 'Events' },
     { href: '/ai', label: 'AI' },
-    { href: '/dashboard/plans', label: isPortuguese ? 'Planos' : 'Plans' },
+    { href: isPortuguese ? '/dashboard/plans?lang=pt' : '/dashboard/plans', label: isPortuguese ? 'Planos' : 'Plans' },
   ]
 
   const dashboardNavItems = getDashboardNavItems()

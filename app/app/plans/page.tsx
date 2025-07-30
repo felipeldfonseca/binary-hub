@@ -1,11 +1,16 @@
+'use client'
 import PublicRoute from '../../components/auth/PublicRoute'
 import Navbar from '../../components/layout/Navbar'
 import FAQSection from '@/components/layout/FAQSection'
 import CheckIcon from '@/components/icons/CheckIcon'
 import XIcon from '@/components/icons/XIcon'
 import Footer from '@/components/layout/Footer'
+import FooterPT from '@/components/layout/FooterPT'
+import { useLanguage } from '@/lib/contexts/LanguageContext'
 
 export default function PlansPage() {
+  const { isPortuguese } = useLanguage()
+
   return (
     <PublicRoute>
       <div className="min-h-screen bg-background">
@@ -19,10 +24,18 @@ export default function PlansPage() {
               {/* Hero Section */}
               <div className="text-center mb-16">
                 <h1 className="hero-title text-3xl md:text-4xl lg:text-5xl font-poly font-bold text-white mb-6">
-                  Choose the plan that powers your <span className="text-primary">trading journey</span>
-              </h1>
+                  {isPortuguese 
+                    ? 'Escolha o plano que impulsiona sua '
+                    : 'Choose the plan that powers your '
+                  }<span className="text-primary">
+                    {isPortuguese ? 'jornada de trading' : 'trading journey'}
+                  </span>
+                </h1>
                 <p className="text-xl font-comfortaa font-normal text-white max-w-3xl mx-auto">
-                  Start free. Unlock premium insights when you're ready.
+                  {isPortuguese 
+                    ? 'Comece grátis. Desbloqueie insights premium quando estiver pronto.'
+                    : 'Start free. Unlock premium insights when you\'re ready.'
+                  }
                 </p>
               </div>
 
@@ -31,47 +44,51 @@ export default function PlansPage() {
                 {/* Free Plan */}
                 <div className="bg-gray-800/50 p-8 rounded-lg border border-gray-700 flex flex-col h-full">
                   <div className="text-center mb-8">
-                    <h3 className="text-2xl font-bold text-white mb-4 font-poly">Free</h3>
+                    <h3 className="text-2xl font-bold text-white mb-4 font-poly">
+                      {isPortuguese ? 'Gratuito' : 'Free'}
+                    </h3>
                     <div className="text-4xl font-bold text-primary mb-2">$0</div>
-                    <p className="text-gray-400">Forever free</p>
+                    <p className="text-gray-400">
+                      {isPortuguese ? 'Sempre grátis' : 'Forever free'}
+                    </p>
                   </div>
                   <ul className="space-y-4 mb-8 flex-1 ml-4 mr-4">
                     {/* Available Features */}
-                                    <li className="flex items-center text-gray-300">
-                      <CheckIcon className="w-5 h-5 mr-3 flex-shrink-0" />
-                      Record 100 trades / month
-                </li>
                     <li className="flex items-center text-gray-300">
                       <CheckIcon className="w-5 h-5 mr-3 flex-shrink-0" />
-                      Manual journaling
+                      {isPortuguese ? 'Registrar 100 operações / mês' : 'Record 100 trades / month'}
                     </li>
                     <li className="flex items-center text-gray-300">
                       <CheckIcon className="w-5 h-5 mr-3 flex-shrink-0" />
-                      CSV import (Ebinex)
+                      {isPortuguese ? 'Registro manual' : 'Manual journaling'}
                     </li>
                     <li className="flex items-center text-gray-300">
                       <CheckIcon className="w-5 h-5 mr-3 flex-shrink-0" />
-                      Basic KPIs (Win Rate, Net P&L, Result)
+                      {isPortuguese ? 'Importação CSV (Ebinex)' : 'CSV import (Ebinex)'}
                     </li>
                     <li className="flex items-center text-gray-300">
                       <CheckIcon className="w-5 h-5 mr-3 flex-shrink-0" />
-                      Performance Heatmap
+                      {isPortuguese ? 'KPIs básicos (Taxa de Acerto, P&L Líquido, Resultado)' : 'Basic KPIs (Win Rate, Net P&L, Result)'}
                     </li>
                     <li className="flex items-center text-gray-300">
                       <CheckIcon className="w-5 h-5 mr-3 flex-shrink-0" />
-                      Weekly AI insights
+                      {isPortuguese ? 'Mapa de Performance' : 'Performance Heatmap'}
                     </li>
                     <li className="flex items-center text-gray-300">
                       <CheckIcon className="w-5 h-5 mr-3 flex-shrink-0" />
-                      Economic calendar: High-impact events
+                      {isPortuguese ? 'Insights de IA semanais' : 'Weekly AI insights'}
                     </li>
                     <li className="flex items-center text-gray-300">
                       <CheckIcon className="w-5 h-5 mr-3 flex-shrink-0" />
-                      Data export: CSV
+                      {isPortuguese ? 'Calendário econômico: Eventos de alto impacto' : 'Economic calendar: High-impact events'}
                     </li>
                     <li className="flex items-center text-gray-300">
                       <CheckIcon className="w-5 h-5 mr-3 flex-shrink-0" />
-                      Priority support: Community
+                      {isPortuguese ? 'Exportação de dados: CSV' : 'Data export: CSV'}
+                    </li>
+                    <li className="flex items-center text-gray-300">
+                      <CheckIcon className="w-5 h-5 mr-3 flex-shrink-0" />
+                      {isPortuguese ? 'Suporte prioritário: Comunidade' : 'Priority support: Community'}
                     </li>
                     
                     {/* Divider */}
@@ -80,31 +97,31 @@ export default function PlansPage() {
                     {/* Unavailable Features */}
                     <li className="flex items-center text-gray-500">
                       <XIcon className="w-5 h-5 mr-3 flex-shrink-0" />
-                      API integrations
+                      {isPortuguese ? 'Integrações API' : 'API integrations'}
                     </li>
                     <li className="flex items-center text-gray-500">
                       <XIcon className="w-5 h-5 mr-3 flex-shrink-0" />
-                      Advanced analytics
+                      {isPortuguese ? 'Análises avançadas' : 'Advanced analytics'}
                     </li>
                     <li className="flex items-center text-gray-500">
                       <XIcon className="w-5 h-5 mr-3 flex-shrink-0" />
-                      Strategy KPIs
+                      {isPortuguese ? 'KPIs de estratégia' : 'Strategy KPIs'}
                     </li>
                     <li className="flex items-center text-gray-500">
                       <XIcon className="w-5 h-5 mr-3 flex-shrink-0" />
-                      Edge Report PDF
+                      {isPortuguese ? 'Relatório Edge PDF' : 'Edge Report PDF'}
                     </li>
                     <li className="flex items-center text-gray-500">
                       <XIcon className="w-5 h-5 mr-3 flex-shrink-0" />
-                      Custom dashboards
+                      {isPortuguese ? 'Dashboards personalizados' : 'Custom dashboards'}
                     </li>
                     <li className="flex items-center text-gray-500">
                       <XIcon className="w-5 h-5 mr-3 flex-shrink-0" />
-                      Team management
+                      {isPortuguese ? 'Gestão de equipe' : 'Team management'}
                     </li>
                   </ul>
                   <button className="w-full py-3 px-6 border border-primary text-primary rounded-full hover:bg-primary hover:text-dark-background transition-all duration-200 mt-auto">
-                    Get Started
+                    {isPortuguese ? 'Começar' : 'Get Started'}
                   </button>
                 </div>
 
@@ -112,71 +129,75 @@ export default function PlansPage() {
                 <div className="bg-primary/10 p-8 rounded-lg border border-primary relative flex flex-col h-full">
                   <div className="absolute -top-4 left-1/2 transform -translate-x-1/2">
                     <span className="bg-primary text-dark-background px-4 py-1 rounded-full text-sm font-medium">
-                      Most Popular
+                      {isPortuguese ? 'Mais Popular' : 'Most Popular'}
                     </span>
                   </div>
                   <div className="text-center mb-8">
-                    <h3 className="text-2xl font-bold text-white mb-4 font-poly">Premium</h3>
+                    <h3 className="text-2xl font-bold text-white mb-4 font-poly">
+                      {isPortuguese ? 'Premium' : 'Premium'}
+                    </h3>
                     <div className="text-4xl font-bold text-primary mb-2">$97</div>
-                    <p className="text-gray-400">per month</p>
+                    <p className="text-gray-400">
+                      {isPortuguese ? 'por mês' : 'per month'}
+                    </p>
                   </div>
                   <ul className="space-y-4 mb-8 flex-1 ml-4 mr-4">
                     {/* Available Features */}
                     <li className="flex items-center text-gray-300">
                       <CheckIcon className="w-5 h-5 mr-3 flex-shrink-0" />
-                      Unlimited
+                      {isPortuguese ? 'Ilimitado' : 'Unlimited'}
                     </li>
                     <li className="flex items-center text-gray-300">
                       <CheckIcon className="w-5 h-5 mr-3 flex-shrink-0" />
-                      Manual journaling
+                      {isPortuguese ? 'Registro manual' : 'Manual journaling'}
                     </li>
                     <li className="flex items-center text-gray-300">
                       <CheckIcon className="w-5 h-5 mr-3 flex-shrink-0" />
-                      CSV import (Ebinex)
+                      {isPortuguese ? 'Importação CSV (Ebinex)' : 'CSV import (Ebinex)'}
                     </li>
                     <li className="flex items-center text-gray-300">
                       <CheckIcon className="w-5 h-5 mr-3 flex-shrink-0" />
-                      Basic KPIs (Win Rate, Net P&L, Result)
+                      {isPortuguese ? 'KPIs básicos (Taxa de Acerto, P&L Líquido, Resultado)' : 'Basic KPIs (Win Rate, Net P&L, Result)'}
                     </li>
                     <li className="flex items-center text-gray-300">
                       <CheckIcon className="w-5 h-5 mr-3 flex-shrink-0" />
-                      Advanced analytics
+                      {isPortuguese ? 'Análises avançadas' : 'Advanced analytics'}
                     </li>
                     <li className="flex items-center text-gray-300">
                       <CheckIcon className="w-5 h-5 mr-3 flex-shrink-0" />
-                      Strategy KPIs
+                      {isPortuguese ? 'KPIs de estratégia' : 'Strategy KPIs'}
                     </li>
                     <li className="flex items-center text-gray-300">
                       <CheckIcon className="w-5 h-5 mr-3 flex-shrink-0" />
-                      Performance Heatmap
+                      {isPortuguese ? 'Mapa de Performance' : 'Performance Heatmap'}
                     </li>
                     <li className="flex items-center text-gray-300">
                       <CheckIcon className="w-5 h-5 mr-3 flex-shrink-0" />
-                      Daily AI insights
+                      {isPortuguese ? 'Insights de IA diários' : 'Daily AI insights'}
                     </li>
                     <li className="flex items-center text-gray-300">
                       <CheckIcon className="w-5 h-5 mr-3 flex-shrink-0" />
-                      Edge Report PDF
+                      {isPortuguese ? 'Relatório Edge PDF' : 'Edge Report PDF'}
                     </li>
                     <li className="flex items-center text-gray-300">
                       <CheckIcon className="w-5 h-5 mr-3 flex-shrink-0" />
-                      Economic calendar: All events + filters
+                      {isPortuguese ? 'Calendário econômico: Todos os eventos + filtros' : 'Economic calendar: All events + filters'}
                     </li>
                     <li className="flex items-center text-gray-300">
                       <CheckIcon className="w-5 h-5 mr-3 flex-shrink-0" />
-                      Custom dashboards: 2
+                      {isPortuguese ? 'Dashboards personalizados: 2' : 'Custom dashboards: 2'}
                     </li>
                     <li className="flex items-center text-gray-300">
                       <CheckIcon className="w-5 h-5 mr-3 flex-shrink-0" />
-                      Data export: CSV · Excel · JSON
+                      {isPortuguese ? 'Exportação de dados: CSV · Excel · JSON' : 'Data export: CSV · Excel · JSON'}
                     </li>
                     <li className="flex items-center text-gray-300">
                       <CheckIcon className="w-5 h-5 mr-3 flex-shrink-0" />
-                      Priority support: Within 24h
+                      {isPortuguese ? 'Suporte prioritário: Em 24h' : 'Priority support: Within 24h'}
                     </li>
                     <li className="flex items-center text-gray-300">
                       <CheckIcon className="w-5 h-5 mr-3 flex-shrink-0" />
-                      Free trial: 14 days
+                      {isPortuguese ? 'Teste gratuito: 14 dias' : 'Free trial: 14 days'}
                     </li>
                     
                     {/* Divider */}
@@ -185,103 +206,109 @@ export default function PlansPage() {
                     {/* Unavailable Features */}
                     <li className="flex items-center text-gray-500">
                       <XIcon className="w-5 h-5 mr-3 flex-shrink-0" />
-                      API integrations
+                      {isPortuguese ? 'Integrações API' : 'API integrations'}
                     </li>
                     <li className="flex items-center text-gray-500">
                       <XIcon className="w-5 h-5 mr-3 flex-shrink-0" />
-                      Team management
+                      {isPortuguese ? 'Gestão de equipe' : 'Team management'}
                     </li>
                   </ul>
                   <button className="w-full py-3 px-6 bg-primary text-dark-background rounded-full hover:scale-105 transition-all duration-200 font-medium mt-auto">
-                    Start Free Trial
+                    {isPortuguese ? 'Começar Teste Gratuito' : 'Start Free Trial'}
                   </button>
                 </div>
 
                 {/* Enterprise Plan */}
                 <div className="bg-gray-800/50 p-8 rounded-lg border border-gray-700 flex flex-col h-full">
                   <div className="text-center mb-8">
-                    <h3 className="text-2xl font-bold text-white mb-4 font-poly">Enterprise</h3>
-                    <div className="text-4xl font-bold text-primary mb-2">Custom</div>
-                    <p className="text-gray-400">Contact Us</p>
+                    <h3 className="text-2xl font-bold text-white mb-4 font-poly">
+                      {isPortuguese ? 'Enterprise' : 'Enterprise'}
+                    </h3>
+                    <div className="text-4xl font-bold text-primary mb-2">
+                      {isPortuguese ? 'Personalizado' : 'Custom'}
+                    </div>
+                    <p className="text-gray-400">
+                      {isPortuguese ? 'Entre em contato' : 'Contact Us'}
+                    </p>
                   </div>
                   <ul className="space-y-4 mb-8 flex-1 ml-4 mr-4">
                     {/* All Features Available */}
                     <li className="flex items-center text-gray-300">
                       <CheckIcon className="w-5 h-5 mr-3 flex-shrink-0" />
-                      Unlimited + auto-sync
+                      {isPortuguese ? 'Ilimitado + sincronização automática' : 'Unlimited + auto-sync'}
                     </li>
                     <li className="flex items-center text-gray-300">
                       <CheckIcon className="w-5 h-5 mr-3 flex-shrink-0" />
-                      Manual journaling
+                      {isPortuguese ? 'Registro manual' : 'Manual journaling'}
                     </li>
                     <li className="flex items-center text-gray-300">
                       <CheckIcon className="w-5 h-5 mr-3 flex-shrink-0" />
-                      CSV import (Ebinex)
+                      {isPortuguese ? 'Importação CSV (Ebinex)' : 'CSV import (Ebinex)'}
                     </li>
                     <li className="flex items-center text-gray-300">
                       <CheckIcon className="w-5 h-5 mr-3 flex-shrink-0" />
-                      Basic KPIs (Win Rate, Net P&L, Result)
+                      {isPortuguese ? 'KPIs básicos (Taxa de Acerto, P&L Líquido, Resultado)' : 'Basic KPIs (Win Rate, Net P&L, Result)'}
                     </li>
                     <li className="flex items-center text-gray-300">
                       <CheckIcon className="w-5 h-5 mr-3 flex-shrink-0" />
-                      Advanced analytics
+                      {isPortuguese ? 'Análises avançadas' : 'Advanced analytics'}
                     </li>
                     <li className="flex items-center text-gray-300">
                       <CheckIcon className="w-5 h-5 mr-3 flex-shrink-0" />
-                      Strategy KPIs 
+                      {isPortuguese ? 'KPIs de estratégia' : 'Strategy KPIs'}
                     </li>
                     <li className="flex items-center text-gray-300">
                       <CheckIcon className="w-5 h-5 mr-3 flex-shrink-0" />
-                      Performance Heatmap
+                      {isPortuguese ? 'Mapa de Performance' : 'Performance Heatmap'}
                     </li>
                     <li className="flex items-center text-gray-300">
                       <CheckIcon className="w-5 h-5 mr-3 flex-shrink-0" />
-                      Real-time AI insights
+                      {isPortuguese ? 'Insights de IA em tempo real' : 'Real-time AI insights'}
                     </li>
                     <li className="flex items-center text-gray-300">
                       <CheckIcon className="w-5 h-5 mr-3 flex-shrink-0" />
-                      Edge Report PDF (white-label)
+                      {isPortuguese ? 'Relatório Edge PDF (white-label)' : 'Edge Report PDF (white-label)'}
                     </li>
                     <li className="flex items-center text-gray-300">
                       <CheckIcon className="w-5 h-5 mr-3 flex-shrink-0" />
-                      Economic calendar: All + team alerts
+                      {isPortuguese ? 'Calendário econômico: Todos + alertas de equipe' : 'Economic calendar: All + team alerts'}
                     </li>
                     <li className="flex items-center text-gray-300">
                       <CheckIcon className="w-5 h-5 mr-3 flex-shrink-0" />
-                      Custom dashboards: Unlimited
+                      {isPortuguese ? 'Dashboards personalizados: Ilimitado' : 'Custom dashboards: Unlimited'}
                     </li>
                     <li className="flex items-center text-gray-300">
                       <CheckIcon className="w-5 h-5 mr-3 flex-shrink-0" />
-                      Team management (10+ users)
+                      {isPortuguese ? 'Gestão de equipe (10+ usuários)' : 'Team management (10+ users)'}
                     </li>
                     <li className="flex items-center text-gray-300">
                       <CheckIcon className="w-5 h-5 mr-3 flex-shrink-0" />
-                      API integrations: All brokers + custom
+                      {isPortuguese ? 'Integrações API: Todos os corretores + personalizado' : 'API integrations: All brokers + custom'}
                     </li>
                     <li className="flex items-center text-gray-300">
                       <CheckIcon className="w-5 h-5 mr-3 flex-shrink-0" />
-                      Data export: API & Webhooks
+                      {isPortuguese ? 'Exportação de dados: API & Webhooks' : 'Data export: API & Webhooks'}
                     </li>
                     <li className="flex items-center text-gray-300">
                       <CheckIcon className="w-5 h-5 mr-3 flex-shrink-0" />
-                      Priority support: Dedicated CSM
+                      {isPortuguese ? 'Suporte prioritário: CSM dedicado' : 'Priority support: Dedicated CSM'}
                     </li>
                     <li className="flex items-center text-gray-300">
                       <CheckIcon className="w-5 h-5 mr-3 flex-shrink-0" />
-                      Branding: Custom logo & colors
+                      {isPortuguese ? 'Marcação: Logotipo e cores personalizados' : 'Branding: Custom logo & colors'}
                     </li>
                     <li className="flex items-center text-gray-300">
                       <CheckIcon className="w-5 h-5 mr-3 flex-shrink-0" />
-                      Free trial: Pilot project
+                      {isPortuguese ? 'Teste gratuito: Projeto piloto' : 'Free trial: Pilot project'}
                     </li>
                   </ul>
                   <button className="w-full py-3 px-6 border border-primary text-primary rounded-full hover:bg-primary hover:text-dark-background transition-all duration-200 mt-auto">
-                    Contact Us
+                    {isPortuguese ? 'Entre em contato' : 'Contact Us'}
                   </button>
                 </div>
               </div>
               <p className="text-base font-comfortaa font-normal text-white text-center mb-12">
-                Cancel anytime • No hidden fees
+                {isPortuguese ? 'Sempre pode cancelar • Sem taxas ocultas' : 'Cancel anytime • No hidden fees'}
               </p>
 
               {/* FAQ Section */}
@@ -289,7 +316,7 @@ export default function PlansPage() {
             </div>
           </div>
         </main>
-        <Footer />
+        {isPortuguese ? <FooterPT /> : <Footer />}
       </div>
     </PublicRoute>
   )
