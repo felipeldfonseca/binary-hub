@@ -40,14 +40,16 @@ export default function Navbar() {
     { href: '#', label: isPortuguese ? 'Configurações' : 'Settings', isDropdown: true },
   ]
   
-  const dashboardNavItems: NavItem[] = [
-    { href: '/dashboard', label: 'Home' },
-    { href: '/trades', label: 'Trades' },
-    { href: '/analytics', label: 'Analytics' },
-    { href: '/events', label: 'Events' },
+  const getDashboardNavItems = (): NavItem[] => [
+    { href: '/dashboard', label: isPortuguese ? 'Início' : 'Home' },
+    { href: '/trades', label: isPortuguese ? 'Operações' : 'Trades' },
+    { href: '/analytics', label: isPortuguese ? 'Análises' : 'Analytics' },
+    { href: '/events', label: isPortuguese ? 'Eventos' : 'Events' },
     { href: '/ai', label: 'AI' },
-    { href: '/dashboard/plans', label: 'Plans' },
+    { href: '/dashboard/plans', label: isPortuguese ? 'Planos' : 'Plans' },
   ]
+
+  const dashboardNavItems = getDashboardNavItems()
 
   const navItems = user ? dashboardNavItems : getLandingNavItems()
   const isLandingPage = !user

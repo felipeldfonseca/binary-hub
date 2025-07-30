@@ -1,7 +1,7 @@
 'use client'
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react'
-import { usePathname, useRouter } from 'next/navigation'
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 
 type Language = 'en' | 'pt'
 
@@ -16,56 +16,46 @@ const LanguageContext = createContext<LanguageContextType | undefined>(undefined
 export function LanguageProvider({ children }: { children: ReactNode }) {
   const [language, setLanguageState] = useState<Language>('en')
   const pathname = usePathname()
+  const searchParams = useSearchParams()
   const router = useRouter()
 
-  // Initialize language from localStorage or pathname
+  // Initialize language from localStorage, query params, or pathname
   useEffect(() => {
     const savedLanguage = localStorage.getItem('binary-hub-language') as Language
-    if (savedLanguage && (savedLanguage === 'en' || savedLanguage === 'pt')) {
-      setLanguageState(savedLanguage)
+    const queryLang = searchParams.get('lang') as Language
+    
+    let detectedLanguage: Language = 'en'
+    
+    if (queryLang && (queryLang === 'en' || queryLang === 'pt')) {
+      // Priority 1: Query parameter
+      detectedLanguage = queryLang
+    } else if (savedLanguage && (savedLanguage === 'en' || savedLanguage === 'pt')) {
+      // Priority 2: Saved preference
+      detectedLanguage = savedLanguage
     } else {
-      // Auto-detect from pathname
-      const detectedLanguage = pathname.startsWith('/pt') ? 'pt' : 'en'
-      setLanguageState(detectedLanguage)
-      localStorage.setItem('binary-hub-language', detectedLanguage)
+      // Priority 3: Auto-detect from pathname (for legacy /pt routes)
+      detectedLanguage = pathname.startsWith('/pt') ? 'pt' : 'en'
     }
-  }, [pathname])
+    
+    setLanguageState(detectedLanguage)
+    localStorage.setItem('binary-hub-language', detectedLanguage)
+  }, [pathname, searchParams])
 
   const setLanguage = (newLanguage: Language) => {
     setLanguageState(newLanguage)
     localStorage.setItem('binary-hub-language', newLanguage)
     
-    // Navigate to the equivalent page in the new language
+    // Navigate to the same page with new language query parameter
     const currentPath = pathname
-    let newPath = currentPath
-
-    if (newLanguage === 'pt') {
-      // Convert English routes to Portuguese
-      if (currentPath === '/') {
-        newPath = '/pt'
-      } else if (currentPath === '/plans') {
-        newPath = '/pt/plans'
-      } else if (currentPath === '/about') {
-        newPath = '/pt/about'
-      } else if (currentPath.startsWith('/dashboard')) {
-        // Keep dashboard routes as is for now (they're not translated yet)
-        newPath = currentPath
-      }
-    } else {
-      // Convert Portuguese routes to English
-      if (currentPath === '/pt') {
-        newPath = '/'
-      } else if (currentPath === '/pt/plans') {
-        newPath = '/plans'
-      } else if (currentPath === '/pt/about') {
-        newPath = '/about'
-      } else if (currentPath.startsWith('/dashboard')) {
-        // Keep dashboard routes as is for now
-        newPath = currentPath
-      }
-    }
-
-    if (newPath !== currentPath) {
+    const currentSearchParams = new URLSearchParams(searchParams.toString())
+    
+    // Update or add the lang query parameter
+    currentSearchParams.set('lang', newLanguage)
+    
+    const newPath = `${currentPath}?${currentSearchParams.toString()}`
+    
+    // Only navigate if the path actually changes
+    if (newPath !== `${pathname}?${searchParams.toString()}`) {
       router.push(newPath)
     }
   }
