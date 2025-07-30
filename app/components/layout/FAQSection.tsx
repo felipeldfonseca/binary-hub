@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { Plus } from 'lucide-react'
-import { usePathname } from 'next/navigation'
+import { useLanguage } from '@/lib/contexts/LanguageContext'
 
 interface FAQItem {
   question: string;
@@ -118,10 +118,10 @@ const getTitle = (variant: 'landing' | 'plans', language: 'en' | 'pt') => {
 
 export default function FAQSection({ variant, language }: FAQSectionProps) {
   const [openIndex, setOpenIndex] = useState<number | null>(null);
-  const pathname = usePathname();
+  const { isPortuguese } = useLanguage();
   
-  // Auto-detect language from pathname if not provided
-  const detectedLanguage = language || (pathname.startsWith('/pt') ? 'pt' : 'en');
+  // Use provided language prop or detect from context
+  const detectedLanguage = language || (isPortuguese ? 'pt' : 'en');
   
   // Robust validation with fallbacks
   const validVariant = ['landing', 'plans'].includes(variant) ? variant : 'landing'

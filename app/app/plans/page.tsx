@@ -308,7 +308,7 @@ export default function PlansPage() {
                 </div>
               </div>
               <p className="text-base font-comfortaa font-normal text-white text-center mb-12">
-                {isPortuguese ? 'Sempre pode cancelar • Sem taxas ocultas' : 'Cancel anytime • No hidden fees'}
+                {isPortuguese ? 'Cancele a qualquer momento • Sem taxas ocultas' : 'Cancel anytime • No hidden fees'}
               </p>
 
               {/* FAQ Section */}
