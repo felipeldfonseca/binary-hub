@@ -101,7 +101,7 @@ export default function PlansComparisonSectionPT() {
           {/* CTA Button */}
           <div className="text-center">
             <Link
-              href="/pt/plans"
+              href="/plans?lang=pt"
               className="btn-primary font-comfortaa font-bold transition-all duration-300 hover:scale-105 text-lg px-8 py-4 max-xl:text-base max-xl:px-6 max-xl:py-3 max-md:text-sm max-md:px-4 max-md:py-2"
             >
               Ver planos completos
