@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { sendPasswordResetEmail } from 'firebase/auth'
 import { auth } from '../../../lib/firebase'
 import PublicRoute from '@/components/auth/PublicRoute'
+import { useLanguage } from '@/lib/contexts/LanguageContext'
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState('')
@@ -13,6 +14,7 @@ export default function ForgotPasswordPage() {
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
   const router = useRouter()
+  const { isPortuguese } = useLanguage()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -22,23 +24,38 @@ export default function ForgotPasswordPage() {
 
     try {
       await sendPasswordResetEmail(auth, email)
-      setMessage('Password reset email sent! Check your inbox and follow the instructions to reset your password.')
+      setMessage(isPortuguese 
+        ? 'Email de redefinição de senha enviado! Verifique sua caixa de entrada e siga as instruções para redefinir sua senha.'
+        : 'Password reset email sent! Check your inbox and follow the instructions to reset your password.'
+      )
     } catch (error: any) {
       console.error('Password reset error:', error)
       
       // Handle specific Firebase errors
       switch (error.code) {
         case 'auth/user-not-found':
-          setError('No account found with this email address.')
+          setError(isPortuguese 
+            ? 'Nenhuma conta encontrada com este endereço de email.'
+            : 'No account found with this email address.'
+          )
           break
         case 'auth/invalid-email':
-          setError('Please enter a valid email address.')
+          setError(isPortuguese 
+            ? 'Por favor, insira um endereço de email válido.'
+            : 'Please enter a valid email address.'
+          )
           break
         case 'auth/too-many-requests':
-          setError('Too many reset requests. Please try again later.')
+          setError(isPortuguese 
+            ? 'Muitas solicitações de redefinição. Tente novamente mais tarde.'
+            : 'Too many reset requests. Please try again later.'
+          )
           break
         default:
-          setError('Failed to send reset email. Please try again.')
+          setError(isPortuguese 
+            ? 'Falha ao enviar email de redefinição. Tente novamente.'
+            : 'Failed to send reset email. Please try again.'
+          )
       }
     } finally {
       setIsLoading(false)
@@ -46,7 +63,7 @@ export default function ForgotPasswordPage() {
   }
 
   const handleGoBack = () => {
-    router.push('/auth/login')
+    router.push(isPortuguese ? '/auth/login?lang=pt' : '/auth/login')
   }
 
   return (
@@ -55,7 +72,7 @@ export default function ForgotPasswordPage() {
         {/* Header */}
         <header className="flex items-center justify-between p-6">
           {/* Logo */}
-          <Link href="/" className="flex items-center">
+          <Link href={isPortuguese ? '/?lang=pt' : '/'} className="flex items-center">
             <div className="flex items-center space-x-1">
               <div className="logo-poly font-normal text-primary text-2xl">
                 binary
@@ -82,7 +99,7 @@ export default function ForgotPasswordPage() {
           <div className="w-full max-w-md">
             {/* Title */}
             <h1 className="text-white text-2xl font-medium text-center mb-12">
-              Reset your password
+              {isPortuguese ? 'Redefinir sua senha' : 'Reset your password'}
             </h1>
 
             {/* Success Message */}
@@ -90,10 +107,10 @@ export default function ForgotPasswordPage() {
               <div className="mb-6 p-4 bg-green-900/20 border border-green-700 rounded-lg">
                 <p className="text-green-400 text-sm">{message}</p>
                 <Link 
-                  href="/auth/login"
+                  href={isPortuguese ? "/auth/login?lang=pt" : "/auth/login"}
                   className="inline-block mt-2 text-primary hover:text-primary/80 text-sm underline"
                 >
-                  Return to login
+                  {isPortuguese ? 'Voltar ao login' : 'Return to login'}
                 </Link>
               </div>
             )}
@@ -109,7 +126,10 @@ export default function ForgotPasswordPage() {
             {!message && (
               <div className="space-y-6">
                 <p className="text-gray-400 text-center text-sm mb-8">
-                  Enter your email address and we'll send you a link to reset your password.
+                  {isPortuguese 
+                    ? 'Digite seu endereço de email e enviaremos um link para redefinir sua senha.'
+                    : 'Enter your email address and we\'ll send you a link to reset your password.'
+                  }
                 </p>
                 
                 <form onSubmit={handleSubmit} className="space-y-6">
@@ -120,7 +140,7 @@ export default function ForgotPasswordPage() {
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                       className="w-full px-4 py-3 bg-gray-900 border border-gray-700 rounded-full text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
-                      placeholder="Enter your email address"
+                      placeholder={isPortuguese ? "Digite seu endereço de email" : "Enter your email address"}
                       required
                       disabled={isLoading}
                     />
@@ -134,14 +154,14 @@ export default function ForgotPasswordPage() {
                     {isLoading ? (
                       <>
                         <div className="w-4 h-4 border-2 border-dark-background border-t-transparent rounded-full animate-spin"></div>
-                        <span>Sending...</span>
+                        <span>{isPortuguese ? 'Enviando...' : 'Sending...'}</span>
                       </>
                     ) : (
                       <>
                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
                         </svg>
-                        <span>Send reset email</span>
+                        <span>{isPortuguese ? 'Enviar email de redefinição' : 'Send reset email'}</span>
                       </>
                     )}
                   </button>
@@ -152,9 +172,9 @@ export default function ForgotPasswordPage() {
             {/* Footer Links */}
             <div className="mt-8 text-center">
               <p className="text-gray-400 text-sm">
-                Remember your password?{' '}
-                <Link href="/auth/login" className="text-primary hover:text-primary/80 underline">
-                  Sign in
+                {isPortuguese ? 'Lembra sua senha?' : 'Remember your password?'}{' '}
+                <Link href={isPortuguese ? "/auth/login?lang=pt" : "/auth/login"} className="text-primary hover:text-primary/80 underline">
+                  {isPortuguese ? 'Entrar' : 'Sign in'}
                 </Link>
               </p>
             </div>
@@ -164,13 +184,16 @@ export default function ForgotPasswordPage() {
         {/* Footer */}
         <footer className="p-6 text-center">
           <p className="text-gray-400 text-sm">
-            By continuing, you agree to Binary Hub's{' '}
+            {isPortuguese 
+              ? 'Ao continuar, você concorda com os '
+              : "By continuing, you agree to Binary Hub's "
+            }
             <Link href="/terms" className="text-white font-bold hover:underline">
-              Terms of Service
+              {isPortuguese ? 'Termos de Serviço' : 'Terms of Service'}
             </Link>
-            {' '}and{' '}
+            {isPortuguese ? ' e ' : ' and '}
             <Link href="/privacy" className="text-white font-bold hover:underline">
-              Privacy Policy
+              {isPortuguese ? 'Política de Privacidade' : 'Privacy Policy'}
             </Link>
             .
           </p>

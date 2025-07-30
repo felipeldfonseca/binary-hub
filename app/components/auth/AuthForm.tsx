@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { useAuth } from '@/hooks/useAuth'
 import { useRouter } from 'next/navigation'
 import { useSessionStorage } from '@/lib/hooks/useSessionStorage'
+import { useLanguage } from '@/lib/contexts/LanguageContext'
 import { 
   XMarkIcon as X, 
   EyeIcon as Eye, 
@@ -24,6 +25,7 @@ interface AuthFormProps {
 export default function AuthForm({ isOpen, onClose, mode, onModeChange }: AuthFormProps) {
   const { register, login, error, loading, clearError } = useAuth()
   const router = useRouter()
+  const { isPortuguese } = useLanguage()
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -69,22 +71,24 @@ export default function AuthForm({ isOpen, onClose, mode, onModeChange }: AuthFo
   // Convert Firebase error messages to user-friendly messages
   const getErrorMessage = (error: string): string => {
     if (error.includes('auth/user-not-found') || error.includes('auth/wrong-password') || error.includes('auth/invalid-credential')) {
-      return 'Invalid email or password.'
+      return isPortuguese ? 'Email ou senha inválidos.' : 'Invalid email or password.'
     }
     if (error.includes('auth/email-already-in-use')) {
-      return 'An account with this email already exists.'
+      return isPortuguese ? 'Uma conta com este email já existe.' : 'An account with this email already exists.'
     }
     if (error.includes('auth/weak-password')) {
-      return 'Password should be at least 6 characters.'
+      return isPortuguese ? 'A senha deve ter pelo menos 6 caracteres.' : 'Password should be at least 6 characters.'
     }
     if (error.includes('auth/invalid-email')) {
-      return 'Please enter a valid email address.'
+      return isPortuguese ? 'Por favor, insira um endereço de email válido.' : 'Please enter a valid email address.'
     }
     if (error.includes('auth/too-many-requests')) {
-      return 'Too many failed attempts. Please try again later.'
+      return isPortuguese ? 'Muitas tentativas falharam. Tente novamente mais tarde.' : 'Too many failed attempts. Please try again later.'
     }
     // Default fallback for any other errors
-    return error.includes('Firebase:') ? 'Authentication failed. Please try again.' : error
+    return error.includes('Firebase:') 
+      ? (isPortuguese ? 'Falha na autenticação. Tente novamente.' : 'Authentication failed. Please try again.') 
+      : error
   }
 
   const validateForm = () => {
@@ -93,32 +97,32 @@ export default function AuthForm({ isOpen, onClose, mode, onModeChange }: AuthFo
     // Name validation for signup
     if (mode === 'signup') {
       if (!formData.name.trim()) {
-        errors.name = 'Name is required'
+        errors.name = isPortuguese ? 'Nome é obrigatório' : 'Name is required'
       } else if (formData.name.trim().length < 2) {
-        errors.name = 'Name must be at least 2 characters'
+        errors.name = isPortuguese ? 'Nome deve ter pelo menos 2 caracteres' : 'Name must be at least 2 characters'
       }
     }
 
     // Email validation
     if (!formData.email.trim()) {
-      errors.email = 'Email is required'
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
-      errors.email = 'Please enter a valid email address'
+      errors.email = isPortuguese ? 'Email é obrigatório' : 'Email is required'
+    } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
+      errors.email = isPortuguese ? 'Por favor, insira um email válido' : 'Please enter a valid email'
     }
 
     // Password validation
     if (!formData.password) {
-      errors.password = 'Password is required'
+      errors.password = isPortuguese ? 'Senha é obrigatória' : 'Password is required'
     } else if (formData.password.length < 6) {
-      errors.password = 'Password must be at least 6 characters'
+      errors.password = isPortuguese ? 'Senha deve ter pelo menos 6 caracteres' : 'Password must be at least 6 characters'
     }
 
     // Confirm password validation for signup
     if (mode === 'signup') {
       if (!formData.confirmPassword) {
-        errors.confirmPassword = 'Please confirm your password'
+        errors.confirmPassword = isPortuguese ? 'Confirmação de senha é obrigatória' : 'Password confirmation is required'
       } else if (formData.password !== formData.confirmPassword) {
-        errors.confirmPassword = 'Passwords do not match'
+        errors.confirmPassword = isPortuguese ? 'As senhas não coincidem' : 'Passwords do not match'
       }
     }
 
@@ -228,7 +232,10 @@ export default function AuthForm({ isOpen, onClose, mode, onModeChange }: AuthFo
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700">
           <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
-            {mode === 'signup' ? 'Create Account' : 'Welcome Back'}
+            {mode === 'signup' 
+              ? (isPortuguese ? 'Criar Conta' : 'Create Account') 
+              : (isPortuguese ? 'Bem-vindo de Volta' : 'Welcome Back')
+            }
           </h2>
           <button
             onClick={onClose}
@@ -251,7 +258,7 @@ export default function AuthForm({ isOpen, onClose, mode, onModeChange }: AuthFo
           {mode === 'signup' && (
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Full Name
+                {isPortuguese ? 'Nome Completo' : 'Full Name'}
               </label>
               <div className="relative">
                 <User className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
@@ -265,7 +272,7 @@ export default function AuthForm({ isOpen, onClose, mode, onModeChange }: AuthFo
                       ? 'border-red-300 dark:border-red-600'
                       : 'border-gray-300 dark:border-gray-600'
                   } bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400`}
-                  placeholder="Enter your full name"
+                  placeholder={isPortuguese ? "Digite seu nome completo" : "Enter your full name"}
                 />
               </div>
               {formErrors.name && (
@@ -277,7 +284,7 @@ export default function AuthForm({ isOpen, onClose, mode, onModeChange }: AuthFo
           {/* Email Field */}
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Email Address
+              {isPortuguese ? 'Endereço de Email' : 'Email Address'}
             </label>
                          <div className="relative">
                <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
@@ -291,7 +298,7 @@ export default function AuthForm({ isOpen, onClose, mode, onModeChange }: AuthFo
                     ? 'border-red-300 dark:border-red-600'
                     : 'border-gray-300 dark:border-gray-600'
                 } bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400`}
-                placeholder="Enter your email"
+                placeholder={isPortuguese ? "Digite seu email" : "Enter your email"}
               />
             </div>
             {formErrors.email && (
@@ -302,7 +309,7 @@ export default function AuthForm({ isOpen, onClose, mode, onModeChange }: AuthFo
           {/* Password Field */}
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Password
+              {isPortuguese ? 'Senha' : 'Password'}
             </label>
                          <div className="relative">
                <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
@@ -316,7 +323,7 @@ export default function AuthForm({ isOpen, onClose, mode, onModeChange }: AuthFo
                      ? 'border-red-300 dark:border-red-600'
                      : 'border-gray-300 dark:border-gray-600'
                  } bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400`}
-                 placeholder="Enter your password"
+                 placeholder={isPortuguese ? "Digite sua senha" : "Enter your password"}
                />
                <button
                  type="button"
@@ -335,7 +342,7 @@ export default function AuthForm({ isOpen, onClose, mode, onModeChange }: AuthFo
           {mode === 'signup' && (
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Confirm Password
+                {isPortuguese ? 'Confirmar Senha' : 'Confirm Password'}
               </label>
                              <div className="relative">
                  <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
@@ -349,7 +356,7 @@ export default function AuthForm({ isOpen, onClose, mode, onModeChange }: AuthFo
                        ? 'border-red-300 dark:border-red-600'
                        : 'border-gray-300 dark:border-gray-600'
                    } bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400`}
-                   placeholder="Confirm your password"
+                   placeholder={isPortuguese ? "Confirme sua senha" : "Confirm your password"}
                  />
                  <button
                    type="button"
@@ -369,10 +376,10 @@ export default function AuthForm({ isOpen, onClose, mode, onModeChange }: AuthFo
           {mode === 'signin' && (
             <div className="text-center">
               <a
-                href="/auth/forgot-password"
+                href={isPortuguese ? "/auth/forgot-password?lang=pt" : "/auth/forgot-password"}
                 className="text-sm text-primary hover:text-primary/80 transition-colors"
               >
-                Forgot your password?
+                {isPortuguese ? 'Esqueceu sua senha?' : 'Forgot your password?'}
               </a>
             </div>
           )}
@@ -388,7 +395,10 @@ export default function AuthForm({ isOpen, onClose, mode, onModeChange }: AuthFo
              <div className="w-5 h-5 border-2 border-gray-900 border-t-transparent rounded-full animate-spin"></div>
            ) : (
              <>
-               {mode === 'signup' ? 'Create Account' : 'Sign In'}
+               {mode === 'signup' 
+                 ? (isPortuguese ? 'Criar Conta' : 'Create Account') 
+                 : (isPortuguese ? 'Entrar' : 'Sign In')
+               }
                <ArrowRight className="w-5 h-5" />
              </>
            )}
@@ -397,13 +407,19 @@ export default function AuthForm({ isOpen, onClose, mode, onModeChange }: AuthFo
           {/* Mode Toggle */}
           <div className="text-center pt-4 border-t border-gray-200 dark:border-gray-700">
             <p className="text-sm text-gray-600 dark:text-gray-400">
-              {mode === 'signup' ? 'Already have an account?' : "Don't have an account?"}
+              {mode === 'signup' 
+                ? (isPortuguese ? 'Já tem uma conta?' : 'Already have an account?')
+                : (isPortuguese ? 'Não tem uma conta?' : "Don't have an account?")
+              }
               <button
                 type="button"
                 onClick={() => handleModeChange(mode === 'signup' ? 'signin' : 'signup')}
                 className="ml-1 text-primary hover:text-primary/80 font-medium transition-colors"
               >
-                {mode === 'signup' ? 'Sign In' : 'Sign Up'}
+                {mode === 'signup' 
+                  ? (isPortuguese ? 'Entrar' : 'Sign In')
+                  : (isPortuguese ? 'Cadastrar' : 'Sign Up')
+                }
               </button>
             </p>
           </div>
