@@ -17,9 +17,9 @@ export default function DashboardPlansPage() {
             <div className="max-w-6xl mx-auto">
               {/* Hero Section */}
               <div className="text-center mb-16">
-                <h1 className="text-3xl md:text-4xl lg:text-5xl font-poly font-bold text-white mb-6">
+                              <h1 className="text-3xl md:text-4xl lg:text-5xl font-poly font-bold text-white mb-6">
                   Choose the plan that powers your <span className="text-primary">trading journey</span>
-                </h1>
+              </h1>
                 <p className="text-xl font-comfortaa font-semibold text-white max-w-3xl mx-auto">
                   <span className="text-primary">Start free.</span> Unlock premium insights when you're ready.
                 </p>
@@ -72,10 +72,10 @@ export default function DashboardPlansPage() {
                       <CheckIcon className="w-5 h-5 mr-3 flex-shrink-0" />
                       Priority support: Community
                     </li>
-                    
+
                     {/* Divider */}
                     <div className="border-t border-gray-600 my-4"></div>
-                    
+
                     {/* Unavailable Features */}
                     <li className="flex items-center text-gray-500">
                       <XIcon className="w-5 h-5 mr-3 flex-shrink-0" />
@@ -227,7 +227,7 @@ export default function DashboardPlansPage() {
                     </li>
                     <li className="flex items-center text-gray-300">
                       <CheckIcon className="w-5 h-5 mr-3 flex-shrink-0" />
-                      Strategy KPIs
+                      Strategy KPIs 
                     </li>
                     <li className="flex items-center text-gray-300">
                       <CheckIcon className="w-5 h-5 mr-3 flex-shrink-0" />

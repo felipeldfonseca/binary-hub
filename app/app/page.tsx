@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import Navbar from '@/components/layout/Navbar'
-import HeroSection from '@/components/dashboard/HeroSection'
+import LandingHeroSection from '@/components/layout/LandingHeroSection'
 import HowItWorksSection from '@/components/layout/HowItWorksSection'
 import MissionSection from '@/components/layout/MissionSection'
 import KeyFeatureSection from '@/components/layout/KeyFeatureSection'
@@ -17,8 +17,8 @@ export default function HomePage() {
         {/* Navbar (copied from dashboard, but with landing page CTAs) */}
         <Navbar />
         <main className="relative">
-          {/* Hero Section (copied from dashboard) */}
-          <HeroSection />
+          {/* Hero Section - Landing page specific */}
+          <LandingHeroSection />
           
           {/* How It Works Section */}
           <HowItWorksSection />

@@ -142,41 +142,41 @@ export default function FAQSection({ variant, language }: FAQSectionProps) {
             {title}
           </h2>
         
-          <dl className="mt-12">
-            {faqs.map((faq, index) => (
-              <div key={index} className="divide-y divide-white/10 border-b border-white/10">
-                <dt className="py-6">
-                  <button
-                    onClick={() => toggleFAQ(index)}
-                    className="flex w-full items-start justify-between text-left focus:outline-none focus:ring-0 focus:border-0 active:outline-none active:ring-0 active:border-0 hover:outline-none hover:ring-0 hover:border-0"
-                  >
-                    <span className="text-lg font-semibold leading-7">
-                      {faq.question}
-                    </span>
-                    <Plus
-                      className={`ml-6 h-5 w-5 flex-shrink-0 transform transition-transform duration-500 ${
-                        openIndex === index ? 'rotate-45' : ''
-                      }`}
-                      aria-hidden="true"
-                    />
-                  </button>
-                </dt>
-                <dd>
-                  <div
-                    className={`grid transition-all duration-500 ease-in-out ${
-                      openIndex === index ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'
+        <dl className="mt-12">
+          {faqs.map((faq, index) => (
+            <div key={index} className="divide-y divide-white/10 border-b border-white/10">
+              <dt className="py-6">
+                <button
+                  onClick={() => toggleFAQ(index)}
+                  className="flex w-full items-start justify-between text-left focus:outline-none focus:ring-0 focus:border-0 active:outline-none active:ring-0 active:border-0 hover:outline-none hover:ring-0 hover:border-0"
+                >
+                  <span className="text-lg font-semibold leading-7">
+                    {faq.question}
+                  </span>
+                  <Plus
+                    className={`ml-6 h-5 w-5 flex-shrink-0 transform transition-transform duration-500 ${
+                      openIndex === index ? 'rotate-45' : ''
                     }`}
-                  >
-                    <div className="overflow-hidden">
-                      <div className="pt-4 pb-6 text-white">
-                        {faq.answer}
-                      </div>
+                    aria-hidden="true"
+                  />
+                </button>
+              </dt>
+              <dd>
+                <div
+                  className={`grid transition-all duration-500 ease-in-out ${
+                    openIndex === index ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'
+                  }`}
+                >
+                  <div className="overflow-hidden">
+                    <div className="pt-4 pb-6 text-white">
+                      {faq.answer}
                     </div>
                   </div>
-                </dd>
-              </div>
-            ))}
-          </dl>
+                </div>
+              </dd>
+            </div>
+          ))}
+        </dl>
         </div>
       </div>
     </section>
