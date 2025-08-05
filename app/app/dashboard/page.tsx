@@ -22,7 +22,7 @@ export default function DashboardPage() {
         <CalendarSection />
         <EventsSection />
       </main>
-              <Footer />
+      <Footer />
     </div>
   )
 } 

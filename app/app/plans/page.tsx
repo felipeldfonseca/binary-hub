@@ -30,7 +30,7 @@ export default function PlansPage() {
                   }<span className="text-primary">
                     {isPortuguese ? 'jornada de trading' : 'trading journey'}
                   </span>
-                </h1>
+              </h1>
                 <p className="text-xl font-comfortaa font-normal text-white max-w-3xl mx-auto">
                   {isPortuguese 
                     ? 'Comece grátis. Desbloqueie insights premium quando estiver pronto.'
@@ -54,10 +54,10 @@ export default function PlansPage() {
                   </div>
                   <ul className="space-y-4 mb-8 flex-1 ml-4 mr-4">
                     {/* Available Features */}
-                    <li className="flex items-center text-gray-300">
+                                    <li className="flex items-center text-gray-300">
                       <CheckIcon className="w-5 h-5 mr-3 flex-shrink-0" />
                       {isPortuguese ? 'Registrar 100 operações / mês' : 'Record 100 trades / month'}
-                    </li>
+                </li>
                     <li className="flex items-center text-gray-300">
                       <CheckIcon className="w-5 h-5 mr-3 flex-shrink-0" />
                       {isPortuguese ? 'Registro manual' : 'Manual journaling'}

@@ -37,8 +37,8 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
       detectedLanguage = pathname.startsWith('/pt') ? 'pt' : 'en'
     }
     
-    setLanguageState(detectedLanguage)
-    localStorage.setItem('binary-hub-language', detectedLanguage)
+      setLanguageState(detectedLanguage)
+      localStorage.setItem('binary-hub-language', detectedLanguage)
   }, [pathname, searchParams])
 
   const setLanguage = (newLanguage: Language) => {

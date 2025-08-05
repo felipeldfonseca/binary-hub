@@ -11,6 +11,9 @@ import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import { generateInsight, generateTradeCoach, checkTradeRules, validateCSVHeaders } from './services/openai';
+import tradesRouter from './routes/trades';
+import importRouter from './routes/import';
+import analyticsRouter from './routes/analytics';
 
 // Extend Express Request to include user property
 interface AuthenticatedRequest extends Request {
@@ -617,6 +620,11 @@ app.post('/trades/validate-csv', authenticate, async (req: AuthenticatedRequest,
     return res.status(500).json({ error: 'Internal server error' });
   }
 });
+
+// API v1 Routes
+app.use('/v1/trades', authenticate, tradesRouter);
+app.use('/v1/import', authenticate, importRouter);
+app.use('/v1/analytics', authenticate, analyticsRouter);
 
 // Export the API
 // Configure HTTPS function with options
