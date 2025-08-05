@@ -1,17 +1,19 @@
 # API Infrastructure Documentation
 
-*Version 1.0 • July 2025*
+*Version 1.1 • July 2025*
 
 ## 📋 Table of Contents
 
 1. [Overview](#overview)
 2. [Authentication & Security](#authentication--security)
 3. [Data Models](#data-models)
-4. [API Endpoints](#api-endpoints)
-5. [Error Handling](#error-handling)
-6. [Development Guidelines](#development-guidelines)
-7. [Testing Strategy](#testing-strategy)
-8. [Performance & Scalability](#performance--scalability)
+4. [CSV Import Strategy](#csv-import-strategy)
+5. [API Endpoints](#api-endpoints)
+6. [Error Handling](#error-handling)
+7. [Development Guidelines](#development-guidelines)
+8. [Testing Strategy](#testing-strategy)
+9. [Performance & Scalability](#performance--scalability)
+10. [Implementation Plan](#implementation-plan)
 
 ---
 
@@ -91,17 +93,24 @@ interface Trade {
   tradeId: string              // Exchange trade ID (from CSV)
   
   // Trade Details
-  asset: string                // Asset/currency pair (e.g., "EUR/USD")
-  direction: 'call' | 'put'    // Trade direction
+  asset: string                // Asset/currency pair (e.g., "MEMXUSDT")
+  direction: 'call' | 'put'    // Trade direction (BULL/BEAR from CSV)
   amount: number               // Trade amount in USD
   entryPrice: number           // Entry price
   exitPrice: number            // Exit price
   entryTime: Date              // Entry timestamp
   exitTime: Date               // Exit timestamp
   
-  // Results
-  result: 'win' | 'loss' | 'open'  // Trade result
+  // CSV-Specific Fields
+  timeframe: string            // Time frame (M1, M5, etc.)
+  candleTime: string           // Candle time (e.g., "21:47")
+  refunded: number             // Refunded amount
+  executed: number             // Executed amount
+  status: 'WIN' | 'LOSE'      // Original status from CSV
+  result: 'win' | 'loss' | 'tie'  // Normalized result
   profit: number               // Calculated profit/loss
+  
+  // Results
   payout: number               // Payout percentage
   
   // Metadata
@@ -115,6 +124,34 @@ interface Trade {
   updatedAt: Date              // Last update time
   importedAt?: Date            // CSV import timestamp
   importBatch?: string         // Import batch ID
+}
+```
+
+### **Import Record Model**
+```typescript
+interface ImportRecord {
+  importId: string             // Auto-generated import ID
+  userId: string               // User ID
+  fileName: string             // Original CSV filename
+  totalRows: number            // Total rows in CSV
+  importedRows: number         // Successfully imported rows
+  duplicateRows: number        // Duplicate rows found
+  errors: ImportError[]        // Import errors
+  status: 'processing' | 'completed' | 'failed'
+  createdAt: Date              // Import start time
+  completedAt?: Date           // Import completion time
+  metadata: {
+    fileSize: number           // File size in bytes
+    processingTime: number     // Processing time in ms
+    csvFormat: string          // Detected CSV format
+  }
+}
+
+interface ImportError {
+  row: number                  // Row number in CSV
+  field?: string               // Field causing error
+  error: string                // Error message
+  code: string                 // Error code
 }
 ```
 
@@ -272,7 +309,7 @@ Query Parameters:
 - end?: string (ISO date)
 - limit?: number (default: 100, max: 1000)
 - offset?: number (default: 0)
-- result?: 'win' | 'loss' | 'open'
+- result?: 'win' | 'loss' | 'tie'
 - asset?: string
 - strategy?: string
 
@@ -298,7 +335,7 @@ Request: {
   exitPrice: number
   entryTime: string (ISO date)
   exitTime: string (ISO date)
-  result: 'win' | 'loss' | 'open'
+  result: 'win' | 'loss' | 'tie'
   strategy?: string
   notes?: string
   platform?: string
@@ -502,6 +539,209 @@ Response: {
   createdAt: string
   completedAt?: string
 }
+```
+
+---
+
+## 📋 CSV Import Strategy
+
+### **Ebinex CSV Format**
+Based on the provided sample CSV, here's the expected format:
+
+#### **CSV Headers**
+```
+ID,Data,Ativo,Tempo,Previsão,Vela,P. ABRT,P. FECH,Valor,Estornado,Executado,Status,Resultado
+```
+
+#### **Data Mapping**
+| **CSV Field** | **Our Model** | **Example** | **Notes** |
+|---------------|----------------|-------------|-----------|
+| `ID` | `tradeId` | `68915477593a1b66d8941cda` | Unique trade ID |
+| `Data` | `entryTime` | `2025-08-05T00:46:47.013+00:00` | ISO timestamp |
+| `Ativo` | `asset` | `MEMXUSDT` | Asset/currency pair |
+| `Tempo` | `timeframe` | `M1` | Time frame (M1, M5, etc.) |
+| `Previsão` | `direction` | `BEAR` | BULL/BEAR (call/put) |
+| `Vela` | `candleTime` | `21:47` | Candle time |
+| `P. ABRT` | `entryPrice` | `$ 2.4664` | Entry price |
+| `P. FECH` | `exitPrice` | `$ 2.4651` | Exit price |
+| `Valor` | `amount` | `$ 8` | Trade amount |
+| `Estornado` | `refunded` | `$ 0` | Refunded amount |
+| `Executado` | `executed` | `$ 8` | Executed amount |
+| `Status` | `status` | `WIN` | WIN/LOSE |
+| `Resultado` | `profit` | `7.36` | Profit/loss amount |
+
+### **CSV Parser Service**
+```typescript
+class CSVParserService {
+  // Parse Ebinex CSV format
+  parseEbinexCsv(csvContent: string): ParsedTrade[] {
+    const lines = csvContent.split('\n')
+    const headers = lines[0].split(',')
+    
+    // Validate headers
+    this.validateHeaders(headers)
+    
+    // Parse data rows
+    const trades: ParsedTrade[] = []
+    for (let i = 1; i < lines.length; i++) {
+      if (lines[i].trim()) {
+        const trade = this.parseRow(lines[i], headers)
+        if (trade) trades.push(trade)
+      }
+    }
+    
+    return trades
+  }
+  
+  private parseRow(row: string, headers: string[]): ParsedTrade | null {
+    const values = row.split(',')
+    
+    return {
+      tradeId: values[0],
+      entryTime: new Date(values[1]),
+      asset: values[2],
+      timeframe: values[3],
+      direction: values[4] === 'BULL' ? 'call' : 'put',
+      candleTime: values[5],
+      entryPrice: parseFloat(values[6].replace('$ ', '').replace(',', '')),
+      exitPrice: parseFloat(values[7].replace('$ ', '').replace(',', '')),
+      amount: parseFloat(values[8].replace('$ ', '')),
+      refunded: parseFloat(values[9].replace('$ ', '')),
+      executed: parseFloat(values[10].replace('$ ', '')),
+      status: values[11] as 'WIN' | 'LOSE',
+      profit: parseFloat(values[12]),
+      result: values[11] === 'WIN' ? 'win' : 'loss'
+    }
+  }
+}
+```
+
+### **Deduplication Strategy**
+```typescript
+class ImportService {
+  async processCsvUpload(userId: string, csvFile: Buffer): Promise<ImportResult> {
+    // Parse CSV
+    const trades = csvParser.parseEbinexCsv(csvFile.toString())
+    
+    // Check for existing trades
+    const existingTradeIds = await this.findExistingTrades(userId, trades.map(t => t.tradeId))
+    
+    // Filter out duplicates
+    const newTrades = trades.filter(trade => !existingTradeIds.includes(trade.tradeId))
+    
+    // Import new trades
+    const importResult = await this.importTrades(userId, newTrades)
+    
+    return {
+      totalRows: trades.length,
+      importedRows: newTrades.length,
+      duplicateRows: trades.length - newTrades.length,
+      errors: [],
+      status: 'completed'
+    }
+  }
+}
+```
+
+### **Multiple CSV Support**
+- **Batch Processing**: Handle multiple CSV files in sequence
+- **Progress Tracking**: Track progress for each file
+- **Error Aggregation**: Collect errors from all files
+- **Import History**: Maintain history of all imports
+
+### **Error Handling**
+```typescript
+// CSV Processing Errors
+CSV_FORMAT_ERROR: 'Invalid CSV format'
+CSV_VALIDATION_ERROR: 'CSV data validation failed'
+DUPLICATE_TRADE_ERROR: 'Trade already exists'
+IMPORT_FAILED_ERROR: 'Import processing failed'
+FILE_TOO_LARGE_ERROR: 'File size exceeds limit'
+
+// User-Friendly Messages (Portuguese)
+'CSV inválido': 'Invalid CSV format'
+'Operação duplicada': 'Duplicate trade detected'
+'Erro no processamento': 'Processing error'
+'Arquivo muito grande': 'File too large'
+```
+
+---
+
+## 🚀 Implementation Plan
+
+### **Phase A: Foundation (6 Days)**
+
+#### **Day 1-2: Core Infrastructure**
+- [ ] Create feature branch `feature/api-infrastructure`
+- [ ] Set up Firebase Functions project structure
+- [ ] Implement authentication middleware
+- [ ] Create basic CRUD operations for trades
+- [ ] Set up error handling and logging
+- [ ] Implement rate limiting
+
+#### **Day 3-4: CSV Processing**
+- [ ] Create CSV parser for Ebinex format
+- [ ] Implement trade data mapping
+- [ ] Add validation for CSV data
+- [ ] Create import service with deduplication
+- [ ] Add import history tracking
+
+#### **Day 5-6: API Endpoints & Frontend Integration**
+- [ ] Create trade management endpoints
+- [ ] Create import endpoints
+- [ ] Create analytics endpoints
+- [ ] Replace mock data with real API calls
+- [ ] Add loading states and error handling
+- [ ] Test with sample CSV data
+
+### **File Structure**
+```typescript
+// New files to create
+functions/src/services/tradeService.ts
+functions/src/services/csvParser.ts
+functions/src/services/importService.ts
+functions/src/utils/validation.ts
+app/hooks/useTrades.ts
+app/hooks/useTradeStats.ts
+app/components/dashboard/CsvUploadSection.tsx
+
+// Files to modify
+functions/src/index.ts (add new endpoints)
+app/components/dashboard/PerformanceSection.tsx (replace mock data)
+app/lib/types/trade.ts (update with CSV fields)
+```
+
+### **Success Criteria**
+- [ ] Users can upload Ebinex CSV files
+- [ ] CSV data is parsed and stored correctly
+- [ ] Dashboard shows real trade statistics
+- [ ] Performance charts display real data
+- [ ] Error handling works for invalid CSV files
+- [ ] Loading states show during data processing
+- [ ] Multiple CSV support with deduplication
+- [ ] Import history tracking
+
+### **Testing Strategy**
+```typescript
+// Unit Tests
+describe('CSVParserService', () => {
+  it('should parse Ebinex CSV correctly')
+  it('should handle malformed CSV data')
+  it('should validate CSV headers')
+})
+
+describe('ImportService', () => {
+  it('should deduplicate trades correctly')
+  it('should handle multiple CSV uploads')
+  it('should track import history')
+})
+
+// Integration Tests
+describe('Trade API', () => {
+  it('should create and retrieve trades')
+  it('should handle CSV upload and processing')
+  it('should return correct analytics')
+})
 ```
 
 ---
