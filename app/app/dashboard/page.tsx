@@ -6,6 +6,7 @@ import HeroSectionPT from '@/components/dashboard/HeroSectionPT'
 import PerformanceSection from '@/components/dashboard/PerformanceSection'
 import CalendarSection from '@/components/dashboard/CalendarSection'
 import EventsSection from '@/components/dashboard/EventsSection'
+import CsvUploadSection from '@/components/dashboard/CsvUploadSection'
 import Footer from '@/components/layout/Footer'
 
 import { useLanguage } from '@/lib/contexts/LanguageContext'
@@ -19,6 +20,7 @@ export default function DashboardPage() {
       <main className="relative">
         {isPortuguese ? <HeroSectionPT /> : <HeroSection />}
         <PerformanceSection />
+        <CsvUploadSection />
         <CalendarSection />
         <EventsSection />
       </main>
