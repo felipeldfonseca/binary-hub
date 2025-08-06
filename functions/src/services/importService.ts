@@ -3,7 +3,8 @@ import { logger } from 'firebase-functions';
 import { csvParserService, ParsedTrade } from './csvParser';
 import { tradeService, Trade } from './tradeService';
 
-const db = getFirestore();
+// Initialize Firestore inside the service
+const getDb = () => getFirestore();
 
 export interface ImportRecord {
   importId: string;
@@ -59,6 +60,7 @@ export class ImportService {
     const importId = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     
     try {
+      const db = getDb();
       // Create import record
       const importRecord: ImportRecord = {
         importId,
@@ -98,50 +100,53 @@ export class ImportService {
         .filter(trade => existingTradeIds.includes(trade.tradeId))
         .map(trade => trade.tradeId);
 
-      // Convert to Trade model
+      // Convert to trade model
       const tradesToImport = newTrades.map(parsedTrade => 
         csvParserService.convertToTradeModel(parsedTrade, userId)
       );
 
       // Import new trades
-      const bulkResult = await tradeService.bulkCreateTrades(userId, tradesToImport, importId);
+      const importResult = await tradeService.bulkCreateTrades(userId, tradesToImport, importId);
 
       // Calculate processing time
       const processingTime = Date.now() - startTime;
 
-      // Update import record
-      const finalResult: ImportResult = {
+      // Update import record with results
+      await this.updateImportRecord(importId, {
+        importedRows: importResult.created,
+        duplicateRows: duplicateTradeIds.length,
+        errors: importResult.errors.map(err => ({
+          row: err.index,
+          error: err.error,
+          code: 'IMPORT_ERROR'
+        })),
+        status: 'completed',
+        completedAt: new Date(),
+        metadata: {
+          fileSize: csvFile.length,
+          processingTime,
+          csvFormat: 'Ebinex'
+        }
+      });
+
+      logger.info(`CSV import completed for user ${userId}: ${importResult.created} trades imported, ${duplicateTradeIds.length} duplicates`);
+
+      return {
         importId,
         status: 'completed',
         totalRows: parsedTrades.length,
-        importedRows: bulkResult.created,
+        importedRows: importResult.created,
         duplicateRows: duplicateTradeIds.length,
-        errors: bulkResult.errors.map(error => ({
-          row: error.index + 1, // +1 because CSV rows are 1-indexed
-          error: error.error,
+        errors: importResult.errors.map(err => ({
+          row: err.index,
+          error: err.error,
           code: 'IMPORT_ERROR'
         })),
         processingTime
       };
 
-      await this.updateImportRecord(importId, {
-        status: 'completed',
-        importedRows: bulkResult.created,
-        duplicateRows: duplicateTradeIds.length,
-        errors: finalResult.errors,
-        completedAt: new Date(),
-        metadata: {
-          fileSize: importRecord.metadata.fileSize,
-          processingTime,
-          csvFormat: importRecord.metadata.csvFormat
-        }
-      });
-
-      logger.info(`CSV import completed: ${importId} for user: ${userId}`);
-      return finalResult;
-
     } catch (error) {
-      const processingTime = Date.now() - startTime;
+      logger.error('CSV import error:', error);
       
       // Update import record with error
       await this.updateImportRecord(importId, {
@@ -151,16 +156,10 @@ export class ImportService {
           error: error instanceof Error ? error.message : 'Unknown error',
           code: 'IMPORT_FAILED'
         }],
-        completedAt: new Date(),
-        metadata: {
-          fileSize: 0,
-          processingTime,
-          csvFormat: 'unknown'
-        }
+        completedAt: new Date()
       });
 
-      logger.error(`CSV import failed: ${importId} for user: ${userId}`, error);
-      throw error;
+      throw new Error('CSV import failed');
     }
   }
 
@@ -204,7 +203,7 @@ export class ImportService {
    */
   async getImportStatus(importId: string): Promise<ImportRecord | null> {
     try {
-      const doc = await db.collection('imports').doc(importId).get();
+      const doc = await getDb().collection('imports').doc(importId).get();
       
       if (!doc.exists) {
         return null;
@@ -225,7 +224,7 @@ export class ImportService {
    */
   async getImportHistory(userId: string, limit = 50): Promise<ImportRecord[]> {
     try {
-      const snapshot = await db
+      const snapshot = await getDb()
         .collection('users')
         .doc(userId)
         .collection('imports')
@@ -316,8 +315,8 @@ export class ImportService {
    */
   private async createImportRecord(importRecord: ImportRecord): Promise<void> {
     try {
-      await db.collection('imports').doc(importRecord.importId).set(importRecord);
-      await db
+      await getDb().collection('imports').doc(importRecord.importId).set(importRecord);
+      await getDb()
         .collection('users')
         .doc(importRecord.userId)
         .collection('imports')
@@ -334,13 +333,13 @@ export class ImportService {
    */
   private async updateImportRecord(importId: string, updates: Partial<ImportRecord>): Promise<void> {
     try {
-      await db.collection('imports').doc(importId).update(updates);
+      await getDb().collection('imports').doc(importId).update(updates);
       
       // Also update in user's import collection
-      const userDoc = await db.collection('imports').doc(importId).get();
+      const userDoc = await getDb().collection('imports').doc(importId).get();
       if (userDoc.exists) {
         const data = userDoc.data() as ImportRecord;
-        await db
+        await getDb()
           .collection('users')
           .doc(data.userId)
           .collection('imports')

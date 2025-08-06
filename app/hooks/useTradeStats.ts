@@ -55,9 +55,9 @@ export function useTradeStats(period: 'day' | 'week' | 'month' | '3months' | '6m
 
     try {
       const idToken = await auth.currentUser?.getIdToken();
-      const response = await fetch(`/api/v1/analytics/dashboard?period=${period}`, {
+      const response = await fetch(`http://localhost:5004/binary-hub/us-central1/api/v1/analytics/dashboard?period=${period}`, {
         headers: {
-          'Authorization': `Bearer ${idToken}`,
+          'Authorization': `Bearer ${idToken || 'mock-token-for-testing'}`,
           'Content-Type': 'application/json',
         },
       });
@@ -97,9 +97,9 @@ export function useTradeStats(period: 'day' | 'week' | 'month' | '3months' | '6m
         queryParams.append('end', end.toISOString());
       }
 
-      const response = await fetch(`/api/v1/analytics/performance?${queryParams.toString()}`, {
+      const response = await fetch(`http://localhost:5004/binary-hub/us-central1/api/v1/analytics/performance?${queryParams.toString()}`, {
         headers: {
-          'Authorization': `Bearer ${idToken}`,
+          'Authorization': `Bearer ${idToken || 'mock-token-for-testing'}`,
           'Content-Type': 'application/json',
         },
       });
@@ -135,9 +135,9 @@ export function useTradeStats(period: 'day' | 'week' | 'month' | '3months' | '6m
       queryParams.append('end', end.toISOString());
     }
 
-    const response = await fetch(`/api/v1/analytics/export?${queryParams.toString()}`, {
+    const response = await fetch(`http://localhost:5004/binary-hub/us-central1/api/v1/analytics/export?${queryParams.toString()}`, {
       headers: {
-        'Authorization': `Bearer ${idToken}`,
+        'Authorization': `Bearer ${idToken || 'mock-token-for-testing'}`,
         'Content-Type': 'application/json',
       },
     });

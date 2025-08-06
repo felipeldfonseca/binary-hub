@@ -73,14 +73,14 @@ export function useTrades(filters: TradeFilters = {}) {
 
   const fetchTrades = useCallback(async (newFilters: TradeFilters = {}) => {
     if (!user) return;
-
+    
     setLoading(true);
     setError(null);
-
+    
     try {
       const idToken = await auth.currentUser?.getIdToken();
       const queryParams = new URLSearchParams();
-
+      
       if (newFilters.start) {
         queryParams.append('start', newFilters.start.toISOString());
       }
@@ -102,32 +102,24 @@ export function useTrades(filters: TradeFilters = {}) {
       if (newFilters.strategy) {
         queryParams.append('strategy', newFilters.strategy);
       }
-
-      const response = await fetch(`/api/v1/trades?${queryParams.toString()}`, {
+      
+      const response = await fetch(`http://localhost:5004/binary-hub/us-central1/api/v1/trades?${queryParams.toString()}`, {
         headers: {
-          'Authorization': `Bearer ${idToken}`,
+          'Authorization': `Bearer ${idToken || 'mock-token-for-testing'}`,
           'Content-Type': 'application/json',
         },
       });
-
+      
       if (!response.ok) {
+        if (response.status === 404) {
+          throw new Error('API endpoints not yet implemented. This feature will be available in Phase B.');
+        }
         const errorData = await response.json();
         throw new Error(errorData.error || 'Failed to fetch trades');
       }
-
-      const data: TradesResponse = await response.json();
       
-      // Convert date strings to Date objects
-      const tradesWithDates = data.trades.map(trade => ({
-        ...trade,
-        entryTime: new Date(trade.entryTime),
-        exitTime: new Date(trade.exitTime),
-        createdAt: new Date(trade.createdAt),
-        updatedAt: new Date(trade.updatedAt),
-        importedAt: trade.importedAt ? new Date(trade.importedAt) : undefined,
-      }));
-
-      setTrades(tradesWithDates);
+      const data: TradesResponse = await response.json();
+      setTrades(data.trades);
       setPagination(data.pagination);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred');
@@ -138,93 +130,138 @@ export function useTrades(filters: TradeFilters = {}) {
 
   const createTrade = useCallback(async (tradeData: Partial<Trade>) => {
     if (!user) throw new Error('User not authenticated');
-
-    const idToken = await auth.currentUser?.getIdToken();
-    const response = await fetch('/api/v1/trades', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${idToken}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(tradeData),
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.error || 'Failed to create trade');
-    }
-
-    const newTrade = await response.json();
     
-    // Convert date strings to Date objects
-    const tradeWithDates = {
-      ...newTrade,
-      entryTime: new Date(newTrade.entryTime),
-      exitTime: new Date(newTrade.exitTime),
-      createdAt: new Date(newTrade.createdAt),
-      updatedAt: new Date(newTrade.updatedAt),
-      importedAt: newTrade.importedAt ? new Date(newTrade.importedAt) : undefined,
-    };
-
-    setTrades(prev => [tradeWithDates, ...prev]);
-    return tradeWithDates;
+    try {
+      const idToken = await auth.currentUser?.getIdToken();
+      const response = await fetch(`http://localhost:5004/binary-hub/us-central1/api/v1/trades`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${idToken || 'mock-token-for-testing'}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(tradeData),
+      });
+      
+      if (!response.ok) {
+        if (response.status === 404) {
+          throw new Error('API endpoints not yet implemented. This feature will be available in Phase B.');
+        }
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to create trade');
+      }
+      
+      const newTrade: Trade = await response.json();
+      
+      // Add to local state
+      setTrades(prev => [newTrade, ...prev]);
+      
+      return newTrade;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An error occurred');
+      throw err;
+    }
   }, [user]);
 
-  const updateTrade = useCallback(async (tradeId: string, tradeData: Partial<Trade>) => {
+  const updateTrade = useCallback(async (tradeId: string, updates: Partial<Trade>) => {
     if (!user) throw new Error('User not authenticated');
-
-    const idToken = await auth.currentUser?.getIdToken();
-    const response = await fetch(`/api/v1/trades/${tradeId}`, {
-      method: 'PUT',
-      headers: {
-        'Authorization': `Bearer ${idToken}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(tradeData),
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.error || 'Failed to update trade');
-    }
-
-    const updatedTrade = await response.json();
     
-    // Convert date strings to Date objects
-    const tradeWithDates = {
-      ...updatedTrade,
-      entryTime: new Date(updatedTrade.entryTime),
-      exitTime: new Date(updatedTrade.exitTime),
-      createdAt: new Date(updatedTrade.createdAt),
-      updatedAt: new Date(updatedTrade.updatedAt),
-      importedAt: updatedTrade.importedAt ? new Date(updatedTrade.importedAt) : undefined,
-    };
-
-    setTrades(prev => prev.map(trade => 
-      trade.id === tradeId ? tradeWithDates : trade
-    ));
-    return tradeWithDates;
+    try {
+      const idToken = await auth.currentUser?.getIdToken();
+      const response = await fetch(`http://localhost:5004/binary-hub/us-central1/api/v1/trades/${tradeId}`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${idToken || 'mock-token-for-testing'}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(updates),
+      });
+      
+      if (!response.ok) {
+        if (response.status === 404) {
+          throw new Error('API endpoints not yet implemented. This feature will be available in Phase B.');
+        }
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to update trade');
+      }
+      
+      const updatedTrade: Trade = await response.json();
+      
+      // Update local state
+      setTrades(prev => prev.map(trade => 
+        trade.id === tradeId ? updatedTrade : trade
+      ));
+      
+      return updatedTrade;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An error occurred');
+      throw err;
+    }
   }, [user]);
 
   const deleteTrade = useCallback(async (tradeId: string) => {
     if (!user) throw new Error('User not authenticated');
-
-    const idToken = await auth.currentUser?.getIdToken();
-    const response = await fetch(`/api/v1/trades/${tradeId}`, {
-      method: 'DELETE',
-      headers: {
-        'Authorization': `Bearer ${idToken}`,
-        'Content-Type': 'application/json',
-      },
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.error || 'Failed to delete trade');
+    
+    try {
+      const idToken = await auth.currentUser?.getIdToken();
+      const response = await fetch(`http://localhost:5004/binary-hub/us-central1/api/v1/trades/${tradeId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${idToken || 'mock-token-for-testing'}`,
+          'Content-Type': 'application/json',
+        },
+      });
+      
+      if (!response.ok) {
+        if (response.status === 404) {
+          throw new Error('API endpoints not yet implemented. This feature will be available in Phase B.');
+        }
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to delete trade');
+      }
+      
+      // Remove from local state
+      setTrades(prev => prev.filter(trade => trade.id !== tradeId));
+      
+      return true;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An error occurred');
+      throw err;
     }
-
-    setTrades(prev => prev.filter(trade => trade.id !== tradeId));
   }, [user]);
+
+  const bulkCreateTrades = useCallback(async (trades: Partial<Trade>[], importBatch?: string) => {
+    if (!user) throw new Error('User not authenticated');
+    
+    try {
+      const idToken = await auth.currentUser?.getIdToken();
+      const response = await fetch(`http://localhost:5004/binary-hub/us-central1/api/v1/trades/bulk`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${idToken || 'mock-token-for-testing'}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ trades, importBatch }),
+      });
+      
+      if (!response.ok) {
+        if (response.status === 404) {
+          throw new Error('API endpoints not yet implemented. This feature will be available in Phase B.');
+        }
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to bulk create trades');
+      }
+      
+      const result = await response.json();
+      
+      // Refresh trades list
+      await fetchTrades();
+      
+      return result;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An error occurred');
+      throw err;
+    }
+  }, [user, fetchTrades]);
 
   // Fetch trades on mount and when filters change
   useEffect(() => {
@@ -240,5 +277,6 @@ export function useTrades(filters: TradeFilters = {}) {
     createTrade,
     updateTrade,
     deleteTrade,
+    bulkCreateTrades,
   };
 } 
