@@ -223,7 +223,7 @@ export class ImportService {
   /**
    * Get import history for a user
    */
-  async getImportHistory(userId: string, limit: number = 50): Promise<ImportRecord[]> {
+  async getImportHistory(userId: string, limit = 50): Promise<ImportRecord[]> {
     try {
       const snapshot = await db
         .collection('users')
