@@ -1,7 +1,8 @@
 import { getFirestore } from 'firebase-admin/firestore';
 import { logger } from 'firebase-functions';
 
-const db = getFirestore();
+// Initialize Firestore inside the service
+const getDb = () => getFirestore();
 
 export interface Trade {
   // Core Fields
@@ -72,6 +73,7 @@ export class TradeService {
    */
   async createTrade(userId: string, tradeData: Partial<Trade>): Promise<Trade> {
     try {
+      const db = getDb();
       const tradeId = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
       
       const trade: Trade = {
@@ -82,7 +84,7 @@ export class TradeService {
         updatedAt: new Date(),
       } as Trade;
       
-      await db.collection('users').doc(userId).collection('trades').doc(tradeId).set(trade);
+      await getDb().collection('users').doc(userId).collection('trades').doc(tradeId).set(trade);
       
       logger.info(`Trade created: ${tradeId} for user: ${userId}`);
       return trade;
@@ -97,6 +99,7 @@ export class TradeService {
    */
   async getUserTrades(userId: string, filters: TradeFilters = {}): Promise<Trade[]> {
     try {
+      const db = getDb();
       let query = db.collection('users').doc(userId).collection('trades') as any;
       
       // Apply filters
@@ -141,6 +144,7 @@ export class TradeService {
    */
   async getTrade(userId: string, tradeId: string): Promise<Trade | null> {
     try {
+      const db = getDb();
       const doc = await db.collection('users').doc(userId).collection('trades').doc(tradeId).get();
       
       if (!doc.exists) {
@@ -162,6 +166,7 @@ export class TradeService {
    */
   async updateTrade(userId: string, tradeId: string, data: Partial<Trade>): Promise<Trade> {
     try {
+      const db = getDb();
       const updateData = {
         ...data,
         updatedAt: new Date()
@@ -188,6 +193,7 @@ export class TradeService {
    */
   async deleteTrade(userId: string, tradeId: string): Promise<boolean> {
     try {
+      const db = getDb();
       await db.collection('users').doc(userId).collection('trades').doc(tradeId).delete();
       
       logger.info(`Trade deleted: ${tradeId} for user: ${userId}`);
@@ -206,6 +212,7 @@ export class TradeService {
     errors: Array<{ index: number; error: string }>;
   }> {
     try {
+      const db = getDb();
       const batch = db.batch();
       const errors: Array<{ index: number; error: string }> = [];
       let created = 0;
@@ -250,9 +257,10 @@ export class TradeService {
    */
   async getTradeStats(userId: string, period: 'daily' | 'weekly' | 'monthly' | 'yearly' = 'weekly'): Promise<TradeStats> {
     try {
-      const trades = await this.getUserTrades(userId, { limit: 1000 });
+      const db = getDb();
+      const trades = await db.collection('users').doc(userId).collection('trades').get();
       
-      if (trades.length === 0) {
+      if (trades.empty) {
         return {
           totalTrades: 0,
           winTrades: 0,
@@ -267,16 +275,16 @@ export class TradeService {
         };
       }
 
-      const winTrades = trades.filter(t => t.result === 'win').length;
-      const lossTrades = trades.filter(t => t.result === 'loss').length;
-      const tieTrades = trades.filter(t => t.result === 'tie').length;
-      const totalTrades = trades.length;
+      const winTrades = trades.docs.filter(doc => doc.data().result === 'win').length;
+      const lossTrades = trades.docs.filter(doc => doc.data().result === 'loss').length;
+      const tieTrades = trades.docs.filter(doc => doc.data().result === 'tie').length;
+      const totalTrades = trades.docs.length;
       
-      const totalPnl = trades.reduce((sum, t) => sum + (t.profit || 0), 0);
+      const totalPnl = trades.docs.reduce((sum, doc) => sum + (doc.data().profit || 0), 0);
       const avgPnl = totalPnl / totalTrades;
       const winRate = totalTrades > 0 ? (winTrades / totalTrades) * 100 : 0;
       
-      const stakes = trades.map(t => t.amount);
+      const stakes = trades.docs.map(doc => doc.data().amount);
       const avgStake = stakes.reduce((sum, s) => sum + s, 0) / stakes.length;
       const maxStake = Math.max(...stakes);
       
@@ -285,8 +293,8 @@ export class TradeService {
       let runningTotal = 0;
       let peak = 0;
       
-      for (const trade of trades.sort((a, b) => a.entryTime.getTime() - b.entryTime.getTime())) {
-        runningTotal += trade.profit || 0;
+      for (const trade of trades.docs.sort((a, b) => a.data().entryTime.getTime() - b.data().entryTime.getTime())) {
+        runningTotal += trade.data().profit || 0;
         if (runningTotal > peak) {
           peak = runningTotal;
         }
@@ -319,6 +327,7 @@ export class TradeService {
    */
   async findExistingTrades(userId: string, tradeIds: string[]): Promise<string[]> {
     try {
+      const db = getDb();
       const existingTradeIds: string[] = [];
       
       // Firestore has a limit of 10 items in 'in' queries, so we need to batch

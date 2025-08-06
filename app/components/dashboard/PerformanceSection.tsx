@@ -4,22 +4,26 @@ import { useState } from 'react'
 import PerformanceChart from '@/components/charts/PerformanceChart'
 import { useTradeStats } from '@/hooks/useTradeStats'
 
-type Period = 'daily' | 'weekly' | 'monthly' | 'yearly'
+type Period = 'day' | 'week' | 'month' | '3months' | '6months' | 'year'
 
 export default function PerformanceSection() {
-  const [selectedPeriod, setSelectedPeriod] = useState<Period>('weekly')
+  const [selectedPeriod, setSelectedPeriod] = useState<Period>('week')
   const { stats, dashboardStats, loading, error } = useTradeStats(selectedPeriod)
 
   const periods = [
-    { value: 'daily' as Period, label: 'Day' },
-    { value: 'weekly' as Period, label: 'Week' },
-    { value: 'monthly' as Period, label: 'Month' },
-    { value: 'yearly' as Period, label: 'Year' },
+    { value: 'day' as Period, label: 'Day' },
+    { value: 'week' as Period, label: 'Week' },
+    { value: 'month' as Period, label: 'Month' },
+    { value: '3months' as Period, label: '3 Months' },
+    { value: '6months' as Period, label: '6 Months' },
+    { value: 'year' as Period, label: 'Year' },
   ]
 
-  const periodText = selectedPeriod === 'daily' ? 'on the day' : 
-                   selectedPeriod === 'weekly' ? 'on the week' : 
-                   selectedPeriod === 'monthly' ? 'on the month' : 'on the year'
+  const periodText = selectedPeriod === 'day' ? 'on the day' : 
+                   selectedPeriod === 'week' ? 'on the week' : 
+                   selectedPeriod === 'month' ? 'on the month' : 
+                   selectedPeriod === '3months' ? 'in the last 3 months' :
+                   selectedPeriod === '6months' ? 'in the last 6 months' : 'on the year'
 
   // Loading state
   if (loading) {
@@ -73,6 +77,23 @@ export default function PerformanceSection() {
         <div className="container mx-auto px-4">
           <div className="flex flex-col md:flex-row justify-between items-center mb-8">
             <h2 className="font-heading text-3xl font-bold mb-4 md:mb-0">Performance</h2>
+            
+            {/* Period Filter */}
+            <div className="flex flex-wrap gap-2 bg-gray-100 p-1 rounded-lg">
+              {periods.map((period) => (
+                <button
+                  key={period.value}
+                  onClick={() => setSelectedPeriod(period.value)}
+                  className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                    selectedPeriod === period.value
+                      ? 'bg-primary text-text'
+                      : 'text-gray-600 hover:text-text'
+                  }`}
+                >
+                  {period.label}
+                </button>
+              ))}
+            </div>
           </div>
           
           <div className="card text-center">

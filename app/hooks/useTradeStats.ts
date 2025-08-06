@@ -39,7 +39,7 @@ export interface PerformanceMetrics {
   }>;
 }
 
-export function useTradeStats(period: 'daily' | 'weekly' | 'monthly' | 'yearly' = 'weekly') {
+export function useTradeStats(period: 'day' | 'week' | 'month' | '3months' | '6months' | 'year' = 'week') {
   const { user } = useAuth();
   const [stats, setStats] = useState<TradeStats | null>(null);
   const [dashboardStats, setDashboardStats] = useState<DashboardStats | null>(null);
@@ -63,6 +63,9 @@ export function useTradeStats(period: 'daily' | 'weekly' | 'monthly' | 'yearly' 
       });
 
       if (!response.ok) {
+        if (response.status === 404) {
+          throw new Error('API endpoints not yet implemented. This feature will be available in Phase B.');
+        }
         const errorData = await response.json();
         throw new Error(errorData.error || 'Failed to fetch dashboard stats');
       }
@@ -102,6 +105,9 @@ export function useTradeStats(period: 'daily' | 'weekly' | 'monthly' | 'yearly' 
       });
 
       if (!response.ok) {
+        if (response.status === 404) {
+          throw new Error('API endpoints not yet implemented. This feature will be available in Phase B.');
+        }
         const errorData = await response.json();
         throw new Error(errorData.error || 'Failed to fetch performance metrics');
       }
@@ -137,6 +143,9 @@ export function useTradeStats(period: 'daily' | 'weekly' | 'monthly' | 'yearly' 
     });
 
     if (!response.ok) {
+      if (response.status === 404) {
+        throw new Error('API endpoints not yet implemented. This feature will be available in Phase B.');
+      }
       const errorData = await response.json();
       throw new Error(errorData.error || 'Failed to export trades');
     }
