@@ -110,7 +110,7 @@ Entregar, em até **10 semanas**, uma versão funcional do Binary Hub que per
 * ≥ 80 % cobertura unitária.
 * Lighthouse perf/accessibility ≥ 90.
 * Contraste AA em todos os textos.
-* Releasenotes adicionadas ao `CHANGELOG.md`.
+* Releasenotes adicionadas ao `docs/project/CHANGELOG.md`.
 
 ---
 

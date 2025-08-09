@@ -3,6 +3,9 @@
 import { useState, useCallback } from 'react'
 import { useAuth } from '@/hooks/useAuth'
 import { auth } from '@/lib/firebase'
+import { useErrorHandler } from '@/hooks/useErrorHandler'
+import { useToastHelpers } from '@/components/ui/Toast'
+import { ChartErrorBoundary } from '@/components/error/ErrorBoundary'
 
 interface UploadStatus {
   uploadId: string
@@ -17,6 +20,8 @@ interface UploadStatus {
 
 export default function CsvUploadSection() {
   const { user } = useAuth()
+  const { handleApiError } = useErrorHandler()
+  const { showSuccess, showError } = useToastHelpers()
   const [isDragOver, setIsDragOver] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [uploadStatus, setUploadStatus] = useState<UploadStatus | null>(null)
@@ -87,19 +92,24 @@ export default function CsvUploadSection() {
       })
 
       if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || 'Upload failed')
+        const errorResult = await handleApiError(response, 'CSV Upload')
+        setError(errorResult.message)
+        return
       }
 
       const result = await response.json()
       setUploadStatus(result)
+      
+      showSuccess('Upload iniciado', 'Seu arquivo CSV está sendo processado')
 
       // Poll for status updates
       if (result.status === 'processing') {
         pollUploadStatus(result.uploadId)
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Upload failed')
+      const errorMessage = err instanceof Error ? err.message : 'Upload failed'
+      setError(errorMessage)
+      showError('Erro no upload', errorMessage)
     } finally {
       setUploading(false)
     }
@@ -137,9 +147,10 @@ export default function CsvUploadSection() {
   }, [])
 
   return (
-    <section className="py-16 bg-background">
-      <div className="container mx-auto px-4">
-        <div className="max-w-2xl mx-auto">
+    <ChartErrorBoundary>
+      <section className="py-16 bg-background">
+        <div className="container mx-auto px-4">
+          <div className="max-w-2xl mx-auto">
           <h2 className="font-heading text-3xl font-bold text-center mb-8">
             Import Your Trades
           </h2>
@@ -267,8 +278,9 @@ export default function CsvUploadSection() {
               You can upload multiple files to import your complete trading history.
             </p>
           </div>
+          </div>
         </div>
-      </div>
-    </section>
+      </section>
+    </ChartErrorBoundary>
   )
 } 

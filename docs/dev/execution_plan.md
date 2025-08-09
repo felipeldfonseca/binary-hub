@@ -47,9 +47,9 @@
 
 ## 📚 Fase 7 – Documentação Final
 21. [ ] Revisar `README.md` principal
-22. [ ] Atualizar `CHANGELOG.md`
+22. [ ] Atualizar `docs/project/CHANGELOG.md`
 23. [ ] Incluir capturas de tela no `README.md` do frontend
-24. [ ] Gerar versão final do `LICENSE`, `CODE_OF_CONDUCT.md` e `CONTRIBUTING.md`
+24. [ ] Gerar versão final do `docs/project/LICENSE`, `docs/project/CODE_OF_CONDUCT.md` e `docs/project/CONTRIBUTING.md`
 
 ---
 

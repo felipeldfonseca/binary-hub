@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from './useAuth';
 import { auth } from '../lib/firebase';
+import { useErrorHandler } from './useErrorHandler';
+import { useToastHelpers } from '@/components/ui/Toast';
 
 export interface Trade {
   id: string;
@@ -66,6 +68,8 @@ export interface TradesResponse {
 
 export function useTrades(filters: TradeFilters = {}) {
   const { user } = useAuth();
+  const { handleApiError } = useErrorHandler();
+  const { showSuccess } = useToastHelpers();
   const [trades, setTrades] = useState<Trade[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -112,21 +116,24 @@ export function useTrades(filters: TradeFilters = {}) {
       
       if (!response.ok) {
         if (response.status === 404) {
-          throw new Error('API endpoints not yet implemented. This feature will be available in Phase B.');
+          setError('API endpoints not yet implemented. This feature will be available in Phase B.');
+          return;
         }
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to fetch trades');
+        const errorResult = await handleApiError(response, 'Fetching trades');
+        setError(errorResult.message);
+        return;
       }
       
       const data: TradesResponse = await response.json();
       setTrades(data.trades);
       setPagination(data.pagination);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred');
+      const errorResult = handleApiError ? handleApiError(err as any, 'Fetching trades') : { message: 'An error occurred' };
+      setError(errorResult.message);
     } finally {
       setLoading(false);
     }
-  }, [user]);
+  }, [user, handleApiError]);
 
   const createTrade = useCallback(async (tradeData: Partial<Trade>) => {
     if (!user) throw new Error('User not authenticated');

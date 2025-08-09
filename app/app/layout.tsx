@@ -3,6 +3,8 @@ import { Comfortaa } from 'next/font/google'
 import '../styles/globals.css'
 import { AuthProvider } from '../lib/contexts/AuthContext'
 import { LanguageProvider } from '../lib/contexts/LanguageContext'
+import ErrorBoundary from '../components/error/ErrorBoundary'
+import { ToastProvider } from '../components/ui/Toast'
 
 const comfortaa = Comfortaa({ 
   subsets: ['latin'], 
@@ -112,12 +114,15 @@ export default function RootLayout({
         suppressHydrationWarning={true}
       >
                 <div id="root" className="min-h-screen bg-background text-text">
-
-          <AuthProvider>
-            <LanguageProvider>
-              {children}
-            </LanguageProvider>
-          </AuthProvider>
+          <ErrorBoundary>
+            <ToastProvider>
+              <AuthProvider>
+                <LanguageProvider>
+                  {children}
+                </LanguageProvider>
+              </AuthProvider>
+            </ToastProvider>
+          </ErrorBoundary>
         </div>
         <div id="modal-root" />
         <div id="toast-root" />

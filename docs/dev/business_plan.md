@@ -177,14 +177,14 @@ Abaixo está a lista completa de arquivos/artefatos que devem existir no reposit
 | 6  | **OPENAPI.yaml**                        | Especificação REST completa (Parte II §5)                                | `/api/OPENAPI.yaml`         |
 | 7  | **PROMPT\_GUIDE.md**                    | Prompt, few‑shots, formato de resposta JSON                              | `/llm/PROMPT_GUIDE.md`      |
 | 8  | **INFRA/terraform/**                    | Scripts IaC (opcional se migrar p/ GCP Cloud Run)                        | `/infra/`                   |
-| 9  | **CONTRIBUTING.md**                     | Branch flow, conv. commit, política de PR                                | raiz                        |
-| 10 | **CODE\_OF\_CONDUCT.md**                | Padrão Open Source                                                       | raiz                        |
+| 9  | **CONTRIBUTING.md**                     | Branch flow, conv. commit, política de PR                                | /docs/project/            |
+| 10 | **CODE\_OF\_CONDUCT.md**                | Padrão Open Source                                                       | /docs/project/            |
 | 11 | **TEST\_STRATEGY.md**                   | Plano unit, E2E, perf (Parte II §8)                                      | `/tests/TEST_STRATEGY.md`   |
 | 12 | **DEPLOY\_GUIDE.md**                    | Como promover para Vercel + Firebase (CI/CD)                             | `/docs/DEPLOY_GUIDE.md`     |
 | 13 | **SECURITY.md**                         | Checklist OWASP, LGPD/GDPR, backup                                       | `/docs/SECURITY.md`         |
 | 14 | **STYLE\_GUIDE\_UI.md**                 | Tokens de cor, tipografia (referência a guia de marca)                   | `/design/STYLE_GUIDE_UI.md` |
-| 15 | **CHANGELOG.md** (keep‑a‑changelog)     | Histórico semântico de versões                                           | raiz                        |
-| 16 | **LICENSE**                             | MIT ou Proprietária – definir                                            | raiz                        |
+| 15 | **CHANGELOG.md** (keep‑a‑changelog)     | Histórico semântico de versões                                           | /docs/project/            |
+| 16 | **LICENSE**                             | MIT ou Proprietária – definir                                            | /docs/project/            |
 
 > **Observação:** arquivos Markdown devem usar cabeçalho YAML com `title`, `description`, `last_updated`.
 
