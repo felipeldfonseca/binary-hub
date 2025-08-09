@@ -1,5 +1,6 @@
 import { logger } from 'firebase-functions';
 import { Trade } from './tradeService';
+import { AppError, ErrorCodes, withTimeout, withRetry } from '../utils/errorHandler';
 
 export interface ParsedTrade {
   tradeId: string;
@@ -54,21 +55,44 @@ export class CSVParserService {
    * Parse Ebinex CSV format
    */
   parseEbinexCsv(csvContent: string): ParsedTrade[] {
+    const startTime = Date.now();
+    logger.info('Starting CSV parsing', {
+      contentLength: csvContent.length,
+      timestamp: new Date().toISOString()
+    });
+
     try {
       const lines = csvContent.trim().split('\n');
       
       if (lines.length < 2) {
-        throw new Error('CSV file is empty or has no data rows');
+        throw new AppError(
+          ErrorCodes.CSV_PARSE_ERROR,
+          'CSV file is empty or has no data rows',
+          400,
+          { totalLines: lines.length }
+        );
       }
 
       const headers = lines[0].split(',').map(h => h.trim());
+      logger.debug('CSV headers detected', { headers });
+
       const validation = this.validateHeaders(headers);
       
       if (!validation.isValid) {
-        throw new Error(`Invalid CSV format: ${validation.missingHeaders.join(', ')}`);
+        throw new AppError(
+          ErrorCodes.CSV_VALIDATION_ERROR,
+          `Invalid CSV format: missing headers: ${validation.missingHeaders.join(', ')}`,
+          400,
+          {
+            missingHeaders: validation.missingHeaders,
+            extraHeaders: validation.extraHeaders,
+            suggestions: validation.suggestions
+          }
+        );
       }
 
       const trades: ParsedTrade[] = [];
+      const errors: Array<{ row: number; error: string }> = [];
       
       for (let i = 1; i < lines.length; i++) {
         const line = lines[i].trim();
@@ -80,16 +104,63 @@ export class CSVParserService {
             trades.push(trade);
           }
         } catch (error) {
-          logger.warn(`Error parsing row ${i + 1}: ${error instanceof Error ? error.message : 'Unknown error'}`);
-          // Continue processing other rows
+          const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+          logger.warn(`Error parsing row ${i + 1}:`, {
+            rowNumber: i + 1,
+            error: errorMessage,
+            line: line.substring(0, 100) // Log first 100 chars of problematic line
+          });
+          
+          errors.push({ row: i + 1, error: errorMessage });
+          
+          // Continue processing other rows, but log if too many errors
+          if (errors.length > 50) {
+            logger.warn('Too many parsing errors, stopping CSV parse', {
+              totalErrors: errors.length,
+              totalProcessed: i
+            });
+            break;
+          }
         }
       }
 
-      logger.info(`Successfully parsed ${trades.length} trades from CSV`);
+      const processingTime = Date.now() - startTime;
+      logger.info('CSV parsing completed', {
+        totalTrades: trades.length,
+        totalErrors: errors.length,
+        totalLines: lines.length,
+        processingTimeMs: processingTime,
+        successRate: ((trades.length / (lines.length - 1)) * 100).toFixed(2) + '%'
+      });
+
+      // If we have too many errors, consider it a failure
+      if (errors.length > trades.length) {
+        throw new AppError(
+          ErrorCodes.CSV_PARSE_ERROR,
+          `Too many parsing errors (${errors.length} errors vs ${trades.length} successful)`,
+          400,
+          { errors: errors.slice(0, 10) } // Include first 10 errors
+        );
+      }
+
       return trades;
     } catch (error) {
-      logger.error('Error parsing CSV:', error);
-      throw new Error(`Failed to parse CSV: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      const processingTime = Date.now() - startTime;
+      logger.error('CSV parsing failed', {
+        error: error instanceof Error ? error.message : 'Unknown error',
+        processingTimeMs: processingTime,
+        timestamp: new Date().toISOString()
+      });
+
+      if (error instanceof AppError) {
+        throw error;
+      }
+
+      throw new AppError(
+        ErrorCodes.CSV_PARSE_ERROR,
+        `Failed to parse CSV: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        400
+      );
     }
   }
 

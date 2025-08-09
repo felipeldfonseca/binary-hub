@@ -1,7 +1,15 @@
 import { Router, Request, Response } from 'express';
 import { tradeService, TradeFilters } from '../services/tradeService';
-import { validateTradeData, validateTradeFilters, sanitizeTradeData, createValidationError, logValidationErrors } from '../utils/validation';
+import { validateTradeData, validateTradeFilters, sanitizeTradeData, logValidationErrors, createValidationError } from '../utils/validation';
 import { logger } from 'firebase-functions';
+import { 
+  asyncHandler, 
+  createAuthError, 
+ 
+  createNotFoundError, 
+  createErrorResponse,
+  ErrorCodes 
+} from '../utils/errorHandler';
 
 // Extend Express Request to include user property
 interface AuthenticatedRequest extends Request {

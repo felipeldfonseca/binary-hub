@@ -2,6 +2,7 @@ import { getFirestore } from 'firebase-admin/firestore';
 import { logger } from 'firebase-functions';
 import { csvParserService, ParsedTrade } from './csvParser';
 import { tradeService, Trade } from './tradeService';
+import { AppError, ErrorCodes, withTimeout, withRetry } from '../utils/errorHandler';
 
 // Initialize Firestore inside the service
 const getDb = () => getFirestore();
@@ -59,6 +60,14 @@ export class ImportService {
     const startTime = Date.now();
     const importId = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     
+    logger.info('Starting CSV import process', {
+      importId,
+      userId,
+      fileName,
+      fileSize: csvFile.length,
+      timestamp: new Date().toISOString()
+    });
+    
     try {
       const db = getDb();
       // Create import record
@@ -81,9 +90,13 @@ export class ImportService {
 
       await this.createImportRecord(importRecord);
 
-      // Parse CSV
+      // Parse CSV with timeout protection
       const csvContent = csvFile.toString('utf-8');
-      const parsedTrades = csvParserService.parseEbinexCsv(csvContent);
+      const parsedTrades = await withTimeout(
+        Promise.resolve(csvParserService.parseEbinexCsv(csvContent)),
+        30000, // 30 second timeout
+        'CSV parsing timed out'
+      );
       
       // Update total rows
       await this.updateImportRecord(importId, {
