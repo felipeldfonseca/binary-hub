@@ -434,4 +434,57 @@ select:focus {
 /* Smooth transition for navbar */
 .navbar-transition {
   transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Text utilities for trade components */
+.line-clamp-1 {
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 1;
+}
+
+.line-clamp-2 {
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.line-clamp-3 {
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+
+/* Trade card specific styles */
+.trade-card {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 16px;
+  padding: 1.5rem;
+  backdrop-filter: blur(10px);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.trade-card:hover {
+  background: rgba(255, 255, 255, 0.15);
+  border-color: rgba(255, 255, 255, 0.3);
+  transform: translateY(-2px) scale(1.02);
+}
+
+.trade-card.win {
+  border-color: rgba(225, 255, 217, 0.4);
+  box-shadow: 0 4px 20px rgba(225, 255, 217, 0.2);
+}
+
+.trade-card.loss {
+  border-color: rgba(255, 68, 68, 0.4);
+  box-shadow: 0 4px 20px rgba(255, 68, 68, 0.2);
+}
+
+.trade-card.tie {
+  border-color: rgba(179, 179, 179, 0.4);
+  box-shadow: 0 4px 20px rgba(179, 179, 179, 0.2);
 } 

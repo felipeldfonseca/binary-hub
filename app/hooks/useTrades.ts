@@ -128,7 +128,7 @@ export function useTrades(filters: TradeFilters = {}) {
       setTrades(data.trades);
       setPagination(data.pagination);
     } catch (err) {
-      const errorResult = handleApiError ? handleApiError(err as any, 'Fetching trades') : { message: 'An error occurred' };
+      const errorResult = handleApiError ? await handleApiError(err as any, 'Fetching trades') : { message: 'An error occurred' };
       setError(errorResult.message);
     } finally {
       setLoading(false);

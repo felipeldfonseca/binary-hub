@@ -1,7 +1,8 @@
 'use client'
 
 import React, { createContext, useContext, useCallback, useState, ReactNode } from 'react'
-import { XIcon, CheckIcon } from '../icons/XIcon'
+import XIcon from '../icons/XIcon'
+import CheckIcon from '../icons/CheckIcon'
 
 export type ToastType = 'success' | 'error' | 'warning' | 'info'
 
