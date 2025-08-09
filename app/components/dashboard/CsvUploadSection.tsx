@@ -163,7 +163,7 @@ export default function CsvUploadSection() {
             {uploading ? (
               <div className="space-y-4">
                 <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
-                <p className="text-lg font-medium">Uploading...</p>
+                <p className="text-lg font-comfortaa font-medium">Uploading...</p>
                 <p className="text-sm text-gray-500">Please wait while we process your file</p>
               </div>
             ) : uploadStatus ? (
@@ -171,7 +171,7 @@ export default function CsvUploadSection() {
                 {uploadStatus.status === 'completed' ? (
                   <div className="text-green-600">
                     <div className="text-4xl mb-2">✓</div>
-                    <h3 className="text-lg font-medium mb-2">Upload Complete!</h3>
+                    <h3 className="text-lg font-comfortaa font-medium mb-2">Upload Complete!</h3>
                     <div className="text-sm space-y-1">
                       <p>Total rows: {uploadStatus.totalRows}</p>
                       <p>Imported: {uploadStatus.importedRows}</p>
@@ -190,7 +190,7 @@ export default function CsvUploadSection() {
                 ) : uploadStatus.status === 'failed' ? (
                   <div className="text-red-600">
                     <div className="text-4xl mb-2">✗</div>
-                    <h3 className="text-lg font-medium mb-2">Upload Failed</h3>
+                    <h3 className="text-lg font-comfortaa font-medium mb-2">Upload Failed</h3>
                     <p className="text-sm">{uploadStatus.errors[0]?.error || 'Unknown error'}</p>
                     <button
                       onClick={resetUpload}
@@ -202,7 +202,7 @@ export default function CsvUploadSection() {
                 ) : (
                   <div className="space-y-4">
                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
-                    <p className="text-lg font-medium">Processing...</p>
+                    <p className="text-lg font-comfortaa font-medium">Processing...</p>
                     <div className="w-full bg-gray-200 rounded-full h-2">
                       <div 
                         className="bg-primary h-2 rounded-full transition-all duration-300"
@@ -218,7 +218,7 @@ export default function CsvUploadSection() {
             ) : (
               <div className="space-y-4">
                 <div className="text-4xl mb-4">📄</div>
-                <h3 className="text-lg font-medium">Drop your CSV file here</h3>
+                <h3 className="text-lg font-comfortaa font-medium">Drop your CSV file here</h3>
                 <p className="text-sm text-gray-500">
                   or click to browse
                 </p>
@@ -254,7 +254,7 @@ export default function CsvUploadSection() {
 
           {/* Instructions */}
           <div className="mt-8 p-6 bg-gray-50 rounded-lg">
-            <h3 className="font-medium mb-4">How to export from Ebinex:</h3>
+            <h3 className="font-comfortaa font-medium mb-4">How to export from Ebinex:</h3>
             <ol className="text-sm text-gray-600 space-y-2 list-decimal list-inside">
               <li>Log into your Ebinex account</li>
               <li>Go to your trading history</li>

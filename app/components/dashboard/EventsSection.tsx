@@ -30,27 +30,27 @@ export default function EventsSection() {
             <div key={event.id} className="card border-l-4 border-l-primary">
               <div className="flex items-start justify-between mb-3">
                 <div className="flex items-center gap-3">
-                  <div className="text-lg font-semibold text-text">{event.time}</div>
+                  <div className="text-lg font-comfortaa font-semibold text-text">{event.time}</div>
                   <span className={`px-2 py-1 text-xs font-medium rounded-full border ${getImpactColor(event.impact)}`}>
                     {event.impact.toUpperCase()}
                   </span>
                 </div>
               </div>
               
-              <h3 className="font-semibold text-text mb-3">{event.event}</h3>
+              <h3 className="font-comfortaa font-semibold text-text mb-3">{event.event}</h3>
               
               <div className="grid grid-cols-3 gap-4 text-sm">
                 <div>
                   <p className="text-gray-600 mb-1">Previous</p>
-                  <p className="font-medium">{event.previous || 'N/A'}</p>
+                  <p className="font-comfortaa font-medium">{event.previous || 'N/A'}</p>
                 </div>
                 <div>
                   <p className="text-gray-600 mb-1">Forecast</p>
-                  <p className="font-medium">{event.forecast || 'N/A'}</p>
+                                      <p className="font-comfortaa font-medium">{event.forecast || 'N/A'}</p>
                 </div>
                 <div>
                   <p className="text-gray-600 mb-1">Actual</p>
-                  <p className="font-medium">{event.actual || 'Pending'}</p>
+                                      <p className="font-comfortaa font-medium">{event.actual || 'Pending'}</p>
                 </div>
               </div>
             </div>

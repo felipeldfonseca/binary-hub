@@ -1,10 +1,14 @@
 import type { Metadata, Viewport } from 'next'
-import { Inter } from 'next/font/google'
+import { Comfortaa } from 'next/font/google'
 import '../styles/globals.css'
 import { AuthProvider } from '../lib/contexts/AuthContext'
 import { LanguageProvider } from '../lib/contexts/LanguageContext'
 
-const inter = Inter({ subsets: ['latin'] })
+const comfortaa = Comfortaa({ 
+  subsets: ['latin'], 
+  weight: ['300', '400', '500', '600', '700'],
+  variable: '--font-comfortaa'
+})
 
 export const viewport: Viewport = {
   width: 'device-width',
@@ -87,7 +91,7 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="pt-BR" className="scroll-smooth">
+    <html lang="pt-BR" className={`scroll-smooth ${comfortaa.variable}`}>
       <head>
         <meta name="theme-color" content="#E1FFD9" />
         <meta name="msapplication-TileColor" content="#E1FFD9" />
@@ -104,10 +108,11 @@ export default function RootLayout({
         <link rel="preload" href="/fonts/etna-free-font.otf" as="font" type="font/otf" crossOrigin="" />
       </head>
       <body 
-        className={`${inter.className} antialiased`}
+        className={`${comfortaa.className} antialiased`}
         suppressHydrationWarning={true}
       >
-        <div id="root" className="min-h-screen bg-background text-text">
+                <div id="root" className="min-h-screen bg-background text-text">
+
           <AuthProvider>
             <LanguageProvider>
               {children}

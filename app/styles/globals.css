@@ -2,8 +2,7 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Import Comfortaa font */
-@import url('https://fonts.googleapis.com/css2?family=Comfortaa:wght@300..700&display=swap');
+/* Comfortaa font is loaded via Next.js Google Fonts in layout.tsx */
 
 /* Fonte Etna - Logo */
 @font-face {
@@ -43,7 +42,7 @@ html,
 body {
   max-width: 100vw;
   overflow-x: hidden;
-  font-family: 'Comfortaa', sans-serif;
+  font-family: var(--font-comfortaa), 'Comfortaa', sans-serif;
   font-weight: 300;
   line-height: 1.5;
   color: #FFFFFF;
@@ -94,7 +93,7 @@ select:focus {
   border: none;
   border-radius: 50px;
   padding: 1rem 2.5rem;
-  font-family: 'Comfortaa', sans-serif;
+  font-family: var(--font-comfortaa), 'Comfortaa', sans-serif;
   font-weight: 700;
   font-size: 1.25rem;
   cursor: pointer;
@@ -340,7 +339,7 @@ select:focus {
 }
 
 .hero-description {
-  font-family: 'Comfortaa', sans-serif;
+  font-family: var(--font-comfortaa), 'Comfortaa', sans-serif;
   font-weight: 400;
   color: #FFFFFF;
   opacity: 0.9;
@@ -362,7 +361,7 @@ select:focus {
 }
 
 .nav-link {
-  font-family: 'Comfortaa', sans-serif;
+  font-family: var(--font-comfortaa), 'Comfortaa', sans-serif;
   font-weight: 700;
   color: #505050;
   transition: all 0.3s ease;

@@ -151,33 +151,33 @@ export default function PerformanceSection() {
         {/* KPI Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
           <div className="card text-center">
-            <h3 className="text-sm font-medium text-gray-600 mb-2">Net P&L</h3>
+                            <h3 className="text-sm font-comfortaa font-medium text-gray-600 mb-2">Net P&L</h3>
             <p className={`text-2xl font-bold ${currentStats.totalPnl >= 0 ? 'text-win' : 'text-loss'}`}>
               ${currentStats.totalPnl.toLocaleString()}
             </p>
           </div>
 
           <div className="card text-center">
-            <h3 className="text-sm font-medium text-gray-600 mb-2">Win Rate</h3>
+                            <h3 className="text-sm font-comfortaa font-medium text-gray-600 mb-2">Win Rate</h3>
             <p className="text-2xl font-bold text-text">{currentStats.winRate.toFixed(1)}%</p>
             <p className="text-xs text-gray-500 mt-1">{periodText}</p>
           </div>
 
           <div className="card text-center">
-            <h3 className="text-sm font-medium text-gray-600 mb-2">Total Trades</h3>
+                            <h3 className="text-sm font-comfortaa font-medium text-gray-600 mb-2">Total Trades</h3>
             <p className="text-2xl font-bold text-text">{currentStats.totalTrades}</p>
             <p className="text-xs text-gray-500 mt-1">{periodText}</p>
           </div>
 
           <div className="card text-center">
-            <h3 className="text-sm font-medium text-gray-600 mb-2">Average P&L</h3>
+                            <h3 className="text-sm font-comfortaa font-medium text-gray-600 mb-2">Average P&L</h3>
             <p className={`text-2xl font-bold ${currentStats.avgPnl >= 0 ? 'text-win' : 'text-loss'}`}>
               ${currentStats.avgPnl.toFixed(2)}
             </p>
           </div>
 
           <div className="card text-center">
-            <h3 className="text-sm font-medium text-gray-600 mb-2">Max Drawdown</h3>
+                            <h3 className="text-sm font-comfortaa font-medium text-gray-600 mb-2">Max Drawdown</h3>
             <p className="text-2xl font-bold text-loss">${currentStats.maxDrawdown.toFixed(2)}</p>
             <p className="text-xs text-gray-500 mt-1">worst loss</p>
           </div>
@@ -185,7 +185,7 @@ export default function PerformanceSection() {
 
         {/* Chart */}
         <div className="card">
-          <h3 className="text-lg font-semibold mb-4">Cumulative Net P&L</h3>
+                      <h3 className="text-lg font-comfortaa font-semibold mb-4">Cumulative Net P&L</h3>
           <PerformanceChart period={selectedPeriod} />
         </div>
       </div>

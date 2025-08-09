@@ -43,28 +43,28 @@ export const functions = getFunctions(app)
 if (process.env.NODE_ENV === 'development' && typeof window !== 'undefined') {
   try {
     // Auth emulator
-    connectAuthEmulator(auth, 'http://localhost:9088')
+    connectAuthEmulator(auth, 'http://localhost:9089')
   } catch (error) {
     // Emulator already connected
   }
   
   try {
     // Firestore emulator
-    connectFirestoreEmulator(db, 'localhost', 8888)
+    connectFirestoreEmulator(db, 'localhost', 8889)
   } catch (error) {
     // Emulator already connected
   }
   
   try {
     // Functions emulator
-    connectFunctionsEmulator(functions, 'localhost', 5002)
+    connectFunctionsEmulator(functions, 'localhost', 5004)
   } catch (error) {
     // Emulator already connected
   }
   
   try {
     // Storage emulator
-    connectStorageEmulator(storage, 'localhost', 9188)
+    connectStorageEmulator(storage, 'localhost', 9189)
   } catch (error) {
     // Emulator already connected
   }
