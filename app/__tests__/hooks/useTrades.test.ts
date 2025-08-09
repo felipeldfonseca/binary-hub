@@ -207,7 +207,7 @@ describe('useTrades', () => {
       })
 
       expect(mockFetch).toHaveBeenCalledWith(
-        'http://localhost:5004/binary-hub/us-central1/api/v1/trades',
+        'http://localhost:5001/binary-hub/us-central1/api/v1/trades',
         {
           method: 'POST',
           headers: {
@@ -263,7 +263,7 @@ describe('useTrades', () => {
       })
 
       expect(mockFetch).toHaveBeenCalledWith(
-        `http://localhost:5004/binary-hub/us-central1/api/v1/trades/${tradeId}`,
+        `http://localhost:5001/binary-hub/us-central1/api/v1/trades/${tradeId}`,
         {
           method: 'PUT',
           headers: {
@@ -294,7 +294,7 @@ describe('useTrades', () => {
       })
 
       expect(mockFetch).toHaveBeenCalledWith(
-        `http://localhost:5004/binary-hub/us-central1/api/v1/trades/${tradeId}`,
+        `http://localhost:5001/binary-hub/us-central1/api/v1/trades/${tradeId}`,
         {
           method: 'DELETE',
           headers: {
@@ -337,7 +337,7 @@ describe('useTrades', () => {
       })
 
       expect(mockFetch).toHaveBeenCalledWith(
-        'http://localhost:5004/binary-hub/us-central1/api/v1/trades/bulk',
+        'http://localhost:5001/binary-hub/us-central1/api/v1/trades/bulk',
         {
           method: 'POST',
           headers: {

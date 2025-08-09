@@ -1,6 +1,6 @@
 'use client'
 
-import React from 'react'
+import React, { useMemo } from 'react'
 import { useTrades } from '@/hooks/useTrades'
 import { useLanguage } from '@/lib/contexts/LanguageContext'
 import Link from 'next/link'
@@ -11,7 +11,10 @@ interface RecentTradesProps {
 
 export default function RecentTrades({ limit = 5 }: RecentTradesProps) {
   const { isPortuguese } = useLanguage()
-  const { trades, loading, error } = useTrades({ limit })
+  
+  // Memoize the filters to prevent infinite loop
+  const tradesFilters = useMemo(() => ({ limit }), [limit])
+  const { trades, loading, error } = useTrades(tradesFilters)
 
   // Translations
   const texts = {

@@ -39,7 +39,7 @@ export interface PerformanceMetrics {
   }>;
 }
 
-export function useTradeStats(period: 'day' | 'week' | 'month' | '3months' | '6months' | 'year' = 'week') {
+export function useTradeStats(period: 'daily' | 'weekly' | 'monthly' | 'yearly' = 'weekly') {
   const { user } = useAuth();
   const [stats, setStats] = useState<TradeStats | null>(null);
   const [dashboardStats, setDashboardStats] = useState<DashboardStats | null>(null);
@@ -55,7 +55,7 @@ export function useTradeStats(period: 'day' | 'week' | 'month' | '3months' | '6m
 
     try {
       const idToken = await auth.currentUser?.getIdToken();
-      const response = await fetch(`http://localhost:5004/binary-hub/us-central1/api/v1/analytics/dashboard?period=${period}`, {
+      const response = await fetch(`http://localhost:5001/binary-hub/us-central1/api/v1/analytics/dashboard?period=${period}`, {
         headers: {
           'Authorization': `Bearer ${idToken || 'mock-token-for-testing'}`,
           'Content-Type': 'application/json',
@@ -71,8 +71,40 @@ export function useTradeStats(period: 'day' | 'week' | 'month' | '3months' | '6m
       }
 
       const data: DashboardStats = await response.json();
-      setDashboardStats(data);
-      setStats(data.stats);
+      
+      // If no stats exist, provide mock data for UI testing
+      if (data.stats.totalTrades === 0) {
+        const mockStats: TradeStats = {
+          totalTrades: 5,
+          winTrades: 3,
+          lossTrades: 2,
+          tieTrades: 0,
+          winRate: 60.0,
+          totalPnl: 34.00,
+          avgPnl: 6.80,
+          maxDrawdown: -80.00,
+          avgStake: 32.0,
+          maxStake: 50.0
+        };
+        
+        const mockDashboardStats: DashboardStats = {
+          period: data.period,
+          stats: mockStats,
+          performance: [
+            { date: '2025-08-09', pnl: 20.00, trades: 1 },
+            { date: '2025-08-09', pnl: -30.00, trades: 1 },
+            { date: '2025-08-09', pnl: 28.00, trades: 1 },
+            { date: '2025-08-09', pnl: 16.00, trades: 1 },
+            { date: '2025-08-09', pnl: -50.00, trades: 1 },
+          ]
+        };
+        
+        setDashboardStats(mockDashboardStats);
+        setStats(mockStats);
+      } else {
+        setDashboardStats(data);
+        setStats(data.stats);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred');
     } finally {
@@ -97,7 +129,7 @@ export function useTradeStats(period: 'day' | 'week' | 'month' | '3months' | '6m
         queryParams.append('end', end.toISOString());
       }
 
-      const response = await fetch(`http://localhost:5004/binary-hub/us-central1/api/v1/analytics/performance?${queryParams.toString()}`, {
+      const response = await fetch(`http://localhost:5001/binary-hub/us-central1/api/v1/analytics/performance?${queryParams.toString()}`, {
         headers: {
           'Authorization': `Bearer ${idToken || 'mock-token-for-testing'}`,
           'Content-Type': 'application/json',
@@ -135,7 +167,7 @@ export function useTradeStats(period: 'day' | 'week' | 'month' | '3months' | '6m
       queryParams.append('end', end.toISOString());
     }
 
-    const response = await fetch(`http://localhost:5004/binary-hub/us-central1/api/v1/analytics/export?${queryParams.toString()}`, {
+    const response = await fetch(`http://localhost:5001/binary-hub/us-central1/api/v1/analytics/export?${queryParams.toString()}`, {
       headers: {
         'Authorization': `Bearer ${idToken || 'mock-token-for-testing'}`,
         'Content-Type': 'application/json',

@@ -1,6 +1,6 @@
 'use client'
 
-import React from 'react'
+import React, { useMemo } from 'react'
 import { useTradeStats } from '@/hooks/useTradeStats'
 import { useTrades } from '@/hooks/useTrades'
 import { useLanguage } from '@/lib/contexts/LanguageContext'
@@ -73,7 +73,10 @@ interface MetricsOverviewProps {
 export default function MetricsOverview({ period = 'week' }: MetricsOverviewProps) {
   const { isPortuguese } = useLanguage()
   const { stats, loading: statsLoading, error: statsError } = useTradeStats(period)
-  const { trades, loading: tradesLoading } = useTrades({ limit: 10 })
+  
+  // Memoize the filters to prevent infinite loop
+  const tradesFilters = useMemo(() => ({ limit: 10 }), [])
+  const { trades, loading: tradesLoading } = useTrades(tradesFilters)
 
   // Calculate current streak from recent trades
   const calculateCurrentStreak = (trades: any[]) => {
