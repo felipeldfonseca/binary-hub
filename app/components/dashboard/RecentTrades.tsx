@@ -7,14 +7,144 @@ import Link from 'next/link'
 
 interface RecentTradesProps {
   limit?: number
+  isDemoMode?: boolean
 }
 
-export default function RecentTrades({ limit = 5 }: RecentTradesProps) {
+export default function RecentTrades({ limit = 5, isDemoMode = false }: RecentTradesProps) {
   const { isPortuguese } = useLanguage()
   
   // Memoize the filters to prevent infinite loop
   const tradesFilters = useMemo(() => ({ limit }), [limit])
   const { trades, loading, error } = useTrades(tradesFilters)
+
+  // Generate mock demo trades
+  const demoTrades = useMemo(() => [
+    {
+      id: 'demo-1',
+      userId: 'demo-user',
+      tradeId: 'DEMO-001',
+      asset: 'BTCUSDT',
+      direction: 'call' as const,
+      amount: 50,
+      entryPrice: 45250.00,
+      exitPrice: 45380.00,
+      entryTime: new Date(Date.now() - 5 * 60 * 1000), // 5 minutes ago
+      exitTime: new Date(Date.now() - 4 * 60 * 1000),
+      timeframe: 'M1',
+      candleTime: '14:25',
+      refunded: 0,
+      executed: 50,
+      status: 'WIN' as const,
+      result: 'win' as const,
+      profit: 42.50,
+      payout: 92.50,
+      platform: 'Demo Platform',
+      strategy: 'Momentum',
+      createdAt: new Date(Date.now() - 4 * 60 * 1000),
+      updatedAt: new Date(Date.now() - 4 * 60 * 1000),
+    },
+    {
+      id: 'demo-2',
+      userId: 'demo-user',
+      tradeId: 'DEMO-002',
+      asset: 'ETHUSDT',
+      direction: 'put' as const,
+      amount: 35,
+      entryPrice: 2845.50,
+      exitPrice: 2820.75,
+      entryTime: new Date(Date.now() - 15 * 60 * 1000), // 15 minutes ago
+      exitTime: new Date(Date.now() - 14 * 60 * 1000),
+      timeframe: 'M1',
+      candleTime: '14:15',
+      refunded: 0,
+      executed: 35,
+      status: 'WIN' as const,
+      result: 'win' as const,
+      profit: 29.75,
+      payout: 64.75,
+      platform: 'Demo Platform',
+      strategy: 'Support/Resistance',
+      createdAt: new Date(Date.now() - 14 * 60 * 1000),
+      updatedAt: new Date(Date.now() - 14 * 60 * 1000),
+    },
+    {
+      id: 'demo-3',
+      userId: 'demo-user',
+      tradeId: 'DEMO-003',
+      asset: 'EURUSD',
+      direction: 'call' as const,
+      amount: 25,
+      entryPrice: 1.0852,
+      exitPrice: 1.0845,
+      entryTime: new Date(Date.now() - 32 * 60 * 1000), // 32 minutes ago
+      exitTime: new Date(Date.now() - 31 * 60 * 1000),
+      timeframe: 'M1',
+      candleTime: '13:58',
+      refunded: 0,
+      executed: 25,
+      status: 'LOSE' as const,
+      result: 'loss' as const,
+      profit: -25.00,
+      payout: 0,
+      platform: 'Demo Platform',
+      strategy: 'Trend Following',
+      createdAt: new Date(Date.now() - 31 * 60 * 1000),
+      updatedAt: new Date(Date.now() - 31 * 60 * 1000),
+    },
+    {
+      id: 'demo-4',
+      userId: 'demo-user',
+      tradeId: 'DEMO-004',
+      asset: 'GBPUSD',
+      direction: 'put' as const,
+      amount: 40,
+      entryPrice: 1.2735,
+      exitPrice: 1.2710,
+      entryTime: new Date(Date.now() - 58 * 60 * 1000), // 58 minutes ago
+      exitTime: new Date(Date.now() - 57 * 60 * 1000),
+      timeframe: 'M1',
+      candleTime: '13:32',
+      refunded: 0,
+      executed: 40,
+      status: 'WIN' as const,
+      result: 'win' as const,
+      profit: 34.00,
+      payout: 74.00,
+      platform: 'Demo Platform',
+      strategy: 'News Trading',
+      createdAt: new Date(Date.now() - 57 * 60 * 1000),
+      updatedAt: new Date(Date.now() - 57 * 60 * 1000),
+    },
+    {
+      id: 'demo-5',
+      userId: 'demo-user',
+      tradeId: 'DEMO-005',
+      asset: 'USDJPY',
+      direction: 'call' as const,
+      amount: 30,
+      entryPrice: 149.85,
+      exitPrice: 150.12,
+      entryTime: new Date(Date.now() - 85 * 60 * 1000), // 1h 25m ago
+      exitTime: new Date(Date.now() - 84 * 60 * 1000),
+      timeframe: 'M1',
+      candleTime: '13:05',
+      refunded: 0,
+      executed: 30,
+      status: 'WIN' as const,
+      result: 'win' as const,
+      profit: 25.50,
+      payout: 55.50,
+      platform: 'Demo Platform',
+      strategy: 'Pattern Recognition',
+      createdAt: new Date(Date.now() - 84 * 60 * 1000),
+      updatedAt: new Date(Date.now() - 84 * 60 * 1000),
+    }
+  ], [])
+
+  // Use demo trades when in demo mode
+  const displayTrades = isDemoMode ? demoTrades : trades
+  const displayLoading = isDemoMode ? false : loading
+  const displayError = isDemoMode ? null : error
 
   // Translations
   const texts = {
@@ -95,7 +225,7 @@ export default function RecentTrades({ limit = 5 }: RecentTradesProps) {
   }
 
   // Loading skeleton
-  if (loading) {
+  if (displayLoading) {
     return (
       <div className="card">
         <div className="flex items-center justify-between mb-6">
@@ -120,7 +250,7 @@ export default function RecentTrades({ limit = 5 }: RecentTradesProps) {
   }
 
   // Error state
-  if (error) {
+  if (displayError) {
     return (
       <div className="card">
         <div className="flex items-center justify-between mb-6">
@@ -131,14 +261,23 @@ export default function RecentTrades({ limit = 5 }: RecentTradesProps) {
         
         <div className="text-center py-8">
           <div className="text-red-400 text-lg mb-2">⚠️</div>
-          <p className="text-red-400 font-comfortaa text-sm">{error}</p>
+          <p className="text-red-400 font-comfortaa text-sm">{displayError}</p>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="card">
+    <div className="card relative">
+      {/* Demo Mode Badge */}
+      {isDemoMode && (
+        <div className="absolute top-4 left-1/2 transform -translate-x-1/2 z-10">
+          <div className="bg-orange-500/90 text-white px-4 py-2 rounded-full text-sm font-semibold font-comfortaa shadow-lg">
+            {isPortuguese ? 'MODO DEMO' : 'DEMO MODE'}
+          </div>
+        </div>
+      )}
+      
       <div className="flex items-center justify-between mb-6">
         <h3 className="text-xl font-comfortaa font-semibold text-white">
           {texts.title}
@@ -152,7 +291,7 @@ export default function RecentTrades({ limit = 5 }: RecentTradesProps) {
       </div>
 
       {/* Trades list */}
-      {trades.length === 0 ? (
+      {displayTrades.length === 0 ? (
         <div className="text-center py-8">
           <div className="text-gray-400 text-4xl mb-4">📊</div>
           <p className="text-gray-400 font-comfortaa mb-4">{texts.noTrades}</p>
@@ -165,7 +304,7 @@ export default function RecentTrades({ limit = 5 }: RecentTradesProps) {
         </div>
       ) : (
         <div className="space-y-3">
-          {trades.slice(0, limit).map((trade) => {
+          {displayTrades.slice(0, limit).map((trade) => {
             const resultBadge = getResultBadge(trade.result)
             const directionBadge = getDirectionBadge(trade.direction)
             
@@ -221,7 +360,7 @@ export default function RecentTrades({ limit = 5 }: RecentTradesProps) {
       )}
 
       {/* Quick stats */}
-      {trades.length > 0 && (
+      {displayTrades.length > 0 && (
         <div className="mt-6 pt-4 border-t border-gray-700">
           <div className="grid grid-cols-3 gap-4 text-center">
             <div>
@@ -229,7 +368,7 @@ export default function RecentTrades({ limit = 5 }: RecentTradesProps) {
                 {isPortuguese ? 'Últimos 5' : 'Last 5'}
               </div>
               <div className="text-lg font-bold text-white">
-                {Math.min(trades.length, limit)}
+                {Math.min(displayTrades.length, limit)}
               </div>
             </div>
             
@@ -238,7 +377,7 @@ export default function RecentTrades({ limit = 5 }: RecentTradesProps) {
                 {isPortuguese ? 'Vitórias' : 'Wins'}
               </div>
               <div className="text-lg font-bold text-green-400">
-                {trades.slice(0, limit).filter(t => t.result === 'win').length}
+                {displayTrades.slice(0, limit).filter(t => t.result === 'win').length}
               </div>
             </div>
             
@@ -247,11 +386,11 @@ export default function RecentTrades({ limit = 5 }: RecentTradesProps) {
                 {texts.pnl}
               </div>
               <div className={`text-lg font-bold ${
-                trades.slice(0, limit).reduce((sum, t) => sum + t.profit, 0) >= 0 
+                displayTrades.slice(0, limit).reduce((sum, t) => sum + t.profit, 0) >= 0 
                   ? 'text-green-400' 
                   : 'text-red-400'
               }`}>
-                ${trades.slice(0, limit).reduce((sum, t) => sum + t.profit, 0).toFixed(2)}
+                ${displayTrades.slice(0, limit).reduce((sum, t) => sum + t.profit, 0).toFixed(2)}
               </div>
             </div>
           </div>

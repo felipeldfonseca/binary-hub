@@ -126,27 +126,56 @@ export function useTradeStats(period: 'daily' | 'weekly' | 'monthly' | 'yearly' 
   const fetchDashboardStats = useCallback(async () => {
     if (!user) return;
 
-    // For Phase A, use mock data with smooth loading transition
+    // For Phase A, check if user has imported data (simulate with localStorage)
+    const hasImportedData = localStorage.getItem('binaryHub_hasData') === 'true';
+    
     setLoading(true);
     setError(null);
 
     // Simulate smooth loading synchronized with chart animation (800ms)
     setTimeout(() => {
-      const mockStats = generateMockData(period);
-      const mockDashboardStats: DashboardStats = {
-        period: period,
-        stats: mockStats,
-        performance: [
-          { date: '2025-08-09', pnl: 20.00, trades: 1 },
-          { date: '2025-08-09', pnl: -30.00, trades: 1 },
-          { date: '2025-08-09', pnl: 28.00, trades: 1 },
-          { date: '2025-08-09', pnl: 16.00, trades: 1 },
-          { date: '2025-08-09', pnl: -50.00, trades: 1 },
-        ]
-      };
+      if (!hasImportedData) {
+        // Show empty state
+        const emptyStats: TradeStats = {
+          totalTrades: 0,
+          winTrades: 0,
+          lossTrades: 0,
+          tieTrades: 0,
+          winRate: 0,
+          totalPnl: 0,
+          avgPnl: 0,
+          maxDrawdown: 0,
+          avgStake: 0,
+          maxStake: 0
+        };
+        
+        const emptyDashboardStats: DashboardStats = {
+          period: period,
+          stats: emptyStats,
+          performance: []
+        };
+        
+        setDashboardStats(emptyDashboardStats);
+        setStats(emptyStats);
+      } else {
+        // Show mock data (user has imported data)
+        const mockStats = generateMockData(period);
+        const mockDashboardStats: DashboardStats = {
+          period: period,
+          stats: mockStats,
+          performance: [
+            { date: '2025-08-09', pnl: 20.00, trades: 1 },
+            { date: '2025-08-09', pnl: -30.00, trades: 1 },
+            { date: '2025-08-09', pnl: 28.00, trades: 1 },
+            { date: '2025-08-09', pnl: 16.00, trades: 1 },
+            { date: '2025-08-09', pnl: -50.00, trades: 1 },
+          ]
+        };
+        
+        setDashboardStats(mockDashboardStats);
+        setStats(mockStats);
+      }
       
-      setDashboardStats(mockDashboardStats);
-      setStats(mockStats);
       setLoading(false);
     }, 800); // Synchronized with chart animation duration
 

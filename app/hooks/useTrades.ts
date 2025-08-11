@@ -125,8 +125,10 @@ export function useTrades(filters: TradeFilters = {}) {
       
       const data: TradesResponse = await response.json();
       
-      // If no trades exist, provide mock data for UI testing
-      if (data.trades.length === 0) {
+      // If no trades exist, check if user has imported data
+      const hasImportedData = localStorage.getItem('binaryHub_hasData') === 'true';
+      
+      if (data.trades.length === 0 && hasImportedData) {
         const mockTrades: Trade[] = [
           {
             id: 'mock-1',
@@ -258,8 +260,9 @@ export function useTrades(filters: TradeFilters = {}) {
         setTrades(mockTrades);
         setPagination({ total: mockTrades.length, limit: 100, offset: 0, hasMore: false });
       } else {
-        setTrades(data.trades);
-        setPagination(data.pagination);
+        // No data imported, show empty state
+        setTrades([]);
+        setPagination({ total: 0, limit: 100, offset: 0, hasMore: false });
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred');
