@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useMemo } from 'react'
+import React, { useMemo, useState } from 'react'
 import { useTradeStats } from '@/hooks/useTradeStats'
 import { useTrades } from '@/hooks/useTrades'
 import { useLanguage } from '@/lib/contexts/LanguageContext'
@@ -67,12 +67,34 @@ function MetricCard({ title, value, subtitle, trend, isLoading }: MetricCardProp
 }
 
 interface MetricsOverviewProps {
-  period?: 'day' | 'week' | 'month' | '3months' | '6months' | 'year'
+  selectedPeriod?: TimePeriod
+  onPeriodChange?: (period: TimePeriod) => void
 }
 
-export default function MetricsOverview({ period = 'week' }: MetricsOverviewProps) {
+type TimePeriod = 'daily' | 'weekly' | 'monthly' | 'yearly' | 'allTime' | 'ytd'
+
+export default function MetricsOverview({ 
+  selectedPeriod: externalSelectedPeriod,
+  onPeriodChange
+}: MetricsOverviewProps) {
   const { isPortuguese } = useLanguage()
-  const { stats, loading: statsLoading, error: statsError } = useTradeStats(period)
+  const [internalSelectedPeriod, setInternalSelectedPeriod] = useState<TimePeriod>('weekly')
+  
+  // Use external period if provided, otherwise use internal
+  const selectedPeriod = externalSelectedPeriod || internalSelectedPeriod
+  const setSelectedPeriod = onPeriodChange || setInternalSelectedPeriod
+  
+  // Map our UI periods to API periods
+  const periodMap: Record<TimePeriod, 'daily' | 'weekly' | 'monthly' | 'yearly'> = {
+    daily: 'daily',
+    weekly: 'weekly',
+    monthly: 'monthly',
+    yearly: 'yearly',
+    allTime: 'yearly', // Use yearly as fallback for now
+    ytd: 'yearly' // Use yearly as approximation for YTD
+  }
+  
+  const { stats, loading: statsLoading, error: statsError } = useTradeStats(periodMap[selectedPeriod])
   
   // Memoize the filters to prevent infinite loop
   const tradesFilters = useMemo(() => ({ limit: 10 }), [])
@@ -109,8 +131,16 @@ export default function MetricsOverview({ period = 'week' }: MetricsOverviewProp
     consecutive: isPortuguese ? 'consecutivos' : 'consecutive',
     wins: isPortuguese ? 'vitórias' : 'wins',
     losses: isPortuguese ? 'perdas' : 'losses',
-    ties: isPortuguese ? 'empates' : 'ties'
+    ties: isPortuguese ? 'empates' : 'ties',
+    daily: isPortuguese ? 'Diário' : 'Daily',
+    weekly: isPortuguese ? 'Semanal' : 'Weekly', 
+    monthly: isPortuguese ? 'Mensal' : 'Monthly',
+    yearly: isPortuguese ? 'Anual' : 'Yearly',
+    allTime: isPortuguese ? 'Todo Período' : 'All Time',
+    ytd: isPortuguese ? 'Ano Atual' : 'Year to Date'
   }
+  
+  const timePeriods: TimePeriod[] = ['daily', 'weekly', 'monthly', 'yearly', 'allTime', 'ytd']
 
   const getStreakText = (streak: { count: number, type: string }) => {
     if (streak.count === 0) return isPortuguese ? 'Nenhuma' : 'None'
@@ -157,6 +187,27 @@ export default function MetricsOverview({ period = 'week' }: MetricsOverviewProp
   return (
     <section className="py-8">
       <div className="container mx-auto px-4">
+        {/* Time Period Tabs - Always show when onPeriodChange is provided */}
+        {onPeriodChange && (
+          <div className="flex justify-center mb-8">
+            <div className="flex bg-gray-800/50 rounded-xl p-1 border border-gray-700/50">
+              {timePeriods.map((period) => (
+                <button
+                  key={period}
+                  onClick={() => setSelectedPeriod(period)}
+                  className={`px-4 py-2 rounded-lg text-sm font-comfortaa font-medium transition-all duration-200 ${
+                    selectedPeriod === period
+                      ? 'bg-gradient-to-r from-[#E1FFD9] to-[#C4F5A8] text-[#2D3748] shadow-lg'
+                      : 'text-gray-300 hover:text-white hover:bg-gray-700/50'
+                  }`}
+                >
+                  {texts[period]}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+        
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           {/* Win Rate */}
           <MetricCard

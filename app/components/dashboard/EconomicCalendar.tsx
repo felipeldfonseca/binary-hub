@@ -181,8 +181,11 @@ export default function EconomicCalendar({ date = new Date(), isLoading = false 
         {(['all', 'high', 'medium', 'low'] as const).map((impact) => (
           <button
             key={impact}
-            onClick={() => setSelectedImpact(impact)}
-            className={`px-3 py-1 rounded-full text-xs font-comfortaa transition-colors ${
+            onClick={(e) => {
+              setSelectedImpact(impact)
+              e.currentTarget.blur()
+            }}
+            className={`px-3 py-1 rounded-full text-xs font-comfortaa transition-colors focus:outline-none ${
               selectedImpact === impact
                 ? 'bg-[#E1FFD9] text-[#505050] font-semibold'
                 : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
@@ -204,7 +207,7 @@ export default function EconomicCalendar({ date = new Date(), isLoading = false 
           filteredEvents.map((event) => (
             <div
               key={event.id}
-              className={`flex items-center gap-4 p-4 bg-gray-800 bg-opacity-30 rounded-lg border border-gray-700 hover:bg-opacity-50 transition-colors ${
+              className={`flex items-center gap-4 p-4 bg-gray-800/20 hover:bg-gray-800/40 rounded-lg border border-gray-700/50 hover:border-gray-600/50 transition-all duration-200 ${
                 hasTimePassed(event.time) ? 'opacity-60' : ''
               }`}
             >
