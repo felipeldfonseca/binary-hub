@@ -26,25 +26,13 @@ interface CumulativePnLChartProps {
   isLoading?: boolean
 }
 
-// Mock data generator for different time periods
+// Stable mock data generator with consistent behavior
 const generateMockData = (period: string, isPortuguese: boolean): CumulativePnLData[] => {
   const data: CumulativePnLData[] = []
-  let cumulative = 0
+  let cumulative = 1000 // Start with base value
   
-  // Determine data points based on period
-  const getDataPoints = (period: string) => {
-    switch (period) {
-      case 'daily': return 7  // Last 7 days
-      case 'weekly': return 12 // Last 12 weeks  
-      case 'monthly': return 12 // Last 12 months
-      case 'yearly': return 3   // Last 3 years
-      case 'ytd': return 8      // Year to date (8 months)
-      case 'allTime': return 24 // 2 years of data
-      default: return 12
-    }
-  }
-  
-  const points = getDataPoints(period)
+  // ALWAYS use exactly 12 data points for consistency
+  const points = 12
   
   // Format date labels based on period
   const formatDateLabel = (date: Date, period: string) => {
@@ -76,35 +64,45 @@ const generateMockData = (period: string, isPortuguese: boolean): CumulativePnLD
     }
   }
   
+  // Create base date
+  const baseDate = new Date()
+  
   for (let i = 0; i < points; i++) {
-    const date = new Date()
+    const date = new Date(baseDate)
     
-    // Calculate date based on period
+    // Simplified date calculation - more predictable
+    const offset = points - 1 - i
     switch (period) {
       case 'daily':
-        date.setDate(date.getDate() - (points - 1 - i))
+        date.setDate(date.getDate() - offset)
         break
       case 'weekly':
-        date.setDate(date.getDate() - (points - 1 - i) * 7)
+        date.setDate(date.getDate() - offset * 7)
         break
       case 'monthly':
-        date.setMonth(date.getMonth() - (points - 1 - i))
+        date.setMonth(date.getMonth() - offset)
         break
       case 'yearly':
-        date.setFullYear(date.getFullYear() - (points - 1 - i))
+        date.setFullYear(date.getFullYear() - offset)
         break
       case 'ytd':
-        date.setMonth(i)
-        date.setDate(1)
+        date.setMonth(date.getMonth() - offset)
         break
       case 'allTime':
-        date.setMonth(date.getMonth() - (points - 1 - i))
+        date.setMonth(date.getMonth() - offset * 2)
         break
     }
     
-    // Generate realistic P&L data with some volatility
-    const baseReturn = (Math.random() - 0.3) * 1000 // Slight positive bias
-    const volatility = Math.random() * 500 - 250
+    // Generate realistic P&L data with seeded randomness for consistency
+    // Use date-based seed to ensure same data for same dates across re-renders
+    const seed = date.getTime() + i * 1000 // Simple seed based on date
+    const seedRandom1 = Math.sin(seed * 0.0001) * 10000
+    const seedRandom2 = Math.sin(seed * 0.0002) * 10000
+    const random1 = seedRandom1 - Math.floor(seedRandom1) // Extract decimal part
+    const random2 = seedRandom2 - Math.floor(seedRandom2)
+    
+    const baseReturn = (random1 - 0.3) * 1000 // Slight positive bias
+    const volatility = random2 * 500 - 250
     const dailyPnL = Math.round(baseReturn + volatility)
     cumulative += dailyPnL
     
@@ -122,8 +120,10 @@ const generateMockData = (period: string, isPortuguese: boolean): CumulativePnLD
 export default function CumulativePnLChart({ period = 'weekly', isLoading = false }: CumulativePnLChartProps) {
   const { isPortuguese } = useLanguage()
   
-  // Generate mock data based on selected period
-  const chartData = useMemo(() => generateMockData(period, isPortuguese), [period, isPortuguese])
+  // Generate mock data based on selected period with stable memoization
+  const chartData = useMemo(() => {
+    return generateMockData(period, isPortuguese)
+  }, [period, isPortuguese])
   
   // Translations
   const texts = {
@@ -133,7 +133,26 @@ export default function CumulativePnLChart({ period = 'weekly', isLoading = fals
     pnl: isPortuguese ? 'P&L' : 'P&L',
     date: isPortuguese ? 'Data' : 'Date',
     profit: isPortuguese ? 'Lucro' : 'Profit',
-    loss: isPortuguese ? 'Prejuízo' : 'Loss'
+    loss: isPortuguese ? 'Prejuízo' : 'Loss',
+    daily: isPortuguese ? 'Diário' : 'Daily',
+    weekly: isPortuguese ? 'Semanal' : 'Weekly',
+    monthly: isPortuguese ? 'Mensal' : 'Monthly',
+    yearly: isPortuguese ? 'Anual' : 'Yearly',
+    allTime: isPortuguese ? 'Todo Período' : 'All Time',
+    ytd: isPortuguese ? 'Ano Atual' : 'YTD'
+  }
+  
+  // Get period-specific label for tooltip
+  const getPeriodLabel = (period: string): string => {
+    switch (period) {
+      case 'daily': return texts.daily
+      case 'weekly': return texts.weekly
+      case 'monthly': return texts.monthly
+      case 'yearly': return texts.yearly
+      case 'allTime': return texts.allTime
+      case 'ytd': return texts.ytd
+      default: return texts.daily
+    }
   }
   
   // Custom tooltip component
@@ -147,7 +166,7 @@ export default function CumulativePnLChart({ period = 'weekly', isLoading = fals
             {texts.pnl}: <span className="font-semibold">${data.cumulativePnL.toLocaleString()}</span>
           </p>
           <p className="text-gray-300 font-comfortaa text-sm">
-            Daily: <span className={`font-semibold ${data.dailyPnL >= 0 ? 'text-[#E1FFD9]' : 'text-red-400'}`}>
+            {getPeriodLabel(period)}: <span className={`font-semibold ${data.dailyPnL >= 0 ? 'text-[#E1FFD9]' : 'text-red-400'}`}>
               ${data.dailyPnL >= 0 ? '+' : ''}{data.dailyPnL.toLocaleString()}
             </span>
           </p>
@@ -170,18 +189,38 @@ export default function CumulativePnLChart({ period = 'weekly', isLoading = fals
   
   return (
     <div className="card">
-      <div className="mb-6">
-        <h3 className="text-xl font-comfortaa font-semibold text-white mb-2">
-          {texts.title}
-        </h3>
-        <p className="text-sm text-gray-400 font-comfortaa">
-          {texts.description}
-        </p>
+      <div className="flex items-start justify-between mb-6">
+        <div>
+          <h3 className="text-xl font-comfortaa font-semibold text-white mb-2">
+            {texts.title}
+          </h3>
+          <p className="text-sm text-gray-400 font-comfortaa">
+            {texts.description}
+          </p>
+        </div>
+        
+        {/* Prominent Cumulative P&L Value */}
+        <div className="text-right">
+          <p className="text-sm text-gray-400 font-comfortaa mb-1 transition-all duration-800 ease-in-out">{texts.title}</p>
+          <div className={`text-3xl font-bold font-comfortaa transition-all duration-800 ease-in-out transform ${
+            chartData[chartData.length - 1]?.cumulativePnL >= 0 ? 'text-[#E1FFD9]' : 'text-red-400'
+          }`}>
+            ${chartData[chartData.length - 1]?.cumulativePnL.toLocaleString() || '0'}
+          </div>
+          <div className="flex items-center gap-2 mt-1 transition-all duration-800 ease-in-out">
+            <div className="w-2 h-2 bg-[#E1FFD9] rounded-full"></div>
+            <span className="text-xs text-gray-400 font-comfortaa">{getPeriodLabel(period)}</span>
+          </div>
+        </div>
       </div>
       
       <div className="h-64">
         <ResponsiveContainer width="100%" height="100%">
-          <AreaChart data={chartData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+          <AreaChart 
+            key={period}
+            data={chartData} 
+            margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+          >
             <defs>
               <linearGradient id="colorPnL" x1="0" y1="0" x2="0" y2="1">
                 <stop offset="5%" stopColor="#E1FFD9" stopOpacity={0.3}/>
@@ -210,28 +249,12 @@ export default function CumulativePnLChart({ period = 'weekly', isLoading = fals
               fill="url(#colorPnL)"
               dot={{ fill: '#E1FFD9', strokeWidth: 2, r: 4 }}
               activeDot={{ r: 6, stroke: '#E1FFD9', strokeWidth: 2, fill: '#E1FFD9' }}
+              isAnimationActive={true}
+              animationDuration={800}
+              animationEasing="ease-in-out"
             />
           </AreaChart>
         </ResponsiveContainer>
-      </div>
-      
-      {/* Chart Summary */}
-      <div className="flex items-center justify-between mt-6 pt-4 border-t border-gray-700">
-        <div className="text-sm">
-          <div className="text-gray-400 font-comfortaa">{texts.title}</div>
-          <div className={`text-lg font-semibold ${
-            chartData[chartData.length - 1]?.cumulativePnL >= 0 ? 'text-[#E1FFD9]' : 'text-red-400'
-          }`}>
-            ${chartData[chartData.length - 1]?.cumulativePnL.toLocaleString() || '0'}
-          </div>
-        </div>
-        
-        <div className="flex items-center gap-4 text-sm">
-          <div className="flex items-center gap-2">
-            <div className="w-3 h-3 bg-[#E1FFD9] rounded-full"></div>
-            <span className="text-gray-400 font-comfortaa">{texts.pnl}</span>
-          </div>
-        </div>
       </div>
     </div>
   )

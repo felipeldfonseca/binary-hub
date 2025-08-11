@@ -1,5 +1,5 @@
 'use client'
-import React, { useState } from 'react'
+import React, { useState, useMemo } from 'react'
 import HeroSection from '@/components/dashboard/HeroSection'
 import HeroSectionPT from '@/components/dashboard/HeroSectionPT'
 import MetricsOverview from '@/components/dashboard/MetricsOverview'
@@ -24,27 +24,30 @@ export default function DashboardV1Modern() {
   const [selectedAsset, setSelectedAsset] = useState<string>('BTC/USDT')
   const [selectedCalendarMonth, setSelectedCalendarMonth] = useState<Date>(new Date())
   
-  // Asset definitions
-  const cryptoAssets: Asset[] = [
+  // Asset definitions - memoized to prevent recreation
+  const cryptoAssets = useMemo(() => [
     { symbol: 'BTC/USDT', name: 'Bitcoin' },
     { symbol: 'ETH/USDT', name: 'Ethereum' },
     { symbol: 'XRP/USDT', name: 'XRP' },
     { symbol: 'SOL/USDT', name: 'Solana' },
     { symbol: 'BNB/USDT', name: 'Binance Coin' },
     { symbol: 'ADA/USDT', name: 'Cardano' }
-  ]
+  ], [])
   
-  const forexAssets: Asset[] = [
+  const forexAssets = useMemo(() => [
     { symbol: 'EUR/USD', name: 'Euro / US Dollar' },
     { symbol: 'GBP/USD', name: 'British Pound / US Dollar' },
     { symbol: 'USD/JPY', name: 'US Dollar / Japanese Yen' },
     { symbol: 'USD/CHF', name: 'US Dollar / Swiss Franc' }
-  ]
+  ], [])
   
-  const currentAssets = selectedAssetType === 'crypto' ? cryptoAssets : forexAssets
+  const currentAssets = useMemo(() => 
+    selectedAssetType === 'crypto' ? cryptoAssets : forexAssets, 
+    [selectedAssetType, cryptoAssets, forexAssets]
+  )
 
-  // Mock data for calendar
-  const mockCalendarData = [
+  // Mock data for calendar - memoized
+  const mockCalendarData = useMemo(() => [
     { date: '2025-08-01', pnl: 250, trades: 3, winRate: 66.7 },
     { date: '2025-08-02', pnl: -120, trades: 2, winRate: 0 },
     { date: '2025-08-03', pnl: 400, trades: 4, winRate: 75 },
@@ -53,7 +56,7 @@ export default function DashboardV1Modern() {
     { date: '2025-08-07', pnl: 320, trades: 3, winRate: 66.7 },
     { date: '2025-08-08', pnl: 150, trades: 2, winRate: 50 },
     { date: '2025-08-09', pnl: 200, trades: 3, winRate: 66.7 }
-  ]
+  ], [])
 
   return (
     <>

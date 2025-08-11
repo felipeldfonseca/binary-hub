@@ -47,18 +47,18 @@ function MetricCard({ title, value, subtitle, trend, isLoading }: MetricCardProp
           {title}
         </h3>
         {getTrendIcon() && (
-          <span className={`text-lg ${getTrendColor()}`}>
+          <span className={`text-lg ${getTrendColor()} transition-all duration-800 ease-in-out`}>
             {getTrendIcon()}
           </span>
         )}
       </div>
       
-      <div className={`text-3xl font-bold mb-1 ${getTrendColor()}`}>
+      <div className={`text-3xl font-bold mb-1 ${getTrendColor()} transition-all duration-800 ease-in-out transform`}>
         {value}
       </div>
       
       {subtitle && (
-        <p className="text-xs text-gray-400 font-comfortaa">
+        <p className="text-xs text-gray-400 font-comfortaa transition-all duration-800 ease-in-out">
           {subtitle}
         </p>
       )}
@@ -84,15 +84,15 @@ export default function MetricsOverview({
   const selectedPeriod = externalSelectedPeriod || internalSelectedPeriod
   const setSelectedPeriod = onPeriodChange || setInternalSelectedPeriod
   
-  // Map our UI periods to API periods
-  const periodMap: Record<TimePeriod, 'daily' | 'weekly' | 'monthly' | 'yearly'> = {
+  // Map our UI periods to API periods - memoized to prevent recreation
+  const periodMap: Record<TimePeriod, 'daily' | 'weekly' | 'monthly' | 'yearly' | 'allTime' | 'ytd'> = useMemo(() => ({
     daily: 'daily',
     weekly: 'weekly',
     monthly: 'monthly',
     yearly: 'yearly',
-    allTime: 'yearly', // Use yearly as fallback for now
-    ytd: 'yearly' // Use yearly as approximation for YTD
-  }
+    allTime: 'allTime', // Now properly mapped to distinct period
+    ytd: 'ytd' // Now properly mapped to distinct period
+  }), [])
   
   const { stats, loading: statsLoading, error: statsError } = useTradeStats(periodMap[selectedPeriod])
   
@@ -140,7 +140,7 @@ export default function MetricsOverview({
     ytd: isPortuguese ? 'Ano Atual' : 'Year to Date'
   }
   
-  const timePeriods: TimePeriod[] = ['daily', 'weekly', 'monthly', 'yearly', 'allTime', 'ytd']
+  const timePeriods: TimePeriod[] = useMemo(() => ['daily', 'weekly', 'monthly', 'yearly', 'allTime', 'ytd'], [])
 
   const getStreakText = (streak: { count: number, type: string }) => {
     if (streak.count === 0) return isPortuguese ? 'Nenhuma' : 'None'
