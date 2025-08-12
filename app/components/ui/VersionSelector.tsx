@@ -7,7 +7,7 @@ export type Version = 'v1' | 'v2' | 'v3'
 interface VersionSelectorProps {
   currentVersion: Version
   onVersionChange: (version: Version) => void
-  type: 'dashboard' | 'trades'
+  type: 'dashboard' | 'trades' | 'ai'
 }
 
 const versionInfo = {
@@ -56,6 +56,29 @@ const versionInfo = {
       color: 'from-yellow-800/20 to-orange-800/20',
       features: ['Advanced Charts', 'Performance Analytics', 'Trend Analysis', 'Risk Metrics', 'Profit Optimization']
     }
+  },
+  ai: {
+    v1: {
+      name: 'Professional AI',
+      description: 'Professional AI analytics and insights',
+      icon: '🎯',
+      color: 'from-blue-800/20 to-indigo-800/20',
+      features: ['AI Insights', 'Risk Analysis', 'Pattern Recognition', 'Professional Reports', 'Strategic Advice']
+    },
+    v2: {
+      name: 'Gamified AI',
+      description: 'AI companion with gamification elements',
+      icon: '🎮',
+      color: 'from-purple-800/20 to-pink-800/20',
+      features: ['AI Companions', 'Achievement System', 'Daily Challenges', 'Interactive Chat', 'Progress Tracking']
+    },
+    v3: {
+      name: 'Advanced AI',
+      description: 'Advanced AI with neural networks and ML',
+      icon: '🚀',
+      color: 'from-orange-800/20 to-red-800/20',
+      features: ['Neural Networks', 'Machine Learning', 'Predictive Models', 'Real-time Analysis', 'Advanced Algorithms']
+    }
   }
 }
 
@@ -68,7 +91,7 @@ export default function VersionSelector({ currentVersion, onVersionChange, type 
     <div className="mb-8">
       <div className="text-center mb-6">
         <h2 className="text-xl font-bold text-white mb-2">
-          {isPortuguese ? `Escolha a Versão do ${type === 'dashboard' ? 'Dashboard' : 'Gerenciador de Trades'}` : `Choose ${type === 'dashboard' ? 'Dashboard' : 'Trades'} Version`}
+          {isPortuguese ? `Escolha a Versão ${type === 'dashboard' ? 'do Dashboard' : type === 'trades' ? 'do Gerenciador de Trades' : 'da IA'}` : `Choose ${type === 'dashboard' ? 'Dashboard' : type === 'trades' ? 'Trades' : 'AI'} Version`}
         </h2>
         <p className="text-gray-400 text-sm">
           {isPortuguese ? 'Selecione a versão que melhor atende às suas necessidades' : 'Select the version that best fits your needs'}
