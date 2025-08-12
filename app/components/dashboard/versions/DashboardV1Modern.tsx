@@ -98,7 +98,11 @@ export default function DashboardV1Modern() {
             /* First-Time User Onboarding */
             <div className="card bg-gradient-to-br from-blue-900/20 to-green-900/20 border-[#E1FFD9]/20 text-center">
               <div className="flex flex-col md:flex-row items-center justify-center gap-6 mb-8">
-                <div className="text-6xl animate-pulse">📊</div>
+                <div className="w-20 h-20 bg-[#E1FFD9]/10 rounded-2xl flex items-center justify-center animate-pulse">
+                  <svg className="w-12 h-12 text-[#E1FFD9]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                  </svg>
+                </div>
                 <div className="text-center md:text-left">
                   <h3 className="text-2xl font-bold text-white mb-2 font-comfortaa">
                     {isPortuguese ? 'Bem-vindo ao Binary Hub!' : 'Welcome to Binary Hub!'}
@@ -116,7 +120,9 @@ export default function DashboardV1Modern() {
               <div className="grid md:grid-cols-3 gap-6 mb-8">
                 <div className="flex items-center gap-3 text-left bg-gray-800/30 p-4 rounded-lg border border-gray-700/50">
                   <div className="w-12 h-12 bg-[#E1FFD9]/20 rounded-full flex items-center justify-center flex-shrink-0">
-                    <span className="text-[#E1FFD9] text-xl">📈</span>
+                    <svg className="w-6 h-6 text-[#E1FFD9]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+                    </svg>
                   </div>
                   <div>
                     <h4 className="font-semibold text-white font-comfortaa">
@@ -130,7 +136,9 @@ export default function DashboardV1Modern() {
                 
                 <div className="flex items-center gap-3 text-left bg-gray-800/30 p-4 rounded-lg border border-gray-700/50">
                   <div className="w-12 h-12 bg-[#E1FFD9]/20 rounded-full flex items-center justify-center flex-shrink-0">
-                    <span className="text-[#E1FFD9] text-xl">📊</span>
+                    <svg className="w-6 h-6 text-[#E1FFD9]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                    </svg>
                   </div>
                   <div>
                     <h4 className="font-semibold text-white font-comfortaa">
@@ -144,7 +152,9 @@ export default function DashboardV1Modern() {
                 
                 <div className="flex items-center gap-3 text-left bg-gray-800/30 p-4 rounded-lg border border-gray-700/50">
                   <div className="w-12 h-12 bg-[#E1FFD9]/20 rounded-full flex items-center justify-center flex-shrink-0">
-                    <span className="text-[#E1FFD9] text-xl">🎯</span>
+                    <svg className="w-6 h-6 text-[#E1FFD9]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                    </svg>
                   </div>
                   <div>
                     <h4 className="font-semibold text-white font-comfortaa">
@@ -165,7 +175,9 @@ export default function DashboardV1Modern() {
                 <div className="grid md:grid-cols-3 gap-4">
                   <div className="text-center">
                     <div className="w-16 h-16 bg-[#E1FFD9]/10 rounded-full flex items-center justify-center mx-auto mb-3">
-                      <span className="text-2xl">📄</span>
+                      <svg className="w-8 h-8 text-[#E1FFD9]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                      </svg>
                     </div>
                     <h5 className="font-semibold text-white text-sm mb-1">
                       {isPortuguese ? '1. Exportar CSV' : '1. Export CSV'}
@@ -177,7 +189,9 @@ export default function DashboardV1Modern() {
                   
                   <div className="text-center">
                     <div className="w-16 h-16 bg-[#E1FFD9]/10 rounded-full flex items-center justify-center mx-auto mb-3">
-                      <span className="text-2xl">⬆️</span>
+                      <svg className="w-8 h-8 text-[#E1FFD9]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                      </svg>
                     </div>
                     <h5 className="font-semibold text-white text-sm mb-1">
                       {isPortuguese ? '2. Importar Dados' : '2. Import Data'}
@@ -189,7 +203,9 @@ export default function DashboardV1Modern() {
                   
                   <div className="text-center">
                     <div className="w-16 h-16 bg-[#E1FFD9]/10 rounded-full flex items-center justify-center mx-auto mb-3">
-                      <span className="text-2xl">✨</span>
+                      <svg className="w-8 h-8 text-[#E1FFD9]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                      </svg>
                     </div>
                     <h5 className="font-semibold text-white text-sm mb-1">
                       {isPortuguese ? '3. Ver Análises' : '3. View Analytics'}
@@ -205,16 +221,23 @@ export default function DashboardV1Modern() {
               <div className="flex flex-col sm:flex-row gap-4 items-center justify-center">
                 <button 
                   onClick={handleImportData}
-                  className="bg-gradient-to-r from-[#E1FFD9] to-[#C4F5A8] text-[#2D3748] font-semibold px-8 py-3 rounded-lg hover:bg-gradient-to-r hover:from-[#C4F5A8] hover:to-[#E1FFD9] hover:shadow-xl transition-all duration-200 shadow-lg font-comfortaa transform hover:scale-105"
+                  className="bg-gradient-to-r from-[#E1FFD9] to-[#C4F5A8] text-[#2D3748] font-semibold px-8 py-3 rounded-lg hover:bg-gradient-to-r hover:from-[#C4F5A8] hover:to-[#E1FFD9] hover:shadow-xl transition-all duration-200 shadow-lg font-comfortaa transform hover:scale-105 flex items-center gap-2"
                 >
-                  {isPortuguese ? '📂 Importar Dados CSV' : '📂 Import CSV Data'}
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                  {isPortuguese ? 'Importar Dados CSV' : 'Import CSV Data'}
                 </button>
                 
                 <button 
                   onClick={() => setIsDemoMode(true)}
-                  className="text-[#E1FFD9] hover:text-[#C4F5A8] transition-colors duration-200 font-comfortaa px-4 py-2 rounded-lg border border-[#E1FFD9]/30 hover:border-[#C4F5A8]/50 bg-[#E1FFD9]/5 hover:bg-[#C4F5A8]/10"
+                  className="text-[#E1FFD9] hover:text-[#C4F5A8] transition-colors duration-200 font-comfortaa px-4 py-2 rounded-lg border border-[#E1FFD9]/30 hover:border-[#C4F5A8]/50 bg-[#E1FFD9]/5 hover:bg-[#C4F5A8]/10 flex items-center gap-2"
                 >
-                  👀 {isPortuguese ? 'Ver Demo com Dados de Exemplo' : 'See Demo with Sample Data'}
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                  </svg>
+                  {isPortuguese ? 'Ver Demo com Dados de Exemplo' : 'See Demo with Sample Data'}
                 </button>
               </div>
             </div>
@@ -263,7 +286,11 @@ export default function DashboardV1Modern() {
             {hasNoData && !isDemoMode ? (
               /* Empty State for Recent Trades */
               <div className="card text-center py-16">
-                <div className="text-4xl mb-4 opacity-60">📋</div>
+                <div className="mb-4 flex justify-center opacity-60">
+                  <svg className="w-16 h-16 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                </div>
                 <h3 className="text-xl font-semibold text-white mb-2 font-comfortaa">
                   {isPortuguese ? 'Suas operações aparecerão aqui' : 'Your trades will appear here'}
                 </h3>
@@ -275,9 +302,12 @@ export default function DashboardV1Modern() {
                 </p>
                 <button 
                   onClick={handleImportData}
-                  className="text-[#E1FFD9] hover:text-[#C4F5A8] transition-colors font-comfortaa hover:scale-105 transform transition-all duration-200"
+                  className="text-[#E1FFD9] hover:text-[#C4F5A8] transition-colors font-comfortaa hover:scale-105 transform transition-all duration-200 flex items-center gap-2 justify-center mx-auto"
                 >
-                  {isPortuguese ? '📂 Importar Dados Agora' : '📂 Import Data Now'}
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                  {isPortuguese ? 'Importar Dados Agora' : 'Import Data Now'}
                 </button>
               </div>
             ) : (
@@ -317,7 +347,9 @@ export default function DashboardV1Modern() {
                         : 'text-gray-300 hover:text-white hover:bg-gray-700/50'
                     }`}
                   >
-                    <span className="text-lg">₿</span>
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
                     {isPortuguese ? 'Crypto' : 'Crypto'}
                   </button>
                   <button
@@ -331,7 +363,9 @@ export default function DashboardV1Modern() {
                         : 'text-gray-300 hover:text-white hover:bg-gray-700/50'
                     }`}
                   >
-                    <span className="text-lg">💱</span>
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+                    </svg>
                     Forex
                   </button>
                 </div>
@@ -380,8 +414,16 @@ export default function DashboardV1Modern() {
               </div>
               
               <div className="text-center p-8">
-                <div className="text-4xl mb-4">
-                  {selectedAssetType === 'crypto' ? '₿' : '💱'}
+                <div className="mb-4 flex justify-center">
+                  {selectedAssetType === 'crypto' ? (
+                    <svg className="w-16 h-16 text-[#E1FFD9]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  ) : (
+                    <svg className="w-16 h-16 text-[#E1FFD9]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+                    </svg>
+                  )}
                 </div>
                 <p className="text-gray-400">
                   {isPortuguese ? 'Gráfico Interativo de Trading' : 'Interactive Trading Chart'}
@@ -423,7 +465,11 @@ export default function DashboardV1Modern() {
             {hasNoData && !isDemoMode ? (
               /* Empty State for Trading Calendar */
               <div className="card text-center py-16">
-                <div className="text-4xl mb-4 opacity-60">📅</div>
+                <div className="mb-4 flex justify-center opacity-60">
+                  <svg className="w-16 h-16 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
+                </div>
                 <h3 className="text-xl font-semibold text-white mb-2 font-comfortaa">
                   {isPortuguese ? 'Seu calendário de trading aparecerá aqui' : 'Your trading calendar will appear here'}
                 </h3>
@@ -489,7 +535,9 @@ export default function DashboardV1Modern() {
         <div className="container mx-auto px-4">
           <div className="card bg-gradient-to-r from-blue-800/20 to-green-800/20 border-primary/20 text-center">
             <div className="flex items-center justify-center gap-3 mb-4">
-              <div className="text-3xl">📊</div>
+              <svg className="w-8 h-8 text-[#E1FFD9]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+              </svg>
               <h3 className="font-heading text-xl font-bold">
                 {isPortuguese ? 'Dashboard V1 - Modern Metrics' : 'Dashboard V1 - Modern Metrics'}
               </h3>
