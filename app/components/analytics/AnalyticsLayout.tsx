@@ -1,5 +1,7 @@
 'use client'
 import React, { useState } from 'react'
+import Navbar from '@/components/layout/Navbar'
+import Footer from '@/components/layout/Footer'
 import { useLanguage } from '@/lib/contexts/LanguageContext'
 import AnalyticsVersionSelector from './AnalyticsVersionSelector'
 import AnalyticsV1Professional from './versions/AnalyticsV1Professional'
@@ -46,8 +48,8 @@ export default function AnalyticsLayout() {
         return <AnalyticsV2Gamified />
       case 'v2-visual':
         return (
-          <div className="min-h-screen bg-[#505050] px-4 py-8">
-            <div className="container mx-auto max-w-6xl">
+          <div className="container mx-auto px-4 sm:px-8 lg:px-12">
+            <div className="max-w-6xl mx-auto">
               <div className="card text-center py-16">
                 <div className="text-6xl mb-6">📈</div>
                 <h3 className="text-2xl font-bold text-white mb-4 font-comfortaa">
@@ -105,8 +107,10 @@ export default function AnalyticsLayout() {
 
   if (showVersionSelector) {
     return (
-      <div className="min-h-screen bg-[#505050] px-4 py-8">
-        <div className="container mx-auto max-w-4xl">
+      <div className="min-h-screen bg-background">
+        <Navbar />
+        <main className="relative pt-32 pb-16">
+          <div className="container mx-auto px-4 sm:px-8 lg:px-12 max-w-4xl">
           {/* Header */}
           <div className="text-center mb-8">
             <button
@@ -133,26 +137,32 @@ export default function AnalyticsLayout() {
               setShowVersionSelector(false)
             }}
           />
-        </div>
+          </div>
+        </main>
+        <Footer />
       </div>
     )
   }
 
   return (
-    <div className="relative">
-      {/* Floating Version Selector Button */}
-      <div className="fixed bottom-6 right-6 z-50">
-        <VersionSelector
-          currentVersion={currentVersion}
-          versionOptions={versionOptions}
-          onVersionChange={setCurrentVersion}
-          onShowSelector={() => setShowVersionSelector(true)}
-          featureType="Analytics"
-        />
-      </div>
+    <div className="min-h-screen bg-background">
+      <Navbar />
+      <main className="relative pt-32 pb-16">
+        {/* Floating Version Selector Button */}
+        <div className="fixed bottom-6 right-6 z-50">
+          <VersionSelector
+            currentVersion={currentVersion}
+            versionOptions={versionOptions}
+            onVersionChange={setCurrentVersion}
+            onShowSelector={() => setShowVersionSelector(true)}
+            featureType="Analytics"
+          />
+        </div>
 
-      {/* Current Version Content */}
-      {renderCurrentVersion()}
+        {/* Current Version Content */}
+        {renderCurrentVersion()}
+      </main>
+      <Footer />
     </div>
   )
 }

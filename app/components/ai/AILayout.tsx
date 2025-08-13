@@ -1,6 +1,8 @@
 'use client'
 
 import React, { useState } from 'react'
+import Navbar from '@/components/layout/Navbar'
+import Footer from '@/components/layout/Footer'
 import { useLanguage } from '@/lib/contexts/LanguageContext'
 import VersionSelector, { Version } from '@/components/ui/VersionSelector'
 import AIV1Professional from './versions/AIV1Professional'
@@ -25,18 +27,24 @@ export default function AILayout() {
   }
 
   return (
-    <div className="min-h-screen bg-dark-background">
-      <div className="container mx-auto px-4 py-8">
-        {/* Version Selector */}
-        <VersionSelector
-          currentVersion={currentVersion}
-          onVersionChange={setCurrentVersion}
-          type="ai"
-        />
-        
-        {/* Version Component */}
-        {renderVersionComponent()}
-      </div>
+    <div className="min-h-screen bg-background">
+      <Navbar />
+      <main className="relative pt-32 pb-16">
+        <div className="container mx-auto px-4 sm:px-8 lg:px-12">
+          <div className="max-w-7xl mx-auto">
+            {/* Version Selector */}
+            <VersionSelector
+              currentVersion={currentVersion}
+              onVersionChange={setCurrentVersion}
+              type="ai"
+            />
+            
+            {/* Version Component */}
+            {renderVersionComponent()}
+          </div>
+        </div>
+      </main>
+      <Footer />
     </div>
   )
 }

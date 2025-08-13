@@ -1,5 +1,6 @@
 'use client'
 import React, { useState } from 'react'
+import ProtectedRoute from '@/components/auth/ProtectedRoute'
 import Navbar from '@/components/layout/Navbar'
 import Footer from '@/components/layout/Footer'
 import VersionSelector, { Version } from '@/components/ui/VersionSelector'
@@ -24,22 +25,24 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      <Navbar />
-      <main className="relative pt-32 pb-16">
-        <div className="container mx-auto px-4 sm:px-8 lg:px-12">
-          <div className="max-w-7xl mx-auto">
-            <VersionSelector 
-              currentVersion={selectedVersion}
-              onVersionChange={setSelectedVersion}
-              type="dashboard"
-            />
-            
-            {renderDashboardVersion()}
+    <ProtectedRoute>
+      <div className="min-h-screen bg-background">
+        <Navbar />
+        <main className="relative pt-32 pb-16">
+          <div className="container mx-auto px-4 sm:px-8 lg:px-12">
+            <div className="max-w-7xl mx-auto">
+              <VersionSelector 
+                currentVersion={selectedVersion}
+                onVersionChange={setSelectedVersion}
+                type="dashboard"
+              />
+              
+              {renderDashboardVersion()}
+            </div>
           </div>
-        </div>
-      </main>
-      <Footer />
-    </div>
+        </main>
+        <Footer />
+      </div>
+    </ProtectedRoute>
   )
 }

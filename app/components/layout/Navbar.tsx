@@ -44,7 +44,7 @@ export default function Navbar() {
     { href: isPortuguese ? '/dashboard?lang=pt' : '/dashboard', label: isPortuguese ? 'Início' : 'Home' },
     { href: '/trades', label: isPortuguese ? 'Operações' : 'Trades' },
     { href: '/analytics', label: isPortuguese ? 'Análises' : 'Analytics' },
-    { href: '/events', label: isPortuguese ? 'Eventos' : 'Events' },
+    { href: '/accomplishments', label: isPortuguese ? 'Conquistas' : 'Accomplishments' },
     { href: '/ai', label: 'AI' },
     { href: isPortuguese ? '/dashboard/plans?lang=pt' : '/dashboard/plans', label: isPortuguese ? 'Planos' : 'Plans' },
   ]
