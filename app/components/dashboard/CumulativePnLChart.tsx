@@ -13,6 +13,7 @@ import {
   AreaChart
 } from 'recharts'
 import { useLanguage } from '@/lib/contexts/LanguageContext'
+import { useTradeStats } from '@/hooks/useTradeStats'
 
 interface CumulativePnLData {
   date: string
@@ -119,11 +120,36 @@ const generateMockData = (period: string, isPortuguese: boolean): CumulativePnLD
 
 export default function CumulativePnLChart({ period = 'weekly', isLoading = false }: CumulativePnLChartProps) {
   const { isPortuguese } = useLanguage()
+  const { dashboardStats } = useTradeStats(period as any)
   
-  // Generate mock data based on selected period with stable memoization
+  // Check if user has real data
+  const hasRealData = localStorage.getItem('binaryHub_hasData') === 'true'
+  const importedTrades = localStorage.getItem('binaryHub_trades')
+  
+  // Generate chart data - use real data if available, otherwise mock data
   const chartData = useMemo(() => {
-    return generateMockData(period, isPortuguese)
-  }, [period, isPortuguese])
+    if (hasRealData && importedTrades && dashboardStats?.performance) {
+      // Use real trade data to generate cumulative P&L
+      const trades = JSON.parse(importedTrades)
+      let cumulative = 0
+      
+      return trades.map((trade: any, index: number) => {
+        cumulative += trade.pnl || trade.profit || 0
+        return {
+          date: trade.entryTime || new Date().toISOString().split('T')[0],
+          formattedDate: new Date(trade.entryTime || new Date()).toLocaleDateString(isPortuguese ? 'pt-BR' : 'en-US', { 
+            month: 'short', 
+            day: 'numeric' 
+          }),
+          dailyPnL: trade.pnl || trade.profit || 0,
+          cumulativePnL: cumulative
+        }
+      })
+    } else {
+      // Fallback to mock data
+      return generateMockData(period, isPortuguese)
+    }
+  }, [period, isPortuguese, hasRealData, importedTrades, dashboardStats])
   
   // Translations
   const texts = {

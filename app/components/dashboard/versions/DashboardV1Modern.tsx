@@ -7,6 +7,7 @@ import CumulativePnLChart from '@/components/dashboard/CumulativePnLChart'
 import TradingCalendar from '@/components/dashboard/TradingCalendar'
 import EconomicCalendar from '@/components/dashboard/EconomicCalendar'
 import RecentTrades from '@/components/dashboard/RecentTrades'
+import CsvUploadModal from '@/components/dashboard/CsvUploadModal'
 import { useLanguage } from '@/lib/contexts/LanguageContext'
 import { useTradeStats } from '@/hooks/useTradeStats'
 
@@ -25,16 +26,26 @@ export default function DashboardV1Modern() {
   const [selectedAsset, setSelectedAsset] = useState<string>('BTC/USDT')
   const [selectedCalendarMonth, setSelectedCalendarMonth] = useState<Date>(new Date())
   const [isDemoMode, setIsDemoMode] = useState(false)
+  const [showCsvUploadModal, setShowCsvUploadModal] = useState(false)
   
   // Check if user has any trading data
-  const { stats } = useTradeStats('weekly')
+  const { stats, fetchDashboardStats } = useTradeStats('weekly')
   const hasNoData = !stats || stats.totalTrades === 0
   
-  // Simulate importing data
+  // Open CSV upload modal
   const handleImportData = () => {
-    localStorage.setItem('binaryHub_hasData', 'true')
-    // Refresh the page to trigger data reload
-    window.location.reload()
+    setShowCsvUploadModal(true)
+  }
+  
+  // Handle successful CSV upload
+  const handleCsvUploadSuccess = () => {
+    setShowCsvUploadModal(false)
+    // Refetch stats to update the UI
+    fetchDashboardStats?.()
+    // Refresh the page to ensure all components get updated data
+    setTimeout(() => {
+      window.location.reload()
+    }, 500)
   }
   
   // Reset data state (for testing)
@@ -594,6 +605,13 @@ export default function DashboardV1Modern() {
           </div>
         </div>
       </div>
+
+      {/* CSV Upload Modal */}
+      <CsvUploadModal 
+        isOpen={showCsvUploadModal}
+        onClose={() => setShowCsvUploadModal(false)}
+        onSuccess={handleCsvUploadSuccess}
+      />
     </>
   )
 }

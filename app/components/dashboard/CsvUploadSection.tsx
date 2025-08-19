@@ -100,7 +100,19 @@ export default function CsvUploadSection() {
       const result = await response.json()
       setUploadStatus(result)
       
-      showSuccess('Upload iniciado', 'Seu arquivo CSV está sendo processado')
+      // Store the imported trades data
+      if (result.status === 'completed' && result.trades) {
+        // Mark that user has imported data
+        localStorage.setItem('binaryHub_hasData', 'true')
+        
+        // Store the actual trades data (in a real app, this would be in Firestore)
+        localStorage.setItem('binaryHub_trades', JSON.stringify(result.trades))
+        
+        // Store statistics
+        localStorage.setItem('binaryHub_stats', JSON.stringify(result.statistics))
+      }
+      
+      showSuccess('Upload concluído', `${result.importedRows} operações foram importadas com sucesso`)
 
       // Poll for status updates
       if (result.status === 'processing') {
@@ -155,7 +167,7 @@ export default function CsvUploadSection() {
             Import Your Trades
           </h2>
           
-          <p className="text-gray-600 text-center mb-8">
+          <p className="text-gray-300 text-center mb-8">
             Upload your Ebinex CSV file to import your trading history. 
             We'll automatically detect and skip any duplicate trades.
           </p>
@@ -242,7 +254,7 @@ export default function CsvUploadSection() {
                 />
                 <label
                   htmlFor="csv-upload"
-                  className="inline-block px-6 py-3 bg-primary text-text rounded-md hover:bg-primary/90 cursor-pointer transition-colors"
+                  className="inline-block px-6 py-3 bg-gradient-to-r from-[#E1FFD9] to-[#C4F5A8] text-gray-900 font-semibold rounded-md hover:bg-gradient-to-r hover:from-[#C4F5A8] hover:to-[#E1FFD9] cursor-pointer transition-colors"
                 >
                   Choose File
                 </label>

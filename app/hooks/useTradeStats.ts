@@ -158,22 +158,70 @@ export function useTradeStats(period: 'daily' | 'weekly' | 'monthly' | 'yearly' 
         setDashboardStats(emptyDashboardStats);
         setStats(emptyStats);
       } else {
-        // Show mock data (user has imported data)
-        const mockStats = generateMockData(period);
-        const mockDashboardStats: DashboardStats = {
-          period: period,
-          stats: mockStats,
-          performance: [
-            { date: '2025-08-09', pnl: 20.00, trades: 1 },
-            { date: '2025-08-09', pnl: -30.00, trades: 1 },
-            { date: '2025-08-09', pnl: 28.00, trades: 1 },
-            { date: '2025-08-09', pnl: 16.00, trades: 1 },
-            { date: '2025-08-09', pnl: -50.00, trades: 1 },
-          ]
-        };
+        // User has imported data - use real data if available, otherwise use demo data
+        const importedTrades = localStorage.getItem('binaryHub_trades');
+        const importedStats = localStorage.getItem('binaryHub_stats');
         
-        setDashboardStats(mockDashboardStats);
-        setStats(mockStats);
+        if (importedTrades && importedStats) {
+          // Use real imported data
+          const trades = JSON.parse(importedTrades);
+          const statsData = JSON.parse(importedStats);
+          
+          // Debug: Log the imported data
+          console.log('useTradeStats Debug:', {
+            tradesCount: trades.length,
+            firstTrade: trades[0],
+            statsData,
+            sampleTrades: trades.slice(0, 3)
+          });
+          
+          // Calculate real stats from imported trades
+          const realStats: TradeStats = {
+            totalTrades: trades.length,
+            winTrades: statsData.winTrades || trades.filter((t: any) => t.result === 'win').length,
+            lossTrades: statsData.lossTrades || trades.filter((t: any) => t.result === 'loss').length,
+            tieTrades: trades.filter((t: any) => t.result === 'tie').length,
+            winRate: statsData.winRate || ((statsData.winTrades || 0) / trades.length * 100),
+            totalPnl: statsData.totalProfit || trades.reduce((sum: number, t: any) => sum + (t.pnl || 0), 0),
+            avgPnl: (statsData.totalProfit || 0) / trades.length,
+            maxDrawdown: -Math.abs(Math.min(...trades.map((t: any) => t.pnl || 0))),
+            avgStake: statsData.avgStake || trades.reduce((sum: number, t: any) => sum + (t.amount || 0), 0) / trades.length,
+            maxStake: Math.max(...trades.map((t: any) => t.amount || 0))
+          };
+          
+          // Generate performance data from real trades
+          const performanceData = trades.map((trade: any) => ({
+            date: trade.entryTime || new Date().toISOString().split('T')[0],
+            pnl: trade.pnl || 0,
+            trades: 1
+          }));
+          
+          const realDashboardStats: DashboardStats = {
+            period: period,
+            stats: realStats,
+            performance: performanceData
+          };
+          
+          setDashboardStats(realDashboardStats);
+          setStats(realStats);
+        } else {
+          // Fallback to demo/mock data only if no real data exists
+          const mockStats = generateMockData(period);
+          const mockDashboardStats: DashboardStats = {
+            period: period,
+            stats: mockStats,
+            performance: [
+              { date: '2025-08-09', pnl: 20.00, trades: 1 },
+              { date: '2025-08-09', pnl: -30.00, trades: 1 },
+              { date: '2025-08-09', pnl: 28.00, trades: 1 },
+              { date: '2025-08-09', pnl: 16.00, trades: 1 },
+              { date: '2025-08-09', pnl: -50.00, trades: 1 },
+            ]
+          };
+          
+          setDashboardStats(mockDashboardStats);
+          setStats(mockStats);
+        }
       }
       
       setLoading(false);

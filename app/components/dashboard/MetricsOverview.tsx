@@ -198,6 +198,16 @@ export default function MetricsOverview({
   // Override stats and trades for demo mode
   const displayStats = isDemoMode ? generateDemoStats(selectedPeriod) : stats
   
+  // Debug logging (temporary)
+  console.log('MetricsOverview Debug:', { 
+    isDemoMode, 
+    hasStats: !!stats, 
+    stats, 
+    selectedPeriod,
+    statsLoading,
+    displayStats
+  })
+  
   // Generate period-specific demo trades for streak calculation
   const generateDemoTrades = (period: string) => {
     const tradePatterns = {
