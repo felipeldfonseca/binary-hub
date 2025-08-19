@@ -78,7 +78,21 @@ export default function TradesV3AnalyticsDashboard() {
           winRate: Math.random() * 100,
           totalPnl: (Math.random() - 0.5) * 500,
           avgStake: Math.random() * 50 + 10
-        }))
+        })),
+        riskMetrics: {
+          sharpeRatio: '1.23',
+          stdDeviation: '8.45',
+          maxDrawdown: '25.30',
+          profitFactor: '1.67',
+          avgReturn: '12.45'
+        },
+        strategyPerformance: [
+          { strategy: 'Trend Following', trades: 25, wins: 15, totalPnl: 156.78, winRate: 60 },
+          { strategy: 'Scalping', trades: 18, wins: 12, totalPnl: 89.34, winRate: 66.67 },
+          { strategy: 'Momentum', trades: 12, wins: 8, totalPnl: 45.23, winRate: 66.67 }
+        ],
+        monthlyData: [],
+        drawdownData: []
       }
     }
 
@@ -468,21 +482,21 @@ export default function TradesV3AnalyticsDashboard() {
           <MetricsCard
             icon="📊"
             title={isPortuguese ? 'Profit Factor' : 'Profit Factor'}
-            value={analyticsData.riskMetrics.profitFactor}
+            value={analyticsData?.riskMetrics?.profitFactor || '0.00'}
             subtitle="1.67 = Good"
             color="from-orange-800/50 to-yellow-800/50"
           />
           <MetricsCard
             icon="🎯"
             title="Sharpe Ratio"
-            value={analyticsData.riskMetrics.sharpeRatio}
+            value={analyticsData?.riskMetrics?.sharpeRatio || '0.00'}
             subtitle="1.23 = Acceptable"
             color="from-yellow-800/50 to-orange-800/50"
           />
           <MetricsCard
             icon="📉"
             title="Max Drawdown"
-            value={`$${analyticsData.riskMetrics.maxDrawdown}`}
+            value={`$${analyticsData?.riskMetrics?.maxDrawdown || '0.00'}`}
             subtitle="-23.4%"
             color="from-orange-700/50 to-red-700/50"
           />
@@ -716,20 +730,20 @@ export default function TradesV3AnalyticsDashboard() {
                   <div className="space-y-4">
                     <div className="flex justify-between items-center p-3 bg-white/5 rounded">
                       <span className="text-gray-300">Profit Factor</span>
-                      <span className="text-orange-400 font-bold">{analyticsData.riskMetrics.profitFactor}</span>
+                      <span className="text-orange-400 font-bold">{analyticsData?.riskMetrics?.profitFactor || '0.00'}</span>
                     </div>
                     <div className="flex justify-between items-center p-3 bg-white/5 rounded">
                       <span className="text-gray-300">Sharpe Ratio</span>
-                      <span className="text-yellow-400 font-bold">{analyticsData.riskMetrics.sharpeRatio}</span>
+                      <span className="text-yellow-400 font-bold">{analyticsData?.riskMetrics?.sharpeRatio || '0.00'}</span>
                     </div>
                     <div className="flex justify-between items-center p-3 bg-white/5 rounded">
                       <span className="text-gray-300">Standard Deviation</span>
-                      <span className="text-blue-400 font-bold">{analyticsData.riskMetrics.stdDeviation}%</span>
+                      <span className="text-blue-400 font-bold">{analyticsData?.riskMetrics?.stdDeviation || '0.00'}%</span>
                     </div>
                     <div className="flex justify-between items-center p-3 bg-white/5 rounded">
                       <span className="text-gray-300">Average Return</span>
-                      <span className={`font-bold ${parseFloat(analyticsData.riskMetrics.avgReturn) >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                        {analyticsData.riskMetrics.avgReturn}%
+                      <span className={`font-bold ${parseFloat(analyticsData?.riskMetrics?.avgReturn || '0') >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                        {analyticsData?.riskMetrics?.avgReturn || '0.00'}%
                       </span>
                     </div>
                   </div>
@@ -740,7 +754,7 @@ export default function TradesV3AnalyticsDashboard() {
                     🎯 {isPortuguese ? 'Performance por Estratégia' : 'Strategy Performance'}
                   </h4>
                   <div className="space-y-2">
-                    {analyticsData.strategyPerformance.slice(0, 6).map((strategy: any) => (
+                    {(analyticsData?.strategyPerformance || []).slice(0, 6).map((strategy: any) => (
                       <div key={strategy.strategy} className="p-2 bg-white/5 rounded">
                         <div className="flex justify-between items-center mb-1">
                           <span className="text-white text-sm font-medium">{strategy.strategy}</span>
@@ -809,21 +823,21 @@ export default function TradesV3AnalyticsDashboard() {
                 <MetricsCard
                   icon="📉"
                   title="Max Drawdown"
-                  value={`$${analyticsData.riskMetrics.maxDrawdown}`}
+                  value={`$${analyticsData?.riskMetrics?.maxDrawdown || '0.00'}`}
                   subtitle="-23.4% of capital"
                   color="from-red-800/50 to-red-600/50"
                 />
                 <MetricsCard
                   icon="⚖️"
                   title="Risk-Adjusted Return"
-                  value={analyticsData.riskMetrics.sharpeRatio}
+                  value={analyticsData?.riskMetrics?.sharpeRatio || '0.00'}
                   subtitle="Sharpe Ratio"
                   color="from-orange-800/50 to-yellow-700/50"
                 />
                 <MetricsCard
                   icon="📊"
                   title="Volatility"
-                  value={`${analyticsData.riskMetrics.stdDeviation}%`}
+                  value={`${analyticsData?.riskMetrics?.stdDeviation || '0.00'}%`}
                   subtitle="Standard Deviation"
                   color="from-yellow-800/50 to-orange-700/50"
                 />

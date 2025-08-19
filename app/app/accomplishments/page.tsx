@@ -1,17 +1,25 @@
 'use client'
 
-import React from 'react'
+import React, { useState } from 'react'
 import ProtectedRoute from '@/components/auth/ProtectedRoute'
 import Navbar from '@/components/layout/Navbar'
 import Footer from '@/components/layout/Footer'
+import ConquistasVersionSelector, { ConquistasVersion } from '@/components/achievements/ConquistasVersionSelector'
+import ConquistasV2Analytics from '@/components/achievements/versions/ConquistasV2Analytics'
+import ConquistasV3Social from '@/components/achievements/versions/ConquistasV3Social'
 import { useLanguage } from '@/lib/contexts/LanguageContext'
 import { useTradeStats } from '@/hooks/useTradeStats'
 import { useTrades } from '@/hooks/useTrades'
+
+// Toggle view types for V2/V3 integration
+export type ConquistasViewMode = 'personal' | 'community'
 
 export default function AccomplishmentsPage() {
   const { isPortuguese } = useLanguage()
   const { stats } = useTradeStats('weekly')
   const { trades } = useTrades()
+  const [selectedVersion, setSelectedVersion] = useState<ConquistasVersion>('v2')
+  const [viewMode, setViewMode] = useState<ConquistasViewMode>('personal')
 
   // Professional Trading Accomplishments Data
   const accomplishmentsData = {
@@ -227,32 +235,89 @@ export default function AccomplishmentsPage() {
     }
   }
 
-  return (
-    <ProtectedRoute>
-      <div className="min-h-screen bg-background">
-        <Navbar />
-        <main className="relative pt-32 pb-16">
-        {/* Header Section */}
-        <section className="py-16">
-        <div className="container mx-auto px-4 sm:px-8 lg:px-12">
-          <div className="max-w-7xl mx-auto text-center">
-            <div className="flex items-center justify-center gap-4 mb-6">
-              <svg className="w-12 h-12 text-[#E1FFD9]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z" />
-              </svg>
-              <h1 className="font-heading text-4xl md:text-5xl font-bold bg-gradient-to-r from-[#E1FFD9] to-[#C4F5A8] bg-clip-text text-transparent">
-                {isPortuguese ? 'Conquistas' : 'Accomplishments'}
-              </h1>
-            </div>
-            <p className="text-xl text-gray-300 max-w-3xl mx-auto">
-              {isPortuguese 
-                ? 'Acompanhe seu progresso, conquiste marcos importantes e compete com outros traders em uma jornada rumo à excelência.'
-                : 'Track your progress, achieve important milestones, and compete with other traders on a journey towards excellence.'
-              }
-            </p>
-          </div>
+  // Elegant toggle component for Personal vs Community views
+  const renderViewModeToggle = () => (
+    <div className="flex justify-center mb-8">
+      <div className="bg-gray-800/50 p-2 rounded-2xl border border-gray-700/50 backdrop-blur-sm">
+        <div className="flex">
+          <button
+            onClick={() => setViewMode('personal')}
+            className={`flex items-center gap-3 px-6 py-3 rounded-xl transition-all duration-300 font-medium focus:outline-none focus:ring-0 focus:shadow-none ${
+              viewMode === 'personal'
+                ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-lg shadow-purple-500/25'
+                : 'text-gray-400 hover:text-white hover:bg-gray-700/50'
+            }`}
+            style={{ outline: 'none', boxShadow: 'none' }}
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+            </svg>
+            {isPortuguese ? 'Pessoal' : 'Personal'}
+          </button>
+          <button
+            onClick={() => setViewMode('community')}
+            className={`flex items-center gap-3 px-6 py-3 rounded-xl transition-all duration-300 font-medium focus:outline-none focus:ring-0 focus:shadow-none ${
+              viewMode === 'community'
+                ? 'bg-gradient-to-r from-blue-600 to-cyan-600 text-white shadow-lg shadow-blue-500/25'
+                : 'text-gray-400 hover:text-white hover:bg-gray-700/50'
+            }`}
+            style={{ outline: 'none', boxShadow: 'none' }}
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+            </svg>
+            {isPortuguese ? 'Comunidade' : 'Community'}
+          </button>
         </div>
-      </section>
+      </div>
+    </div>
+  )
+
+  // Function to render the selected version content
+  const renderVersionContent = () => {
+    // For V2 and V3, we now use the toggle system
+    if (selectedVersion === 'v2' || selectedVersion === 'v3') {
+      return (
+        <div>
+          {renderViewModeToggle()}
+          {viewMode === 'personal' ? <ConquistasV2Analytics /> : <ConquistasV3Social />}
+        </div>
+      )
+    }
+    
+    // V1 keeps the original version selector
+    switch (selectedVersion) {
+      case 'v1':
+        return renderV1Content()
+      default:
+        return renderV1Content()
+    }
+  }
+
+  // V1 Content (original implementation)
+  const renderV1Content = () => (
+    <div className="space-y-16">
+      {/* Header Section */}
+      <section className="py-16">
+      <div className="container mx-auto px-4 sm:px-8 lg:px-12">
+        <div className="max-w-7xl mx-auto text-center">
+          <div className="flex items-center justify-center gap-4 mb-6">
+            <svg className="w-12 h-12 text-[#E1FFD9]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z" />
+            </svg>
+            <h1 className="font-heading text-4xl md:text-5xl font-bold bg-gradient-to-r from-[#E1FFD9] to-[#C4F5A8] bg-clip-text text-transparent">
+              {isPortuguese ? 'Conquistas' : 'Accomplishments'}
+            </h1>
+          </div>
+          <p className="text-xl text-gray-300 max-w-3xl mx-auto">
+            {isPortuguese 
+              ? 'Acompanhe seu progresso, conquiste marcos importantes e compete com outros traders em uma jornada rumo à excelência.'
+              : 'Track your progress, achieve important milestones, and compete with other traders on a journey towards excellence.'
+            }
+          </p>
+        </div>
+      </div>
+    </section>
       
       {/* Level & XP Section */}
       <section className="py-12">
@@ -645,9 +710,31 @@ export default function AccomplishmentsPage() {
           </div>
         </div>
       </div>
-      </main>
-      <Footer />
     </div>
+  )
+
+  return (
+    <ProtectedRoute>
+      <div className="min-h-screen bg-background">
+        <Navbar />
+        <main className="relative pt-32 pb-16">
+          <div className="container mx-auto px-4 sm:px-8 lg:px-12">
+            <div className="max-w-7xl mx-auto">
+              {/* Only show version selector for V1, V2 and V3 now use the integrated toggle */}
+              {selectedVersion === 'v1' && (
+                <ConquistasVersionSelector 
+                  currentVersion={selectedVersion}
+                  onVersionChange={setSelectedVersion}
+                />
+              )}
+              
+              
+              {renderVersionContent()}
+            </div>
+          </div>
+        </main>
+        <Footer />
+      </div>
     </ProtectedRoute>
   )
 }

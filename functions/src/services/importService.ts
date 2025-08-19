@@ -3,6 +3,7 @@ import { logger } from 'firebase-functions';
 import { csvParserService, ParsedTrade } from './csvParser';
 import { tradeService, Trade } from './tradeService';
 import { AppError, ErrorCodes, withTimeout, withRetry } from '../utils/errorHandler';
+import { realTimeService } from './realTimeService';
 
 // Initialize Firestore inside the service
 const getDb = () => getFirestore();
@@ -90,6 +91,16 @@ export class ImportService {
 
       await this.createImportRecord(importRecord);
 
+      // Emit initial progress
+      realTimeService.emitImportProgress(userId, {
+        uploadId: importId,
+        status: 'processing',
+        progress: 0,
+        totalRows: 0,
+        processedRows: 0,
+        errors: []
+      });
+
       // Parse CSV with timeout protection
       const csvContent = csvFile.toString('utf-8');
       const parsedTrades = await withTimeout(
@@ -103,9 +114,29 @@ export class ImportService {
         totalRows: parsedTrades.length
       });
 
+      // Emit progress with total rows discovered
+      realTimeService.emitImportProgress(userId, {
+        uploadId: importId,
+        status: 'processing',
+        progress: 10,
+        totalRows: parsedTrades.length,
+        processedRows: 0,
+        errors: []
+      });
+
       // Check for existing trades
       const tradeIds = parsedTrades.map(t => t.tradeId);
       const existingTradeIds = await tradeService.findExistingTrades(userId, tradeIds);
+      
+      // Emit progress after deduplication check
+      realTimeService.emitImportProgress(userId, {
+        uploadId: importId,
+        status: 'processing',
+        progress: 30,
+        totalRows: parsedTrades.length,
+        processedRows: 0,
+        errors: []
+      });
       
       // Filter out duplicates
       const newTrades = parsedTrades.filter(trade => !existingTradeIds.includes(trade.tradeId));
@@ -117,6 +148,16 @@ export class ImportService {
       const tradesToImport = newTrades.map(parsedTrade => 
         csvParserService.convertToTradeModel(parsedTrade, userId)
       );
+
+      // Emit progress before bulk import
+      realTimeService.emitImportProgress(userId, {
+        uploadId: importId,
+        status: 'processing',
+        progress: 50,
+        totalRows: parsedTrades.length,
+        processedRows: 0,
+        errors: []
+      });
 
       // Import new trades
       const importResult = await tradeService.bulkCreateTrades(userId, tradesToImport, importId);
@@ -139,6 +180,33 @@ export class ImportService {
           fileSize: csvFile.length,
           processingTime,
           csvFormat: 'Ebinex'
+        }
+      });
+
+      // Emit final completion progress
+      realTimeService.emitImportProgress(userId, {
+        uploadId: importId,
+        status: 'completed',
+        progress: 100,
+        totalRows: parsedTrades.length,
+        processedRows: importResult.created,
+        errors: importResult.errors.map(err => ({
+          row: err.index,
+          error: err.error
+        }))
+      });
+
+      // Send completion notification
+      realTimeService.emitNotification(userId, {
+        type: importResult.errors.length > 0 ? 'warning' : 'success',
+        title: 'Import Completed',
+        message: `Successfully imported ${importResult.created} trades${duplicateTradeIds.length > 0 ? ` (${duplicateTradeIds.length} duplicates skipped)` : ''}${importResult.errors.length > 0 ? ` with ${importResult.errors.length} errors` : ''}`,
+        data: {
+          importId,
+          importedRows: importResult.created,
+          duplicateRows: duplicateTradeIds.length,
+          errors: importResult.errors.length,
+          processingTime
         }
       });
 

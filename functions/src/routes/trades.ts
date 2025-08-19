@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { tradeService, TradeFilters } from '../services/tradeService';
 import { validateTradeData, validateTradeFilters, sanitizeTradeData, logValidationErrors, createValidationError } from '../utils/validation';
+import { cacheMiddleware, cacheInvalidationMiddleware, cacheWarmingMiddleware, cacheStatsMiddleware } from '../middleware/cache';
 import { logger } from 'firebase-functions';
 import { 
   asyncHandler, 
@@ -10,6 +11,7 @@ import {
   createErrorResponse,
   ErrorCodes 
 } from '../utils/errorHandler';
+import { realTimeService } from '../services/realTimeService';
 
 // Extend Express Request to include user property
 interface AuthenticatedRequest extends Request {
@@ -22,10 +24,37 @@ interface AuthenticatedRequest extends Request {
 
 const router = Router();
 
+// Add cache statistics to all responses
+router.use(cacheStatsMiddleware());
+
+// Add cache invalidation for write operations
+router.use(cacheInvalidationMiddleware({
+  tags: (req) => {
+    const authReq = req as AuthenticatedRequest;
+    return [`user:${authReq.user?.uid}`, 'trades', 'analytics', 'dashboard'];
+  }
+}));
+
+// Add cache warming after successful operations
+router.use(cacheWarmingMiddleware());
+
 /**
  * GET /v1/trades - List user trades with filtering and pagination
  */
-router.get('/', async (req: AuthenticatedRequest, res: Response) => {
+router.get('/',
+  cacheMiddleware({
+    ttl: 900, // 15 minutes
+    tags: (req) => {
+      const authReq = req as AuthenticatedRequest;
+      return [`user:${authReq.user?.uid}`, 'trades'];
+    },
+    keyGenerator: (req) => {
+      const authReq = req as AuthenticatedRequest;
+      const query = JSON.stringify(req.query);
+      return `trades:list:${authReq.user?.uid}:${query}`;
+    }
+  }),
+  async (req: AuthenticatedRequest, res: Response) => {
   try {
     const userId = req.user?.uid;
     if (!userId) {
@@ -108,6 +137,17 @@ router.post('/', async (req: AuthenticatedRequest, res: Response) => {
     // Create trade
     const trade = await tradeService.createTrade(userId, sanitizedData);
     
+    // Emit real-time event
+    realTimeService.emitTradeCreated(userId, trade);
+    
+    // Send success notification
+    realTimeService.emitNotification(userId, {
+      type: 'success',
+      title: 'Trade Created',
+      message: `Trade for ${trade.asset} created successfully`,
+      data: { tradeId: trade.id }
+    });
+    
     res.status(201).json(trade);
     return;
 
@@ -125,7 +165,19 @@ router.post('/', async (req: AuthenticatedRequest, res: Response) => {
 /**
  * GET /v1/trades/:id - Get specific trade details
  */
-router.get('/:id', async (req: AuthenticatedRequest, res: Response) => {
+router.get('/:id',
+  cacheMiddleware({
+    ttl: 3600, // 1 hour - trades don't change often once created
+    tags: (req) => {
+      const authReq = req as AuthenticatedRequest;
+      return [`user:${authReq.user?.uid}`, 'trades', `trade:${req.params.id}`];
+    },
+    keyGenerator: (req) => {
+      const authReq = req as AuthenticatedRequest;
+      return `trade:${authReq.user?.uid}:${req.params.id}`;
+    }
+  }),
+  async (req: AuthenticatedRequest, res: Response) => {
   try {
     const userId = req.user?.uid;
     const tradeId = req.params.id;
@@ -219,6 +271,17 @@ router.put('/:id', async (req: AuthenticatedRequest, res: Response) => {
     // Update trade
     const updatedTrade = await tradeService.updateTrade(userId, tradeId, sanitizedData);
     
+    // Emit real-time event
+    realTimeService.emitTradeUpdated(userId, updatedTrade);
+    
+    // Send success notification
+    realTimeService.emitNotification(userId, {
+      type: 'info',
+      title: 'Trade Updated',
+      message: `Trade for ${updatedTrade.asset} updated successfully`,
+      data: { tradeId: updatedTrade.id }
+    });
+    
     res.json(updatedTrade);
     return;
 
@@ -270,6 +333,17 @@ router.delete('/:id', async (req: AuthenticatedRequest, res: Response) => {
 
     // Delete trade
     await tradeService.deleteTrade(userId, tradeId);
+    
+    // Emit real-time event
+    realTimeService.emitTradeDeleted(userId, tradeId);
+    
+    // Send success notification
+    realTimeService.emitNotification(userId, {
+      type: 'info',
+      title: 'Trade Deleted',
+      message: `Trade for ${existingTrade.asset} deleted successfully`,
+      data: { tradeId }
+    });
     
     res.json({ success: true });
     return;

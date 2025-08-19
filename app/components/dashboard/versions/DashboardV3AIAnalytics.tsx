@@ -3,14 +3,38 @@
 import React from 'react'
 import HeroSection from '@/components/dashboard/HeroSection'
 import HeroSectionPT from '@/components/dashboard/HeroSectionPT'
+import RealTimeStatus from '@/components/dashboard/RealTimeStatus'
+import LiveNotifications from '@/components/dashboard/LiveNotifications'
+import { FirestoreErrorBoundary } from '@/components/ui/FirestoreErrorBoundary'
 import { useLanguage } from '@/lib/contexts/LanguageContext'
 import { useTradeStats } from '@/hooks/useTradeStats'
 import { useTrades } from '@/hooks/useTrades'
+import { useRealTimeCharts } from '@/hooks/useRealTimeCharts'
+import { useNotifications } from '@/hooks/useNotifications'
+import { useImportProgress } from '@/hooks/useImportProgress'
 
 export default function DashboardV3AIAnalytics() {
   const { isPortuguese } = useLanguage()
   const { stats } = useTradeStats('weekly')
   const { trades } = useTrades()
+  
+  // Real-time hooks with error handling
+  const { 
+    chartData, 
+    metrics, 
+    assetPerformance, 
+    connected: chartsConnected,
+    loading: chartsLoading,
+    error: chartsError 
+  } = useRealTimeCharts({ period: 'month', groupBy: 'day' })
+  
+  const { hasActiveImports, totalProgress } = useImportProgress()
+  const { unreadCount, hasCritical } = useNotifications()
+
+  // Error boundary fallback for Firestore issues
+  if (chartsError && chartsError.includes('INTERNAL ASSERTION FAILED')) {
+    console.warn('Firestore internal error in Dashboard V3, using fallback data');
+  }
 
   // Mock AI analysis data and predictions
   const aiAnalyticsData = {
@@ -114,9 +138,19 @@ export default function DashboardV3AIAnalytics() {
   const profitability = stats?.totalPnl || 34
 
   return (
-    <>
+    <FirestoreErrorBoundary>
+      {/* Live Notifications */}
+      <LiveNotifications position="top-right" />
+      
       {/* Hero Section - Keep personalized welcome and CTA */}
       {isPortuguese ? <HeroSectionPT /> : <HeroSection />}
+      
+      {/* Real-Time Status */}
+      <section className="py-8">
+        <div className="container mx-auto px-4 sm:px-8 lg:px-12">
+          <RealTimeStatus showDetailed={true} />
+        </div>
+      </section>
       
       {/* VERSION 3: AI ANALYTICS DASHBOARD - Future of Trading */}
       
@@ -603,6 +637,6 @@ export default function DashboardV3AIAnalytics() {
           </div>
         </div>
       </div>
-    </>
+    </FirestoreErrorBoundary>
   )
 }

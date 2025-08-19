@@ -1,0 +1,564 @@
+import { Request, Response, NextFunction } from 'express';
+import { getFirestore } from 'firebase-admin/firestore';
+import { logger } from 'firebase-functions';
+
+const getDb = () => getFirestore();
+
+export interface RateLimitConfig {
+  windowMs: number; // Time window in milliseconds
+  maxRequests: number; // Max requests per window
+  tier: 'free' | 'pro'; // User tier
+  endpoint: string; // Specific endpoint
+}
+
+export interface RateLimitRecord {
+  userId: string;
+  endpoint: string;
+  requests: Array<{
+    timestamp: number;
+    success: boolean;
+    tokens?: number;
+  }>;
+  totalTokensUsed: number;
+  resetTime: number;
+}
+
+// Rate limit configurations for different endpoints and user tiers
+const RATE_LIMITS: Record<string, Record<string, RateLimitConfig>> = {
+  '/insights/generate': {
+    free: {
+      windowMs: 15 * 60 * 1000, // 15 minutes
+      maxRequests: 3,
+      tier: 'free',
+      endpoint: '/insights/generate'
+    },
+    pro: {
+      windowMs: 15 * 60 * 1000,
+      maxRequests: 10,
+      tier: 'pro',
+      endpoint: '/insights/generate'
+    }
+  },
+  '/insights/coach': {
+    free: {
+      windowMs: 60 * 60 * 1000, // 1 hour
+      maxRequests: 5,
+      tier: 'free',
+      endpoint: '/insights/coach'
+    },
+    pro: {
+      windowMs: 60 * 60 * 1000,
+      maxRequests: 20,
+      tier: 'pro',
+      endpoint: '/insights/coach'
+    }
+  },
+  '/trades/check-rules': {
+    free: {
+      windowMs: 5 * 60 * 1000, // 5 minutes
+      maxRequests: 10,
+      tier: 'free',
+      endpoint: '/trades/check-rules'
+    },
+    pro: {
+      windowMs: 5 * 60 * 1000,
+      maxRequests: 50,
+      tier: 'pro',
+      endpoint: '/trades/check-rules'
+    }
+  },
+  '/import/validate-csv': {
+    free: {
+      windowMs: 15 * 60 * 1000,
+      maxRequests: 5,
+      tier: 'free',
+      endpoint: '/import/validate-csv'
+    },
+    pro: {
+      windowMs: 15 * 60 * 1000,
+      maxRequests: 20,
+      tier: 'pro',
+      endpoint: '/import/validate-csv'
+    }
+  }
+};
+
+// Token limits for OpenAI usage (monthly)
+const TOKEN_LIMITS = {
+  free: {
+    monthly: 50000, // 50k tokens per month
+    daily: 2000     // 2k tokens per day
+  },
+  pro: {
+    monthly: 500000, // 500k tokens per month
+    daily: 20000     // 20k tokens per day
+  }
+};
+
+interface AuthenticatedRequest extends Request {
+  user?: {
+    uid: string;
+    email?: string;
+    plan?: 'free' | 'pro';
+    [key: string]: any;
+  };
+}
+
+/**
+ * AI Rate limiting middleware with advanced features
+ */
+export const aiRateLimit = (endpoint: string) => {
+  return async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+    try {
+      if (!req.user) {
+        return res.status(401).json({
+          error: 'Authentication required',
+          code: 'AUTH_REQUIRED'
+        });
+      }
+
+      const userId = req.user.uid;
+      const userTier = req.user.plan || 'free';
+      
+      // Get rate limit configuration
+      const endpointLimits = RATE_LIMITS[endpoint];
+      if (!endpointLimits) {
+        logger.warn(`No rate limit configuration found for endpoint: ${endpoint}`);
+        return next(); // Allow if no config found
+      }
+
+      const config = endpointLimits[userTier];
+      if (!config) {
+        logger.warn(`No rate limit configuration found for tier: ${userTier} on endpoint: ${endpoint}`);
+        return next();
+      }
+
+      // Check rate limits
+      const rateLimitResult = await checkRateLimit(userId, config);
+      if (!rateLimitResult.allowed) {
+        return res.status(429).json({
+          error: 'Rate limit exceeded',
+          code: 'RATE_LIMIT_EXCEEDED',
+          details: {
+            limit: config.maxRequests,
+            windowMs: config.windowMs,
+            resetTime: rateLimitResult.resetTime,
+            tier: userTier,
+            endpoint
+          },
+          message: getRateLimitMessage(userTier, endpoint)
+        });
+      }
+
+      // Check token limits
+      const tokenLimitResult = await checkTokenLimit(userId, userTier);
+      if (!tokenLimitResult.allowed) {
+        return res.status(429).json({
+          error: 'Token limit exceeded',
+          code: 'TOKEN_LIMIT_EXCEEDED',
+          details: {
+            dailyLimit: TOKEN_LIMITS[userTier].daily,
+            monthlyLimit: TOKEN_LIMITS[userTier].monthly,
+            resetTime: tokenLimitResult.resetTime,
+            tier: userTier
+          },
+          message: getTokenLimitMessage(userTier)
+        });
+      }
+
+      // Add rate limit info to headers
+      res.set({
+        'X-RateLimit-Limit': config.maxRequests.toString(),
+        'X-RateLimit-Remaining': (config.maxRequests - rateLimitResult.currentRequests).toString(),
+        'X-RateLimit-Reset': new Date(rateLimitResult.resetTime).toISOString(),
+        'X-Token-Limit-Daily': TOKEN_LIMITS[userTier].daily.toString(),
+        'X-Token-Remaining-Daily': (TOKEN_LIMITS[userTier].daily - tokenLimitResult.dailyUsage).toString(),
+        'X-Token-Limit-Monthly': TOKEN_LIMITS[userTier].monthly.toString(),
+        'X-Token-Remaining-Monthly': (TOKEN_LIMITS[userTier].monthly - tokenLimitResult.monthlyUsage).toString()
+      });
+
+      // Store request info for tracking
+      req.rateLimitInfo = {
+        userId,
+        endpoint,
+        tier: userTier,
+        config
+      };
+
+      next();
+    } catch (error) {
+      logger.error('Error in AI rate limit middleware:', error);
+      // Allow request to proceed if rate limit check fails
+      next();
+    }
+  };
+};
+
+/**
+ * Middleware to track OpenAI usage after successful API calls
+ */
+export const trackAIUsage = (tokens: number) => {
+  return async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+    const originalSend = res.send;
+    
+    res.send = function(data: any) {
+      // Track usage only for successful requests
+      if (res.statusCode >= 200 && res.statusCode < 300 && req.rateLimitInfo) {
+        trackUsage(req.rateLimitInfo.userId, req.rateLimitInfo.endpoint, true, tokens)
+          .catch(error => logger.error('Error tracking AI usage:', error));
+      } else if (req.rateLimitInfo) {
+        trackUsage(req.rateLimitInfo.userId, req.rateLimitInfo.endpoint, false, 0)
+          .catch(error => logger.error('Error tracking AI usage:', error));
+      }
+      
+      return originalSend.call(this, data);
+    };
+    
+    next();
+  };
+};
+
+/**
+ * Check if user has exceeded rate limits
+ */
+async function checkRateLimit(userId: string, config: RateLimitConfig): Promise<{
+  allowed: boolean;
+  currentRequests: number;
+  resetTime: number;
+}> {
+  try {
+    const db = getDb();
+    const now = Date.now();
+    const windowStart = now - config.windowMs;
+    
+    const rateLimitDoc = db.collection('rate_limits').doc(`${userId}_${config.endpoint}`);
+    const doc = await rateLimitDoc.get();
+    
+    let record: RateLimitRecord;
+    
+    if (!doc.exists) {
+      record = {
+        userId,
+        endpoint: config.endpoint,
+        requests: [],
+        totalTokensUsed: 0,
+        resetTime: now + config.windowMs
+      };
+    } else {
+      record = doc.data() as RateLimitRecord;
+    }
+
+    // Remove old requests outside the window
+    record.requests = record.requests.filter(req => req.timestamp > windowStart);
+    
+    const currentRequests = record.requests.length;
+    const allowed = currentRequests < config.maxRequests;
+    
+    if (allowed) {
+      // Add current request
+      record.requests.push({
+        timestamp: now,
+        success: false // Will be updated by trackUsage
+      });
+      record.resetTime = Math.max(record.resetTime, now + config.windowMs);
+      
+      // Save updated record
+      await rateLimitDoc.set(record);
+    }
+
+    return {
+      allowed,
+      currentRequests,
+      resetTime: record.resetTime
+    };
+  } catch (error) {
+    logger.error('Error checking rate limit:', error);
+    return { allowed: true, currentRequests: 0, resetTime: Date.now() };
+  }
+}
+
+/**
+ * Check if user has exceeded token limits
+ */
+async function checkTokenLimit(userId: string, tier: 'free' | 'pro'): Promise<{
+  allowed: boolean;
+  dailyUsage: number;
+  monthlyUsage: number;
+  resetTime: number;
+}> {
+  try {
+    const db = getDb();
+    const now = new Date();
+    const dayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    
+    const tokenDoc = db.collection('token_usage').doc(userId);
+    const doc = await tokenDoc.get();
+    
+    let dailyUsage = 0;
+    let monthlyUsage = 0;
+    
+    if (doc.exists) {
+      const data = doc.data();
+      
+      // Calculate daily usage
+      if (data?.dailyUsage && data.dailyResetTime > dayStart.getTime()) {
+        dailyUsage = data.dailyUsage;
+      }
+      
+      // Calculate monthly usage
+      if (data?.monthlyUsage && data.monthlyResetTime > monthStart.getTime()) {
+        monthlyUsage = data.monthlyUsage;
+      }
+    }
+
+    const dailyLimit = TOKEN_LIMITS[tier].daily;
+    const monthlyLimit = TOKEN_LIMITS[tier].monthly;
+    
+    const allowed = dailyUsage < dailyLimit && monthlyUsage < monthlyLimit;
+    
+    const nextDay = new Date(dayStart);
+    nextDay.setDate(nextDay.getDate() + 1);
+    
+    return {
+      allowed,
+      dailyUsage,
+      monthlyUsage,
+      resetTime: nextDay.getTime()
+    };
+  } catch (error) {
+    logger.error('Error checking token limit:', error);
+    return { allowed: true, dailyUsage: 0, monthlyUsage: 0, resetTime: Date.now() };
+  }
+}
+
+/**
+ * Track API usage after completion
+ */
+async function trackUsage(userId: string, endpoint: string, success: boolean, tokens: number = 0): Promise<void> {
+  try {
+    const db = getDb();
+    const batch = db.batch();
+    
+    // Update rate limit record
+    const rateLimitDoc = db.collection('rate_limits').doc(`${userId}_${endpoint}`);
+    const rateLimitSnapshot = await rateLimitDoc.get();
+    
+    if (rateLimitSnapshot.exists) {
+      const record = rateLimitSnapshot.data() as RateLimitRecord;
+      const lastRequest = record.requests[record.requests.length - 1];
+      
+      if (lastRequest) {
+        lastRequest.success = success;
+        lastRequest.tokens = tokens;
+        record.totalTokensUsed += tokens;
+        
+        batch.update(rateLimitDoc, record as any);
+      }
+    }
+
+    // Update token usage
+    if (tokens > 0) {
+      const tokenDoc = db.collection('token_usage').doc(userId);
+      const nowDate = new Date();
+      const dayStart = new Date(nowDate.getFullYear(), nowDate.getMonth(), nowDate.getDate());
+      const monthStart = new Date(nowDate.getFullYear(), nowDate.getMonth(), 1);
+      const nextDay = new Date(dayStart);
+      nextDay.setDate(nextDay.getDate() + 1);
+      const nextMonth = new Date(nowDate.getFullYear(), nowDate.getMonth() + 1, 1);
+      
+      const tokenSnapshot = await tokenDoc.get();
+      let tokenData: any = {};
+      
+      if (tokenSnapshot.exists) {
+        tokenData = tokenSnapshot.data();
+      }
+      
+      // Reset counters if period has passed
+      if (!tokenData.dailyResetTime || tokenData.dailyResetTime <= dayStart.getTime()) {
+        tokenData.dailyUsage = 0;
+        tokenData.dailyResetTime = nextDay.getTime();
+      }
+      
+      if (!tokenData.monthlyResetTime || tokenData.monthlyResetTime <= monthStart.getTime()) {
+        tokenData.monthlyUsage = 0;
+        tokenData.monthlyResetTime = nextMonth.getTime();
+      }
+      
+      // Add current usage
+      tokenData.dailyUsage = (tokenData.dailyUsage || 0) + tokens;
+      tokenData.monthlyUsage = (tokenData.monthlyUsage || 0) + tokens;
+      tokenData.lastUpdated = nowDate.toISOString();
+      
+      batch.set(tokenDoc, tokenData, { merge: true });
+    }
+
+    // Track usage statistics
+    const statsDoc = db.collection('ai_usage_stats').doc(`${userId}_${nowDate.getFullYear()}_${nowDate.getMonth() + 1}`);
+    const statsSnapshot = await statsDoc.get();
+    
+    let stats: any = {
+      userId,
+      year: nowDate.getFullYear(),
+      month: nowDate.getMonth() + 1,
+      endpoints: {}
+    };
+    
+    if (statsSnapshot.exists) {
+      stats = statsSnapshot.data();
+    }
+    
+    if (!stats.endpoints[endpoint]) {
+      stats.endpoints[endpoint] = {
+        requests: 0,
+        successfulRequests: 0,
+        tokensUsed: 0,
+        firstRequest: nowDate.toISOString(),
+        lastRequest: nowDate.toISOString()
+      };
+    }
+    
+    stats.endpoints[endpoint].requests++;
+    if (success) {
+      stats.endpoints[endpoint].successfulRequests++;
+    }
+    stats.endpoints[endpoint].tokensUsed += tokens;
+    stats.endpoints[endpoint].lastRequest = nowDate.toISOString();
+    
+    batch.set(statsDoc, stats, { merge: true });
+    
+    await batch.commit();
+  } catch (error) {
+    logger.error('Error tracking usage:', error);
+  }
+}
+
+/**
+ * Get rate limit message based on user tier
+ */
+function getRateLimitMessage(tier: 'free' | 'pro', endpoint: string): string {
+  const messages = {
+    free: {
+      '/insights/generate': 'Limite de 3 análises por 15 minutos atingido. Atualize para Pro para mais análises.',
+      '/insights/coach': 'Limite de 5 sessões de coaching por hora atingido. Atualize para Pro para mais sessões.',
+      '/trades/check-rules': 'Limite de 10 verificações de regras por 5 minutos atingido.',
+      '/import/validate-csv': 'Limite de 5 validações de CSV por 15 minutos atingido.'
+    },
+    pro: {
+      '/insights/generate': 'Limite de 10 análises por 15 minutos atingido. Aguarde alguns minutos.',
+      '/insights/coach': 'Limite de 20 sessões de coaching por hora atingido.',
+      '/trades/check-rules': 'Limite de 50 verificações de regras por 5 minutos atingido.',
+      '/import/validate-csv': 'Limite de 20 validações de CSV por 15 minutos atingido.'
+    }
+  };
+  
+  return (messages[tier] as any)[endpoint] || 'Rate limit exceeded. Please try again later.';
+}
+
+/**
+ * Get token limit message
+ */
+function getTokenLimitMessage(tier: 'free' | 'pro'): string {
+  if (tier === 'free') {
+    return 'Limite de tokens de IA atingido. Atualize para Pro para mais tokens ou aguarde a renovação.';
+  } else {
+    return 'Limite de tokens Pro atingido. Os tokens são renovados mensalmente.';
+  }
+}
+
+/**
+ * Get user's current usage statistics
+ */
+export async function getUserUsageStats(userId: string): Promise<{
+  rateLimits: Record<string, any>;
+  tokenUsage: any;
+  monthlyStats: any;
+}> {
+  try {
+    const db = getDb();
+    const now = new Date();
+    
+    // Get rate limits for all endpoints
+    const rateLimitsSnapshot = await db.collection('rate_limits')
+      .where('userId', '==', userId)
+      .get();
+    
+    const rateLimits: Record<string, any> = {};
+    for (const doc of rateLimitsSnapshot.docs) {
+      const data = doc.data() as RateLimitRecord;
+      rateLimits[data.endpoint] = {
+        requests: data.requests.length,
+        resetTime: data.resetTime,
+        totalTokensUsed: data.totalTokensUsed
+      };
+    }
+    
+    // Get token usage
+    const tokenDoc = await db.collection('token_usage').doc(userId).get();
+    const tokenUsage = tokenDoc.exists ? tokenDoc.data() : {};
+    
+    // Get monthly stats
+    const statsDoc = await db.collection('ai_usage_stats')
+      .doc(`${userId}_${now.getFullYear()}_${now.getMonth() + 1}`)
+      .get();
+    const monthlyStats = statsDoc.exists ? statsDoc.data() : {};
+    
+    return {
+      rateLimits,
+      tokenUsage,
+      monthlyStats
+    };
+  } catch (error) {
+    logger.error('Error getting user usage stats:', error);
+    return {
+      rateLimits: {},
+      tokenUsage: {},
+      monthlyStats: {}
+    };
+  }
+}
+
+/**
+ * Reset user's rate limits (admin function)
+ */
+export async function resetUserRateLimits(userId: string, endpoint?: string): Promise<void> {
+  try {
+    const db = getDb();
+    
+    if (endpoint) {
+      // Reset specific endpoint
+      await db.collection('rate_limits').doc(`${userId}_${endpoint}`).delete();
+    } else {
+      // Reset all endpoints for user
+      const snapshot = await db.collection('rate_limits')
+        .where('userId', '==', userId)
+        .get();
+      
+      const batch = db.batch();
+      snapshot.docs.forEach(doc => {
+        batch.delete(doc.ref);
+      });
+      
+      await batch.commit();
+    }
+    
+    logger.info(`Rate limits reset for user ${userId}`, { endpoint });
+  } catch (error) {
+    logger.error('Error resetting rate limits:', error);
+    throw error;
+  }
+}
+
+// Extend Express Request type
+declare global {
+  namespace Express {
+    interface Request {
+      rateLimitInfo?: {
+        userId: string;
+        endpoint: string;
+        tier: 'free' | 'pro';
+        config: RateLimitConfig;
+      };
+    }
+  }
+}

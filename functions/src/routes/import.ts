@@ -3,6 +3,7 @@ import { importService } from '../services/importService';
 import { validateImportRequest, createValidationError, logValidationErrors } from '../utils/validation';
 import { logger } from 'firebase-functions';
 import multer from 'multer';
+import { realTimeService } from '../services/realTimeService';
 
 // Extend Express Request to include user property
 interface AuthenticatedRequest extends Request {

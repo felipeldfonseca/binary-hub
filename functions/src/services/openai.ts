@@ -11,6 +11,31 @@ function getOpenAIClient() {
   });
 }
 
+// Simple retry function for critical functions
+async function withRetry<T>(
+  operation: () => Promise<T>,
+  operationName: string,
+  retries = 2
+): Promise<T> {
+  let lastError: any;
+  
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      return await operation();
+    } catch (error: any) {
+      lastError = error;
+      
+      if (attempt === retries) {
+        break;
+      }
+      
+      await new Promise(resolve => setTimeout(resolve, 1000 * (attempt + 1)));
+    }
+  }
+  
+  throw lastError;
+}
+
 // Types for LLM responses
 export interface InsightResponse {
   insight: string;
@@ -256,13 +281,56 @@ Cabeçalho esperado: ${JSON.stringify(data.expectedHeaders)}`;
   } catch (error) {
     logger.error('Error validating CSV headers:', error);
     
+    // Fallback to simple comparison
     const missingColumns = data.expectedHeaders.filter(h => !data.receivedHeaders.includes(h));
     const extraColumns = data.receivedHeaders.filter(h => !data.expectedHeaders.includes(h));
     
-    return {
+    const fallbackResponse: CSVValidationResponse = {
       missingColumns,
       extraColumns,
       isValid: missingColumns.length === 0 && extraColumns.length === 0
+    };
+    
+    logger.info('Returning fallback CSV validation response', fallbackResponse);
+    return fallbackResponse;
+  }
+}
+
+// Utility function to estimate tokens for rate limiting
+export function estimateTokens(text: string): number {
+  // Rough estimation: 1 token ≈ 4 characters for English, 3 for Portuguese
+  return Math.ceil(text.length / 3.5);
+}
+
+// Health check function for OpenAI service
+export async function healthCheck(): Promise<{ status: string; latency?: number; error?: string }> {
+  try {
+    const startTime = Date.now();
+    
+    await withRetry(async () => {
+      const openai = getOpenAIClient();
+      const response = await openai.chat.completions.create({
+        model: 'gpt-3.5-turbo',
+        messages: [{ role: 'user', content: 'Hello' }],
+        max_tokens: 1,
+        temperature: 0
+      });
+      
+      if (!response.choices[0]?.message?.content) {
+        throw new Error('Invalid response');
+      }
+    }, 'healthCheck', 1); // Only 1 retry for health check
+    
+    const latency = Date.now() - startTime;
+    
+    return {
+      status: 'healthy',
+      latency
+    };
+  } catch (error: any) {
+    return {
+      status: 'unhealthy',
+      error: error.message || 'Unknown error'
     };
   }
 } 

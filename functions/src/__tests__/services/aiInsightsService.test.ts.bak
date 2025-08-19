@@ -1,0 +1,373 @@
+import { aiInsightsService } from '../../services/aiInsightsService';
+import { tradeService } from '../../services/tradeService';
+import * as openaiService from '../../services/openai';
+
+// Mock the dependencies
+jest.mock('../../services/tradeService');
+jest.mock('../../services/openai');
+jest.mock('firebase-admin/firestore');
+jest.mock('firebase-functions', () => ({
+  logger: {
+    info: jest.fn(),
+    error: jest.fn(),
+    warn: jest.fn(),
+  },
+}));
+
+const mockTradeService = tradeService as jest.Mocked<typeof tradeService>;
+const mockOpenaiService = openaiService as jest.Mocked<typeof openaiService>;
+
+describe('AIInsightsService', () => {
+  const mockUserId = 'test-user-123';
+  
+  const mockTrades = [
+    {
+      id: '1',
+      userId: mockUserId,
+      tradeId: 'trade1',
+      asset: 'EURUSD',
+      direction: 'call' as const,
+      amount: 100,
+      entryPrice: 1.1000,
+      exitPrice: 1.1050,
+      entryTime: new Date('2024-01-01T10:00:00Z'),
+      exitTime: new Date('2024-01-01T10:05:00Z'),
+      timeframe: 'M5',
+      candleTime: '10:00',
+      refunded: 0,
+      executed: 100,
+      status: 'WIN' as const,
+      result: 'win' as const,
+      profit: 85,
+      payout: 85,
+      platform: 'Ebinex',
+      createdAt: new Date('2024-01-01T10:00:00Z'),
+      updatedAt: new Date('2024-01-01T10:00:00Z'),
+    },
+    {
+      id: '2',
+      userId: mockUserId,
+      tradeId: 'trade2',
+      asset: 'EURUSD',
+      direction: 'put' as const,
+      amount: 100,
+      entryPrice: 1.1050,
+      exitPrice: 1.1000,
+      entryTime: new Date('2024-01-01T11:00:00Z'),
+      exitTime: new Date('2024-01-01T11:05:00Z'),
+      timeframe: 'M5',
+      candleTime: '11:00',
+      refunded: 0,
+      executed: 100,
+      status: 'LOSE' as const,
+      result: 'loss' as const,
+      profit: -100,
+      payout: 0,
+      platform: 'Ebinex',
+      createdAt: new Date('2024-01-01T11:00:00Z'),
+      updatedAt: new Date('2024-01-01T11:00:00Z'),
+    },
+    // Add more mock trades for better testing
+    ...Array.from({ length: 18 }, (_, i) => ({
+      id: `${i + 3}`,
+      userId: mockUserId,
+      tradeId: `trade${i + 3}`,
+      asset: i % 2 === 0 ? 'EURUSD' : 'GBPUSD',
+      direction: i % 2 === 0 ? 'call' as const : 'put' as const,
+      amount: 100,
+      entryPrice: 1.1000 + (i * 0.001),
+      exitPrice: 1.1000 + (i * 0.001) + (i % 3 === 0 ? 0.005 : -0.005),
+      entryTime: new Date(`2024-01-0${Math.floor(i / 5) + 1}T${10 + (i % 10)}:00:00Z`),
+      exitTime: new Date(`2024-01-0${Math.floor(i / 5) + 1}T${10 + (i % 10)}:05:00Z`),
+      timeframe: 'M5',
+      candleTime: `${10 + (i % 10)}:00`,
+      refunded: 0,
+      executed: 100,
+      status: i % 3 === 0 ? 'WIN' as const : 'LOSE' as const,
+      result: i % 3 === 0 ? 'win' as const : 'loss' as const,
+      profit: i % 3 === 0 ? 85 : -100,
+      payout: i % 3 === 0 ? 85 : 0,
+      platform: 'Ebinex',
+      createdAt: new Date(`2024-01-0${Math.floor(i / 5) + 1}T${10 + (i % 10)}:00:00Z`),
+      updatedAt: new Date(`2024-01-0${Math.floor(i / 5) + 1}T${10 + (i % 10)}:00:00Z`),
+    })),
+  ];
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    
+    // Mock tradeService.getUserTrades
+    mockTradeService.getUserTrades.mockResolvedValue(mockTrades);
+    
+    // Mock openaiService.generateInsight
+    mockOpenaiService.generateInsight.mockResolvedValue({
+      insight: 'Your trading performance shows room for improvement with a 35% win rate.',
+      kpi: {
+        winRate: 35,
+        lossStreak: 2
+      },
+      acao: 'Focus on risk management and strategy refinement.'
+    });
+  });
+
+  describe('generateComprehensiveInsights', () => {
+    it('should generate comprehensive insights for user with sufficient trades', async () => {
+      const result = await aiInsightsService.generateComprehensiveInsights(mockUserId);
+
+      expect(result).toBeDefined();
+      expect(result.userId).toBe(mockUserId);
+      expect(result.type).toBe('comprehensive');
+      expect(result.patternAnalysis).toBeDefined();
+      expect(result.riskAssessment).toBeDefined();
+      expect(result.performancePrediction).toBeDefined();
+      expect(result.actionableInsights).toBeInstanceOf(Array);
+      expect(result.urgentWarnings).toBeInstanceOf(Array);
+      expect(result.metadata.tradesAnalyzed).toBe(mockTrades.length);
+      expect(result.metadata.aiGenerated).toBe(true);
+    });
+
+    it('should throw error for insufficient trade data', async () => {
+      mockTradeService.getUserTrades.mockResolvedValue(mockTrades.slice(0, 5)); // Only 5 trades
+
+      await expect(
+        aiInsightsService.generateComprehensiveInsights(mockUserId)
+      ).rejects.toThrow('Insufficient trade data for comprehensive analysis');
+    });
+
+    it('should analyze time-based patterns correctly', async () => {
+      const result = await aiInsightsService.generateComprehensiveInsights(mockUserId);
+
+      expect(result.patternAnalysis.timeBasedPatterns).toBeDefined();
+      expect(result.patternAnalysis.timeBasedPatterns.bestPerformingHours).toBeInstanceOf(Array);
+      expect(result.patternAnalysis.timeBasedPatterns.worstPerformingHours).toBeInstanceOf(Array);
+      expect(result.patternAnalysis.timeBasedPatterns.bestPerformingDays).toBeInstanceOf(Array);
+      expect(result.patternAnalysis.timeBasedPatterns.worstPerformingDays).toBeInstanceOf(Array);
+    });
+
+    it('should calculate asset performance correctly', async () => {
+      const result = await aiInsightsService.generateComprehensiveInsights(mockUserId);
+
+      expect(result.patternAnalysis.assetPerformance).toBeDefined();
+      expect(result.patternAnalysis.assetPerformance['EURUSD']).toBeDefined();
+      expect(result.patternAnalysis.assetPerformance['GBPUSD']).toBeDefined();
+      
+      const eurusdPerf = result.patternAnalysis.assetPerformance['EURUSD'];
+      expect(eurusdPerf.winRate).toBeGreaterThanOrEqual(0);
+      expect(eurusdPerf.winRate).toBeLessThanOrEqual(1);
+      expect(eurusdPerf.totalTrades).toBeGreaterThan(0);
+      expect(['keep', 'avoid', 'improve']).toContain(eurusdPerf.recommendation);
+    });
+
+    it('should assess risk levels correctly', async () => {
+      const result = await aiInsightsService.generateComprehensiveInsights(mockUserId);
+
+      expect(result.riskAssessment).toBeDefined();
+      expect(['low', 'medium', 'high', 'extreme']).toContain(result.riskAssessment.riskLevel);
+      expect(result.riskAssessment.riskScore).toBeGreaterThanOrEqual(0);
+      expect(result.riskAssessment.riskScore).toBeLessThanOrEqual(100);
+      expect(result.riskAssessment.factors).toBeDefined();
+      expect(result.riskAssessment.warnings).toBeInstanceOf(Array);
+      expect(result.riskAssessment.recommendations).toBeInstanceOf(Array);
+    });
+
+    it('should generate performance predictions', async () => {
+      const result = await aiInsightsService.generateComprehensiveInsights(mockUserId);
+
+      expect(result.performancePrediction).toBeDefined();
+      expect(result.performancePrediction.expectedWinRate).toBeGreaterThanOrEqual(0.2);
+      expect(result.performancePrediction.expectedWinRate).toBeLessThanOrEqual(0.8);
+      expect(result.performancePrediction.confidenceInterval).toBeDefined();
+      expect(result.performancePrediction.confidenceInterval.lower).toBeLessThanOrEqual(
+        result.performancePrediction.confidenceInterval.upper
+      );
+      expect(result.performancePrediction.requiredChanges).toBeInstanceOf(Array);
+    });
+
+    it('should detect behavioral patterns', async () => {
+      const result = await aiInsightsService.generateComprehensiveInsights(mockUserId);
+
+      expect(result.patternAnalysis.behavioralPatterns).toBeDefined();
+      expect(result.patternAnalysis.behavioralPatterns.averageTradeSize).toBeGreaterThan(0);
+      expect(result.patternAnalysis.behavioralPatterns.stakeSizeConsistency).toBeGreaterThanOrEqual(0);
+      expect(result.patternAnalysis.behavioralPatterns.stakeSizeConsistency).toBeLessThanOrEqual(1);
+      expect(result.patternAnalysis.behavioralPatterns.emotionalTrading).toBeDefined();
+      expect(result.patternAnalysis.behavioralPatterns.streakBehavior).toBeDefined();
+    });
+
+    it('should handle OpenAI service errors gracefully', async () => {
+      mockOpenaiService.generateInsight.mockRejectedValue(new Error('OpenAI API error'));
+
+      const result = await aiInsightsService.generateComprehensiveInsights(mockUserId);
+
+      expect(result).toBeDefined();
+      expect(result.summary).toContain('análise de performance');
+    });
+  });
+
+  describe('getInsights', () => {
+    it('should retrieve user insights with default options', async () => {
+      // Mock Firestore query
+      const mockGet = jest.fn().mockResolvedValue({
+        docs: [
+          {
+            data: () => ({
+              id: 'insight1',
+              userId: mockUserId,
+              type: 'comprehensive',
+              timestamp: '2024-01-01T10:00:00Z',
+            }),
+          },
+        ],
+      });
+
+      const mockLimit = jest.fn().mockReturnValue({ get: mockGet });
+      const mockOrderBy = jest.fn().mockReturnValue({ limit: mockLimit });
+      const mockCollection = jest.fn().mockReturnValue({ orderBy: mockOrderBy });
+      const mockDoc = jest.fn().mockReturnValue({ collection: mockCollection });
+
+      // Mock getFirestore
+      const mockDb = { collection: jest.fn().mockReturnValue({ doc: mockDoc }) };
+      jest.doMock('firebase-admin/firestore', () => ({
+        getFirestore: () => mockDb,
+      }));
+
+      const insights = await aiInsightsService.getInsights(mockUserId);
+
+      expect(insights).toBeInstanceOf(Array);
+    });
+
+    it('should apply filters correctly', async () => {
+      const mockGet = jest.fn().mockResolvedValue({ docs: [] });
+      const mockLimit = jest.fn().mockReturnValue({ get: mockGet });
+      const mockWhere = jest.fn().mockReturnValue({ orderBy: jest.fn().mockReturnValue({ limit: mockLimit }) });
+      const mockOrderBy = jest.fn().mockReturnValue({ limit: mockLimit });
+      const mockCollection = jest.fn().mockReturnValue({ 
+        where: mockWhere,
+        orderBy: mockOrderBy,
+      });
+      const mockDoc = jest.fn().mockReturnValue({ collection: mockCollection });
+      const mockDb = { collection: jest.fn().mockReturnValue({ doc: mockDoc }) };
+
+      jest.doMock('firebase-admin/firestore', () => ({
+        getFirestore: () => mockDb,
+      }));
+
+      await aiInsightsService.getInsights(mockUserId, {
+        type: 'comprehensive',
+        limit: 5,
+        since: new Date('2024-01-01'),
+      });
+
+      expect(mockWhere).toHaveBeenCalledWith('type', '==', 'comprehensive');
+    });
+  });
+
+  describe('Edge Cases', () => {
+    it('should handle empty trade data', async () => {
+      mockTradeService.getUserTrades.mockResolvedValue([]);
+
+      await expect(
+        aiInsightsService.generateComprehensiveInsights(mockUserId)
+      ).rejects.toThrow('Insufficient trade data');
+    });
+
+    it('should handle trades with missing fields', async () => {
+      const incompleteTradesData = mockTrades.map(trade => ({
+        ...trade,
+        profit: trade.profit || 0,
+        amount: trade.amount || 100,
+      }));
+
+      mockTradeService.getUserTrades.mockResolvedValue(incompleteTradesData);
+
+      const result = await aiInsightsService.generateComprehensiveInsights(mockUserId);
+      expect(result).toBeDefined();
+    });
+
+    it('should detect revenge trading patterns', async () => {
+      // Create trades with increasing stakes after losses
+      const revengeTradesData = [
+        { ...mockTrades[0], result: 'loss' as const, amount: 100, entryTime: new Date('2024-01-01T10:00:00Z') },
+        { ...mockTrades[1], result: 'loss' as const, amount: 200, entryTime: new Date('2024-01-01T10:05:00Z') }, // Doubled after loss
+        { ...mockTrades[2], result: 'loss' as const, amount: 100, entryTime: new Date('2024-01-01T10:10:00Z') },
+        ...mockTrades.slice(3),
+      ];
+
+      mockTradeService.getUserTrades.mockResolvedValue(revengeTradesData);
+
+      const result = await aiInsightsService.generateComprehensiveInsights(mockUserId);
+
+      expect(result.patternAnalysis.behavioralPatterns.emotionalTrading.revengeTrading).toBe(true);
+    });
+
+    it('should handle very high win rate scenarios', async () => {
+      const highWinTrades = mockTrades.map((trade, index) => ({
+        ...trade,
+        result: index < 18 ? 'win' as const : 'loss' as const,
+        status: index < 18 ? 'WIN' as const : 'LOSE' as const,
+        profit: index < 18 ? 85 : -100,
+      }));
+
+      mockTradeService.getUserTrades.mockResolvedValue(highWinTrades);
+
+      const result = await aiInsightsService.generateComprehensiveInsights(mockUserId);
+
+      expect(result.performancePrediction.expectedWinRate).toBeGreaterThan(0.5);
+      expect(result.riskAssessment.riskLevel).toBe('low');
+    });
+
+    it('should handle very low win rate scenarios', async () => {
+      const lowWinTrades = mockTrades.map((trade, index) => ({
+        ...trade,
+        result: index < 2 ? 'win' as const : 'loss' as const,
+        status: index < 2 ? 'WIN' as const : 'LOSE' as const,
+        profit: index < 2 ? 85 : -100,
+      }));
+
+      mockTradeService.getUserTrades.mockResolvedValue(lowWinTrades);
+
+      const result = await aiInsightsService.generateComprehensiveInsights(mockUserId);
+
+      expect(result.performancePrediction.expectedWinRate).toBeLessThan(0.5);
+      expect(result.riskAssessment.riskLevel).toBe('extreme');
+      expect(result.urgentWarnings.length).toBeGreaterThan(0);
+    });
+  });
+});
+
+  describe('Pattern Analysis', () => {
+    it('should identify best performing hours', async () => {
+      // Mock trades concentrated in specific hours
+      const hourlyTrades = Array.from({ length: 20 }, (_, i) => ({
+        ...mockTrades[0],
+        id: `hourly-${i}`,
+        tradeId: `hourly-trade-${i}`,
+        entryTime: new Date(`2024-01-01T${i < 10 ? '10' : '14'}:00:00Z`),
+        result: i < 10 ? 'win' as const : 'loss' as const,
+        status: i < 10 ? 'WIN' as const : 'LOSE' as const,
+        profit: i < 10 ? 85 : -100,
+      }));
+
+      mockTradeService.getUserTrades.mockResolvedValue(hourlyTrades);
+
+      const result = await aiInsightsService.generateComprehensiveInsights(mockUserId);
+
+      expect(result.patternAnalysis.timeBasedPatterns.bestPerformingHours).toContain(10);
+      expect(result.patternAnalysis.timeBasedPatterns.worstPerformingHours).toContain(14);
+    });
+
+    it('should calculate consistency score correctly', async () => {
+      // All trades same stake size = high consistency
+      const consistentTrades = mockTrades.map(trade => ({
+        ...trade,
+        amount: 100, // Same amount for all
+      }));
+
+      mockTradeService.getUserTrades.mockResolvedValue(consistentTrades);
+
+      const result = await aiInsightsService.generateComprehensiveInsights(mockUserId);
+
+      expect(result.patternAnalysis.behavioralPatterns.stakeSizeConsistency).toBeGreaterThan(0.9);
+    });
+  });
+});

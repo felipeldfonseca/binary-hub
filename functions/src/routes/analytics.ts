@@ -1,5 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { tradeService } from '../services/tradeService';
+import { analyticsService } from '../services/analyticsService';
+import { cacheMiddleware, cacheInvalidationMiddleware, cacheStatsMiddleware } from '../middleware/cache';
 import { logger } from 'firebase-functions';
 
 // Extend Express Request to include user property
@@ -13,10 +15,21 @@ interface AuthenticatedRequest extends Request {
 
 const router = Router();
 
+// Add cache statistics to all responses
+router.use(cacheStatsMiddleware());
+
 /**
  * GET /v1/analytics/dashboard - Get dashboard statistics
  */
-router.get('/dashboard', async (req: AuthenticatedRequest, res: Response) => {
+router.get('/dashboard', 
+  cacheMiddleware({
+    ttl: 900, // 15 minutes
+    tags: (req) => {
+      const authReq = req as AuthenticatedRequest;
+      return [`user:${authReq.user?.uid}`, 'analytics', 'dashboard'];
+    }
+  }),
+  async (req: AuthenticatedRequest, res: Response) => {
   try {
     const userId = req.user?.uid;
     const period = (req.query.period as 'daily' | 'weekly' | 'monthly' | 'yearly') || 'weekly';
@@ -38,49 +51,10 @@ router.get('/dashboard', async (req: AuthenticatedRequest, res: Response) => {
       });
     }
 
-    // Get trade statistics
-    const stats = await tradeService.getTradeStats(userId, period);
-
-    // Get recent trades for performance chart
-    const recentTrades = await tradeService.getUserTrades(userId, {
-      limit: 30,
-      end: new Date()
-    });
-
-    // Calculate performance data (simplified - in real implementation, you'd group by date)
-    const performance = recentTrades.map(trade => ({
-      date: trade.entryTime.toISOString().split('T')[0],
-      trades: 1,
-      pnl: trade.profit || 0
-    }));
-
-    // Group by date and sum
-    const groupedPerformance = performance.reduce((acc, item) => {
-      const existing = acc.find(p => p.date === item.date);
-      if (existing) {
-        existing.trades += item.trades;
-        existing.pnl += item.pnl;
-      } else {
-        acc.push(item);
-      }
-      return acc;
-    }, [] as typeof performance);
-
-    res.json({
-      period,
-      stats: {
-        totalTrades: stats.totalTrades,
-        winTrades: stats.winTrades,
-        lossTrades: stats.lossTrades,
-        winRate: stats.winRate,
-        totalPnl: stats.totalPnl,
-        avgPnl: stats.avgPnl,
-        maxDrawdown: stats.maxDrawdown,
-        avgStake: stats.avgStake,
-        maxStake: stats.maxStake
-      },
-      performance: groupedPerformance.sort((a, b) => a.date.localeCompare(b.date))
-    });
+    // Use enhanced analytics service with caching
+    const dashboardData = await analyticsService.getDashboardAnalytics(userId, period);
+    
+    res.json(dashboardData);
     return;
 
   } catch (error) {
@@ -97,7 +71,15 @@ router.get('/dashboard', async (req: AuthenticatedRequest, res: Response) => {
 /**
  * GET /v1/analytics/performance - Get detailed performance metrics
  */
-router.get('/performance', async (req: AuthenticatedRequest, res: Response) => {
+router.get('/performance',
+  cacheMiddleware({
+    ttl: 1800, // 30 minutes
+    tags: (req) => {
+      const authReq = req as AuthenticatedRequest;
+      return [`user:${authReq.user?.uid}`, 'analytics', 'performance'];
+    }
+  }),
+  async (req: AuthenticatedRequest, res: Response) => {
   try {
     const userId = req.user?.uid;
     const start = req.query.start ? new Date(req.query.start as string) : undefined;
@@ -121,64 +103,25 @@ router.get('/performance', async (req: AuthenticatedRequest, res: Response) => {
       });
     }
 
-    // Get trades with date filters
-    const trades = await tradeService.getUserTrades(userId, {
-      start,
-      end,
-      limit: 1000
-    });
+    // Determine analytics period based on date range
+    let analyticsPeriod: 'daily' | 'weekly' | 'monthly' | 'yearly' = 'weekly';
+    if (start && end) {
+      const diffDays = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+      if (diffDays <= 7) analyticsPeriod = 'daily';
+      else if (diffDays <= 30) analyticsPeriod = 'weekly';
+      else if (diffDays <= 365) analyticsPeriod = 'monthly';
+      else analyticsPeriod = 'yearly';
+    }
 
-    // Calculate metrics
-    const totalTrades = trades.length;
-    const winTrades = trades.filter(t => t.result === 'win').length;
-    const lossTrades = trades.filter(t => t.result === 'loss').length;
-    const tieTrades = trades.filter(t => t.result === 'tie').length;
-    const winRate = totalTrades > 0 ? (winTrades / totalTrades) * 100 : 0;
-    const totalPnl = trades.reduce((sum, t) => sum + (t.profit || 0), 0);
-    const avgPnl = totalTrades > 0 ? totalPnl / totalTrades : 0;
-
-    // Calculate asset breakdown
-    const assetBreakdown = trades.reduce((acc, trade) => {
-      const asset = trade.asset;
-      if (!acc[asset]) {
-        acc[asset] = {
-          asset,
-          trades: 0,
-          winRate: 0,
-          totalPnl: 0
-        };
-      }
-      
-      acc[asset].trades++;
-      if (trade.result === 'win') {
-        acc[asset].totalPnl += trade.profit || 0;
-      }
-      
-      return acc;
-    }, {} as Record<string, { asset: string; trades: number; winRate: number; totalPnl: number }>);
-
-    // Calculate win rates for each asset
-    Object.values(assetBreakdown).forEach(asset => {
-      const assetTrades = trades.filter(t => t.asset === asset.asset);
-      const assetWinTrades = assetTrades.filter(t => t.result === 'win').length;
-      asset.winRate = assetTrades.length > 0 ? (assetWinTrades / assetTrades.length) * 100 : 0;
-    });
-
+    // Use enhanced analytics service with comprehensive data
+    const analyticsData = await analyticsService.getAnalytics(userId, analyticsPeriod);
+    
     res.json({
-      period: {
+      dateRange: {
         start: start?.toISOString(),
         end: end?.toISOString()
       },
-      metrics: {
-        totalTrades,
-        winTrades,
-        lossTrades,
-        tieTrades,
-        winRate,
-        totalPnl,
-        avgPnl
-      },
-      assetBreakdown: Object.values(assetBreakdown)
+      ...analyticsData
     });
     return;
 
@@ -192,6 +135,49 @@ router.get('/performance', async (req: AuthenticatedRequest, res: Response) => {
     return;
   }
 });
+
+/**
+ * GET /v1/analytics/assets - Get asset performance analytics
+ */
+router.get('/assets',
+  cacheMiddleware({
+    ttl: 1800, // 30 minutes
+    tags: (req) => {
+      const authReq = req as AuthenticatedRequest;
+      return [`user:${authReq.user?.uid}`, 'analytics', 'assets'];
+    }
+  }),
+  async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const userId = req.user?.uid;
+      const asset = req.query.asset as string;
+
+      if (!userId) {
+        return res.status(401).json({
+          error: 'Authentication required',
+          code: 'AUTH_REQUIRED',
+          timestamp: new Date().toISOString()
+        });
+      }
+
+      const assetAnalytics = await analyticsService.getAssetAnalytics(userId, asset);
+      
+      res.json({
+        assets: assetAnalytics,
+        timestamp: new Date().toISOString()
+      });
+      return;
+
+    } catch (error) {
+      logger.error('Error getting asset analytics:', error);
+      res.status(500).json({
+        error: 'Internal server error',
+        code: 'INTERNAL_ERROR',
+        timestamp: new Date().toISOString()
+      });
+      return;
+    }
+  });
 
 /**
  * GET /v1/analytics/export - Export analytics data

@@ -1,541 +1,567 @@
 'use client'
 
-import React from 'react'
+import React, { useState } from 'react'
 import { useTradeStats } from '@/hooks/useTradeStats'
 import { useTrades } from '@/hooks/useTrades'
 import { useLanguage } from '@/lib/contexts/LanguageContext'
 
-// TypeScript interfaces
-interface ExecutiveKPI {
-  id: string
-  title: string
-  value: string
-  change: number
-  trend: 'up' | 'down' | 'stable'
-  target?: string
-  category: 'performance' | 'risk' | 'growth' | 'efficiency'
-}
-
-interface BusinessMilestone {
-  id: string
-  title: string
-  description: string
-  status: 'achieved' | 'in_progress' | 'pending'
-  progress: number
-  impact: 'high' | 'medium' | 'low'
-  category: 'revenue' | 'risk' | 'compliance' | 'operational'
-  completedDate?: string
-}
-
-interface QuarterlyReport {
-  quarter: string
-  kpis: {
-    roi: { value: number; target: number; status: 'above' | 'at' | 'below' }
-    riskScore: { value: number; target: number; status: 'above' | 'at' | 'below' }
-    compliance: { value: number; target: number; status: 'above' | 'at' | 'below' }
-    efficiency: { value: number; target: number; status: 'above' | 'at' | 'below' }
-  }
-  summary: string
-}
-
-// Professional Executive-focused Conquistas V3
+// Social Community-focused Conquistas V3
 export default function ConquistasV3Executive() {
   const { isPortuguese } = useLanguage()
-  const { stats } = useTradeStats('monthly')
+  const { stats } = useTradeStats('weekly')
   const { trades } = useTrades()
+  const [activeTab, setActiveTab] = useState('community')
 
-  // Executive KPIs
-  const executiveKPIs: ExecutiveKPI[] = [
+  // Mock data for social features (in real app, would come from API)
+  const communityData = {
+    userRank: 347,
+    totalUsers: 2847,
+    percentile: 88,
+    tier: 'Gold',
+    region: isPortuguese ? 'Brasil' : 'Brazil'
+  }
+
+  // Mock friends data
+  const friends = [
     {
-      id: 'monthly_roi',
-      title: isPortuguese ? 'ROI Mensal' : 'Monthly ROI',
-      value: '12.4%',
-      change: 2.3,
-      trend: 'up',
-      target: '10%',
-      category: 'performance'
+      id: 1,
+      name: 'João Silva',
+      avatar: (
+        <svg className="w-8 h-8 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+        </svg>
+      ),
+      winRate: 65,
+      weeklyProfit: 45,
+      currentStreak: 3,
+      isOnline: true,
+      level: 'Silver'
     },
     {
-      id: 'sharpe_ratio',
-      title: isPortuguese ? 'Índice Sharpe' : 'Sharpe Ratio',
-      value: '1.85',
-      change: 0.15,
-      trend: 'up',
-      target: '1.5',
-      category: 'risk'
+      id: 2,
+      name: 'Maria Santos',
+      avatar: (
+        <svg className="w-8 h-8 text-pink-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+        </svg>
+      ),
+      winRate: 58,
+      weeklyProfit: 23,
+      currentStreak: 1,
+      isOnline: false,
+      level: 'Bronze'
     },
     {
-      id: 'var',
-      title: isPortuguese ? 'VaR (95%)' : 'VaR (95%)',
-      value: '8.2%',
-      change: -0.5,
-      trend: 'down',
-      target: '10%',
-      category: 'risk'
-    },
-    {
-      id: 'capital_efficiency',
-      title: isPortuguese ? 'Eficiência de Capital' : 'Capital Efficiency',
-      value: '94.7%',
-      change: 1.2,
-      trend: 'up',
-      target: '90%',
-      category: 'efficiency'
+      id: 3,
+      name: 'Pedro Costa',
+      avatar: (
+        <svg className="w-8 h-8 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+        </svg>
+      ),
+      winRate: 72,
+      weeklyProfit: 89,
+      currentStreak: 7,
+      isOnline: true,
+      level: 'Gold'
     }
   ]
 
-  // Business Milestones
-  const businessMilestones: BusinessMilestone[] = [
+  // Mock group challenges
+  const groupChallenges = [
     {
-      id: 'regulatory_compliance',
-      title: isPortuguese ? 'Conformidade Regulatória' : 'Regulatory Compliance',
-      description: isPortuguese ? 'Aderência total às regulamentações' : 'Full adherence to regulations',
-      status: 'achieved',
-      progress: 100,
-      impact: 'high',
-      category: 'compliance',
-      completedDate: '2025-02-15'
+      id: 1,
+      title: isPortuguese ? 'Desafio da Comunidade' : 'Community Challenge',
+      description: isPortuguese ? 'Ganhem 500 trades juntos esta semana!' : 'Win 500 trades together this week!',
+      progress: 347,
+      target: 500,
+      participants: 156,
+      timeLeft: '2d 14h',
+      reward: isPortuguese ? 'Emblema Especial + 1000 XP' : 'Special Badge + 1000 XP',
+      difficulty: 'medium'
     },
     {
-      id: 'risk_framework',
-      title: isPortuguese ? 'Framework de Risco' : 'Risk Framework',
-      description: isPortuguese ? 'Implementação do sistema de gestão de risco' : 'Risk management system implementation',
-      status: 'achieved',
-      progress: 100,
-      impact: 'high',
-      category: 'risk',
-      completedDate: '2025-01-30'
-    },
-    {
-      id: 'profitability_target',
-      title: isPortuguese ? 'Meta de Lucratividade' : 'Profitability Target',
-      description: isPortuguese ? 'Alcançar 15% ROI anualizado' : 'Achieve 15% annualized ROI',
-      status: 'in_progress',
-      progress: 82,
-      impact: 'high',
-      category: 'revenue'
-    },
-    {
-      id: 'operational_excellence',
-      title: isPortuguese ? 'Excelência Operacional' : 'Operational Excellence',
-      description: isPortuguese ? 'Otimização de processos e eficiência' : 'Process optimization and efficiency',
-      status: 'in_progress',
-      progress: 67,
-      impact: 'medium',
-      category: 'operational'
-    },
-    {
-      id: 'diversification_strategy',
-      title: isPortuguese ? 'Estratégia de Diversificação' : 'Diversification Strategy',
-      description: isPortuguese ? 'Expansão para novos ativos e mercados' : 'Expansion to new assets and markets',
-      status: 'pending',
-      progress: 25,
-      impact: 'high',
-      category: 'revenue'
+      id: 2,
+      title: isPortuguese ? 'Maratona de Fim de Semana' : 'Weekend Marathon',
+      description: isPortuguese ? 'Façam 200 trades no fim de semana!' : 'Make 200 trades over the weekend!',
+      progress: 89,
+      target: 200,
+      participants: 67,
+      timeLeft: '5h 23m',
+      reward: isPortuguese ? 'Título: Guerreiro do Fim de Semana' : 'Title: Weekend Warrior',
+      difficulty: 'hard'
     }
   ]
 
-  // Quarterly Reports
-  const quarterlyReports: QuarterlyReport[] = [
+  // Mock trending traders
+  const trendingTraders = [
+    { name: 'Carlos_Pro', region: 'SP', winRate: 78, badge: (
+        <svg className="w-6 h-6 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 18.657A8 8 0 016.343 7.343S7 9 9 10c0-2 .5-5 2.986-7C14 5 16.09 5.777 17.656 7.343A7.975 7.975 0 0120 13a7.975 7.975 0 01-2.343 5.657z" />
+        </svg>
+      ), tier: 'Platinum' },
+    { name: 'TradingQueen', region: 'RJ', winRate: 76, badge: (
+        <svg className="w-6 h-6 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
+        </svg>
+      ), tier: 'Gold' },
+    { name: 'BinaryMaster', region: 'MG', winRate: 74, badge: (
+        <svg className="w-6 h-6 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+        </svg>
+      ), tier: 'Gold' },
+    { name: 'LuckyTrader', region: 'RS', winRate: 73, badge: (
+        <svg className="w-6 h-6 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
+        </svg>
+      ), tier: 'Gold' }
+  ]
+
+  // Social achievements
+  const socialAchievements = [
     {
-      quarter: 'Q1 2025',
-      kpis: {
-        roi: { value: 12.4, target: 10, status: 'above' },
-        riskScore: { value: 8.2, target: 10, status: 'below' },
-        compliance: { value: 100, target: 100, status: 'at' },
-        efficiency: { value: 94.7, target: 90, status: 'above' }
-      },
-      summary: isPortuguese 
-        ? 'Desempenho excepcional no primeiro trimestre com ROI acima da meta e gestão de risco eficaz.'
-        : 'Exceptional performance in the first quarter with ROI above target and effective risk management.'
+      id: 'community_top10',
+      title: isPortuguese ? 'Top 10 da Região' : 'Regional Top 10',
+      description: isPortuguese ? 'Ficou entre os 10 melhores do Brasil!' : 'Ranked in top 10 in Brazil!',
+      icon: (
+        <svg className="w-12 h-12 text-yellow-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
+        </svg>
+      ),
+      rarity: 'Epic',
+      unlocked: false,
+      progress: 347,
+      target: 10
+    },
+    {
+      id: 'friend_challenger',
+      title: isPortuguese ? 'Desafiador de Amigos' : 'Friend Challenger',
+      description: isPortuguese ? 'Venceu 10 comparações com amigos!' : 'Won 10 comparisons with friends!',
+      icon: (
+        <svg className="w-12 h-12 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 9l3 3-3 3m13 0h-8m-8-9l3 3-3 3m13 0h-8" />
+        </svg>
+      ),
+      rarity: 'Rare',
+      unlocked: true,
+      progress: 10,
+      target: 10
+    },
+    {
+      id: 'group_hero',
+      title: isPortuguese ? 'Herói do Grupo' : 'Group Hero',
+      description: isPortuguese ? 'Completou 5 desafios em grupo!' : 'Completed 5 group challenges!',
+      icon: (
+        <svg className="w-12 h-12 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
+        </svg>
+      ),
+      rarity: 'Legendary',
+      unlocked: false,
+      progress: 2,
+      target: 5
     }
   ]
 
-  // Risk Assessment
-  const riskAssessment = {
-    currentScore: 8.2,
-    maxExposure: 15.0,
-    diversification: 85,
-    correlation: 0.34
-  }
-
-  // Get KPI icon based on category
-  const getKPIIcon = (category: string) => {
-    switch (category) {
-      case 'performance':
-        return (
-          <svg className="w-8 h-8 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
-          </svg>
-        )
-      case 'risk':
-        return (
-          <svg className="w-8 h-8 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-          </svg>
-        )
-      case 'growth':
-        return (
-          <svg className="w-8 h-8 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z" />
-          </svg>
-        )
-      case 'efficiency':
-        return (
-          <svg className="w-8 h-8 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-          </svg>
-        )
-      default:
-        return (
-          <svg className="w-8 h-8 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-          </svg>
-        )
+  // Helper functions
+  const getTierColor = (tier: string) => {
+    switch (tier) {
+      case 'Bronze': return 'text-amber-600'
+      case 'Silver': return 'text-gray-400'
+      case 'Gold': return 'text-yellow-400'
+      case 'Platinum': return 'text-cyan-400'
+      case 'Diamond': return 'text-purple-400'
+      default: return 'text-gray-400'
     }
   }
 
-  // Get milestone icon based on category
-  const getMilestoneIcon = (category: string) => {
-    switch (category) {
-      case 'revenue':
-        return (
-          <svg className="w-6 h-6 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-          </svg>
-        )
-      case 'risk':
-        return (
-          <svg className="w-6 h-6 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-          </svg>
-        )
-      case 'compliance':
-        return (
-          <svg className="w-6 h-6 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z" />
-          </svg>
-        )
-      case 'operational':
-        return (
-          <svg className="w-6 h-6 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-          </svg>
-        )
-      default:
-        return (
-          <svg className="w-6 h-6 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-          </svg>
-        )
+  const getRarityColor = (rarity: string) => {
+    switch (rarity) {
+      case 'Common': return 'text-gray-400 border-gray-400/30 bg-gray-400/10'
+      case 'Rare': return 'text-blue-400 border-blue-400/30 bg-blue-400/10'
+      case 'Epic': return 'text-purple-400 border-purple-400/30 bg-purple-400/10'
+      case 'Legendary': return 'text-yellow-400 border-yellow-400/30 bg-yellow-400/10'
+      default: return 'text-gray-400 border-gray-400/30 bg-gray-400/10'
     }
   }
 
-  // Get status color
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'achieved': return 'text-emerald-400 bg-emerald-400/10 border-emerald-400/30'
-      case 'in_progress': return 'text-amber-400 bg-amber-400/10 border-amber-400/30'
-      case 'pending': return 'text-slate-400 bg-slate-400/10 border-slate-400/30'
-      default: return 'text-slate-400 bg-slate-400/10 border-slate-400/30'
+  const tabs = [
+    { 
+      id: 'community', 
+      label: isPortuguese ? 'Comunidade' : 'Community',
+      icon: (
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+      )
+    },
+    { 
+      id: 'friends', 
+      label: isPortuguese ? 'Amigos' : 'Friends',
+      icon: (
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z" />
+        </svg>
+      )
+    },
+    { 
+      id: 'challenges', 
+      label: isPortuguese ? 'Desafios' : 'Challenges',
+      icon: (
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
+        </svg>
+      )
+    },
+    { 
+      id: 'achievements', 
+      label: isPortuguese ? 'Conquistas' : 'Achievements',
+      icon: (
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z" />
+        </svg>
+      )
     }
-  }
-
-  // Get impact color
-  const getImpactColor = (impact: string) => {
-    switch (impact) {
-      case 'high': return 'text-red-400'
-      case 'medium': return 'text-amber-400'
-      case 'low': return 'text-emerald-400'
-      default: return 'text-slate-400'
-    }
-  }
-
-  // Get benchmark status color
-  const getBenchmarkColor = (status: string) => {
-    switch (status) {
-      case 'above': return 'text-emerald-400'
-      case 'at': return 'text-amber-400'
-      case 'below': return 'text-red-400'
-      default: return 'text-slate-400'
-    }
-  }
+  ]
 
   return (
     <div className="space-y-8">
-      {/* Executive Header */}
+      {/* Social Header */}
       <div className="text-center">
-        <div className="flex items-center justify-center gap-3 mb-4">
-          <svg className="w-12 h-12 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-          </svg>
-          <h1 className="text-4xl font-bold text-white">
-            {isPortuguese ? 'Dashboard Executivo' : 'Executive Dashboard'}
-          </h1>
+        <div className="flex items-center justify-center gap-4 mb-6">
+          <div className="relative">
+            <svg className="w-16 h-16 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+            </svg>
+            <div className="absolute -top-1 -right-1 bg-green-500 w-4 h-4 rounded-full animate-pulse"></div>
+          </div>
+          <div>
+            <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">
+              {isPortuguese ? 'Comunidade de Traders' : 'Trading Community'}
+            </h1>
+            <p className="text-lg text-gray-400">
+              {isPortuguese ? 'Conecte-se, compete e cresça junto!' : 'Connect, compete, and grow together!'}
+            </p>
+          </div>
         </div>
-        <p className="text-slate-400 max-w-3xl mx-auto">
-          {isPortuguese 
-            ? 'Visão executiva abrangente de performance, marcos estratégicos e indicadores-chave de negócio.'
-            : 'Comprehensive executive view of performance, strategic milestones, and key business indicators.'
-          }
-        </p>
+
+        {/* User Community Status */}
+        <div className="max-w-md mx-auto bg-gradient-to-r from-blue-600/20 to-purple-600/20 rounded-xl p-4 border border-blue-500/30">
+          <div className="flex items-center justify-between">
+            <div className="text-center">
+              <div className="text-2xl font-bold text-white">#{communityData.userRank}</div>
+              <div className="text-sm text-blue-400">{isPortuguese ? 'Ranking' : 'Rank'}</div>
+            </div>
+            <div className="text-center">
+              <div className={`text-2xl font-bold ${getTierColor(communityData.tier)}`}>{communityData.tier}</div>
+              <div className="text-sm text-gray-400">{isPortuguese ? 'Nível' : 'Tier'}</div>
+            </div>
+            <div className="text-center">
+              <div className="text-2xl font-bold text-white">{communityData.percentile}%</div>
+              <div className="text-sm text-purple-400">{isPortuguese ? 'Melhor que' : 'Better than'}</div>
+            </div>
+          </div>
+        </div>
       </div>
 
-      {/* Executive KPIs */}
-      <section className="space-y-6">
-        <h2 className="text-2xl font-bold text-white flex items-center gap-3">
-          <svg className="w-8 h-8 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-          </svg>
-          {isPortuguese ? 'Indicadores Executivos' : 'Executive KPIs'}
-        </h2>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {executiveKPIs.map((kpi) => (
-            <div key={kpi.id} className="bg-white/5 backdrop-blur-sm rounded-xl p-6 border border-slate-700/50 hover:border-slate-600/50 transition-all duration-300 hover:scale-105">
-              <div className="flex items-center justify-between mb-4">
-                {getKPIIcon(kpi.category)}
-                <div className={`flex items-center gap-1 text-sm ${
-                  kpi.trend === 'up' ? 'text-emerald-400' :
-                  kpi.trend === 'down' ? 'text-red-400' : 'text-slate-400'
-                }`}>
-                  {kpi.trend === 'up' ? (
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 17L17 7M17 7H7M17 7V17" />
-                    </svg>
-                  ) : kpi.trend === 'down' ? (
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17L7 7M7 7H17M7 7V17" />
-                    </svg>
-                  ) : (
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 12H19" />
-                    </svg>
-                  )}
-                  {kpi.change > 0 ? '+' : ''}{kpi.change}%
-                </div>
-              </div>
-              
-              <h3 className="text-sm font-medium text-slate-400 mb-2">{kpi.title}</h3>
-              <div className="text-3xl font-bold text-white mb-1">{kpi.value}</div>
-              
-              {kpi.target && (
-                <div className="text-xs text-slate-500">
-                  {isPortuguese ? 'Meta' : 'Target'}: {kpi.target}
-                </div>
-              )}
-            </div>
+      {/* Navigation Tabs */}
+      <div className="border-b border-gray-700">
+        <nav className="-mb-px flex justify-center space-x-8 overflow-x-auto">
+          {tabs.map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`flex items-center gap-2 py-3 px-4 border-b-2 font-medium text-sm transition-colors whitespace-nowrap ${
+                activeTab === tab.id
+                  ? 'border-blue-400 text-blue-400'
+                  : 'border-transparent text-gray-400 hover:text-white hover:border-gray-300'
+              }`}
+            >
+              {tab.icon}
+              {tab.label}
+            </button>
           ))}
+        </nav>
+      </div>
+
+      {/* Tab Content */}
+      {activeTab === 'community' && (
+        <div className="space-y-8">
+          {/* Trending Traders */}
+          <div>
+            <h3 className="text-2xl font-bold text-white mb-6 flex items-center gap-2">
+              <svg className="w-6 h-6 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 18.657A8 8 0 016.343 7.343S7 9 9 10c0-2 .5-5 2.986-7C14 5 16.09 5.777 17.656 7.343A7.975 7.975 0 0120 13a7.975 7.975 0 01-2.343 5.657z" />
+              </svg>
+              {isPortuguese ? 'Traders em Destaque' : 'Trending Traders'}
+            </h3>
+            
+            <div className="grid gap-4">
+              {trendingTraders.map((trader, index) => (
+                <div key={index} className="bg-gray-800/50 rounded-lg p-4 border border-gray-700 hover:border-blue-500/50 transition-all">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="p-1">{trader.badge}</div>
+                      <div>
+                        <div className="font-bold text-white">{trader.name}</div>
+                        <div className="text-sm text-gray-400">{trader.region} • {trader.tier}</div>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-xl font-bold text-green-400">{trader.winRate}%</div>
+                      <div className="text-sm text-gray-400">{isPortuguese ? 'Taxa de Vitória' : 'Win Rate'}</div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Community Stats */}
+          <div className="bg-gradient-to-r from-green-600/20 to-blue-600/20 rounded-xl p-6 border border-green-500/30">
+            <h4 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
+              <svg className="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+              </svg>
+              {isPortuguese ? 'Estatísticas da Comunidade' : 'Community Stats'}
+            </h4>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
+              <div>
+                <div className="text-2xl font-bold text-white">{communityData.totalUsers.toLocaleString()}</div>
+                <div className="text-sm text-gray-400">{isPortuguese ? 'Traders Ativos' : 'Active Traders'}</div>
+              </div>
+              <div>
+                <div className="text-2xl font-bold text-green-400">67%</div>
+                <div className="text-sm text-gray-400">{isPortuguese ? 'Taxa Média' : 'Average Win Rate'}</div>
+              </div>
+              <div>
+                <div className="text-2xl font-bold text-yellow-400">$1,247</div>
+                <div className="text-sm text-gray-400">{isPortuguese ? 'Lucro Médio' : 'Average Profit'}</div>
+              </div>
+              <div>
+                <div className="text-2xl font-bold text-blue-400">23</div>
+                <div className="text-sm text-gray-400">{isPortuguese ? 'Desafios Ativos' : 'Active Challenges'}</div>
+              </div>
+            </div>
+          </div>
         </div>
-      </section>
+      )}
 
-      {/* Strategic Objectives */}
-      <section className="space-y-6">
-        <h2 className="text-2xl font-bold text-white flex items-center gap-3">
-          <svg className="w-8 h-8 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
-          </svg>
-          {isPortuguese ? 'Objetivos Estratégicos' : 'Strategic Objectives'}
-        </h2>
-
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {businessMilestones.map((milestone) => (
-            <div key={milestone.id} className="bg-white/5 backdrop-blur-sm rounded-xl p-6 border border-slate-700/50 hover:border-slate-600/50 transition-all duration-300">
-              <div className="flex items-start justify-between mb-4">
-                <div className="flex items-center gap-3">
-                  {getMilestoneIcon(milestone.category)}
-                  <div>
-                    <h3 className="text-lg font-semibold text-white">{milestone.title}</h3>
-                    <p className="text-sm text-slate-400">{milestone.description}</p>
+      {activeTab === 'friends' && (
+        <div className="space-y-6">
+          <h3 className="text-2xl font-bold text-white mb-6 flex items-center gap-2">
+            <svg className="w-6 h-6 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z" />
+            </svg>
+            {isPortuguese ? 'Seus Amigos Traders' : 'Your Trading Friends'}
+          </h3>
+          
+          <div className="grid gap-4">
+            {friends.map((friend) => (
+              <div key={friend.id} className="bg-gray-800/50 rounded-lg p-6 border border-gray-700">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-4">
+                    <div className="relative p-2 bg-gray-700/50 rounded-full">
+                      {friend.avatar}
+                      {friend.isOnline && (
+                        <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-green-500 rounded-full border-2 border-gray-800"></div>
+                      )}
+                    </div>
+                    <div>
+                      <h4 className="text-lg font-bold text-white">{friend.name}</h4>
+                      <div className={`text-sm ${getTierColor(friend.level)}`}>{friend.level}</div>
+                    </div>
+                  </div>
+                  
+                  <div className="text-right">
+                    <div className="text-sm text-gray-400 mb-1">
+                      {friend.isOnline 
+                        ? (isPortuguese ? 'Online agora' : 'Online now')
+                        : (isPortuguese ? 'Offline' : 'Offline')
+                      }
+                    </div>
                   </div>
                 </div>
                 
-                <div className="flex flex-col items-end gap-2">
-                  <div className={`px-2 py-1 rounded text-xs font-medium border ${getStatusColor(milestone.status)}`}>
-                    {milestone.status.replace('_', ' ').toUpperCase()}
+                <div className="grid grid-cols-3 gap-4 text-center">
+                  <div>
+                    <div className="text-xl font-bold text-white">{friend.winRate}%</div>
+                    <div className="text-xs text-gray-400">{isPortuguese ? 'Taxa de Vitória' : 'Win Rate'}</div>
+                    <div className={`text-xs ${friend.winRate > (stats?.winRate || 0) ? 'text-red-400' : 'text-green-400'}`}>
+                      {friend.winRate > (stats?.winRate || 0) 
+                        ? `+${(friend.winRate - (stats?.winRate || 0)).toFixed(1)}% ${isPortuguese ? 'melhor' : 'better'}`
+                        : `${(friend.winRate - (stats?.winRate || 0)).toFixed(1)}% ${isPortuguese ? 'pior' : 'worse'}`
+                      }
+                    </div>
                   </div>
-                  <div className={`text-xs font-medium ${getImpactColor(milestone.impact)}`}>
-                    {milestone.impact.toUpperCase()} {isPortuguese ? 'IMPACTO' : 'IMPACT'}
+                  <div>
+                    <div className="text-xl font-bold text-white">${friend.weeklyProfit}</div>
+                    <div className="text-xs text-gray-400">{isPortuguese ? 'Lucro Semanal' : 'Weekly Profit'}</div>
+                  </div>
+                  <div>
+                    <div className="text-xl font-bold text-white">{friend.currentStreak}</div>
+                    <div className="text-xs text-gray-400">{isPortuguese ? 'Sequência' : 'Streak'}</div>
+                    {friend.currentStreak >= 5 && (
+                      <div className="text-xs text-orange-400 flex items-center gap-1">
+                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 18.657A8 8 0 716.343 7.343S7 9 9 10c0-2 .5-5 2.986-7C14 5 16.09 5.777 17.656 7.343A7.975 7.975 0 0120 13a7.975 7.975 0 01-2.343 5.657z" />
+                        </svg>
+                        {isPortuguese ? 'Em chamas!' : 'On fire!'}
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
-
-              {/* Progress Bar */}
-              <div className="mb-4">
-                <div className="flex justify-between text-sm text-slate-400 mb-2">
-                  <span>{isPortuguese ? 'Progresso' : 'Progress'}</span>
-                  <span>{milestone.progress}%</span>
-                </div>
-                <div className="w-full bg-slate-700 rounded-full h-2">
-                  <div 
-                    className={`h-2 rounded-full transition-all duration-700 ${
-                      milestone.status === 'achieved' ? 'bg-emerald-500' :
-                      milestone.status === 'in_progress' ? 'bg-amber-500' : 'bg-slate-500'
-                    }`}
-                    style={{ width: `${milestone.progress}%` }}
-                  ></div>
-                </div>
-              </div>
-
-              {milestone.completedDate && (
-                <div className="text-xs text-slate-500">
-                  {isPortuguese ? 'Concluído em' : 'Completed on'}: {milestone.completedDate}
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* Performance Reports */}
-      <section className="space-y-6">
-        <h2 className="text-2xl font-bold text-white flex items-center gap-3">
-          <svg className="w-8 h-8 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-          </svg>
-          {isPortuguese ? 'Relatórios de Performance' : 'Performance Reports'}
-        </h2>
-
-        {quarterlyReports.map((report) => (
-          <div key={report.quarter} className="bg-white/5 backdrop-blur-sm rounded-xl p-6 border border-slate-700/50">
-            <div className="flex items-center justify-between mb-6">
-              <h3 className="text-xl font-semibold text-white">{report.quarter} {isPortuguese ? 'Relatório' : 'Report'}</h3>
-              <div className="text-sm text-slate-400">
-                {isPortuguese ? 'Atualizado' : 'Updated'}: {new Date().toLocaleDateString()}
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-              <div className="text-center p-4 bg-slate-800/30 rounded-lg">
-                <div className="text-sm text-slate-400 mb-1">ROI</div>
-                <div className={`text-lg font-bold ${getBenchmarkColor(report.kpis.roi.status)}`}>
-                  {report.kpis.roi.value}%
-                </div>
-                <div className="text-xs text-slate-500">
-                  {isPortuguese ? 'Meta' : 'Target'}: {report.kpis.roi.target}%
-                </div>
-              </div>
-              
-              <div className="text-center p-4 bg-slate-800/30 rounded-lg">
-                <div className="text-sm text-slate-400 mb-1">{isPortuguese ? 'Risco' : 'Risk'}</div>
-                <div className={`text-lg font-bold ${getBenchmarkColor(report.kpis.riskScore.status)}`}>
-                  {report.kpis.riskScore.value}
-                </div>
-                <div className="text-xs text-slate-500">
-                  {isPortuguese ? 'Meta' : 'Target'}: &lt;{report.kpis.riskScore.target}
-                </div>
-              </div>
-              
-              <div className="text-center p-4 bg-slate-800/30 rounded-lg">
-                <div className="text-sm text-slate-400 mb-1">{isPortuguese ? 'Compliance' : 'Compliance'}</div>
-                <div className={`text-lg font-bold ${getBenchmarkColor(report.kpis.compliance.status)}`}>
-                  {report.kpis.compliance.value}%
-                </div>
-                <div className="text-xs text-slate-500">
-                  {isPortuguese ? 'Meta' : 'Target'}: {report.kpis.compliance.target}%
-                </div>
-              </div>
-              
-              <div className="text-center p-4 bg-slate-800/30 rounded-lg">
-                <div className="text-sm text-slate-400 mb-1">{isPortuguese ? 'Eficiência' : 'Efficiency'}</div>
-                <div className={`text-lg font-bold ${getBenchmarkColor(report.kpis.efficiency.status)}`}>
-                  {report.kpis.efficiency.value}%
-                </div>
-                <div className="text-xs text-slate-500">
-                  {isPortuguese ? 'Meta' : 'Target'}: {report.kpis.efficiency.target}%
-                </div>
-              </div>
-            </div>
-
-            <div className="p-4 bg-slate-800/20 rounded-lg">
-              <h4 className="text-sm font-medium text-slate-300 mb-2">
-                {isPortuguese ? 'Resumo Executivo' : 'Executive Summary'}
-              </h4>
-              <p className="text-sm text-slate-400">{report.summary}</p>
-            </div>
-          </div>
-        ))}
-      </section>
-
-      {/* Risk Management Overview */}
-      <section className="space-y-6">
-        <h2 className="text-2xl font-bold text-white flex items-center gap-3">
-          <svg className="w-8 h-8 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-          </svg>
-          {isPortuguese ? 'Visão Geral de Riscos' : 'Risk Management Overview'}
-        </h2>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          <div className="bg-white/5 backdrop-blur-sm rounded-xl p-6 border border-slate-700/50 text-center">
-            <div className="text-sm text-slate-400 mb-2">{isPortuguese ? 'Score de Risco Atual' : 'Current Risk Score'}</div>
-            <div className="text-3xl font-bold text-amber-400 mb-1">{riskAssessment.currentScore}</div>
-            <div className="text-xs text-slate-500">{isPortuguese ? 'Baixo Risco' : 'Low Risk'}</div>
+            ))}
           </div>
 
-          <div className="bg-white/5 backdrop-blur-sm rounded-xl p-6 border border-slate-700/50 text-center">
-            <div className="text-sm text-slate-400 mb-2">{isPortuguese ? 'Exposição Máxima' : 'Maximum Exposure'}</div>
-            <div className="text-3xl font-bold text-red-400 mb-1">{riskAssessment.maxExposure}%</div>
-            <div className="text-xs text-slate-500">{isPortuguese ? 'do Capital' : 'of Capital'}</div>
-          </div>
-
-          <div className="bg-white/5 backdrop-blur-sm rounded-xl p-6 border border-slate-700/50 text-center">
-            <div className="text-sm text-slate-400 mb-2">{isPortuguese ? 'Diversificação' : 'Diversification'}</div>
-            <div className="text-3xl font-bold text-emerald-400 mb-1">{riskAssessment.diversification}%</div>
-            <div className="text-xs text-slate-500">{isPortuguese ? 'Bem Diversificado' : 'Well Diversified'}</div>
-          </div>
-
-          <div className="bg-white/5 backdrop-blur-sm rounded-xl p-6 border border-slate-700/50 text-center">
-            <div className="text-sm text-slate-400 mb-2">{isPortuguese ? 'Correlação de Mercado' : 'Market Correlation'}</div>
-            <div className="text-3xl font-bold text-blue-400 mb-1">{riskAssessment.correlation}</div>
-            <div className="text-xs text-slate-500">{isPortuguese ? 'Baixa Correlação' : 'Low Correlation'}</div>
+          <div className="text-center p-8 bg-gray-800/30 rounded-lg border border-gray-600">
+            <svg className="w-12 h-12 text-blue-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
+            </svg>
+            <h4 className="text-lg font-bold text-white mb-2">
+              {isPortuguese ? 'Convide Amigos!' : 'Invite Friends!'}
+            </h4>
+            <p className="text-gray-400 text-sm">
+              {isPortuguese ? 'Trading é mais divertido com amigos. Convide outros traders para competir!' : 'Trading is more fun with friends. Invite other traders to compete!'}
+            </p>
           </div>
         </div>
-      </section>
+      )}
 
-      {/* Compliance Status */}
-      <section className="space-y-6">
-        <h2 className="text-2xl font-bold text-white flex items-center gap-3">
-          <svg className="w-8 h-8 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z" />
-          </svg>
-          {isPortuguese ? 'Status de Compliance' : 'Compliance Status'}
-        </h2>
-
-        <div className="bg-white/5 backdrop-blur-sm rounded-xl p-6 border border-slate-700/50">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="flex items-center gap-3 p-4 bg-emerald-900/20 rounded-lg border border-emerald-500/30">
-              <svg className="w-8 h-8 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-              </svg>
-              <div>
-                <div className="text-sm font-medium text-emerald-400">{isPortuguese ? 'Regulamentações' : 'Regulations'}</div>
-                <div className="text-xs text-slate-400">{isPortuguese ? 'Totalmente Compatível' : 'Fully Compliant'}</div>
+      {activeTab === 'challenges' && (
+        <div className="space-y-6">
+          <h3 className="text-2xl font-bold text-white mb-6 flex items-center gap-2">
+            <svg className="w-6 h-6 text-yellow-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
+            </svg>
+            {isPortuguese ? 'Desafios em Grupo' : 'Group Challenges'}
+          </h3>
+          
+          <div className="grid gap-6">
+            {groupChallenges.map((challenge) => (
+              <div key={challenge.id} className="bg-gray-800/50 rounded-xl p-6 border border-gray-700">
+                <div className="flex justify-between items-start mb-4">
+                  <div>
+                    <h4 className="text-xl font-bold text-white mb-2">{challenge.title}</h4>
+                    <p className="text-gray-400 mb-2">{challenge.description}</p>
+                    <div className="flex items-center gap-4 text-sm text-gray-400">
+                      <span className="flex items-center gap-1">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z" />
+                        </svg>
+                        {challenge.participants} {isPortuguese ? 'participantes' : 'participants'}
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        {challenge.timeLeft} {isPortuguese ? 'restantes' : 'left'}
+                      </span>
+                    </div>
+                  </div>
+                  
+                  <div className="text-right">
+                    <div className="mb-2">
+                      <svg className="w-8 h-8 text-yellow-400 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
+                      </svg>
+                    </div>
+                    <div className="text-sm text-yellow-400 font-medium">{challenge.reward}</div>
+                  </div>
+                </div>
+                
+                <div className="mb-4">
+                  <div className="flex justify-between text-sm text-gray-400 mb-2">
+                    <span>{isPortuguese ? 'Progresso da Comunidade' : 'Community Progress'}</span>
+                    <span>{challenge.progress}/{challenge.target}</span>
+                  </div>
+                  <div className="w-full bg-gray-700 rounded-full h-4">
+                    <div 
+                      className="bg-gradient-to-r from-green-500 to-blue-500 h-4 rounded-full transition-all duration-700 flex items-center justify-center"
+                      style={{ width: `${(challenge.progress / challenge.target) * 100}%` }}
+                    >
+                      <span className="text-white text-xs font-bold">
+                        {Math.round((challenge.progress / challenge.target) * 100)}%
+                      </span>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="flex justify-between items-center">
+                  <div className="text-sm text-gray-400">
+                    {isPortuguese ? 'Sua contribuição: 5 trades' : 'Your contribution: 5 trades'}
+                  </div>
+                  <button className="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-lg text-white font-medium transition-colors">
+                    {isPortuguese ? 'Participar' : 'Join Challenge'}
+                  </button>
+                </div>
               </div>
-            </div>
-
-            <div className="flex items-center gap-3 p-4 bg-emerald-900/20 rounded-lg border border-emerald-500/30">
-              <svg className="w-8 h-8 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-              <div>
-                <div className="text-sm font-medium text-emerald-400">{isPortuguese ? 'Auditoria' : 'Audit Trail'}</div>
-                <div className="text-xs text-slate-400">{isPortuguese ? 'Atualizada' : 'Up to Date'}</div>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-3 p-4 bg-emerald-900/20 rounded-lg border border-emerald-500/30">
-              <svg className="w-8 h-8 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-              </svg>
-              <div>
-                <div className="text-sm font-medium text-emerald-400">{isPortuguese ? 'Documentação' : 'Documentation'}</div>
-                <div className="text-xs text-slate-400">{isPortuguese ? 'Completa' : 'Complete'}</div>
-              </div>
-            </div>
+            ))}
           </div>
         </div>
-      </section>
+      )}
+
+      {activeTab === 'achievements' && (
+        <div className="space-y-6">
+          <h3 className="text-2xl font-bold text-white mb-6 flex items-center gap-2">
+            <svg className="w-6 h-6 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z" />
+            </svg>
+            {isPortuguese ? 'Conquistas Sociais' : 'Social Achievements'}
+          </h3>
+          
+          <div className="grid gap-6">
+            {socialAchievements.map((achievement) => (
+              <div key={achievement.id} className={`rounded-xl p-6 border transition-all duration-300 ${
+                achievement.unlocked
+                  ? 'bg-gradient-to-r from-yellow-600/20 to-orange-600/20 border-yellow-500/30'
+                  : 'bg-gray-800/50 border-gray-700 opacity-75'
+              }`}>
+                <div className="flex items-start justify-between mb-4">
+                  <div className="flex items-center gap-4">
+                    <div className={achievement.unlocked ? '' : 'grayscale opacity-50'}>
+                      {achievement.icon}
+                    </div>
+                    <div>
+                      <h4 className="text-xl font-bold text-white mb-1">{achievement.title}</h4>
+                      <p className="text-gray-400 mb-2">{achievement.description}</p>
+                    </div>
+                  </div>
+                  
+                  <div className={`px-3 py-1 rounded-full text-xs font-medium border ${getRarityColor(achievement.rarity)}`}>
+                    {achievement.rarity.toUpperCase()}
+                  </div>
+                </div>
+                
+                {!achievement.unlocked && (
+                  <div className="mb-4">
+                    <div className="flex justify-between text-sm text-gray-400 mb-2">
+                      <span>{isPortuguese ? 'Progresso' : 'Progress'}</span>
+                      <span>{achievement.progress}/{achievement.target}</span>
+                    </div>
+                    <div className="w-full bg-gray-700 rounded-full h-2">
+                      <div 
+                        className="bg-gradient-to-r from-blue-500 to-purple-500 h-2 rounded-full transition-all duration-700"
+                        style={{ width: `${(achievement.progress / achievement.target) * 100}%` }}
+                      ></div>
+                    </div>
+                  </div>
+                )}
+                
+                {achievement.unlocked && (
+                  <div className="flex items-center gap-2 text-green-400 font-medium">
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                    {isPortuguese ? 'Conquistado!' : 'Achieved!'}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   )
 }

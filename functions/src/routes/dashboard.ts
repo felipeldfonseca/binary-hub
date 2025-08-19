@@ -1,5 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { getFirestore } from 'firebase-admin/firestore';
+import { analyticsService } from '../services/analyticsService';
+import { cacheMiddleware, cacheStatsMiddleware } from '../middleware/cache';
 import { logger } from 'firebase-functions';
 
 // Extend Express Request to include user property
@@ -15,10 +17,21 @@ const router = Router();
 // Firebase admin is initialized in the main index.ts
 const getDb = () => getFirestore();
 
+// Add cache statistics to all responses
+router.use(cacheStatsMiddleware());
+
 /**
- * GET /dashboard/stats - Get dashboard statistics
+ * GET /dashboard/stats - Get dashboard statistics (Legacy - with caching)
  */
-router.get('/stats', async (req: AuthenticatedRequest, res: Response) => {
+router.get('/stats',
+  cacheMiddleware({
+    ttl: 600, // 10 minutes
+    tags: (req) => {
+      const authReq = req as AuthenticatedRequest;
+      return [`user:${authReq.user?.uid}`, 'dashboard', 'stats'];
+    }
+  }),
+  async (req: AuthenticatedRequest, res: Response) => {
   try {
     if (!req.user) {
       return res.status(401).json({ error: 'User not authenticated' });
@@ -75,9 +88,17 @@ router.get('/stats', async (req: AuthenticatedRequest, res: Response) => {
 });
 
 /**
- * GET /dashboard/performance - Get performance data
+ * GET /dashboard/performance - Get performance data (Legacy - with caching)
  */
-router.get('/performance', async (req: AuthenticatedRequest, res: Response) => {
+router.get('/performance',
+  cacheMiddleware({
+    ttl: 900, // 15 minutes
+    tags: (req) => {
+      const authReq = req as AuthenticatedRequest;
+      return [`user:${authReq.user?.uid}`, 'dashboard', 'performance'];
+    }
+  }),
+  async (req: AuthenticatedRequest, res: Response) => {
   try {
     if (!req.user) {
       return res.status(401).json({ error: 'User not authenticated' });
@@ -115,5 +136,51 @@ router.get('/performance', async (req: AuthenticatedRequest, res: Response) => {
     return res.status(500).json({ error: 'Internal server error' });
   }
 });
+
+/**
+ * GET /dashboard/enhanced - Get enhanced dashboard with comprehensive analytics
+ */
+router.get('/enhanced',
+  cacheMiddleware({
+    ttl: 300, // 5 minutes for real-time feel
+    tags: (req) => {
+      const authReq = req as AuthenticatedRequest;
+      return [`user:${authReq.user?.uid}`, 'dashboard', 'enhanced'];
+    }
+  }),
+  async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ error: 'User not authenticated' });
+      }
+
+      const uid = req.user.uid;
+      const { period = 'weekly' } = req.query;
+
+      // Validate period
+      if (!['daily', 'weekly', 'monthly', 'yearly'].includes(period as string)) {
+        return res.status(400).json({
+          error: 'Invalid period. Must be daily, weekly, monthly, or yearly',
+          code: 'VALIDATION_ERROR',
+          timestamp: new Date().toISOString()
+        });
+      }
+
+      // Get comprehensive dashboard data using analytics service
+      const dashboardData = await analyticsService.getDashboardAnalytics(uid, period as 'daily' | 'weekly' | 'monthly' | 'yearly');
+
+      return res.json({
+        ...dashboardData,
+        timestamp: new Date().toISOString()
+      });
+    } catch (error) {
+      logger.error('Get enhanced dashboard error:', error);
+      return res.status(500).json({ 
+        error: 'Internal server error',
+        code: 'INTERNAL_ERROR',
+        timestamp: new Date().toISOString()
+      });
+    }
+  });
 
 export default router;
