@@ -6,6 +6,7 @@ import { auth } from '@/lib/firebase'
 import { useErrorHandler } from '@/hooks/useErrorHandler'
 import { useToastHelpers } from '@/components/ui/Toast'
 import { useLanguage } from '@/lib/contexts/LanguageContext'
+import { triggerCsvDataUpdate } from '@/hooks/useCsvTradeData'
 
 interface UploadStatus {
   uploadId: string
@@ -112,11 +113,58 @@ export default function CsvUploadModal({ isOpen, onClose, onSuccess }: CsvUpload
         // Mark that user has imported data
         localStorage.setItem('binaryHub_hasData', 'true')
         
-        // Store the actual trades data (in a real app, this would be in Firestore)
-        localStorage.setItem('binaryHub_trades', JSON.stringify(result.trades))
+        // Merge with existing trades data instead of overwriting
+        const existingTrades = localStorage.getItem('binaryHub_trades')
+        let allTrades = result.trades
         
-        // Store statistics
-        localStorage.setItem('binaryHub_stats', JSON.stringify(result.statistics))
+        if (existingTrades) {
+          try {
+            const parsedExistingTrades = JSON.parse(existingTrades)
+            // Create a unique key for deduplication based on entryTime + asset + direction + amount
+            const getTradeKey = (trade: any) => 
+              `${trade.entryTime}-${trade.asset}-${trade.direction}-${trade.amount}`
+            
+            // Create a set of existing trade keys for fast lookup
+            const existingKeys = new Set(parsedExistingTrades.map(getTradeKey))
+            
+            // Filter out duplicates from new trades
+            const newUniqueTrades = result.trades.filter((trade: any) => 
+              !existingKeys.has(getTradeKey(trade))
+            )
+            
+            // Merge existing + new unique trades
+            allTrades = [...parsedExistingTrades, ...newUniqueTrades]
+            
+            console.log(`Merged trades: ${parsedExistingTrades.length} existing + ${newUniqueTrades.length} new = ${allTrades.length} total`)
+          } catch (error) {
+            console.error('Error parsing existing trades, using new trades only:', error)
+            allTrades = result.trades
+          }
+        }
+        
+        // Store the merged trades data
+        localStorage.setItem('binaryHub_trades', JSON.stringify(allTrades))
+        
+        // Recalculate statistics for all trades
+        const totalTrades = allTrades.length
+        const winTrades = allTrades.filter((t: any) => t.result === 'win').length
+        const lossTrades = allTrades.filter((t: any) => t.result === 'loss').length
+        const totalProfit = allTrades.reduce((sum: number, t: any) => sum + (t.pnl || t.profit || 0), 0)
+        const avgStake = totalTrades > 0 ? allTrades.reduce((sum: number, t: any) => sum + (t.amount || 0), 0) / totalTrades : 0
+        
+        const mergedStats = {
+          totalTrades,
+          winTrades,
+          lossTrades,
+          winRate: totalTrades > 0 ? (winTrades / totalTrades) * 100 : 0,
+          totalProfit,
+          avgStake
+        }
+        
+        localStorage.setItem('binaryHub_stats', JSON.stringify(mergedStats))
+        
+        // Trigger data update for components using CSV data
+        triggerCsvDataUpdate()
       }
       
       showSuccess(
@@ -162,6 +210,62 @@ export default function CsvUploadModal({ isOpen, onClose, onSuccess }: CsvUpload
           // Continue polling
           setTimeout(() => pollUploadStatus(uploadId), 2000)
         } else if (status.status === 'completed') {
+          // Store the data and trigger updates
+          if (status.trades) {
+            localStorage.setItem('binaryHub_hasData', 'true')
+            
+            // Merge with existing trades data instead of overwriting
+            const existingTrades = localStorage.getItem('binaryHub_trades')
+            let allTrades = status.trades
+            
+            if (existingTrades) {
+              try {
+                const parsedExistingTrades = JSON.parse(existingTrades)
+                // Create a unique key for deduplication based on entryTime + asset + direction + amount
+                const getTradeKey = (trade: any) => 
+                  `${trade.entryTime}-${trade.asset}-${trade.direction}-${trade.amount}`
+                
+                // Create a set of existing trade keys for fast lookup
+                const existingKeys = new Set(parsedExistingTrades.map(getTradeKey))
+                
+                // Filter out duplicates from new trades
+                const newUniqueTrades = status.trades.filter((trade: any) => 
+                  !existingKeys.has(getTradeKey(trade))
+                )
+                
+                // Merge existing + new unique trades
+                allTrades = [...parsedExistingTrades, ...newUniqueTrades]
+                
+                console.log(`Polling merged trades: ${parsedExistingTrades.length} existing + ${newUniqueTrades.length} new = ${allTrades.length} total`)
+              } catch (error) {
+                console.error('Error parsing existing trades during polling, using new trades only:', error)
+                allTrades = status.trades
+              }
+            }
+            
+            // Store merged trades
+            localStorage.setItem('binaryHub_trades', JSON.stringify(allTrades))
+            
+            // Recalculate statistics for all trades
+            const totalTrades = allTrades.length
+            const winTrades = allTrades.filter((t: any) => t.result === 'win').length
+            const lossTrades = allTrades.filter((t: any) => t.result === 'loss').length
+            const totalProfit = allTrades.reduce((sum: number, t: any) => sum + (t.pnl || t.profit || 0), 0)
+            const avgStake = totalTrades > 0 ? allTrades.reduce((sum: number, t: any) => sum + (t.amount || 0), 0) / totalTrades : 0
+            
+            const mergedStats = {
+              totalTrades,
+              winTrades,
+              lossTrades,
+              winRate: totalTrades > 0 ? (winTrades / totalTrades) * 100 : 0,
+              totalProfit,
+              avgStake
+            }
+            
+            localStorage.setItem('binaryHub_stats', JSON.stringify(mergedStats))
+            triggerCsvDataUpdate()
+          }
+          
           // Call success callback after upload completes
           setTimeout(() => {
             onSuccess?.()
