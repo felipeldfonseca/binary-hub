@@ -38,6 +38,7 @@ import realtimeRouter from './routes/realtime';
 import performanceRouter from './routes/performance';
 import communityRouter from './routes/community';
 import socialRouter from './routes/social';
+import aiRouter from './routes/ai';
 import { realTimeService } from './services/realTimeService';
 
 // Extend Express Request to include user property
@@ -202,6 +203,7 @@ app.use('/v1/bulk', authenticate, bulkOperationsRouter);
 app.use('/v1/realtime', authenticate, realtimeRouter);
 app.use('/v1/community', authenticate, communityRouter);
 app.use('/v1/social', authenticate, socialRouter);
+app.use('/v1/ai', authenticate, aiRouter);
 
 // Performance monitoring routes (admin-only in production)
 app.use('/v1/performance', performanceRouter);
@@ -212,7 +214,7 @@ app.use(errorTrackingMiddleware());
 // Export the API
 // Configure HTTPS function with options
 export const api = onRequest({
-  secrets: ['OPENAI_API_KEY']
+  secrets: ['OPENAI_API_KEY', 'GEMINI_API_KEY']
 }, app);
 
 // Background functions
