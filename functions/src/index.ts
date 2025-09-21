@@ -37,6 +37,7 @@ import bulkOperationsRouter from './routes/bulk-operations';
 import realtimeRouter from './routes/realtime';
 import performanceRouter from './routes/performance';
 import communityRouter from './routes/community';
+import socialRouter from './routes/social';
 import { realTimeService } from './services/realTimeService';
 
 // Extend Express Request to include user property
@@ -200,6 +201,7 @@ app.use('/v1/analytics', authenticate, analyticsRouter);
 app.use('/v1/bulk', authenticate, bulkOperationsRouter);
 app.use('/v1/realtime', authenticate, realtimeRouter);
 app.use('/v1/community', authenticate, communityRouter);
+app.use('/v1/social', authenticate, socialRouter);
 
 // Performance monitoring routes (admin-only in production)
 app.use('/v1/performance', performanceRouter);
