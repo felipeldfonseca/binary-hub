@@ -1,146 +1,428 @@
-# Binary Hub – MVP Scope
+# Binary Hub – Social Trading Platform MVP Scope
 
-*Versão 1.0 – julho 2025*
+*Versão 3.0 – Social-First Approach*
 
 ## Objetivo
 
-Entregar, em até **10 semanas**, uma versão funcional do Binary Hub que permita a um trader de opções binárias:
+Entregar, em até **3-4 meses**, a primeira plataforma social dedicada a traders de opções binárias que permita:
 
-1. Criar conta, logar e registrar manualmente seus trades ou  baixar o CSV feito na corretora com o histórico das transações.
-2. Visualizar indicadores‑chave de performance (KPIs) em um dashboard resumido.
-3. Navegar por um calendário mensal com color‑heat por lucro/prejuízo diário.
-4. Definir até **3 regras pessoais** de disciplina e acompanhar a aderência.
-5. Receber **1 insight automático** do LLM por semana sobre padrões de execução.
+### Core Social Features
+1. **Criar perfil público** com métricas de performance e biografia
+2. **Conectar-se com outros traders** através de sistema de follow/followers  
+3. **Compartilhar trades e insights** em feed social da comunidade
+4. **Descobrir novos traders** através de busca e recomendações
 
-> **Meta de sucesso:** 50 usuários ativos semanais (WAU) & ≥ 10 assinantes Pro até o final do MVP.
+### Core Trading Features  
+5. **Registrar trades** manualmente ou via CSV import (Ebinex)
+6. **Visualizar KPIs** em dashboard com controles de privacidade
+7. **Navegar calendário** de performance com heat-map
+8. **Definir regras pessoais** e acompanhar aderência
+
+### Business Features
+9. **Sistema de billing** com tiers Free/Pro/Collaborative
+10. **Controles de privacidade** granulares para dados e perfil
+
+> **Meta de sucesso:** 1.000 usuários ativos, 200 assinantes Pro ($2.400 MRR), 70% completion rate de profiles
 
 ---
 
 ## 1. Funcionalidades (Must / Should / Could)
 
-| ID       | Epic / Feature            | Descrição resumida                                                                                                      | Prioridade |
-| -------- | ------------------------- | ----------------------------------------------------------------------------------------------------------------------- | ---------- |
-| **P‑01** | Onboarding & Auth         | E‑mail + Google SSO. Detectar timezone.                                                                                 | **Must**   |
-| **P‑02** | Log Manual de Trade       | Form em `/app/log` com validação. Campos: data/hora, ativo, direção (CALL/PUT), stake, payout, resultado, tag & emoção. | **Must**   |
-| **P‑03** | Dashboard KPIs            | Win Rate, série de vitórias/derrotas, P\&L diário/sem.                                                                  | **Must**   |
-| **P‑04** | Calendário de Performance | Grade mensal com cor (verde, vermelho, neutro) conforme lucro. Tooltip mostra stats do dia.                             | **Must**   |
-| **P‑05** | Regras & Aderência        | CRUD de até 3 regras. Cálculo % aderência last 30 trades.                                                               | **Should** |
-| **P‑06** | Insight LLM semanal       | Cron job gera insight JSON e grava em `insights/{uid}`. Mostra último insight no dashboard.                             | **Could**  |
-| **P‑07** | Billing Stripe            | Upgrade Free → Pro (US\$ 12/mês).                                                                                       | **Could**  |
-| **P‑08** | Exportação PDF            | PDF semanal com KPIs + calendário.                                                                                      | **Could**  |
+### SOCIAL CORE FEATURES
+
+| ID | Epic / Feature | Descrição | Prioridade | Sprint |
+|----|----------------|-----------|------------|---------|
+| **S-01** | Public Trader Profiles | Profile setup com bio, avatar, performance metrics, achievements | **Must** | S-01 |
+| **S-02** | Follow/Follower System | One-way follow, notifications, follower management | **Must** | S-01 |
+| **S-03** | Social Feed | Timeline com posts, trade shares, achievements | **Must** | S-02 |
+| **S-04** | Trade Sharing | Share trades específicos com contexto e insights | **Must** | S-02 |
+| **S-05** | Discovery & Search | Buscar traders, filtrar por performance, recomendações | **Should** | S-03 |
+| **S-06** | Achievement System | Badges, milestones, community recognition | **Should** | S-03 |
+| **S-07** | Notifications | Real-time notifications para follows, likes, comments | **Should** | S-03 |
+
+### TRADING CORE FEATURES
+
+| ID | Epic / Feature | Descrição | Prioridade | Sprint |
+|----|----------------|-----------|------------|---------|
+| **T-01** | Authentication & Onboarding | Email, Google, Apple SSO + social profile setup | **Must** | S-01 |
+| **T-02** | Enhanced Trade Logging | Form com opções de sharing social | **Must** | S-01 |
+| **T-03** | CSV Import (Ebinex) | Upload, parse, deduplicate com prompts de sharing | **Must** | S-02 |
+| **T-04** | Dashboard KPIs | Performance metrics com privacy controls | **Must** | S-02 |
+| **T-05** | Trading Calendar | Heat-map com social sharing integration | **Must** | S-02 |
+| **T-06** | Personal Rules | CRUD com opções de community sharing | **Should** | S-03 |
+
+### BUSINESS & PLATFORM FEATURES
+
+| ID | Epic / Feature | Descrição | Prioridade | Sprint |
+|----|----------------|-----------|------------|---------|
+| **B-01** | Billing & Subscriptions | Stripe integration, Free/Pro/Collaborative tiers | **Must** | S-04 |
+| **B-02** | Privacy Controls | Granular visibility settings para profile e métricas | **Must** | S-04 |
+| **B-03** | Content Moderation | Basic moderation tools, reporting system | **Should** | S-04 |
+| **B-04** | Admin Dashboard | User management, content moderation, analytics | **Could** | Future |
 
 ---
 
 ## 2. User Stories & Acceptance Criteria
 
-### Epic P‑02 – Log Manual de Trade
+### Epic S-01 – Public Trader Profiles
 
-* **US‑02‑01:** *Como trader*, quero registrar um trade em < 15 seg, para manter meu diário atualizado.
+**US-S01-01:** *Como trader*, quero criar um perfil público para showcasing my trading performance para a comunidade.
 
-  * **AC‑1:** Campo obrigatório sinalizado; submit desabilitado se inválido.
-  * **AC‑2:** Após salvar, toast “Trade salvo” e redirect opcional.
-  * **AC‑3:** Request REST `/trades POST` responde 201.
+* **AC-1:** Profile setup wizard durante onboarding com steps: basic info, bio, performance settings
+* **AC-2:** Avatar upload com resize automático para 200x200px
+* **AC-3:** Bio campo com 280 caracteres max, markdown support básico
+* **AC-4:** Performance metrics calculadas automaticamente de trades existentes
+* **AC-5:** Achievement badges atribuídos automaticamente (primeiro trade, 100 trades, etc.)
 
-### Epic P‑03 – Dashboard KPIs
+**US-S01-02:** *Como visitante*, quero visualizar profiles públicos de outros traders para descobrir potenciais conexões.
 
-* **US‑03‑01:** *Como usuário*, quero ver meu win rate semanal na primeira dobra do dashboard.
+* **AC-1:** Profile page `/profile/[username]` acessível sem login
+* **AC-2:** Performance metrics mostradas conforme privacy settings do usuário
+* **AC-3:** Recent trades e posts mostrados conforme visibility settings
+* **AC-4:** Follow button para usuários logados
+* **AC-5:** SEO otimizado com meta tags para sharing
 
-  * **AC‑1:** Cálculo: wins ÷ (wins+losses) × 100, período rolante 7 dias.
-  * **AC‑2:** Gauge exibe zona verde ≥ 60 %, amarelo 50–60 %, vermelho < 50 %.
+### Epic S-02 – Follow/Follower System  
 
-*(demais histórias em backlog →* `docs/PRD.md`)\*
+**US-S02-01:** *Como trader*, quero seguir outros traders para acompanhar their updates no meu feed.
 
----
+* **AC-1:** Follow button em profiles com loading state
+* **AC-2:** Follow action cria documento em `follows/{uid}/following/{targetUid}`
+* **AC-3:** Real-time update de follower count no profile do target
+* **AC-4:** Notification enviada para o trader seguido
+* **AC-5:** Unfollow functionality com confirmação
 
-## 3. Restrições & Premissas
+**US-S02-02:** *Como trader*, quero gerenciar meus followers para controlar minha audience.
 
-* Front‑end **Next.js 14** + **Tailwind v3**.
-* Back‑end **Firebase** (Auth, Firestore, Cloud Functions).
-* LLM: **OpenAI GPT‑4o** via função programada (cron Diário Dom‑05 UTC).
-* Sem importação automática de ordens (integrações planejadas pós‑MVP).
+* **AC-1:** Followers list em `/profile/me/followers` 
+* **AC-2:** Remove follower functionality
+* **AC-3:** Block user option com UI confirmation
+* **AC-4:** Privacy setting para require approval for new followers
 
----
+### Epic S-03 – Social Feed
 
-## 4. Métricas de Sucesso (MVP)
+**US-S03-01:** *Como trader*, quero ver um feed personalizado com updates dos traders que sigo.
 
-| Métrica                     | Meta                          |
-| --------------------------- | ----------------------------- |
-| WAU (traders ativos)        | ≥ 50                          |
-| Trades registrados          | ≥ 2 500 nos primeiros 60 dias |
-| Conversão Free → Pro        | ≥ 15 %                        |
-| Churn 30D                   | ≤ 10 %                        |
-| Tempo médio de resposta API | < 300 ms (p95)                |
+* **AC-1:** Feed page `/feed` com infinite scroll
+* **AC-2:** Posts de followed users ordenados cronologicamente
+* **AC-3:** Post types: trade shares, achievements, general insights
+* **AC-4:** Like/comment functionality em cada post
+* **AC-5:** Real-time updates via WebSocket connections
 
----
+**US-S03-02:** *Como trader*, quero compartilhar insights e conquistas para engajar com a community.
 
-## 5. Cronograma Macro
+* **AC-1:** Post composer com 500 caracteres max
+* **AC-2:** Attach specific trade para contextualizar post
+* **AC-3:** Hashtag support para categorização (#strategy #analysis)
+* **AC-4:** Privacy levels: public, followers-only, private
+* **AC-5:** Post analytics: views, likes, comments, shares
 
-| Semana | Entregável chave                               |
-| ------ | ---------------------------------------------- |
-| 1‑2    | P‑01 (Auth) + Setup CI/CD                      |
-| 3‑4    | P‑02 (Log) + Modelo Firestore                  |
-| 5‑6    | P‑03 Dashboard + P‑04 Calendário               |
-| 7‑8    | P‑05 Regras + Beta privado (20 users)          |
-| 9‑10   | P‑06 Insight LLM + Hardening + Go‑Live público |
+### Epic T-02 – Enhanced Trade Logging
 
----
+**US-T02-01:** *Como trader*, quero registrar trades com opção de compartilhar achievements socially.
 
-## 6. Fora de Escopo MVP
+* **AC-1:** Enhanced form com seção "Share with Community"
+* **AC-2:** Checkbox para auto-share milestones (first win, streak achievements)
+* **AC-3:** Quick share button após successful trade save
+* **AC-4:** Trade context field para explicar strategy/reasoning
+* **AC-5:** Privacy setting para default sharing behavior
 
-* Integração automática com corretoras (Ebinex API).
-* App mobile nativo.
-* Suporte a Forex/Futuros/Crypto.
-* IA preditiva em tempo‑real.
+### Epic B-01 – Billing & Subscriptions
 
----
+**US-B01-01:** *Como usuário free*, quero upgrade para Pro para unlock advanced features.
 
-## 7. Riscos & Mitigações
+* **AC-1:** Pricing page `/pricing` com tier comparison
+* **AC-2:** Stripe checkout integration com payment methods locais
+* **AC-3:** Subscription management em `/settings/billing`
+* **AC-4:** Feature gating baseado em subscription tier
+* **AC-5:** Billing notifications e email confirmations
 
-| Risco                           | Impacto             | Mitigação                                      |
-| ------------------------------- | ------------------- | ---------------------------------------------- |
-| Sobrecarga Firestore > 50 req/s | Latência alta       | Cache SWR + índices corretos                   |
-| Custos API OpenAI               | Surpresa financeira | Limitar prompt semanal e tamanho do histórico  |
-| Falta de engajamento            | WAU < 50            | Gamificação: streak, badges, notificações push |
-
----
-
-## 8. Definição de Pronto (DoD)
-
-* Código em *main* compila sem erros.
-* ≥ 80 % cobertura unitária.
-* Lighthouse perf/accessibility ≥ 90.
-* Contraste AA em todos os textos.
-* Releasenotes adicionadas ao `docs/project/CHANGELOG.md`.
-
----
-
-## 9. Analytics & Observability
-
-| Camada            | Ferramenta                                  | Propósito                                                                              |
-| ----------------- | ------------------------------------------- | -------------------------------------------------------------------------------------- |
-| Event Tracking    | **PostHog** (self‑host, open‑source)        | Track page views, feature usage, funnel to Pro upgrade                                 |
-| Product Analytics | **Google Analytics 4**                      | Complementary web traffic metrics                                                      |
-| Logs & Metrics    | **Google Cloud Logging + Cloud Monitoring** | Collect logs from Cloud Functions; set alerts (latency > 500 ms p95, error rate > 1 %) |
-| Error Reporting   | **Sentry**                                  | Capture front‑end (Next.js) and back‑end exceptions, tag by uid                        |
-
-> **Nota:** Eventos‑chave enviados ao PostHog: `trade_created`, `csv_imported`, `insight_viewed`, `plan_upgraded`. Dashboard padrão disponível em `/ph/dashboard/1`.
-
-## 10. CDN & Asset Storage
-
-1. **Firebase Hosting + CDN (Fastly)** para servir bundle Next.js, estáticos e imagens públicas.<br>
-2. **Cloud Storage Buckets** divididos:
-
-   * `public-assets` (imagens marketing) — **CDN ativado**.
-   * `user-uploads` (prints de trade/manual) — acesso autenticado, **Signed URL** expirando em 15 min.
-3. **Cloudflare Proxiado** (CNAME) sobre `cdn.binaryhub.app` para cache global e WAF extra.
-4. Imagens otimizadas on‑the‑fly usando `next/image` + `Image CDN`.
-
-### Fluxo de Upload de Imagem (Plano Pro)
-
+**Subscription Tiers:**
 ```
-Client → /api/getSignedUrl → GCS (user‑uploads) → CDN invalidation (Cloudflare) → Firestore trade.document.imageUrl
+FREE (Community)
+├─ Profile público básico  
+├─ Follow/followers unlimited
+├─ Social feed completo
+├─ Trading journal (50 trades/mês)
+└─ Basic analytics
+
+PRO ($12/mês)
+├─ Tudo do Free
+├─ Trading journal unlimited  
+├─ Advanced analytics & charts
+├─ Export capabilities (PDF/CSV)
+├─ Priority support
+└─ Profile customization
+
+COLLABORATIVE ($24/mês) [Future]
+├─ Tudo do Pro
+├─ Live trading collaboration
+├─ Voice communication
+├─ Shared charts & annotations
+└─ Partnership analytics
 ```
 
-Alertas de quota (GCS, CDN egress) configurados em Cloud Billing.
+---
 
-*Fim do MVP\_SCOPE*
+## 3. Technical Architecture
+
+### Database Schema (Social Extensions)
+
+```typescript
+// User Profiles
+profiles/{uid}: {
+  basic: {
+    displayName: string;
+    username: string; // unique
+    avatar: string;
+    bio: string;
+    location?: string;
+    tradingSince: timestamp;
+    isVerified: boolean;
+    subscription: 'free' | 'pro' | 'collaborative';
+  };
+  stats: {
+    followersCount: number;
+    followingCount: number;
+    postsCount: number;
+    totalTrades: number;
+    winRate?: number;
+    monthlyPnL?: number;
+    currentStreak?: number;
+  };
+  privacy: {
+    profileVisibility: 'public' | 'community' | 'private';
+    metricsVisibility: {
+      winRate: boolean;
+      pnl: boolean;
+      streaks: boolean;
+      tradeCount: boolean;
+    };
+    allowFollowers: boolean;
+    requireFollowApproval: boolean;
+  };
+  achievements: {
+    badges: string[];
+    milestones: Achievement[];
+    lastCalculated: timestamp;
+  };
+}
+
+// Social Relationships
+follows/{uid}/following/{targetUid}: {
+  followedAt: timestamp;
+  notificationsEnabled: boolean;
+  status: 'active' | 'muted';
+}
+
+follows/{uid}/followers/{followerUid}: {
+  followedAt: timestamp;
+  status: 'active' | 'pending' | 'blocked';
+}
+
+// Social Content
+posts/{uid}/{postId}: {
+  type: 'trade' | 'insight' | 'achievement' | 'general';
+  content: string;
+  hashtags?: string[];
+  attachments?: string[];
+  tradeRef?: string; // reference to specific trade
+  visibility: 'public' | 'followers' | 'private';
+  metrics: {
+    likesCount: number;
+    commentsCount: number; 
+    sharesCount: number;
+    viewsCount: number;
+  };
+  createdAt: timestamp;
+  updatedAt: timestamp;
+}
+
+// Feed Generation
+feed/{uid}/{feedItemId}: {
+  authorId: string;
+  postId: string;
+  type: 'post' | 'achievement' | 'follow' | 'milestone';
+  timestamp: timestamp;
+  score: number; // for algorithmic ranking
+}
+
+// Enhanced Trades (Social Integration)
+trades/{uid}/{tradeId}: {
+  // existing trade fields...
+  social: {
+    isShared: boolean;
+    postRef?: string;
+    sharedAt?: timestamp;
+    visibility: 'private' | 'followers' | 'public';
+  };
+}
+```
+
+### API Endpoints (Social Extensions)
+
+```typescript
+// Profile Management
+GET    /api/profiles/{username}           # Get public profile
+PUT    /api/profiles/me                   # Update own profile  
+GET    /api/profiles/me/privacy           # Get privacy settings
+PUT    /api/profiles/me/privacy           # Update privacy settings
+GET    /api/profiles/search               # Search profiles
+GET    /api/profiles/suggestions          # Get recommended profiles
+
+// Social Interactions
+POST   /api/social/follow/{uid}           # Follow user
+DELETE /api/social/follow/{uid}           # Unfollow user
+GET    /api/social/followers/{uid}        # Get followers list
+GET    /api/social/following/{uid}        # Get following list
+POST   /api/social/block/{uid}            # Block user
+DELETE /api/social/block/{uid}            # Unblock user
+
+// Content Management  
+GET    /api/posts                         # Get feed posts
+POST   /api/posts                         # Create new post
+GET    /api/posts/{postId}                # Get specific post
+PUT    /api/posts/{postId}                # Update own post
+DELETE /api/posts/{postId}                # Delete own post
+POST   /api/posts/{postId}/like           # Like/unlike post
+GET    /api/posts/{postId}/comments       # Get post comments
+POST   /api/posts/{postId}/comments       # Add comment
+
+// Discovery & Analytics
+GET    /api/discovery/trending            # Trending content/users
+GET    /api/discovery/recommended         # Personalized recommendations
+GET    /api/analytics/profile             # Own profile analytics
+```
+
+---
+
+## 4. Success Metrics & KPIs
+
+### User Acquisition (Month 1-3)
+- **Target:** 1.000 registered users
+- **Growth Rate:** 25% MoM after initial launch
+- **Channel Performance:** 60% organic, 25% referral, 15% paid
+
+### User Engagement (Month 1-6)
+- **Profile Completion:** 70%+ users complete full profile setup
+- **Social Engagement:** 2.5+ follows per active user
+- **Content Creation:** 30%+ users create at least 1 post per month
+- **Session Time:** 15+ minutes average session duration
+- **Retention:** 80%+ monthly retention rate
+
+### Monetization (Month 3-6)
+- **Conversion Rate:** 20%+ free users upgrade to Pro
+- **ARPU:** $15+ average revenue per user  
+- **Churn Rate:** <5% monthly churn for paid users
+- **LTV/CAC Ratio:** >3:1 ratio
+
+### Community Health (Ongoing)
+- **Content Quality:** <5% reported posts
+- **Engagement Rate:** 25%+ posts receive likes/comments
+- **Network Density:** 40%+ users follow 3+ other users
+- **Community Growth:** 40%+ new users come via referrals
+
+---
+
+## 5. Go-to-Market Strategy
+
+### Phase 1: Beta Community (Week 1-4)
+- **Target:** 50 engaged traders como founding members
+- **Selection:** Existing trading course students, active community members
+- **Goal:** Validate core social features, gather feedback
+- **Success:** 80%+ profile completion, 5+ posts per user
+
+### Phase 2: Controlled Expansion (Week 5-8)  
+- **Target:** 200 users através de invite-only expansion
+- **Strategy:** Existing users can invite 3 friends each
+- **Goal:** Test scalability, refine social algorithms  
+- **Success:** 3+ follows per user, 70%+ weekly retention
+
+### Phase 3: Public Launch (Week 9-12)
+- **Target:** 1.000 users através de marketing campaign
+- **Channels:** YouTube partnerships, influencer collaborations
+- **Goal:** Achieve product-market fit indicators
+- **Success:** Organic growth, positive user feedback
+
+### Phase 4: Growth & Iteration (Month 4+)
+- **Target:** 2.500+ users, sustainable growth rate
+- **Focus:** Feature improvements based on user data
+- **Goal:** Prepare for Phase 2 (Live Collaboration) development
+
+---
+
+## 6. Development Timeline
+
+### Sprint 1 (Week 1-3): Social Foundation
+- [ ] Enhanced authentication with profile setup
+- [ ] Public profile pages with performance metrics
+- [ ] Basic follow/follower system
+- [ ] Profile discovery and search
+
+### Sprint 2 (Week 4-6): Social Features
+- [ ] Social feed with post creation
+- [ ] Trade sharing functionality  
+- [ ] Like/comment system
+- [ ] Real-time notifications
+
+### Sprint 3 (Week 7-9): Community Features
+- [ ] Achievement system and badges
+- [ ] Advanced discovery algorithms
+- [ ] Content moderation tools
+- [ ] Privacy controls enhancement
+
+### Sprint 4 (Week 10-12): Business Features  
+- [ ] Billing integration with Stripe
+- [ ] Subscription tier management
+- [ ] Analytics and reporting
+- [ ] Launch preparation and testing
+
+### Sprint 5 (Week 13-16): Polish & Launch
+- [ ] Performance optimization
+- [ ] Bug fixes and edge cases
+- [ ] Community management tools
+- [ ] Public launch campaign
+
+---
+
+## 7. Risk Mitigation
+
+### Technical Risks
+- **Real-time Performance:** Implement efficient WebSocket connections with fallbacks
+- **Database Scaling:** Plan for Firestore limits, implement proper indexing
+- **Image Storage:** Optimize avatar/image uploads with CDN integration
+
+### Product Risks  
+- **Cold Start Problem:** Address with beta community strategy
+- **Content Moderation:** Implement hybrid AI + human moderation
+- **Privacy Concerns:** Transparent privacy controls and user education
+
+### Business Risks
+- **Competition:** Focus on community moat and network effects
+- **Monetization:** Validate pricing through beta testing
+- **Regulatory:** Monitor financial content regulations
+
+---
+
+## 8. Definition of Done
+
+### Feature Completion Criteria
+- [ ] All acceptance criteria met and tested
+- [ ] Unit tests with ≥80% coverage  
+- [ ] Performance meets targets (<2s load, <500ms API)
+- [ ] Mobile responsive design verified
+- [ ] Privacy controls functional and tested
+- [ ] Social features work in real-time
+- [ ] Billing integration fully functional
+
+### Launch Readiness Criteria
+- [ ] Beta testing completed with 50+ users
+- [ ] Performance optimization completed
+- [ ] Security audit passed
+- [ ] Content moderation system active  
+- [ ] Customer support processes defined
+- [ ] Analytics and monitoring in place
+
+---
+
+*"Building the future of social trading, one connection at a time."*

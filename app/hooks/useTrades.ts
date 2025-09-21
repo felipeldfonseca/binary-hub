@@ -76,99 +76,118 @@ export function useTrades(filters: TradeFilters = {}) {
   const [pagination, setPagination] = useState<TradesResponse['pagination'] | null>(null);
 
   const fetchTrades = useCallback(async (newFilters: TradeFilters = {}) => {
-    if (!user) return;
-    
     setLoading(true);
     setError(null);
     
     try {
-      const idToken = await auth.currentUser?.getIdToken();
-      const queryParams = new URLSearchParams();
-      
-      if (newFilters.start) {
-        queryParams.append('start', newFilters.start.toISOString());
-      }
-      if (newFilters.end) {
-        queryParams.append('end', newFilters.end.toISOString());
-      }
-      if (newFilters.limit) {
-        queryParams.append('limit', newFilters.limit.toString());
-      }
-      if (newFilters.offset) {
-        queryParams.append('offset', newFilters.offset.toString());
-      }
-      if (newFilters.result) {
-        queryParams.append('result', newFilters.result);
-      }
-      if (newFilters.asset) {
-        queryParams.append('asset', newFilters.asset);
-      }
-      if (newFilters.strategy) {
-        queryParams.append('strategy', newFilters.strategy);
-      }
-      
-      const response = await fetch(`http://localhost:5001/binary-hub/us-central1/api/v1/trades?${queryParams.toString()}`, {
-        headers: {
-          'Authorization': `Bearer ${idToken || 'mock-token-for-testing'}`,
-          'Content-Type': 'application/json',
-        },
-      });
-      
-      if (!response.ok) {
-        if (response.status === 404) {
-          setError('API endpoints not yet implemented. This feature will be available in Phase B.');
-          return;
-        }
-        setError(`API Error: ${response.status} - ${response.statusText}`);
-        return;
-      }
-      
-      const data: TradesResponse = await response.json();
-      
-      // If no trades exist, check if user has imported data
+      // Check if user has imported data first (skip API call for now since Firebase emulator isn't running)
       const hasImportedData = localStorage.getItem('binaryHub_hasData') === 'true';
       const importedTrades = localStorage.getItem('binaryHub_trades');
       
-      if (data.trades.length === 0 && hasImportedData && importedTrades) {
+      if (hasImportedData && importedTrades) {
         // Use real imported trades instead of mock data
         const realTrades = JSON.parse(importedTrades);
-        const formattedTrades: Trade[] = realTrades.map((trade: any, index: number) => ({
-          id: trade.id || `imported-${index}`,
-          userId: user?.uid || 'test-user',
-          tradeId: trade.id || `TRADE-${String(index + 1).padStart(3, '0')}`,
-          asset: trade.asset || 'UNKNOWN',
-          direction: trade.direction?.toLowerCase() === 'put' ? 'put' : 'call',
-          amount: trade.amount || 0,
-          entryPrice: trade.entryPrice || 0,
-          exitPrice: trade.exitPrice || 0,
-          entryTime: trade.entryTime ? new Date(trade.entryTime) : new Date(),
-          exitTime: trade.entryTime ? new Date(trade.entryTime) : new Date(),
-          timeframe: '1m',
-          candleTime: trade.entryTime ? trade.entryTime.split(' ')[1] : '00:00',
-          refunded: 0,
-          executed: 1,
-          status: trade.result === 'win' ? 'WIN' : 'LOSE',
-          result: trade.result || 'tie',
-          profit: trade.pnl || trade.profit || 0,
-          payout: trade.result === 'win' ? (trade.amount || 0) + (trade.pnl || 0) : 0,
-          platform: 'Ebinex',
-          strategy: 'Imported',
-          notes: 'Imported from CSV',
-          createdAt: new Date(),
-          updatedAt: new Date(),
-          importedAt: new Date(),
-          importBatch: 'csv-import'
-        }));
+        
+        const formattedTrades: Trade[] = realTrades.map((trade: any, index: number) => {
+          // Safe date parsing
+          let entryTime = new Date();
+          let candleTime = '00:00';
+          
+          if (trade.entryTime) {
+            if (typeof trade.entryTime === 'string') {
+              entryTime = new Date(trade.entryTime);
+              // Safely extract candle time if it's in the format "YYYY-MM-DD HH:MM"
+              if (trade.entryTime.includes(' ')) {
+                candleTime = trade.entryTime.split(' ')[1] || '00:00';
+              }
+            } else {
+              entryTime = new Date(trade.entryTime);
+            }
+          }
+          
+          return {
+            id: trade.id || `imported-${index}`,
+            userId: user?.uid || 'test-user',
+            tradeId: trade.id || `TRADE-${String(index + 1).padStart(3, '0')}`,
+            asset: trade.asset || 'UNKNOWN',
+            direction: trade.direction?.toLowerCase() === 'put' ? 'put' : 'call',
+            amount: trade.amount || 0,
+            entryPrice: trade.entryPrice || 0,
+            exitPrice: trade.exitPrice || 0,
+            entryTime: entryTime,
+            exitTime: entryTime, // Use same time for exit since we don't have separate exit time
+            timeframe: trade.timeframe || '1m',
+            candleTime: trade.candleTime || candleTime,
+            refunded: trade.refunded || 0,
+            executed: trade.executed || 1,
+            status: trade.result === 'win' ? 'WIN' : 'LOSE',
+            result: trade.result || 'tie',
+            profit: trade.pnl || trade.profit || 0,
+            payout: trade.result === 'win' ? (trade.amount || 0) + (trade.pnl || trade.profit || 0) : 0,
+            platform: 'Ebinex',
+            strategy: 'Imported',
+            notes: 'Imported from CSV',
+            createdAt: new Date(),
+            updatedAt: new Date(),
+            importedAt: new Date(),
+            importBatch: 'csv-import'
+          };
+        });
         
         setTrades(formattedTrades);
         setPagination({ total: formattedTrades.length, limit: 100, offset: 0, hasMore: false });
       } else {
-        // No data imported, show empty state
-        setTrades([]);
-        setPagination({ total: 0, limit: 100, offset: 0, hasMore: false });
+        // Try API call as fallback (though it will likely fail in development)
+        try {
+          const idToken = await auth.currentUser?.getIdToken();
+          const queryParams = new URLSearchParams();
+          
+          if (newFilters.start) {
+            queryParams.append('start', newFilters.start.toISOString());
+          }
+          if (newFilters.end) {
+            queryParams.append('end', newFilters.end.toISOString());
+          }
+          if (newFilters.limit) {
+            queryParams.append('limit', newFilters.limit.toString());
+          }
+          if (newFilters.offset) {
+            queryParams.append('offset', newFilters.offset.toString());
+          }
+          if (newFilters.result) {
+            queryParams.append('result', newFilters.result);
+          }
+          if (newFilters.asset) {
+            queryParams.append('asset', newFilters.asset);
+          }
+          if (newFilters.strategy) {
+            queryParams.append('strategy', newFilters.strategy);
+          }
+          
+          const response = await fetch(`http://localhost:5001/binary-hub/us-central1/api/v1/trades?${queryParams.toString()}`, {
+            headers: {
+              'Authorization': `Bearer ${idToken || 'mock-token-for-testing'}`,
+              'Content-Type': 'application/json',
+            },
+          });
+          
+          if (response.ok) {
+            const data: TradesResponse = await response.json();
+            setTrades(data.trades);
+            setPagination(data.pagination);
+          } else {
+            throw new Error('API not available');
+          }
+        } catch (apiError) {
+          // API failed, show empty state
+          setTrades([]);
+          setPagination({ total: 0, limit: 100, offset: 0, hasMore: false });
+        }
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred');
+      setTrades([]);
+      setPagination({ total: 0, limit: 100, offset: 0, hasMore: false });
     } finally {
       setLoading(false);
     }
@@ -312,7 +331,7 @@ export function useTrades(filters: TradeFilters = {}) {
   // Fetch trades on mount only (filters cause infinite loop)
   useEffect(() => {
     fetchTrades();
-  }, [fetchTrades]);
+  }, []); // Remove fetchTrades dependency to avoid infinite loop
 
   return {
     trades,

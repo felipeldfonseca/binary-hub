@@ -511,9 +511,10 @@ export default function DashboardV1Modern() {
                   </div>
                 )}
                 <TradingCalendar 
-                  data={isDemoMode ? mockCalendarData : mockCalendarData} 
+                  data={isDemoMode ? mockCalendarData : []} 
                   month={selectedCalendarMonth}
                   onMonthChange={setSelectedCalendarMonth}
+                  isDemoMode={isDemoMode && hasNoData}
                 />
               </div>
             )}

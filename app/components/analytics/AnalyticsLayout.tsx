@@ -6,6 +6,7 @@ import { useLanguage } from '@/lib/contexts/LanguageContext'
 import AnalyticsVersionSelector from './AnalyticsVersionSelector'
 import AnalyticsV1Professional from './versions/AnalyticsV1Professional'
 import AnalyticsV2Gamified from './versions/AnalyticsV2Gamified'
+import AnalyticsV2Dashboard from './versions/AnalyticsV2Dashboard'
 import AnalyticsV3AIPowered from './versions/AnalyticsV3AIPowered'
 // import VersionSelector from '../ui/VersionSelector'
 
@@ -46,6 +47,8 @@ export default function AnalyticsLayout() {
         return <AnalyticsV1Professional />
       case 'v2-gamified':
         return <AnalyticsV2Gamified />
+      case 'v2-dashboard':
+        return <AnalyticsV2Dashboard />
       case 'v2-visual':
         return (
           <div className="container mx-auto px-4 sm:px-8 lg:px-12">
@@ -83,6 +86,12 @@ export default function AnalyticsLayout() {
       id: 'v1-professional',
       name: isPortuguese ? 'V1 Professional' : 'V1 Professional',
       description: isPortuguese ? 'Estilo Bloomberg' : 'Bloomberg Style',
+      available: true
+    },
+    {
+      id: 'v2-dashboard',
+      name: isPortuguese ? 'V2 Dashboard' : 'V2 Dashboard',
+      description: isPortuguese ? 'Gráficos & Visualizações' : 'Charts & Visualizations',
       available: true
     },
     {
@@ -148,15 +157,53 @@ export default function AnalyticsLayout() {
     <div className="min-h-screen bg-background">
       <Navbar />
       <main className="relative pt-32 pb-16">
-        {/* Floating Version Selector Button */}
-        <div className="fixed bottom-6 right-6 z-50">
-          <VersionSelector
-            currentVersion={currentVersion}
-            versionOptions={versionOptions}
-            onVersionChange={setCurrentVersion}
-            onShowSelector={() => setShowVersionSelector(true)}
-            featureType="Analytics"
-          />
+        {/* Version Selector at Top */}
+        <div className="container mx-auto px-4 sm:px-8 lg:px-12 mb-8">
+          <div className="max-w-7xl mx-auto">
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h1 className="text-2xl font-bold text-white mb-2">
+                  {isPortuguese ? 'Análises' : 'Analytics'}
+                </h1>
+                <p className="text-gray-400">
+                  {isPortuguese ? 'Compare as versões V1 e V2' : 'Compare V1 and V2 versions'}
+                </p>
+              </div>
+              
+              {/* Simple Version Toggle */}
+              <div className="card p-2 bg-white/5 border-orange-500/20">
+                <div className="flex gap-1">
+                  <button
+                    onClick={() => setCurrentVersion('v1-professional')}
+                    className={`px-4 py-2 rounded-lg font-medium transition-all ${
+                      currentVersion === 'v1-professional'
+                        ? 'bg-orange-500/20 text-orange-400 border border-orange-500/30'
+                        : 'text-gray-400 hover:text-white hover:bg-white/5'
+                    }`}
+                  >
+                    📊 V1 Professional
+                  </button>
+                  <button
+                    onClick={() => setCurrentVersion('v2-dashboard')}
+                    className={`px-4 py-2 rounded-lg font-medium transition-all ${
+                      currentVersion === 'v2-dashboard'
+                        ? 'bg-orange-500/20 text-orange-400 border border-orange-500/30'
+                        : 'text-gray-400 hover:text-white hover:bg-white/5'
+                    }`}
+                  >
+                    📈 V2 Dashboard
+                  </button>
+                  <button
+                    onClick={() => setShowVersionSelector(true)}
+                    className="px-3 py-2 rounded-lg text-gray-400 hover:text-white hover:bg-white/5 transition-all"
+                    title={isPortuguese ? 'Ver todas as versões' : 'View all versions'}
+                  >
+                    ⚙️
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
 
         {/* Current Version Content */}

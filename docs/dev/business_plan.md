@@ -1,198 +1,321 @@
-# Binary Hub – Business Blueprint (0 → 500 usuários pagantes)
+# Binary Hub – Social Trading Platform Business Blueprint
 
-> **Versão 2.0 – inclui documentação completa para agente LLM construir o produto do zero**
+> **Versão 3.0 – Primeira plataforma social para traders de opções binárias com colaboração em tempo real**
 
 ---
 
-## Parte I – Plano de Negócios (revisão‑relâmpago)
+## Parte I – Plano de Negócios (Social Trading Platform)
 
 ### 1. Resumo Executivo
 
-Binary Hub é uma plataforma de *journaling* e insights para traders de **opções binárias**. Missão inicial: validar o MVP como fundador solo, alcançar **500 assinantes Pro (US\$ 6 000 MRR)** em até 6 meses e gerar fluxo de caixa suficiente para reinvestir em integrações (Forex/Futuros/Crypto).
-*→ Detalhamento completo do business case permanece inalterado; consulte Apêndice A.*
+Binary Hub é a **primeira plataforma social** dedicada a traders de opções binárias, combinando networking entre traders, ferramentas de colaboração em tempo real e journaling inteligente. 
+
+**Missão**: Transformar o trading solitário em uma experiência colaborativa e social, conectando traders globalmente para compartilhamento de estratégias, aprendizado conjunto e crescimento mútuo.
+
+**Objetivo financeiro**: Alcançar **1.000 usuários ativos** com **200 assinantes Pro (US$ 2.400 MRR)** em 6 meses, focando em network effects e community building.
+
+#### Proposta de Valor Única
+- **Network Effects**: Plataforma fica mais valiosa com cada novo trader
+- **Collaborative Learning**: Traders aprendem uns com os outros em tempo real
+- **Community-Driven**: Foco em relacionamentos e parcerias de trading
+- **AI-Enhanced**: Inteligência artificial potencializa colaboração (roadmap fase 3)
+
+### 2. Análise de Mercado
+
+#### Mercado Alvo
+- **Mercado Primário**: Traders de opções binárias (Brasil, América Latina)
+- **Mercado Secundário**: Traders iniciantes buscando mentoria e comunidade
+- **Mercado Terciário**: Grupos de trading e comunidades existentes
+
+#### Expansão Gradual para Mercados Adjacentes
+- **Fase 2**: Forex traders (após consolidação em opções binárias)
+- **Fase 3**: Crypto traders (aproveitando features de colaboração)
+- **Fase 4**: Futures e day trading (expandindo para todos os mercados de curto prazo)
+
+**Estratégia**: Dominar opções binárias primeiro, depois replicar success pattern nos mercados adjacentes com base na infraestrutura social já estabelecida.
+
+#### Tamanho do Mercado
+- **TAM**: 200M+ traders ativos globalmente (todos os mercados)
+- **SAM**: 15M+ traders ativos na América Latina (opções binárias + adjacentes)
+- **SOM**: 50K+ traders brasileiros engajados em comunidades
+
+#### Análise Competitiva
+- **Journals Pessoais**: Edgewonk, MyFxBook (sem features sociais)
+- **Plataformas Sociais**: eToro, TradingView (não focadas em opções binárias)
+- **Comunidades**: Discord/Telegram groups (sem ferramentas integradas)
+- **Nosso Diferencial**: Primeira plataforma social específica para opções binárias
+
+### 3. Modelo de Produto & Roadmap
+
+#### Fase 1: Social Trading Platform MVP (3-4 meses)
+**Core Features**:
+- Profiles públicos de traders com performance metrics
+- Sistema de follow/followers
+- Feed social com compartilhamento de trades
+- Sistema de achievements e badges
+- Journaling integrado com analytics
+
+**MVP Success Metrics**:
+- 500+ usuários registrados
+- 70%+ completion rate de profiles
+- 2.5+ follows por usuário ativo
+- 15 min+ tempo médio de sessão
+
+#### Fase 2: Live Collaboration Tools (3-4 meses)
+**Premium Features**:
+- Real-time presence system ("quem está trading agora")
+- Voice communication integrada
+- Shared chart functionality
+- Collaborative session recording
+- Advanced analytics para partnerships
+
+#### Fase 3: AI-Powered Collaborative Analysis (4-5 meses)
+**Premium Plus Features**:
+- Real-time AI chart analysis durante sessions
+- Visual AI annotations em shared charts
+- Collaborative AI insights
+- Custom strategy templates
+- Predictive partnership matching
+
+### 4. Modelo de Monetização
+
+#### Tier Structure
+```
+FREE (Community)
+├─ Profile público básico
+├─ Follow/followers unlimited
+├─ Feed social completo
+├─ Journaling básico (50 trades/mês)
+└─ Community features
+
+PRO ($12/mês) 
+├─ Tudo do Free
+├─ Journaling unlimited
+├─ Advanced analytics
+├─ Priority support
+├─ Profile customization
+└─ Export capabilities
+
+COLLABORATIVE ($24/mês)
+├─ Tudo do Pro
+├─ Live collaboration tools
+├─ Voice communication
+├─ Shared charts
+├─ Session recording
+└─ Partnership analytics
+
+AI ENHANCED ($49/mês)
+├─ Tudo do Collaborative
+├─ AI chart analysis
+├─ Collaborative AI insights
+├─ Custom AI strategies
+├─ Predictive matching
+└─ Advanced AI features
+```
+
+#### Revenue Projections (6 meses)
+```
+Month 1-2: 100 users (10% Pro) = $120 MRR
+Month 3-4: 400 users (15% Pro) = $720 MRR  
+Month 5-6: 1000 users (20% Pro, 5% Collaborative) = $3,000 MRR
+```
+
+### 5. Go-to-Market Strategy
+
+#### Community-First Approach
+1. **Beta Community**: Recruit 50 engaged traders como founding members
+2. **Content Marketing**: Educational content sobre collaborative trading
+3. **Influencer Partnerships**: Parcerias com trading educators brasileiros
+4. **Organic Growth**: Word-of-mouth através de network effects
+
+#### Marketing Channels
+- **Primary**: YouTube trading educators partnerships
+- **Secondary**: TikTok/Instagram organic content
+- **Tertiary**: Google Ads para "trading community" keywords
+- **Retention**: In-app referral system com rewards
+
+#### Success Metrics
+- **Acquisition**: 150+ novos usuários/mês após mês 3
+- **Activation**: 70%+ profile completion rate
+- **Retention**: 80%+ monthly retention rate
+- **Revenue**: 20%+ conversion to paid plans
+- **Referral**: 40%+ users invite pelo menos 1 friend
 
 ---
 
-## Parte II – Documentação para o Agente LLM
+## Parte II – Documentação Técnica para Desenvolvimento
 
-### 2. Visão Funcional (PRD condensado)
+### 6. Visão Funcional (Social MVP)
 
-| Nº       | Funcionalidade            | Descrição curta                                                                                                           | Prioridade | Sprint alvo |
-| -------- | ------------------------- | ------------------------------------------------------------------------------------------------------------------------- | ---------- | ----------- |
-| P‑01     | Cadastro & Auth           | Email, Google, Apple; timezone do usuário                                                                                 | Must       | S‑01        |
-| P‑02     | Log manual de trade       | Form  ➜ ativo, horário, direção, stake, resultado                                                                         | Must       | S‑01        |
-| P‑03     | Importar CSV (Ebinex)     | Upload de arquivo .csv (colunas padrão da corretora) com parser, deduplicação (ID) e validação; batch insert em Firestore | **Must**   |             |
-| **P‑03** | Dashboard KPIs            | Win rate, série de vitórias, P\&L diário                                                                                  | Must       | S‑02        |
-| P‑04     | Calendário de performance | Grid (1 mês) color‑heat por lucro                                                                                         | Must       | S‑02        |
-| P‑05     | Regras pessoais & Score   | CRUD de regras + cálculo de aderência (%)                                                                                 | Should     | S‑03        |
-| P‑06     | IA – Detector de padrões  | LLM analisa histórico e devolve 3 insights                                                                                | Could      | S‑04        |
-| P‑07     | Exportação PDF            | Snapshot semanal                                                                                                          | Could      | S‑05        |
+| Nº | Funcionalidade | Descrição | Prioridade | Sprint |
+|----|----------------|-----------|------------|---------|
+| **SOCIAL CORE** |
+| S-01 | Public Trader Profiles | Profile setup, bio, performance metrics, achievements | Must | S-01 |
+| S-02 | Follow/Follower System | One-way follow, notifications, follower management | Must | S-01 |
+| S-03 | Social Feed | Posts, trade shares, achievements, community timeline | Must | S-02 |
+| S-04 | Trade Sharing | Share specific trades with context and insights | Must | S-02 |
+| S-05 | Achievement System | Badges, milestones, community recognition | Should | S-03 |
+| S-06 | Discovery & Search | Find traders, filter by performance, recommendations | Should | S-03 |
+| **TRADING CORE** |
+| T-01 | Authentication | Email, Google, Apple, timezone detection | Must | S-01 |
+| T-02 | Manual Trade Logging | Enhanced form with social sharing options | Must | S-01 |
+| T-03 | CSV Import (Ebinex) | Upload, parse, deduplicate with sharing prompts | Must | S-02 |
+| T-04 | Dashboard KPIs | Performance metrics with privacy controls | Must | S-02 |
+| T-05 | Trading Calendar | Heat-map with social sharing integration | Must | S-02 |
+| T-06 | Personal Rules | CRUD with community sharing options | Should | S-03 |
+| **BUSINESS LOGIC** |
+| B-01 | Billing & Subscriptions | Stripe integration, tier management | Must | S-04 |
+| B-02 | Privacy Controls | Granular visibility settings | Must | S-04 |
+| B-03 | Content Moderation | Basic moderation tools and reporting | Should | S-04 |
 
-> **Definição de pronto (DoD)**: teste unitário ≥ 80 % cobertura, contraste AA, tempo médio de resposta API < 300 ms.
-
-### 3. Arquitetura de Solução
+### 7. Arquitetura Técnica (Social Platform)
 
 ```
-┌────────Front‑end (Next.js)────────┐     ┌───────── LLM Layer ─────────┐
-│ React + SWR + Tailwind            │ REST│ FastAPI Gateway            │
-│ Pages: /log, /dashboard, /rules   │ ←→  │ OpenAI GPT‑4o (insights)    │
-└───────────────────────────────────┘     └────────────────────────────┘
-          │ GraphQL (Apollo)                         ↑
-┌─────────── Firebase Auth ───────────┐              │
-│ User pool, email verification       │              │
-└─────────────────────────────────────┘              │
-          │                                          │
-┌────────── Firestore (NoSQL) ──────────┐            │
-│ trades ⚫ rules ⚫ userStats           │ Cloud Fn ▷ pattern‑cron
-└───────────────────────────────────────┘            │
-          │                                          │
-        Storage        Cloud Tasks         SendGrid (e‑mail)
+┌─────────── Frontend (Next.js 14) ──────────┐
+│ ┌─── Social Components ───┐ ┌─── Trading ───┐ │
+│ │ • Profiles & Feeds     │ │ • Dashboard   │ │
+│ │ • Discovery & Search   │ │ • Trade Forms │ │
+│ │ • Notifications       │ │ • Analytics   │ │
+│ └──────────────────────┘ └──────────────┘ │
+└──────────────────────────────────────────┘
+            │ WebSocket (Real-time)
+            ▼
+┌────────── Firebase Platform ──────────────┐
+│ ┌─── Authentication ───┐ ┌─── Functions ───┐ │
+│ │ • Multi-provider    │ │ • Social API    │ │
+│ │ • User management   │ │ • Trading API   │ │
+│ └────────────────────┘ └────────────────┘ │
+│ ┌─── Firestore (NoSQL) ──────────────────┐ │
+│ │ • users/{uid}/profile               │ │
+│ │ • follows/{uid}/{targetUid}         │ │
+│ │ • posts/{uid}/{postId}              │ │
+│ │ • trades/{uid}/{tradeId}            │ │
+│ │ • feed/{uid}/{feedItemId}           │ │
+│ └────────────────────────────────────────┘ │
+└──────────────────────────────────────────┘
+            │
+┌─────── External Services ───────┐
+│ • Stripe (billing)             │
+│ • SendGrid (email)             │
+│ • OpenAI (future AI features)  │
+└───────────────────────────────┘
 ```
 
-### 4. Modelo de Dados (NoSQL)
+### 8. Database Schema (Social Extensions)
 
-```json
-// Coleção: users/{uid}
-{
-  "displayName": "Felipe",
-  "email": "felipe@example.com",
-  "tz": "America/Sao_Paulo",
-  "plan": "free|pro",
-  "createdAt": "TS"
+```typescript
+// Core Social Collections
+profiles/{uid}: {
+  basic: {
+    displayName: string;
+    avatar: string;
+    bio: string;
+    location?: string;
+    tradingSince: timestamp;
+    isVerified: boolean;
+  };
+  stats: {
+    followersCount: number;
+    followingCount: number;
+    postsCount: number;
+    totalTrades: number;
+    winRate?: number; // based on privacy settings
+  };
+  privacy: {
+    profileVisibility: 'public' | 'community' | 'private';
+    metricsVisibility: Record<string, boolean>;
+    allowFollowers: boolean;
+  };
 }
-// trades/{uid}/{tradeId}
-{
-  "ts": 1718121900,
-  "asset": "EURUSD",
-  "direction": "CALL",
-  "stake": 10,
-  "payout": 8.5,
-  "result": "win|loss|draw",
-  "tags": ["bullish clássico"],
-  "emotion": "calm|impulse|fear"
+
+follows/{uid}/following/{targetUid}: {
+  followedAt: timestamp;
+  notificationsEnabled: boolean;
+  status: 'active' | 'muted';
+}
+
+posts/{uid}/{postId}: {
+  type: 'trade' | 'insight' | 'achievement' | 'general';
+  content: string;
+  attachments?: string[];
+  tradeRef?: string;
+  visibility: 'public' | 'followers' | 'private';
+  metrics: {
+    likesCount: number;
+    commentsCount: number;
+    sharesCount: number;
+  };
+  createdAt: timestamp;
+}
+
+feed/{uid}/{feedItemId}: {
+  authorId: string;
+  postId: string;
+  type: 'post' | 'achievement' | 'follow';
+  timestamp: timestamp;
+  score: number; // algorithmic ranking
 }
 ```
 
-### 5. Especificação de API (FastAPI)
+### 9. Success Criteria & KPIs
 
-| ROTa          | Método | Auth   | Descrição                   |
-| ------------- | ------ | ------ | --------------------------- |
-| /trades       | GET    | Bearer | Listar trades com paginação |
-| /trades       | POST   | Bearer | Criar/editar trade          |
-| /stats/weekly | GET    | Bearer | KPIs agregados semanais     |
-| /insights     | POST   | Bearer | Disparar análise LLM        |
+#### Technical KPIs
+- **Performance**: < 2s page load, < 500ms API response
+- **Reliability**: 99.9% uptime, < 0.1% error rate
+- **Security**: SOC 2 compliance, data encryption
+- **Scalability**: Support 10K concurrent users
 
-*Rate‑limit:* 60 req/min / usuário.
+#### Product KPIs
+- **User Growth**: 25% MoM growth in active users
+- **Engagement**: 70%+ monthly retention, 15+ min session time
+- **Social Features**: 2.5+ follows per user, 30%+ post engagement
+- **Monetization**: 15%+ conversion to paid, $15+ ARPU
 
-### 6. LLM – Prompt & Few‑Shot
-
-**System:** “You are a trading performance coach…”
-**User template:**
-
-```
-Context metrics:
-- WinRate: {{win}}%
-- Avg R/R: {{rr}}
-- Max loss streak: {{ls}}
-Last 30 trades (JSON):
-{{history}}
-Rules broken: {{broken}}
-```
-
-**Assistant response (JSON)**
-
-```json
-{
-  "top_bad_habit": "Operar após 3 perdas seguidas",
-  "pattern": "Loss em CALL 5 min após notícia",
-  "actionable": "Pare 15 min após loss streak ≥ 3"
-}
-```
-
-### 7. Pipeline de Desenvolvimento
-
-1. **Branch flow:** main → dev → feature/\*
-2. **CI (GitHub Actions):** lint + pytest + build → preview (Vercel)
-3. **CD:** merge main → Vercel + Cloud Run
-4. **Infra como código:** `firebase.json`, `vercel.json`, `openapi.yaml`
-
-### 8. Testes
-
-* **Unit:** Jest (React) & Pytest (API)
-* **E2E:** Playwright (simula log + export PDF)
-* **Performance:** Lighthouse ≥ 90, K6 para /stats endpoint
-
-### 9. Segurança & Compliance
-
-* TLS 1.2+, Firebase Auth JWT.
-* Dados sensíveis cifrados at‑rest (Firestore default).
-* Backup diário Firestore → GCS + 30 dias retenção.
-* GDPR / LGPD: botão *Delete Account* (soft‑delete + purge cron‑job).
-
-### 10. Cronograma de Sprints (2 sem cada)
-
-| Sprint | Objetivo                  | Issues chave             |
-| ------ | ------------------------- | ------------------------ |
-| S‑01   | Auth + Log Form           | FE‑001, BE‑001, CI‑001   |
-| S‑02   | Dashboard & Calendar      | FE‑002, BE‑002, TEST‑002 |
-| S‑03   | Rules & Scoring           | FE‑003, BE‑003, LLM‑Stub |
-| S‑04   | IA Insights v1            | BE‑LLM‑001, Prompt‑01    |
-| S‑05   | PDF Export + Beta público | FE‑005, DevOps‑05        |
-
-### 11. Observabilidade
-
-* **Logging:** Cloud Logging + Datadog forward.
-* **Metrics:** Firestore document count, p95 latency.
-* **Alertas:** Slack webhook (downtime > 1 min).
-
-### 12. Políticas de Pricing & Feature‑Flags
-
-* Plano é salvo em `users.plan`.
-* Middleware verifica quota: Free = 150 trades/mês.
-* Feature‑flags via `remoteConfig.binaryHub` → ativar IA somente p/ Pro.
-
-### 13. Glossário de Rotas Front‑end
-
-```
-/      -> Landing (public)
-/app   -> Dashboard root (authed)
-/app/log -> Form trade
-/app/rules -> CRUD Regras
-/app/settings -> Billing & Conta
-```
+#### Business KPIs
+- **Revenue**: $3K MRR by month 6
+- **Customer Acquisition**: < $50 CAC
+- **Lifetime Value**: > $200 LTV
+- **Market Position**: #1 social platform for binary options traders
 
 ---
 
-## 14. Pacote de Documentação para o Agente LLM
+## Risk Analysis & Mitigation
 
-Abaixo está a lista completa de arquivos/artefatos que devem existir no repositório a fim de que o agente LLM consiga **gerar, testar e implantar** o Binary Hub do zero.
+### Technical Risks
+- **Scalability**: Plan for Firebase limits, implement caching
+- **Real-time Features**: WebSocket fallbacks, offline support
+- **Data Privacy**: LGPD compliance, granular privacy controls
 
-| Nº | Documento / Arquivo                     | Propósito                                                                | Local / Nome‑padrão         |
-| -- | --------------------------------------- | ------------------------------------------------------------------------ | --------------------------- |
-| 1  | **README.md**                           | Visão geral do produto, como rodar localmente, badges CI                 | raiz do repo                |
-| 2  | **MVP\_SCOPE.md**                       | Recorte funcional P‑01 → P‑05 (história de usuário, critérios de aceite) | `/docs/MVP_SCOPE.md`        |
-| 3  | **PRD.md**                              | Requisitos de produto (detalhe completo da Parte II §2)                  | `/docs/PRD.md`              |
-| 4  | **ARCHITECTURE.md** + diagrama Draw\.io | Desenho detalhado dos componentes (Parte II §3)                          | `/docs/ARCHITECTURE.md`     |
-| 5  | **DATA\_MODEL.md**                      | Schemas Firestore + ER simplificado                                      | `/docs/DATA_MODEL.md`       |
-| 6  | **OPENAPI.yaml**                        | Especificação REST completa (Parte II §5)                                | `/api/OPENAPI.yaml`         |
-| 7  | **PROMPT\_GUIDE.md**                    | Prompt, few‑shots, formato de resposta JSON                              | `/llm/PROMPT_GUIDE.md`      |
-| 8  | **INFRA/terraform/**                    | Scripts IaC (opcional se migrar p/ GCP Cloud Run)                        | `/infra/`                   |
-| 9  | **CONTRIBUTING.md**                     | Branch flow, conv. commit, política de PR                                | /docs/project/            |
-| 10 | **CODE\_OF\_CONDUCT.md**                | Padrão Open Source                                                       | /docs/project/            |
-| 11 | **TEST\_STRATEGY.md**                   | Plano unit, E2E, perf (Parte II §8)                                      | `/tests/TEST_STRATEGY.md`   |
-| 12 | **DEPLOY\_GUIDE.md**                    | Como promover para Vercel + Firebase (CI/CD)                             | `/docs/DEPLOY_GUIDE.md`     |
-| 13 | **SECURITY.md**                         | Checklist OWASP, LGPD/GDPR, backup                                       | `/docs/SECURITY.md`         |
-| 14 | **STYLE\_GUIDE\_UI.md**                 | Tokens de cor, tipografia (referência a guia de marca)                   | `/design/STYLE_GUIDE_UI.md` |
-| 15 | **CHANGELOG.md** (keep‑a‑changelog)     | Histórico semântico de versões                                           | /docs/project/            |
-| 16 | **LICENSE**                             | MIT ou Proprietária – definir                                            | /docs/project/            |
+### Business Risks  
+- **Community Building**: Chicken-and-egg problem → Beta community strategy
+- **Content Moderation**: Implement AI + human moderation hybrid
+- **Competitive Response**: Focus on community moat and network effects
 
-> **Observação:** arquivos Markdown devem usar cabeçalho YAML com `title`, `description`, `last_updated`.
+### Market Risks
+- **Regulatory Changes**: Monitor binary options regulations
+- **Market Saturation**: Gradual expansion to adjacent markets (Forex → Crypto → Futures)
+- **Economic Downturn**: Freemium model provides resilience
 
 ---
 
-## Apêndice A – Business Plan Detalhado
+## Next Steps & Timeline
 
-*(conteúdo mantido da versão 1.0; omitido aqui para foco técnico)*
+### Development Timeline (3-4 meses)
+```
+Month 1: Core social infrastructure + trading features
+Month 2: Social feed, discovery, and interaction features  
+Month 3: Billing, privacy controls, and polish
+Month 4: Testing, launch preparation, and community building
+```
+
+### Launch Strategy
+1. **Soft Launch**: Beta community (50 users) - Week 1-2
+2. **Controlled Rollout**: Invite-only expansion (200 users) - Week 3-4  
+3. **Public Launch**: Full marketing campaign - Month 2
+4. **Growth Phase**: Feature iterations based on user feedback - Month 3+
+
+**Target**: 1.000 active users, 200 Pro subscribers, $3K MRR by month 6.
 
 ---
 
+*"Building the future of collaborative trading, one connection at a time."*

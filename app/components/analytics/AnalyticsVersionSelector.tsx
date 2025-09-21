@@ -34,13 +34,23 @@ export default function AnalyticsVersionSelector({
       available: true
     },
     {
+      id: 'v2-dashboard',
+      name: isPortuguese ? 'V2 Dashboard' : 'V2 Dashboard',
+      description: isPortuguese 
+        ? 'Dashboard visual com gráficos interativos, análise temporal, distribuição de ativos e métricas de performance'
+        : 'Visual dashboard with interactive charts, temporal analysis, asset distribution and performance metrics',
+      icon: '📈',
+      badge: isPortuguese ? 'NOVO' : 'NEW',
+      available: true
+    },
+    {
       id: 'v2-gamified',
       name: isPortuguese ? 'V2 Gamificado' : 'V2 Gamified',
       description: isPortuguese 
         ? 'Interface visual Pinterest-style com sistema de níveis, conquistas, desafios e aprendizado gamificado'
         : 'Pinterest-style visual interface with level system, achievements, challenges and gamified learning',
       icon: '🎮',
-      badge: isPortuguese ? 'NOVO' : 'NEW',
+      badge: isPortuguese ? 'GAMIFICADO' : 'GAMIFIED',
       available: true
     },
     {
@@ -49,7 +59,7 @@ export default function AnalyticsVersionSelector({
       description: isPortuguese 
         ? 'Interface visual com gráficos interativos e dashboards dinâmicos (Em Breve)'
         : 'Visual interface with interactive charts and dynamic dashboards (Coming Soon)',
-      icon: '📈',
+      icon: '🎨',
       badge: isPortuguese ? 'EM BREVE' : 'COMING SOON',
       available: false
     },
@@ -57,11 +67,11 @@ export default function AnalyticsVersionSelector({
       id: 'v3-ai-powered',
       name: isPortuguese ? 'V3 IA Avançada' : 'V3 AI-Powered',
       description: isPortuguese 
-        ? 'Analytics alimentado por IA com previsões e recomendações automatizadas (Em Breve)'
-        : 'AI-powered analytics with predictions and automated recommendations (Coming Soon)',
+        ? 'Analytics alimentado por IA com previsões e recomendações automatizadas'
+        : 'AI-powered analytics with predictions and automated recommendations',
       icon: '🤖',
-      badge: isPortuguese ? 'EM BREVE' : 'COMING SOON',
-      available: false
+      badge: isPortuguese ? 'IA AVANÇADA' : 'AI-POWERED',
+      available: true
     }
   ]
 

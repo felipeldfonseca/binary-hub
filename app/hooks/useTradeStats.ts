@@ -107,7 +107,7 @@ export function useTradeStats(period: 'daily' | 'weekly' | 'monthly' | 'yearly' 
       }
     };
     
-    const config = periodConfigs[period] || periodConfigs.weekly;
+    const config = periodConfigs[period as keyof typeof periodConfigs] || periodConfigs.weekly;
     
     return {
       totalTrades: config.totalTrades,
@@ -124,9 +124,8 @@ export function useTradeStats(period: 'daily' | 'weekly' | 'monthly' | 'yearly' 
   }, []);
 
   const fetchDashboardStats = useCallback(async () => {
-    if (!user) return;
-
     // For Phase A, check if user has imported data (simulate with localStorage)
+    // Remove user dependency to allow localStorage access in development
     const hasImportedData = localStorage.getItem('binaryHub_hasData') === 'true';
     
     setLoading(true);
@@ -166,14 +165,6 @@ export function useTradeStats(period: 'daily' | 'weekly' | 'monthly' | 'yearly' 
           // Use real imported data
           const trades = JSON.parse(importedTrades);
           const statsData = JSON.parse(importedStats);
-          
-          // Debug: Log the imported data
-          console.log('useTradeStats Debug:', {
-            tradesCount: trades.length,
-            firstTrade: trades[0],
-            statsData,
-            sampleTrades: trades.slice(0, 3)
-          });
           
           // Calculate real stats from imported trades
           const realStats: TradeStats = {
@@ -240,7 +231,7 @@ export function useTradeStats(period: 'daily' | 'weekly' | 'monthly' | 'yearly' 
     // } catch (err) {
     //   setError(err instanceof Error ? err.message : 'An error occurred');
     // }
-  }, [user, period, generateMockData]);
+  }, [period, generateMockData]); // Remove user dependency to allow localStorage access
 
   const fetchPerformanceMetrics = useCallback(async (start?: Date, end?: Date) => {
     if (!user) return;
@@ -331,7 +322,7 @@ export function useTradeStats(period: 'daily' | 'weekly' | 'monthly' | 'yearly' 
   // Fetch dashboard stats on mount and when period changes
   useEffect(() => {
     fetchDashboardStats();
-  }, [fetchDashboardStats]);
+  }, [period]); // Remove fetchDashboardStats dependency to avoid infinite loop
 
   return {
     stats,

@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react'
 import { useLanguage } from '@/lib/contexts/LanguageContext'
+import { useCsvTradeData } from '@/hooks/useCsvTradeData'
 
 interface DayData {
   date: string
@@ -15,16 +16,22 @@ interface TradingCalendarProps {
   month?: Date
   onMonthChange?: (month: Date) => void
   isLoading?: boolean
+  isDemoMode?: boolean
 }
 
 export default function TradingCalendar({ 
   data = [], 
   month = new Date(), 
   onMonthChange,
-  isLoading = false 
+  isLoading = false,
+  isDemoMode = false
 }: TradingCalendarProps) {
   const { isPortuguese } = useLanguage()
+  const csvData = useCsvTradeData()
   const [selectedDate, setSelectedDate] = useState<string | null>(null)
+
+  // Use real CSV data if available, otherwise fall back to passed data or demo mode
+  const calendarData = isDemoMode ? data : (csvData.hasData ? csvData.calendarData : data)
 
   // Translations
   const texts = {
@@ -81,12 +88,12 @@ export default function TradingCalendar({
     }
   }
 
-  const maxPnl = data.length > 0 ? Math.max(...data.map(d => Math.abs(d.pnl))) : 100
+  const maxPnl = calendarData.length > 0 ? Math.max(...calendarData.map(d => Math.abs(d.pnl))) : 100
 
   // Get data for a specific date
   const getDataForDate = (date: Date) => {
     const dateStr = date.toISOString().split('T')[0]
-    return data.find(d => d.date === dateStr)
+    return calendarData.find(d => d.date === dateStr)
   }
 
   // Check if date is today
@@ -286,7 +293,7 @@ export default function TradingCalendar({
 
       {/* Selected date details */}
       {selectedDate && (() => {
-        const selected = data.find(d => d.date === selectedDate)
+        const selected = calendarData.find(d => d.date === selectedDate)
         const selectedDay = new Date(selectedDate)
         
         return (

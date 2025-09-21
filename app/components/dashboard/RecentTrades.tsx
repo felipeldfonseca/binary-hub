@@ -2,6 +2,7 @@
 
 import React, { useMemo } from 'react'
 import { useTrades } from '@/hooks/useTrades'
+import { useCsvTradeData } from '@/hooks/useCsvTradeData'
 import { useLanguage } from '@/lib/contexts/LanguageContext'
 import Link from 'next/link'
 
@@ -12,10 +13,11 @@ interface RecentTradesProps {
 
 export default function RecentTrades({ limit = 5, isDemoMode = false }: RecentTradesProps) {
   const { isPortuguese } = useLanguage()
+  const csvData = useCsvTradeData()
   
   // Memoize the filters to prevent infinite loop
   const tradesFilters = useMemo(() => ({ limit }), [limit])
-  const { trades, loading, error } = useTrades(tradesFilters)
+  const { trades: apiTrades, loading, error } = useTrades(tradesFilters)
 
   // Generate mock demo trades
   const demoTrades = useMemo(() => [
@@ -141,10 +143,10 @@ export default function RecentTrades({ limit = 5, isDemoMode = false }: RecentTr
     }
   ], [])
 
-  // Use demo trades when in demo mode
-  const displayTrades = isDemoMode ? demoTrades : trades
-  const displayLoading = isDemoMode ? false : loading
-  const displayError = isDemoMode ? null : error
+  // Use CSV data if available, otherwise fall back to API trades or demo mode
+  const displayTrades = isDemoMode ? demoTrades : (csvData.hasData ? csvData.trades : apiTrades)
+  const displayLoading = isDemoMode ? false : (csvData.hasData ? false : loading)
+  const displayError = isDemoMode ? null : (csvData.hasData ? null : error)
 
   // Translations
   const texts = {
