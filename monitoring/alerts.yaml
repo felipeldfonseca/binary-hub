@@ -1,0 +1,291 @@
+# Binary Hub Production Monitoring & Alerts Configuration
+# This file defines monitoring policies and alert configurations
+
+alerting_policies:
+  # API Performance Alerts
+  - name: "High API Error Rate"
+    display_name: "API Error Rate > 5%"
+    documentation:
+      content: "API error rate has exceeded 5% threshold"
+      mime_type: "text/markdown"
+    conditions:
+      - display_name: "Function error rate condition"
+        condition_threshold:
+          filter: 'resource.type="cloud_function" AND resource.labels.function_name="api"'
+          comparison: "COMPARISON_GREATER_THAN"
+          threshold_value: 0.05
+          duration: "300s"
+          aggregations:
+            - alignment_period: "60s"
+              per_series_aligner: "ALIGN_RATE"
+              cross_series_reducer: "REDUCE_MEAN"
+    alert_strategy:
+      auto_close: "604800s"  # 7 days
+    notification_channels: []  # Add notification channels in production
+
+  - name: "High API Latency"
+    display_name: "API Response Time > 5s"
+    documentation:
+      content: "API response time has exceeded 5 seconds"
+      mime_type: "text/markdown"
+    conditions:
+      - display_name: "Function execution time condition"
+        condition_threshold:
+          filter: 'resource.type="cloud_function" AND resource.labels.function_name="api"'
+          comparison: "COMPARISON_GREATER_THAN"
+          threshold_value: 5000
+          duration: "300s"
+          aggregations:
+            - alignment_period: "60s"
+              per_series_aligner: "ALIGN_MEAN"
+              cross_series_reducer: "REDUCE_MEAN"
+
+  # Database Performance Alerts
+  - name: "High Database Read Usage"
+    display_name: "Daily Firestore Reads > 50,000"
+    documentation:
+      content: "Daily Firestore read operations have exceeded 50,000"
+      mime_type: "text/markdown"
+    conditions:
+      - display_name: "Firestore reads condition"
+        condition_threshold:
+          filter: 'resource.type="firestore_instance"'
+          comparison: "COMPARISON_GREATER_THAN"
+          threshold_value: 50000
+          duration: "3600s"  # 1 hour
+          aggregations:
+            - alignment_period: "3600s"
+              per_series_aligner: "ALIGN_SUM"
+
+  - name: "High Database Write Usage"
+    display_name: "Daily Firestore Writes > 10,000"
+    documentation:
+      content: "Daily Firestore write operations have exceeded 10,000"
+      mime_type: "text/markdown"
+    conditions:
+      - display_name: "Firestore writes condition"
+        condition_threshold:
+          filter: 'resource.type="firestore_instance"'
+          comparison: "COMPARISON_GREATER_THAN"
+          threshold_value: 10000
+          duration: "3600s"
+          aggregations:
+            - alignment_period: "3600s"
+              per_series_aligner: "ALIGN_SUM"
+
+  # AI Service Alerts
+  - name: "High AI API Costs"
+    display_name: "AI API Daily Cost > $50"
+    documentation:
+      content: "Daily AI API costs have exceeded $50 budget"
+      mime_type: "text/markdown"
+    conditions:
+      - display_name: "AI cost tracking"
+        condition_threshold:
+          filter: 'resource.type="cloud_function" AND metric.label.function_name="api" AND metric.label.endpoint=~"ai.*"'
+          comparison: "COMPARISON_GREATER_THAN"
+          threshold_value: 50
+          duration: "3600s"
+
+  # Billing System Alerts
+  - name: "Payment Processing Failures"
+    display_name: "Payment Failure Rate > 2%"
+    documentation:
+      content: "Payment processing failure rate has exceeded 2%"
+      mime_type: "text/markdown"
+    conditions:
+      - display_name: "Payment failure condition"
+        condition_threshold:
+          filter: 'resource.type="cloud_function" AND metric.label.endpoint=~"billing.*"'
+          comparison: "COMPARISON_GREATER_THAN"
+          threshold_value: 0.02
+          duration: "600s"
+
+  # Security Alerts
+  - name: "Unusual Authentication Activity"
+    display_name: "Failed Auth Attempts > 100/hour"
+    documentation:
+      content: "Unusual number of failed authentication attempts detected"
+      mime_type: "text/markdown"
+    conditions:
+      - display_name: "Auth failure condition"
+        condition_threshold:
+          filter: 'resource.type="firebase_domain" AND metric.type="firebase.com/auth/failed_attempts"'
+          comparison: "COMPARISON_GREATER_THAN"
+          threshold_value: 100
+          duration: "3600s"
+
+  # Storage Alerts
+  - name: "High Storage Usage"
+    display_name: "Storage Usage > 5GB"
+    documentation:
+      content: "Firebase Storage usage has exceeded 5GB"
+      mime_type: "text/markdown"
+    conditions:
+      - display_name: "Storage usage condition"
+        condition_threshold:
+          filter: 'resource.type="firebase_storage_bucket"'
+          comparison: "COMPARISON_GREATER_THAN"
+          threshold_value: 5368709120  # 5GB in bytes
+          duration: "3600s"
+
+# Dashboard Configuration
+dashboards:
+  - name: "binary-hub-overview"
+    display_name: "Binary Hub - Production Overview"
+    widgets:
+      # API Performance Section
+      - title: "API Request Rate"
+        xy_chart:
+          data_sets:
+            - time_series_query:
+                time_series_filter:
+                  filter: 'resource.type="cloud_function" AND resource.labels.function_name="api"'
+                  aggregation:
+                    alignment_period: "60s"
+                    per_series_aligner: "ALIGN_RATE"
+                    cross_series_reducer: "REDUCE_SUM"
+                plot_type: "LINE"
+
+      - title: "API Response Time"
+        xy_chart:
+          data_sets:
+            - time_series_query:
+                time_series_filter:
+                  filter: 'resource.type="cloud_function" AND resource.labels.function_name="api"'
+                  aggregation:
+                    alignment_period: "60s"
+                    per_series_aligner: "ALIGN_MEAN"
+                plot_type: "LINE"
+
+      - title: "API Error Rate"
+        xy_chart:
+          data_sets:
+            - time_series_query:
+                time_series_filter:
+                  filter: 'resource.type="cloud_function" AND resource.labels.function_name="api"'
+                  aggregation:
+                    alignment_period: "60s"
+                    per_series_aligner: "ALIGN_RATE"
+                plot_type: "LINE"
+
+      # Database Performance Section
+      - title: "Firestore Operations"
+        xy_chart:
+          data_sets:
+            - time_series_query:
+                time_series_filter:
+                  filter: 'resource.type="firestore_instance"'
+                  aggregation:
+                    alignment_period: "300s"
+                    per_series_aligner: "ALIGN_RATE"
+                    cross_series_reducer: "REDUCE_SUM"
+                plot_type: "STACKED_AREA"
+
+      # User Metrics Section
+      - title: "Active Users"
+        xy_chart:
+          data_sets:
+            - time_series_query:
+                time_series_filter:
+                  filter: 'resource.type="firebase_domain"'
+                  aggregation:
+                    alignment_period: "3600s"
+                    per_series_aligner: "ALIGN_MAX"
+                plot_type: "LINE"
+
+      # Business Metrics Section
+      - title: "Subscription Conversions"
+        scorecard:
+          time_series_query:
+            time_series_filter:
+              filter: 'resource.type="cloud_function" AND metric.label.endpoint="billing/create-subscription"'
+              aggregation:
+                alignment_period: "86400s"  # 24 hours
+                per_series_aligner: "ALIGN_SUM"
+
+      - title: "AI Usage"
+        xy_chart:
+          data_sets:
+            - time_series_query:
+                time_series_filter:
+                  filter: 'resource.type="cloud_function" AND metric.label.endpoint=~"ai.*"'
+                  aggregation:
+                    alignment_period: "3600s"
+                    per_series_aligner: "ALIGN_RATE"
+                    cross_series_reducer: "REDUCE_SUM"
+                plot_type: "STACKED_BAR"
+
+# SLO Configuration
+service_level_objectives:
+  - name: "api-availability"
+    display_name: "API Availability SLO"
+    service_level_indicator:
+      request_based:
+        good_total_ratio:
+          good_service_filter: 'resource.type="cloud_function" AND resource.labels.function_name="api" AND metric.label.status_code!~"5.*"'
+          total_service_filter: 'resource.type="cloud_function" AND resource.labels.function_name="api"'
+    goal: 0.999  # 99.9% availability
+    rolling_period: "2592000s"  # 30 days
+
+  - name: "api-latency"
+    display_name: "API Latency SLO"
+    service_level_indicator:
+      request_based:
+        distribution_cut:
+          distribution_filter: 'resource.type="cloud_function" AND resource.labels.function_name="api"'
+          range:
+            max: 2000  # 2 seconds
+    goal: 0.95  # 95% of requests under 2 seconds
+    rolling_period: "2592000s"
+
+# Log-based Metrics
+log_metrics:
+  - name: "user_signup_count"
+    description: "Count of user signups"
+    filter: 'resource.type="cloud_function" AND jsonPayload.event="user_signup"'
+    metric_descriptor:
+      metric_kind: "COUNTER"
+      value_type: "INT64"
+
+  - name: "payment_failures"
+    description: "Count of payment processing failures"
+    filter: 'resource.type="cloud_function" AND jsonPayload.event="payment_failed"'
+    metric_descriptor:
+      metric_kind: "COUNTER"
+      value_type: "INT64"
+    label_extractors:
+      error_type: 'EXTRACT(jsonPayload.error_type)'
+      payment_method: 'EXTRACT(jsonPayload.payment_method)'
+
+  - name: "ai_api_costs"
+    description: "AI API usage costs"
+    filter: 'resource.type="cloud_function" AND jsonPayload.event="ai_request"'
+    metric_descriptor:
+      metric_kind: "COUNTER"
+      value_type: "DOUBLE"
+    value_extractor: 'EXTRACT(jsonPayload.cost)'
+    label_extractors:
+      model: 'EXTRACT(jsonPayload.model)'
+      user_tier: 'EXTRACT(jsonPayload.user_tier)'
+
+# Notification Channels (to be configured in production)
+notification_channels:
+  - type: "email"
+    display_name: "Dev Team Email"
+    description: "Email notifications for critical alerts"
+    labels:
+      email_address: "dev-team@binaryhub.com"
+
+  - type: "slack"
+    display_name: "Dev Team Slack"
+    description: "Slack notifications for alerts"
+    labels:
+      channel_name: "#alerts"
+      url: "https://hooks.slack.com/services/YOUR/SLACK/WEBHOOK"
+
+  - type: "sms"
+    display_name: "On-call SMS"
+    description: "SMS for critical production issues"
+    labels:
+      number: "+1234567890"

@@ -43,10 +43,11 @@ export default function Navbar() {
   const getDashboardNavItems = (): NavItem[] => [
     { href: isPortuguese ? '/dashboard?lang=pt' : '/dashboard', label: isPortuguese ? 'Início' : 'Home' },
     { href: '/trades', label: isPortuguese ? 'Operações' : 'Trades' },
+    { href: '/social', label: isPortuguese ? 'Social' : 'Social' },
     { href: '/analytics', label: isPortuguese ? 'Análises' : 'Analytics' },
-    { href: '/accomplishments', label: isPortuguese ? 'Conquistas' : 'Accomplishments' },
     { href: '/ai', label: 'AI' },
-    { href: isPortuguese ? '/dashboard/plans?lang=pt' : '/dashboard/plans', label: isPortuguese ? 'Planos' : 'Plans' },
+    { href: '/accomplishments', label: isPortuguese ? 'Conquistas' : 'Accomplishments' },
+    { href: isPortuguese ? '/plans?lang=pt' : '/plans', label: isPortuguese ? 'Planos' : 'Plans' },
   ]
 
   const dashboardNavItems = getDashboardNavItems()
@@ -354,11 +355,11 @@ export default function Navbar() {
                       <p className="text-sm font-medium text-white truncate">{user?.email}</p>
                     </div>
                     <Link
-                      href="/profile"
+                      href="/profile/edit"
                       onClick={() => setIsProfileOpen(false)}
                       className="block px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 hover:text-white transition-colors"
                     >
-                      Your Profile
+                      Edit Profile
                     </Link>
                     <Link
                       href="/settings"
@@ -500,11 +501,11 @@ export default function Navbar() {
                   <p className="text-sm font-medium text-green-400 truncate">{user?.email}</p>
                 </div>
                 <Link
-                  href="/profile"
+                  href="/profile/edit"
                   onClick={() => setIsMobileMenuOpen(false)}
                   className="nav-link block px-4 py-3 rounded-lg text-base transition-all duration-300 text-green-400 hover:bg-primary/10 font-comfortaa font-bold"
                 >
-                  Your Profile
+                  Edit Profile
                 </Link>
                 <Link
                   href="/settings"

@@ -1,7 +1,25 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  experimental: {
+    turbo: {
+      rules: {
+        '*.svg': {
+          loaders: ['@svgr/webpack'],
+          as: '*.js',
+        },
+      },
+    },
+  },
+  compiler: {
+    // Remove console logs in production
+    removeConsole: process.env.NODE_ENV === 'production',
+  },
   images: {
     domains: ['firebasestorage.googleapis.com'],
+    formats: ['image/avif', 'image/webp'],
+    minimumCacheTTL: 60,
+    dangerouslyAllowSVG: true,
+    contentSecurityPolicy: "default-src 'self'; script-src 'none'; sandbox;",
   },
   env: {
     NEXT_PUBLIC_FIREBASE_API_KEY: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -11,7 +29,49 @@ const nextConfig = {
     NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
     NEXT_PUBLIC_FIREBASE_APP_ID: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
   },
-  webpack: (config, { isServer }) => {
+  poweredByHeader: false,
+  generateEtags: false,
+  webpack: (config, { buildId, dev, isServer, defaultLoaders, webpack }) => {
+    // Optimization for production builds
+    if (!dev) {
+      config.optimization = {
+        ...config.optimization,
+        splitChunks: {
+          chunks: 'all',
+          cacheGroups: {
+            vendor: {
+              test: /[\\/]node_modules[\\/]/,
+              name: 'vendors',
+              chunks: 'all',
+            },
+            firebase: {
+              test: /[\\/]node_modules[\\/](firebase|@firebase)[\\/]/,
+              name: 'firebase',
+              chunks: 'all',
+              priority: 20,
+            },
+            ui: {
+              test: /[\\/]components[\\/]/,
+              name: 'ui',
+              chunks: 'all',
+              priority: 10,
+            },
+          },
+        },
+      };
+    }
+
+    // Bundle analyzer
+    if (process.env.ANALYZE === 'true') {
+      const { BundleAnalyzerPlugin } = require('webpack-bundle-analyzer');
+      config.plugins.push(
+        new BundleAnalyzerPlugin({
+          analyzerMode: 'server',
+          openAnalyzer: true,
+        })
+      );
+    }
+
     if (!isServer) {
       config.resolve.fallback = {
         ...config.resolve.fallback,
@@ -30,6 +90,7 @@ const nextConfig = {
         'process/browser': require.resolve('process/browser'),
       };
     }
+
     return config;
   },
   async rewrites() {

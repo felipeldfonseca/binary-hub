@@ -3,10 +3,10 @@ import React from 'react'
 import ProtectedRoute from '@/components/auth/ProtectedRoute'
 import Navbar from '@/components/layout/Navbar'
 import Footer from '@/components/layout/Footer'
-import { AIDashboard } from '@/components/lazy'
+import { SocialFeed } from '@/components/lazy'
 import LazyWrapper from '@/components/shared/LazyWrapper'
 
-export default function AIPage() {
+export default function SocialPage() {
   return (
     <ProtectedRoute>
       <div className="min-h-screen bg-background">
@@ -18,7 +18,7 @@ export default function AIPage() {
                 threshold={0.1}
                 rootMargin="100px"
               >
-                <AIDashboard />
+                <SocialFeed />
               </LazyWrapper>
             </div>
           </div>
