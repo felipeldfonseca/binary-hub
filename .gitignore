@@ -74,6 +74,27 @@ ui-debug.log
 # Local development
 .local/
 
-# Service account files
+# Security - CRITICAL
 service-account.json
 *.json.key
+*.pem
+*.key
+*.p12
+*.pfx
+secrets.json
+.env.production.local
+
+# Firebase Functions
+functions/lib/
+functions/.firebase/
+functions/functions/
+
+# Testing
+coverage/
+.nyc_output/
+jest-coverage/
+
+# Local development
+.local/
+tmp/
+temp/

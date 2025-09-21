@@ -10,7 +10,34 @@ import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
-import { generateInsight, generateTradeCoach, checkTradeRules, validateCSVHeaders } from './services/openai';
+import { cacheHealthMiddleware, cacheManagementMiddleware } from './middleware/cache';
+import { 
+  performanceTrackingMiddleware, 
+  createDatabaseTracker, 
+  errorTrackingMiddleware,
+  requestCorrelationMiddleware,
+  memoryTrackingMiddleware,
+  responseSizeTrackingMiddleware
+} from './middleware/performanceMiddleware';
+import { cacheService } from './services/cacheService';
+import { cacheWarmingService } from './services/cacheWarmingService';
+import { cacheMonitoringService } from './services/cacheMonitoringService';
+import { performanceMonitoringService } from './services/performanceMonitoringService';
+import { systemHealthService } from './services/systemHealthService';
+import { generateInsight } from './services/openai';
+import tradesRouter from './routes/trades';
+import importRouter from './routes/import';
+import analyticsRouter from './routes/analytics';
+import authRouter from './routes/auth';
+import dashboardRouter from './routes/dashboard';
+import rulesRouter from './routes/rules';
+import insightsRouter from './routes/insights';
+import legacyTradesRouter from './routes/legacy-trades';
+import bulkOperationsRouter from './routes/bulk-operations';
+import realtimeRouter from './routes/realtime';
+import performanceRouter from './routes/performance';
+import communityRouter from './routes/community';
+import { realTimeService } from './services/realTimeService';
 
 // Extend Express Request to include user property
 interface AuthenticatedRequest extends Request {
@@ -27,20 +54,37 @@ const db = getFirestore();
 const auth = getAuth();
 const storage = getStorage();
 
+// Initialize performance monitoring
+createDatabaseTracker();
+
 // Create Express app
 const app = express();
 
 // Configure middleware
 app.use(helmet());
 app.use(cors({ origin: true }));
+
+// Performance monitoring middleware (must be early in the stack)
+app.use(requestCorrelationMiddleware());
+app.use(performanceTrackingMiddleware());
+app.use(memoryTrackingMiddleware());
+app.use(responseSizeTrackingMiddleware());
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
-app.use(rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100 // limit each IP to 100 requests per windowMs
-}));
 
-// Add health check endpoints for Cloud Run
+// Cache middleware (health check and management)
+app.use(cacheHealthMiddleware());
+app.use(cacheManagementMiddleware());
+
+// Rate limiting - Disabled in development
+// const limiter = rateLimit({
+//   windowMs: 15 * 60 * 1000, // 15 minutes
+//   max: 100, // limit each IP to 100 requests per windowMs
+//   message: 'Too many requests from this IP, please try again later.',
+// });
+// app.use(limiter);
+
+// Health check endpoints
 app.get('/_ah/warmup', (_, res) => {
   res.status(200).send('OK');
 });
@@ -49,21 +93,22 @@ app.get('/_health', (_, res) => {
   res.status(200).send('OK');
 });
 
-app.get('/health', (req: Request, res: Response) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+app.get('/health', async (req: Request, res: Response) => {
+  const cacheHealth = await cacheService.healthCheck();
+  const cacheStats = cacheService.getStats();
+  
+  res.json({ 
+    status: 'ok', 
+    timestamp: new Date().toISOString(),
+    cache: {
+      redis: cacheHealth.redis,
+      memory: cacheHealth.memory,
+      hitRate: `${cacheStats.overall.hitRate.toFixed(2)}%`,
+      totalHits: cacheStats.overall.totalHits,
+      totalMisses: cacheStats.overall.totalMisses
+    }
+  });
 });
-
-// Configure additional middleware
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true }));
-
-// Rate limiting
-const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // limit each IP to 100 requests per windowMs
-  message: 'Too many requests from this IP, please try again later.',
-});
-app.use(limiter);
 
 // Authentication middleware
 const authenticate = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
@@ -90,533 +135,77 @@ const authenticate = async (req: AuthenticatedRequest, res: Response, next: Next
   }
 };
 
-// Routes
+// Mount route handlers
+app.use('/auth', authenticate, authRouter);
+app.use('/dashboard', authenticate, dashboardRouter);
+app.use('/rules', authenticate, rulesRouter);
+app.use('/insights', authenticate, insightsRouter);
+app.use('/trades', authenticate, legacyTradesRouter);
 
-// Health check
-app.get('/health', (req: Request, res: Response) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
-});
 
-// Auth routes
-app.post('/auth/exchange-token', authenticate, async (req: AuthenticatedRequest, res: Response) => {
+
+
+
+
+
+
+
+// Cache monitoring endpoints (admin only)
+app.get('/admin/cache/health', async (req: Request, res: Response) => {
   try {
-    if (!req.user) {
-      return res.status(401).json({ error: 'User not authenticated' });
-    }
-
-    return res.json({
-      token: req.headers.authorization?.split(' ')[1],
-      uid: req.user.uid,
-      email: req.user.email,
-      expiresAt: new Date(Date.now() + 3600 * 1000).toISOString() // 1 hour
-    });
+    const health = await cacheMonitoringService.getHealthStatus();
+    res.json(health);
   } catch (error) {
-    logger.error('Token exchange error:', error);
-    return res.status(500).json({ error: 'Internal server error' });
+    logger.error('Cache health check error:', error);
+    res.status(500).json({ error: 'Failed to get cache health' });
   }
 });
 
-app.get('/auth/profile', authenticate, async (req: AuthenticatedRequest, res: Response) => {
+app.get('/admin/cache/stats', async (req: Request, res: Response) => {
   try {
-    if (!req.user) {
-      return res.status(401).json({ error: 'User not authenticated' });
-    }
-
-    return res.json({
-      uid: req.user.uid,
-      email: req.user.email
-    });
+    const stats = await cacheMonitoringService.getRealTimeStats();
+    res.json(stats);
   } catch (error) {
-    logger.error('Get profile error:', error);
-    return res.status(500).json({ error: 'Internal server error' });
+    logger.error('Cache stats error:', error);
+    res.status(500).json({ error: 'Failed to get cache stats' });
   }
 });
 
-// Trades routes
-app.get('/trades', authenticate, async (req: AuthenticatedRequest, res: Response) => {
+app.get('/admin/cache/report', async (req: Request, res: Response) => {
   try {
-    if (!req.user) {
-      return res.status(401).json({ error: 'User not authenticated' });
-    }
-
-    const uid = req.user.uid;
-    const { start, end, limit = 100 } = req.query;
-
-    let query = db.collection('trades').doc(uid).collection('trades')
-      .orderBy('timestamp', 'desc');
-
-    if (start) {
-      query = query.where('timestamp', '>=', start);
-    }
-    if (end) {
-      query = query.where('timestamp', '<=', end);
-    }
-
-    query = query.limit(Math.min(Number(limit), 1000));
-
-    const snapshot = await query.get();
-    const trades = snapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data()
-    }));
-
-    return res.json(trades);
+    const period = (req.query.period as 'hour' | 'day' | 'week' | 'month') || 'day';
+    const report = await cacheMonitoringService.generateReport(period);
+    res.json(report);
   } catch (error) {
-    logger.error('Get trades error:', error);
-    return res.status(500).json({ error: 'Internal server error' });
+    logger.error('Cache report error:', error);
+    res.status(500).json({ error: 'Failed to generate cache report' });
   }
 });
 
-app.post('/trades', authenticate, async (req: AuthenticatedRequest, res: Response) => {
+app.get('/admin/cache/alerts', async (req: Request, res: Response) => {
   try {
-    if (!req.user) {
-      return res.status(401).json({ error: 'User not authenticated' });
-    }
-
-    const uid = req.user.uid;
-    const tradeData = req.body;
-
-    // Validate required fields
-    const requiredFields = ['asset', 'type', 'amount'];
-    const missingFields = requiredFields.filter(field => !tradeData[field]);
-    
-    if (missingFields.length > 0) {
-      return res.status(400).json({ 
-        error: 'Missing required fields', 
-        missing: missingFields 
-      });
-    }
-
-    // Generate trade ID
-    const tradeId = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-
-    const trade = {
-      tradeId,
-      asset: tradeData.asset,
-      type: tradeData.type,
-      amount: tradeData.amount,
-      entry_price: tradeData.entry_price,
-      exit_price: tradeData.exit_price,
-      result: tradeData.result || 'OPEN',
-      platform: tradeData.platform || 'Manual',
-      timestamp: new Date().toISOString(),
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    };
-
-    await db.collection('trades').doc(uid).collection('trades').doc(tradeId).set(trade);
-
-    return res.status(201).json({ id: tradeId, ...trade });
+    const severity = req.query.severity as 'low' | 'medium' | 'high' | 'critical';
+    const alerts = cacheMonitoringService.getAlerts(severity);
+    res.json({ alerts });
   } catch (error) {
-    logger.error('Create trade error:', error);
-    return res.status(500).json({ error: 'Internal server error' });
+    logger.error('Cache alerts error:', error);
+    res.status(500).json({ error: 'Failed to get cache alerts' });
   }
 });
 
-// Dashboard routes
-app.get('/dashboard/stats', authenticate, async (req: AuthenticatedRequest, res: Response) => {
-  try {
-    if (!req.user) {
-      return res.status(401).json({ error: 'User not authenticated' });
-    }
+// API v1 Routes
+app.use('/v1/trades', authenticate, tradesRouter);
+app.use('/v1/import', authenticate, importRouter);
+app.use('/v1/analytics', authenticate, analyticsRouter);
+app.use('/v1/bulk', authenticate, bulkOperationsRouter);
+app.use('/v1/realtime', authenticate, realtimeRouter);
+app.use('/v1/community', authenticate, communityRouter);
 
-    const uid = req.user.uid;
-    const { period = 'weekly' } = req.query;
+// Performance monitoring routes (admin-only in production)
+app.use('/v1/performance', performanceRouter);
 
-    // Get trades for the period
-    const now = new Date();
-    let startDate: Date;
-
-    switch (period) {
-      case 'daily':
-        startDate = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-        break;
-      case 'weekly':
-        startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-        break;
-      case 'monthly':
-        startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-        break;
-      default:
-        startDate = new Date(0); // All time
-    }
-
-    const snapshot = await db.collection('trades').doc(uid).collection('trades')
-      .where('timestamp', '>=', startDate.toISOString())
-      .orderBy('timestamp', 'desc')
-      .get();
-
-    const trades = snapshot.docs.map(doc => doc.data());
-
-    // Calculate KPIs
-    const totalTrades = trades.length;
-    const wins = trades.filter(t => t.result === 'WIN').length;
-    const losses = trades.filter(t => t.result === 'LOSS').length;
-    const winRate = totalTrades > 0 ? (wins / totalTrades) * 100 : 0;
-    const totalPnl = trades.reduce((sum, t) => sum + ((t.result === 'WIN' ? t.amount : -t.amount) || 0), 0);
-
-    return res.json({
-      totalTrades,
-      wins,
-      losses,
-      winRate: Math.round(winRate * 100) / 100,
-      totalPnl: Math.round(totalPnl * 100) / 100,
-      period
-    });
-  } catch (error) {
-    logger.error('Get dashboard stats error:', error);
-    return res.status(500).json({ error: 'Internal server error' });
-  }
-});
-
-app.get('/dashboard/performance', authenticate, async (req: AuthenticatedRequest, res: Response) => {
-  try {
-    if (!req.user) {
-      return res.status(401).json({ error: 'User not authenticated' });
-    }
-
-    const uid = req.user.uid;
-    
-    // Get all trades for performance calculation
-    const snapshot = await db.collection('trades').doc(uid).collection('trades')
-      .orderBy('timestamp', 'desc')
-      .limit(1000)
-      .get();
-
-    const trades = snapshot.docs.map(doc => doc.data());
-
-    // Group trades by date for performance chart
-    const performanceData = trades.reduce((acc: any, trade) => {
-      const date = new Date(trade.timestamp).toISOString().split('T')[0];
-      if (!acc[date]) {
-        acc[date] = { date, trades: 0, pnl: 0 };
-      }
-      acc[date].trades++;
-      acc[date].pnl += trade.result === 'WIN' ? trade.amount : -trade.amount;
-      return acc;
-    }, {});
-
-    const performance = Object.values(performanceData).sort((a: any, b: any) => 
-      new Date(a.date).getTime() - new Date(b.date).getTime()
-    );
-
-    return res.json(performance);
-  } catch (error) {
-    logger.error('Get dashboard performance error:', error);
-    return res.status(500).json({ error: 'Internal server error' });
-  }
-});
-
-// Rules routes
-app.get('/rules', authenticate, async (req: AuthenticatedRequest, res: Response) => {
-  try {
-    if (!req.user) {
-      return res.status(401).json({ error: 'User not authenticated' });
-    }
-
-    const uid = req.user.uid;
-    const snapshot = await db.collection('rules').doc(uid).collection('rules').get();
-    
-    const rules = snapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data()
-    }));
-
-    return res.json(rules);
-  } catch (error) {
-    logger.error('Get rules error:', error);
-    return res.status(500).json({ error: 'Internal server error' });
-  }
-});
-
-app.post('/rules', authenticate, async (req: AuthenticatedRequest, res: Response) => {
-  try {
-    if (!req.user) {
-      return res.status(401).json({ error: 'User not authenticated' });
-    }
-
-    const uid = req.user.uid;
-    const ruleData = req.body;
-
-    // Validate required fields
-    const requiredFields = ['title', 'description', 'category'];
-    const missingFields = requiredFields.filter(field => !ruleData[field]);
-    
-    if (missingFields.length > 0) {
-      return res.status(400).json({ 
-        error: 'Missing required fields', 
-        missing: missingFields 
-      });
-    }
-
-    const ruleId = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-
-    const rule = {
-      ruleId,
-      title: ruleData.title,
-      description: ruleData.description,
-      category: ruleData.category,
-      is_active: ruleData.is_active || true,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    };
-
-    await db.collection('rules').doc(uid).collection('rules').doc(ruleId).set(rule);
-
-    return res.status(201).json({ id: ruleId, ...rule });
-  } catch (error) {
-    logger.error('Create rule error:', error);
-    return res.status(500).json({ error: 'Internal server error' });
-  }
-});
-
-// Insights routes
-app.get('/insights', authenticate, async (req: AuthenticatedRequest, res: Response) => {
-  try {
-    if (!req.user) {
-      return res.status(401).json({ error: 'User not authenticated' });
-    }
-
-    const uid = req.user.uid;
-    const snapshot = await db.collection('insights').doc(uid).collection('insights')
-      .orderBy('timestamp', 'desc')
-      .limit(10)
-      .get();
-    
-    const insights = snapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data()
-    }));
-
-    return res.json(insights);
-  } catch (error) {
-    logger.error('Get insights error:', error);
-    return res.status(500).json({ error: 'Internal server error' });
-  }
-});
-
-// Generate on-demand insight
-app.post('/insights/generate', authenticate, async (req: AuthenticatedRequest, res: Response) => {
-  try {
-    if (!req.user) {
-      return res.status(401).json({ error: 'User not authenticated' });
-    }
-
-    const uid = req.user.uid;
-    
-    // Get user profile
-    const userProfileSnapshot = await db.collection('users').doc(uid).get();
-    const userProfile = userProfileSnapshot.data();
-    
-    // Get recent trades (last 30 days)
-    const monthAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
-    const tradesSnapshot = await db.collection('trades').doc(uid).collection('trades')
-      .where('timestamp', '>=', monthAgo.toISOString())
-      .get();
-    
-    if (tradesSnapshot.empty) {
-      return res.status(400).json({ error: 'No trades found for analysis' });
-    }
-    
-    const trades = tradesSnapshot.docs.map(doc => doc.data());
-    
-    // Calculate KPIs
-    const winTrades = trades.filter(t => t.result === 'WIN');
-    const winRate = Math.round((winTrades.length / trades.length) * 100);
-    const avgStake = trades.reduce((sum, t) => sum + (t.stake || 0), 0) / trades.length;
-    
-    // Calculate loss streak
-    let currentStreak = 0;
-    let maxLossStreak = 0;
-    for (const trade of trades.reverse()) {
-      if (trade.result === 'LOSS') {
-        currentStreak++;
-        maxLossStreak = Math.max(maxLossStreak, currentStreak);
-      } else {
-        currentStreak = 0;
-      }
-    }
-    
-    // Get user's broken rules
-    const rulesSnapshot = await db.collection('rules').doc(uid).collection('rules')
-      .where('active', '==', true)
-      .get();
-    
-    let ruleBrokenMost = 'Nenhuma regra quebrada identificada';
-    if (!rulesSnapshot.empty) {
-      const rules = rulesSnapshot.docs.map(doc => doc.data());
-      const brokenRule = rules.find(r => r.violations && r.violations > 0);
-      if (brokenRule) {
-        ruleBrokenMost = brokenRule.description || brokenRule.name || 'Regra não especificada';
-      }
-    }
-    
-    // Generate AI insight
-    const aiInsight = await generateInsight({
-      uid,
-      firstName: userProfile?.firstName || 'Trader',
-      kpi: {
-        winRate,
-        avgStake,
-        lossStreak: maxLossStreak
-      },
-      ruleBrokenMost
-    });
-    
-    // Save insight
-    const insight = {
-      type: 'on_demand',
-      title: 'Análise Personalizada',
-      content: aiInsight.insight,
-      action: aiInsight.acao,
-      timestamp: new Date().toISOString(),
-      metadata: {
-        totalTrades: trades.length,
-        winRate: winRate / 100,
-        avgStake,
-        lossStreak: maxLossStreak,
-        aiGenerated: true,
-        kpi: aiInsight.kpi
-      }
-    };
-    
-    const docRef = await db.collection('insights').doc(uid).collection('insights').add(insight);
-    
-    return res.json({
-      id: docRef.id,
-      ...insight
-    });
-  } catch (error) {
-    logger.error('Generate insight error:', error);
-    return res.status(500).json({ error: 'Internal server error' });
-  }
-});
-
-// Trade coaching endpoint
-app.post('/insights/coach', authenticate, async (req: AuthenticatedRequest, res: Response) => {
-  try {
-    if (!req.user) {
-      return res.status(401).json({ error: 'User not authenticated' });
-    }
-
-    const uid = req.user.uid;
-    const { situation } = req.body;
-    
-    if (!situation) {
-      return res.status(400).json({ error: 'Situation is required' });
-    }
-    
-    // Get user profile
-    const userProfileSnapshot = await db.collection('users').doc(uid).get();
-    const userProfile = userProfileSnapshot.data();
-    
-    // Generate coaching response
-    const coaching = await generateTradeCoach({
-      firstName: userProfile?.firstName || 'Trader',
-      situation
-    });
-    
-    // Save coaching session
-    const coachingSession = {
-      type: 'coaching',
-      title: 'Suporte Motivacional',
-      content: coaching.message,
-      quote: coaching.quote,
-      timestamp: new Date().toISOString(),
-      metadata: {
-        situation,
-        aiGenerated: true
-      }
-    };
-    
-    const docRef = await db.collection('insights').doc(uid).collection('insights').add(coachingSession);
-    
-    return res.json({
-      id: docRef.id,
-      ...coachingSession
-    });
-  } catch (error) {
-    logger.error('Generate coaching error:', error);
-    return res.status(500).json({ error: 'Internal server error' });
-  }
-});
-
-// Rule checking endpoint
-app.post('/trades/check-rules', authenticate, async (req: AuthenticatedRequest, res: Response) => {
-  try {
-    if (!req.user) {
-      return res.status(401).json({ error: 'User not authenticated' });
-    }
-
-    const uid = req.user.uid;
-    const { trade } = req.body;
-    
-    if (!trade) {
-      return res.status(400).json({ error: 'Trade data is required' });
-    }
-    
-    // Get user's active rules
-    const rulesSnapshot = await db.collection('rules').doc(uid).collection('rules')
-      .where('active', '==', true)
-      .get();
-    
-    if (rulesSnapshot.empty) {
-      return res.json({ violations: [] });
-    }
-    
-    const rules = rulesSnapshot.docs.map(doc => doc.data());
-    const ruleDescriptions = rules.map(r => r.description || r.name || 'Regra não especificada');
-    
-    // Check rules using AI
-    const ruleCheck = await checkTradeRules({
-      trade,
-      rules: ruleDescriptions
-    });
-    
-    return res.json(ruleCheck);
-  } catch (error) {
-    logger.error('Check trade rules error:', error);
-    return res.status(500).json({ error: 'Internal server error' });
-  }
-});
-
-// CSV validation endpoint
-app.post('/trades/validate-csv', authenticate, async (req: AuthenticatedRequest, res: Response) => {
-  try {
-    if (!req.user) {
-      return res.status(401).json({ error: 'User not authenticated' });
-    }
-
-    const { headers } = req.body;
-    
-    if (!headers || !Array.isArray(headers)) {
-      return res.status(400).json({ error: 'Headers array is required' });
-    }
-    
-    // Expected headers for Ebinex CSV
-    const expectedHeaders = [
-      'ID',
-      'Data',
-      'Ativo',
-      'Direção',
-      'Valor',
-      'Resultado',
-      'Payout',
-      'Horário'
-    ];
-    
-    // Validate using AI
-    const validation = await validateCSVHeaders({
-      receivedHeaders: headers,
-      expectedHeaders
-    });
-    
-    return res.json(validation);
-  } catch (error) {
-    logger.error('Validate CSV headers error:', error);
-    return res.status(500).json({ error: 'Internal server error' });
-  }
-});
+// Error handling middleware (must be last)
+app.use(errorTrackingMiddleware());
 
 // Export the API
 // Configure HTTPS function with options
@@ -649,9 +238,47 @@ export const processCSVUpload = onDocumentCreated({
         updatedAt: new Date().toISOString()
       });
 
-      // TODO: Add actual CSV processing logic here
-      // For now, just simulate processing
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      // Process CSV file using the import service
+      try {
+        // Get file data from storage
+        const bucket = storage.bucket();
+        const file = bucket.file(`uploads/${userId}/${fileId}`);
+        
+        // Check if file exists
+        const [exists] = await file.exists();
+        if (!exists) {
+          throw new Error('File not found in storage');
+        }
+
+        // Download file content
+        const [fileBuffer] = await file.download();
+        
+        // Get original filename from document data
+        const originalFileName = data.fileName || 'unknown.csv';
+        
+        // Process CSV using import service
+        const { importService } = await import('./services/importService');
+        const result = await importService.processCsvUpload(userId, fileBuffer, originalFileName);
+        
+        // Update status with detailed results
+        await db.collection('uploads').doc(userId).collection('files').doc(fileId).update({
+          status: result.status,
+          totalRows: result.totalRows,
+          importedRows: result.importedRows,
+          duplicateRows: result.duplicateRows,
+          errors: result.errors,
+          processingTime: result.processingTime,
+          processedAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          importId: result.importId
+        });
+        
+        logger.log(`CSV processing completed for user ${userId}: ${result.importedRows} trades imported, ${result.duplicateRows} duplicates skipped`);
+        
+      } catch (processingError) {
+        logger.error('CSV processing failed:', processingError);
+        throw processingError; // Re-throw to trigger the catch block below
+      }
 
       // Update status to completed
       await db.collection('uploads').doc(userId).collection('files').doc(fileId).update({
@@ -807,5 +434,263 @@ export const cleanupOldData = onSchedule({
     logger.log(`Cleaned up ${uploadsSnapshot.size} old upload records`);
   } catch (error) {
     logger.error('Cleanup error:', error);
+  }
+});
+
+// Scheduled cache warming function
+export const warmCache = onSchedule({
+  schedule: '0 */3 * * *', // Every 3 hours
+  memory: '1GiB',
+  timeoutSeconds: 540,
+  region: 'us-central1',
+  retryCount: 2
+}, async () => {
+  logger.log('Running scheduled cache warming');
+  
+  try {
+    await cacheWarmingService.scheduleWarmingTask();
+    logger.log('Cache warming completed successfully');
+  } catch (error) {
+    logger.error('Cache warming error:', error);
+  }
+});
+
+// Morning cache warm-up (6 AM UTC)
+export const morningCacheWarmup = onSchedule({
+  schedule: '0 6 * * *',
+  memory: '1GiB',
+  timeoutSeconds: 300,
+  region: 'us-central1',
+  retryCount: 1
+}, async () => {
+  logger.log('Running morning cache warm-up');
+  
+  try {
+    // Warm dashboard data for active users
+    await cacheWarmingService.warmSpecificData('dashboard');
+    logger.log('Morning cache warm-up completed');
+  } catch (error) {
+    logger.error('Morning cache warm-up error:', error);
+  }
+});
+
+// Evening analytics warming (6 PM UTC)
+export const eveningAnalyticsWarmup = onSchedule({
+  schedule: '0 18 * * *',
+  memory: '1GiB',
+  timeoutSeconds: 600,
+  region: 'us-central1',
+  retryCount: 1
+}, async () => {
+  logger.log('Running evening analytics warm-up');
+  
+  try {
+    // Smart warming for comprehensive analytics
+    await cacheWarmingService.smartWarmCache();
+    logger.log('Evening analytics warm-up completed');
+  } catch (error) {
+    logger.error('Evening analytics warm-up error:', error);
+  }
+});
+
+// Performance metrics aggregation function
+export const aggregatePerformanceMetrics = onSchedule({
+  schedule: '0 */6 * * *', // Every 6 hours
+  memory: '1GiB',
+  timeoutSeconds: 300,
+  region: 'us-central1',
+  retryCount: 2
+}, async () => {
+  logger.log('Running performance metrics aggregation');
+  
+  try {
+    const endTime = new Date();
+    const startTime = new Date(endTime.getTime() - 6 * 60 * 60 * 1000); // 6 hours ago
+    
+    // Get performance summary for the period
+    const performanceSummary = await performanceMonitoringService.getPerformanceSummary('1h');
+    
+    // Store aggregated metrics
+    await db.collection('performance_aggregates')
+      .doc(`${endTime.toISOString().substring(0, 13)}:00:00.000Z`) // Hour-based aggregation
+      .set({
+        timestamp: endTime,
+        period: '6h',
+        startTime,
+        endTime,
+        metrics: performanceSummary,
+        createdAt: new Date()
+      });
+    
+    logger.log('Performance metrics aggregation completed');
+  } catch (error) {
+    logger.error('Performance metrics aggregation error:', error);
+  }
+});
+
+// System health monitoring function
+export const monitorSystemHealth = onSchedule({
+  schedule: '*/5 * * * *', // Every 5 minutes
+  memory: '512MiB',
+  timeoutSeconds: 120,
+  region: 'us-central1',
+  retryCount: 1
+}, async () => {
+  try {
+    const systemStatus = await systemHealthService.getSystemStatus();
+    
+    // Store system health snapshot
+    await db.collection('system_health_snapshots')
+      .doc(systemStatus.timestamp.toISOString())
+      .set({
+        ...systemStatus,
+        createdAt: new Date()
+      });
+    
+    // Clean up old snapshots (keep only last 24 hours)
+    const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    const oldSnapshots = await db.collection('system_health_snapshots')
+      .where('timestamp', '<', cutoff)
+      .get();
+    
+    if (!oldSnapshots.empty) {
+      const batch = db.batch();
+      oldSnapshots.docs.forEach(doc => batch.delete(doc.ref));
+      await batch.commit();
+      logger.debug(`Cleaned up ${oldSnapshots.size} old health snapshots`);
+    }
+    
+  } catch (error) {
+    logger.error('System health monitoring error:', error);
+  }
+});
+
+// Performance alert processing function
+export const processPerformanceAlerts = onSchedule({
+  schedule: '* * * * *', // Every minute
+  memory: '256MiB',
+  timeoutSeconds: 60,
+  region: 'us-central1',
+  retryCount: 1
+}, async () => {
+  try {
+    const activeAlerts = performanceMonitoringService.getActiveAlerts();
+    const criticalAlerts = activeAlerts.filter(alert => alert.severity === 'critical');
+    
+    // Log critical alerts for external monitoring systems
+    if (criticalAlerts.length > 0) {
+      logger.error('CRITICAL PERFORMANCE ALERTS', {
+        count: criticalAlerts.length,
+        alerts: criticalAlerts.map(alert => ({
+          id: alert.id,
+          message: alert.message,
+          value: alert.value,
+          threshold: alert.threshold
+        }))
+      });
+      
+      // In production, this could trigger external notifications
+      // (email, Slack, PagerDuty, etc.)
+    }
+    
+  } catch (error) {
+    logger.error('Performance alert processing error:', error);
+  }
+});
+
+// Legacy weekly insights function (keeping for backward compatibility)
+export const legacyWeeklyInsights = onSchedule({
+  schedule: '0 9 * * 1', // Changed to 9 AM to avoid conflicts
+  memory: '1GiB',
+  timeoutSeconds: 540,
+  region: 'us-central1',
+  retryCount: 3,
+  secrets: ['OPENAI_API_KEY']
+}, async () => {
+  logger.log('Running legacy weekly insights generation');
+  
+  try {
+    // This is the original implementation, kept for compatibility
+    const usersSnapshot = await db.collection('trades').listDocuments();
+    
+    for (const userDoc of usersSnapshot) {
+      const userId = userDoc.id;
+      
+      const userProfileSnapshot = await db.collection('users').doc(userId).get();
+      const userProfile = userProfileSnapshot.data();
+      
+      const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+      const tradesSnapshot = await db.collection('trades').doc(userId).collection('trades')
+        .where('timestamp', '>=', weekAgo.toISOString())
+        .get();
+      
+      if (tradesSnapshot.empty) {
+        continue;
+      }
+      
+      const trades = tradesSnapshot.docs.map(doc => doc.data());
+      
+      const winTrades = trades.filter(t => t.result === 'WIN');
+      const winRate = Math.round((winTrades.length / trades.length) * 100);
+      const avgStake = trades.reduce((sum, t) => sum + (t.stake || 0), 0) / trades.length;
+      
+      let currentStreak = 0;
+      let maxLossStreak = 0;
+      for (const trade of trades.reverse()) {
+        if (trade.result === 'LOSS') {
+          currentStreak++;
+          maxLossStreak = Math.max(maxLossStreak, currentStreak);
+        } else {
+          currentStreak = 0;
+        }
+      }
+      
+      const rulesSnapshot = await db.collection('rules').doc(userId).collection('rules')
+        .where('active', '==', true)
+        .get();
+      
+      let ruleBrokenMost = 'Nenhuma regra quebrada identificada';
+      if (!rulesSnapshot.empty) {
+        const rules = rulesSnapshot.docs.map(doc => doc.data());
+        const brokenRule = rules.find(r => r.violations && r.violations > 0);
+        if (brokenRule) {
+          ruleBrokenMost = brokenRule.description || brokenRule.name || 'Regra não especificada';
+        }
+      }
+      
+      const aiInsight = await generateInsight({
+        uid: userId,
+        firstName: userProfile?.firstName || 'Trader',
+        kpi: {
+          winRate,
+          avgStake,
+          lossStreak: maxLossStreak
+        },
+        ruleBrokenMost
+      });
+      
+      const insight = {
+        type: 'weekly_summary_legacy',
+        title: 'Análise Semanal Inteligente (Legacy)',
+        content: aiInsight.insight,
+        action: aiInsight.acao,
+        timestamp: new Date().toISOString(),
+        metadata: {
+          totalTrades: trades.length,
+          winRate: winRate / 100,
+          avgStake,
+          lossStreak: maxLossStreak,
+          aiGenerated: true,
+          kpi: aiInsight.kpi
+        }
+      };
+      
+      await db.collection('insights').doc(userId).collection('insights').add(insight);
+      logger.log(`Generated legacy AI insight for user ${userId}`);
+    }
+    
+    logger.log('Legacy weekly insights generation completed');
+  } catch (error) {
+    logger.error('Legacy weekly insights generation error:', error);
   }
 }); 

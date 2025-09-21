@@ -29,26 +29,26 @@
   },
   "emulators": {
     "auth": {
-      "port": 9088
+      "port": 9099
     },
     "functions": {
-      "port": 5002
+      "port": 5001
     },
     "firestore": {
-      "port": 8888
+      "port": 8080
     },
     "hosting": {
-      "port": 3001
+      "port": 5000
     },
     "storage": {
-      "port": 9188
+      "port": 9199
     },
     "extensions": {
       "port": 6001
     },
     "ui": {
       "enabled": true,
-      "port": 4444
+      "port": 4002
     }
   }
 } 

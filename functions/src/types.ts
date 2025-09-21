@@ -184,4 +184,85 @@ export interface ScheduledTaskContext {
   resource: string;
   eventId: string;
   eventType: string;
+}
+
+// Bulk Operations types
+export interface BulkOperationStatus {
+  operationId: string;
+  userId: string;
+  operationType: 'csv_import' | 'trade_update' | 'trade_delete' | 'analytics_batch';
+  status: 'pending' | 'processing' | 'completed' | 'failed' | 'cancelled';
+  progress: number; // 0-100
+  totalItems: number;
+  processedItems: number;
+  successfulItems: number;
+  failedItems: number;
+  errors: BulkOperationError[];
+  createdAt: string;
+  updatedAt: string;
+  completedAt?: string;
+  estimatedTimeRemaining?: number;
+  metadata?: Record<string, any>;
+}
+
+export interface BulkOperationError {
+  index?: number;
+  itemId?: string;
+  error: string;
+  code: string;
+  timestamp: string;
+  context?: Record<string, any>;
+}
+
+export interface BulkImportOptions {
+  skipDuplicates?: boolean;
+  validateBeforeImport?: boolean;
+  maxConcurrent?: number;
+  dryRun?: boolean;
+}
+
+export interface BulkTradeUpdateRequest {
+  tradeIds?: string[];
+  filters?: {
+    start?: string;
+    end?: string;
+    result?: 'win' | 'loss' | 'tie';
+    asset?: string;
+    strategy?: string;
+  };
+  updateData: Partial<TradeData>;
+  confirmBulkUpdate?: boolean;
+}
+
+export interface BulkTradeDeleteRequest {
+  tradeIds?: string[];
+  filters?: {
+    start?: string;
+    end?: string;
+    result?: 'win' | 'loss' | 'tie';
+    asset?: string;
+    strategy?: string;
+  };
+  confirmBulkDelete?: boolean;
+}
+
+export interface BatchAnalyticsRequest {
+  periods: Array<{
+    start: string;
+    end: string;
+    label?: string;
+  }>;
+  metrics: ('winRate' | 'totalPnl' | 'avgPnl' | 'maxDrawdown' | 'riskRewardRatio')[];
+  groupBy?: 'daily' | 'weekly' | 'monthly';
+}
+
+export interface BatchAnalyticsResult {
+  calculationId: string;
+  results: Array<{
+    period: { start: string; end: string; label?: string };
+    metrics: Record<string, number>;
+    tradeCount: number;
+  }>;
+  totalCalculationTime: number;
+  completedAt: string;
 } 
