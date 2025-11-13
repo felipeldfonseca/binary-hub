@@ -23,7 +23,20 @@ interface AchievementBadgesProps {
 }
 
 export default function AchievementBadges({ period = 'week' }: AchievementBadgesProps) {
-  const { stats, loading } = useTradeStats(period)
+  // Map period values to useTradeStats format
+  const mapPeriod = (period: string) => {
+    const periodMap: Record<string, string> = {
+      'day': 'daily',
+      'week': 'weekly', 
+      'month': 'monthly',
+      '3months': 'monthly',
+      '6months': 'monthly',
+      'year': 'yearly'
+    }
+    return periodMap[period] || 'weekly'
+  }
+  
+  const { stats, loading } = useTradeStats(mapPeriod(period) as any)
   const { trades } = useTrades()
   const { isPortuguese } = useLanguage()
 

@@ -221,13 +221,17 @@ export function createLazyComponent<T extends React.ComponentType<any>>(
 ) {
   const LazyComponent = React.lazy(importFn);
   
-  return React.forwardRef<any, React.ComponentProps<T>>((props, ref) => (
+  const WrappedComponent = React.forwardRef<any, React.ComponentProps<T>>((props, ref) => (
     <React.Suspense 
       fallback={fallback ? React.createElement(fallback) : <div>Loading...</div>}
     >
       <LazyComponent {...props} ref={ref} />
     </React.Suspense>
   ));
+  
+  WrappedComponent.displayName = `Lazy(${importFn.name || 'Component'})`;
+  
+  return WrappedComponent;
 }
 
 // Resource preloading utility

@@ -32,7 +32,7 @@ interface PatternTendency {
 
 export default function PatternAnalysis() {
   const { isPortuguese } = useLanguage()
-  const { stats, loading: statsLoading } = useTradeStats('month')
+  const { stats, loading: statsLoading } = useTradeStats('monthly')
   const { trades, loading: tradesLoading } = useTrades({ limit: 200 })
   const [patterns, setPatterns] = useState<TradingPattern[]>([])
   const [tendencies, setTendencies] = useState<PatternTendency[]>([])

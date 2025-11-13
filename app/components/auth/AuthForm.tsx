@@ -20,9 +20,11 @@ interface AuthFormProps {
   onClose: () => void
   mode: 'signin' | 'signup'
   onModeChange: (mode: 'signin' | 'signup') => void
+  onSuccess?: (data: any) => void
+  isEmbedded?: boolean
 }
 
-export default function AuthForm({ isOpen, onClose, mode, onModeChange }: AuthFormProps) {
+export default function AuthForm({ isOpen, onClose, mode, onModeChange, onSuccess, isEmbedded = false }: AuthFormProps) {
   const { register, login, error, loading, clearError } = useAuth()
   const router = useRouter()
   const { isPortuguese } = useLanguage()
@@ -165,7 +167,18 @@ export default function AuthForm({ isOpen, onClose, mode, onModeChange }: AuthFo
         setFormData({ name: '', email: '', password: '', confirmPassword: '' })
         setFormErrors({})
         setLocalError(null)
-        onClose()
+        
+        // Call success callback for multi-step registration
+        if (onSuccess && mode === 'signup') {
+          onSuccess({
+            email: formData.email,
+            password: formData.password,
+            displayName: formData.name,
+            acceptedTerms: true
+          })
+        } else {
+          onClose()
+        }
       } else {
         console.log('Auth failed - showing error')
         // Set local error and keep form open
@@ -226,9 +239,17 @@ export default function AuthForm({ isOpen, onClose, mode, onModeChange }: AuthFo
 
   if (!isOpen) return null
 
+  const containerClass = isEmbedded 
+    ? "w-full" 
+    : "fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50"
+  
+  const cardClass = isEmbedded
+    ? "bg-transparent"
+    : "bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-md mx-4 overflow-hidden"
+
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-      <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-md mx-4 overflow-hidden">
+    <div className={containerClass}>
+      <div className={cardClass}>
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700">
           <h2 className="text-2xl font-comfortaa font-bold text-gray-900 dark:text-white">

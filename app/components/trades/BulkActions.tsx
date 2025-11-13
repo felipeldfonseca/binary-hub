@@ -141,7 +141,7 @@ const BulkActions: React.FC<BulkActionsProps> = ({
         updates.notes = bulkEditData.notes
       }
       
-      if (bulkEditData.result && bulkEditData.result !== '') {
+      if (bulkEditData.result) {
         updates.result = bulkEditData.result
         updates.status = bulkEditData.result === 'win' ? 'WIN' : 'LOSE'
         

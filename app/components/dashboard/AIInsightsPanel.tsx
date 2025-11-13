@@ -29,7 +29,7 @@ interface PredictiveIndicator {
 
 export default function AIInsightsPanel() {
   const { isPortuguese } = useLanguage()
-  const { stats, loading: statsLoading } = useTradeStats('month')
+  const { stats, loading: statsLoading } = useTradeStats('monthly')
   const { trades, loading: tradesLoading } = useTrades({ limit: 100 })
   const [insights, setInsights] = useState<AIInsight[]>([])
   const [predictions, setPredictions] = useState<PredictiveIndicator[]>([])

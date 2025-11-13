@@ -651,14 +651,15 @@ export default function AnalyticsV2Gamified() {
 
                 {/* Achievement Categories */}
                 <div className="grid gap-8">
-                  {(['trades', 'profit', 'streak', 'risk', 'consistency'] as AchievementCategory[]).map(category => {
+                  {(['trades', 'profit', 'streak', 'risk', 'consistency', 'special'] as AchievementCategory[]).map(category => {
                     const categoryAchievements = achievements.filter(a => a.category === category)
                     const categoryNames = {
                       trades: isPortuguese ? 'Operações' : 'Trading',
                       profit: isPortuguese ? 'Lucros' : 'Profits',
                       streak: isPortuguese ? 'Sequências' : 'Streaks',
                       risk: isPortuguese ? 'Gestão de Risco' : 'Risk Management',
-                      consistency: isPortuguese ? 'Consistência' : 'Consistency'
+                      consistency: isPortuguese ? 'Consistência' : 'Consistency',
+                      special: isPortuguese ? 'Especiais' : 'Special'
                     }
                     
                     return (

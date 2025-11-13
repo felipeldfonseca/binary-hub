@@ -1,6 +1,5 @@
 'use client'
 import React, { Suspense, memo } from 'react'
-import { useIntersectionObserver } from '@/lib/performance'
 
 interface LazyWrapperProps {
   children: React.ReactNode
@@ -23,10 +22,23 @@ const LazyWrapper = memo<LazyWrapperProps>(({
   onLoad
 }) => {
   const ref = React.useRef<HTMLDivElement>(null)
-  const isIntersecting = useIntersectionObserver(ref, {
-    threshold,
-    rootMargin
-  })
+  const [isIntersecting, setIsIntersecting] = React.useState(false)
+
+  React.useEffect(() => {
+    const element = ref.current
+    if (!element) return
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const [entry] = entries
+        setIsIntersecting(entry.isIntersecting)
+      },
+      { threshold, rootMargin }
+    )
+
+    observer.observe(element)
+    return () => observer.disconnect()
+  }, [threshold, rootMargin])
 
   React.useEffect(() => {
     if (isIntersecting && onLoad) {
@@ -62,11 +74,15 @@ export function withLazyLoading<P extends object>(
     rootMargin?: string
   }
 ) {
-  return memo((props: P) => (
+  const WrappedComponent = memo((props: P) => (
     <LazyWrapper {...options}>
       <Component {...props} />
     </LazyWrapper>
   ))
+  
+  WrappedComponent.displayName = `withLazyLoading(${Component.displayName || Component.name})`
+  
+  return WrappedComponent
 }
 
 /**

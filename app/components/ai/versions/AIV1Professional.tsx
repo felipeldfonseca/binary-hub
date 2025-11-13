@@ -47,7 +47,7 @@ export default function AIV1Professional() {
     error: aiError 
   } = useAI()
   
-  const { stats, loading: statsLoading } = useTradeStats('month')
+  const { stats, loading: statsLoading } = useTradeStats('monthly')
   const { trades, loading: tradesLoading } = useTrades({ limit: 100 })
 
   const [aiState, setAiState] = useState<AIAnalysisState>({

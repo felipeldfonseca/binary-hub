@@ -1,0 +1,136 @@
+{
+  "test-user-123": [
+    {
+      "id": "test-user-123_binary_1763018126608",
+      "userId": "test-user-123",
+      "marketType": "binary",
+      "displayName": "Opções Binárias",
+      "bankroll": {
+        "initial": 500,
+        "current": 500,
+        "currency": "USD",
+        "deposits": 500,
+        "withdrawals": 0,
+        "realizedPnL": 0,
+        "unrealizedPnL": 0,
+        "lastUpdated": "2025-11-13T07:15:26.608Z"
+      },
+      "performance": {
+        "totalTrades": 0,
+        "winningTrades": 0,
+        "losingTrades": 0,
+        "winRate": 0,
+        "profitLoss": 0,
+        "profitLossPercentage": 0,
+        "bestTrade": 0,
+        "worstTrade": 0,
+        "averageWin": 0,
+        "averageLoss": 0,
+        "profitFactor": 0,
+        "maxDrawdown": 0,
+        "currentDrawdown": 0,
+        "totalVolume": 0,
+        "averageTradeSize": 0,
+        "tradingDays": 0,
+        "averageTradesPerDay": 0,
+        "lastUpdated": "2025-11-13T07:15:26.608Z"
+      },
+      "settings": {
+        "displayName": "Opções Binárias",
+        "maxRiskPerTrade": 0.02,
+        "notifications": {
+          "tradeAlerts": true,
+          "performanceReports": true,
+          "aiInsights": true,
+          "socialUpdates": true
+        },
+        "privacy": {
+          "sharePerformance": false,
+          "shareTradeHistory": false,
+          "allowFollowers": true
+        },
+        "preferences": {
+          "timezone": "UTC",
+          "chartType": "candlestick",
+          "defaultTimeframe": "1h"
+        }
+      },
+      "brokerConnections": [],
+      "isActive": true,
+      "isPrimary": false,
+      "createdAt": "2025-11-13T07:15:26.608Z",
+      "updatedAt": "2025-11-13T07:15:26.608Z",
+      "metadata": {
+        "experienceLevel": "beginner",
+        "tradingStyle": [],
+        "goals": []
+      }
+    },
+    {
+      "id": "test-user-123_futures_1763018126608",
+      "userId": "test-user-123",
+      "marketType": "futures",
+      "displayName": "Futuros",
+      "bankroll": {
+        "initial": 20000,
+        "current": 20000,
+        "currency": "USD",
+        "deposits": 20000,
+        "withdrawals": 0,
+        "realizedPnL": 0,
+        "unrealizedPnL": 0,
+        "lastUpdated": "2025-11-13T07:15:26.608Z"
+      },
+      "performance": {
+        "totalTrades": 0,
+        "winningTrades": 0,
+        "losingTrades": 0,
+        "winRate": 0,
+        "profitLoss": 0,
+        "profitLossPercentage": 0,
+        "bestTrade": 0,
+        "worstTrade": 0,
+        "averageWin": 0,
+        "averageLoss": 0,
+        "profitFactor": 0,
+        "maxDrawdown": 0,
+        "currentDrawdown": 0,
+        "totalVolume": 0,
+        "averageTradeSize": 0,
+        "tradingDays": 0,
+        "averageTradesPerDay": 0,
+        "lastUpdated": "2025-11-13T07:15:26.608Z"
+      },
+      "settings": {
+        "displayName": "Futuros",
+        "maxRiskPerTrade": 0.02,
+        "notifications": {
+          "tradeAlerts": true,
+          "performanceReports": true,
+          "aiInsights": true,
+          "socialUpdates": true
+        },
+        "privacy": {
+          "sharePerformance": false,
+          "shareTradeHistory": false,
+          "allowFollowers": true
+        },
+        "preferences": {
+          "timezone": "UTC",
+          "chartType": "candlestick",
+          "defaultTimeframe": "1h"
+        }
+      },
+      "brokerConnections": [],
+      "isActive": true,
+      "isPrimary": true,
+      "createdAt": "2025-11-13T07:15:26.608Z",
+      "updatedAt": "2025-11-13T07:15:26.608Z",
+      "metadata": {
+        "experienceLevel": "beginner",
+        "tradingStyle": [],
+        "goals": []
+      }
+    }
+  ]
+}

@@ -57,7 +57,7 @@ export default function CreatePost({
     resolver: zodResolver(postSchema),
     defaultValues: {
       content: '',
-      visibility: userProfile?.socialPreferences?.defaultPostVisibility || 'public',
+      visibility: 'public',
       tags: []
     }
   })
@@ -161,16 +161,16 @@ export default function CreatePost({
       {/* Header */}
       <div className="flex items-start gap-4 mb-4">
         <Avatar
-          src={userProfile?.photoURL}
-          alt={userProfile?.displayName}
+          src={user?.photoURL || undefined}
+          alt={user?.displayName || undefined}
           size="md"
         />
         <div className="flex-1">
           <h3 className="text-white font-medium">
-            {userProfile?.displayName}
+            {user?.displayName || 'User'}
           </h3>
-          {userProfile?.username && (
-            <p className="text-gray-400 text-sm">@{userProfile.username}</p>
+          {user?.email && (
+            <p className="text-gray-400 text-sm">{user.email}</p>
           )}
         </div>
       </div>

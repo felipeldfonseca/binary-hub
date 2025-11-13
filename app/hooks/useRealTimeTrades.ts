@@ -30,7 +30,7 @@ export function useRealTimeTrades() {
     fetchTrades 
   } = useTrades();
   
-  const { refetch: refetchStats } = useTradeStats();
+  const { fetchDashboardStats: refetchStats } = useTradeStats();
 
   const [state, setState] = useState<RealTimeTradesState>({
     trades: [],
@@ -97,7 +97,7 @@ export function useRealTimeTrades() {
       }
 
       // Mark event as processed
-      setProcessedEvents(prev => new Set([...prev, eventKey]));
+      setProcessedEvents(prev => new Set([...Array.from(prev), eventKey]));
     });
 
     // Refresh data if needed

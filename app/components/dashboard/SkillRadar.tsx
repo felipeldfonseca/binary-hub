@@ -238,17 +238,18 @@ export default function SkillRadar() {
 
                 {/* Data points */}
                 {radarPoints.map((point, index) => (
-                  <circle
-                    key={index}
-                    cx={point.x}
-                    cy={point.y}
-                    r="4"
-                    fill={skillMetrics[index].color}
-                    stroke="white"
-                    strokeWidth="2"
-                    className="drop-shadow-sm cursor-pointer hover:r-6 transition-all"
-                    title={`${skillMetrics[index].name}: ${skillMetrics[index].value.toFixed(1)}`}
-                  />
+                  <g key={index}>
+                    <circle
+                      cx={point.x}
+                      cy={point.y}
+                      r="4"
+                      fill={skillMetrics[index].color}
+                      stroke="white"
+                      strokeWidth="2"
+                      className="drop-shadow-sm cursor-pointer hover:r-6 transition-all"
+                    />
+                    <title>{`${skillMetrics[index].name}: ${skillMetrics[index].value.toFixed(1)}`}</title>
+                  </g>
                 ))}
 
                 {/* Labels */}

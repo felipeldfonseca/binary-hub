@@ -25,7 +25,7 @@ interface UsernameSetupProps {
 
 export default function UsernameSetup({ onComplete, onSkip, showSkip = false }: UsernameSetupProps) {
   const { isPortuguese } = useLanguage()
-  const { user, userProfile } = useAuth()
+  const { user } = useAuth()
   const [loading, setLoading] = useState(false)
   const [checkingUsername, setCheckingUsername] = useState(false)
   const [usernameAvailable, setUsernameAvailable] = useState<boolean | null>(null)
@@ -49,9 +49,9 @@ export default function UsernameSetup({ onComplete, onSkip, showSkip = false }: 
   // Generate suggested username on component mount
   useEffect(() => {
     const generateSuggestion = async () => {
-      if (userProfile?.displayName) {
+      if (user?.displayName) {
         try {
-          const suggestion = await createUniqueUsername(userProfile.displayName)
+          const suggestion = await createUniqueUsername(user.displayName)
           setSuggestedUsername(suggestion)
           setValue('username', suggestion)
         } catch (error) {
@@ -61,7 +61,7 @@ export default function UsernameSetup({ onComplete, onSkip, showSkip = false }: 
     }
 
     generateSuggestion()
-  }, [userProfile?.displayName, setValue])
+  }, [user?.displayName, setValue])
 
   // Check username availability when it changes
   useEffect(() => {

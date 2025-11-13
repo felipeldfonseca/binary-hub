@@ -30,14 +30,16 @@ export default function SignUpPage() {
   }
 
   const handleEmailSignUp = () => {
-    setAuthMode('signup')
     setShowAuthForm(true)
   }
 
   const handleGoogleSignUp = async () => {
     try {
-      await loginWithGoogle()
-      router.push(isPortuguese ? '/dashboard?lang=pt' : '/dashboard')
+      const result = await loginWithGoogle()
+      if (result.success) {
+        // Redirect to onboarding for new users or dashboard for existing users
+        router.push(isPortuguese ? '/onboarding?lang=pt' : '/onboarding')
+      }
     } catch (error) {
       console.error('Google sign up failed:', error)
     }
@@ -45,11 +47,19 @@ export default function SignUpPage() {
 
   const handleAppleSignUp = async () => {
     try {
-      await loginWithApple()
-      router.push(isPortuguese ? '/dashboard?lang=pt' : '/dashboard')
+      const result = await loginWithApple()
+      if (result.success) {
+        // Redirect to onboarding for new users or dashboard for existing users  
+        router.push(isPortuguese ? '/onboarding?lang=pt' : '/onboarding')
+      }
     } catch (error) {
       console.error('Apple sign up failed:', error)
     }
+  }
+
+  const handleAuthSuccess = () => {
+    // Redirect to onboarding wizard after successful email registration
+    router.push(isPortuguese ? '/onboarding?lang=pt' : '/onboarding')
   }
 
   return (
@@ -165,12 +175,13 @@ export default function SignUpPage() {
         </p>
       </footer>
 
-      {/* Auth Form Modal */}
+      {/* Simple Auth Form Modal */}
       <AuthForm 
         isOpen={showAuthForm}
         onClose={() => setShowAuthForm(false)}
         mode={authMode}
         onModeChange={setAuthMode}
+        onSuccess={handleAuthSuccess}
       />
       </div>
     </PublicRoute>

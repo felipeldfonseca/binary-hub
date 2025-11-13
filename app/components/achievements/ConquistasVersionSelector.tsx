@@ -12,8 +12,8 @@ interface ConquistasVersionSelectorProps {
 
 const conquistasVersionInfo = {
   v1: {
-    name: isPortuguese => isPortuguese ? 'Gamificação Profissional' : 'Professional Gamification',
-    description: isPortuguese => isPortuguese 
+    name: (isPortuguese: boolean) => isPortuguese ? 'Gamificação Profissional' : 'Professional Gamification',
+    description: (isPortuguese: boolean) => isPortuguese 
       ? 'Sistema completo de conquistas com níveis XP, rankings e desafios diários'
       : 'Complete achievement system with XP levels, rankings, and daily challenges',
     icon: (
@@ -22,13 +22,13 @@ const conquistasVersionInfo = {
       </svg>
     ),
     color: 'from-purple-800/20 to-pink-800/20',
-    features: isPortuguese => isPortuguese 
+    features: (isPortuguese: boolean) => isPortuguese 
       ? ['Sistema de Níveis XP', 'Série de Vitórias', 'Conquistas por Categoria', 'Ranking Competitivo', 'Desafios Diários', 'Metas de Progresso']
       : ['XP Level System', 'Win Streaks', 'Category Achievements', 'Competitive Ranking', 'Daily Challenges', 'Progress Goals']
   },
   v2: {
-    name: isPortuguese => isPortuguese ? 'Jornada Visual' : 'Visual Journey',
-    description: isPortuguese => isPortuguese
+    name: (isPortuguese: boolean) => isPortuguese ? 'Jornada Visual' : 'Visual Journey',
+    description: (isPortuguese: boolean) => isPortuguese
       ? 'Jornada visual gamificada com níveis simples, marcos e desafios diários'
       : 'Gamified visual journey with simple levels, milestones and daily challenges',
     icon: (
@@ -37,13 +37,13 @@ const conquistasVersionInfo = {
       </svg>
     ),
     color: 'from-blue-800/20 to-indigo-800/20',
-    features: isPortuguese => isPortuguese 
+    features: (isPortuguese: boolean) => isPortuguese 
       ? ['Sistema de Níveis Simples', 'Marco de Conquistas', 'Progressão Visual', 'Desafios Diários', 'Mensagens Motivacionais', 'Estatísticas Fáceis']
       : ['Simple Level System', 'Achievement Milestones', 'Visual Progression', 'Daily Challenges', 'Motivational Messages', 'Easy Stats']
   },
   v3: {
-    name: isPortuguese => isPortuguese ? 'Comunidade Social' : 'Social Community',
-    description: isPortuguese => isPortuguese
+    name: (isPortuguese: boolean) => isPortuguese ? 'Comunidade Social' : 'Social Community',
+    description: (isPortuguese: boolean) => isPortuguese
       ? 'Experiência social divertida com amigos, desafios em grupo e comparações amigáveis'
       : 'Fun social experience with friends, group challenges and friendly comparisons',
     icon: (
@@ -52,7 +52,7 @@ const conquistasVersionInfo = {
       </svg>
     ),
     color: 'from-pink-800/20 to-purple-800/20',
-    features: isPortuguese => isPortuguese 
+    features: (isPortuguese: boolean) => isPortuguese 
       ? ['Sistema de Amigos', 'Desafios em Grupo', 'Ranking da Comunidade', 'Conquistas Sociais', 'Comparação com Pares', 'Motivação Social']
       : ['Friend System', 'Group Challenges', 'Community Rankings', 'Social Achievements', 'Peer Comparison', 'Social Motivation']
   }

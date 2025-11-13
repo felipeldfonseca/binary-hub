@@ -81,7 +81,7 @@ export interface CoachingSession {
 
 export function useAI() {
   const { user } = useAuth();
-  const { handleApiError } = useErrorHandler();
+  const { handleError } = useErrorHandler();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -125,12 +125,12 @@ export function useAI() {
     } catch (err) {
       const error = err instanceof Error ? err.message : 'An error occurred';
       setError(error);
-      handleApiError(error);
+      handleError(error);
       throw err;
     } finally {
       setLoading(false);
     }
-  }, [user, handleApiError]);
+  }, [user, handleError]);
 
   // Generate comprehensive AI analysis
   const generateComprehensiveAnalysis = useCallback(async (): Promise<ComprehensiveInsight> => {
@@ -156,12 +156,12 @@ export function useAI() {
     } catch (err) {
       const error = err instanceof Error ? err.message : 'An error occurred';
       setError(error);
-      handleApiError(error);
+      handleError(error);
       throw err;
     } finally {
       setLoading(false);
     }
-  }, [user, handleApiError]);
+  }, [user, handleError]);
 
   // Get coaching session
   const getCoachingSession = useCallback(async (situation: string, triggerType?: string): Promise<CoachingSession> => {
@@ -188,12 +188,12 @@ export function useAI() {
     } catch (err) {
       const error = err instanceof Error ? err.message : 'An error occurred';
       setError(error);
-      handleApiError(error);
+      handleError(error);
       throw err;
     } finally {
       setLoading(false);
     }
-  }, [user, handleApiError]);
+  }, [user, handleError]);
 
   // Get strategic recommendations
   const getRecommendations = useCallback(async (): Promise<AIRecommendation[]> => {
@@ -219,12 +219,12 @@ export function useAI() {
     } catch (err) {
       const error = err instanceof Error ? err.message : 'An error occurred';
       setError(error);
-      handleApiError(error);
+      handleError(error);
       throw err;
     } finally {
       setLoading(false);
     }
-  }, [user, handleApiError]);
+  }, [user, handleError]);
 
   // Get insights history
   const getInsightsHistory = useCallback(async (options?: {
@@ -260,12 +260,12 @@ export function useAI() {
     } catch (err) {
       const error = err instanceof Error ? err.message : 'An error occurred';
       setError(error);
-      handleApiError(error);
+      handleError(error);
       throw err;
     } finally {
       setLoading(false);
     }
-  }, [user, handleApiError]);
+  }, [user, handleError]);
 
   // Get coaching history
   const getCoachingHistory = useCallback(async (options?: {
@@ -301,12 +301,12 @@ export function useAI() {
     } catch (err) {
       const error = err instanceof Error ? err.message : 'An error occurred';
       setError(error);
-      handleApiError(error);
+      handleError(error);
       throw err;
     } finally {
       setLoading(false);
     }
-  }, [user, handleApiError]);
+  }, [user, handleError]);
 
   // Check trade against rules
   const checkTradeRules = useCallback(async (trade: any) => {
@@ -333,12 +333,12 @@ export function useAI() {
     } catch (err) {
       const error = err instanceof Error ? err.message : 'An error occurred';
       setError(error);
-      handleApiError(error);
+      handleError(error);
       throw err;
     } finally {
       setLoading(false);
     }
-  }, [user, handleApiError]);
+  }, [user, handleError]);
 
   return {
     loading,

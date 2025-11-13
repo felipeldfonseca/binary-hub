@@ -37,7 +37,7 @@ interface PositionSizingInsight {
 
 export default function RiskAssessment() {
   const { isPortuguese } = useLanguage()
-  const { stats, loading: statsLoading } = useTradeStats('month')
+  const { stats, loading: statsLoading } = useTradeStats('monthly')
   const { trades, loading: tradesLoading } = useTrades({ limit: 500 })
   const [riskMetrics, setRiskMetrics] = useState<RiskMetric[]>([])
   const [drawdownAnalysis, setDrawdownAnalysis] = useState<DrawdownAnalysis | null>(null)
@@ -187,7 +187,7 @@ export default function RiskAssessment() {
     setDrawdownAnalysis({
       currentDrawdown: currentDD,
       maxDrawdown: maxDD,
-      maxDrawdownDate,
+      maxDrawdownDate: maxDDDate,
       recoveryTime,
       drawdownFrequency: drawdownCount / (trades.length / 30), // per month
       worstStreak

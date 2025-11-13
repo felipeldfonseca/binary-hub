@@ -100,12 +100,12 @@ export function useNotifications() {
 
   // Dismiss notification (hide from UI)
   const dismiss = useCallback((notificationId: string) => {
-    setDismissed(prev => new Set([...prev, notificationId]));
+    setDismissed(prev => new Set([...Array.from(prev), notificationId]));
   }, []);
 
   // Dismiss multiple notifications
   const dismissMultiple = useCallback((notificationIds: string[]) => {
-    setDismissed(prev => new Set([...prev, ...notificationIds]));
+    setDismissed(prev => new Set([...Array.from(prev), ...notificationIds]));
   }, []);
 
   // Clear all dismissed notifications

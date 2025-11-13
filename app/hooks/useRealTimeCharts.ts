@@ -438,7 +438,7 @@ export function useRealTimeCharts(options: ChartOptions = {}) {
 
       const prev = data[index - 1];
       const next = data[index + 1];
-      const smoothedValue = (prev[field] as number + point[field] as number + next[field] as number) / 3;
+      const smoothedValue = (Number(prev[field]) + Number(point[field]) + Number(next[field])) / 3;
 
       return {
         ...point,

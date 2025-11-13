@@ -34,7 +34,21 @@ interface AdvancedMetric {
 export default function PerformanceSection() {
   const { isPortuguese } = useLanguage()
   const [selectedPeriod, setSelectedPeriod] = useState<Period>('week')
-  const { stats, dashboardStats, loading, error } = useTradeStats(selectedPeriod)
+  
+  // Map period values to match useTradeStats expected format
+  const mapPeriodToStatsFormat = (period: Period): 'daily' | 'weekly' | 'monthly' | 'yearly' | 'allTime' | 'ytd' => {
+    switch (period) {
+      case 'day': return 'daily'
+      case 'week': return 'weekly'
+      case 'month': return 'monthly'
+      case '3months':
+      case '6months': return 'monthly' // Use monthly for 3 and 6 months as approximation
+      case 'year': return 'yearly'
+      default: return 'weekly'
+    }
+  }
+  
+  const { stats, dashboardStats, loading, error } = useTradeStats(mapPeriodToStatsFormat(selectedPeriod))
   const { trades } = useTrades({ limit: 200 })
   const [predictiveMetrics, setPredictiveMetrics] = useState<PredictiveMetric[]>([])
   const [advancedMetrics, setAdvancedMetrics] = useState<AdvancedMetric[]>([])

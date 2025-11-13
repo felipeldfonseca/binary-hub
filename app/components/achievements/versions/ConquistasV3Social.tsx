@@ -44,7 +44,7 @@ interface SocialAchievement {
   id: string
   title: string
   description: string
-  icon: string
+  icon: React.ReactNode
   rarity: 'Common' | 'Rare' | 'Epic' | 'Legendary'
   unlockedBy: number // number of people who have this
   earnedAt?: string

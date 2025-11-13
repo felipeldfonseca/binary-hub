@@ -35,7 +35,7 @@ type ProfileFormData = z.infer<typeof profileSchema>
 
 export default function ProfileSettings() {
   const { isPortuguese } = useLanguage()
-  const { user, userProfile } = useAuth()
+  const { user } = useAuth()
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
   const [usernameAvailable, setUsernameAvailable] = useState<boolean | null>(null)
@@ -51,20 +51,20 @@ export default function ProfileSettings() {
   } = useForm<ProfileFormData>({
     resolver: zodResolver(profileSchema),
     defaultValues: {
-      displayName: userProfile?.displayName || '',
-      username: userProfile?.username || '',
-      bio: userProfile?.bio || '',
-      location: userProfile?.location || '',
-      website: userProfile?.website || '',
-      tradingSince: userProfile?.tradingSince || '',
-      allowsFollows: userProfile?.privacy?.allowsFollows ?? true,
-      requiresFollowApproval: userProfile?.privacy?.requiresFollowApproval ?? false,
-      showsOnlineStatus: userProfile?.privacy?.showsOnlineStatus ?? true,
-      allowsDirectMessages: userProfile?.privacy?.allowsDirectMessages ?? true,
-      defaultPostVisibility: userProfile?.socialPreferences?.defaultPostVisibility ?? 'public',
-      autoShareTrades: userProfile?.socialPreferences?.autoShareTrades ?? false,
-      notifyOnMentions: userProfile?.socialPreferences?.notifyOnMentions ?? true,
-      notifyOnFollows: userProfile?.socialPreferences?.notifyOnFollows ?? true
+      displayName: user?.displayName || '',
+      username: '',
+      bio: '',
+      location: '',
+      website: '',
+      tradingSince: '',
+      allowsFollows: true,
+      requiresFollowApproval: false,
+      showsOnlineStatus: true,
+      allowsDirectMessages: true,
+      defaultPostVisibility: 'public',
+      autoShareTrades: false,
+      notifyOnMentions: true,
+      notifyOnFollows: true
     }
   })
 
@@ -73,7 +73,7 @@ export default function ProfileSettings() {
   // Check username availability when it changes
   useEffect(() => {
     const checkUsername = async () => {
-      if (!watchedUsername || watchedUsername === userProfile?.username || watchedUsername.length < 3) {
+      if (!watchedUsername || watchedUsername.length < 3) {
         setUsernameAvailable(null)
         return
       }
@@ -91,29 +91,8 @@ export default function ProfileSettings() {
 
     const timeoutId = setTimeout(checkUsername, 500)
     return () => clearTimeout(timeoutId)
-  }, [watchedUsername, userProfile?.username])
+  }, [watchedUsername])
 
-  // Reset form when userProfile changes
-  useEffect(() => {
-    if (userProfile) {
-      reset({
-        displayName: userProfile.displayName || '',
-        username: userProfile.username || '',
-        bio: userProfile.bio || '',
-        location: userProfile.location || '',
-        website: userProfile.website || '',
-        tradingSince: userProfile.tradingSince || '',
-        allowsFollows: userProfile.privacy?.allowsFollows ?? true,
-        requiresFollowApproval: userProfile.privacy?.requiresFollowApproval ?? false,
-        showsOnlineStatus: userProfile.privacy?.showsOnlineStatus ?? true,
-        allowsDirectMessages: userProfile.privacy?.allowsDirectMessages ?? true,
-        defaultPostVisibility: userProfile.socialPreferences?.defaultPostVisibility ?? 'public',
-        autoShareTrades: userProfile.socialPreferences?.autoShareTrades ?? false,
-        notifyOnMentions: userProfile.socialPreferences?.notifyOnMentions ?? true,
-        notifyOnFollows: userProfile.socialPreferences?.notifyOnFollows ?? true
-      })
-    }
-  }, [userProfile, reset])
 
   const onSubmit = async (data: ProfileFormData) => {
     if (!user) return
@@ -123,7 +102,7 @@ export default function ProfileSettings() {
 
     try {
       // Check username availability one more time if changed
-      if (data.username && data.username !== userProfile?.username) {
+      if (data.username) {
         const exists = await usernameExists(data.username)
         if (exists) {
           setMessage({ type: 'error', text: isPortuguese ? 'Nome de usuário não disponível' : 'Username not available' })
@@ -133,7 +112,7 @@ export default function ProfileSettings() {
       }
 
       // Update username if changed
-      if (data.username && data.username !== userProfile?.username) {
+      if (data.username) {
         const result = await updateUsername(user.uid, data.username)
         if (!result.success) {
           setMessage({ type: 'error', text: result.error || 'Failed to update username' })
@@ -212,8 +191,8 @@ export default function ProfileSettings() {
       <div className="card mb-8">
         <div className="flex items-center gap-6">
           <Avatar 
-            src={userProfile?.photoURL} 
-            alt={userProfile?.displayName}
+            src={user?.photoURL || undefined} 
+            alt={user?.displayName || undefined}
             size="xl"
           />
           <div>

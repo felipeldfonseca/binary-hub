@@ -17,6 +17,7 @@ interface TradesGridProps {
   sortBy?: 'date' | 'profit' | 'asset' | 'result'
   sortOrder?: 'asc' | 'desc'
   onSortChange?: (sortBy: string, sortOrder: 'asc' | 'desc') => void
+  onViewModeChange?: (viewMode: 'grid' | 'compact') => void
   className?: string
 }
 
@@ -32,6 +33,7 @@ export default function TradesGrid({
   sortBy = 'date',
   sortOrder = 'desc',
   onSortChange,
+  onViewModeChange,
   className = ''
 }: TradesGridProps) {
   const { isPortuguese } = useLanguage()
@@ -185,7 +187,7 @@ export default function TradesGrid({
           {/* View Mode Toggle */}
           <div className="flex bg-white/10 rounded-lg p-1 backdrop-blur-sm">
             <button
-              onClick={() => onSortChange?.('viewMode', viewMode === 'grid' ? 'compact' : 'grid')}
+              onClick={() => onViewModeChange?.(viewMode === 'grid' ? 'compact' : 'grid')}
               className={`p-2 rounded transition-colors ${
                 viewMode === 'grid' 
                   ? 'bg-primary text-background' 
@@ -198,7 +200,7 @@ export default function TradesGrid({
               </svg>
             </button>
             <button
-              onClick={() => onSortChange?.('viewMode', viewMode === 'compact' ? 'grid' : 'compact')}
+              onClick={() => onViewModeChange?.(viewMode === 'compact' ? 'grid' : 'compact')}
               className={`p-2 rounded transition-colors ${
                 viewMode === 'compact' 
                   ? 'bg-primary text-background' 

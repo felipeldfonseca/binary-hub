@@ -74,7 +74,7 @@ export default function AnalyticsV2Dashboard() {
 
     return Object.entries(assetCounts).map(([asset, count]) => ({
       asset,
-      count,
+      count: count as number,
       percentage: ((count as number) / trades.length * 100).toFixed(1)
     })).sort((a, b) => (b.count as number) - (a.count as number))
   }, [trades])

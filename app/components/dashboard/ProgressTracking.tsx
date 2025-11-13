@@ -25,7 +25,20 @@ interface ProgressTrackingProps {
 }
 
 export default function ProgressTracking({ period = 'week' }: ProgressTrackingProps) {
-  const { stats, loading } = useTradeStats(period)
+  // Map period values to match useTradeStats expected format
+  const mapPeriodToStatsFormat = (period: 'day' | 'week' | 'month' | '3months' | '6months' | 'year'): 'daily' | 'weekly' | 'monthly' | 'yearly' | 'allTime' | 'ytd' => {
+    switch (period) {
+      case 'day': return 'daily'
+      case 'week': return 'weekly'
+      case 'month': return 'monthly'
+      case '3months':
+      case '6months': return 'monthly' // Use monthly for 3 and 6 months as approximation
+      case 'year': return 'yearly'
+      default: return 'weekly'
+    }
+  }
+  
+  const { stats, loading } = useTradeStats(mapPeriodToStatsFormat(period))
   const { trades } = useTrades()
   const { isPortuguese } = useLanguage()
 

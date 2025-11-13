@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useAuth } from '@/lib/contexts/AuthContext'
+import { auth } from '@/lib/firebase'
 import { 
   SharedTrade, 
   CommunityFeed, 
@@ -35,7 +36,7 @@ export function useCommunityFeed(options: UseCommunityFeedOptions = {}) {
       if (options.filters?.result) params.append('result', options.filters.result)
       if (options.filters?.sortBy) params.append('sortBy', options.filters.sortBy)
 
-      const token = await user.getIdToken()
+      const token = await auth.currentUser?.getIdToken()
       const response = await fetch(`${API_BASE}/community/feed?${params}`, {
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -115,7 +116,7 @@ export function useCreatePost() {
       setLoading(true)
       setError(null)
 
-      const token = await user.getIdToken()
+      const token = await auth.currentUser?.getIdToken()
       const response = await fetch(`${API_BASE}/community/create-post`, {
         method: 'POST',
         headers: {
@@ -167,7 +168,7 @@ export function useShareTrade() {
       setLoading(true)
       setError(null)
 
-      const token = await user.getIdToken()
+      const token = await auth.currentUser?.getIdToken()
       const response = await fetch(`${API_BASE}/community/share-trade`, {
         method: 'POST',
         headers: {
@@ -219,7 +220,7 @@ export function useLikeTrade() {
       setLoading(true)
       setError(null)
 
-      const token = await user.getIdToken()
+      const token = await auth.currentUser?.getIdToken()
       const response = await fetch(`${API_BASE}/community/trades/${tradeId}/like`, {
         method: 'POST',
         headers: {
@@ -270,7 +271,7 @@ export function useAddComment() {
       setLoading(true)
       setError(null)
 
-      const token = await user.getIdToken()
+      const token = await auth.currentUser?.getIdToken()
       const response = await fetch(`${API_BASE}/community/trades/${tradeId}/comment`, {
         method: 'POST',
         headers: {
@@ -325,7 +326,7 @@ export function useSharedTrade(tradeId: string | null) {
         setLoading(true)
         setError(null)
 
-        const token = await user.getIdToken()
+        const token = await auth.currentUser?.getIdToken()
         const response = await fetch(`${API_BASE}/community/trades/${tradeId}`, {
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -376,7 +377,7 @@ export function useCommunityStats(timeframe: '24h' | '7d' | '30d' = '24h') {
         setLoading(true)
         setError(null)
 
-        const token = await user.getIdToken()
+        const token = await auth.currentUser?.getIdToken()
         const response = await fetch(`${API_BASE}/community/stats?timeframe=${timeframe}`, {
           headers: {
             'Authorization': `Bearer ${token}`,

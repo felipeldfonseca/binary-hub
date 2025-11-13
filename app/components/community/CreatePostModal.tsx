@@ -3,9 +3,8 @@
 import React, { useState, useRef } from 'react'
 import { useLanguage } from '@/lib/contexts/LanguageContext'
 import { useAuth } from '@/lib/contexts/AuthContext'
-import { useTrades } from '@/hooks/useTrades'
+import { useTrades, Trade } from '@/hooks/useTrades'
 import { useCreatePost, CreatePostData } from '@/hooks/useCommunity'
-import { Trade } from '@/types/trade'
 
 interface CreatePostModalProps {
   isOpen: boolean

@@ -1,100 +1,10 @@
 'use client'
-import { useState } from 'react'
-import Link from 'next/link'
 import Navbar from '@/components/layout/Navbar'
 import Footer from '@/components/layout/Footer'
 import PublicRoute from '@/components/auth/PublicRoute'
-import { useLanguage } from '@/lib/contexts/LanguageContext'
-import VersionSelector, { LandingVersion } from '@/components/layout/VersionSelector'
-
-// Import landing page versions
 import LandingPageAnimatedV1 from '@/components/layout/versions/LandingPageAnimatedV1'
 
-// Import fallback components for missing versions
-import LandingHeroSection from '@/components/layout/LandingHeroSection'
-import LandingHeroSectionPT from '@/components/layout/LandingHeroSectionPT'
-import HowItWorksSection from '@/components/layout/HowItWorksSection'
-import HowItWorksSectionPT from '@/components/layout/HowItWorksSectionPT'
-import MissionSection from '@/components/layout/MissionSection'
-import MissionSectionPT from '@/components/layout/MissionSectionPT'
-import KeyFeatureSection from '@/components/layout/KeyFeatureSection'
-import KeyFeatureSectionPT from '@/components/layout/KeyFeatureSectionPT'
-import PlansComparisonSection from '@/components/layout/PlansComparisonSection'
-import PlansComparisonSectionPT from '@/components/layout/PlansComparisonSectionPT'
-import CommunityFeaturesSection from '@/components/layout/CommunityFeaturesSection'
-import MultiMarketShowcase from '@/components/layout/MultiMarketShowcase'
-import SocialProofSection from '@/components/layout/SocialProofSection'
-import SocialProofSectionPT from '@/components/layout/SocialProofSectionPT'
-import FAQSection from '@/components/layout/FAQSection'
-
 export default function HomePage() {
-  const { isPortuguese } = useLanguage()
-  const [currentVersion, setCurrentVersion] = useState<LandingVersion>('animated-v1')
-
-  const renderLandingPage = () => {
-    switch (currentVersion) {
-      case 'animated-v1':
-        return <LandingPageAnimatedV1 />
-      case 'original':
-      default:
-        // Original component structure
-        return (
-          <>
-            {/* Hero Section - Language-aware */}
-            {isPortuguese ? <LandingHeroSectionPT /> : <LandingHeroSection />}
-            
-            {/* How It Works Section */}
-            {isPortuguese ? <HowItWorksSectionPT /> : <HowItWorksSection />}
-            
-            {/* Mission Section */}
-            {isPortuguese ? <MissionSectionPT /> : <MissionSection />}
-            
-            {/* Key Feature Section */}
-            {isPortuguese ? <KeyFeatureSectionPT /> : <KeyFeatureSection />}
-            
-            {/* Multi-Market Showcase */}
-            <MultiMarketShowcase />
-            
-            {/* Community Features Section */}
-            <CommunityFeaturesSection />
-            
-            {/* Plans Comparison Section */}
-            {isPortuguese ? <PlansComparisonSectionPT /> : <PlansComparisonSection />}
-
-            {/* Social Proof Section */}
-            {isPortuguese ? <SocialProofSectionPT /> : <SocialProofSection />}
-
-            {/* FAQ Section */}
-            <FAQSection variant="landing" />
-
-            {/* Multi-Market CTA Section */}
-            <section className="py-20 bg-primary">
-              <div className="container mx-auto px-4 text-center">
-                <h2 className="font-poly text-3xl font-bold text-gray-600 mb-2">
-                  {isPortuguese ? 'Evolua em qualquer mercado.' : 'Evolve in any market.'}
-                </h2>
-                <h2 className="font-poly text-3xl font-bold text-gray-600 mb-4">
-                  {isPortuguese ? 'Com a IA que ganhou competições reais.' : 'With AI that won real competitions.'}
-                </h2>
-                <p className="text-gray-700 mb-8 max-w-2xl mx-auto">
-                  {isPortuguese 
-                    ? 'Binary Options, Forex, Crypto, Futuros - todos os mercados em uma plataforma. Powered by Qwen3 Max (+117% retorno) e DeepSeek V3 (+76% retorno).'
-                    : 'Binary Options, Forex, Crypto, Futures - all markets in one platform. Powered by Qwen3 Max (+117% returns) and DeepSeek V3 (+76% returns).'
-                  }
-                </p>
-                <Link 
-                  href="/auth/register" 
-                  className="bg-gray-800 text-primary px-8 py-3 text-lg font-comfortaa font-bold rounded-full hover:bg-gray-700 transition-colors"
-                >
-                  {isPortuguese ? 'Começar com IA Campeã Gratuitamente' : 'Start with Championship AI for Free'}
-                </Link>
-              </div>
-            </section>
-          </>
-        )
-    }
-  }
-
   return (
     <PublicRoute>
       <div className="min-h-screen bg-background">
@@ -102,18 +12,8 @@ export default function HomePage() {
         <Navbar />
         
         <main className="relative">
-          {/* Version Selector */}
-          <div className="bg-gray-900 py-8">
-            <div className="container mx-auto px-4">
-              <VersionSelector 
-                currentVersion={currentVersion}
-                onVersionChange={setCurrentVersion}
-              />
-            </div>
-          </div>
-          
-          {/* Render Selected Landing Page Version */}
-          {renderLandingPage()}
+          {/* Performance Animated Landing Page */}
+          <LandingPageAnimatedV1 />
         </main>
         
         <Footer />

@@ -574,7 +574,7 @@ function AdvancedInsightsPanel({ insights }: { insights: AdvancedInsight[] }) {
 // Main AI V3 Advanced Component
 export default function AIV3Advanced() {
   const { isPortuguese } = useLanguage()
-  const { stats, loading: statsLoading } = useTradeStats('month')
+  const { stats, loading: statsLoading } = useTradeStats('monthly')
   const { trades, loading: tradesLoading } = useTrades({ limit: 100 })
   const { aiModels, neuralNetwork, insights, processing, activeModel, setActiveModel } = useAdvancedAI()
   const [activeTab, setActiveTab] = useState<'neural' | 'models' | 'insights' | 'strategy'>('neural')

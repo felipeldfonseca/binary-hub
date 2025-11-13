@@ -36,7 +36,7 @@ interface AssetComparison {
 
 export default function AssetPerformance() {
   const { isPortuguese } = useLanguage()
-  const { stats, loading: statsLoading } = useTradeStats('month')
+  const { stats, loading: statsLoading } = useTradeStats('monthly')
   const { trades, loading: tradesLoading } = useTrades({ limit: 500 })
   const [assetData, setAssetData] = useState<AssetPerformanceData[]>([])
   const [comparisons, setComparisons] = useState<AssetComparison[]>([])

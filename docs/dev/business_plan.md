@@ -79,46 +79,70 @@ Binary Hub é a **primeira plataforma social** dedicada a traders de opções bi
 
 ### 4. Modelo de Monetização
 
-#### Tier Structure
+#### Tier Structure (Dual Payment System)
 ```
 FREE (Community)
 ├─ Profile público básico
 ├─ Follow/followers unlimited
 ├─ Feed social completo
 ├─ Journaling básico (50 trades/mês)
+├─ 5 análises de IA por mês
 └─ Community features
 
-PRO ($12/mês) 
+PRO TRADER (R$ 97/mês | $19 USDT/USDC)
 ├─ Tudo do Free
 ├─ Journaling unlimited
-├─ Advanced analytics
-├─ Priority support
-├─ Profile customization
-└─ Export capabilities
+├─ Análises avançadas e gráficos
+├─ Feed social personalizado
+├─ 50 análises de IA por mês
+├─ 10 relatórios diários de IA
+├─ Sistema completo de seguidores
+├─ Compartilhamento de trades
+└─ Suporte prioritário
 
-COLLABORATIVE ($24/mês)
-├─ Tudo do Pro
+PREMIUM (R$ 147/mês | $29 USDT/USDC)
+├─ Tudo do Pro Trader
+├─ IA ilimitada 🚀
+├─ Relatórios semanais detalhados
+├─ Reconhecimento de padrões avançado
+├─ Colaboração ao vivo (Fase 2)
+├─ Insights exclusivos da comunidade
+├─ Análises personalizadas
+└─ Suporte dedicado
+
+FUTURO - COLLABORATIVE (Fase 2)
 ├─ Live collaboration tools
 ├─ Voice communication
 ├─ Shared charts
 ├─ Session recording
 └─ Partnership analytics
 
-AI ENHANCED ($49/mês)
-├─ Tudo do Collaborative
-├─ AI chart analysis
+FUTURO - AI ENHANCED (Fase 3)
+├─ Real-time AI chart analysis
 ├─ Collaborative AI insights
 ├─ Custom AI strategies
 ├─ Predictive matching
 └─ Advanced AI features
 ```
 
+#### Payment Methods & Pricing Strategy
+- **Traditional**: R$ 97/147 via Stripe (cartão, PIX, boleto)
+- **Crypto**: $19/29 via USDT/USDC (CoinGate integration)
+- **Target Market**: Brasil (BRL) + Global crypto users (USD)
+- **Launch Discount**: Preços promocionais por tempo limitado
+
 #### Revenue Projections (6 meses)
 ```
-Month 1-2: 100 users (10% Pro) = $120 MRR
-Month 3-4: 400 users (15% Pro) = $720 MRR  
-Month 5-6: 1000 users (20% Pro, 5% Collaborative) = $3,000 MRR
+Month 1-2: 150 users (15% Pro) = R$ 2.180 (~$430 MRR)
+Month 3-4: 500 users (20% Pro, 5% Premium) = R$ 8.430 (~$1.670 MRR)  
+Month 5-6: 1000 users (25% Pro, 10% Premium) = R$ 19.650 (~$3.900 MRR)
 ```
+
+#### Pricing Advantages
+- **Crypto Appeals to Global Market**: USDT/USDC attracts international traders
+- **Lower Processing Fees**: Crypto eliminates credit card fees
+- **Competitive Brazilian Pricing**: R$ 97/147 positioned competitively in local market
+- **Flexible Payment Options**: Accommodates both traditional and crypto-native users
 
 ### 5. Go-to-Market Strategy
 

@@ -285,23 +285,14 @@ export default function TradesV1Professional() {
 
         {activeTab === 'form' && (
           <TradeForm
-            onTradeCreate={handleTradeCreate}
+            onSubmit={handleTradeCreate}
             loading={tradesLoading}
           />
         )}
 
         {activeTab === 'filters' && (
           <TradeFilters
-            filters={filters}
-            onFiltersChange={setFilters}
-            onClearFilters={() => setFilters({
-              dateRange: { start: '', end: '' },
-              asset: '',
-              result: '',
-              minAmount: '',
-              maxAmount: ''
-            })}
-            trades={trades}
+            onFiltersChange={(newFilters) => setFilters(newFilters as any)}
           />
         )}
 
@@ -378,10 +369,13 @@ export default function TradesV1Professional() {
       {selectedTrade && (
         <TradeModal
           trade={selectedTrade}
+          isOpen={true}
           onClose={() => setSelectedTrade(null)}
-          onUpdate={handleTradeUpdate}
-          onDelete={async () => {
-            await deleteTrade(selectedTrade.id)
+          onUpdate={async (tradeId, updates) => {
+            await handleTradeUpdate(updates)
+          }}
+          onDelete={async (tradeId) => {
+            await deleteTrade(tradeId)
             await fetchTrades()
             setSelectedTrade(null)
           }}

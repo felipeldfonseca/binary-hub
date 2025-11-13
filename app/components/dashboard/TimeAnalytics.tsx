@@ -41,7 +41,7 @@ interface OptimalTradingWindow {
 
 export default function TimeAnalytics() {
   const { isPortuguese } = useLanguage()
-  const { stats, loading: statsLoading } = useTradeStats('month')
+  const { stats, loading: statsLoading } = useTradeStats('monthly')
   const { trades, loading: tradesLoading } = useTrades({ limit: 500 })
   const [hourlyPerformance, setHourlyPerformance] = useState<TimePerformance[]>([])
   const [dailyPerformance, setDailyPerformance] = useState<DayPerformance[]>([])

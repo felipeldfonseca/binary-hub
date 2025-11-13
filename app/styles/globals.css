@@ -150,6 +150,119 @@ select:focus {
   100% { transform: rotate(360deg); }
 }
 
+/* Enhanced UX Animations for Landing Page */
+@keyframes slide-up {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slide-down {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes scale-in {
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes bounce-in {
+  0% {
+    opacity: 0;
+    transform: scale(0.3);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.05);
+  }
+  70% {
+    transform: scale(0.9);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* Animation utility classes */
+.animate-slide-up {
+  animation: slide-up 0.6s ease-out;
+}
+
+.animate-slide-down {
+  animation: slide-down 0.4s ease-out;
+}
+
+.animate-fade-in {
+  animation: fade-in 0.8s ease-out;
+}
+
+.animate-scale-in {
+  animation: scale-in 0.5s ease-out;
+}
+
+.animate-bounce-in {
+  animation: bounce-in 0.6s ease-out;
+}
+
+/* Delay utility classes */
+.delay-200 {
+  animation-delay: 0.2s;
+  animation-fill-mode: both;
+}
+
+.delay-400 {
+  animation-delay: 0.4s;
+  animation-fill-mode: both;
+}
+
+.delay-600 {
+  animation-delay: 0.6s;
+  animation-fill-mode: both;
+}
+
+.delay-800 {
+  animation-delay: 0.8s;
+  animation-fill-mode: both;
+}
+
+.delay-1000 {
+  animation-delay: 1s;
+  animation-fill-mode: both;
+}
+
+.delay-2000 {
+  animation-delay: 2s;
+  animation-fill-mode: both;
+}
+
 .toast {
   position: fixed;
   top: 20px;
@@ -487,4 +600,85 @@ select:focus {
 .trade-card.tie {
   border-color: rgba(179, 179, 179, 0.4);
   box-shadow: 0 4px 20px rgba(179, 179, 179, 0.2);
+}
+
+/* V1 Landing Page Animations - Performance Optimized */
+.typewriter-effect {
+  overflow: hidden;
+  border-right: 3px solid #E1FFD9;
+  white-space: nowrap;
+  margin: 0 auto;
+  letter-spacing: 0.15em;
+  animation: typewriter 2.5s steps(40, end), blink-caret 0.75s step-end infinite;
+}
+
+@keyframes typewriter {
+  from { width: 0 }
+  to { width: 100% }
+}
+
+@keyframes blink-caret {
+  from, to { border-color: transparent }
+  50% { border-color: #E1FFD9 }
+}
+
+.shadow-glow {
+  box-shadow: 0 0 20px rgba(225, 255, 217, 0.3);
+}
+
+/* Performance-optimized animations for V1 */
+.parallax-layer {
+  transform: translate3d(0, 0, 0);
+  backface-visibility: hidden;
+  will-change: transform;
+}
+
+.scroll-triggered {
+  transform: translate3d(0, 0, 0);
+  backface-visibility: hidden;
+  will-change: opacity, transform;
+}
+
+.hover-scale {
+  transform: translate3d(0, 0, 0);
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  will-change: transform;
+}
+
+.hover-scale:hover {
+  transform: translate3d(0, -2px, 0) scale(1.02);
+}
+
+/* Smooth parallax keyframes */
+@keyframes parallax-float {
+  0%, 100% { transform: translate3d(0, 0, 0); }
+  50% { transform: translate3d(0, -10px, 0); }
+}
+
+.parallax-float {
+  animation: parallax-float 6s ease-in-out infinite;
+  will-change: transform;
+}
+
+/* Counter animation optimization */
+.counter-number {
+  font-feature-settings: 'tnum';
+  font-variant-numeric: tabular-nums;
+}
+
+/* Scroll snap optimization */
+.scroll-snap-section {
+  scroll-snap-align: start;
+  scroll-snap-stop: always;
+}
+
+/* Reduced motion preferences */
+@media (prefers-reduced-motion: reduce) {
+  .parallax-layer,
+  .scroll-triggered,
+  .hover-scale {
+    transform: none !important;
+    animation: none !important;
+    transition: none !important;
+  }
 } 
