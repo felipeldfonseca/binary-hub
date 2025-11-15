@@ -24,6 +24,7 @@ export interface Trade {
   profit: number;
   payout: number;
   platform: string;
+  marketType?: 'binary' | 'forex' | 'crypto' | 'futures' | 'options';
   strategy?: string;
   notes?: string;
   screenshots?: string[];
@@ -41,6 +42,7 @@ export interface TradeFilters {
   result?: 'win' | 'loss' | 'tie';
   asset?: string;
   strategy?: string;
+  marketType?: 'binary' | 'forex' | 'crypto' | 'futures' | 'options';
 }
 
 export interface TradeStats {
@@ -125,6 +127,7 @@ export function useTrades(filters: TradeFilters = {}) {
             profit: trade.pnl || trade.profit || 0,
             payout: trade.result === 'win' ? (trade.amount || 0) + (trade.pnl || trade.profit || 0) : 0,
             platform: 'Ebinex',
+            marketType: 'binary', // Default to binary for imported trades
             strategy: 'Imported',
             notes: 'Imported from CSV',
             createdAt: new Date(),
@@ -162,6 +165,9 @@ export function useTrades(filters: TradeFilters = {}) {
           }
           if (newFilters.strategy) {
             queryParams.append('strategy', newFilters.strategy);
+          }
+          if (newFilters.marketType) {
+            queryParams.append('marketType', newFilters.marketType);
           }
           
           const response = await fetch(`http://localhost:5001/binary-hub/us-central1/api/v1/trades?${queryParams.toString()}`, {

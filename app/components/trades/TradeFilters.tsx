@@ -25,6 +25,7 @@ interface FilterState {
   strategy: string
   minAmount: string
   maxAmount: string
+  marketType: string
 }
 
 const TradeFiltersComponent: React.FC<TradeFiltersProps> = ({
@@ -53,6 +54,13 @@ const TradeFiltersComponent: React.FC<TradeFiltersProps> = ({
       amountRange: 'Amount Range ($)',
       minAmount: 'Min Amount',
       maxAmount: 'Max Amount',
+      marketType: 'Market Type',
+      allMarkets: 'All Markets',
+      binary: 'Binary Options',
+      forex: 'Forex',
+      crypto: 'Cryptocurrency',
+      futures: 'Futures',
+      options: 'Options',
       quickFilters: 'Quick Filters',
       today: 'Today',
       thisWeek: 'This Week',
@@ -90,6 +98,13 @@ const TradeFiltersComponent: React.FC<TradeFiltersProps> = ({
       amountRange: 'Faixa de Valor ($)',
       minAmount: 'Valor Mínimo',
       maxAmount: 'Valor Máximo',
+      marketType: 'Tipo de Mercado',
+      allMarkets: 'Todos os Mercados',
+      binary: 'Opções Binárias',
+      forex: 'Forex',
+      crypto: 'Criptomoedas',
+      futures: 'Futuros',
+      options: 'Opções',
       quickFilters: 'Filtros Rápidos',
       today: 'Hoje',
       thisWeek: 'Esta Semana',
@@ -123,6 +138,7 @@ const TradeFiltersComponent: React.FC<TradeFiltersProps> = ({
     strategy: '',
     minAmount: '',
     maxAmount: '',
+    marketType: '',
   })
 
   // Saved filters state
@@ -181,6 +197,10 @@ const TradeFiltersComponent: React.FC<TradeFiltersProps> = ({
       tradeFilters.strategy = filterState.strategy
     }
 
+    if (filterState.marketType && filterState.marketType !== 'all') {
+      tradeFilters.marketType = filterState.marketType as 'binary' | 'forex' | 'crypto' | 'futures' | 'options'
+    }
+
     // Note: minAmount and maxAmount would need to be added to TradeFilters interface
     // For now, we'll skip them but they can be implemented in the backend
 
@@ -202,6 +222,7 @@ const TradeFiltersComponent: React.FC<TradeFiltersProps> = ({
       strategy: '',
       minAmount: '',
       maxAmount: '',
+      marketType: '',
     }
     setFilters(emptyFilters)
     onFiltersChange({})
@@ -270,6 +291,7 @@ const TradeFiltersComponent: React.FC<TradeFiltersProps> = ({
       strategy: savedFilter.filters.strategy || '',
       minAmount: '',
       maxAmount: '',
+      marketType: savedFilter.filters.marketType || '',
     }
 
     setFilters(filterState)
@@ -351,7 +373,7 @@ const TradeFiltersComponent: React.FC<TradeFiltersProps> = ({
         </div>
 
         {/* Main Filters */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
           {/* Date Range */}
           <div className="space-y-2">
             <label className="block text-sm font-comfortaa font-medium text-gray-200">
@@ -375,6 +397,25 @@ const TradeFiltersComponent: React.FC<TradeFiltersProps> = ({
               onChange={(e) => handleFilterChange('endDate', e.target.value)}
               className="form-input w-full"
             />
+          </div>
+
+          {/* Market Type Filter */}
+          <div className="space-y-2">
+            <label className="block text-sm font-comfortaa font-medium text-gray-200">
+              {t.marketType}
+            </label>
+            <select
+              value={filters.marketType}
+              onChange={(e) => handleFilterChange('marketType', e.target.value)}
+              className="form-input w-full"
+            >
+              <option value="" className="bg-gray-800">{t.allMarkets}</option>
+              <option value="binary" className="bg-gray-800">{t.binary}</option>
+              <option value="forex" className="bg-gray-800">{t.forex}</option>
+              <option value="crypto" className="bg-gray-800">{t.crypto}</option>
+              <option value="futures" className="bg-gray-800">{t.futures}</option>
+              <option value="options" className="bg-gray-800">{t.options}</option>
+            </select>
           </div>
 
           {/* Result Filter */}

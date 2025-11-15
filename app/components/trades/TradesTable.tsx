@@ -45,6 +45,7 @@ const TradesTable: React.FC<TradesTableProps> = ({
       entryTime: 'Entry Time',
       exitTime: 'Exit Time',
       asset: 'Asset',
+      market: 'Market',
       direction: 'Direction',
       amount: 'Amount',
       entryPrice: 'Entry Price',
@@ -71,6 +72,7 @@ const TradesTable: React.FC<TradesTableProps> = ({
       entryTime: 'Hora de Entrada',
       exitTime: 'Hora de Saída',
       asset: 'Ativo',
+      market: 'Mercado',
       direction: 'Direção',
       amount: 'Valor',
       entryPrice: 'Preço de Entrada',
@@ -173,6 +175,32 @@ const TradesTable: React.FC<TradesTableProps> = ({
     )
   }
 
+  const MarketBadge: React.FC<{ marketType?: string }> = ({ marketType }) => {
+    if (!marketType) {
+      return <span className="text-xs text-gray-400">-</span>
+    }
+
+    const marketConfig = {
+      binary: { color: 'bg-orange-500', icon: '📊' },
+      forex: { color: 'bg-blue-500', icon: '💱' },
+      crypto: { color: 'bg-purple-500', icon: '₿' },
+      futures: { color: 'bg-green-500', icon: '📈' },
+      options: { color: 'bg-yellow-500', icon: '🎯' }
+    }
+
+    const config = marketConfig[marketType as keyof typeof marketConfig]
+    if (!config) {
+      return <span className="text-xs text-gray-400">{marketType}</span>
+    }
+
+    return (
+      <span className={`inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-semibold text-white ${config.color}`}>
+        <span>{config.icon}</span>
+        <span>{marketType.toUpperCase()}</span>
+      </span>
+    )
+  }
+
   // Pagination calculations
   const currentPage = pagination ? Math.floor(pagination.offset / pagination.limit) + 1 : 1
   const totalPages = pagination ? Math.ceil(pagination.total / pagination.limit) : 1
@@ -232,6 +260,7 @@ const TradesTable: React.FC<TradesTableProps> = ({
                   <SortIcon field="asset" />
                 </div>
               </th>
+              <th className="px-4 py-3">{t.market}</th>
               <th className="px-4 py-3">{t.direction}</th>
               <th 
                 className="px-4 py-3 cursor-pointer hover:bg-white/5 transition-colors"
@@ -281,6 +310,9 @@ const TradesTable: React.FC<TradesTableProps> = ({
                 </td>
                 <td className="px-4 py-3 font-medium">
                   {trade.asset}
+                </td>
+                <td className="px-4 py-3">
+                  <MarketBadge marketType={trade.marketType} />
                 </td>
                 <td className="px-4 py-3">
                   <DirectionBadge direction={trade.direction} />

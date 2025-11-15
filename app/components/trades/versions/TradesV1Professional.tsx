@@ -1,9 +1,10 @@
 'use client'
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import CsvUploadSection from '@/components/dashboard/CsvUploadSection'
 import { useLanguage } from '@/lib/contexts/LanguageContext'
 import { useTrades, Trade } from '@/hooks/useTrades'
 import { useTradeStats } from '@/hooks/useTradeStats'
+import { useMarketAccounts } from '@/hooks/useMarketAccounts'
 import TradesTable from '@/components/trades/TradesTable'
 import TradeForm from '@/components/trades/TradeForm'
 import TradeFilters from '@/components/trades/TradeFilters'
@@ -12,6 +13,7 @@ import BulkActions from '@/components/trades/BulkActions'
 
 export default function TradesV1Professional() {
   const { isPortuguese } = useLanguage()
+  const { activeMarket } = useMarketAccounts()
   const [activeTab, setActiveTab] = useState<'table' | 'form' | 'filters' | 'import'>('table')
   const [selectedTrade, setSelectedTrade] = useState<Trade | null>(null)
   const [selectedIds, setSelectedIds] = useState<string[]>([])
@@ -22,8 +24,19 @@ export default function TradesV1Professional() {
     asset: '',
     result: '',
     minAmount: '',
-    maxAmount: ''
+    maxAmount: '',
+    marketType: ''
   })
+
+  // Auto-filter by active market when it changes
+  useEffect(() => {
+    if (activeMarket && activeMarket.marketType !== filters.marketType) {
+      setFilters(prev => ({
+        ...prev,
+        marketType: activeMarket.marketType
+      }))
+    }
+  }, [activeMarket, filters.marketType])
 
   const { 
     trades, 
@@ -46,6 +59,7 @@ export default function TradesV1Professional() {
     if (filters.dateRange?.end && new Date(trade.entryTime) > new Date(filters.dateRange.end)) return false
     if (filters.asset && !trade.asset.toLowerCase().includes(filters.asset.toLowerCase())) return false
     if (filters.result && trade.result !== filters.result) return false
+    if (filters.marketType && trade.marketType !== filters.marketType) return false
     if (filters.minAmount && trade.amount < parseFloat(filters.minAmount)) return false
     if (filters.maxAmount && trade.amount > parseFloat(filters.maxAmount)) return false
     return true
@@ -163,12 +177,23 @@ export default function TradesV1Professional() {
         <h1 className="hero-title text-3xl md:text-4xl lg:text-5xl font-poly font-bold text-white mb-6">
           {isPortuguese ? 'Gerenciamento Profissional de Operações' : 'Professional Trade Management'}
         </h1>
-        <p className="text-xl font-comfortaa font-normal text-white max-w-4xl mx-auto">
+        <p className="text-xl font-comfortaa font-normal text-white max-w-4xl mx-auto mb-6">
           {isPortuguese 
             ? 'Interface avançada estilo Excel/Airtable com recursos profissionais de filtragem, ordenação e ações em lote.' 
             : 'Advanced Excel/Airtable-style interface with professional filtering, sorting, and bulk action features.'
           }
         </p>
+        
+        {/* Active Market Indicator */}
+        {activeMarket && (
+          <div className="flex items-center justify-center gap-2 text-sm text-gray-300">
+            <span>{isPortuguese ? 'Mostrando operações de:' : 'Showing trades from:'}</span>
+            <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-white/10 text-white font-medium">
+              <span>{activeMarket.marketType === 'binary' ? '📊' : activeMarket.marketType === 'forex' ? '💱' : activeMarket.marketType === 'crypto' ? '₿' : activeMarket.marketType === 'futures' ? '📈' : '🎯'}</span>
+              <span>{activeMarket.displayName}</span>
+            </span>
+          </div>
+        )}
       </div>
 
       {/* Error Display */}
