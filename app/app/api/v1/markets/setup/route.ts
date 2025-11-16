@@ -49,6 +49,25 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Market accounts required' }, { status: 400 })
     }
 
+    // Check for existing accounts for this user
+    const allAccounts = loadAccounts()
+    const existingAccounts = allAccounts[userId] || []
+    
+    if (existingAccounts.length > 0) {
+      console.log(`User ${userId} already has ${existingAccounts.length} market accounts. Skipping creation.`)
+      return NextResponse.json({
+        success: true,
+        message: 'Market accounts already exist for this user',
+        accountsCreated: 0,
+        accounts: existingAccounts.map(account => ({
+          id: account.id,
+          marketType: account.marketType,
+          displayName: account.displayName,
+          isPrimary: account.isPrimary
+        }))
+      })
+    }
+
     // Validate that at least one market is marked as primary
     const hasPrimaryMarket = marketAccounts.some(market => market.isPrimary)
     if (!hasPrimaryMarket) {
@@ -142,11 +161,11 @@ export async function POST(request: NextRequest) {
     }
     
     // Store accounts persistently for development
-    const allAccounts = loadAccounts()
-    allAccounts[userId] = createdAccounts
-    saveAccounts(allAccounts)
+    const finalAccounts = loadAccounts()
+    finalAccounts[userId] = createdAccounts
+    saveAccounts(finalAccounts)
     console.log(`Mock: Created ${createdAccounts.length} market accounts for user ${userId}`)
-    console.log('Stored accounts:', allAccounts)
+    console.log('Stored accounts:', finalAccounts)
     
     return NextResponse.json({
       success: true,
