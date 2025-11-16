@@ -24,9 +24,11 @@ export default function DashboardPage() {
       if (!user) return
       
       try {
+        // Get Firebase auth token
+        const token = await (await import('@/lib/firebase')).auth.currentUser?.getIdToken()
         const response = await fetch('/api/v1/markets/setup', {
           headers: {
-            'Authorization': `Bearer mock-token-for-testing`
+            'Authorization': `Bearer ${token || 'mock-token-for-testing'}`
           }
         })
         

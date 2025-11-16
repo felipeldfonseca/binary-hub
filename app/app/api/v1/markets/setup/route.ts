@@ -38,7 +38,8 @@ export async function POST(request: NextRequest) {
 
     const token = authHeader.split('Bearer ')[1]
     // Mock user ID for development - in production this would verify the token
-    const userId = 'test-user-123'
+    // For now, use the token as user ID for testing different users
+    const userId = token === 'mock-token-for-testing' ? 'test-user-123' : token
 
     // Parse request body
     const body = await request.json()
@@ -177,7 +178,8 @@ export async function GET(request: NextRequest) {
 
     const token = authHeader.split('Bearer ')[1]
     // Mock user ID for development - in production this would verify the token
-    const userId = 'test-user-123'
+    // For now, use the token as user ID for testing different users
+    const userId = token === 'mock-token-for-testing' ? 'test-user-123' : token
 
     // Get stored market accounts for this user
     const allAccounts = loadAccounts()

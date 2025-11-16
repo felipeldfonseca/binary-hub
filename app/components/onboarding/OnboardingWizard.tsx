@@ -98,12 +98,16 @@ export default function OnboardingWizard({ onComplete }: OnboardingWizardProps) 
     try {
       console.log('Sending market accounts to API:', onboardingData.selectedMarkets)
       
+      // Get Firebase auth token
+      const token = await (await import('@/lib/firebase')).auth.currentUser?.getIdToken()
+      console.log('Using auth token:', token?.substring(0, 20) + '...')
+      
       // Create market accounts via API
       const response = await fetch('/api/v1/markets/setup', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer mock-token-for-testing`
+          'Authorization': `Bearer ${token || 'mock-token-for-testing'}`
         },
         body: JSON.stringify({
           marketAccounts: onboardingData.selectedMarkets
