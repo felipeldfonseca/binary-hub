@@ -4,7 +4,7 @@ import CsvUploadSection from '@/components/dashboard/CsvUploadSection'
 import { useLanguage } from '@/lib/contexts/LanguageContext'
 import { useTrades, Trade } from '@/hooks/useTrades'
 import { useTradeStats } from '@/hooks/useTradeStats'
-import { useMarketAccounts } from '@/hooks/useMarketAccounts'
+import { useMarketContext } from '@/lib/contexts/MarketContext'
 import TradesTable from '@/components/trades/TradesTable'
 import TradeForm from '@/components/trades/TradeForm'
 import TradeFilters from '@/components/trades/TradeFilters'
@@ -13,7 +13,7 @@ import BulkActions from '@/components/trades/BulkActions'
 
 export default function TradesV1Professional() {
   const { isPortuguese } = useLanguage()
-  const { activeMarket } = useMarketAccounts()
+  const { activeMarket, marketAccounts, setActiveMarket } = useMarketContext()
   const [activeTab, setActiveTab] = useState<'table' | 'form' | 'filters' | 'import'>('table')
   const [selectedTrade, setSelectedTrade] = useState<Trade | null>(null)
   const [selectedIds, setSelectedIds] = useState<string[]>([])
@@ -30,13 +30,13 @@ export default function TradesV1Professional() {
 
   // Auto-filter by active market when it changes
   useEffect(() => {
-    if (activeMarket && activeMarket.marketType !== filters.marketType) {
+    if (activeMarket) {
       setFilters(prev => ({
         ...prev,
         marketType: activeMarket.marketType
       }))
     }
-  }, [activeMarket, filters.marketType])
+  }, [activeMarket])
 
   const { 
     trades, 
@@ -184,8 +184,43 @@ export default function TradesV1Professional() {
           }
         </p>
         
-        {/* Active Market Indicator */}
-        {activeMarket && (
+        {/* Market Selection */}
+        {activeMarket && marketAccounts.length > 1 && (
+          <div className="flex items-center justify-center gap-4 text-sm">
+            <span className="text-gray-300">{isPortuguese ? 'Mostrando operações de:' : 'Showing trades from:'}</span>
+            <div className="flex items-center gap-2">
+              {marketAccounts.map((market) => {
+                const isActive = market.marketType === activeMarket?.marketType
+                const marketConfig = {
+                  binary: { icon: '📊', color: 'orange' },
+                  forex: { icon: '💱', color: 'blue' },
+                  crypto: { icon: '₿', color: 'purple' },
+                  futures: { icon: '📈', color: 'green' },
+                  options: { icon: '🎯', color: 'yellow' }
+                }
+                const config = marketConfig[market.marketType as keyof typeof marketConfig]
+                
+                return (
+                  <button
+                    key={market.marketType}
+                    onClick={() => setActiveMarket(market.marketType)}
+                    className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-white font-medium transition-all ${
+                      isActive 
+                        ? 'bg-white/20 ring-2 ring-primary/50' 
+                        : 'bg-white/10 hover:bg-white/15'
+                    }`}
+                  >
+                    <span>{config?.icon}</span>
+                    <span>{market.displayName}</span>
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        )}
+        
+        {/* Single Market Indicator */}
+        {activeMarket && marketAccounts.length === 1 && (
           <div className="flex items-center justify-center gap-2 text-sm text-gray-300">
             <span>{isPortuguese ? 'Mostrando operações de:' : 'Showing trades from:'}</span>
             <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-white/10 text-white font-medium">

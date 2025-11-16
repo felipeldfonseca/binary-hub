@@ -31,6 +31,59 @@ interface FormErrors {
   [key: string]: string
 }
 
+const InputField: React.FC<{
+  label: string
+  type: string
+  value: string
+  onChange: (value: string) => void
+  placeholder?: string
+  error?: string
+  required?: boolean
+  step?: string
+}> = ({ label, type, value, onChange, placeholder, error, required, step }) => (
+  <div className="space-y-1">
+    <label className="block text-sm font-comfortaa font-medium text-gray-200">
+      {label} {required && <span className="text-red-400">*</span>}
+    </label>
+    <input
+      type={type}
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      placeholder={placeholder}
+      className={`form-input w-full ${error ? 'border-red-500' : 'border-gray-600'}`}
+      step={step}
+    />
+    {error && <p className="text-red-400 text-xs mt-1">{error}</p>}
+  </div>
+)
+
+const SelectField: React.FC<{
+  label: string
+  value: string
+  onChange: (value: string) => void
+  options: { value: string; label: string }[]
+  error?: string
+  required?: boolean
+}> = ({ label, value, onChange, options, error, required }) => (
+  <div className="space-y-1">
+    <label className="block text-sm font-comfortaa font-medium text-gray-200">
+      {label} {required && <span className="text-red-400">*</span>}
+    </label>
+    <select
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      className={`form-input w-full ${error ? 'border-red-500' : 'border-gray-600'}`}
+    >
+      {options.map(option => (
+        <option key={option.value} value={option.value} className="bg-gray-800 text-white">
+          {option.label}
+        </option>
+      ))}
+    </select>
+    {error && <p className="text-red-400 text-xs mt-1">{error}</p>}
+  </div>
+)
+
 const TradeForm: React.FC<TradeFormProps> = ({
   onSubmit,
   initialData,
@@ -140,10 +193,15 @@ const TradeForm: React.FC<TradeFormProps> = ({
   const handleInputChange = useCallback((field: keyof FormData, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }))
     // Clear error when user starts typing
-    if (errors[field]) {
-      setErrors(prev => ({ ...prev, [field]: '' }))
-    }
-  }, [errors])
+    setErrors(prev => {
+      if (prev[field]) {
+        const newErrors = { ...prev }
+        delete newErrors[field]
+        return newErrors
+      }
+      return prev
+    })
+  }, [])
 
   const validateForm = useCallback((): boolean => {
     const newErrors: FormErrors = {}
@@ -252,58 +310,6 @@ const TradeForm: React.FC<TradeFormProps> = ({
     }
   }, [formData, validateForm, calculateProfit, onSubmit, showError])
 
-  const InputField: React.FC<{
-    label: string
-    type: string
-    value: string
-    onChange: (value: string) => void
-    placeholder?: string
-    error?: string
-    required?: boolean
-    step?: string
-  }> = ({ label, type, value, onChange, placeholder, error, required, step }) => (
-    <div className="space-y-1">
-      <label className="block text-sm font-comfortaa font-medium text-gray-200">
-        {label} {required && <span className="text-red-400">*</span>}
-      </label>
-      <input
-        type={type}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder}
-        className={`form-input w-full ${error ? 'border-red-500' : 'border-gray-600'}`}
-        step={step}
-      />
-      {error && <p className="text-red-400 text-xs mt-1">{error}</p>}
-    </div>
-  )
-
-  const SelectField: React.FC<{
-    label: string
-    value: string
-    onChange: (value: string) => void
-    options: { value: string; label: string }[]
-    error?: string
-    required?: boolean
-  }> = ({ label, value, onChange, options, error, required }) => (
-    <div className="space-y-1">
-      <label className="block text-sm font-comfortaa font-medium text-gray-200">
-        {label} {required && <span className="text-red-400">*</span>}
-      </label>
-      <select
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className={`form-input w-full ${error ? 'border-red-500' : 'border-gray-600'}`}
-      >
-        {options.map(option => (
-          <option key={option.value} value={option.value} className="bg-gray-800 text-white">
-            {option.label}
-          </option>
-        ))}
-      </select>
-      {error && <p className="text-red-400 text-xs mt-1">{error}</p>}
-    </div>
-  )
 
   return (
     <div className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-lg p-6">

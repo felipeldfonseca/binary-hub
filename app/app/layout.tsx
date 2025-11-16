@@ -3,6 +3,7 @@ import { Comfortaa } from 'next/font/google'
 import '../styles/globals.css'
 import { AuthProvider } from '../lib/contexts/AuthContext'
 import { LanguageProvider } from '../lib/contexts/LanguageContext'
+import { MarketProvider } from '../lib/contexts/MarketContext'
 import ErrorBoundary from '../components/error/ErrorBoundary'
 import { ToastProvider } from '../components/ui/Toast'
 
@@ -118,7 +119,9 @@ export default function RootLayout({
             <ToastProvider>
               <AuthProvider>
                 <LanguageProvider>
-                  {children}
+                  <MarketProvider>
+                    {children}
+                  </MarketProvider>
                 </LanguageProvider>
               </AuthProvider>
             </ToastProvider>

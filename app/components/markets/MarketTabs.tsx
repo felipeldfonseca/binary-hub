@@ -1,6 +1,6 @@
 'use client'
 import { useState } from 'react'
-import { useMarketAccounts } from '@/hooks/useMarketAccounts'
+import { useMarketContext } from '@/lib/contexts/MarketContext'
 import { MarketAccount, MarketType, getMarketConfig, getMarketColorClass, formatCurrency } from '@/types/markets'
 import { useLanguage } from '@/lib/contexts/LanguageContext'
 
@@ -11,7 +11,7 @@ interface MarketTabsProps {
 
 export default function MarketTabs({ showAddButton = true, onAddMarket }: MarketTabsProps) {
   const { isPortuguese } = useLanguage()
-  const { marketAccounts, activeMarket, setActiveMarket, isLoading } = useMarketAccounts()
+  const { marketAccounts, activeMarket, setActiveMarket, isLoading } = useMarketContext()
   const [showDropdown, setShowDropdown] = useState(false)
 
   if (isLoading) {

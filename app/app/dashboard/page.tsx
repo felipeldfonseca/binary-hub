@@ -1,69 +1,28 @@
 'use client'
-import React, { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
-import { useAuth } from '@/hooks/useAuth'
+import React from 'react'
 import ProtectedRoute from '@/components/auth/ProtectedRoute'
 import Navbar from '@/components/layout/Navbar'
 import Footer from '@/components/layout/Footer'
 import MarketTabs from '@/components/markets/MarketTabs'
 import { DashboardV1Modern } from '@/components/lazy'
 import LazyWrapper from '@/components/shared/LazyWrapper'
+import { useMarketContext } from '@/lib/contexts/MarketContext'
 import { useLanguage } from '@/lib/contexts/LanguageContext'
+import { useRouter } from 'next/navigation'
 
 export default function DashboardPage() {
-  const router = useRouter()
-  const { user } = useAuth()
   const { isPortuguese } = useLanguage()
-  const [isLoading, setIsLoading] = useState(true)
-  const [hasMarketAccounts, setHasMarketAccounts] = useState(false)
+  const { marketAccounts, isLoading } = useMarketContext()
+  const router = useRouter()
 
-  // Check if user has completed onboarding (has market accounts)
-  useEffect(() => {
-    const checkOnboardingStatus = async () => {
-      console.log('Dashboard: Checking onboarding status for user:', user?.uid)
-      if (!user) return
-      
-      try {
-        // Get Firebase auth token
-        const token = await (await import('@/lib/firebase')).auth.currentUser?.getIdToken()
-        const response = await fetch('/api/v1/markets/setup', {
-          headers: {
-            'Authorization': `Bearer ${token || 'mock-token-for-testing'}`
-          }
-        })
-        
-        console.log('Dashboard: API response status:', response.status)
-        
-        if (response.ok) {
-          const data = await response.json()
-          console.log('Dashboard: API response data:', data)
-          
-          if (data.success && data.marketAccounts?.length > 0) {
-            console.log(`Dashboard: Found ${data.marketAccounts.length} market accounts, showing dashboard`)
-            setHasMarketAccounts(true)
-          } else {
-            console.log('Dashboard: No market accounts found, redirecting to onboarding')
-            // No market accounts, redirect to onboarding
-            router.push(isPortuguese ? '/onboarding?lang=pt' : '/onboarding')
-            return
-          }
-        } else {
-          console.log('Dashboard: API response not ok, redirecting to onboarding')
-        }
-      } catch (error) {
-        console.error('Dashboard: Error checking onboarding status:', error)
-        // On error, redirect to onboarding to be safe
-        router.push(isPortuguese ? '/onboarding?lang=pt' : '/onboarding')
-        return
-      }
-      
-      setIsLoading(false)
+  // Redirect to onboarding if no market accounts
+  React.useEffect(() => {
+    if (!isLoading && marketAccounts.length === 0) {
+      router.push(isPortuguese ? '/onboarding?lang=pt' : '/onboarding')
     }
+  }, [isLoading, marketAccounts, router, isPortuguese])
 
-    checkOnboardingStatus()
-  }, [user, router, isPortuguese])
-
-  // Show loading while checking onboarding status
+  // Show loading while checking market accounts
   if (isLoading) {
     return (
       <ProtectedRoute>
@@ -79,9 +38,9 @@ export default function DashboardPage() {
     )
   }
 
-  // Only render dashboard if user has market accounts
-  if (!hasMarketAccounts) {
-    return null // Will redirect to onboarding
+  // Return null while redirecting to onboarding
+  if (marketAccounts.length === 0) {
+    return null
   }
 
   return (
