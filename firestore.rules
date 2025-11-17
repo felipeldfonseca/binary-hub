@@ -30,6 +30,19 @@ service cloud.firestore {
         request.resource.data.uid == uid;
     }
     
+    // MARKET ACCOUNTS - Users can only access their own market accounts
+    match /market_accounts/{uid}/{accountId} {
+      allow read, write: if isUserData(uid);
+      
+      // Validate market account data on create/update
+      allow write: if isUserData(uid) &&
+        request.resource.data.keys().hasAll(['id', 'userId', 'marketType', 'displayName', 'bankroll', 'performance', 'settings', 'isActive', 'createdAt']) &&
+        request.resource.data.marketType in ['binary', 'forex', 'crypto', 'futures', 'options'] &&
+        request.resource.data.userId == uid &&
+        request.resource.data.id == accountId &&
+        request.resource.data.isActive is bool;
+    }
+    
     // TRADES - Users can only access their own trades
     match /trades/{uid}/{tradeId} {
       allow read, write: if isUserData(uid);

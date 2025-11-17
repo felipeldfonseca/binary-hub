@@ -1,84 +1,83 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { MarketSelectionData, MarketAccount, MarketPerformance, MarketBankroll, MarketSettings } from '@/types/markets'
+import { initializeApp, getApps, cert } from 'firebase-admin/app'
+import { getFirestore } from 'firebase-admin/firestore'
+import { getAuth } from 'firebase-admin/auth'
 
-// Simple file-based storage for development persistence
-// In production this would be Firebase/database
-import fs from 'fs'
-import path from 'path'
-
-const STORAGE_FILE = path.join(process.cwd(), 'temp-market-accounts.json')
-
-function loadAccounts(): { [userId: string]: MarketAccount[] } {
-  try {
-    if (fs.existsSync(STORAGE_FILE)) {
-      const data = fs.readFileSync(STORAGE_FILE, 'utf8')
-      return JSON.parse(data)
-    }
-  } catch (error) {
-    console.error('Error loading accounts:', error)
-  }
-  return {}
+// Initialize Firebase Admin SDK
+if (!getApps().length) {
+  initializeApp({
+    credential: process.env.NODE_ENV === 'production' 
+      ? cert(JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_KEY || '{}'))
+      : undefined // Use default credentials in development
+  })
 }
 
-function saveAccounts(accounts: { [userId: string]: MarketAccount[] }) {
+const db = getFirestore()
+const auth = getAuth()
+
+// Collection paths
+const MARKET_ACCOUNTS_COLLECTION = 'market_accounts'
+const USERS_COLLECTION = 'users'
+
+async function verifyAuthToken(token: string): Promise<string | null> {
   try {
-    fs.writeFileSync(STORAGE_FILE, JSON.stringify(accounts, null, 2))
+    // For development with Firebase emulators, handle special case
+    if (process.env.NODE_ENV === 'development' && token === 'mock-token-for-testing') {
+      console.warn('⚠️ Using mock authentication for development only')
+      return 'test-user-123'
+    }
+    
+    // Verify real Firebase token
+    const decodedToken = await auth.verifyIdToken(token)
+    return decodedToken.uid
   } catch (error) {
-    console.error('Error saving accounts:', error)
+    console.error('Token verification failed:', error)
+    return null
   }
 }
 
-export async function POST(request: NextRequest) {
+async function getMarketAccounts(userId: string): Promise<MarketAccount[]> {
   try {
-    // Verify authentication (simplified for development)
-    const authHeader = request.headers.get('authorization')
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const token = authHeader.split('Bearer ')[1]
-    // Mock user ID for development - in production this would verify the token
-    // For now, use the token as user ID for testing different users
-    const userId = token === 'mock-token-for-testing' ? 'test-user-123' : token
-
-    // Parse request body
-    const body = await request.json()
-    const { marketAccounts }: { marketAccounts: MarketSelectionData[] } = body
-
-    if (!marketAccounts || marketAccounts.length === 0) {
-      return NextResponse.json({ error: 'Market accounts required' }, { status: 400 })
-    }
-
-    // Check for existing accounts for this user
-    const allAccounts = loadAccounts()
-    const existingAccounts = allAccounts[userId] || []
+    const accountsRef = db.collection(MARKET_ACCOUNTS_COLLECTION).doc(userId).collection('accounts')
+    const snapshot = await accountsRef.where('isActive', '==', true).get()
     
-    if (existingAccounts.length > 0) {
-      console.log(`User ${userId} already has ${existingAccounts.length} market accounts. Skipping creation.`)
-      return NextResponse.json({
-        success: true,
-        message: 'Market accounts already exist for this user',
-        accountsCreated: 0,
-        accounts: existingAccounts.map(account => ({
-          id: account.id,
-          marketType: account.marketType,
-          displayName: account.displayName,
-          isPrimary: account.isPrimary
-        }))
-      })
-    }
-
-    // Validate that at least one market is marked as primary
-    const hasPrimaryMarket = marketAccounts.some(market => market.isPrimary)
-    if (!hasPrimaryMarket) {
-      return NextResponse.json({ error: 'At least one market must be marked as primary' }, { status: 400 })
-    }
-
-    // Create market account documents (mock for development)
-    const createdAccounts: MarketAccount[] = []
+    const accounts: MarketAccount[] = []
+    snapshot.forEach(doc => {
+      const data = doc.data()
+      // Convert Firestore Timestamps to JavaScript Dates
+      const account = {
+        id: doc.id,
+        ...data,
+        createdAt: data.createdAt?.toDate ? data.createdAt.toDate() : new Date(data.createdAt),
+        updatedAt: data.updatedAt?.toDate ? data.updatedAt.toDate() : new Date(data.updatedAt),
+        bankroll: {
+          ...data.bankroll,
+          lastUpdated: data.bankroll?.lastUpdated?.toDate ? data.bankroll.lastUpdated.toDate() : new Date(data.bankroll?.lastUpdated)
+        },
+        performance: {
+          ...data.performance,
+          lastUpdated: data.performance?.lastUpdated?.toDate ? data.performance.lastUpdated.toDate() : new Date(data.performance?.lastUpdated)
+        }
+      } as MarketAccount
+      accounts.push(account)
+    })
     
-    for (const marketData of marketAccounts) {
-      const accountId = `${userId}_${marketData.marketType}_${Date.now()}`
+    return accounts.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+  } catch (error) {
+    console.error('Error fetching market accounts:', error)
+    return []
+  }
+}
+
+async function createMarketAccounts(userId: string, marketData: MarketSelectionData[]): Promise<MarketAccount[]> {
+  const batch = db.batch()
+  const createdAccounts: MarketAccount[] = []
+  
+  try {
+    for (const market of marketData) {
+      const accountId = `${market.marketType}_${Date.now()}`
+      const accountRef = db.collection(MARKET_ACCOUNTS_COLLECTION).doc(userId).collection('accounts').doc(accountId)
       
       // Initialize performance metrics
       const performance: MarketPerformance = {
@@ -104,10 +103,10 @@ export async function POST(request: NextRequest) {
       
       // Initialize bankroll
       const bankroll: MarketBankroll = {
-        initial: marketData.initialBankroll,
-        current: marketData.initialBankroll,
-        currency: marketData.currency,
-        deposits: marketData.initialBankroll,
+        initial: market.initialBankroll,
+        current: market.initialBankroll,
+        currency: market.currency,
+        deposits: market.initialBankroll,
         withdrawals: 0,
         realizedPnL: 0,
         unrealizedPnL: 0,
@@ -116,7 +115,7 @@ export async function POST(request: NextRequest) {
       
       // Initialize settings
       const settings: MarketSettings = {
-        displayName: marketData.displayName,
+        displayName: market.displayName,
         maxRiskPerTrade: 0.02, // 2% default
         notifications: {
           tradeAlerts: true,
@@ -140,32 +139,96 @@ export async function POST(request: NextRequest) {
       const marketAccount: MarketAccount = {
         id: accountId,
         userId,
-        marketType: marketData.marketType,
-        displayName: marketData.displayName,
+        marketType: market.marketType,
+        displayName: market.displayName,
         bankroll,
         performance,
         settings,
         brokerConnections: [],
         isActive: true,
-        isPrimary: marketData.isPrimary,
+        isPrimary: market.isPrimary,
         createdAt: new Date(),
         updatedAt: new Date(),
         metadata: {
-          experienceLevel: marketData.experienceLevel,
+          experienceLevel: market.experienceLevel,
           tradingStyle: [],
           goals: []
         }
       }
       
+      batch.set(accountRef, marketAccount)
       createdAccounts.push(marketAccount)
     }
     
-    // Store accounts persistently for development
-    const finalAccounts = loadAccounts()
-    finalAccounts[userId] = createdAccounts
-    saveAccounts(finalAccounts)
-    console.log(`Mock: Created ${createdAccounts.length} market accounts for user ${userId}`)
-    console.log('Stored accounts:', finalAccounts)
+    // Commit the batch
+    await batch.commit()
+    
+    // Update user document with onboarding completion
+    const userRef = db.collection(USERS_COLLECTION).doc(userId)
+    await userRef.set({
+      onboardingCompleted: true,
+      onboardingCompletedAt: new Date(),
+      marketAccountsCount: createdAccounts.length
+    }, { merge: true })
+    
+    console.log(`✅ Created ${createdAccounts.length} market accounts for user ${userId}`)
+    return createdAccounts
+    
+  } catch (error) {
+    console.error('Error creating market accounts:', error)
+    throw new Error('Failed to create market accounts')
+  }
+}
+
+export async function POST(request: NextRequest) {
+  try {
+    // Verify authentication
+    const authHeader = request.headers.get('authorization')
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const token = authHeader.split('Bearer ')[1]
+    const userId = await verifyAuthToken(token)
+    
+    if (!userId) {
+      return NextResponse.json({ error: 'Invalid authentication token' }, { status: 401 })
+    }
+
+    // Parse request body
+    const body = await request.json()
+    const { marketAccounts }: { marketAccounts: MarketSelectionData[] } = body
+
+    if (!marketAccounts || marketAccounts.length === 0) {
+      return NextResponse.json({ error: 'Market accounts required' }, { status: 400 })
+    }
+
+    // Check for existing accounts for this user
+    const existingAccounts = await getMarketAccounts(userId)
+    
+    if (existingAccounts.length > 0) {
+      console.log(`User ${userId} already has ${existingAccounts.length} market accounts. Returning existing accounts.`)
+      return NextResponse.json({
+        success: true,
+        message: 'Market accounts already exist for this user',
+        accountsCreated: 0,
+        accounts: existingAccounts.map(account => ({
+          id: account.id,
+          marketType: account.marketType,
+          displayName: account.displayName,
+          isPrimary: account.isPrimary
+        }))
+      })
+    }
+
+    // Validate that at least one market is marked as primary
+    const hasPrimaryMarket = marketAccounts.some(market => market.isPrimary)
+    if (!hasPrimaryMarket) {
+      return NextResponse.json({ error: 'At least one market must be marked as primary' }, { status: 400 })
+    }
+
+    // Create market account documents in Firestore
+    const createdAccounts = await createMarketAccounts(userId, marketAccounts)
     
     return NextResponse.json({
       success: true,
@@ -189,165 +252,23 @@ export async function POST(request: NextRequest) {
 
 export async function GET(request: NextRequest) {
   try {
-    // Verify authentication (simplified for development)
+    // Verify authentication
     const authHeader = request.headers.get('authorization')
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
     const token = authHeader.split('Bearer ')[1]
-    // Mock user ID for development - in production this would verify the token
-    // For now, use the token as user ID for testing different users
-    const userId = token === 'mock-token-for-testing' ? 'test-user-123' : token
-
-    // Get stored market accounts for this user
-    const allAccounts = loadAccounts()
-    const storedAccounts = allAccounts[userId] || []
-    console.log(`Getting accounts for user ${userId}:`, storedAccounts)
-    console.log('All stored accounts:', allAccounts)
+    const userId = await verifyAuthToken(token)
     
-    // If no stored accounts, check if mock data is requested for testing
-    const url = new URL(request.url)
-    const includeMock = url.searchParams.get('mock') === 'true'
-    
-    let marketAccounts: MarketAccount[] = storedAccounts
-    
-    if (marketAccounts.length === 0 && includeMock) {
-      marketAccounts = [
-      {
-        id: `${userId}_binary_1734120000000`,
-        userId,
-        marketType: 'binary',
-        displayName: 'My Binary Options',
-        bankroll: {
-          initial: 1000,
-          current: 1250,
-          currency: 'USD',
-          deposits: 1000,
-          withdrawals: 0,
-          realizedPnL: 250,
-          unrealizedPnL: 0,
-          lastUpdated: new Date()
-        },
-        performance: {
-          totalTrades: 45,
-          winningTrades: 28,
-          losingTrades: 17,
-          winRate: 62.2,
-          profitLoss: 250,
-          profitLossPercentage: 25,
-          bestTrade: 85,
-          worstTrade: -50,
-          averageWin: 32.5,
-          averageLoss: -25,
-          profitFactor: 1.3,
-          maxDrawdown: 150,
-          currentDrawdown: 0,
-          totalVolume: 22500,
-          averageTradeSize: 500,
-          tradingDays: 15,
-          averageTradesPerDay: 3,
-          lastUpdated: new Date()
-        },
-        settings: {
-          displayName: 'My Binary Options',
-          maxRiskPerTrade: 0.02,
-          notifications: {
-            tradeAlerts: true,
-            performanceReports: true,
-            aiInsights: true,
-            socialUpdates: true
-          },
-          privacy: {
-            sharePerformance: false,
-            shareTradeHistory: false,
-            allowFollowers: true
-          },
-          preferences: {
-            timezone: 'UTC',
-            chartType: 'candlestick',
-            defaultTimeframe: '1h'
-          }
-        },
-        brokerConnections: [],
-        isActive: true,
-        isPrimary: true,
-        createdAt: new Date('2024-12-01'),
-        updatedAt: new Date(),
-        metadata: {
-          experienceLevel: 'intermediate',
-          tradingStyle: [],
-          goals: []
-        }
-      },
-      {
-        id: `${userId}_forex_1734120060000`,
-        userId,
-        marketType: 'forex',
-        displayName: 'Forex Trading',
-        bankroll: {
-          initial: 5000,
-          current: 4850,
-          currency: 'USD',
-          deposits: 5000,
-          withdrawals: 0,
-          realizedPnL: -150,
-          unrealizedPnL: 0,
-          lastUpdated: new Date()
-        },
-        performance: {
-          totalTrades: 12,
-          winningTrades: 6,
-          losingTrades: 6,
-          winRate: 50,
-          profitLoss: -150,
-          profitLossPercentage: -3,
-          bestTrade: 200,
-          worstTrade: -120,
-          averageWin: 150,
-          averageLoss: -75,
-          profitFactor: 0.97,
-          maxDrawdown: 300,
-          currentDrawdown: 150,
-          totalVolume: 60000,
-          averageTradeSize: 5000,
-          tradingDays: 8,
-          averageTradesPerDay: 1.5,
-          lastUpdated: new Date()
-        },
-        settings: {
-          displayName: 'Forex Trading',
-          maxRiskPerTrade: 0.01,
-          notifications: {
-            tradeAlerts: true,
-            performanceReports: true,
-            aiInsights: true,
-            socialUpdates: false
-          },
-          privacy: {
-            sharePerformance: true,
-            shareTradeHistory: false,
-            allowFollowers: true
-          },
-          preferences: {
-            timezone: 'UTC',
-            chartType: 'candlestick',
-            defaultTimeframe: '4h'
-          }
-        },
-        brokerConnections: [],
-        isActive: true,
-        isPrimary: false,
-        createdAt: new Date('2024-12-01'),
-        updatedAt: new Date(),
-        metadata: {
-          experienceLevel: 'beginner',
-          tradingStyle: [],
-          goals: []
-        }
-      }]
+    if (!userId) {
+      return NextResponse.json({ error: 'Invalid authentication token' }, { status: 401 })
     }
 
+    // Get market accounts from Firestore
+    const marketAccounts = await getMarketAccounts(userId)
+    console.log(`✅ Retrieved ${marketAccounts.length} market accounts for user ${userId}`)
+    
     return NextResponse.json({
       success: true,
       marketAccounts

@@ -4,7 +4,7 @@ import '../styles/globals.css'
 import { AuthProvider } from '../lib/contexts/AuthContext'
 import { LanguageProvider } from '../lib/contexts/LanguageContext'
 import { MarketProvider } from '../lib/contexts/MarketContext'
-import ErrorBoundary from '../components/error/ErrorBoundary'
+import ErrorBoundary from '../components/ErrorBoundary'
 import { ToastProvider } from '../components/ui/Toast'
 
 const comfortaa = Comfortaa({ 
