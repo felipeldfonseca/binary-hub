@@ -48,12 +48,19 @@ export function MarketProvider({ children }: { children: React.ReactNode }) {
       const token = await auth.currentUser?.getIdToken()
       const response = await fetch('/api/v1/markets/setup', {
         headers: {
-          'Authorization': `Bearer ${token}`
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
         }
       })
 
       if (!response.ok) {
-        throw new Error('Failed to fetch market accounts')
+        // Handle authentication errors gracefully
+        if (response.status === 401) {
+          console.warn('Authentication token expired or invalid')
+          setError('Authentication expired. Please log in again.')
+          return
+        }
+        throw new Error(`Failed to fetch market accounts: ${response.status}`)
       }
 
       const data = await response.json()
@@ -75,12 +82,18 @@ export function MarketProvider({ children }: { children: React.ReactNode }) {
         // Fallback to primary market
         const primary = accounts.find(account => account.isPrimary)
         setActiveMarketState(primary || accounts[0] || null)
+        
+        console.log(`✅ Loaded ${accounts.length} market accounts`)
       } else {
         throw new Error(data.error || 'Failed to fetch market accounts')
       }
     } catch (err) {
       console.error('Error fetching market accounts:', err)
       setError(err instanceof Error ? err.message : 'Unknown error')
+      
+      // Clear accounts on error
+      setMarketAccounts([])
+      setActiveMarketState(null)
     } finally {
       setIsLoading(false)
     }
