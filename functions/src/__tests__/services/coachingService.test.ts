@@ -7,14 +7,7 @@ import { aiInsightsService } from '../../services/aiInsightsService';
 jest.mock('../../services/tradeService');
 jest.mock('../../services/openai');
 jest.mock('../../services/aiInsightsService');
-jest.mock('firebase-admin/firestore');
-jest.mock('firebase-functions', () => ({
-  logger: {
-    info: jest.fn(),
-    error: jest.fn(),
-    warn: jest.fn(),
-  },
-}));
+// Note: firebase-admin/firestore is mocked globally in setup.ts
 
 const mockTradeService = tradeService as jest.Mocked<typeof tradeService>;
 const mockOpenaiService = openaiService as jest.Mocked<typeof openaiService>;

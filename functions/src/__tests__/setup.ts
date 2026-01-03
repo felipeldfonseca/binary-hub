@@ -13,20 +13,74 @@ jest.mock('firebase-admin/app', () => ({
   cert: jest.fn(),
 }));
 
+// @ts-ignore - Suppress TypeScript errors for complex Jest mocks
 jest.mock('firebase-admin/firestore', () => ({
-  getFirestore: jest.fn(() => ({
-    collection: jest.fn(),
-    doc: jest.fn(),
-    batch: jest.fn(),
-    runTransaction: jest.fn(),
-    collectionGroup: jest.fn(),
-  })),
+  getFirestore: jest.fn(() => {
+    // Create a factory function to avoid circular references
+    const createMockCollection = (): any => ({
+      doc: jest.fn(() => createMockDoc()),
+      // @ts-ignore
+      add: jest.fn().mockResolvedValue({ id: 'mock-new-doc-id' }),
+      where: jest.fn().mockReturnThis(),
+      orderBy: jest.fn().mockReturnThis(),
+      limit: jest.fn().mockReturnThis(),
+      // @ts-ignore
+      get: jest.fn().mockResolvedValue({
+        docs: [],
+        forEach: jest.fn(),
+        empty: true,
+        size: 0,
+      }),
+    });
+
+    const createMockDoc = (): any => ({
+      exists: true,
+      data: jest.fn(() => ({})),
+      id: 'mock-doc-id',
+      collection: jest.fn(() => createMockCollection()), // Support nested collections
+      // @ts-ignore
+      get: jest.fn().mockResolvedValue({
+        exists: true,
+        data: () => ({}),
+        id: 'mock-doc-id',
+      }),
+      // @ts-ignore
+      set: jest.fn().mockResolvedValue(undefined),
+      // @ts-ignore
+      update: jest.fn().mockResolvedValue(undefined),
+      // @ts-ignore
+      delete: jest.fn().mockResolvedValue(undefined),
+    });
+
+    const mockBatch = {
+      set: jest.fn().mockReturnThis(),
+      update: jest.fn().mockReturnThis(),
+      delete: jest.fn().mockReturnThis(),
+      // @ts-ignore
+      commit: jest.fn().mockResolvedValue([]),
+    };
+
+    return {
+      collection: jest.fn(() => createMockCollection()),
+      doc: jest.fn(() => createMockDoc()),
+      batch: jest.fn(() => mockBatch),
+      // @ts-ignore
+      runTransaction: jest.fn().mockResolvedValue({}),
+      collectionGroup: jest.fn(() => createMockCollection()),
+    };
+  }),
   Timestamp: {
     now: jest.fn(() => ({ seconds: Math.floor(Date.now() / 1000), nanoseconds: 0 })),
     fromDate: jest.fn((date: Date) => ({ 
       seconds: Math.floor(date.getTime() / 1000), 
       nanoseconds: 0 
     })),
+  },
+  FieldValue: {
+    serverTimestamp: jest.fn(() => ({ _type: 'server_timestamp' })),
+    increment: jest.fn((value: number) => ({ _type: 'increment', _value: value })),
+    arrayUnion: jest.fn((...values: unknown[]) => ({ _type: 'array_union', _values: values })),
+    arrayRemove: jest.fn((...values: unknown[]) => ({ _type: 'array_remove', _values: values })),
   },
 }));
 
@@ -131,7 +185,8 @@ jest.mock('express-rate-limit', () => {
 });
 
 // Set up environment variables for testing
-process.env.OPENAI_API_KEY = 'test-api-key';
+process.env.OPENROUTER_API_KEY = 'test-openrouter-key';
+process.env.OPENAI_API_KEY = 'test-legacy-key'; // For backward compatibility
 process.env.FIREBASE_PROJECT_ID = 'demo-test';
 process.env.NODE_ENV = 'test';
 
@@ -141,8 +196,24 @@ jest.setTimeout(30000);
 // Global test setup
 beforeAll(async () => {
   // Initialize any global test setup here
+  jest.useFakeTimers();
 });
 
 afterAll(async () => {
   // Clean up any global test resources here
+  jest.useRealTimers();
+  jest.clearAllTimers();
+  jest.clearAllMocks();
+});
+
+// Add cleanup for each test to prevent memory leaks
+beforeEach(() => {
+  // Use fake timers for each test to prevent real setInterval calls
+  jest.useFakeTimers();
+});
+
+afterEach(() => {
+  // Clear any timers set during tests and restore real timers
+  jest.clearAllTimers();
+  jest.useRealTimers();
 }); 

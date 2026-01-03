@@ -154,6 +154,8 @@ export class PerformanceMonitoringService {
   private bufferFlushInterval = 30000; // 30 seconds
   private maxBufferSize = 1000;
   private healthCheckInterval = 60000; // 1 minute
+  private flushIntervalId?: NodeJS.Timeout;
+  private healthIntervalId?: NodeJS.Timeout;
 
   constructor() {
     this.initializeDefaultAlerts();
@@ -693,13 +695,13 @@ export class PerformanceMonitoringService {
   }
 
   private startPeriodicFlush(): void {
-    setInterval(() => {
+    this.flushIntervalId = setInterval(() => {
       this.flushMetrics();
     }, this.bufferFlushInterval);
   }
 
   private startHealthMonitoring(): void {
-    setInterval(async () => {
+    this.healthIntervalId = setInterval(async () => {
       const health = this.getSystemHealth();
       
       // Store system health
@@ -714,8 +716,22 @@ export class PerformanceMonitoringService {
     }, this.healthCheckInterval);
   }
 
+  /**
+   * Cleanup method for tests and graceful shutdown
+   */
+  cleanup(): void {
+    if (this.flushIntervalId) {
+      clearInterval(this.flushIntervalId);
+      this.flushIntervalId = undefined;
+    }
+    if (this.healthIntervalId) {
+      clearInterval(this.healthIntervalId);
+      this.healthIntervalId = undefined;
+    }
+  }
+
   private generateId(): string {
-    return Date.now().toString(36) + Math.random().toString(36).substr(2);
+    return Date.now().toString(36) + Math.random().toString(36).substring(2);
   }
 
   private getPeriodRange(period: string): { startTime: Date; endTime: Date } {
