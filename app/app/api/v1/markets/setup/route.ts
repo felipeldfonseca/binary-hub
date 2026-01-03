@@ -6,11 +6,16 @@ import { getAuth } from 'firebase-admin/auth'
 
 // Initialize Firebase Admin SDK
 if (!getApps().length) {
-  initializeApp({
-    credential: process.env.NODE_ENV === 'production' 
-      ? cert(JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_KEY || '{}'))
-      : undefined // Use default credentials in development
-  })
+  if (process.env.NODE_ENV === 'production') {
+    initializeApp({
+      credential: cert(JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_KEY || '{}'))
+    })
+  } else {
+    // For development with Firebase emulators
+    initializeApp({
+      projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || 'demo-binary-hub'
+    })
+  }
 }
 
 const db = getFirestore()

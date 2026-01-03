@@ -6,12 +6,14 @@ import ProtectedRoute from '@/components/auth/ProtectedRoute'
 import OnboardingWizard from '@/components/onboarding/OnboardingWizard'
 import { useLanguage } from '@/lib/contexts/LanguageContext'
 import { useAuth } from '@/hooks/useAuth'
+import { useMarketContext } from '@/lib/contexts/MarketContext'
 import { onboardingService } from '@/lib/services/onboardingService'
 
 export default function OnboardingPage() {
   const router = useRouter()
   const { isPortuguese } = useLanguage()
   const { user } = useAuth()
+  const { refreshAccounts } = useMarketContext()
   const [isCheckingStatus, setIsCheckingStatus] = useState(true)
   const [shouldShowWizard, setShouldShowWizard] = useState(false)
 
@@ -52,6 +54,10 @@ export default function OnboardingPage() {
     try {
       // Mark onboarding as completed
       await onboardingService.markOnboardingCompleted()
+      
+      // Refresh market accounts to get the newly created accounts
+      console.log('🔄 Refreshing market accounts...')
+      await refreshAccounts()
       
       // Small delay to ensure everything is saved
       setTimeout(() => {
