@@ -890,4 +890,7 @@ export class PerformanceMonitoringService {
   }
 }
 
-export const performanceMonitoringService = new PerformanceMonitoringService();
+// Export singleton instance only in non-test environments to prevent memory leaks
+export const performanceMonitoringService = process.env.NODE_ENV === 'test' 
+  ? null as any // Return null in tests to prevent timer instantiation
+  : new PerformanceMonitoringService();

@@ -221,6 +221,9 @@ describe('Cache Performance Integration Tests', () => {
 
   describe('Memory Usage and Cleanup', () => {
     test('should manage memory efficiently with TTL expiration', async () => {
+      // Use real timers for this TTL test
+      jest.useRealTimers();
+      
       const shortTTL = 1; // 1 second
       const numItems = 100;
 
@@ -251,6 +254,9 @@ describe('Cache Performance Integration Tests', () => {
       expect(results).toHaveLength(numItems);
 
       console.log('TTL Management Test: TTL parameters handled correctly');
+      
+      // Restore fake timers for other tests
+      jest.useFakeTimers();
     });
 
     test('should handle cache clear operations efficiently', async () => {

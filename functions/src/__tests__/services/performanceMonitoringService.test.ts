@@ -1,4 +1,4 @@
-import { performanceMonitoringService } from '../../services/performanceMonitoringService';
+import { PerformanceMonitoringService } from '../../services/performanceMonitoringService';
 import { logger } from 'firebase-functions';
 
 // Mock Firebase Admin SDK
@@ -33,8 +33,17 @@ jest.mock('firebase-functions', () => ({
 }));
 
 describe('PerformanceMonitoringService', () => {
+  let performanceMonitoringService: PerformanceMonitoringService;
+
   beforeEach(() => {
     jest.clearAllMocks();
+    // Create a fresh instance for each test
+    performanceMonitoringService = new PerformanceMonitoringService();
+  });
+
+  afterEach(() => {
+    // Clean up timers after each test
+    performanceMonitoringService.cleanup();
   });
 
   describe('trackAPIPerformance', () => {
