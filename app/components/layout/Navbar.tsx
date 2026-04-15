@@ -43,11 +43,11 @@ export default function Navbar() {
   const getDashboardNavItems = (): NavItem[] => [
     { href: isPortuguese ? '/dashboard?lang=pt' : '/dashboard', label: isPortuguese ? 'Início' : 'Home' },
     { href: '/trades', label: isPortuguese ? 'Operações' : 'Trades' },
+    { href: '/market', label: isPortuguese ? 'Mercado' : 'Market' },
     { href: '/social', label: isPortuguese ? 'Social' : 'Social' },
     { href: '/analytics', label: isPortuguese ? 'Análises' : 'Analytics' },
     { href: '/ai', label: 'AI' },
     { href: '/accomplishments', label: isPortuguese ? 'Conquistas' : 'Accomplishments' },
-    { href: isPortuguese ? '/plans?lang=pt' : '/plans', label: isPortuguese ? 'Planos' : 'Plans' },
   ]
 
   const dashboardNavItems = getDashboardNavItems()
@@ -368,6 +368,13 @@ export default function Navbar() {
                     >
                       Settings
                     </Link>
+                    <Link
+                      href={isPortuguese ? '/plans?lang=pt' : '/plans'}
+                      onClick={() => setIsProfileOpen(false)}
+                      className="block px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 hover:text-white transition-colors"
+                    >
+                      {isPortuguese ? 'Planos' : 'Plans'}
+                    </Link>
                     <div className="border-t border-gray-700 mt-2">
                       <button
                         onClick={handleLogout}
@@ -513,6 +520,13 @@ export default function Navbar() {
                   className="nav-link block px-4 py-3 rounded-lg text-base transition-all duration-300 text-green-400 hover:bg-primary/10 font-comfortaa font-bold"
                 >
                   Settings
+                </Link>
+                <Link
+                  href={isPortuguese ? '/plans?lang=pt' : '/plans'}
+                  onClick={() => setIsMobileMenuOpen(false)}
+                  className="nav-link block px-4 py-3 rounded-lg text-base transition-all duration-300 text-green-400 hover:bg-primary/10 font-comfortaa font-bold"
+                >
+                  {isPortuguese ? 'Planos' : 'Plans'}
                 </Link>
                 <button
                   onClick={handleLogout}

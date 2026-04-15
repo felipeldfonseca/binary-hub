@@ -1,73 +1,51 @@
-import { initializeApp, getApps } from 'firebase/app'
-import { getAuth, connectAuthEmulator } from 'firebase/auth'
-import { getFirestore, connectFirestoreEmulator } from 'firebase/firestore'
-import { getStorage, connectStorageEmulator } from 'firebase/storage'
-import { getFunctions, connectFunctionsEmulator } from 'firebase/functions'
+// Firebase stub for lean rebuild
+// This file provides mock exports to prevent import errors
+// Actual functionality is handled by Supabase
 
-// Runtime validation for required Firebase environment variables
-const requiredEnvVars = [
-  'NEXT_PUBLIC_FIREBASE_API_KEY',
-  'NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN', 
-  'NEXT_PUBLIC_FIREBASE_PROJECT_ID',
-  'NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET',
-  'NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID',
-  'NEXT_PUBLIC_FIREBASE_APP_ID'
-] as const
+console.warn('Firebase stub loaded - using Supabase for all operations');
 
-if (process.env.NODE_ENV === 'production') {
-  const missingVars = requiredEnvVars.filter(varName => !process.env[varName])
-  if (missingVars.length > 0) {
-    throw new Error(`Missing required Firebase environment variables: ${missingVars.join(', ')}`)
-  }
+// Mock Firebase Auth user type
+interface MockUser {
+  uid: string;
+  email: string | null;
+  displayName: string | null;
+  photoURL: string | null;
+  getIdToken: () => Promise<string>;
 }
 
-const firebaseConfig = {
-  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY || 'demo-api-key',
-  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN || 'demo-project.firebaseapp.com',
-  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || 'demo-project',
-  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET || 'demo-project.appspot.com',
-  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID || '123456789',
-  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID || '1:123456789:web:abcdef123456',
+// Mock auth object with compatible interface
+export const auth = {
+  currentUser: null as MockUser | null,
+  onAuthStateChanged: (_callback: (user: MockUser | null) => void) => {
+    // Return unsubscribe function
+    return () => {};
+  },
+  signOut: async () => {},
+};
+
+// Mock Firestore types
+interface MockDocRef {
+  id: string;
 }
 
-// Initialize Firebase
-const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0]
-
-// Initialize Firebase services
-export const auth = getAuth(app)
-export const db = getFirestore(app)
-export const storage = getStorage(app)
-export const functions = getFunctions(app)
-
-// Connect to Firebase emulators in development only
-if (process.env.NODE_ENV === 'development' && typeof window !== 'undefined') {
-  try {
-    // Auth emulator
-    connectAuthEmulator(auth, 'http://localhost:9099')
-  } catch (error) {
-    // Emulator already connected
-  }
-  
-  try {
-    // Firestore emulator
-    connectFirestoreEmulator(db, 'localhost', 8080)
-  } catch (error) {
-    // Emulator already connected
-  }
-  
-  try {
-    // Functions emulator
-    connectFunctionsEmulator(functions, 'localhost', 5001)
-  } catch (error) {
-    // Emulator already connected
-  }
-  
-  try {
-    // Storage emulator
-    connectStorageEmulator(storage, 'localhost', 9199)
-  } catch (error) {
-    // Emulator already connected
-  }
+interface MockCollection {
+  doc: (id?: string) => MockDocRef;
 }
 
-export default app 
+// Mock Firestore object
+export const db = {
+  collection: (_name: string): MockCollection => ({
+    doc: (id?: string) => ({ id: id || 'mock-id' }),
+  }),
+  doc: (_path: string) => ({ id: 'mock-id' }),
+};
+
+// Mock storage object
+export const storage = {};
+
+// Mock functions object
+export const functions = {};
+
+// Default export
+const app = {};
+export default app;

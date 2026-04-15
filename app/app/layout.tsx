@@ -1,9 +1,10 @@
 import type { Metadata, Viewport } from 'next'
 import { Comfortaa } from 'next/font/google'
 import '../styles/globals.css'
-import { AuthProvider } from '../lib/contexts/AuthContext'
+import { AuthProvider } from '../lib/contexts/AuthContextSupabase'
 import { LanguageProvider } from '../lib/contexts/LanguageContext'
-import { MarketProvider } from '../lib/contexts/MarketContext'
+import { MarketProvider } from '../lib/contexts/MarketContextSupabase'
+import { QueryProvider } from '../lib/providers/QueryProvider'
 import ErrorBoundary from '../components/ErrorBoundary'
 import { ToastProvider } from '../components/ui/Toast'
 
@@ -116,15 +117,17 @@ export default function RootLayout({
       >
                 <div id="root" className="min-h-screen bg-background text-text">
           <ErrorBoundary>
-            <ToastProvider>
-              <AuthProvider>
-                <LanguageProvider>
-                  <MarketProvider>
-                    {children}
-                  </MarketProvider>
-                </LanguageProvider>
-              </AuthProvider>
-            </ToastProvider>
+            <QueryProvider>
+              <ToastProvider>
+                <AuthProvider>
+                  <LanguageProvider>
+                    <MarketProvider>
+                      {children}
+                    </MarketProvider>
+                  </LanguageProvider>
+                </AuthProvider>
+              </ToastProvider>
+            </QueryProvider>
           </ErrorBoundary>
         </div>
         <div id="modal-root" />
