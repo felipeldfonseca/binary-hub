@@ -28,10 +28,10 @@ export default function RealTimeStatus({
   } = useRealTime()
 
   const {
-    connected: firestoreConnected,
-    subscription: firestoreSubscription,
-    lastUpdate: firestoreLastUpdate,
-    isHealthy: firestoreHealthy
+    connected: dbConnected,
+    subscription: dbSubscription,
+    lastUpdate: dbLastUpdate,
+    isHealthy: dbHealthy
   } = useFirestoreTrades({ realTimeUpdates: true })
 
   const { 
@@ -48,8 +48,8 @@ export default function RealTimeStatus({
   } = useNotifications()
 
   // Overall connection status
-  const overallStatus = sseHealthy && firestoreHealthy ? 'connected' : 
-                       (sseConnected || firestoreConnected) ? 'partial' : 
+  const overallStatus = sseHealthy && dbHealthy ? 'connected' :
+                       (sseConnected || dbConnected) ? 'partial' :
                        (sseConnecting) ? 'connecting' : 'disconnected'
 
   const statusColor = {
@@ -201,17 +201,17 @@ export default function RealTimeStatus({
               </div>
             </div>
 
-            {/* Firestore Connection */}
+            {/* Supabase Connection */}
             <div className="space-y-2">
               <h4 className="text-sm font-semibold text-white">
-                {isPortuguese ? 'Firestore Real-time' : 'Firestore Real-time'}
+                {isPortuguese ? 'Supabase Real-time' : 'Supabase Real-time'}
               </h4>
               <div className="space-y-1 text-xs">
                 <div className="flex justify-between">
                   <span className="text-gray-400">Status:</span>
-                  <span className={firestoreConnected ? 'text-green-400' : 'text-red-400'}>
-                    {firestoreConnected ? 
-                      (isPortuguese ? 'Conectado' : 'Connected') : 
+                  <span className={dbConnected ? 'text-green-400' : 'text-red-400'}>
+                    {dbConnected ?
+                      (isPortuguese ? 'Conectado' : 'Connected') :
                       (isPortuguese ? 'Desconectado' : 'Disconnected')
                     }
                   </span>
@@ -221,20 +221,20 @@ export default function RealTimeStatus({
                     {isPortuguese ? 'Subscription:' : 'Subscription:'}
                   </span>
                   <span className={`capitalize ${
-                    firestoreSubscription === 'active' ? 'text-green-400' :
-                    firestoreSubscription === 'error' ? 'text-red-400' :
+                    dbSubscription === 'active' ? 'text-green-400' :
+                    dbSubscription === 'error' ? 'text-red-400' :
                     'text-gray-400'
                   }`}>
-                    {firestoreSubscription}
+                    {dbSubscription}
                   </span>
                 </div>
-                {firestoreLastUpdate && (
+                {dbLastUpdate && (
                   <div className="flex justify-between">
                     <span className="text-gray-400">
                       {isPortuguese ? 'Última atualização:' : 'Last update:'}
                     </span>
                     <span className="text-gray-300">
-                      {firestoreLastUpdate.toLocaleTimeString()}
+                      {dbLastUpdate.toLocaleTimeString()}
                     </span>
                   </div>
                 )}

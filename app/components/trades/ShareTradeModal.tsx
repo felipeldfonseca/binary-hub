@@ -3,7 +3,7 @@
 import React, { useState } from 'react'
 import { useLanguage } from '@/lib/contexts/LanguageContext'
 import { useShareTrade } from '@/hooks/useCommunity'
-import { Trade } from '@/types/firestore'
+import { Trade } from '@/types/database'
 
 interface ShareTradeModalProps {
   trade: Trade
@@ -45,7 +45,7 @@ export default function ShareTradeModal({ trade, isOpen, onClose, onSuccess }: S
 
     try {
       const shareData = {
-        tradeId: trade.tradeId,
+        tradeId: trade.id,
         title: formData.title.trim(),
         description: formData.description.trim(),
         tags: formData.tags,
@@ -132,27 +132,27 @@ export default function ShareTradeModal({ trade, isOpen, onClose, onSuccess }: S
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
               <div>
                 <div className="text-sm text-gray-400">{isPortuguese ? 'Ativo' : 'Asset'}</div>
-                <div className="font-bold text-white">{trade.asset}</div>
+                <div className="font-bold text-white">{trade.symbol}</div>
               </div>
               <div>
                 <div className="text-sm text-gray-400">{isPortuguese ? 'Direção' : 'Direction'}</div>
-                <div className={`font-bold ${trade.direction === 'BUY' ? 'text-green-400' : 'text-red-400'}`}>
-                  {trade.direction === 'BUY' ? 
-                    (isPortuguese ? 'BULL' : 'CALL') : 
-                    (isPortuguese ? 'BEAR' : 'PUT')
+                <div className={`font-bold ${trade.direction === 'call' || trade.direction === 'long' ? 'text-green-400' : 'text-red-400'}`}>
+                  {trade.direction === 'call' || trade.direction === 'long'
+                    ? (isPortuguese ? 'BULL' : 'CALL')
+                    : (isPortuguese ? 'BEAR' : 'PUT')
                   }
                 </div>
               </div>
               <div>
                 <div className="text-sm text-gray-400">{isPortuguese ? 'Resultado' : 'Result'}</div>
                 <div className={`font-bold ${
-                  trade.result === 'WIN' ? 'text-green-400' : 
-                  trade.result === 'LOSS' ? 'text-red-400' : 'text-gray-400'
+                  trade.result === 'win' ? 'text-green-400' :
+                  trade.result === 'loss' ? 'text-red-400' : 'text-gray-400'
                 }`}>
-                  {trade.result === 'WIN' ? 
-                    (isPortuguese ? 'VITÓRIA' : 'WIN') : 
-                    trade.result === 'LOSS' ? 
-                      (isPortuguese ? 'DERROTA' : 'LOSS') : 
+                  {trade.result === 'win' ?
+                    (isPortuguese ? 'VITÓRIA' : 'WIN') :
+                    trade.result === 'loss' ?
+                      (isPortuguese ? 'DERROTA' : 'LOSS') :
                       (isPortuguese ? 'EMPATE' : 'TIE')
                   }
                 </div>
