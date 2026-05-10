@@ -8,6 +8,7 @@ import TradingCalendar from '@/components/dashboard/TradingCalendar'
 import EconomicCalendar from '@/components/dashboard/EconomicCalendar'
 import RecentTrades from '@/components/dashboard/RecentTrades'
 import CsvUploadModal from '@/components/dashboard/CsvUploadModal'
+import AccountBalanceDisplay from '@/components/dashboard/AccountBalanceDisplay'
 import { useLanguage } from '@/lib/contexts/LanguageContext'
 import { useTradeStats } from '@/hooks/useTradeStats'
 
@@ -93,8 +94,11 @@ export default function DashboardV1Modern() {
       {/* Hero Section - Keep personalized welcome and CTA */}
       {isPortuguese ? <HeroSectionPT /> : <HeroSection />}
       
-      {/* VERSION 1: MODERN METRICS - Bloomberg/TradingView Style */}
-      
+      {/* Account balance — cards (≤2 accounts) or pill strip (3+) */}
+      <div className="pt-8">
+        <AccountBalanceDisplay />
+      </div>
+
       {/* Key Metrics Overview */}
       <MetricsOverview 
         selectedPeriod={selectedPeriod}

@@ -3,7 +3,6 @@ import React from 'react'
 import ProtectedRoute from '@/components/auth/ProtectedRoute'
 import Navbar from '@/components/layout/Navbar'
 import Footer from '@/components/layout/Footer'
-import MarketTabs from '@/components/markets/MarketTabs'
 import { DashboardV1Modern } from '@/components/lazy'
 import LazyWrapper from '@/components/shared/LazyWrapper'
 import { useMarketContext } from '@/lib/contexts/MarketContext'
@@ -47,13 +46,8 @@ export default function DashboardPage() {
     <ProtectedRoute>
       <div className="min-h-screen bg-background">
         <Navbar />
-        
-        {/* Market Tabs */}
-        <div className="pt-24">
-          <MarketTabs />
-        </div>
-        
-        <main className="relative pt-8 pb-16">
+
+        <main className="relative pt-32 pb-16">
           <div className="container mx-auto px-4 sm:px-8 lg:px-12">
             <div className="max-w-7xl mx-auto">
               <LazyWrapper

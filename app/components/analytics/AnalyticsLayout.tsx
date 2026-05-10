@@ -8,7 +8,6 @@ import AnalyticsV1Professional from './versions/AnalyticsV1Professional'
 import AnalyticsV2Gamified from './versions/AnalyticsV2Gamified'
 import AnalyticsV2Dashboard from './versions/AnalyticsV2Dashboard'
 import AnalyticsV3AIPowered from './versions/AnalyticsV3AIPowered'
-import EquityCurveSection from './EquityCurveSection'
 // import VersionSelector from '../ui/VersionSelector'
 
 // Temporary version selector component
@@ -204,13 +203,6 @@ export default function AnalyticsLayout() {
                 </div>
               </div>
             </div>
-          </div>
-        </div>
-
-        {/* Equity Curve */}
-        <div className="container mx-auto px-4 sm:px-8 lg:px-12 mb-8">
-          <div className="max-w-7xl mx-auto">
-            <EquityCurveSection />
           </div>
         </div>
 
