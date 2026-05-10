@@ -2,10 +2,11 @@
 
 import { useState, useCallback } from 'react'
 import { useAuth } from '@/hooks/useAuth'
-import { auth } from '@/lib/firebase'
 import { useErrorHandler } from '@/hooks/useErrorHandler'
 import { useToastHelpers } from '@/components/ui/Toast'
 import { ChartErrorBoundary } from '@/components/error/ErrorBoundary'
+import { supabase } from '@/lib/supabase'
+import { parseEbinexCsv } from '@/lib/utils/ebinexParser'
 
 interface UploadStatus {
   uploadId: string
@@ -75,93 +76,49 @@ export default function CsvUploadSection() {
     setUploadStatus(null)
 
     try {
-      const idToken = await auth.currentUser?.getIdToken()
-      if (!idToken) {
-        throw new Error('Authentication required')
-      }
+      const text = await file.text()
+      const { trades: parsed, ebinexIds, parseErrors } = parseEbinexCsv(text)
 
-      const formData = new FormData()
-      formData.append('csv', file)
-
-      const response = await fetch('/api/v1/import/upload', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${idToken}`,
-        },
-        body: formData,
-      })
-
-      if (!response.ok) {
-        const errorResult = await handleApiError(response, 'CSV Upload')
-        setError(errorResult.message)
+      if (parsed.length === 0) {
+        setError(parseErrors[0]?.error ?? 'No trades found in CSV')
+        setUploading(false)
         return
       }
 
-      const result = await response.json()
-      setUploadStatus(result)
-      
-      // Store the imported trades data
-      if (result.status === 'completed' && result.trades) {
-        // Mark that user has imported data
-        localStorage.setItem('binaryHub_hasData', 'true')
-        
-        // Merge with existing trades data instead of overwriting
-        const existingTrades = localStorage.getItem('binaryHub_trades')
-        let allTrades = result.trades
-        
-        if (existingTrades) {
-          try {
-            const parsedExistingTrades = JSON.parse(existingTrades)
-            // Create a unique key for deduplication based on entryTime + asset + direction + amount
-            const getTradeKey = (trade: any) => 
-              `${trade.entryTime}-${trade.asset}-${trade.direction}-${trade.amount}`
-            
-            // Create a set of existing trade keys for fast lookup
-            const existingKeys = new Set(parsedExistingTrades.map(getTradeKey))
-            
-            // Filter out duplicates from new trades
-            const newUniqueTrades = result.trades.filter((trade: any) => 
-              !existingKeys.has(getTradeKey(trade))
-            )
-            
-            // Merge existing + new unique trades
-            allTrades = [...parsedExistingTrades, ...newUniqueTrades]
-            
-            console.log(`CsvUploadSection merged trades: ${parsedExistingTrades.length} existing + ${newUniqueTrades.length} new = ${allTrades.length} total`)
-          } catch (error) {
-            console.error('Error parsing existing trades in CsvUploadSection, using new trades only:', error)
-            allTrades = result.trades
-          }
-        }
-        
-        // Store merged trades data
-        localStorage.setItem('binaryHub_trades', JSON.stringify(allTrades))
-        
-        // Recalculate statistics for all trades
-        const totalTrades = allTrades.length
-        const winTrades = allTrades.filter((t: any) => t.result === 'win').length
-        const lossTrades = allTrades.filter((t: any) => t.result === 'loss').length
-        const totalProfit = allTrades.reduce((sum: number, t: any) => sum + (t.pnl || t.profit || 0), 0)
-        const avgStake = totalTrades > 0 ? allTrades.reduce((sum: number, t: any) => sum + (t.amount || 0), 0) / totalTrades : 0
-        
-        const mergedStats = {
-          totalTrades,
-          winTrades,
-          lossTrades,
-          winRate: totalTrades > 0 ? (winTrades / totalTrades) * 100 : 0,
-          totalProfit,
-          avgStake
-        }
-        
-        localStorage.setItem('binaryHub_stats', JSON.stringify(mergedStats))
-      }
-      
-      showSuccess('Upload concluído', `${result.importedRows} operações foram importadas com sucesso`)
+      // Deduplicate against existing Supabase records
+      const noteKeys = ebinexIds.map(id => `ebinex:${id}`)
+      const { data: existingNotes } = await supabase
+        .from('trades')
+        .select('notes')
+        .eq('user_id', user.id)
+        .in('notes', noteKeys)
 
-      // Poll for status updates
-      if (result.status === 'processing') {
-        pollUploadStatus(result.uploadId)
+      const alreadyImported = new Set((existingNotes ?? []).map((r: { notes: string | null }) => r.notes))
+      const newTrades = parsed.filter(t => !alreadyImported.has(t.notes ?? ''))
+      const duplicateRows = parsed.length - newTrades.length
+
+      let importedRows = 0
+      if (newTrades.length > 0) {
+        const { error: insertError } = await supabase
+          .from('trades')
+          .insert(newTrades.map(t => ({ ...t, user_id: user.id })))
+
+        if (insertError) throw new Error(insertError.message)
+        importedRows = newTrades.length
       }
+
+      setUploadStatus({
+        uploadId: `import-${Date.now()}`,
+        status: 'completed',
+        progress: 100,
+        totalRows: parsed.length,
+        importedRows,
+        duplicateRows,
+        errors: parseErrors,
+        processingTime: 0,
+      })
+
+      showSuccess('Upload concluído', `${importedRows} operações importadas (${duplicateRows} duplicatas ignoradas)`)
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Upload failed'
       setError(errorMessage)
@@ -169,33 +126,7 @@ export default function CsvUploadSection() {
     } finally {
       setUploading(false)
     }
-  }, [user])
-
-  const pollUploadStatus = useCallback(async (uploadId: string) => {
-    try {
-      const idToken = await auth.currentUser?.getIdToken()
-      if (!idToken) return
-
-      const response = await fetch(`/api/v1/import/status/${uploadId}`, {
-        headers: {
-          'Authorization': `Bearer ${idToken}`,
-          'Content-Type': 'application/json',
-        },
-      })
-
-      if (response.ok) {
-        const status = await response.json()
-        setUploadStatus(status)
-
-        if (status.status === 'processing') {
-          // Continue polling
-          setTimeout(() => pollUploadStatus(uploadId), 2000)
-        }
-      }
-    } catch (error) {
-      console.error('Error polling upload status:', error)
-    }
-  }, [])
+  }, [user, showSuccess, showError])
 
   const resetUpload = useCallback(() => {
     setUploadStatus(null)

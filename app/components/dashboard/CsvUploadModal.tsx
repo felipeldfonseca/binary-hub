@@ -2,11 +2,11 @@
 
 import { useState, useCallback } from 'react'
 import { useAuth } from '@/hooks/useAuth'
-import { auth } from '@/lib/firebase'
 import { useErrorHandler } from '@/hooks/useErrorHandler'
 import { useToastHelpers } from '@/components/ui/Toast'
 import { useLanguage } from '@/lib/contexts/LanguageContext'
-import { triggerCsvDataUpdate } from '@/hooks/useCsvTradeData'
+import { supabase } from '@/lib/supabase'
+import { parseEbinexCsv } from '@/lib/utils/ebinexParser'
 
 interface UploadStatus {
   uploadId: string
@@ -83,104 +83,58 @@ export default function CsvUploadModal({ isOpen, onClose, onSuccess }: CsvUpload
     setUploadStatus(null)
 
     try {
-      const idToken = await auth.currentUser?.getIdToken()
-      if (!idToken) {
-        throw new Error(isPortuguese ? 'Autenticação necessária' : 'Authentication required')
-      }
+      const text = await file.text()
+      const { trades: parsed, ebinexIds, parseErrors } = parseEbinexCsv(text)
 
-      const formData = new FormData()
-      formData.append('csv', file)
-
-      const response = await fetch('/api/v1/import/upload', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${idToken}`,
-        },
-        body: formData,
-      })
-
-      if (!response.ok) {
-        const errorResult = await handleApiError(response, 'CSV Upload')
-        setError(errorResult.message)
+      if (parsed.length === 0) {
+        const msg = parseErrors[0]?.error ?? (isPortuguese ? 'Nenhuma operação encontrada no CSV' : 'No trades found in CSV')
+        setError(msg)
+        setUploading(false)
         return
       }
 
-      const result = await response.json()
-      setUploadStatus(result)
-      
-      // Store the imported trades data
-      if (result.status === 'completed' && result.trades) {
-        // Mark that user has imported data
-        localStorage.setItem('binaryHub_hasData', 'true')
-        
-        // Merge with existing trades data instead of overwriting
-        const existingTrades = localStorage.getItem('binaryHub_trades')
-        let allTrades = result.trades
-        
-        if (existingTrades) {
-          try {
-            const parsedExistingTrades = JSON.parse(existingTrades)
-            // Create a unique key for deduplication based on entryTime + asset + direction + amount
-            const getTradeKey = (trade: any) => 
-              `${trade.entryTime}-${trade.asset}-${trade.direction}-${trade.amount}`
-            
-            // Create a set of existing trade keys for fast lookup
-            const existingKeys = new Set(parsedExistingTrades.map(getTradeKey))
-            
-            // Filter out duplicates from new trades
-            const newUniqueTrades = result.trades.filter((trade: any) => 
-              !existingKeys.has(getTradeKey(trade))
-            )
-            
-            // Merge existing + new unique trades
-            allTrades = [...parsedExistingTrades, ...newUniqueTrades]
-            
-            console.log(`Merged trades: ${parsedExistingTrades.length} existing + ${newUniqueTrades.length} new = ${allTrades.length} total`)
-          } catch (error) {
-            console.error('Error parsing existing trades, using new trades only:', error)
-            allTrades = result.trades
-          }
-        }
-        
-        // Store the merged trades data
-        localStorage.setItem('binaryHub_trades', JSON.stringify(allTrades))
-        
-        // Recalculate statistics for all trades
-        const totalTrades = allTrades.length
-        const winTrades = allTrades.filter((t: any) => t.result === 'win').length
-        const lossTrades = allTrades.filter((t: any) => t.result === 'loss').length
-        const totalProfit = allTrades.reduce((sum: number, t: any) => sum + (t.pnl || t.profit || 0), 0)
-        const avgStake = totalTrades > 0 ? allTrades.reduce((sum: number, t: any) => sum + (t.amount || 0), 0) / totalTrades : 0
-        
-        const mergedStats = {
-          totalTrades,
-          winTrades,
-          lossTrades,
-          winRate: totalTrades > 0 ? (winTrades / totalTrades) * 100 : 0,
-          totalProfit,
-          avgStake
-        }
-        
-        localStorage.setItem('binaryHub_stats', JSON.stringify(mergedStats))
-        
-        // Trigger data update for components using CSV data
-        triggerCsvDataUpdate()
+      // Deduplicate against existing Supabase records
+      const noteKeys = ebinexIds.map(id => `ebinex:${id}`)
+      const { data: existingNotes } = await supabase
+        .from('trades')
+        .select('notes')
+        .eq('user_id', user.id)
+        .in('notes', noteKeys)
+
+      const alreadyImported = new Set((existingNotes ?? []).map((r: { notes: string | null }) => r.notes))
+      const newTrades = parsed.filter(t => !alreadyImported.has(t.notes ?? ''))
+      const duplicateRows = parsed.length - newTrades.length
+
+      let importedRows = 0
+      if (newTrades.length > 0) {
+        const { error: insertError } = await supabase
+          .from('trades')
+          .insert(newTrades.map(t => ({ ...t, user_id: user.id })))
+
+        if (insertError) throw new Error(insertError.message)
+        importedRows = newTrades.length
       }
-      
+
+      const uploadId = `import-${Date.now()}`
+      setUploadStatus({
+        uploadId,
+        status: 'completed',
+        progress: 100,
+        totalRows: parsed.length,
+        importedRows,
+        duplicateRows,
+        errors: parseErrors,
+        processingTime: 0,
+      })
+
       showSuccess(
-        isPortuguese ? 'Upload concluído' : 'Upload completed', 
-        isPortuguese ? `${result.importedRows} operações foram importadas com sucesso` : `${result.importedRows} trades imported successfully`
+        isPortuguese ? 'Upload concluído' : 'Upload completed',
+        isPortuguese
+          ? `${importedRows} operações importadas (${duplicateRows} duplicatas ignoradas)`
+          : `${importedRows} trades imported (${duplicateRows} duplicates skipped)`
       )
 
-      // Poll for status updates
-      if (result.status === 'processing') {
-        pollUploadStatus(result.uploadId)
-      } else if (result.status === 'completed') {
-        // Call success callback after a short delay
-        setTimeout(() => {
-          onSuccess?.()
-        }, 1500)
-      }
+      setTimeout(() => { onSuccess?.() }, 1500)
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : (isPortuguese ? 'Falha no upload' : 'Upload failed')
       setError(errorMessage)
@@ -188,94 +142,7 @@ export default function CsvUploadModal({ isOpen, onClose, onSuccess }: CsvUpload
     } finally {
       setUploading(false)
     }
-  }, [user, isPortuguese, handleApiError, showSuccess, showError, onSuccess])
-
-  const pollUploadStatus = useCallback(async (uploadId: string) => {
-    try {
-      const idToken = await auth.currentUser?.getIdToken()
-      if (!idToken) return
-
-      const response = await fetch(`/api/v1/import/status/${uploadId}`, {
-        headers: {
-          'Authorization': `Bearer ${idToken}`,
-          'Content-Type': 'application/json',
-        },
-      })
-
-      if (response.ok) {
-        const status = await response.json()
-        setUploadStatus(status)
-
-        if (status.status === 'processing') {
-          // Continue polling
-          setTimeout(() => pollUploadStatus(uploadId), 2000)
-        } else if (status.status === 'completed') {
-          // Store the data and trigger updates
-          if (status.trades) {
-            localStorage.setItem('binaryHub_hasData', 'true')
-            
-            // Merge with existing trades data instead of overwriting
-            const existingTrades = localStorage.getItem('binaryHub_trades')
-            let allTrades = status.trades
-            
-            if (existingTrades) {
-              try {
-                const parsedExistingTrades = JSON.parse(existingTrades)
-                // Create a unique key for deduplication based on entryTime + asset + direction + amount
-                const getTradeKey = (trade: any) => 
-                  `${trade.entryTime}-${trade.asset}-${trade.direction}-${trade.amount}`
-                
-                // Create a set of existing trade keys for fast lookup
-                const existingKeys = new Set(parsedExistingTrades.map(getTradeKey))
-                
-                // Filter out duplicates from new trades
-                const newUniqueTrades = status.trades.filter((trade: any) => 
-                  !existingKeys.has(getTradeKey(trade))
-                )
-                
-                // Merge existing + new unique trades
-                allTrades = [...parsedExistingTrades, ...newUniqueTrades]
-                
-                console.log(`Polling merged trades: ${parsedExistingTrades.length} existing + ${newUniqueTrades.length} new = ${allTrades.length} total`)
-              } catch (error) {
-                console.error('Error parsing existing trades during polling, using new trades only:', error)
-                allTrades = status.trades
-              }
-            }
-            
-            // Store merged trades
-            localStorage.setItem('binaryHub_trades', JSON.stringify(allTrades))
-            
-            // Recalculate statistics for all trades
-            const totalTrades = allTrades.length
-            const winTrades = allTrades.filter((t: any) => t.result === 'win').length
-            const lossTrades = allTrades.filter((t: any) => t.result === 'loss').length
-            const totalProfit = allTrades.reduce((sum: number, t: any) => sum + (t.pnl || t.profit || 0), 0)
-            const avgStake = totalTrades > 0 ? allTrades.reduce((sum: number, t: any) => sum + (t.amount || 0), 0) / totalTrades : 0
-            
-            const mergedStats = {
-              totalTrades,
-              winTrades,
-              lossTrades,
-              winRate: totalTrades > 0 ? (winTrades / totalTrades) * 100 : 0,
-              totalProfit,
-              avgStake
-            }
-            
-            localStorage.setItem('binaryHub_stats', JSON.stringify(mergedStats))
-            triggerCsvDataUpdate()
-          }
-          
-          // Call success callback after upload completes
-          setTimeout(() => {
-            onSuccess?.()
-          }, 2000)
-        }
-      }
-    } catch (error) {
-      console.error('Error polling upload status:', error)
-    }
-  }, [onSuccess])
+  }, [user, isPortuguese, showSuccess, showError, onSuccess])
 
   const resetUpload = useCallback(() => {
     setUploadStatus(null)
