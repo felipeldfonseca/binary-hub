@@ -10,7 +10,8 @@ import RecentTrades from '@/components/dashboard/RecentTrades'
 import CsvUploadModal from '@/components/dashboard/CsvUploadModal'
 import AccountBalanceDisplay from '@/components/dashboard/AccountBalanceDisplay'
 import { useLanguage } from '@/lib/contexts/LanguageContext'
-import { useTradeStats } from '@/hooks/useTradeStats'
+import { useMarketContext } from '@/lib/contexts/MarketContext'
+import { useTradesSupabase } from '@/hooks/useTradesSupabase'
 
 type TimePeriod = 'daily' | 'weekly' | 'monthly' | 'yearly' | 'allTime' | 'ytd'
 type AssetType = 'crypto' | 'forex'
@@ -29,27 +30,28 @@ export default function DashboardV1Modern() {
   const [isDemoMode, setIsDemoMode] = useState(false)
   const [showCsvUploadModal, setShowCsvUploadModal] = useState(false)
   
-  // Check if user has any trading data
-  const { stats, fetchDashboardStats } = useTradeStats('weekly')
-  const hasNoData = !stats || stats.totalTrades === 0
-  
-  // Open CSV upload modal
+  const { activeMarket } = useMarketContext()
+
+  // Load trades for the active account
+  const { trades, stats, isLoading: tradesLoading, refetch } = useTradesSupabase(
+    activeMarket?.marketType ? { marketType: activeMarket.marketType } : undefined
+  )
+  // Load ALL trades (no filter) to detect whether the user is brand new
+  const { trades: allTrades, isLoading: allTradesLoading } = useTradesSupabase()
+
+  const thisAccountEmpty = !tradesLoading && trades.length === 0
+  // Only treat as first-time if there is no data in ANY account
+  const isFirstTimeUser = !allTradesLoading && allTrades.length === 0
+
   const handleImportData = () => {
     setShowCsvUploadModal(true)
   }
-  
-  // Handle successful CSV upload
+
   const handleCsvUploadSuccess = () => {
     setShowCsvUploadModal(false)
-    // Refetch stats to update the UI
-    fetchDashboardStats?.()
-    // Refresh the page to ensure all components get updated data
-    setTimeout(() => {
-      window.location.reload()
-    }, 500)
+    refetch()
   }
-  
-  // Reset data state (for testing)
+
   const handleResetData = () => {
     localStorage.removeItem('binaryHub_hasData')
     window.location.reload()
@@ -103,163 +105,57 @@ export default function DashboardV1Modern() {
       <MetricsOverview 
         selectedPeriod={selectedPeriod}
         onPeriodChange={setSelectedPeriod}
-        isDemoMode={isDemoMode && hasNoData}
+        isDemoMode={isDemoMode && isFirstTimeUser}
       />
       
       {/* Cumulative P&L Chart or Onboarding */}
       <section className="pb-8">
         <div className="container mx-auto px-4">
-          {hasNoData && !isDemoMode ? (
-            /* First-Time User Onboarding */
+          {isFirstTimeUser && !isDemoMode ? (
+            /* First-Time User Onboarding — only shown when NO trades exist anywhere */
             <div className="card bg-gradient-to-br from-blue-900/20 to-green-900/20 border-[#E1FFD9]/20 text-center">
-              <div className="flex flex-col md:flex-row items-center justify-center gap-6 mb-8">
-                <div className="w-20 h-20 bg-[#E1FFD9]/10 rounded-2xl flex items-center justify-center animate-pulse">
-                  <svg className="w-12 h-12 text-[#E1FFD9]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                  </svg>
-                </div>
-                <div className="text-center md:text-left">
-                  <h3 className="text-2xl font-bold text-white mb-2 font-comfortaa">
-                    {isPortuguese ? 'Bem-vindo ao Binary Hub!' : 'Welcome to Binary Hub!'}
-                  </h3>
-                  <p className="text-gray-300 text-lg">
-                    {isPortuguese 
-                      ? 'Importe seus dados de trading para visualizar análises profissionais'
-                      : 'Import your trading data to unlock professional analytics'
-                    }
-                  </p>
-                </div>
-              </div>
-              
-              {/* Features Preview */}
-              <div className="grid md:grid-cols-3 gap-6 mb-8">
-                <div className="flex items-center gap-3 text-left bg-gray-800/30 p-4 rounded-lg border border-gray-700/50">
-                  <div className="w-12 h-12 bg-[#E1FFD9]/20 rounded-full flex items-center justify-center flex-shrink-0">
-                    <svg className="w-6 h-6 text-[#E1FFD9]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
-                    </svg>
-                  </div>
-                  <div>
-                    <h4 className="font-semibold text-white font-comfortaa">
-                      {isPortuguese ? 'Análises em Tempo Real' : 'Real-Time Analytics'}
-                    </h4>
-                    <p className="text-sm text-gray-400">
-                      {isPortuguese ? 'Métricas profissionais e insights' : 'Professional metrics & insights'}
-                    </p>
-                  </div>
-                </div>
-                
-                <div className="flex items-center gap-3 text-left bg-gray-800/30 p-4 rounded-lg border border-gray-700/50">
-                  <div className="w-12 h-12 bg-[#E1FFD9]/20 rounded-full flex items-center justify-center flex-shrink-0">
-                    <svg className="w-6 h-6 text-[#E1FFD9]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                    </svg>
-                  </div>
-                  <div>
-                    <h4 className="font-semibold text-white font-comfortaa">
-                      {isPortuguese ? 'Gráficos Avançados' : 'Advanced Charts'}
-                    </h4>
-                    <p className="text-sm text-gray-400">
-                      {isPortuguese ? 'Visualizações interativas' : 'Interactive visualizations'}
-                    </p>
-                  </div>
-                </div>
-                
-                <div className="flex items-center gap-3 text-left bg-gray-800/30 p-4 rounded-lg border border-gray-700/50">
-                  <div className="w-12 h-12 bg-[#E1FFD9]/20 rounded-full flex items-center justify-center flex-shrink-0">
-                    <svg className="w-6 h-6 text-[#E1FFD9]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
-                    </svg>
-                  </div>
-                  <div>
-                    <h4 className="font-semibold text-white font-comfortaa">
-                      {isPortuguese ? 'Insights Personalizados' : 'Personal Insights'}
-                    </h4>
-                    <p className="text-sm text-gray-400">
-                      {isPortuguese ? 'Recomendações baseadas em IA' : 'AI-powered recommendations'}
-                    </p>
-                  </div>
-                </div>
-              </div>
-              
-              {/* Onboarding Steps */}
-              <div className="bg-gray-800/40 rounded-lg p-6 mb-8 border border-gray-700/30">
-                <h4 className="text-lg font-semibold text-white mb-4 font-comfortaa">
-                  {isPortuguese ? 'Como começar:' : 'Getting started:'}
-                </h4>
-                <div className="grid md:grid-cols-3 gap-4">
-                  <div className="text-center">
-                    <div className="w-16 h-16 bg-[#E1FFD9]/10 rounded-full flex items-center justify-center mx-auto mb-3">
-                      <svg className="w-8 h-8 text-[#E1FFD9]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                      </svg>
-                    </div>
-                    <h5 className="font-semibold text-white text-sm mb-1">
-                      {isPortuguese ? '1. Exportar CSV' : '1. Export CSV'}
-                    </h5>
-                    <p className="text-xs text-gray-400">
-                      {isPortuguese ? 'Da sua corretora (Ebinex, etc.)' : 'From your broker (Ebinex, etc.)'}
-                    </p>
-                  </div>
-                  
-                  <div className="text-center">
-                    <div className="w-16 h-16 bg-[#E1FFD9]/10 rounded-full flex items-center justify-center mx-auto mb-3">
-                      <svg className="w-8 h-8 text-[#E1FFD9]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                      </svg>
-                    </div>
-                    <h5 className="font-semibold text-white text-sm mb-1">
-                      {isPortuguese ? '2. Importar Dados' : '2. Import Data'}
-                    </h5>
-                    <p className="text-xs text-gray-400">
-                      {isPortuguese ? 'Upload seu arquivo CSV' : 'Upload your CSV file'}
-                    </p>
-                  </div>
-                  
-                  <div className="text-center">
-                    <div className="w-16 h-16 bg-[#E1FFD9]/10 rounded-full flex items-center justify-center mx-auto mb-3">
-                      <svg className="w-8 h-8 text-[#E1FFD9]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
-                      </svg>
-                    </div>
-                    <h5 className="font-semibold text-white text-sm mb-1">
-                      {isPortuguese ? '3. Ver Análises' : '3. View Analytics'}
-                    </h5>
-                    <p className="text-xs text-gray-400">
-                      {isPortuguese ? 'Insights profissionais instantâneos' : 'Instant professional insights'}
-                    </p>
-                  </div>
-                </div>
-              </div>
-              
-              {/* Action Buttons */}
+              <h3 className="text-2xl font-bold text-white mb-2 font-comfortaa">
+                {isPortuguese ? 'Bem-vindo ao Binary Hub!' : 'Welcome to Binary Hub!'}
+              </h3>
+              <p className="text-gray-300 text-lg mb-8">
+                {isPortuguese
+                  ? 'Importe seus dados de trading para visualizar análises profissionais'
+                  : 'Import your trading data to unlock professional analytics'}
+              </p>
               <div className="flex flex-col sm:flex-row gap-4 items-center justify-center">
-                <button 
+                <button
                   onClick={handleImportData}
-                  className="bg-gradient-to-r from-[#E1FFD9] to-[#C4F5A8] text-[#2D3748] font-semibold px-8 py-3 rounded-lg hover:bg-gradient-to-r hover:from-[#C4F5A8] hover:to-[#E1FFD9] hover:shadow-xl transition-all duration-200 shadow-lg font-comfortaa transform hover:scale-105 flex items-center gap-2"
+                  className="bg-gradient-to-r from-[#E1FFD9] to-[#C4F5A8] text-[#2D3748] font-semibold px-8 py-3 rounded-lg hover:shadow-xl transition-all duration-200 shadow-lg font-comfortaa transform hover:scale-105"
                 >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                  </svg>
                   {isPortuguese ? 'Importar Dados CSV' : 'Import CSV Data'}
                 </button>
-                
-                <button 
+                <button
                   onClick={() => setIsDemoMode(true)}
-                  className="text-[#E1FFD9] hover:text-[#C4F5A8] transition-colors duration-200 font-comfortaa px-4 py-2 rounded-lg border border-[#E1FFD9]/30 hover:border-[#C4F5A8]/50 bg-[#E1FFD9]/5 hover:bg-[#C4F5A8]/10 flex items-center gap-2"
+                  className="text-[#E1FFD9] hover:text-[#C4F5A8] transition-colors duration-200 font-comfortaa px-4 py-2 rounded-lg border border-[#E1FFD9]/30 hover:border-[#C4F5A8]/50 bg-[#E1FFD9]/5"
                 >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                  </svg>
-                  {isPortuguese ? 'Ver Demo com Dados de Exemplo' : 'See Demo with Sample Data'}
+                  {isPortuguese ? 'Ver Demo' : 'See Demo'}
                 </button>
               </div>
+            </div>
+          ) : thisAccountEmpty && !isDemoMode ? (
+            /* This account has no trades yet — compact prompt, doesn't block layout */
+            <div className="card border border-dashed border-gray-700 text-center py-10">
+              <p className="text-gray-400 font-comfortaa mb-4">
+                {isPortuguese
+                  ? `Nenhuma operação importada para ${activeMarket?.displayName ?? 'esta conta'} ainda.`
+                  : `No trades imported for ${activeMarket?.displayName ?? 'this account'} yet.`}
+              </p>
+              <button
+                onClick={handleImportData}
+                className="bg-gradient-to-r from-[#E1FFD9] to-[#C4F5A8] text-[#2D3748] font-semibold px-6 py-2.5 rounded-lg hover:shadow-lg transition-all duration-200 font-comfortaa text-sm"
+              >
+                {isPortuguese ? 'Importar CSV' : 'Import CSV'}
+              </button>
             </div>
           ) : (
             /* Regular Chart Display */
             <div className="relative">
-              {hasNoData && isDemoMode && (
+              {isFirstTimeUser && isDemoMode && (
                 <div className="absolute top-4 left-1/2 transform -translate-x-1/2 z-10">
                   <div className="bg-orange-500/90 text-white px-4 py-2 rounded-full text-sm font-semibold font-comfortaa shadow-lg">
                     {isPortuguese ? 'MODO DEMO' : 'DEMO MODE'}
@@ -267,7 +163,7 @@ export default function DashboardV1Modern() {
                 </div>
               )}
               <CumulativePnLChart period={selectedPeriod} />
-              {hasNoData && isDemoMode && (
+              {isFirstTimeUser && isDemoMode && (
                 <div className="text-center mt-4">
                   <button 
                     onClick={() => setIsDemoMode(false)}
@@ -298,7 +194,7 @@ export default function DashboardV1Modern() {
               </p>
             </div>
             
-            {hasNoData && !isDemoMode ? (
+            {isFirstTimeUser && !isDemoMode ? (
               /* Empty State for Recent Trades */
               <div className="card text-center py-16">
                 <div className="mb-4 flex justify-center opacity-60">
@@ -326,7 +222,7 @@ export default function DashboardV1Modern() {
                 </button>
               </div>
             ) : (
-              <RecentTrades isDemoMode={isDemoMode && hasNoData} />
+              <RecentTrades isDemoMode={isDemoMode && isFirstTimeUser} />
             )}
           </div>
         </div>
@@ -477,7 +373,7 @@ export default function DashboardV1Modern() {
               </p>
             </div>
             
-            {hasNoData && !isDemoMode ? (
+            {isFirstTimeUser && !isDemoMode ? (
               /* Empty State for Trading Calendar */
               <div className="card text-center py-16">
                 <div className="mb-4 flex justify-center opacity-60">
@@ -507,7 +403,7 @@ export default function DashboardV1Modern() {
               </div>
             ) : (
               <div className="relative">
-                {hasNoData && isDemoMode && (
+                {isFirstTimeUser && isDemoMode && (
                   <div className="absolute top-4 left-1/2 transform -translate-x-1/2 z-10">
                     <div className="bg-orange-500/90 text-white px-4 py-2 rounded-full text-sm font-semibold font-comfortaa shadow-lg">
                       {isPortuguese ? 'MODO DEMO' : 'DEMO MODE'}
@@ -518,7 +414,7 @@ export default function DashboardV1Modern() {
                   data={isDemoMode ? mockCalendarData : []} 
                   month={selectedCalendarMonth}
                   onMonthChange={setSelectedCalendarMonth}
-                  isDemoMode={isDemoMode && hasNoData}
+                  isDemoMode={isDemoMode && isFirstTimeUser}
                 />
               </div>
             )}

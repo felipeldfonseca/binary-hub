@@ -7,6 +7,8 @@ import { useToastHelpers } from '@/components/ui/Toast'
 import { ChartErrorBoundary } from '@/components/error/ErrorBoundary'
 import { supabase } from '@/lib/supabase'
 import { parseEbinexCsv } from '@/lib/utils/ebinexParser'
+import { parseTopOneCsv } from '@/lib/utils/topOneParser'
+import { detectBrokerFormat } from '@/lib/utils/csvBrokerDetect'
 
 interface UploadStatus {
   uploadId: string
@@ -55,6 +57,8 @@ export default function CsvUploadSection() {
 
   const handleFileSelect = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
+    // Reset input so the same file can be re-selected after an error or retry
+    e.target.value = ''
     if (!file) return
 
     if (!file.type.includes('csv') && !file.name.endsWith('.csv')) {
@@ -77,7 +81,16 @@ export default function CsvUploadSection() {
 
     try {
       const text = await file.text()
-      const { trades: parsed, ebinexIds, parseErrors } = parseEbinexCsv(text)
+
+      const format = detectBrokerFormat(text)
+      if (!format) {
+        setError('Unrecognized CSV format. We support Ebinex and Top One Futures.')
+        setUploading(false)
+        return
+      }
+
+      const { trades: parsed, parseErrors } =
+        format === 'topone' ? parseTopOneCsv(text) : parseEbinexCsv(text)
 
       if (parsed.length === 0) {
         setError(parseErrors[0]?.error ?? 'No trades found in CSV')
@@ -85,27 +98,19 @@ export default function CsvUploadSection() {
         return
       }
 
-      // Deduplicate against existing Supabase records
-      const noteKeys = ebinexIds.map(id => `ebinex:${id}`)
-      const { data: existingNotes } = await supabase
+      // Single upsert — the unique constraint on (user_id, notes) handles dedup
+      const { data: insertedRows, error: insertError } = await supabase
         .from('trades')
-        .select('notes')
-        .eq('user_id', user.id)
-        .in('notes', noteKeys)
+        .upsert(
+          parsed.map(t => ({ ...t, user_id: user.id })),
+          { onConflict: 'user_id,notes', ignoreDuplicates: true }
+        )
+        .select('id')
 
-      const alreadyImported = new Set((existingNotes ?? []).map((r: { notes: string | null }) => r.notes))
-      const newTrades = parsed.filter(t => !alreadyImported.has(t.notes ?? ''))
-      const duplicateRows = parsed.length - newTrades.length
+      if (insertError) throw new Error(insertError.message)
 
-      let importedRows = 0
-      if (newTrades.length > 0) {
-        const { error: insertError } = await supabase
-          .from('trades')
-          .insert(newTrades.map(t => ({ ...t, user_id: user.id })))
-
-        if (insertError) throw new Error(insertError.message)
-        importedRows = newTrades.length
-      }
+      const importedRows = insertedRows?.length ?? 0
+      const duplicateRows = parsed.length - importedRows
 
       setUploadStatus({
         uploadId: `import-${Date.now()}`,

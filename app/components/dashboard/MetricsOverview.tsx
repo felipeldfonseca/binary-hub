@@ -1,9 +1,9 @@
 'use client'
 
 import React, { useMemo, useState, useEffect } from 'react'
-import { useTradeStats } from '@/hooks/useTradeStats'
-import { useTrades } from '@/hooks/useTrades'
 import { useLanguage } from '@/lib/contexts/LanguageContext'
+import { useMarketContext } from '@/lib/contexts/MarketContext'
+import { useTradesSupabase } from '@/hooks/useTradesSupabase'
 
 interface MetricCardProps {
   title: string
@@ -52,11 +52,11 @@ function MetricCard({ title, value, subtitle, trend, isLoading }: MetricCardProp
           </span>
         )}
       </div>
-      
+
       <div className={`text-3xl font-bold mb-1 ${getTrendColor()} transition-all duration-800 ease-in-out transform`}>
         {value}
       </div>
-      
+
       {subtitle && (
         <p className="text-xs text-gray-400 font-comfortaa transition-all duration-800 ease-in-out">
           {subtitle}
@@ -74,20 +74,21 @@ interface MetricsOverviewProps {
 
 type TimePeriod = 'daily' | 'weekly' | 'monthly' | 'yearly' | 'allTime' | 'ytd'
 
-export default function MetricsOverview({ 
+export default function MetricsOverview({
   selectedPeriod: externalSelectedPeriod,
   onPeriodChange,
   isDemoMode = false
 }: MetricsOverviewProps) {
   const { isPortuguese } = useLanguage()
+  const { activeMarket } = useMarketContext()
   const [internalSelectedPeriod, setInternalSelectedPeriod] = useState<TimePeriod>('weekly')
   const [demoLoading, setDemoLoading] = useState(false)
   const [prevPeriod, setPrevPeriod] = useState(externalSelectedPeriod || internalSelectedPeriod)
-  
+
   // Use external period if provided, otherwise use internal
   const selectedPeriod = externalSelectedPeriod || internalSelectedPeriod
   const setSelectedPeriod = onPeriodChange || setInternalSelectedPeriod
-  
+
   // Handle demo mode loading animation when period changes
   useEffect(() => {
     if (isDemoMode && selectedPeriod !== prevPeriod) {
@@ -97,90 +98,89 @@ export default function MetricsOverview({
         setDemoLoading(false)
         setPrevPeriod(selectedPeriod)
       }, 800)
-      
+
       return () => clearTimeout(timer)
     } else if (!isDemoMode) {
       setPrevPeriod(selectedPeriod)
     }
   }, [isDemoMode, selectedPeriod, prevPeriod])
-  
-  // Map our UI periods to API periods - memoized to prevent recreation
-  const periodMap: Record<TimePeriod, 'daily' | 'weekly' | 'monthly' | 'yearly' | 'allTime' | 'ytd'> = useMemo(() => ({
-    daily: 'daily',
-    weekly: 'weekly',
-    monthly: 'monthly',
-    yearly: 'yearly',
-    allTime: 'allTime', // Now properly mapped to distinct period
-    ytd: 'ytd' // Now properly mapped to distinct period
-  }), [])
-  
-  const { stats, loading: statsLoading, error: statsError } = useTradeStats(periodMap[selectedPeriod])
-  
-  // Memoize the filters to prevent infinite loop
-  const tradesFilters = useMemo(() => ({ limit: 10 }), [])
-  const { trades, loading: tradesLoading } = useTrades(tradesFilters)
-  
+
+  // Compute date range from selectedPeriod for Supabase filtering
+  const dateFrom = useMemo(() => {
+    const now = new Date()
+    switch (selectedPeriod) {
+      case 'daily': {
+        const start = new Date(now)
+        start.setHours(0, 0, 0, 0)
+        return start.toISOString()
+      }
+      case 'weekly': {
+        const start = new Date(now)
+        start.setDate(now.getDate() - 7)
+        return start.toISOString()
+      }
+      case 'monthly': {
+        const start = new Date(now)
+        start.setMonth(now.getMonth() - 1)
+        return start.toISOString()
+      }
+      case 'yearly': {
+        const start = new Date(now)
+        start.setFullYear(now.getFullYear() - 1)
+        return start.toISOString()
+      }
+      case 'ytd': {
+        const start = new Date(now.getFullYear(), 0, 1)
+        return start.toISOString()
+      }
+      default:
+        return undefined
+    }
+  }, [selectedPeriod])
+
+  const statsFilters = useMemo(() => ({
+    marketType: activeMarket?.marketType,
+    ...(dateFrom ? { dateFrom } : {}),
+  }), [activeMarket?.marketType, dateFrom])
+
+  const { trades, stats, isLoading: dataLoading, error: statsError } = useTradesSupabase(
+    isDemoMode ? undefined : statsFilters
+  )
+
   // Generate period-specific demo data
-  const generateDemoStats = (period: string) => {
-    const periodConfigs = {
+  const generateDemoStats = (period: TimePeriod) => {
+    const periodConfigs: Record<TimePeriod, {
+      totalTrades: number; winTrades: number; lossTrades: number;
+      winRate: number; totalPnl: number; avgPnl: number; maxDrawdown: number
+    }> = {
       daily: {
-        totalTrades: 1,
-        winTrades: 1,
-        lossTrades: 0,
-        winRate: 100.0,
-        totalPnl: 25,
-        avgPnl: 25,
-        maxDrawdown: -15
+        totalTrades: 1, winTrades: 1, lossTrades: 0,
+        winRate: 100.0, totalPnl: 25, avgPnl: 25, maxDrawdown: -15
       },
       weekly: {
-        totalTrades: 5,
-        winTrades: 3,
-        lossTrades: 2,
-        winRate: 60.0,
-        totalPnl: 34,
-        avgPnl: 6.8,
-        maxDrawdown: -80
+        totalTrades: 5, winTrades: 3, lossTrades: 2,
+        winRate: 60.0, totalPnl: 34, avgPnl: 6.8, maxDrawdown: -80
       },
       monthly: {
-        totalTrades: 22,
-        winTrades: 14,
-        lossTrades: 8,
-        winRate: 63.6,
-        totalPnl: 156,
-        avgPnl: 7.1,
-        maxDrawdown: -120
+        totalTrades: 22, winTrades: 14, lossTrades: 8,
+        winRate: 63.6, totalPnl: 156, avgPnl: 7.1, maxDrawdown: -120
       },
       yearly: {
-        totalTrades: 264,
-        winTrades: 172,
-        lossTrades: 92,
-        winRate: 65.2,
-        totalPnl: 2840,
-        avgPnl: 10.8,
-        maxDrawdown: -450
+        totalTrades: 264, winTrades: 172, lossTrades: 92,
+        winRate: 65.2, totalPnl: 2840, avgPnl: 10.8, maxDrawdown: -450
       },
       allTime: {
-        totalTrades: 847,
-        winTrades: 576,
-        lossTrades: 271,
-        winRate: 68.0,
-        totalPnl: 8960,
-        avgPnl: 10.6,
-        maxDrawdown: -680
+        totalTrades: 847, winTrades: 576, lossTrades: 271,
+        winRate: 68.0, totalPnl: 8960, avgPnl: 10.6, maxDrawdown: -680
       },
       ytd: {
-        totalTrades: 198,
-        winTrades: 126,
-        lossTrades: 72,
-        winRate: 63.6,
-        totalPnl: 2156,
-        avgPnl: 10.9,
-        maxDrawdown: -340
+        totalTrades: 198, winTrades: 126, lossTrades: 72,
+        winRate: 63.6, totalPnl: 2156, avgPnl: 10.9, maxDrawdown: -340
       }
-    };
-    
-    const config = periodConfigs[periodMap[selectedPeriod]] || periodConfigs.weekly;
-    
+    }
+
+    const config = periodConfigs[period] || periodConfigs.weekly
+
     return {
       totalTrades: config.totalTrades,
       winTrades: config.winTrades,
@@ -192,81 +192,85 @@ export default function MetricsOverview({
       maxDrawdown: config.maxDrawdown,
       avgStake: 32.0,
       maxStake: 50.0
-    };
+    }
   }
 
-  // Override stats and trades for demo mode
-  const displayStats = isDemoMode ? generateDemoStats(selectedPeriod) : stats
-  
-  // Debug logging (temporary)
-  console.log('MetricsOverview Debug:', { 
-    isDemoMode, 
-    hasStats: !!stats, 
-    stats, 
-    selectedPeriod,
-    statsLoading,
-    displayStats
-  })
-  
+  // Map Supabase stats shape to display shape
+  const mappedStats = stats ? {
+    totalTrades: stats.totalTrades,
+    winTrades: stats.wins,
+    lossTrades: stats.losses,
+    tieTrades: stats.totalTrades - stats.wins - stats.losses,
+    winRate: stats.winRate,
+    totalPnl: stats.totalPnl,
+    avgPnl: stats.totalTrades > 0 ? stats.totalPnl / stats.totalTrades : 0,
+    maxDrawdown: 0,
+    avgStake: 0,
+    maxStake: 0,
+  } : null
+
+  // Override stats for demo mode
+  const displayStats = isDemoMode ? generateDemoStats(selectedPeriod) : mappedStats
+
   // Generate period-specific demo trades for streak calculation
-  const generateDemoTrades = (period: string) => {
-    const tradePatterns = {
-      daily: [{ result: 'win' }], // 1 win trade
+  const generateDemoTrades = (period: TimePeriod) => {
+    const tradePatterns: Record<TimePeriod, { result: string }[]> = {
+      daily: [{ result: 'win' }],
       weekly: [
         { result: 'win' },
-        { result: 'win' }, 
+        { result: 'win' },
         { result: 'loss' },
         { result: 'win' },
         { result: 'loss' }
-      ], // 3 wins, 2 losses - last trade was loss, so streak is 0
+      ],
       monthly: [
         { result: 'win' },
         { result: 'win' },
         { result: 'win' }
-      ], // Current 3-win streak
+      ],
       yearly: [
         { result: 'loss' },
         { result: 'win' }
-      ], // Current 1-win streak  
+      ],
       allTime: [
         { result: 'win' },
         { result: 'win' },
         { result: 'win' },
         { result: 'win' },
         { result: 'win' }
-      ], // Current 5-win streak
+      ],
       ytd: [
         { result: 'loss' },
         { result: 'loss' }
-      ] // Current 2-loss streak
-    };
-    
-    return tradePatterns[periodMap[selectedPeriod]] || tradePatterns.weekly;
+      ]
+    }
+
+    return tradePatterns[period] || tradePatterns.weekly
   }
-  
+
   const displayTrades = isDemoMode ? generateDemoTrades(selectedPeriod) : trades
 
   // Calculate current streak from recent trades
-  const calculateCurrentStreak = (trades: any[]) => {
+  const calculateCurrentStreak = (trades: { result: string | null }[]) => {
     if (!trades || trades.length === 0) return { count: 0, type: 'neutral' as const }
-    
+
     let currentStreak = 0
-    let streakType = trades[0]?.result || 'neutral'
-    
+    const streakType = trades[0]?.result || 'neutral'
+
     for (const trade of trades) {
-      if (trade.result === streakType) {
+      if ((trade.result ?? 'neutral') === streakType) {
         currentStreak++
       } else {
         break
       }
     }
-    
+
     return { count: currentStreak, type: streakType as 'win' | 'loss' | 'tie' }
   }
 
   const streak = calculateCurrentStreak(displayTrades)
-  const isLoading = isDemoMode ? demoLoading : (statsLoading || tradesLoading)
-  
+  const isLoading = isDemoMode ? demoLoading : dataLoading
+
   // Translations
   const texts = {
     winRate: isPortuguese ? 'Taxa de Vitória' : 'Win Rate',
@@ -279,21 +283,21 @@ export default function MetricsOverview({
     losses: isPortuguese ? 'perdas' : 'losses',
     ties: isPortuguese ? 'empates' : 'ties',
     daily: isPortuguese ? 'Diário' : 'Daily',
-    weekly: isPortuguese ? 'Semanal' : 'Weekly', 
+    weekly: isPortuguese ? 'Semanal' : 'Weekly',
     monthly: isPortuguese ? 'Mensal' : 'Monthly',
     yearly: isPortuguese ? 'Anual' : 'Yearly',
     allTime: isPortuguese ? 'Todo Período' : 'All Time',
     ytd: isPortuguese ? 'Ano Atual' : 'Year to Date'
   }
-  
+
   const timePeriods: TimePeriod[] = useMemo(() => ['daily', 'weekly', 'monthly', 'yearly', 'ytd', 'allTime'], [])
 
   const getStreakText = (streak: { count: number, type: string }) => {
     if (streak.count === 0) return isPortuguese ? 'Nenhuma' : 'None'
-    
-    const typeText = streak.type === 'win' ? texts.wins : 
+
+    const typeText = streak.type === 'win' ? texts.wins :
                     streak.type === 'loss' ? texts.losses : texts.ties
-    
+
     return `${streak.count} ${texts.consecutive} ${typeText}`
   }
 
@@ -353,7 +357,7 @@ export default function MetricsOverview({
             </div>
           </div>
         )}
-        
+
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           {/* Win Rate */}
           <MetricCard
@@ -387,7 +391,7 @@ export default function MetricsOverview({
             title={texts.currentStreak}
             value={isLoading ? '...' : streak.count}
             subtitle={getStreakText(streak)}
-            trend={streak.type === 'win' && streak.count >= 3 ? 'up' : 
+            trend={streak.type === 'win' && streak.count >= 3 ? 'up' :
                   streak.type === 'loss' && streak.count >= 3 ? 'down' : 'neutral'}
             isLoading={isLoading}
           />

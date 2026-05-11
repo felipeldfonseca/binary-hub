@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '@/lib/supabase';
+import { useMemo } from 'react';
+import { createDataClient } from '@/lib/supabase';
 import { useAuth } from '@/lib/contexts/AuthContextSupabase';
 
 export interface AccountTransaction {
@@ -24,7 +25,8 @@ export interface AccountTransactionInsert {
 const QUERY_KEY = ['account-transactions'] as const;
 
 export function useAccountTransactions(marketType?: string) {
-  const { user } = useAuth();
+  const { user, session } = useAuth();
+  const db = useMemo(() => createDataClient(session?.access_token ?? null), [session?.access_token]);
   const queryClient = useQueryClient();
 
   const transactionsQuery = useQuery({
@@ -32,7 +34,7 @@ export function useAccountTransactions(marketType?: string) {
     queryFn: async (): Promise<AccountTransaction[]> => {
       if (!user) throw new Error('Not authenticated');
 
-      let query = supabase
+      let query = db
         .from('account_transactions')
         .select('*')
         .eq('user_id', user.id)
@@ -53,7 +55,7 @@ export function useAccountTransactions(marketType?: string) {
     mutationFn: async (payload: AccountTransactionInsert): Promise<AccountTransaction> => {
       if (!user) throw new Error('Not authenticated');
 
-      const { data, error } = await supabase
+      const { data, error } = await db
         .from('account_transactions')
         .insert({
           user_id: user.id,
@@ -76,7 +78,7 @@ export function useAccountTransactions(marketType?: string) {
 
   const deleteTransaction = useMutation({
     mutationFn: async (id: string): Promise<void> => {
-      const { error } = await supabase
+      const { error } = await db
         .from('account_transactions')
         .delete()
         .eq('id', id);

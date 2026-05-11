@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '@/lib/supabase';
+import { useMemo } from 'react';
+import { createDataClient } from '@/lib/supabase';
 import { useAuth } from '@/lib/contexts/AuthContextSupabase';
 import type { Trade, TradeInsert, TradeUpdate } from '@/types/database';
 
@@ -9,11 +10,13 @@ interface TradeFilters {
   dateFrom?: string;
   dateTo?: string;
   sessionId?: string;
+  marketType?: string;
   limit?: number;
 }
 
 export function useTradesSupabase(filters?: TradeFilters) {
-  const { user } = useAuth();
+  const { user, session } = useAuth();
+  const db = useMemo(() => createDataClient(session?.access_token ?? null), [session?.access_token]);
   const queryClient = useQueryClient();
 
   // Get trades with filters
@@ -22,7 +25,7 @@ export function useTradesSupabase(filters?: TradeFilters) {
     queryFn: async () => {
       if (!user) throw new Error('Not authenticated');
 
-      let query = supabase
+      let query = db
         .from('trades')
         .select('*')
         .eq('user_id', user.id)
@@ -36,6 +39,9 @@ export function useTradesSupabase(filters?: TradeFilters) {
       }
       if (filters?.sessionId) {
         query = query.eq('session_id', filters.sessionId);
+      }
+      if (filters?.marketType) {
+        query = query.eq('market_type', filters.marketType);
       }
       if (filters?.dateFrom) {
         query = query.gte('entry_time', filters.dateFrom);
@@ -102,7 +108,7 @@ export function useTradesSupabase(filters?: TradeFilters) {
     mutationFn: async (trade: Omit<TradeInsert, 'user_id'>) => {
       if (!user) throw new Error('Not authenticated');
 
-      const { data, error } = await supabase
+      const { data, error } = await db
         .from('trades')
         .insert({
           ...trade,
@@ -130,7 +136,7 @@ export function useTradesSupabase(filters?: TradeFilters) {
       tradeId: string;
       updates: TradeUpdate;
     }) => {
-      const { data, error } = await supabase
+      const { data, error } = await db
         .from('trades')
         .update(updates)
         .eq('id', tradeId)
@@ -150,7 +156,7 @@ export function useTradesSupabase(filters?: TradeFilters) {
   // Delete a trade
   const deleteTrade = useMutation({
     mutationFn: async (tradeId: string) => {
-      const { error } = await supabase.from('trades').delete().eq('id', tradeId);
+      const { error } = await db.from('trades').delete().eq('id', tradeId);
 
       if (error) throw error;
     },
@@ -180,7 +186,7 @@ export function useTradesSupabase(filters?: TradeFilters) {
           ? trade.stake_amount * (trade.payout_percent / 100)
           : -trade.stake_amount;
 
-      const { data, error } = await supabase
+      const { data, error } = await db
         .from('trades')
         .insert({
           user_id: user.id,
@@ -231,7 +237,7 @@ export function useTradesSupabase(filters?: TradeFilters) {
       const pnl =
         (trade.exit_price - trade.entry_price) * direction * multiplier * qty;
 
-      const { data, error } = await supabase
+      const { data, error } = await db
         .from('trades')
         .insert({
           user_id: user.id,

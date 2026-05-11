@@ -1,23 +1,56 @@
 'use client'
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import CsvUploadSection from '@/components/dashboard/CsvUploadSection'
 import { useLanguage } from '@/lib/contexts/LanguageContext'
-import { useTrades, Trade } from '@/hooks/useTrades'
-import { useTradeStats } from '@/hooks/useTradeStats'
+import { Trade as LegacyTrade } from '@/hooks/useTrades'
+import { useTradesSupabase } from '@/hooks/useTradesSupabase'
 import { useMarketContext } from '@/lib/contexts/MarketContext'
+import type { Trade as SupabaseTrade } from '@/types/database'
 import TradesTable from '@/components/trades/TradesTable'
-import TradeForm from '@/components/trades/TradeForm'
 import TradeFilters from '@/components/trades/TradeFilters'
-import TradeModal from '@/components/trades/TradeModal'
 import BulkActions from '@/components/trades/BulkActions'
+
+// Map Supabase snake_case trade to the legacy camelCase shape that child components expect
+function adaptTrade(t: SupabaseTrade & { market_type?: string | null }): LegacyTrade {
+  const result = t.result === 'breakeven' ? 'tie' : (t.result ?? 'loss') as 'win' | 'loss' | 'tie'
+  return {
+    id: t.id,
+    userId: t.user_id,
+    tradeId: t.id,
+    asset: t.symbol,
+    direction: (t.direction === 'long' || t.direction === 'short')
+      ? 'call' // futures don't have call/put — map for legacy compat
+      : (t.direction as 'call' | 'put'),
+    amount: t.stake_amount ?? 0,
+    entryPrice: t.entry_price ?? 0,
+    exitPrice: t.exit_price ?? 0,
+    entryTime: new Date(t.entry_time),
+    exitTime: t.exit_time ? new Date(t.exit_time) : new Date(t.entry_time),
+    timeframe: t.timeframe ?? '',
+    candleTime: '',
+    refunded: 0,
+    executed: 0,
+    status: result === 'win' ? 'WIN' : 'LOSE',
+    result,
+    profit: t.pnl ?? 0,
+    payout: t.payout_percent ?? 0,
+    platform: '',
+    marketType: (t.market_type as LegacyTrade['marketType']) ?? undefined,
+    strategy: t.strategy ?? undefined,
+    notes: t.notes ?? undefined,
+    screenshots: [],
+    createdAt: new Date(t.created_at),
+    updatedAt: new Date(t.updated_at ?? t.created_at),
+  }
+}
 
 export default function TradesV1Professional() {
   const { isPortuguese } = useLanguage()
   const { activeMarket, marketAccounts, setActiveMarket } = useMarketContext()
-  const [activeTab, setActiveTab] = useState<'table' | 'form' | 'filters' | 'import'>('table')
-  const [selectedTrade, setSelectedTrade] = useState<Trade | null>(null)
+  const [activeTab, setActiveTab] = useState<'table' | 'filters' | 'import'>('table')
+  const [selectedTrade, setSelectedTrade] = useState<LegacyTrade | null>(null)
   const [selectedIds, setSelectedIds] = useState<string[]>([])
-  const [sortField, setSortField] = useState<keyof Trade>('entryTime')
+  const [sortField, setSortField] = useState<keyof LegacyTrade>('entryTime')
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc')
   const [filters, setFilters] = useState({
     dateRange: { start: '', end: '' },
@@ -38,20 +71,26 @@ export default function TradesV1Professional() {
     }
   }, [activeMarket])
 
-  const { 
-    trades, 
-    loading: tradesLoading, 
-    error: tradesError,
-    createTrade,
-    updateTrade,
-    deleteTrade,
-    fetchTrades 
-  } = useTrades()
+  const supabaseFilters = useMemo(() => ({
+    marketType: activeMarket?.marketType,
+  }), [activeMarket?.marketType])
 
-  const { 
-    stats, 
-    loading: statsLoading 
-  } = useTradeStats()
+  const {
+    trades: rawTrades,
+    stats,
+    isLoading,
+    error,
+    deleteTrade,
+    refetch,
+  } = useTradesSupabase(supabaseFilters)
+
+  // Adapt to legacy shape for child components
+  const trades = useMemo(
+    () => rawTrades.map(t => adaptTrade(t as SupabaseTrade & { market_type?: string | null })),
+    [rawTrades]
+  )
+
+  const tradesError = error?.message ?? null
 
   // Filter trades based on current filters
   const filteredTrades = trades.filter(trade => {
@@ -69,45 +108,21 @@ export default function TradesV1Professional() {
   const sortedTrades = [...filteredTrades].sort((a, b) => {
     const aValue = a[sortField]
     const bValue = b[sortField]
-    
+
     if (typeof aValue === 'string' && typeof bValue === 'string') {
       return sortDirection === 'asc' ? aValue.localeCompare(bValue) : bValue.localeCompare(aValue)
     }
-    
     if (typeof aValue === 'number' && typeof bValue === 'number') {
       return sortDirection === 'asc' ? aValue - bValue : bValue - aValue
     }
-    
     if (aValue instanceof Date && bValue instanceof Date) {
       return sortDirection === 'asc' ? aValue.getTime() - bValue.getTime() : bValue.getTime() - aValue.getTime()
     }
-    
     return 0
   })
 
-  const handleTradeCreate = async (tradeData: Partial<Trade>) => {
-    await createTrade(tradeData)
-    await fetchTrades()
-    setActiveTab('table')
-  }
-
-  const handleTradeUpdate = async (tradeData: Partial<Trade>) => {
-    if (selectedTrade) {
-      await updateTrade(selectedTrade.id, tradeData)
-      await fetchTrades()
-      setSelectedTrade(null)
-    }
-  }
-
   const handleBulkDelete = async (tradeIds: string[]) => {
-    await Promise.all(tradeIds.map(id => deleteTrade(id)))
-    await fetchTrades()
-    setSelectedIds([])
-  }
-
-  const handleBulkUpdate = async (tradeIds: string[], updates: Partial<Trade>) => {
-    await Promise.all(tradeIds.map(id => updateTrade(id, updates)))
-    await fetchTrades()
+    await Promise.all(tradeIds.map(id => deleteTrade.mutateAsync(id)))
     setSelectedIds([])
   }
 
@@ -128,7 +143,7 @@ export default function TradesV1Professional() {
         trade.notes || ''
       ])
     ].map(row => row.join(',')).join('\n')
-    
+
     const blob = new Blob([csvData], { type: 'text/csv' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
@@ -138,32 +153,26 @@ export default function TradesV1Professional() {
     URL.revokeObjectURL(url)
   }
 
-  const handleSort = (field: keyof Trade, direction: 'asc' | 'desc') => {
+  const handleSort = (field: keyof LegacyTrade, direction: 'asc' | 'desc') => {
     setSortField(field)
     setSortDirection(direction)
   }
 
   const tabs = [
-    { 
-      key: 'table', 
+    {
+      key: 'table',
       label: isPortuguese ? 'Tabela' : 'Table',
       icon: '📋',
       description: isPortuguese ? 'Visualização em tabela' : 'Table view'
     },
-    { 
-      key: 'form', 
-      label: isPortuguese ? 'Nova Operação' : 'New Trade',
-      icon: '➕',
-      description: isPortuguese ? 'Adicionar operação' : 'Add trade'
-    },
-    { 
-      key: 'filters', 
+    {
+      key: 'filters',
       label: isPortuguese ? 'Filtros' : 'Filters',
       icon: '🔍',
       description: isPortuguese ? 'Filtros avançados' : 'Advanced filters'
     },
-    { 
-      key: 'import', 
+    {
+      key: 'import',
       label: isPortuguese ? 'Importar' : 'Import',
       icon: '📄',
       description: isPortuguese ? 'Upload de dados' : 'Data upload'
@@ -178,12 +187,12 @@ export default function TradesV1Professional() {
           {isPortuguese ? 'Gerenciamento Profissional de Operações' : 'Professional Trade Management'}
         </h1>
         <p className="text-xl font-comfortaa font-normal text-white max-w-4xl mx-auto mb-6">
-          {isPortuguese 
-            ? 'Interface avançada estilo Excel/Airtable com recursos profissionais de filtragem, ordenação e ações em lote.' 
+          {isPortuguese
+            ? 'Interface avançada estilo Excel/Airtable com recursos profissionais de filtragem, ordenação e ações em lote.'
             : 'Advanced Excel/Airtable-style interface with professional filtering, sorting, and bulk action features.'
           }
         </p>
-        
+
         {/* Market Selection */}
         {activeMarket && marketAccounts.length > 1 && (
           <div className="flex items-center justify-center gap-4 text-sm">
@@ -192,21 +201,21 @@ export default function TradesV1Professional() {
               {marketAccounts.map((market) => {
                 const isActive = market.marketType === activeMarket?.marketType
                 const marketConfig = {
-                  binary: { icon: '📊', color: 'orange' },
-                  forex: { icon: '💱', color: 'blue' },
-                  crypto: { icon: '₿', color: 'purple' },
-                  futures: { icon: '📈', color: 'green' },
-                  options: { icon: '🎯', color: 'yellow' }
+                  binary: { icon: '📊' },
+                  forex: { icon: '💱' },
+                  crypto: { icon: '₿' },
+                  futures: { icon: '📈' },
+                  options: { icon: '🎯' }
                 }
                 const config = marketConfig[market.marketType as keyof typeof marketConfig]
-                
+
                 return (
                   <button
                     key={market.marketType}
                     onClick={() => setActiveMarket(market.marketType)}
                     className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-white font-medium transition-all ${
-                      isActive 
-                        ? 'bg-white/20 ring-2 ring-primary/50' 
+                      isActive
+                        ? 'bg-white/20 ring-2 ring-primary/50'
                         : 'bg-white/10 hover:bg-white/15'
                     }`}
                   >
@@ -218,13 +227,17 @@ export default function TradesV1Professional() {
             </div>
           </div>
         )}
-        
-        {/* Single Market Indicator */}
+
         {activeMarket && marketAccounts.length === 1 && (
           <div className="flex items-center justify-center gap-2 text-sm text-gray-300">
             <span>{isPortuguese ? 'Mostrando operações de:' : 'Showing trades from:'}</span>
             <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-white/10 text-white font-medium">
-              <span>{activeMarket.marketType === 'binary' ? '📊' : activeMarket.marketType === 'forex' ? '💱' : activeMarket.marketType === 'crypto' ? '₿' : activeMarket.marketType === 'futures' ? '📈' : '🎯'}</span>
+              <span>
+                {activeMarket.marketType === 'binary' ? '📊'
+                  : activeMarket.marketType === 'forex' ? '💱'
+                  : activeMarket.marketType === 'crypto' ? '₿'
+                  : activeMarket.marketType === 'futures' ? '📈' : '🎯'}
+              </span>
               <span>{activeMarket.displayName}</span>
             </span>
           </div>
@@ -247,8 +260,8 @@ export default function TradesV1Professional() {
       )}
 
       {/* Quick Stats Bar */}
-      {stats && !statsLoading && (
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8">
+      {stats && !isLoading && (
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
           <div className="card text-center">
             <div className="text-2xl font-bold text-primary">{stats.totalTrades}</div>
             <div className="text-sm text-gray-300 font-comfortaa">
@@ -265,28 +278,41 @@ export default function TradesV1Professional() {
           </div>
           <div className="card text-center">
             <div className={`text-2xl font-bold ${stats.totalPnl >= 0 ? 'text-win' : 'text-loss'}`}>
-              ${stats.totalPnl >= 0 ? '+' : ''}{stats.totalPnl.toFixed(0)}
+              {stats.totalPnl >= 0 ? '+' : ''}${stats.totalPnl.toFixed(0)}
             </div>
             <div className="text-sm text-gray-300 font-comfortaa">
               P&L Total
             </div>
           </div>
           <div className="card text-center">
-            <div className={`text-2xl font-bold ${stats.avgPnl >= 0 ? 'text-win' : 'text-loss'}`}>
-              ${stats.avgPnl >= 0 ? '+' : ''}{stats.avgPnl.toFixed(2)}
+            <div className={`text-2xl font-bold ${stats.avgWin >= 0 ? 'text-win' : 'text-loss'}`}>
+              {stats.avgWin >= 0 ? '+' : ''}${stats.avgWin.toFixed(2)}
             </div>
             <div className="text-sm text-gray-300 font-comfortaa">
-              P&L Médio
+              {isPortuguese ? 'Média/Vitória' : 'Avg Win'}
             </div>
           </div>
-          <div className="card text-center">
-            <div className="text-2xl font-bold text-loss">
-              ${Math.abs(stats.maxDrawdown).toFixed(0)}
-            </div>
-            <div className="text-sm text-gray-300 font-comfortaa">
-              Max DD
-            </div>
-          </div>
+        </div>
+      )}
+
+      {/* Empty state */}
+      {!isLoading && trades.length === 0 && !tradesError && (
+        <div className="card text-center py-12 mb-8">
+          <div className="text-4xl mb-4">📭</div>
+          <h3 className="text-xl font-bold text-white mb-2">
+            {isPortuguese ? 'Nenhuma operação encontrada' : 'No trades found'}
+          </h3>
+          <p className="text-gray-400 font-comfortaa mb-6">
+            {isPortuguese
+              ? 'Importe suas operações via CSV para começar.'
+              : 'Import your trades via CSV to get started.'}
+          </p>
+          <button
+            onClick={() => setActiveTab('import')}
+            className="btn-primary"
+          >
+            {isPortuguese ? 'Importar CSV' : 'Import CSV'}
+          </button>
         </div>
       )}
 
@@ -295,7 +321,7 @@ export default function TradesV1Professional() {
         {tabs.map(tab => (
           <button
             key={tab.key}
-            onClick={() => setActiveTab(tab.key as any)}
+            onClick={() => setActiveTab(tab.key as typeof activeTab)}
             className={`flex items-center gap-2 px-4 py-3 rounded-lg transition-all font-medium ${
               activeTab === tab.key
                 ? 'bg-primary text-background shadow-glow'
@@ -316,21 +342,19 @@ export default function TradesV1Professional() {
       <div className="space-y-6">
         {activeTab === 'table' && (
           <>
-            {/* Bulk Actions */}
             <BulkActions
               selectedIds={selectedIds}
               selectedTrades={trades.filter(t => selectedIds.includes(t.id))}
               onBulkDelete={handleBulkDelete}
-              onBulkUpdate={handleBulkUpdate}
+              onBulkUpdate={async () => {}}
               onExport={handleExport}
               onClearSelection={() => setSelectedIds([])}
-              loading={tradesLoading}
+              loading={isLoading}
             />
-            
-            {/* Advanced Table */}
+
             <TradesTable
               trades={sortedTrades}
-              loading={tradesLoading}
+              loading={isLoading}
               onTradeSelect={setSelectedTrade}
               onBulkSelect={setSelectedIds}
               selectedIds={selectedIds}
@@ -343,16 +367,9 @@ export default function TradesV1Professional() {
           </>
         )}
 
-        {activeTab === 'form' && (
-          <TradeForm
-            onSubmit={handleTradeCreate}
-            loading={tradesLoading}
-          />
-        )}
-
         {activeTab === 'filters' && (
           <TradeFilters
-            onFiltersChange={(newFilters) => setFilters(newFilters as any)}
+            onFiltersChange={(newFilters) => setFilters(newFilters as typeof filters)}
           />
         )}
 
@@ -363,8 +380,8 @@ export default function TradesV1Professional() {
                 {isPortuguese ? 'Importar Dados' : 'Import Data'}
               </h2>
               <p className="text-gray-300 font-comfortaa mb-8">
-                {isPortuguese 
-                  ? 'Importe seus dados do Ebinex ou outras plataformas via CSV.' 
+                {isPortuguese
+                  ? 'Importe seus dados do Ebinex ou outras plataformas via CSV.'
                   : 'Import your Ebinex or other platform data via CSV.'}
               </p>
             </div>
@@ -372,75 +389,6 @@ export default function TradesV1Professional() {
           </div>
         )}
       </div>
-
-      {/* Loading States */}
-      {(tradesLoading || statsLoading) && (
-        <div className="fixed inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center z-50">
-          <div className="card p-8 text-center">
-            <div className="spinner mx-auto mb-4"></div>
-            <p className="text-white font-comfortaa">
-              {isPortuguese ? 'Carregando dados...' : 'Loading data...'}
-            </p>
-          </div>
-        </div>
-      )}
-
-      {/* Professional Table Dashboard Summary */}
-      <div className="mt-16 py-8">
-        <div className="card bg-gradient-to-r from-indigo-800/20 to-blue-800/20 border-primary/20 text-center">
-          <div className="flex items-center justify-center gap-3 mb-4">
-            <div className="text-3xl">📋</div>
-            <h3 className="font-heading text-xl font-bold">
-              {isPortuguese ? 'Trades V1 - Professional Table' : 'Trades V1 - Professional Table'}
-            </h3>
-          </div>
-          <p className="text-gray-400 max-w-3xl mx-auto mb-6">
-            {isPortuguese 
-              ? 'Esta versão da página de trades oferece uma interface profissional estilo Excel/Airtable com recursos avançados de filtragem, ordenação, ações em lote e exportação de dados.'
-              : 'This trades page version offers a professional Excel/Airtable-style interface with advanced filtering, sorting, bulk actions, and data export capabilities.'
-            }
-          </p>
-          <div className="flex flex-wrap items-center justify-center gap-6 text-sm text-gray-500">
-            <div className="flex items-center gap-2">
-              <div className="w-2 h-2 bg-indigo-400 rounded-full animate-pulse"></div>
-              {isPortuguese ? 'Tabela Avançada' : 'Advanced Table'}
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-2 h-2 bg-blue-400 rounded-full animate-pulse"></div>
-              {isPortuguese ? 'Ações em Lote' : 'Bulk Actions'}
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
-              {isPortuguese ? 'Filtros Avançados' : 'Advanced Filters'}
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-2 h-2 bg-yellow-400 rounded-full animate-pulse"></div>
-              {isPortuguese ? 'Exportação CSV' : 'CSV Export'}
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-2 h-2 bg-purple-400 rounded-full animate-pulse"></div>
-              {isPortuguese ? 'Ordenação Dinâmica' : 'Dynamic Sorting'}
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Trade Detail Modal */}
-      {selectedTrade && (
-        <TradeModal
-          trade={selectedTrade}
-          isOpen={true}
-          onClose={() => setSelectedTrade(null)}
-          onUpdate={async (tradeId, updates) => {
-            await handleTradeUpdate(updates)
-          }}
-          onDelete={async (tradeId) => {
-            await deleteTrade(tradeId)
-            await fetchTrades()
-            setSelectedTrade(null)
-          }}
-        />
-      )}
     </>
   )
 }

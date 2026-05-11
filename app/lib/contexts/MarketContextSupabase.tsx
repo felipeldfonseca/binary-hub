@@ -11,6 +11,7 @@ interface MarketContextType {
   error: string | null;
   setActiveMarket: (marketType: MarketType) => void;
   refreshAccounts: () => Promise<void>;
+  updateAccountBalance: (marketType: MarketType, newInitialBankroll: number) => void;
 }
 
 const MarketContext = createContext<MarketContextType | null>(null);
@@ -140,6 +141,22 @@ export function MarketProvider({ children }: { children: ReactNode }) {
     setMarketAccounts(accounts);
   }, []);
 
+  const updateAccountBalance = useCallback((marketType: MarketType, newInitialBankroll: number) => {
+    try {
+      const raw = localStorage.getItem('binaryHub_onboardingData');
+      if (!raw) return;
+      const data = JSON.parse(raw) as { selectedMarkets?: Array<{ marketType: string; initialBankroll: number; [key: string]: unknown }> };
+      if (!data.selectedMarkets) return;
+      data.selectedMarkets = data.selectedMarkets.map(m =>
+        m.marketType === marketType ? { ...m, initialBankroll: newInitialBankroll } : m
+      );
+      localStorage.setItem('binaryHub_onboardingData', JSON.stringify(data));
+    } catch { /* ignore */ }
+    // Reload accounts from updated storage
+    const accounts = loadAccountsFromStorage();
+    setMarketAccounts(accounts);
+  }, []);
+
   const value: MarketContextType = {
     marketAccounts,
     primaryMarket,
@@ -148,6 +165,7 @@ export function MarketProvider({ children }: { children: ReactNode }) {
     error: null,
     setActiveMarket,
     refreshAccounts,
+    updateAccountBalance,
   };
 
   return (

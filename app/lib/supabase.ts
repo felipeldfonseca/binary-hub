@@ -52,6 +52,24 @@ export async function getCurrentSession() {
   return session;
 }
 
+// Data client — bypasses the auth lock entirely.
+// Use this for all table queries inside hooks/components.
+// The JWT is injected via global headers at creation time so the client never
+// calls getSession() (and therefore never waits on the internal auth lock).
+export function createDataClient(accessToken: string | null): SupabaseClient {
+  if (!isSupabaseConfigured) return createMockClient();
+  return createClient(supabaseUrl, supabaseAnonKey, {
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+      detectSessionInUrl: false,
+    },
+    global: {
+      headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : {},
+    },
+  });
+}
+
 // Server-side client (for API routes)
 export function createServerClient(accessToken?: string): SupabaseClient {
   return createClient(supabaseUrl, supabaseAnonKey, {

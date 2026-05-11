@@ -8,7 +8,7 @@ import {
   ReactNode,
 } from 'react';
 import { User, Session, AuthError } from '@supabase/supabase-js';
-import { supabase } from '@/lib/supabase';
+import { supabase, createDataClient } from '@/lib/supabase';
 import type { Profile } from '@/types/database';
 
 interface AuthContextType {
@@ -51,19 +51,38 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const clearError = () => setError(null);
 
-  // Fetch user profile
-  const fetchProfile = async (userId: string) => {
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', userId)
-      .single();
+  // Fetch user profile via raw fetch to avoid the Supabase auth lock.
+  // The global supabase client calls getSession() before every query, which
+  // acquires an internal lock. If a background token refresh is hanging,
+  // that lock is held indefinitely and all subsequent queries hang too.
+  // Raw fetch bypasses this entirely.
+  const fetchProfile = async (userId: string, accessToken?: string) => {
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    if (!url || !key) return null;
 
-    if (error) {
-      console.error('Error fetching profile:', error);
+    const controller = new AbortController();
+    const tid = setTimeout(() => controller.abort(), 5000);
+    try {
+      const res = await fetch(
+        `${url}/rest/v1/profiles?id=eq.${userId}&select=*&limit=1`,
+        {
+          signal: controller.signal,
+          headers: {
+            apikey: key,
+            Authorization: `Bearer ${accessToken ?? key}`,
+            Accept: 'application/json',
+          },
+        }
+      );
+      clearTimeout(tid);
+      if (!res.ok) return null;
+      const rows = await res.json();
+      return (rows[0] ?? null) as Profile | null;
+    } catch {
+      clearTimeout(tid);
       return null;
     }
-    return data;
   };
 
   useEffect(() => {
@@ -99,7 +118,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser(initialSession?.user ?? null);
 
         if (initialSession?.user) {
-          const userProfile = await fetchProfile(initialSession.user.id);
+          const userProfile = await fetchProfile(initialSession.user.id, initialSession.access_token);
           setProfile(userProfile);
         }
       } catch (error) {
@@ -121,7 +140,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser(newSession?.user ?? null);
 
         if (newSession?.user) {
-          let userProfile = await fetchProfile(newSession.user.id);
+          let userProfile = await fetchProfile(newSession.user.id, newSession.access_token);
 
           // Create profile if it doesn't exist (e.g., after OAuth sign-in)
           if (!userProfile && newSession.user.email) {
@@ -130,7 +149,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               newSession.user.email,
               newSession.user.user_metadata?.full_name as string | undefined
             );
-            userProfile = await fetchProfile(newSession.user.id);
+            userProfile = await fetchProfile(newSession.user.id, newSession.access_token);
           }
 
           setProfile(userProfile);
@@ -239,14 +258,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return { error: new Error('Not authenticated') };
     }
 
-    const { error } = await supabase
-      .from('profiles')
-      .update(updates)
-      .eq('id', user.id);
+    const { data: { session: currentSession } } = await supabase.auth.getSession();
+    const db = createDataClient(currentSession?.access_token ?? null);
+    const { error } = await db.from('profiles').update(updates).eq('id', user.id);
 
     if (!error) {
-      // Refresh profile
-      const updatedProfile = await fetchProfile(user.id);
+      const updatedProfile = await fetchProfile(user.id, currentSession?.access_token);
       setProfile(updatedProfile);
     }
 

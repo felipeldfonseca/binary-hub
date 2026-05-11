@@ -5,8 +5,11 @@ import { useAuth } from '@/hooks/useAuth'
 import { useErrorHandler } from '@/hooks/useErrorHandler'
 import { useToastHelpers } from '@/components/ui/Toast'
 import { useLanguage } from '@/lib/contexts/LanguageContext'
+import { useMarketContext } from '@/lib/contexts/MarketContext'
 import { supabase } from '@/lib/supabase'
 import { parseEbinexCsv } from '@/lib/utils/ebinexParser'
+import { parseTopOneCsv } from '@/lib/utils/topOneParser'
+import { detectBrokerFormat } from '@/lib/utils/csvBrokerDetect'
 
 interface UploadStatus {
   uploadId: string
@@ -27,13 +30,18 @@ interface CsvUploadModalProps {
 
 export default function CsvUploadModal({ isOpen, onClose, onSuccess }: CsvUploadModalProps) {
   const { isPortuguese } = useLanguage()
-  const { user } = useAuth()
+  const { user, session } = useAuth()
   const { handleApiError } = useErrorHandler()
   const { showSuccess, showError } = useToastHelpers()
+  const { marketAccounts, activeMarket } = useMarketContext()
+  const [selectedMarketType, setSelectedMarketType] = useState<string>('')
   const [isDragOver, setIsDragOver] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [uploadStatus, setUploadStatus] = useState<UploadStatus | null>(null)
   const [error, setError] = useState<string | null>(null)
+
+  // Default to active market when modal opens
+  const effectiveMarketType = selectedMarketType || activeMarket?.marketType || ''
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault()
@@ -44,33 +52,6 @@ export default function CsvUploadModal({ isOpen, onClose, onSuccess }: CsvUpload
     e.preventDefault()
     setIsDragOver(false)
   }, [])
-
-  const handleDrop = useCallback(async (e: React.DragEvent) => {
-    e.preventDefault()
-    setIsDragOver(false)
-
-    const files = Array.from(e.dataTransfer.files)
-    const csvFile = files.find(file => file.type === 'text/csv' || file.name.endsWith('.csv'))
-
-    if (!csvFile) {
-      setError(isPortuguese ? 'Por favor, selecione um arquivo CSV válido' : 'Please select a valid CSV file')
-      return
-    }
-
-    await uploadFile(csvFile)
-  }, [isPortuguese])
-
-  const handleFileSelect = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file) return
-
-    if (!file.type.includes('csv') && !file.name.endsWith('.csv')) {
-      setError(isPortuguese ? 'Por favor, selecione um arquivo CSV válido' : 'Please select a valid CSV file')
-      return
-    }
-
-    await uploadFile(file)
-  }, [isPortuguese])
 
   const uploadFile = useCallback(async (file: File) => {
     if (!user) {
@@ -84,7 +65,19 @@ export default function CsvUploadModal({ isOpen, onClose, onSuccess }: CsvUpload
 
     try {
       const text = await file.text()
-      const { trades: parsed, ebinexIds, parseErrors } = parseEbinexCsv(text)
+
+      const format = detectBrokerFormat(text)
+      if (!format) {
+        const msg = isPortuguese
+          ? 'Formato CSV não reconhecido. Suportamos Ebinex e Top One Futures.'
+          : 'Unrecognized CSV format. We support Ebinex and Top One Futures.'
+        setError(msg)
+        setUploading(false)
+        return
+      }
+
+      const { trades: parsed, parseErrors } =
+        format === 'topone' ? parseTopOneCsv(text) : parseEbinexCsv(text)
 
       if (parsed.length === 0) {
         const msg = parseErrors[0]?.error ?? (isPortuguese ? 'Nenhuma operação encontrada no CSV' : 'No trades found in CSV')
@@ -93,27 +86,50 @@ export default function CsvUploadModal({ isOpen, onClose, onSuccess }: CsvUpload
         return
       }
 
-      // Deduplicate against existing Supabase records
-      const noteKeys = ebinexIds.map(id => `ebinex:${id}`)
-      const { data: existingNotes } = await supabase
-        .from('trades')
-        .select('notes')
-        .eq('user_id', user.id)
-        .in('notes', noteKeys)
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
+      const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
+      // Use JWT from auth context — avoids calling getSession() which can deadlock
+      const accessToken = session?.access_token ?? supabaseKey
 
-      const alreadyImported = new Set((existingNotes ?? []).map((r: { notes: string | null }) => r.notes))
-      const newTrades = parsed.filter(t => !alreadyImported.has(t.notes ?? ''))
-      const duplicateRows = parsed.length - newTrades.length
+      const timeoutMsg = isPortuguese
+        ? 'Conexão com o servidor expirou. Verifique sua conexão e tente novamente.'
+        : 'Server connection timed out. Check your connection and try again.'
 
-      let importedRows = 0
-      if (newTrades.length > 0) {
-        const { error: insertError } = await supabase
-          .from('trades')
-          .insert(newTrades.map(t => ({ ...t, user_id: user.id })))
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 20000)
 
-        if (insertError) throw new Error(insertError.message)
-        importedRows = newTrades.length
+      let insertedRows: Array<{ id: string }> = []
+      try {
+        const response = await fetch(
+          `${supabaseUrl}/rest/v1/trades?on_conflict=user_id%2Cnotes&select=id`,
+          {
+            method: 'POST',
+            signal: controller.signal,
+            headers: {
+              apikey: supabaseKey,
+              Authorization: `Bearer ${accessToken}`,
+              'Content-Type': 'application/json',
+              Prefer: 'resolution=ignore-duplicates,return=representation',
+            },
+            body: JSON.stringify(parsed.map(t => ({ ...t, user_id: user.id, market_type: effectiveMarketType || null }))),
+          }
+        )
+        clearTimeout(timeoutId)
+
+        if (!response.ok) {
+          const errBody = await response.text()
+          throw new Error(`HTTP ${response.status}: ${errBody.slice(0, 200)}`)
+        }
+
+        insertedRows = await response.json() as Array<{ id: string }>
+      } catch (e: unknown) {
+        clearTimeout(timeoutId)
+        if (e instanceof Error && e.name === 'AbortError') throw new Error(timeoutMsg)
+        throw e
       }
+
+      const importedRows = insertedRows.length
+      const duplicateRows = parsed.length - importedRows
 
       const uploadId = `import-${Date.now()}`
       setUploadStatus({
@@ -142,7 +158,31 @@ export default function CsvUploadModal({ isOpen, onClose, onSuccess }: CsvUpload
     } finally {
       setUploading(false)
     }
-  }, [user, isPortuguese, showSuccess, showError, onSuccess])
+  }, [user, session, effectiveMarketType, isPortuguese, showSuccess, showError, onSuccess])
+
+  const handleDrop = useCallback(async (e: React.DragEvent) => {
+    e.preventDefault()
+    setIsDragOver(false)
+    const files = Array.from(e.dataTransfer.files)
+    const csvFile = files.find(file => file.type === 'text/csv' || file.name.endsWith('.csv'))
+    if (!csvFile) {
+      setError(isPortuguese ? 'Por favor, selecione um arquivo CSV válido' : 'Please select a valid CSV file')
+      return
+    }
+    await uploadFile(csvFile)
+  }, [isPortuguese, uploadFile])
+
+  const handleFileSelect = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    // Reset so the same file can be re-selected after an error or retry
+    e.target.value = ''
+    if (!file) return
+    if (!file.type.includes('csv') && !file.name.endsWith('.csv')) {
+      setError(isPortuguese ? 'Por favor, selecione um arquivo CSV válido' : 'Please select a valid CSV file')
+      return
+    }
+    await uploadFile(file)
+  }, [isPortuguese, uploadFile])
 
   const resetUpload = useCallback(() => {
     setUploadStatus(null)
@@ -171,10 +211,30 @@ export default function CsvUploadModal({ isOpen, onClose, onSuccess }: CsvUpload
 
         {/* Content */}
         <div className="p-6">
+          {/* Account selector */}
+          {marketAccounts.length > 0 && (
+            <div className="mb-5">
+              <label className="block text-sm font-medium text-gray-300 mb-1.5 font-comfortaa">
+                {isPortuguese ? 'Importar para a conta:' : 'Import to account:'}
+              </label>
+              <select
+                value={effectiveMarketType}
+                onChange={e => setSelectedMarketType(e.target.value)}
+                className="w-full bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-2 focus:ring-[#E1FFD9]/40 font-comfortaa"
+              >
+                {marketAccounts.map(acc => (
+                  <option key={acc.id} value={acc.marketType}>
+                    {acc.displayName}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
           <p className="text-gray-400 text-center mb-6">
-            {isPortuguese 
-              ? 'Faça upload do seu arquivo CSV do Ebinex para importar seu histórico de trading. Detectaremos e pularemos automaticamente trades duplicados.' 
-              : 'Upload your Ebinex CSV file to import your trading history. We will automatically detect and skip duplicate trades.'
+            {isPortuguese
+              ? 'Faça upload do seu arquivo CSV para importar seu histórico de trading. Detectaremos e pularemos automaticamente trades duplicados.'
+              : 'Upload your CSV file to import your trading history. We will automatically detect and skip duplicate trades.'
             }
           </p>
 
@@ -305,23 +365,34 @@ export default function CsvUploadModal({ isOpen, onClose, onSuccess }: CsvUpload
           )}
 
           {/* Instructions */}
-          <div className="bg-gray-800/50 rounded-lg p-4 border border-gray-700/50">
-            <h3 className="font-comfortaa font-medium mb-3 text-white">
-              {isPortuguese ? 'Como exportar do Ebinex:' : 'How to export from Ebinex:'}
-            </h3>
-            <ol className="text-sm text-gray-300 space-y-1 list-decimal list-inside">
-              <li>{isPortuguese ? 'Entre na sua conta Ebinex' : 'Log into your Ebinex account'}</li>
-              <li>{isPortuguese ? 'Vá para seu histórico de trading' : 'Go to your trading history'}</li>
-              <li>{isPortuguese ? 'Selecione o período que deseja exportar' : 'Select the date range you want to export'}</li>
-              <li>{isPortuguese ? 'Clique no botão "Exportar CSV"' : 'Click the "Export CSV" button'}</li>
-              <li>{isPortuguese ? 'Faça upload do arquivo baixado aqui' : 'Upload the downloaded file here'}</li>
-            </ol>
-            <p className="text-xs text-gray-400 mt-3">
-              {isPortuguese 
-                ? 'Nota: O Ebinex permite exportar até 50 trades por vez. Você pode enviar múltiplos arquivos para importar seu histórico completo de trading.'
-                : 'Note: Ebinex allows exporting up to 50 trades at a time. You can upload multiple files to import your complete trading history.'
-              }
+          <div className="bg-gray-800/50 rounded-lg p-4 border border-gray-700/50 space-y-4">
+            <p className="text-xs text-[#E1FFD9]/70 font-comfortaa font-medium uppercase tracking-wide">
+              {isPortuguese ? 'Formatos suportados' : 'Supported formats'}
             </p>
+
+            {/* Ebinex */}
+            <div>
+              <p className="text-sm font-comfortaa font-medium text-white mb-1">Ebinex</p>
+              <ol className="text-sm text-gray-400 space-y-0.5 list-decimal list-inside">
+                <li>{isPortuguese ? 'Vá para Histórico de Operações' : 'Go to Trade History'}</li>
+                <li>{isPortuguese ? 'Selecione o período e clique em "Exportar CSV"' : 'Select date range and click "Export CSV"'}</li>
+                <li>{isPortuguese ? 'Faça upload aqui' : 'Upload here'}</li>
+              </ol>
+              <p className="text-xs text-gray-600 mt-1">
+                {isPortuguese ? 'Máx. 50 trades por arquivo.' : 'Max 50 trades per file.'}
+              </p>
+            </div>
+
+            {/* Top One Futures */}
+            <div>
+              <p className="text-sm font-comfortaa font-medium text-white mb-1">Top One Futures</p>
+              <ol className="text-sm text-gray-400 space-y-0.5 list-decimal list-inside">
+                <li>{isPortuguese ? 'Acesse o portal da Top One' : 'Log into the Top One portal'}</li>
+                <li>{isPortuguese ? 'Vá para Histórico de Trades' : 'Go to Trade History'}</li>
+                <li>{isPortuguese ? 'Clique em "Export" → CSV' : 'Click "Export" → CSV'}</li>
+                <li>{isPortuguese ? 'Faça upload aqui' : 'Upload here'}</li>
+              </ol>
+            </div>
           </div>
         </div>
       </div>
