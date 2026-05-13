@@ -187,19 +187,13 @@ export default function TradesV1Professional() {
 
   return (
     <>
-      {/* Header */}
-      <div className="text-center mb-12">
-        <h1 className="hero-title text-3xl md:text-4xl lg:text-5xl font-poly font-bold text-white mb-6">
-          {isPortuguese ? 'Gerenciamento Profissional de Operações' : 'Professional Trade Management'}
-        </h1>
-        <p className="text-xl font-comfortaa font-normal text-white max-w-4xl mx-auto mb-6">
-          {isPortuguese
-            ? 'Interface avançada estilo Excel/Airtable com recursos profissionais de filtragem, ordenação e ações em lote.'
-            : 'Advanced Excel/Airtable-style interface with professional filtering, sorting, and bulk action features.'
-          }
-        </p>
+      {/* Title */}
+      <h1 className="text-2xl font-bold font-heading text-white text-center mb-6">
+        {isPortuguese ? 'Histórico de Operações' : 'Trade History'}
+      </h1>
 
-        {/* Market Selection */}
+      {/* Market Selection */}
+      <div className="text-center mb-8">
         {activeMarket && marketAccounts.length > 1 && (
           <div className="flex items-center justify-center gap-4 text-sm">
             <span className="text-gray-300">{isPortuguese ? 'Mostrando operações de:' : 'Showing trades from:'}</span>
