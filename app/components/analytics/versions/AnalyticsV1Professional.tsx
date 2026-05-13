@@ -1,1495 +1,868 @@
 'use client'
 import React, { useState, useMemo, useCallback } from 'react'
+import {
+  AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell,
+  XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine,
+} from 'recharts'
+import {
+  BarChart2, ArrowLeftRight, Coins, TrendingUp, TrendingDown, Target,
+  CheckCircle, AlertTriangle, Lightbulb, Shield, Brain, AlertCircle,
+  StopCircle, Star, Clock, Ban,
+} from 'lucide-react'
 import { useLanguage } from '@/lib/contexts/LanguageContext'
-import { useTradeStats } from '@/hooks/useTradeStats'
-import { useTrades, Trade } from '@/hooks/useTrades'
+import { useTradesSupabase } from '@/hooks/useTradesSupabase'
+import { useMarketContext } from '@/lib/contexts/MarketContext'
+import type { Trade as SupabaseTrade } from '@/types/database'
 
-// Type definitions for analytics
-type TimePeriod = 'daily' | 'weekly' | 'monthly' | 'yearly' | 'allTime' | 'ytd'
-type AnalyticsTab = 'overview' | 'trades' | 'assets' | 'periods' | 'risks' | 'streaks' | 'insights' | 'export'
-type SortDirection = 'asc' | 'desc'
-
-interface AnalyticsFilters {
-  period: TimePeriod
-  dateRange: { start: string; end: string }
-  assets: string[]
-  strategies: string[]
-  minAmount: number
-  maxAmount: number
-  results: ('win' | 'loss' | 'tie')[]
-}
-
-interface RiskMetrics {
-  maxDrawdown: number
-  currentDrawdown: number
-  volatility: number
-  sharpeRatio: number
-  profitFactor: number
-  calmarRatio: number
-  averageRisk: number
-  maxRisk: number
-  riskAdjustedReturn: number
-}
-
-interface StreakAnalysis {
-  currentWinStreak: number
-  currentLossStreak: number
-  maxWinStreak: number
-  maxLossStreak: number
-  avgWinStreak: number
-  avgLossStreak: number
-  streakHistory: Array<{
-    type: 'win' | 'loss'
-    count: number
-    startDate: string
-    endDate: string
-    totalPnl: number
-  }>
-}
-
-interface AssetPerformance {
+// ─── Internal trade shape ─────────────────────────────────────────────────────
+interface Trade {
+  id: string
   asset: string
-  trades: number
-  winRate: number
-  totalPnl: number
-  avgPnl: number
-  maxWin: number
-  maxLoss: number
-  totalVolume: number
-  profitFactor: number
-  sharpeRatio: number
+  direction: string
+  amount: number
+  entryTime: Date
+  result: 'win' | 'loss' | 'tie'
+  profit: number
 }
 
-interface PeriodPerformance {
-  period: string
-  trades: number
-  winRate: number
-  totalPnl: number
-  avgPnl: number
-  bestDay: number
-  worstDay: number
-  profitableDays: number
-  unprofitableDays: number
-  consistency: number
+function adaptTrade(t: SupabaseTrade): Trade {
+  return {
+    id: t.id,
+    asset: t.symbol,
+    direction: t.direction ?? 'call',
+    amount: t.stake_amount ?? 0,
+    entryTime: new Date(t.entry_time),
+    result: t.result === 'breakeven' ? 'tie' : (t.result ?? 'loss') as 'win' | 'loss' | 'tie',
+    profit: t.pnl ?? 0,
+  }
 }
 
+type TimePeriod = 'daily' | 'weekly' | 'monthly' | 'allTime'
+
+// ─── Chart tooltips ───────────────────────────────────────────────────────────
+// Defined outside the component so recharts never remounts them on re-render.
+// High-contrast colours: slate-800 bg, slate-100 text.
+
+function EquityTooltip({ active, payload, label }: {
+  active?: boolean; payload?: { value: number }[]; label?: string
+}) {
+  if (!active || !payload?.length) return null
+  const val = payload[0].value
+  return (
+    <div style={{ background: '#1e293b', border: '1px solid #475569', borderRadius: 8, padding: '8px 12px' }}>
+      <p style={{ color: '#94a3b8', fontSize: 11, marginBottom: 4 }}>{label}</p>
+      <p style={{ color: val >= 0 ? '#4ade80' : '#f87171', fontWeight: 700, fontSize: 14 }}>
+        {val >= 0 ? '+' : '−'}${Math.abs(val).toFixed(2)}
+      </p>
+    </div>
+  )
+}
+
+function PnlBarTooltip({ active, payload, label }: {
+  active?: boolean
+  payload?: { value: number; dataKey: string; payload: { trades?: number } }[]
+  label?: string
+}) {
+  if (!active || !payload?.length) return null
+  const { value: val } = payload[0]
+  const trades = payload[0].payload.trades
+  return (
+    <div style={{ background: '#1e293b', border: '1px solid #475569', borderRadius: 8, padding: '8px 12px' }}>
+      <p style={{ color: '#94a3b8', fontSize: 11, marginBottom: 4 }}>{label}</p>
+      <p style={{ color: val >= 0 ? '#4ade80' : '#f87171', fontWeight: 700, fontSize: 14 }}>
+        {val >= 0 ? '+' : '−'}${Math.abs(val).toFixed(2)}
+      </p>
+      {trades !== undefined && (
+        <p style={{ color: '#64748b', fontSize: 11, marginTop: 2 }}>{trades} trades</p>
+      )}
+    </div>
+  )
+}
+
+function AssetTooltip({ active, payload, label }: {
+  active?: boolean; payload?: { value: number; dataKey: string }[]; label?: string
+}) {
+  if (!active || !payload?.length) return null
+  const { value: val, dataKey } = payload[0]
+  return (
+    <div style={{ background: '#1e293b', border: '1px solid #475569', borderRadius: 8, padding: '8px 12px' }}>
+      <p style={{ color: '#e2e8f0', fontSize: 12, fontWeight: 600, marginBottom: 4 }}>{label}</p>
+      <p style={{ color: dataKey === 'winRate' ? (val >= 50 ? '#4ade80' : '#f87171') : dataKey === 'trades' ? '#818cf8' : (val >= 0 ? '#4ade80' : '#f87171'), fontWeight: 700, fontSize: 14 }}>
+        {dataKey === 'pnl' ? `${val >= 0 ? '+' : '−'}$${Math.abs(val).toFixed(2)}` :
+         dataKey === 'winRate' ? `${val}%` : `${val}`}
+      </p>
+    </div>
+  )
+}
+
+function HourTooltip({ active, payload, label }: {
+  active?: boolean; payload?: { value: number }[]; label?: string
+}) {
+  if (!active || !payload?.length) return null
+  const val = payload[0].value
+  return (
+    <div style={{ background: '#1e293b', border: '1px solid #475569', borderRadius: 8, padding: '8px 12px' }}>
+      <p style={{ color: '#94a3b8', fontSize: 11, marginBottom: 4 }}>{label}</p>
+      <p style={{ color: val >= 50 ? '#4ade80' : '#f87171', fontWeight: 700, fontSize: 14 }}>{val}%</p>
+    </div>
+  )
+}
+
+// ─── Constants ────────────────────────────────────────────────────────────────
+const MARKET_ICONS: Record<string, React.ReactNode> = {
+  binary:  <BarChart2 size={14} />,
+  forex:   <ArrowLeftRight size={14} />,
+  crypto:  <Coins size={14} />,
+  futures: <TrendingUp size={14} />,
+  options: <Target size={14} />,
+}
+// Axis label colour — light enough to read on dark card backgrounds
+const AXIS_COLOR = '#cbd5e1'
+
+// ─── Main component ───────────────────────────────────────────────────────────
 export default function AnalyticsV1Professional() {
   const { isPortuguese } = useLanguage()
-  const [activeTab, setActiveTab] = useState<AnalyticsTab>('overview')
-  const [filters, setFilters] = useState<AnalyticsFilters>({
-    period: 'allTime',
-    dateRange: { start: '', end: '' },
-    assets: [],
-    strategies: [],
-    minAmount: 0,
-    maxAmount: 0,
-    results: []
-  })
-  const [sortField, setSortField] = useState<string>('totalPnl')
-  const [sortDirection, setSortDirection] = useState<SortDirection>('desc')
+  const { activeMarket, marketAccounts, setActiveMarket } = useMarketContext()
+  const [period, setPeriod] = useState<TimePeriod>('allTime')
+  const [sortAssetBy, setSortAssetBy] = useState<'pnl' | 'winRate' | 'trades'>('pnl')
 
-  // Hooks
-  const { stats, loading: statsLoading, error: statsError } = useTradeStats(filters.period)
-  const { trades, loading: tradesLoading, error: tradesError } = useTrades()
+  // ── Data ─────────────────────────────────────────────────────────────────────
+  const accountFilter = useMemo(
+    () => activeMarket?.marketType ? { marketType: activeMarket.marketType } : undefined,
+    [activeMarket?.marketType],
+  )
+  const { trades: rawTrades, isLoading } = useTradesSupabase(accountFilter)
+  const allTrades = useMemo(() => rawTrades.map(t => adaptTrade(t as SupabaseTrade)), [rawTrades])
 
-  // Check if user has data
-  const hasData = trades.length > 0
-  const loading = statsLoading || tradesLoading
-  const error = statsError || tradesError
+  // Client-side period filter — shares the React Query cache
+  const dateFrom = useMemo(() => {
+    const now = new Date()
+    switch (period) {
+      case 'daily':   { const s = new Date(now); s.setHours(0, 0, 0, 0); return s }
+      case 'weekly':  { const s = new Date(now); s.setDate(now.getDate() - 7); return s }
+      case 'monthly': { const s = new Date(now); s.setMonth(now.getMonth() - 1); return s }
+      default: return null
+    }
+  }, [period])
 
-  // Calculate advanced metrics
-  const riskMetrics = useMemo((): RiskMetrics => {
-    if (!hasData) return {
-      maxDrawdown: 0, currentDrawdown: 0, volatility: 0, sharpeRatio: 0,
-      profitFactor: 0, calmarRatio: 0, averageRisk: 0, maxRisk: 0, riskAdjustedReturn: 0
+  const trades = useMemo(
+    () => dateFrom ? allTrades.filter(t => t.entryTime >= dateFrom) : allTrades,
+    [allTrades, dateFrom],
+  )
+
+  // ── Core stats (expanded) ──────────────────────────────────────────────────
+  const stats = useMemo(() => {
+    const total = trades.length
+    if (total === 0) return {
+      total: 0, wins: 0, losses: 0, ties: 0,
+      winRate: 0, totalPnl: 0, profitFactor: 0,
+      avgWin: 0, avgLoss: 0, maxDrawdown: 0,
+      stdDev: 0, bestTrade: 0, worstTrade: 0, avgStake: 0,
     }
 
-    // Calculate daily returns for volatility
-    const dailyReturns: number[] = []
-    const groupedByDate = trades.reduce((acc, trade) => {
-      const date = new Date(trade.entryTime).toDateString()
-      if (!acc[date]) acc[date] = []
-      acc[date].push(trade)
-      return acc
-    }, {} as Record<string, Trade[]>)
+    const wins   = trades.filter(t => t.result === 'win').length
+    const losses = trades.filter(t => t.result === 'loss').length
+    const ties   = total - wins - losses
+    const winRate = (wins / total) * 100
+    const totalPnl = trades.reduce((s, t) => s + t.profit, 0)
 
-    Object.values(groupedByDate).forEach(dayTrades => {
-      const dayPnl = dayTrades.reduce((sum, trade) => sum + trade.profit, 0)
-      const dayVolume = dayTrades.reduce((sum, trade) => sum + trade.amount, 0)
-      if (dayVolume > 0) dailyReturns.push(dayPnl / dayVolume)
+    const grossProfit = trades.filter(t => t.profit > 0).reduce((s, t) => s + t.profit, 0)
+    const grossLoss   = Math.abs(trades.filter(t => t.profit < 0).reduce((s, t) => s + t.profit, 0))
+    const profitFactor = grossLoss > 0 ? grossProfit / grossLoss : grossProfit > 0 ? Infinity : 0
+    const avgWin  = wins   > 0 ? grossProfit / wins   : 0
+    const avgLoss = losses > 0 ? grossLoss   / losses : 0
+
+    // Max drawdown: deepest peak-to-trough drop as % of starting capital (always 0–100%)
+    const initialBalance = activeMarket?.bankroll?.initial ?? 1000
+    const sorted = [...trades].sort((a, b) => a.entryTime.getTime() - b.entryTime.getTime())
+    let cum = 0, peak = 0, maxDrawdown = 0
+    sorted.forEach(t => {
+      cum += t.profit
+      if (cum > peak) peak = cum
+      const peakBalance   = initialBalance + peak
+      const troughBalance = initialBalance + cum
+      const dd = peakBalance > 0
+        ? Math.max(0, (peakBalance - troughBalance) / peakBalance * 100)
+        : 0
+      if (dd > maxDrawdown) maxDrawdown = dd
     })
 
-    // Volatility calculation
-    const avgReturn = dailyReturns.reduce((sum, ret) => sum + ret, 0) / dailyReturns.length
-    const volatility = Math.sqrt(
-      dailyReturns.reduce((sum, ret) => sum + Math.pow(ret - avgReturn, 2), 0) / dailyReturns.length
-    ) * Math.sqrt(252) // Annualized
+    // Trade P&L std dev (consistency)
+    const avgPnl = totalPnl / total
+    const variance = trades.reduce((s, t) => s + Math.pow(t.profit - avgPnl, 2), 0) / total
+    const stdDev = Math.sqrt(variance)
 
-    // Drawdown calculation
-    let runningPnl = 0
-    let peak = 0
-    let maxDrawdown = 0
-    let currentDrawdown = 0
-
-    trades.forEach(trade => {
-      runningPnl += trade.profit
-      if (runningPnl > peak) peak = runningPnl
-      const drawdown = (peak - runningPnl) / peak * 100
-      if (drawdown > maxDrawdown) maxDrawdown = drawdown
-    })
-    
-    currentDrawdown = peak > 0 ? (peak - runningPnl) / peak * 100 : 0
-
-    // Profit factor
-    const winningTrades = trades.filter(t => t.profit > 0)
-    const losingTrades = trades.filter(t => t.profit < 0)
-    const grossProfit = winningTrades.reduce((sum, t) => sum + t.profit, 0)
-    const grossLoss = Math.abs(losingTrades.reduce((sum, t) => sum + t.profit, 0))
-    const profitFactor = grossLoss > 0 ? grossProfit / grossLoss : 0
-
-    // Sharpe ratio
-    const riskFreeRate = 0.02 // 2% annual risk-free rate
-    const sharpeRatio = volatility > 0 ? (avgReturn * 252 - riskFreeRate) / volatility : 0
-
-    // Calmar ratio
-    const annualReturn = avgReturn * 252
-    const calmarRatio = maxDrawdown > 0 ? annualReturn / (maxDrawdown / 100) : 0
+    const profits = trades.map(t => t.profit)
+    const bestTrade  = Math.max(...profits)
+    const worstTrade = Math.min(...profits)
+    const avgStake = trades.reduce((s, t) => s + t.amount, 0) / total
 
     return {
-      maxDrawdown,
-      currentDrawdown,
-      volatility: volatility * 100,
-      sharpeRatio,
-      profitFactor,
-      calmarRatio,
-      averageRisk: trades.reduce((sum, t) => sum + t.amount, 0) / trades.length,
-      maxRisk: Math.max(...trades.map(t => t.amount)),
-      riskAdjustedReturn: sharpeRatio
+      total, wins, losses, ties, winRate, totalPnl,
+      profitFactor, avgWin, avgLoss, maxDrawdown,
+      stdDev, bestTrade, worstTrade, avgStake,
     }
-  }, [trades, hasData])
+  }, [trades])
 
-  // Calculate streak analysis
-  const streakAnalysis = useMemo((): StreakAnalysis => {
-    if (!hasData) return {
-      currentWinStreak: 0, currentLossStreak: 0, maxWinStreak: 0, maxLossStreak: 0,
-      avgWinStreak: 0, avgLossStreak: 0, streakHistory: []
-    }
-
-    const sortedTrades = [...trades].sort((a, b) => 
-      new Date(a.entryTime).getTime() - new Date(b.entryTime).getTime()
-    )
-
-    let currentStreak = { type: 'win' as 'win' | 'loss', count: 0, startDate: '', totalPnl: 0 }
-    let maxWinStreak = 0
-    let maxLossStreak = 0
-    const streakHistory: StreakAnalysis['streakHistory'] = []
-    const winStreaks: number[] = []
-    const lossStreaks: number[] = []
-
-    sortedTrades.forEach((trade, index) => {
-      const isWin = trade.profit > 0
-      const tradeDate = new Date(trade.entryTime).toISOString().split('T')[0]
-
-      if (index === 0 || currentStreak.type !== (isWin ? 'win' : 'loss')) {
-        // Start new streak
-        if (currentStreak.count > 0) {
-          streakHistory.push({
-            ...currentStreak,
-            endDate: sortedTrades[index - 1] ? 
-              new Date(sortedTrades[index - 1].entryTime).toISOString().split('T')[0] : 
-              currentStreak.startDate
-          })
-
-          if (currentStreak.type === 'win') {
-            winStreaks.push(currentStreak.count)
-            maxWinStreak = Math.max(maxWinStreak, currentStreak.count)
-          } else {
-            lossStreaks.push(currentStreak.count)
-            maxLossStreak = Math.max(maxLossStreak, currentStreak.count)
-          }
-        }
-
-        currentStreak = {
-          type: isWin ? 'win' : 'loss',
-          count: 1,
-          startDate: tradeDate,
-          totalPnl: trade.profit
-        }
-      } else {
-        // Continue current streak
-        currentStreak.count++
-        currentStreak.totalPnl += trade.profit
-      }
-    })
-
-    // Add final streak
-    if (currentStreak.count > 0) {
-      streakHistory.push({
-        ...currentStreak,
-        endDate: sortedTrades[sortedTrades.length - 1] ? 
-          new Date(sortedTrades[sortedTrades.length - 1].entryTime).toISOString().split('T')[0] : 
-          currentStreak.startDate
-      })
-
-      if (currentStreak.type === 'win') {
-        winStreaks.push(currentStreak.count)
-        maxWinStreak = Math.max(maxWinStreak, currentStreak.count)
-      } else {
-        lossStreaks.push(currentStreak.count)
-        maxLossStreak = Math.max(maxLossStreak, currentStreak.count)
-      }
-    }
-
-    return {
-      currentWinStreak: currentStreak.type === 'win' ? currentStreak.count : 0,
-      currentLossStreak: currentStreak.type === 'loss' ? currentStreak.count : 0,
-      maxWinStreak,
-      maxLossStreak,
-      avgWinStreak: winStreaks.length > 0 ? winStreaks.reduce((a, b) => a + b, 0) / winStreaks.length : 0,
-      avgLossStreak: lossStreaks.length > 0 ? lossStreaks.reduce((a, b) => a + b, 0) / lossStreaks.length : 0,
-      streakHistory
-    }
-  }, [trades, hasData])
-
-  // Calculate asset performance
-  const assetPerformance = useMemo((): AssetPerformance[] => {
-    if (!hasData) return []
-
-    const assetMap = trades.reduce((acc, trade) => {
-      if (!acc[trade.asset]) {
-        acc[trade.asset] = []
-      }
-      acc[trade.asset].push(trade)
-      return acc
-    }, {} as Record<string, Trade[]>)
-
-    return Object.entries(assetMap).map(([asset, assetTrades]): AssetPerformance => {
-      const wins = assetTrades.filter(t => t.profit > 0)
-      const losses = assetTrades.filter(t => t.profit < 0)
-      const totalPnl = assetTrades.reduce((sum, t) => sum + t.profit, 0)
-      const totalVolume = assetTrades.reduce((sum, t) => sum + t.amount, 0)
-      
-      const grossProfit = wins.reduce((sum, t) => sum + t.profit, 0)
-      const grossLoss = Math.abs(losses.reduce((sum, t) => sum + t.profit, 0))
-      
+  // ── Equity curve ─────────────────────────────────────────────────────────────
+  const equityData = useMemo(() => {
+    const sorted = [...trades].sort((a, b) => a.entryTime.getTime() - b.entryTime.getTime())
+    let cum = 0
+    return sorted.map(t => {
+      cum += t.profit
       return {
-        asset,
-        trades: assetTrades.length,
-        winRate: (wins.length / assetTrades.length) * 100,
-        totalPnl,
-        avgPnl: totalPnl / assetTrades.length,
-        maxWin: Math.max(...assetTrades.map(t => t.profit)),
-        maxLoss: Math.min(...assetTrades.map(t => t.profit)),
-        totalVolume,
-        profitFactor: grossLoss > 0 ? grossProfit / grossLoss : 0,
-        sharpeRatio: 0 // Simplified for now
+        date: t.entryTime.toLocaleDateString(isPortuguese ? 'pt-BR' : 'en-US', { month: 'short', day: 'numeric' }),
+        cumPnl: parseFloat(cum.toFixed(2)),
       }
-    }).sort((a, b) => {
-      if (sortField === 'asset') return sortDirection === 'asc' ? 
-        a.asset.localeCompare(b.asset) : b.asset.localeCompare(a.asset)
-      
-      const aValue = a[sortField as keyof AssetPerformance] as number
-      const bValue = b[sortField as keyof AssetPerformance] as number
-      
-      return sortDirection === 'asc' ? aValue - bValue : bValue - aValue
     })
-  }, [trades, hasData, sortField, sortDirection])
+  }, [trades, isPortuguese])
 
-  // Export functionality
-  const handleExport = useCallback(async (format: 'csv' | 'pdf' = 'csv') => {
-    try {
-      if (format === 'csv') {
-        // Create comprehensive CSV export
-        const headers = [
-          'Period', 'Total Trades', 'Win Rate (%)', 'Total P&L', 'Avg P&L',
-          'Max Drawdown (%)', 'Volatility (%)', 'Sharpe Ratio', 'Profit Factor',
-          'Max Win Streak', 'Max Loss Streak', 'Risk-Adjusted Return'
-        ]
-
-        const data = [
-          filters.period.toUpperCase(),
-          stats?.totalTrades || 0,
-          stats?.winRate || 0,
-          stats?.totalPnl || 0,
-          stats?.avgPnl || 0,
-          riskMetrics.maxDrawdown,
-          riskMetrics.volatility,
-          riskMetrics.sharpeRatio,
-          riskMetrics.profitFactor,
-          streakAnalysis.maxWinStreak,
-          streakAnalysis.maxLossStreak,
-          riskMetrics.riskAdjustedReturn
-        ]
-
-        const csvContent = [headers.join(','), data.join(',')].join('\n')
-        const blob = new Blob([csvContent], { type: 'text/csv' })
-        const url = URL.createObjectURL(blob)
-        const a = document.createElement('a')
-        a.href = url
-        a.download = `analytics_report_${new Date().toISOString().split('T')[0]}.csv`
-        a.click()
-        URL.revokeObjectURL(url)
+  // ── P&L bars — granularity adapts to period ───────────────────────────────
+  const pnlBars = useMemo(() => {
+    if (!trades.length) return []
+    const g: Record<string, { pnl: number; wins: number; losses: number; trades: number; sk: string }> = {}
+    trades.forEach(t => {
+      const d = t.entryTime
+      let key: string, sk: string
+      if (period === 'daily') {
+        key = `${d.getHours().toString().padStart(2, '0')}h`
+        sk  = d.getHours().toString().padStart(3, '0')
+      } else if (period === 'weekly') {
+        key = d.toLocaleDateString(isPortuguese ? 'pt-BR' : 'en-US', { weekday: 'short', month: 'short', day: 'numeric' })
+        sk  = d.toISOString().slice(0, 10)
+      } else if (period === 'monthly') {
+        const wk = Math.ceil(d.getDate() / 7)
+        const mo = d.toLocaleDateString(isPortuguese ? 'pt-BR' : 'en-US', { month: 'short' })
+        key = `${mo} W${wk}`
+        sk  = `${d.getFullYear()}-${(d.getMonth() + 1).toString().padStart(2, '0')}-W${wk}`
+      } else {
+        key = d.toLocaleDateString(isPortuguese ? 'pt-BR' : 'en-US', { month: 'short', year: '2-digit' })
+        sk  = d.toISOString().slice(0, 7)
       }
-    } catch (err) {
-      console.error('Export failed:', err)
-    }
-  }, [stats, riskMetrics, streakAnalysis, filters.period])
+      if (!g[key]) g[key] = { pnl: 0, wins: 0, losses: 0, trades: 0, sk }
+      g[key].pnl += t.profit; g[key].trades++
+      if (t.result === 'win') g[key].wins++
+      else if (t.result === 'loss') g[key].losses++
+    })
+    return Object.entries(g)
+      .sort(([, a], [, b]) => a.sk.localeCompare(b.sk))
+      .map(([label, d]) => ({
+        label,
+        pnl:     parseFloat(d.pnl.toFixed(2)),
+        winRate: d.trades > 0 ? parseFloat((d.wins / d.trades * 100).toFixed(1)) : 0,
+        trades:  d.trades,
+      }))
+  }, [trades, period, isPortuguese])
 
-  // Tab configuration
-  const tabs = [
-    { 
-      key: 'overview', 
-      label: isPortuguese ? 'Visão Geral' : 'Overview',
-      icon: '📊',
-      description: isPortuguese ? 'Métricas principais' : 'Key metrics'
-    },
-    { 
-      key: 'trades', 
-      label: isPortuguese ? 'Análise de Trades' : 'Trade Analysis',
-      icon: '📈',
-      description: isPortuguese ? 'Detalhes das operações' : 'Trade details'
-    },
-    { 
-      key: 'assets', 
-      label: isPortuguese ? 'Ativos' : 'Assets',
-      icon: '💰',
-      description: isPortuguese ? 'Performance por ativo' : 'Asset performance'
-    },
-    { 
-      key: 'periods', 
-      label: isPortuguese ? 'Períodos' : 'Periods',
-      icon: '📅',
-      description: isPortuguese ? 'Análise temporal' : 'Time analysis'
-    },
-    { 
-      key: 'risks', 
-      label: isPortuguese ? 'Risco' : 'Risk',
-      icon: '⚠️',
-      description: isPortuguese ? 'Métricas de risco' : 'Risk metrics'
-    },
-    { 
-      key: 'streaks', 
-      label: isPortuguese ? 'Sequências' : 'Streaks',
-      icon: '🔥',
-      description: isPortuguese ? 'Análise de sequências' : 'Streak analysis'
-    },
-    { 
-      key: 'insights', 
-      label: isPortuguese ? 'Insights' : 'Insights',
-      icon: '💡',
-      description: isPortuguese ? 'Recomendações' : 'Recommendations'
-    },
-    { 
-      key: 'export', 
-      label: isPortuguese ? 'Exportar' : 'Export',
-      icon: '📤',
-      description: isPortuguese ? 'Exportar dados' : 'Export data'
+  // ── Win/Loss donut ────────────────────────────────────────────────────────────
+  const donutData = useMemo(() => [
+    { name: isPortuguese ? 'Ganhos'  : 'Wins',   value: stats.wins,   color: '#4ade80' },
+    { name: isPortuguese ? 'Perdas'  : 'Losses', value: stats.losses, color: '#f87171' },
+    ...(stats.ties > 0
+      ? [{ name: isPortuguese ? 'Empates' : 'Ties', value: stats.ties, color: '#94a3b8' }]
+      : []),
+  ].filter(d => d.value > 0), [stats, isPortuguese])
+
+  // ── Asset performance ─────────────────────────────────────────────────────────
+  const assetData = useMemo(() => {
+    const m: Record<string, { pnl: number; wins: number; count: number }> = {}
+    trades.forEach(t => {
+      if (!m[t.asset]) m[t.asset] = { pnl: 0, wins: 0, count: 0 }
+      m[t.asset].pnl += t.profit; m[t.asset].count++
+      if (t.result === 'win') m[t.asset].wins++
+    })
+    return Object.entries(m)
+      .map(([asset, d]) => ({
+        asset:    asset.length > 14 ? asset.slice(0, 14) + '…' : asset,
+        fullName: asset,
+        pnl:      parseFloat(d.pnl.toFixed(2)),
+        winRate:  d.count > 0 ? parseFloat((d.wins / d.count * 100).toFixed(1)) : 0,
+        trades:   d.count,
+      }))
+      .sort((a, b) =>
+        sortAssetBy === 'pnl'     ? b.pnl - a.pnl :
+        sortAssetBy === 'winRate' ? b.winRate - a.winRate :
+        b.trades - a.trades,
+      )
+      .slice(0, 12)
+  }, [trades, sortAssetBy])
+
+  // ── Hour-of-day ───────────────────────────────────────────────────────────────
+  const hourData = useMemo(() => {
+    const h: Record<number, { wins: number; count: number }> = {}
+    trades.forEach(t => {
+      const hr = t.entryTime.getHours()
+      if (!h[hr]) h[hr] = { wins: 0, count: 0 }
+      h[hr].count++
+      if (t.result === 'win') h[hr].wins++
+    })
+    return Object.entries(h)
+      .map(([hr, d]) => ({
+        hour:    `${hr.toString().padStart(2, '0')}h`,
+        trades:  d.count,
+        winRate: d.count > 0 ? parseFloat((d.wins / d.count * 100).toFixed(1)) : 0,
+      }))
+      .sort((a, b) => parseInt(a.hour) - parseInt(b.hour))
+  }, [trades])
+
+  // ── Streak ────────────────────────────────────────────────────────────────────
+  const streak = useMemo(() => {
+    const sorted = [...trades].sort((a, b) => a.entryTime.getTime() - b.entryTime.getTime())
+    if (!sorted.length) return { current: 0, type: 'neutral' as const, maxWin: 0, maxLoss: 0 }
+    let maxWin = 0, maxLoss = 0, curW = 0, curL = 0
+    sorted.forEach(t => {
+      if      (t.result === 'win')  { curW++; curL = 0; maxWin  = Math.max(maxWin,  curW) }
+      else if (t.result === 'loss') { curL++; curW = 0; maxLoss = Math.max(maxLoss, curL) }
+      else                          { curW = 0; curL = 0 }
+    })
+    const lastResult = sorted[sorted.length - 1].result
+    let current = 0
+    for (let i = sorted.length - 1; i >= 0; i--) {
+      if (sorted[i].result === lastResult) current++
+      else break
     }
+    return { current, type: lastResult as 'win' | 'loss' | 'tie', maxWin, maxLoss }
+  }, [trades])
+
+  // ── Insights (dynamic, data-driven) ─────────────────────────────────────────
+  const insights = useMemo(() => {
+    if (!trades.length) return { strengths: [], improvements: [], recommendations: [] }
+
+    const strengths:       { icon: React.ReactNode; text: string }[] = []
+    const improvements:    { icon: React.ReactNode; text: string }[] = []
+    const recommendations: { icon: React.ReactNode; text: string }[] = []
+
+    const wr = stats.winRate
+    if (wr >= 65)      strengths.push({ icon: <Target size={13} className="text-win shrink-0 mt-0.5" />, text: isPortuguese ? `Taxa de acerto excelente: ${wr.toFixed(1)}%` : `Excellent win rate: ${wr.toFixed(1)}%` })
+    else if (wr >= 50) strengths.push({ icon: <CheckCircle size={13} className="text-win shrink-0 mt-0.5" />, text: isPortuguese ? `Taxa de acerto positiva: ${wr.toFixed(1)}%` : `Positive win rate: ${wr.toFixed(1)}%` })
+    else               improvements.push({ icon: <AlertTriangle size={13} className="text-loss shrink-0 mt-0.5" />, text: isPortuguese ? `Taxa de acerto abaixo de 50%: ${wr.toFixed(1)}%` : `Win rate below 50%: ${wr.toFixed(1)}%` })
+
+    if (stats.profitFactor >= 1.5)  strengths.push({ icon: <TrendingUp size={13} className="text-win shrink-0 mt-0.5" />, text: isPortuguese ? `Fator de lucro sólido: ${stats.profitFactor.toFixed(2)}` : `Strong profit factor: ${stats.profitFactor.toFixed(2)}` })
+    else if (stats.profitFactor < 1 && stats.total >= 10) improvements.push({ icon: <TrendingDown size={13} className="text-loss shrink-0 mt-0.5" />, text: isPortuguese ? `Fator de lucro < 1 — perdas superam ganhos` : `Profit factor < 1 — losses outweigh gains` })
+
+    if (stats.maxDrawdown < 15)      strengths.push({ icon: <Shield size={13} className="text-win shrink-0 mt-0.5" />, text: isPortuguese ? `Drawdown controlado: ${stats.maxDrawdown.toFixed(1)}%` : `Controlled drawdown: ${stats.maxDrawdown.toFixed(1)}%` })
+    else if (stats.maxDrawdown > 30) improvements.push({ icon: <TrendingDown size={13} className="text-loss shrink-0 mt-0.5" />, text: isPortuguese ? `Drawdown alto: ${stats.maxDrawdown.toFixed(1)}% — revisar gestão de risco` : `High drawdown: ${stats.maxDrawdown.toFixed(1)}% — review risk management` })
+
+    if (streak.maxLoss <= 3)      strengths.push({ icon: <Brain size={13} className="text-win shrink-0 mt-0.5" />, text: isPortuguese ? 'Ótimo controle emocional — sequências de perda curtas' : 'Strong emotional control — short loss streaks' })
+    else if (streak.maxLoss >= 8) improvements.push({ icon: <AlertCircle size={13} className="text-loss shrink-0 mt-0.5" />, text: isPortuguese ? `Sequência máxima de perdas: ${streak.maxLoss} — revisar disciplina` : `Max loss streak of ${streak.maxLoss} — review discipline` })
+
+    // Recommendations
+    const stopAfter = Math.max(3, Math.round(streak.maxLoss * 0.6))
+    recommendations.push({ icon: <StopCircle size={13} className="text-gray-300 shrink-0 mt-0.5" />, text: isPortuguese ? `Pare após ${stopAfter} perdas consecutivas` : `Stop trading after ${stopAfter} consecutive losses` })
+
+    const bestAsset = [...assetData].filter(a => a.trades >= 5).sort((a, b) => b.winRate - a.winRate)[0]
+    if (bestAsset) recommendations.push({ icon: <Star size={13} className="text-gray-300 shrink-0 mt-0.5" />, text: isPortuguese ? `${bestAsset.fullName} tem sua melhor taxa de acerto (${bestAsset.winRate}%)` : `${bestAsset.fullName} has your highest win rate (${bestAsset.winRate}%)` })
+
+    const bestHour  = [...hourData].filter(h => h.trades >= 3).sort((a, b) => b.winRate - a.winRate)[0]
+    const worstHour = [...hourData].filter(h => h.trades >= 3).sort((a, b) => a.winRate - b.winRate)[0]
+    if (bestHour  && bestHour.winRate  > 60) recommendations.push({ icon: <Clock size={13} className="text-gray-300 shrink-0 mt-0.5" />, text: isPortuguese ? `Melhor horário: ${bestHour.hour} (${bestHour.winRate}% de acerto)` : `Best hour: ${bestHour.hour} (${bestHour.winRate}% win rate)` })
+    if (worstHour && worstHour.winRate < 40) recommendations.push({ icon: <Ban size={13} className="text-gray-300 shrink-0 mt-0.5" />, text: isPortuguese ? `Evite operar às ${worstHour.hour} (${worstHour.winRate}% de acerto)` : `Avoid trading at ${worstHour.hour} (${worstHour.winRate}% win rate)` })
+
+    return { strengths, improvements, recommendations }
+  }, [trades, stats, streak, assetData, hourData, isPortuguese])
+
+  // ── CSV export ────────────────────────────────────────────────────────────────
+  const handleExport = useCallback(() => {
+    const rows = [...trades]
+      .sort((a, b) => b.entryTime.getTime() - a.entryTime.getTime())
+      .map(t => [t.entryTime.toISOString(), t.asset, t.direction, t.amount.toFixed(2), t.result, t.profit.toFixed(2)])
+    const csv = [['Date', 'Asset', 'Direction', 'Stake', 'Result', 'P&L'], ...rows].map(r => r.join(',')).join('\n')
+    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }))
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `analytics_${activeMarket?.marketType ?? 'all'}_${period}_${new Date().toISOString().slice(0, 10)}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+  }, [trades, period, activeMarket?.marketType])
+
+  const fmtPnl = (v: number) => `${v >= 0 ? '+' : '−'}$${Math.abs(v).toFixed(2)}`
+
+  const periodTabs: { key: TimePeriod; label: string }[] = [
+    { key: 'daily',   label: isPortuguese ? 'Hoje'    : 'Today'    },
+    { key: 'weekly',  label: isPortuguese ? '7 Dias'  : '7 Days'   },
+    { key: 'monthly', label: isPortuguese ? '30 Dias' : '30 Days'  },
+    { key: 'allTime', label: isPortuguese ? 'Tudo'    : 'All Time' },
   ]
 
-  if (!hasData && !loading) {
+  // ── Loading ───────────────────────────────────────────────────────────────────
+  if (isLoading) {
     return (
-      <div className="min-h-screen bg-[#505050] px-4 py-8">
-        <div className="container mx-auto max-w-6xl">
-          {/* Header */}
-          <div className="text-center mb-12">
-            <h1 className="hero-title text-3xl md:text-4xl lg:text-5xl font-poly font-bold text-white mb-6">
-              {isPortuguese ? 'Analytics Profissional' : 'Professional Analytics'}
-            </h1>
-            <p className="text-xl font-comfortaa font-normal text-white max-w-4xl mx-auto">
-              {isPortuguese 
-                ? 'Centro de aprendizado abrangente para análise profunda de performance e insights acionáveis.'
-                : 'Comprehensive learning center for deep performance analysis and actionable insights.'
-              }
-            </p>
-          </div>
-
-          {/* Empty State */}
-          <div className="card bg-gradient-to-br from-blue-900/20 to-green-900/20 border-[#E1FFD9]/20 text-center py-16">
-            <div className="text-6xl mb-6 opacity-60">📊</div>
-            <h3 className="text-2xl font-bold text-white mb-4 font-comfortaa">
-              {isPortuguese ? 'Importe seus dados para começar' : 'Import your data to get started'}
-            </h3>
-            <p className="text-gray-300 text-lg mb-8 max-w-2xl mx-auto">
-              {isPortuguese 
-                ? 'Para acessar o centro de aprendizado analytics profissional, você precisa primeiro importar seus dados de trading. Todas as análises avançadas estarão disponíveis após a importação.'
-                : 'To access the professional analytics learning center, you need to first import your trading data. All advanced analyses will be available after import.'
-              }
-            </p>
-            
-            {/* Feature Preview */}
-            <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-              {tabs.slice(0, 4).map(tab => (
-                <div key={tab.key} className="bg-gray-800/30 p-6 rounded-lg border border-gray-700/50">
-                  <div className="text-3xl mb-3">{tab.icon}</div>
-                  <h4 className="font-semibold text-white font-comfortaa mb-2">{tab.label}</h4>
-                  <p className="text-sm text-gray-400">{tab.description}</p>
-                </div>
-              ))}
-            </div>
-
-            <button 
-              onClick={() => window.location.href = '/dashboard'}
-              className="bg-gradient-to-r from-[#E1FFD9] to-[#C4F5A8] text-[#2D3748] font-semibold px-8 py-3 rounded-lg hover:bg-gradient-to-r hover:from-[#C4F5A8] hover:to-[#E1FFD9] hover:shadow-xl transition-all duration-200 shadow-lg font-comfortaa transform hover:scale-105"
-            >
-              {isPortuguese ? '📂 Ir para Dashboard e Importar Dados' : '📂 Go to Dashboard and Import Data'}
-            </button>
-          </div>
+      <div className="flex items-center justify-center py-32">
+        <div className="text-center">
+          <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-primary mb-4" />
+          <p className="text-gray-400 font-comfortaa">{isPortuguese ? 'Carregando...' : 'Loading...'}</p>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-[#505050] px-4 py-8">
-      <div className="container mx-auto max-w-7xl">
-        {/* Header */}
-        <div className="text-center mb-12">
-          <h1 className="hero-title text-3xl md:text-4xl lg:text-5xl font-poly font-bold text-white mb-6">
-            {isPortuguese ? 'Analytics Profissional' : 'Professional Analytics'}
-          </h1>
-          <p className="text-xl font-comfortaa font-normal text-white max-w-4xl mx-auto">
-            {isPortuguese 
-              ? 'Centro de aprendizado abrangente para análise profunda de performance e insights acionáveis.'
-              : 'Comprehensive learning center for deep performance analysis and actionable insights.'
-            }
-          </p>
-        </div>
+    <div className="space-y-6 pb-16">
 
-        {/* Error Display */}
-        {error && (
-          <div className="card border-l-4 border-red-500 bg-red-500/10 mb-6">
-            <div className="flex items-center gap-3">
-              <span className="text-red-400">⚠️</span>
-              <div>
-                <h4 className="font-bold text-white">
-                  {isPortuguese ? 'Erro ao carregar dados' : 'Error loading data'}
-                </h4>
-                <p className="text-gray-300 text-sm">{error}</p>
-              </div>
+      {/* ── Page header: title + account switcher + period tabs ────────────── */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <h1 className="text-2xl font-bold font-heading text-white">
+          {isPortuguese ? 'Análises' : 'Analytics'}
+        </h1>
+
+        <div className="flex flex-wrap items-center gap-3">
+          {/* Account switcher */}
+          {marketAccounts.length > 1 && <>
+            <div className="flex items-center gap-1.5">
+              {marketAccounts.map(acc => (
+                <button
+                  key={acc.marketType}
+                  onClick={() => setActiveMarket(acc.marketType)}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-all ${
+                    activeMarket?.marketType === acc.marketType
+                      ? 'bg-white/20 ring-2 ring-primary/40 text-white'
+                      : 'bg-white/10 text-gray-300 hover:bg-white/15 hover:text-white'
+                  }`}
+                >
+                  {MARKET_ICONS[acc.marketType] ?? <BarChart2 size={14} />}
+                  <span>{acc.displayName}</span>
+                </button>
+              ))}
             </div>
-          </div>
-        )}
+            <div className="w-px h-6 bg-white/20 hidden sm:block" />
+          </>}
 
-        {/* Tab Navigation */}
-        <div className="flex flex-wrap gap-2 mb-8 border-b border-gray-600 pb-4 overflow-x-auto">
-          {tabs.map(tab => (
-            <button
-              key={tab.key}
-              onClick={() => setActiveTab(tab.key as AnalyticsTab)}
-              className={`flex items-center gap-2 px-4 py-3 rounded-lg transition-all font-medium whitespace-nowrap ${
-                activeTab === tab.key
-                  ? 'bg-[#E1FFD9] text-[#2D3748] shadow-lg'
-                  : 'bg-gray-800/50 text-gray-300 hover:bg-white/20 hover:text-white border border-gray-700/50'
-              }`}
-            >
-              <span className="text-lg">{tab.icon}</span>
-              <div className="text-left hidden sm:block">
-                <div className="text-sm font-bold">{tab.label}</div>
-                <div className="text-xs opacity-75">{tab.description}</div>
-              </div>
-              <span className="sm:hidden">{tab.label}</span>
-            </button>
-          ))}
-        </div>
-
-        {/* Loading State */}
-        {loading && (
-          <div className="card text-center py-16">
-            <div className="inline-block animate-spin rounded-full h-16 w-16 border-b-2 border-[#E1FFD9] mb-4"></div>
-            <p className="text-white font-comfortaa">
-              {isPortuguese ? 'Carregando analytics...' : 'Loading analytics...'}
-            </p>
-          </div>
-        )}
-
-        {/* Tab Content */}
-        {!loading && (
-          <div className="space-y-6">
-            {/* Overview Tab */}
-            {activeTab === 'overview' && (
-              <div className="space-y-6">
-                {/* Key Performance Metrics */}
-                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
-                  <div className="card text-center bg-gradient-to-br from-blue-900/20 to-blue-800/20 border-blue-500/30">
-                    <div className="text-2xl font-bold text-blue-300">{stats?.totalTrades || 0}</div>
-                    <div className="text-sm text-gray-300 font-comfortaa">
-                      {isPortuguese ? 'Total Trades' : 'Total Trades'}
-                    </div>
-                  </div>
-                  
-                  <div className="card text-center bg-gradient-to-br from-green-900/20 to-green-800/20 border-green-500/30">
-                    <div className={`text-2xl font-bold ${(stats?.winRate || 0) >= 50 ? 'text-green-300' : 'text-red-300'}`}>
-                      {(stats?.winRate || 0).toFixed(1)}%
-                    </div>
-                    <div className="text-sm text-gray-300 font-comfortaa">
-                      {isPortuguese ? 'Taxa de Acerto' : 'Win Rate'}
-                    </div>
-                  </div>
-
-                  <div className="card text-center bg-gradient-to-br from-purple-900/20 to-purple-800/20 border-purple-500/30">
-                    <div className={`text-2xl font-bold ${(stats?.totalPnl || 0) >= 0 ? 'text-green-300' : 'text-red-300'}`}>
-                      ${(stats?.totalPnl || 0) >= 0 ? '+' : ''}{(stats?.totalPnl || 0).toFixed(0)}
-                    </div>
-                    <div className="text-sm text-gray-300 font-comfortaa">
-                      P&L Total
-                    </div>
-                  </div>
-
-                  <div className="card text-center bg-gradient-to-br from-yellow-900/20 to-yellow-800/20 border-yellow-500/30">
-                    <div className="text-2xl font-bold text-red-300">
-                      {riskMetrics.maxDrawdown.toFixed(1)}%
-                    </div>
-                    <div className="text-sm text-gray-300 font-comfortaa">
-                      {isPortuguese ? 'Drawdown Máx' : 'Max Drawdown'}
-                    </div>
-                  </div>
-
-                  <div className="card text-center bg-gradient-to-br from-indigo-900/20 to-indigo-800/20 border-indigo-500/30">
-                    <div className="text-2xl font-bold text-indigo-300">
-                      {riskMetrics.sharpeRatio.toFixed(2)}
-                    </div>
-                    <div className="text-sm text-gray-300 font-comfortaa">
-                      Sharpe Ratio
-                    </div>
-                  </div>
-
-                  <div className="card text-center bg-gradient-to-br from-orange-900/20 to-orange-800/20 border-orange-500/30">
-                    <div className="text-2xl font-bold text-orange-300">
-                      {riskMetrics.profitFactor.toFixed(2)}
-                    </div>
-                    <div className="text-sm text-gray-300 font-comfortaa">
-                      {isPortuguese ? 'Fator Lucro' : 'Profit Factor'}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Quick Action Cards */}
-                <div className="grid md:grid-cols-3 gap-6">
-                  <div className="card cursor-pointer hover:bg-white/20 transition-colors"
-                       onClick={() => setActiveTab('risks')}>
-                    <div className="flex items-center gap-4">
-                      <div className="text-4xl">⚠️</div>
-                      <div>
-                        <h3 className="font-bold text-white font-comfortaa">
-                          {isPortuguese ? 'Análise de Risco' : 'Risk Analysis'}
-                        </h3>
-                        <p className="text-gray-300 text-sm">
-                          {isPortuguese ? 'Métricas avançadas de gestão de risco' : 'Advanced risk management metrics'}
-                        </p>
-                        <div className="mt-2 text-sm">
-                          <span className="text-red-300">Volatilidade: {riskMetrics.volatility.toFixed(1)}%</span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="card cursor-pointer hover:bg-white/20 transition-colors"
-                       onClick={() => setActiveTab('streaks')}>
-                    <div className="flex items-center gap-4">
-                      <div className="text-4xl">🔥</div>
-                      <div>
-                        <h3 className="font-bold text-white font-comfortaa">
-                          {isPortuguese ? 'Sequências' : 'Streaks'}
-                        </h3>
-                        <p className="text-gray-300 text-sm">
-                          {isPortuguese ? 'Análise de sequências de ganhos e perdas' : 'Win/loss streak analysis'}
-                        </p>
-                        <div className="mt-2 text-sm">
-                          <span className="text-green-300">Max Win: {streakAnalysis.maxWinStreak}</span>
-                          <span className="mx-2">|</span>
-                          <span className="text-red-300">Max Loss: {streakAnalysis.maxLossStreak}</span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="card cursor-pointer hover:bg-white/20 transition-colors"
-                       onClick={() => setActiveTab('assets')}>
-                    <div className="flex items-center gap-4">
-                      <div className="text-4xl">💰</div>
-                      <div>
-                        <h3 className="font-bold text-white font-comfortaa">
-                          {isPortuguese ? 'Performance de Ativos' : 'Asset Performance'}
-                        </h3>
-                        <p className="text-gray-300 text-sm">
-                          {isPortuguese ? 'Análise detalhada por ativo' : 'Detailed asset analysis'}
-                        </p>
-                        <div className="mt-2 text-sm text-gray-300">
-                          {assetPerformance.length} {isPortuguese ? 'ativos analisados' : 'assets analyzed'}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Assets Tab */}
-            {activeTab === 'assets' && (
-              <div className="space-y-6">
-                <div className="flex justify-between items-center">
-                  <h2 className="text-2xl font-bold text-white font-comfortaa">
-                    {isPortuguese ? 'Performance por Ativo' : 'Asset Performance'}
-                  </h2>
-                  
-                  {/* Sort Controls */}
-                  <div className="flex gap-2">
-                    <select
-                      value={sortField}
-                      onChange={(e) => setSortField(e.target.value)}
-                      className="bg-gray-800/50 border border-gray-700/50 rounded-lg px-3 py-2 text-white text-sm"
-                    >
-                      <option value="totalPnl">{isPortuguese ? 'P&L Total' : 'Total P&L'}</option>
-                      <option value="winRate">{isPortuguese ? 'Taxa de Acerto' : 'Win Rate'}</option>
-                      <option value="trades">{isPortuguese ? 'Número de Trades' : 'Trade Count'}</option>
-                      <option value="profitFactor">{isPortuguese ? 'Fator de Lucro' : 'Profit Factor'}</option>
-                      <option value="asset">{isPortuguese ? 'Ativo' : 'Asset'}</option>
-                    </select>
-                    
-                    <button
-                      onClick={() => setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc')}
-                      className="bg-gray-800/50 border border-gray-700/50 rounded-lg px-3 py-2 text-white text-sm hover:bg-gray-700/50"
-                    >
-                      {sortDirection === 'asc' ? '↑' : '↓'}
-                    </button>
-                  </div>
-                </div>
-
-                {/* Asset Performance Table */}
-                <div className="card overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b border-gray-700">
-                        <th className="text-left p-3 text-gray-300 font-comfortaa">
-                          {isPortuguese ? 'Ativo' : 'Asset'}
-                        </th>
-                        <th className="text-right p-3 text-gray-300 font-comfortaa">
-                          {isPortuguese ? 'Trades' : 'Trades'}
-                        </th>
-                        <th className="text-right p-3 text-gray-300 font-comfortaa">
-                          {isPortuguese ? 'Taxa Acerto' : 'Win Rate'}
-                        </th>
-                        <th className="text-right p-3 text-gray-300 font-comfortaa">
-                          P&L Total
-                        </th>
-                        <th className="text-right p-3 text-gray-300 font-comfortaa">
-                          P&L Médio
-                        </th>
-                        <th className="text-right p-3 text-gray-300 font-comfortaa">
-                          {isPortuguese ? 'Maior Ganho' : 'Max Win'}
-                        </th>
-                        <th className="text-right p-3 text-gray-300 font-comfortaa">
-                          {isPortuguese ? 'Maior Perda' : 'Max Loss'}
-                        </th>
-                        <th className="text-right p-3 text-gray-300 font-comfortaa">
-                          {isPortuguese ? 'Fator Lucro' : 'Profit Factor'}
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {assetPerformance.map((asset, index) => (
-                        <tr key={asset.asset} className={`border-b border-gray-700/50 ${
-                          index % 2 === 0 ? 'bg-gray-800/20' : 'bg-transparent'
-                        }`}>
-                          <td className="p-3 font-medium text-white">{asset.asset}</td>
-                          <td className="p-3 text-right text-gray-300">{asset.trades}</td>
-                          <td className={`p-3 text-right font-medium ${
-                            asset.winRate >= 50 ? 'text-green-300' : 'text-red-300'
-                          }`}>
-                            {asset.winRate.toFixed(1)}%
-                          </td>
-                          <td className={`p-3 text-right font-medium ${
-                            asset.totalPnl >= 0 ? 'text-green-300' : 'text-red-300'
-                          }`}>
-                            ${asset.totalPnl >= 0 ? '+' : ''}{asset.totalPnl.toFixed(2)}
-                          </td>
-                          <td className={`p-3 text-right ${
-                            asset.avgPnl >= 0 ? 'text-green-300' : 'text-red-300'
-                          }`}>
-                            ${asset.avgPnl >= 0 ? '+' : ''}{asset.avgPnl.toFixed(2)}
-                          </td>
-                          <td className="p-3 text-right text-green-300">
-                            ${asset.maxWin.toFixed(2)}
-                          </td>
-                          <td className="p-3 text-right text-red-300">
-                            ${asset.maxLoss.toFixed(2)}
-                          </td>
-                          <td className={`p-3 text-right font-medium ${
-                            asset.profitFactor >= 1 ? 'text-green-300' : 'text-red-300'
-                          }`}>
-                            {asset.profitFactor.toFixed(2)}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            )}
-
-            {/* Risk Tab */}
-            {activeTab === 'risks' && (
-              <div className="space-y-6">
-                <h2 className="text-2xl font-bold text-white font-comfortaa">
-                  {isPortuguese ? 'Análise de Risco' : 'Risk Analysis'}
-                </h2>
-
-                {/* Risk Metrics Grid */}
-                <div className="grid md:grid-cols-3 gap-6">
-                  <div className="card bg-gradient-to-br from-red-900/20 to-red-800/20 border-red-500/30">
-                    <h3 className="font-bold text-white mb-4 font-comfortaa">
-                      {isPortuguese ? 'Drawdown' : 'Drawdown'}
-                    </h3>
-                    <div className="space-y-3">
-                      <div className="flex justify-between">
-                        <span className="text-gray-300">{isPortuguese ? 'Máximo:' : 'Maximum:'}</span>
-                        <span className="text-red-300 font-bold">{riskMetrics.maxDrawdown.toFixed(2)}%</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-300">{isPortuguese ? 'Atual:' : 'Current:'}</span>
-                        <span className="text-red-300">{riskMetrics.currentDrawdown.toFixed(2)}%</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="card bg-gradient-to-br from-yellow-900/20 to-yellow-800/20 border-yellow-500/30">
-                    <h3 className="font-bold text-white mb-4 font-comfortaa">
-                      {isPortuguese ? 'Volatilidade' : 'Volatility'}
-                    </h3>
-                    <div className="space-y-3">
-                      <div className="flex justify-between">
-                        <span className="text-gray-300">{isPortuguese ? 'Anualizada:' : 'Annualized:'}</span>
-                        <span className="text-yellow-300 font-bold">{riskMetrics.volatility.toFixed(2)}%</span>
-                      </div>
-                      <div className="text-sm text-gray-400">
-                        {isPortuguese ? 'Baseada em retornos diários' : 'Based on daily returns'}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="card bg-gradient-to-br from-blue-900/20 to-blue-800/20 border-blue-500/30">
-                    <h3 className="font-bold text-white mb-4 font-comfortaa">
-                      {isPortuguese ? 'Ratios de Risco' : 'Risk Ratios'}
-                    </h3>
-                    <div className="space-y-3">
-                      <div className="flex justify-between">
-                        <span className="text-gray-300">Sharpe:</span>
-                        <span className="text-blue-300 font-bold">{riskMetrics.sharpeRatio.toFixed(3)}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-300">Calmar:</span>
-                        <span className="text-blue-300">{riskMetrics.calmarRatio.toFixed(3)}</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Risk Management Insights */}
-                <div className="card bg-gradient-to-br from-purple-900/20 to-purple-800/20 border-purple-500/30">
-                  <h3 className="font-bold text-white mb-4 font-comfortaa">
-                    {isPortuguese ? 'Insights de Gestão de Risco' : 'Risk Management Insights'}
-                  </h3>
-                  <div className="grid md:grid-cols-2 gap-4">
-                    <div>
-                      <h4 className="text-purple-300 font-semibold mb-2">
-                        {isPortuguese ? 'Pontos Fortes' : 'Strengths'}
-                      </h4>
-                      <ul className="space-y-1 text-sm text-gray-300">
-                        {riskMetrics.sharpeRatio > 1 && (
-                          <li>• {isPortuguese ? 'Excelente Sharpe ratio (>1.0)' : 'Excellent Sharpe ratio (>1.0)'}</li>
-                        )}
-                        {riskMetrics.maxDrawdown < 20 && (
-                          <li>• {isPortuguese ? 'Drawdown controlado (<20%)' : 'Controlled drawdown (<20%)'}</li>
-                        )}
-                        {riskMetrics.profitFactor > 1.5 && (
-                          <li>• {isPortuguese ? 'Alto fator de lucro (>1.5)' : 'High profit factor (>1.5)'}</li>
-                        )}
-                      </ul>
-                    </div>
-                    <div>
-                      <h4 className="text-red-300 font-semibold mb-2">
-                        {isPortuguese ? 'Áreas de Melhoria' : 'Areas for Improvement'}
-                      </h4>
-                      <ul className="space-y-1 text-sm text-gray-300">
-                        {riskMetrics.maxDrawdown > 30 && (
-                          <li>• {isPortuguese ? 'Reduzir drawdown máximo' : 'Reduce maximum drawdown'}</li>
-                        )}
-                        {riskMetrics.volatility > 50 && (
-                          <li>• {isPortuguese ? 'Diminuir volatilidade' : 'Lower volatility'}</li>
-                        )}
-                        {riskMetrics.sharpeRatio < 0.5 && (
-                          <li>• {isPortuguese ? 'Melhorar retorno ajustado ao risco' : 'Improve risk-adjusted returns'}</li>
-                        )}
-                      </ul>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Export Tab */}
-            {activeTab === 'export' && (
-              <div className="space-y-6">
-                <h2 className="text-2xl font-bold text-white font-comfortaa">
-                  {isPortuguese ? 'Exportar Dados' : 'Export Data'}
-                </h2>
-
-                <div className="grid md:grid-cols-2 gap-6">
-                  <div className="card">
-                    <h3 className="font-bold text-white mb-4 font-comfortaa">
-                      {isPortuguese ? 'Relatório Completo (CSV)' : 'Complete Report (CSV)'}
-                    </h3>
-                    <p className="text-gray-300 mb-4 text-sm">
-                      {isPortuguese 
-                        ? 'Exporta todas as métricas e análises em formato CSV para análise externa.'
-                        : 'Export all metrics and analyses in CSV format for external analysis.'
-                      }
-                    </p>
-                    <button
-                      onClick={() => handleExport('csv')}
-                      className="bg-gradient-to-r from-[#E1FFD9] to-[#C4F5A8] text-[#2D3748] font-semibold px-6 py-2 rounded-lg hover:shadow-lg transition-all font-comfortaa"
-                    >
-                      📥 {isPortuguese ? 'Baixar CSV' : 'Download CSV'}
-                    </button>
-                  </div>
-
-                  <div className="card opacity-50">
-                    <h3 className="font-bold text-white mb-4 font-comfortaa">
-                      {isPortuguese ? 'Relatório PDF (Em Breve)' : 'PDF Report (Coming Soon)'}
-                    </h3>
-                    <p className="text-gray-300 mb-4 text-sm">
-                      {isPortuguese 
-                        ? 'Relatório profissional em PDF com gráficos e análises visuais.'
-                        : 'Professional PDF report with charts and visual analyses.'
-                      }
-                    </p>
-                    <button
-                      disabled
-                      className="bg-gray-600 text-gray-400 font-semibold px-6 py-2 rounded-lg cursor-not-allowed font-comfortaa"
-                    >
-                      📄 {isPortuguese ? 'Em Desenvolvimento' : 'In Development'}
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Trades Tab */}
-            {activeTab === 'trades' && (
-              <div className="space-y-6">
-                <div className="flex justify-between items-center">
-                  <h2 className="text-2xl font-bold text-white font-comfortaa">
-                    {isPortuguese ? 'Análise Detalhada de Trades' : 'Detailed Trade Analysis'}
-                  </h2>
-                  
-                  {/* Filter Controls */}
-                  <div className="flex gap-2">
-                    <select
-                      value={filters.period}
-                      onChange={(e) => setFilters({...filters, period: e.target.value as TimePeriod})}
-                      className="bg-gray-800/50 border border-gray-700/50 rounded-lg px-3 py-2 text-white text-sm"
-                    >
-                      <option value="daily">{isPortuguese ? 'Hoje' : 'Today'}</option>
-                      <option value="weekly">{isPortuguese ? 'Esta Semana' : 'This Week'}</option>
-                      <option value="monthly">{isPortuguese ? 'Este Mês' : 'This Month'}</option>
-                      <option value="allTime">{isPortuguese ? 'Todo Período' : 'All Time'}</option>
-                    </select>
-                  </div>
-                </div>
-
-                {/* Trade Statistics Summary */}
-                <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-                  <div className="card text-center bg-gradient-to-br from-emerald-900/20 to-emerald-800/20 border-emerald-500/30">
-                    <div className="text-xl font-bold text-emerald-300">{trades.filter(t => t.profit > 0).length}</div>
-                    <div className="text-sm text-gray-300 font-comfortaa">
-                      {isPortuguese ? 'Trades Ganhos' : 'Winning Trades'}
-                    </div>
-                  </div>
-                  
-                  <div className="card text-center bg-gradient-to-br from-rose-900/20 to-rose-800/20 border-rose-500/30">
-                    <div className="text-xl font-bold text-rose-300">{trades.filter(t => t.profit < 0).length}</div>
-                    <div className="text-sm text-gray-300 font-comfortaa">
-                      {isPortuguese ? 'Trades Perdidos' : 'Losing Trades'}
-                    </div>
-                  </div>
-
-                  <div className="card text-center bg-gradient-to-br from-amber-900/20 to-amber-800/20 border-amber-500/30">
-                    <div className="text-xl font-bold text-amber-300">
-                      ${Math.max(...trades.map(t => t.profit)).toFixed(2)}
-                    </div>
-                    <div className="text-sm text-gray-300 font-comfortaa">
-                      {isPortuguese ? 'Melhor Trade' : 'Best Trade'}
-                    </div>
-                  </div>
-
-                  <div className="card text-center bg-gradient-to-br from-red-900/20 to-red-800/20 border-red-500/30">
-                    <div className="text-xl font-bold text-red-300">
-                      ${Math.min(...trades.map(t => t.profit)).toFixed(2)}
-                    </div>
-                    <div className="text-sm text-gray-300 font-comfortaa">
-                      {isPortuguese ? 'Pior Trade' : 'Worst Trade'}
-                    </div>
-                  </div>
-
-                  <div className="card text-center bg-gradient-to-br from-cyan-900/20 to-cyan-800/20 border-cyan-500/30">
-                    <div className="text-xl font-bold text-cyan-300">
-                      ${(trades.reduce((sum, t) => sum + t.amount, 0) / trades.length).toFixed(2)}
-                    </div>
-                    <div className="text-sm text-gray-300 font-comfortaa">
-                      {isPortuguese ? 'Stake Médio' : 'Avg Stake'}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Recent Trades Table */}
-                <div className="card overflow-x-auto">
-                  <div className="flex justify-between items-center mb-4">
-                    <h3 className="font-bold text-white font-comfortaa">
-                      {isPortuguese ? 'Trades Recentes' : 'Recent Trades'}
-                    </h3>
-                    <span className="text-sm text-gray-400">
-                      {isPortuguese ? 'Últimos 50 trades' : 'Last 50 trades'}
-                    </span>
-                  </div>
-                  
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b border-gray-700">
-                        <th className="text-left p-3 text-gray-300 font-comfortaa">
-                          {isPortuguese ? 'Data/Hora' : 'Date/Time'}
-                        </th>
-                        <th className="text-left p-3 text-gray-300 font-comfortaa">
-                          {isPortuguese ? 'Ativo' : 'Asset'}
-                        </th>
-                        <th className="text-left p-3 text-gray-300 font-comfortaa">
-                          {isPortuguese ? 'Direção' : 'Direction'}
-                        </th>
-                        <th className="text-right p-3 text-gray-300 font-comfortaa">
-                          Stake
-                        </th>
-                        <th className="text-right p-3 text-gray-300 font-comfortaa">
-                          {isPortuguese ? 'Resultado' : 'Result'}
-                        </th>
-                        <th className="text-right p-3 text-gray-300 font-comfortaa">
-                          P&L
-                        </th>
-                        <th className="text-left p-3 text-gray-300 font-comfortaa">
-                          {isPortuguese ? 'Estratégia' : 'Strategy'}
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {trades.slice(0, 50).map((trade, index) => (
-                        <tr key={trade.id} className={`border-b border-gray-700/50 ${
-                          index % 2 === 0 ? 'bg-gray-800/20' : 'bg-transparent'
-                        }`}>
-                          <td className="p-3 text-gray-300">
-                            {new Date(trade.entryTime).toLocaleString(isPortuguese ? 'pt-BR' : 'en-US')}
-                          </td>
-                          <td className="p-3 font-medium text-white">{trade.asset}</td>
-                          <td className="p-3">
-                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                              trade.direction === 'call' 
-                                ? 'bg-green-500/20 text-green-300' 
-                                : 'bg-red-500/20 text-red-300'
-                            }`}>
-                              {trade.direction === 'call' ? '↗' : '↘'} {trade.direction.toUpperCase()}
-                            </span>
-                          </td>
-                          <td className="p-3 text-right text-gray-300">${trade.amount.toFixed(2)}</td>
-                          <td className="p-3 text-right">
-                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                              trade.result === 'win' 
-                                ? 'bg-green-500/20 text-green-300' 
-                                : 'bg-red-500/20 text-red-300'
-                            }`}>
-                              {trade.result === 'win' ? '✓' : '✗'} 
-                              {isPortuguese ? (trade.result === 'win' ? 'GANHO' : 'PERDA') : trade.result.toUpperCase()}
-                            </span>
-                          </td>
-                          <td className={`p-3 text-right font-medium ${
-                            trade.profit >= 0 ? 'text-green-300' : 'text-red-300'
-                          }`}>
-                            ${trade.profit >= 0 ? '+' : ''}{trade.profit.toFixed(2)}
-                          </td>
-                          <td className="p-3 text-gray-300">{trade.strategy || '-'}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            )}
-
-            {/* Periods Tab */}
-            {activeTab === 'periods' && (
-              <div className="space-y-6">
-                <h2 className="text-2xl font-bold text-white font-comfortaa">
-                  {isPortuguese ? 'Análise por Período' : 'Period Analysis'}
-                </h2>
-
-                {/* Time Period Performance */}
-                <div className="grid gap-6">
-                  {/* Daily Performance */}
-                  <div className="card">
-                    <h3 className="font-bold text-white mb-4 font-comfortaa">
-                      {isPortuguese ? 'Performance Diária' : 'Daily Performance'}
-                    </h3>
-                    <div className="grid md:grid-cols-4 gap-4">
-                      {(() => {
-                        const dailyData = trades.reduce((acc, trade) => {
-                          const date = new Date(trade.entryTime).toDateString()
-                          if (!acc[date]) {
-                            acc[date] = { trades: 0, pnl: 0, wins: 0 }
-                          }
-                          acc[date].trades++
-                          acc[date].pnl += trade.profit
-                          if (trade.profit > 0) acc[date].wins++
-                          return acc
-                        }, {} as Record<string, {trades: number, pnl: number, wins: number}>)
-
-                        const days = Object.entries(dailyData).slice(-7) // Last 7 days
-                        
-                        return days.map(([date, data]) => (
-                          <div key={date} className="bg-gray-800/30 p-4 rounded-lg border border-gray-700/50">
-                            <div className="text-sm text-gray-400 mb-1">
-                              {new Date(date).toLocaleDateString(isPortuguese ? 'pt-BR' : 'en-US', { 
-                                weekday: 'short', month: 'short', day: 'numeric' 
-                              })}
-                            </div>
-                            <div className={`text-lg font-bold mb-1 ${
-                              data.pnl >= 0 ? 'text-green-300' : 'text-red-300'
-                            }`}>
-                              ${data.pnl >= 0 ? '+' : ''}{data.pnl.toFixed(2)}
-                            </div>
-                            <div className="text-sm text-gray-300">
-                              {data.trades} trades • {((data.wins / data.trades) * 100).toFixed(0)}% win
-                            </div>
-                          </div>
-                        ))
-                      })()}
-                    </div>
-                  </div>
-
-                  {/* Monthly Summary */}
-                  <div className="card">
-                    <h3 className="font-bold text-white mb-4 font-comfortaa">
-                      {isPortuguese ? 'Resumo Mensal' : 'Monthly Summary'}
-                    </h3>
-                    <div className="grid md:grid-cols-3 gap-4">
-                      {(() => {
-                        const monthlyData = trades.reduce((acc, trade) => {
-                          const month = new Date(trade.entryTime).toISOString().slice(0, 7) // YYYY-MM
-                          if (!acc[month]) {
-                            acc[month] = { trades: 0, pnl: 0, wins: 0 }
-                          }
-                          acc[month].trades++
-                          acc[month].pnl += trade.profit
-                          if (trade.profit > 0) acc[month].wins++
-                          return acc
-                        }, {} as Record<string, {trades: number, pnl: number, wins: number}>)
-
-                        const months = Object.entries(monthlyData).slice(-3) // Last 3 months
-                        
-                        return months.map(([month, data]) => (
-                          <div key={month} className="bg-gray-800/30 p-4 rounded-lg border border-gray-700/50">
-                            <div className="text-sm text-gray-400 mb-1">
-                              {new Date(month + '-01').toLocaleDateString(isPortuguese ? 'pt-BR' : 'en-US', { 
-                                year: 'numeric', month: 'long' 
-                              })}
-                            </div>
-                            <div className={`text-xl font-bold mb-2 ${
-                              data.pnl >= 0 ? 'text-green-300' : 'text-red-300'
-                            }`}>
-                              ${data.pnl >= 0 ? '+' : ''}{data.pnl.toFixed(2)}
-                            </div>
-                            <div className="text-sm text-gray-300">
-                              {data.trades} trades • {((data.wins / data.trades) * 100).toFixed(1)}% win rate
-                            </div>
-                            <div className="text-sm text-gray-400">
-                              Avg: ${(data.pnl / data.trades).toFixed(2)} per trade
-                            </div>
-                          </div>
-                        ))
-                      })()}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Streaks Tab */}
-            {activeTab === 'streaks' && (
-              <div className="space-y-6">
-                <h2 className="text-2xl font-bold text-white font-comfortaa">
-                  {isPortuguese ? 'Análise de Sequências' : 'Streak Analysis'}
-                </h2>
-
-                {/* Current Streaks */}
-                <div className="grid md:grid-cols-4 gap-4">
-                  <div className="card text-center bg-gradient-to-br from-green-900/20 to-green-800/20 border-green-500/30">
-                    <div className="text-3xl font-bold text-green-300">{streakAnalysis.currentWinStreak}</div>
-                    <div className="text-sm text-gray-300 font-comfortaa">
-                      {isPortuguese ? 'Sequência Atual de Ganhos' : 'Current Win Streak'}
-                    </div>
-                  </div>
-                  
-                  <div className="card text-center bg-gradient-to-br from-red-900/20 to-red-800/20 border-red-500/30">
-                    <div className="text-3xl font-bold text-red-300">{streakAnalysis.currentLossStreak}</div>
-                    <div className="text-sm text-gray-300 font-comfortaa">
-                      {isPortuguese ? 'Sequência Atual de Perdas' : 'Current Loss Streak'}
-                    </div>
-                  </div>
-
-                  <div className="card text-center bg-gradient-to-br from-emerald-900/20 to-emerald-800/20 border-emerald-500/30">
-                    <div className="text-3xl font-bold text-emerald-300">{streakAnalysis.maxWinStreak}</div>
-                    <div className="text-sm text-gray-300 font-comfortaa">
-                      {isPortuguese ? 'Melhor Sequência de Ganhos' : 'Best Win Streak'}
-                    </div>
-                  </div>
-
-                  <div className="card text-center bg-gradient-to-br from-rose-900/20 to-rose-800/20 border-rose-500/30">
-                    <div className="text-3xl font-bold text-rose-300">{streakAnalysis.maxLossStreak}</div>
-                    <div className="text-sm text-gray-300 font-comfortaa">
-                      {isPortuguese ? 'Pior Sequência de Perdas' : 'Worst Loss Streak'}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Streak Statistics */}
-                <div className="grid md:grid-cols-2 gap-6">
-                  <div className="card">
-                    <h3 className="font-bold text-white mb-4 font-comfortaa">
-                      {isPortuguese ? 'Estatísticas de Sequências' : 'Streak Statistics'}
-                    </h3>
-                    <div className="space-y-3">
-                      <div className="flex justify-between">
-                        <span className="text-gray-300">
-                          {isPortuguese ? 'Média de ganhos consecutivos:' : 'Average win streak:'}
-                        </span>
-                        <span className="text-green-300 font-bold">
-                          {streakAnalysis.avgWinStreak.toFixed(1)}
-                        </span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-300">
-                          {isPortuguese ? 'Média de perdas consecutivas:' : 'Average loss streak:'}
-                        </span>
-                        <span className="text-red-300 font-bold">
-                          {streakAnalysis.avgLossStreak.toFixed(1)}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="card">
-                    <h3 className="font-bold text-white mb-4 font-comfortaa">
-                      {isPortuguese ? 'Análise de Consistência' : 'Consistency Analysis'}
-                    </h3>
-                    <div className="space-y-3">
-                      <div className="flex justify-between">
-                        <span className="text-gray-300">
-                          {isPortuguese ? 'Ratio Win/Loss:' : 'Win/Loss Ratio:'}
-                        </span>
-                        <span className="text-blue-300 font-bold">
-                          {(streakAnalysis.avgWinStreak / (streakAnalysis.avgLossStreak || 1)).toFixed(2)}
-                        </span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-300">
-                          {isPortuguese ? 'Controle emocional:' : 'Emotional control:'}
-                        </span>
-                        <span className={`font-bold ${
-                          streakAnalysis.maxLossStreak <= 5 ? 'text-green-300' : 
-                          streakAnalysis.maxLossStreak <= 10 ? 'text-yellow-300' : 'text-red-300'
-                        }`}>
-                          {streakAnalysis.maxLossStreak <= 5 ? 
-                            (isPortuguese ? 'Excelente' : 'Excellent') :
-                            streakAnalysis.maxLossStreak <= 10 ?
-                            (isPortuguese ? 'Bom' : 'Good') :
-                            (isPortuguese ? 'Precisa melhorar' : 'Needs improvement')
-                          }
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Streak History */}
-                <div className="card">
-                  <h3 className="font-bold text-white mb-4 font-comfortaa">
-                    {isPortuguese ? 'Histórico de Sequências' : 'Streak History'}
-                  </h3>
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
-                      <thead>
-                        <tr className="border-b border-gray-700">
-                          <th className="text-left p-3 text-gray-300 font-comfortaa">
-                            {isPortuguese ? 'Tipo' : 'Type'}
-                          </th>
-                          <th className="text-right p-3 text-gray-300 font-comfortaa">
-                            {isPortuguese ? 'Duração' : 'Length'}
-                          </th>
-                          <th className="text-left p-3 text-gray-300 font-comfortaa">
-                            {isPortuguese ? 'Período' : 'Period'}
-                          </th>
-                          <th className="text-right p-3 text-gray-300 font-comfortaa">
-                            P&L Total
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {streakAnalysis.streakHistory.slice(-10).map((streak, index) => (
-                          <tr key={index} className={`border-b border-gray-700/50 ${
-                            index % 2 === 0 ? 'bg-gray-800/20' : 'bg-transparent'
-                          }`}>
-                            <td className="p-3">
-                              <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                                streak.type === 'win' 
-                                  ? 'bg-green-500/20 text-green-300' 
-                                  : 'bg-red-500/20 text-red-300'
-                              }`}>
-                                {streak.type === 'win' ? '🔥' : '❄️'} 
-                                {isPortuguese ? (streak.type === 'win' ? 'GANHOS' : 'PERDAS') : streak.type.toUpperCase()}
-                              </span>
-                            </td>
-                            <td className="p-3 text-right font-bold text-white">{streak.count}</td>
-                            <td className="p-3 text-gray-300">
-                              {new Date(streak.startDate).toLocaleDateString(isPortuguese ? 'pt-BR' : 'en-US')} - 
-                              {new Date(streak.endDate).toLocaleDateString(isPortuguese ? 'pt-BR' : 'en-US')}
-                            </td>
-                            <td className={`p-3 text-right font-medium ${
-                              streak.totalPnl >= 0 ? 'text-green-300' : 'text-red-300'
-                            }`}>
-                              ${streak.totalPnl >= 0 ? '+' : ''}{streak.totalPnl.toFixed(2)}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Insights Tab */}
-            {activeTab === 'insights' && (
-              <div className="space-y-6">
-                <h2 className="text-2xl font-bold text-white font-comfortaa">
-                  {isPortuguese ? 'Insights e Recomendações' : 'Insights & Recommendations'}
-                </h2>
-
-                {/* Performance Insights */}
-                <div className="grid md:grid-cols-2 gap-6">
-                  <div className="card bg-gradient-to-br from-green-900/20 to-green-800/20 border-green-500/30">
-                    <h3 className="font-bold text-white mb-4 font-comfortaa flex items-center gap-2">
-                      <span className="text-green-400">✅</span>
-                      {isPortuguese ? 'Pontos Fortes' : 'Strengths'}
-                    </h3>
-                    <ul className="space-y-2 text-sm">
-                      {(stats?.winRate || 0) > 50 && (
-                        <li className="text-green-300">
-                          • {isPortuguese ? `Boa taxa de acerto: ${(stats?.winRate || 0).toFixed(1)}%` : `Good win rate: ${(stats?.winRate || 0).toFixed(1)}%`}
-                        </li>
-                      )}
-                      {riskMetrics.maxDrawdown < 20 && (
-                        <li className="text-green-300">
-                          • {isPortuguese ? 'Drawdown controlado (< 20%)' : 'Controlled drawdown (< 20%)'}
-                        </li>
-                      )}
-                      {streakAnalysis.maxLossStreak <= 5 && (
-                        <li className="text-green-300">
-                          • {isPortuguese ? 'Excelente controle emocional' : 'Excellent emotional control'}
-                        </li>
-                      )}
-                      {riskMetrics.profitFactor > 1.2 && (
-                        <li className="text-green-300">
-                          • {isPortuguese ? `Bom fator de lucro: ${riskMetrics.profitFactor.toFixed(2)}` : `Good profit factor: ${riskMetrics.profitFactor.toFixed(2)}`}
-                        </li>
-                      )}
-                    </ul>
-                  </div>
-
-                  <div className="card bg-gradient-to-br from-red-900/20 to-red-800/20 border-red-500/30">
-                    <h3 className="font-bold text-white mb-4 font-comfortaa flex items-center gap-2">
-                      <span className="text-red-400">⚠️</span>
-                      {isPortuguese ? 'Áreas de Melhoria' : 'Areas for Improvement'}
-                    </h3>
-                    <ul className="space-y-2 text-sm">
-                      {(stats?.winRate || 0) < 50 && (
-                        <li className="text-red-300">
-                          • {isPortuguese ? 'Taxa de acerto baixa - revisar estratégia' : 'Low win rate - review strategy'}
-                        </li>
-                      )}
-                      {riskMetrics.maxDrawdown > 30 && (
-                        <li className="text-red-300">
-                          • {isPortuguese ? 'Drawdown alto - melhorar gestão de risco' : 'High drawdown - improve risk management'}
-                        </li>
-                      )}
-                      {streakAnalysis.maxLossStreak > 10 && (
-                        <li className="text-red-300">
-                          • {isPortuguese ? 'Sequências de perda longas - controle emocional' : 'Long loss streaks - emotional control needed'}
-                        </li>
-                      )}
-                      {riskMetrics.profitFactor < 1 && (
-                        <li className="text-red-300">
-                          • {isPortuguese ? 'Fator de lucro baixo - revisar estratégia' : 'Low profit factor - strategy review needed'}
-                        </li>
-                      )}
-                    </ul>
-                  </div>
-                </div>
-
-                {/* Actionable Recommendations */}
-                <div className="card bg-gradient-to-br from-blue-900/20 to-blue-800/20 border-blue-500/30">
-                  <h3 className="font-bold text-white mb-6 font-comfortaa flex items-center gap-2">
-                    <span className="text-blue-400">💡</span>
-                    {isPortuguese ? 'Recomendações Acionáveis' : 'Actionable Recommendations'}
-                  </h3>
-                  
-                  <div className="grid md:grid-cols-2 gap-6">
-                    <div>
-                      <h4 className="font-semibold text-blue-300 mb-3">
-                        {isPortuguese ? 'Gestão de Risco' : 'Risk Management'}
-                      </h4>
-                      <ul className="space-y-2 text-sm text-gray-300">
-                        <li>
-                          • {isPortuguese ? 
-                            `Considere limitar o stake a ${Math.min(5, Math.round((stats?.avgStake || 0) * 0.8))}% do capital` :
-                            `Consider limiting stake to ${Math.min(5, Math.round((stats?.avgStake || 0) * 0.8))}% of capital`
-                          }
-                        </li>
-                        <li>
-                          • {isPortuguese ? 'Estabeleça stop-loss diário de 10% do capital' : 'Set daily stop-loss at 10% of capital'}
-                        </li>
-                        <li>
-                          • {isPortuguese ? 'Pare após 3 perdas consecutivas' : 'Stop trading after 3 consecutive losses'}
-                        </li>
-                      </ul>
-                    </div>
-                    
-                    <div>
-                      <h4 className="font-semibold text-blue-300 mb-3">
-                        {isPortuguese ? 'Otimização de Performance' : 'Performance Optimization'}
-                      </h4>
-                      <ul className="space-y-2 text-sm text-gray-300">
-                        <li>
-                          • {isPortuguese ? 
-                            `Foque em ${assetPerformance[0]?.asset || 'seus melhores'} ativos (maior winrate)` :
-                            `Focus on ${assetPerformance[0]?.asset || 'your best performing'} assets (higher winrate)`
-                          }
-                        </li>
-                        <li>
-                          • {isPortuguese ? 'Analise padrões nos horários de melhor performance' : 'Analyze patterns in your best performing time periods'}
-                        </li>
-                        <li>
-                          • {isPortuguese ? 'Mantenha registro das emoções em cada trade' : 'Keep emotion logs for each trade'}
-                        </li>
-                      </ul>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Learning Resources */}
-                <div className="card bg-gradient-to-br from-purple-900/20 to-purple-800/20 border-purple-500/30">
-                  <h3 className="font-bold text-white mb-4 font-comfortaa flex items-center gap-2">
-                    <span className="text-purple-400">📚</span>
-                    {isPortuguese ? 'Recursos de Aprendizado' : 'Learning Resources'}
-                  </h3>
-                  
-                  <div className="grid md:grid-cols-3 gap-4">
-                    <div className="bg-gray-800/30 p-4 rounded-lg border border-gray-700/50">
-                      <h4 className="font-semibold text-purple-300 mb-2">
-                        {isPortuguese ? 'Gestão de Risco' : 'Risk Management'}
-                      </h4>
-                      <p className="text-sm text-gray-300 mb-2">
-                        {isPortuguese ? 
-                          'Aprenda sobre position sizing e gestão de capital' :
-                          'Learn about position sizing and capital management'
-                        }
-                      </p>
-                      <button className="text-xs text-purple-400 hover:text-purple-300">
-                        {isPortuguese ? 'Ver recursos →' : 'View resources →'}
-                      </button>
-                    </div>
-                    
-                    <div className="bg-gray-800/30 p-4 rounded-lg border border-gray-700/50">
-                      <h4 className="font-semibold text-purple-300 mb-2">
-                        {isPortuguese ? 'Psicologia do Trading' : 'Trading Psychology'}
-                      </h4>
-                      <p className="text-sm text-gray-300 mb-2">
-                        {isPortuguese ? 
-                          'Controle emocional e disciplina no trading' :
-                          'Emotional control and trading discipline'
-                        }
-                      </p>
-                      <button className="text-xs text-purple-400 hover:text-purple-300">
-                        {isPortuguese ? 'Ver recursos →' : 'View resources →'}
-                      </button>
-                    </div>
-                    
-                    <div className="bg-gray-800/30 p-4 rounded-lg border border-gray-700/50">
-                      <h4 className="font-semibold text-purple-300 mb-2">
-                        {isPortuguese ? 'Análise Técnica' : 'Technical Analysis'}
-                      </h4>
-                      <p className="text-sm text-gray-300 mb-2">
-                        {isPortuguese ? 
-                          'Melhore suas habilidades de análise de mercado' :
-                          'Improve your market analysis skills'
-                        }
-                      </p>
-                      <button className="text-xs text-purple-400 hover:text-purple-300">
-                        {isPortuguese ? 'Ver recursos →' : 'View resources →'}
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Professional Analytics Summary */}
-        <div className="mt-16 py-8">
-          <div className="card bg-gradient-to-r from-indigo-800/20 to-purple-800/20 border-primary/20 text-center">
-            <div className="flex items-center justify-center gap-3 mb-4">
-              <div className="text-3xl">📊</div>
-              <h3 className="font-heading text-xl font-bold">
-                {isPortuguese ? 'Analytics V1 - Professional Bloomberg Style' : 'Analytics V1 - Professional Bloomberg Style'}
-              </h3>
-            </div>
-            <p className="text-gray-400 max-w-3xl mx-auto mb-6">
-              {isPortuguese 
-                ? 'Centro de aprendizado analytics profissional com métricas avançadas, análise de risco, performance por ativo e insights acionáveis para melhorar sua estratégia de trading.'
-                : 'Professional analytics learning center with advanced metrics, risk analysis, asset performance and actionable insights to improve your trading strategy.'
-              }
-            </p>
-            <div className="flex flex-wrap items-center justify-center gap-6 text-sm text-gray-500">
-              <div className="flex items-center gap-2">
-                <div className="w-2 h-2 bg-indigo-400 rounded-full animate-pulse"></div>
-                {isPortuguese ? 'Métricas Avançadas' : 'Advanced Metrics'}
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-2 h-2 bg-purple-400 rounded-full animate-pulse"></div>
-                {isPortuguese ? 'Análise de Risco' : 'Risk Analysis'}
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-2 h-2 bg-blue-400 rounded-full animate-pulse"></div>
-                {isPortuguese ? 'Performance de Ativos' : 'Asset Performance'}
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
-                {isPortuguese ? 'Exportação de Dados' : 'Data Export'}
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-2 h-2 bg-yellow-400 rounded-full animate-pulse"></div>
-                {isPortuguese ? 'Insights Profissionais' : 'Professional Insights'}
-              </div>
-            </div>
+          {/* Period tabs */}
+          <div className="flex gap-1 bg-white/5 border border-white/10 rounded-xl p-1">
+            {periodTabs.map(p => (
+              <button
+                key={p.key}
+                onClick={() => setPeriod(p.key)}
+                className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-all ${
+                  period === p.key
+                    ? 'bg-primary text-background shadow-sm'
+                    : 'text-gray-300 hover:text-white hover:bg-white/10'
+                }`}
+              >
+                {p.label}
+              </button>
+            ))}
           </div>
         </div>
       </div>
+
+      {/* ── Empty state ──────────────────────────────────────────────────────── */}
+      {!trades.length && (
+        <div className="card text-center py-20">
+          <div className="mb-4 text-gray-500 flex justify-center"><BarChart2 size={48} /></div>
+          <h3 className="text-xl font-bold text-white mb-2">
+            {isPortuguese ? 'Nenhuma operação neste período' : 'No trades in this period'}
+          </h3>
+          <p className="text-gray-400 font-comfortaa">
+            {isPortuguese
+              ? 'Tente outro período ou importe dados na aba Trades.'
+              : 'Try a different period or import data in the Trades tab.'}
+          </p>
+        </div>
+      )}
+
+      {trades.length > 0 && <>
+
+        {/* ── KPI strip ─────────────────────────────────────────────────────── */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+
+          <div className="card text-center">
+            <div className={`text-3xl font-bold mb-1 ${stats.winRate >= 50 ? 'text-win' : 'text-loss'}`}>
+              {stats.winRate.toFixed(1)}%
+            </div>
+            <div className="text-xs text-gray-400 uppercase tracking-wide font-comfortaa">
+              {isPortuguese ? 'Taxa de Acerto' : 'Win Rate'}
+            </div>
+            <div className="text-xs text-gray-400 mt-1">
+              {stats.wins}W · {stats.losses}L{stats.ties > 0 ? ` · ${stats.ties}T` : ''}
+            </div>
+          </div>
+
+          <div className="card text-center">
+            <div className={`text-3xl font-bold mb-1 ${stats.totalPnl >= 0 ? 'text-win' : 'text-loss'}`}>
+              {fmtPnl(stats.totalPnl)}
+            </div>
+            <div className="text-xs text-gray-400 uppercase tracking-wide font-comfortaa">Net P&L</div>
+            <div className="text-xs text-gray-400 mt-1">
+              {stats.total} {isPortuguese ? 'operações' : 'trades'} · avg {fmtPnl(stats.total > 0 ? stats.totalPnl / stats.total : 0)}
+            </div>
+          </div>
+
+          <div className="card text-center">
+            <div className={`text-3xl font-bold mb-1 ${stats.profitFactor >= 1 ? 'text-win' : 'text-loss'}`}>
+              {isFinite(stats.profitFactor) ? stats.profitFactor.toFixed(2) : '∞'}
+            </div>
+            <div className="text-xs text-gray-400 uppercase tracking-wide font-comfortaa">
+              {isPortuguese ? 'Fator de Lucro' : 'Profit Factor'}
+            </div>
+            <div className="text-xs text-gray-400 mt-1">
+              ↑${stats.avgWin.toFixed(2)} · ↓${stats.avgLoss.toFixed(2)}
+            </div>
+          </div>
+
+          <div className="card text-center">
+            <div className={`text-3xl font-bold mb-1 ${stats.maxDrawdown < 20 ? 'text-win' : stats.maxDrawdown < 40 ? 'text-yellow-400' : 'text-loss'}`}>
+              {stats.maxDrawdown.toFixed(1)}%
+            </div>
+            <div className="text-xs text-gray-400 uppercase tracking-wide font-comfortaa">
+              {isPortuguese ? 'Max Drawdown' : 'Max Drawdown'}
+            </div>
+            <div className="text-xs text-gray-400 mt-1">
+              {isPortuguese ? 'Seq. atual' : 'Streak'}: {streak.current} {streak.type === 'win' ? (isPortuguese ? 'G' : 'W') : streak.type === 'loss' ? (isPortuguese ? 'P' : 'L') : ''}
+            </div>
+          </div>
+
+        </div>
+
+        {/* ── Equity curve (2/3) + Donut (1/3) ─────────────────────────────── */}
+        <div className="grid md:grid-cols-3 gap-6">
+
+          <div className="card md:col-span-2">
+            <h2 className="font-heading font-bold text-white mb-6 text-lg">
+              {isPortuguese ? 'Curva de Capital' : 'Equity Curve'}
+            </h2>
+            {equityData.length > 1 ? (
+              <ResponsiveContainer width="100%" height={240}>
+                <AreaChart data={equityData} margin={{ top: 8, right: 12, bottom: 0, left: 8 }}>
+                  <defs>
+                    <linearGradient id="eqGrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%"  stopColor={stats.totalPnl >= 0 ? '#4ade80' : '#f87171'} stopOpacity={0.3} />
+                      <stop offset="95%" stopColor={stats.totalPnl >= 0 ? '#4ade80' : '#f87171'} stopOpacity={0}   />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#ffffff0d" />
+                  <XAxis
+                    dataKey="date"
+                    tick={{ fill: AXIS_COLOR, fontSize: 11 }}
+                    tickLine={false} axisLine={false}
+                    interval={Math.max(0, Math.floor(equityData.length / 7) - 1)}
+                  />
+                  <YAxis
+                    tick={{ fill: AXIS_COLOR, fontSize: 11 }}
+                    tickLine={false} axisLine={false}
+                    tickFormatter={v => `$${v}`}
+                  />
+                  <Tooltip content={<EquityTooltip />} cursor={false} />
+                  <ReferenceLine y={0} stroke="#ffffff20" strokeDasharray="4 4" />
+                  <Area
+                    type="monotone" dataKey="cumPnl"
+                    stroke={stats.totalPnl >= 0 ? '#4ade80' : '#f87171'}
+                    strokeWidth={2} fill="url(#eqGrad)"
+                    dot={false} activeDot={false}
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="h-[240px] flex items-center justify-center text-gray-500 font-comfortaa text-sm">
+                {isPortuguese ? 'Dados insuficientes' : 'Not enough data'}
+              </div>
+            )}
+          </div>
+
+          {/* Donut */}
+          <div className="card flex flex-col">
+            <h2 className="font-heading font-bold text-white mb-4 text-lg">
+              {isPortuguese ? 'Distribuição' : 'Distribution'}
+            </h2>
+            <div className="flex-1 flex flex-col items-center justify-center gap-4">
+              <div className="relative mx-auto" style={{ width: 180, height: 180 }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={donutData} cx="50%" cy="50%"
+                      innerRadius={56} outerRadius={76}
+                      dataKey="value" stroke="none" paddingAngle={3}
+                    >
+                      {donutData.map((entry, i) => <Cell key={i} fill={entry.color} />)}
+                    </Pie>
+                  </PieChart>
+                </ResponsiveContainer>
+                <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                  <span className={`text-2xl font-bold leading-none ${stats.winRate >= 50 ? 'text-win' : 'text-loss'}`}>
+                    {stats.winRate.toFixed(0)}%
+                  </span>
+                  <span className="text-xs text-gray-500 mt-0.5">WR</span>
+                </div>
+              </div>
+              <div className="flex flex-wrap justify-center gap-x-4 gap-y-1.5 text-sm">
+                {donutData.map(d => (
+                  <div key={d.name} className="flex items-center gap-1.5">
+                    <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: d.color }} />
+                    <span className="text-gray-400 font-comfortaa">{d.name}</span>
+                    <span className="font-bold text-white">{d.value}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        {/* ── P&L by Period (1/2) + Asset Performance (1/2) ────────────────── */}
+        <div className="grid md:grid-cols-2 gap-6">
+
+          <div className="card">
+            <h2 className="font-heading font-bold text-white mb-6 text-lg">
+              {isPortuguese ? 'P&L por Período' : 'P&L by Period'}
+            </h2>
+            {pnlBars.length > 0 ? (
+              <ResponsiveContainer width="100%" height={220}>
+                <BarChart data={pnlBars} margin={{ top: 4, right: 8, bottom: 0, left: 8 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#ffffff0d" vertical={false} />
+                  <XAxis
+                    dataKey="label"
+                    tick={{ fill: AXIS_COLOR, fontSize: 11 }}
+                    tickLine={false} axisLine={false}
+                    interval={pnlBars.length > 14 ? Math.floor(pnlBars.length / 10) : 0}
+                  />
+                  <YAxis
+                    tick={{ fill: AXIS_COLOR, fontSize: 11 }}
+                    tickLine={false} axisLine={false}
+                    tickFormatter={v => `$${v}`}
+                  />
+                  <Tooltip content={<PnlBarTooltip />} cursor={false} />
+                  <ReferenceLine y={0} stroke="#ffffff18" />
+                  <Bar dataKey="pnl" radius={[4, 4, 0, 0]}>
+                    {pnlBars.map((e, i) => (
+                      <Cell key={i} fill={e.pnl >= 0 ? '#4ade80' : '#f87171'} fillOpacity={0.85} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="h-[220px] flex items-center justify-center text-gray-500 text-sm">
+                {isPortuguese ? 'Sem dados' : 'No data'}
+              </div>
+            )}
+          </div>
+
+          <div className="card">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="font-heading font-bold text-white text-lg">
+                {isPortuguese ? 'Por Ativo' : 'By Asset'}
+              </h2>
+              <div className="flex gap-1 bg-white/5 rounded-lg p-1 text-xs">
+                {(['pnl', 'winRate', 'trades'] as const).map(key => (
+                  <button
+                    key={key}
+                    onClick={() => setSortAssetBy(key)}
+                    className={`px-2.5 py-1 rounded transition-all font-comfortaa ${
+                      sortAssetBy === key ? 'bg-white/15 text-white' : 'text-gray-400 hover:text-white'
+                    }`}
+                  >
+                    {key === 'pnl' ? 'P&L' : key === 'winRate' ? 'Win%' : 'Vol'}
+                  </button>
+                ))}
+              </div>
+            </div>
+            {assetData.length > 0 ? (
+              <ResponsiveContainer width="100%" height={220}>
+                <BarChart data={assetData} layout="vertical" margin={{ top: 0, right: 40, bottom: 0, left: 8 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#ffffff0d" horizontal={false} />
+                  <XAxis
+                    type="number"
+                    tick={{ fill: AXIS_COLOR, fontSize: 11 }}
+                    tickLine={false} axisLine={false}
+                    tickFormatter={v =>
+                      sortAssetBy === 'pnl' ? `$${v}` :
+                      sortAssetBy === 'winRate' ? `${v}%` : `${v}`
+                    }
+                  />
+                  <YAxis
+                    type="category" dataKey="asset"
+                    tick={{ fill: '#e2e8f0', fontSize: 11 }}
+                    tickLine={false} axisLine={false} width={88}
+                  />
+                  <Tooltip content={<AssetTooltip />} cursor={false} />
+                  <Bar dataKey={sortAssetBy} radius={[0, 4, 4, 0]}>
+                    {assetData.map((e, i) => (
+                      <Cell
+                        key={i}
+                        fill={
+                          sortAssetBy === 'pnl'     ? (e.pnl     >= 0  ? '#4ade80' : '#f87171') :
+                          sortAssetBy === 'winRate' ? (e.winRate >= 50  ? '#4ade80' : '#f87171') :
+                          '#818cf8'
+                        }
+                        fillOpacity={0.85}
+                      />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="h-[220px] flex items-center justify-center text-gray-500 text-sm">
+                {isPortuguese ? 'Sem dados' : 'No data'}
+              </div>
+            )}
+          </div>
+
+        </div>
+
+        {/* ── Streak (1/3) + Risk metrics (1/3) + Trade stats (1/3) ─────────── */}
+        <div className="grid md:grid-cols-3 gap-6">
+
+          <div className="card">
+            <h2 className="font-heading font-bold text-white mb-4 text-base">
+              {isPortuguese ? 'Sequências' : 'Streaks'}
+            </h2>
+            <div className="space-y-3">
+              {[
+                { label: isPortuguese ? 'Sequência atual' : 'Current streak', value: `${streak.current} ${streak.type === 'win' ? (isPortuguese ? 'G' : 'W') : streak.type === 'loss' ? (isPortuguese ? 'P' : 'L') : '—'}`, color: streak.type === 'win' ? 'text-win' : streak.type === 'loss' ? 'text-loss' : 'text-gray-300' },
+                { label: isPortuguese ? 'Melhor sequência' : 'Best win streak',  value: `${streak.maxWin}${isPortuguese ? 'G' : 'W'}`,  color: 'text-win'  },
+                { label: isPortuguese ? 'Pior sequência'   : 'Worst loss streak', value: `${streak.maxLoss}${isPortuguese ? 'P' : 'L'}`, color: 'text-loss' },
+              ].map(row => (
+                <div key={row.label} className="flex justify-between items-center py-2 border-b border-white/5 last:border-0">
+                  <span className="text-sm text-gray-400 font-comfortaa">{row.label}</span>
+                  <span className={`font-bold text-sm ${row.color}`}>{row.value}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="card">
+            <h2 className="font-heading font-bold text-white mb-4 text-base">
+              {isPortuguese ? 'Risco' : 'Risk'}
+            </h2>
+            <div className="space-y-3">
+              {[
+                { label: 'Max Drawdown', value: `${stats.maxDrawdown.toFixed(1)}%`, color: stats.maxDrawdown < 15 ? 'text-win' : stats.maxDrawdown < 30 ? 'text-yellow-400' : 'text-loss' },
+                { label: isPortuguese ? 'Desvio padrão P&L' : 'P&L Std Dev',        value: `$${stats.stdDev.toFixed(2)}`, color: 'text-gray-300' },
+                { label: isPortuguese ? 'Stake médio'       : 'Avg Stake',           value: `$${stats.avgStake.toFixed(2)}`, color: 'text-gray-300' },
+              ].map(row => (
+                <div key={row.label} className="flex justify-between items-center py-2 border-b border-white/5 last:border-0">
+                  <span className="text-sm text-gray-400 font-comfortaa">{row.label}</span>
+                  <span className={`font-bold text-sm ${row.color}`}>{row.value}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="card">
+            <h2 className="font-heading font-bold text-white mb-4 text-base">
+              {isPortuguese ? 'Extremos' : 'Extremes'}
+            </h2>
+            <div className="space-y-3">
+              {[
+                { label: isPortuguese ? 'Melhor operação' : 'Best trade',  value: fmtPnl(stats.bestTrade),  color: 'text-win'  },
+                { label: isPortuguese ? 'Pior operação'   : 'Worst trade', value: fmtPnl(stats.worstTrade), color: 'text-loss' },
+                { label: isPortuguese ? 'Fator de lucro'  : 'Profit factor', value: isFinite(stats.profitFactor) ? stats.profitFactor.toFixed(2) : '∞', color: stats.profitFactor >= 1 ? 'text-win' : 'text-loss' },
+              ].map(row => (
+                <div key={row.label} className="flex justify-between items-center py-2 border-b border-white/5 last:border-0">
+                  <span className="text-sm text-gray-400 font-comfortaa">{row.label}</span>
+                  <span className={`font-bold text-sm ${row.color}`}>{row.value}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+        </div>
+
+        {/* ── Hour-of-day (full width) ──────────────────────────────────────── */}
+        {hourData.length > 1 && (
+          <div className="card">
+            <h2 className="font-heading font-bold text-white mb-1 text-lg">
+              {isPortuguese ? 'Performance por Horário' : 'Performance by Hour'}
+            </h2>
+            <p className="text-xs text-gray-500 font-comfortaa mb-6">
+              {isPortuguese
+                ? 'Taxa de acerto por hora — verde ≥ 50%, vermelho < 50%'
+                : 'Win rate per hour — green ≥ 50%, red < 50%'}
+            </p>
+            <ResponsiveContainer width="100%" height={200}>
+              <BarChart data={hourData} margin={{ top: 4, right: 8, bottom: 0, left: 8 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#ffffff0d" vertical={false} />
+                <XAxis dataKey="hour" tick={{ fill: AXIS_COLOR, fontSize: 11 }} tickLine={false} axisLine={false} />
+                <YAxis
+                  tick={{ fill: AXIS_COLOR, fontSize: 11 }}
+                  tickLine={false} axisLine={false}
+                  tickFormatter={v => `${v}%`} domain={[0, 100]}
+                />
+                <Tooltip content={<HourTooltip />} cursor={false} />
+                <ReferenceLine y={50} stroke="#ffffff25" strokeDasharray="4 4" />
+                <Bar dataKey="winRate" radius={[4, 4, 0, 0]}>
+                  {hourData.map((e, i) => (
+                    <Cell key={i} fill={e.winRate >= 50 ? '#4ade80' : '#f87171'} fillOpacity={0.8} />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        )}
+
+        {/* ── Insights ─────────────────────────────────────────────────────── */}
+        {(insights.strengths.length > 0 || insights.improvements.length > 0) && (
+          <div className="grid md:grid-cols-2 gap-6">
+
+            <div className="card border border-win/20 bg-win/5">
+              <h2 className="font-heading font-bold text-white mb-4 text-base flex items-center gap-2">
+                <CheckCircle size={16} className="text-win shrink-0" />
+                {isPortuguese ? 'Pontos Fortes' : 'Strengths'}
+              </h2>
+              <ul className="space-y-2">
+                {insights.strengths.length > 0
+                  ? insights.strengths.map((s, i) => (
+                      <li key={i} className="flex items-start gap-2 text-sm text-gray-300 font-comfortaa">
+                        {s.icon}
+                        {s.text}
+                      </li>
+                    ))
+                  : <li className="text-sm text-gray-500 font-comfortaa italic">
+                      {isPortuguese ? 'Continue operando para gerar insights.' : 'Keep trading to generate insights.'}
+                    </li>
+                }
+              </ul>
+            </div>
+
+            <div className="card border border-loss/20 bg-loss/5">
+              <h2 className="font-heading font-bold text-white mb-4 text-base flex items-center gap-2">
+                <AlertTriangle size={16} className="text-loss shrink-0" />
+                {isPortuguese ? 'Áreas de Melhoria' : 'Areas to Improve'}
+              </h2>
+              <ul className="space-y-2">
+                {insights.improvements.length > 0
+                  ? insights.improvements.map((s, i) => (
+                      <li key={i} className="flex items-start gap-2 text-sm text-gray-300 font-comfortaa">
+                        {s.icon}
+                        {s.text}
+                      </li>
+                    ))
+                  : <li className="text-sm text-gray-500 font-comfortaa italic">
+                      {isPortuguese ? 'Nenhuma área crítica identificada.' : 'No critical areas identified.'}
+                    </li>
+                }
+              </ul>
+            </div>
+
+          </div>
+        )}
+
+        {/* Recommendations */}
+        {insights.recommendations.length > 0 && (
+          <div className="card border border-primary/20 bg-primary/5">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="font-heading font-bold text-white text-base flex items-center gap-2">
+                <Lightbulb size={16} className="text-primary shrink-0" />
+                {isPortuguese ? 'Recomendações' : 'Recommendations'}
+              </h2>
+              <button
+                onClick={handleExport}
+                className="text-xs px-3 py-1.5 rounded-lg bg-white/10 text-gray-300 hover:bg-white/20 hover:text-white transition-all font-comfortaa"
+              >
+                ↓ {isPortuguese ? 'Exportar CSV' : 'Export CSV'}
+              </button>
+            </div>
+            <div className="grid sm:grid-cols-2 gap-3">
+              {insights.recommendations.map((r, i) => (
+                <div key={i} className="flex items-start gap-2 text-sm text-gray-300 font-comfortaa bg-white/5 rounded-lg px-3 py-2">
+                  {r.icon}
+                  {r.text}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+      </>}
     </div>
   )
 }

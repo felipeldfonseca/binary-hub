@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useState, useCallback, useMemo } from 'react'
+import { BarChart2, ArrowLeftRight, Coins, TrendingUp, Target, BarChart3 } from 'lucide-react'
 import { Trade } from '@/hooks/useTrades'
 import { useLanguage } from '@/lib/contexts/LanguageContext'
 
@@ -180,12 +181,12 @@ const TradesTable: React.FC<TradesTableProps> = ({
       return <span className="text-xs text-gray-400">-</span>
     }
 
-    const marketConfig = {
-      binary: { color: 'bg-orange-500', icon: '📊' },
-      forex: { color: 'bg-blue-500', icon: '💱' },
-      crypto: { color: 'bg-purple-500', icon: '₿' },
-      futures: { color: 'bg-green-500', icon: '📈' },
-      options: { color: 'bg-yellow-500', icon: '🎯' }
+    const marketConfig: Record<string, { color: string; icon: React.ReactNode }> = {
+      binary:  { color: 'bg-orange-500', icon: <BarChart2 size={11} /> },
+      forex:   { color: 'bg-blue-500',   icon: <ArrowLeftRight size={11} /> },
+      crypto:  { color: 'bg-purple-500', icon: <Coins size={11} /> },
+      futures: { color: 'bg-green-500',  icon: <TrendingUp size={11} /> },
+      options: { color: 'bg-yellow-500', icon: <Target size={11} /> },
     }
 
     const config = marketConfig[marketType as keyof typeof marketConfig]
@@ -195,7 +196,7 @@ const TradesTable: React.FC<TradesTableProps> = ({
 
     return (
       <span className={`inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-semibold text-white ${config.color}`}>
-        <span>{config.icon}</span>
+        {config.icon}
         <span>{marketType.toUpperCase()}</span>
       </span>
     )
@@ -220,7 +221,7 @@ const TradesTable: React.FC<TradesTableProps> = ({
   if (trades.length === 0) {
     return (
       <div className="text-center py-12">
-        <div className="text-4xl mb-4">📊</div>
+        <div className="mb-4 text-gray-500 flex justify-center"><BarChart3 size={48} /></div>
         <h3 className="text-xl font-comfortaa font-semibold mb-2">{t.noTrades}</h3>
         <p className="text-gray-400">Start by adding your first trade or importing a CSV file.</p>
       </div>

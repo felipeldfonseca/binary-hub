@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useState, useCallback } from 'react'
+import { Zap } from 'lucide-react'
 import { Trade } from '@/hooks/useTrades'
 import { useLanguage } from '@/lib/contexts/LanguageContext'
 import { useToastHelpers } from '@/components/ui/Toast'
@@ -198,7 +199,7 @@ const BulkActions: React.FC<BulkActionsProps> = ({
     return (
       <div className="bg-white/5 border border-gray-700 rounded-lg p-4">
         <div className="text-center text-gray-400">
-          <div className="text-2xl mb-2">⚡</div>
+          <div className="mb-2 flex justify-center text-gray-500"><Zap size={24} /></div>
           <p className="text-sm">{t.selectTrades}</p>
         </div>
       </div>

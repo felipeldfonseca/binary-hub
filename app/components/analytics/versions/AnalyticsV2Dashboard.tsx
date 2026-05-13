@@ -1,24 +1,52 @@
 'use client'
 import React, { useState, useMemo } from 'react'
 import { useLanguage } from '@/lib/contexts/LanguageContext'
-import { useTrades, Trade } from '@/hooks/useTrades'
-import { useTradeStats } from '@/hooks/useTradeStats'
+import { useTradesSupabase } from '@/hooks/useTradesSupabase'
+import { useMarketContext } from '@/lib/contexts/MarketContext'
+import type { Trade as SupabaseTrade } from '@/types/database'
+
+interface Trade {
+  asset: string
+  amount: number
+  entryTime: Date
+  result: 'win' | 'loss' | 'tie'
+  profit: number
+}
+
+function adaptTrade(t: SupabaseTrade): Trade {
+  return {
+    asset: t.symbol,
+    amount: t.stake_amount ?? 0,
+    entryTime: new Date(t.entry_time),
+    result: t.result === 'breakeven' ? 'tie' : (t.result ?? 'loss') as 'win' | 'loss' | 'tie',
+    profit: t.pnl ?? 0,
+  }
+}
 
 export default function AnalyticsV2Dashboard() {
   const { isPortuguese } = useLanguage()
   const [analyticsView, setAnalyticsView] = useState<'performance' | 'assets' | 'time' | 'statistics'>('performance')
   const [timeframe, setTimeframe] = useState<'daily' | 'weekly' | 'monthly' | 'yearly'>('weekly')
 
-  const { 
-    trades, 
-    loading: tradesLoading, 
-    error: tradesError,
-  } = useTrades()
+  const { activeMarket } = useMarketContext()
+  const accountFilter = useMemo(
+    () => (activeMarket?.marketType ? { marketType: activeMarket.marketType } : undefined),
+    [activeMarket?.marketType]
+  )
+  const { trades: rawTrades, isLoading } = useTradesSupabase(accountFilter)
 
-  const { 
-    stats, 
-    loading: statsLoading 
-  } = useTradeStats(timeframe)
+  const trades = useMemo(() => rawTrades.map(t => adaptTrade(t as SupabaseTrade)), [rawTrades])
+
+  // Compute stats from Supabase trades (replaces useTradeStats)
+  const stats = useMemo(() => {
+    const totalTrades = trades.length
+    const winTrades = trades.filter(t => t.profit > 0).length
+    const lossTrades = trades.filter(t => t.profit < 0).length
+    const winRate = totalTrades > 0 ? (winTrades / totalTrades) * 100 : 0
+    const totalProfit = trades.reduce((sum, t) => sum + t.profit, 0)
+    const avgStake = totalTrades > 0 ? trades.reduce((sum, t) => sum + t.amount, 0) / totalTrades : 0
+    return { totalTrades, winTrades, lossTrades, winRate, totalProfit, avgStake }
+  }, [trades])
 
   // Chart Error Wrapper
   const ChartWrapper = ({ children, title }: { children: React.ReactNode; title: string }) => {
@@ -184,7 +212,7 @@ export default function AnalyticsV2Dashboard() {
                       {isPortuguese ? 'Lucro Total' : 'Total Profit'}
                     </p>
                     <p className="text-2xl font-bold text-white">
-                      ${((stats as any)?.totalProfit)?.toFixed(2) || '0.00'}
+                      ${stats.totalProfit.toFixed(2)}
                     </p>
                   </div>
                   <div className="text-3xl">💰</div>
@@ -340,7 +368,7 @@ export default function AnalyticsV2Dashboard() {
                   <div className="flex justify-between items-center py-2">
                     <span className="text-gray-400">{isPortuguese ? 'Lucro Médio' : 'Avg Profit'}</span>
                     <span className="text-blue-400 font-bold">
-                      ${stats?.totalTrades ? (((stats as any)?.totalProfit || 0) / stats.totalTrades).toFixed(2) : '0.00'}
+                      ${stats.totalTrades > 0 ? (stats.totalProfit / stats.totalTrades).toFixed(2) : '0.00'}
                     </span>
                   </div>
                 </div>
@@ -375,7 +403,7 @@ export default function AnalyticsV2Dashboard() {
       </div>
 
       {/* Loading States */}
-      {(tradesLoading || statsLoading) && (
+      {isLoading && (
         <div className="fixed inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center z-50">
           <div className="card bg-gradient-to-br from-orange-800/50 to-yellow-800/50 border-orange-500/30 border p-8 text-center">
             <div className="w-12 h-12 border-4 border-orange-400 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>

@@ -1,5 +1,9 @@
 'use client'
 import React, { useState, useMemo } from 'react'
+import {
+  BarChart2, ArrowLeftRight, Coins, TrendingUp, Target,
+  Table2, SlidersHorizontal, Upload, AlertTriangle, Inbox,
+} from 'lucide-react'
 import CsvUploadSection from '@/components/dashboard/CsvUploadSection'
 import { useLanguage } from '@/lib/contexts/LanguageContext'
 import { Trade as LegacyTrade } from '@/hooks/useTrades'
@@ -9,6 +13,14 @@ import type { Trade as SupabaseTrade } from '@/types/database'
 import TradesTable from '@/components/trades/TradesTable'
 import TradeFilters from '@/components/trades/TradeFilters'
 import BulkActions from '@/components/trades/BulkActions'
+
+const MARKET_ICONS: Record<string, React.ReactNode> = {
+  binary:  <BarChart2 size={14} />,
+  forex:   <ArrowLeftRight size={14} />,
+  crypto:  <Coins size={14} />,
+  futures: <TrendingUp size={14} />,
+  options: <Target size={14} />,
+}
 
 // Map Supabase snake_case trade to the legacy camelCase shape that child components expect
 function adaptTrade(t: SupabaseTrade & { market_type?: string | null }): LegacyTrade {
@@ -164,23 +176,23 @@ export default function TradesV1Professional() {
     hasMore: (page + 1) * PAGE_SIZE < sortedTrades.length,
   }
 
-  const tabs = [
+  const tabs: { key: string; label: string; icon: React.ReactNode; description: string }[] = [
     {
       key: 'table',
       label: isPortuguese ? 'Tabela' : 'Table',
-      icon: '📋',
+      icon: <Table2 size={18} />,
       description: isPortuguese ? 'Visualização em tabela' : 'Table view'
     },
     {
       key: 'filters',
       label: isPortuguese ? 'Filtros' : 'Filters',
-      icon: '🔍',
+      icon: <SlidersHorizontal size={18} />,
       description: isPortuguese ? 'Filtros avançados' : 'Advanced filters'
     },
     {
       key: 'import',
       label: isPortuguese ? 'Importar' : 'Import',
-      icon: '📄',
+      icon: <Upload size={18} />,
       description: isPortuguese ? 'Upload de dados' : 'Data upload'
     }
   ]
@@ -200,26 +212,17 @@ export default function TradesV1Professional() {
             <div className="flex items-center gap-2">
               {marketAccounts.map((market) => {
                 const isActive = market.marketType === activeMarket?.marketType
-                const marketConfig = {
-                  binary: { icon: '📊' },
-                  forex: { icon: '💱' },
-                  crypto: { icon: '₿' },
-                  futures: { icon: '📈' },
-                  options: { icon: '🎯' }
-                }
-                const config = marketConfig[market.marketType as keyof typeof marketConfig]
-
                 return (
                   <button
                     key={market.marketType}
                     onClick={() => setActiveMarket(market.marketType)}
-                    className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-white font-medium transition-all ${
+                    className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-white font-medium transition-all ${
                       isActive
                         ? 'bg-white/20 ring-2 ring-primary/50'
                         : 'bg-white/10 hover:bg-white/15'
                     }`}
                   >
-                    <span>{config?.icon}</span>
+                    {MARKET_ICONS[market.marketType] ?? <BarChart2 size={14} />}
                     <span>{market.displayName}</span>
                   </button>
                 )
@@ -231,13 +234,8 @@ export default function TradesV1Professional() {
         {activeMarket && marketAccounts.length === 1 && (
           <div className="flex items-center justify-center gap-2 text-sm text-gray-300">
             <span>{isPortuguese ? 'Mostrando operações de:' : 'Showing trades from:'}</span>
-            <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-white/10 text-white font-medium">
-              <span>
-                {activeMarket.marketType === 'binary' ? '📊'
-                  : activeMarket.marketType === 'forex' ? '💱'
-                  : activeMarket.marketType === 'crypto' ? '₿'
-                  : activeMarket.marketType === 'futures' ? '📈' : '🎯'}
-              </span>
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/10 text-white font-medium">
+              {MARKET_ICONS[activeMarket.marketType] ?? <BarChart2 size={14} />}
               <span>{activeMarket.displayName}</span>
             </span>
           </div>
@@ -248,7 +246,7 @@ export default function TradesV1Professional() {
       {tradesError && (
         <div className="card border-l-4 border-loss bg-loss/10 mb-6">
           <div className="flex items-center gap-3">
-            <span className="text-loss">⚠️</span>
+            <AlertTriangle size={18} className="text-loss shrink-0" />
             <div>
               <h4 className="font-bold text-white">
                 {isPortuguese ? 'Erro ao carregar dados' : 'Error loading data'}
@@ -298,7 +296,7 @@ export default function TradesV1Professional() {
       {/* Empty state */}
       {!isLoading && trades.length === 0 && !tradesError && (
         <div className="card text-center py-12 mb-8">
-          <div className="text-4xl mb-4">📭</div>
+          <div className="mb-4 text-gray-500 flex justify-center"><Inbox size={48} /></div>
           <h3 className="text-xl font-bold text-white mb-2">
             {isPortuguese ? 'Nenhuma operação encontrada' : 'No trades found'}
           </h3>
@@ -328,7 +326,7 @@ export default function TradesV1Professional() {
                 : 'bg-dark-card text-gray-300 hover:bg-white/20 hover:text-white'
             }`}
           >
-            <span className="text-lg">{tab.icon}</span>
+            {tab.icon}
             <div className="text-left hidden sm:block">
               <div className="text-sm font-bold">{tab.label}</div>
               <div className="text-xs opacity-75">{tab.description}</div>
