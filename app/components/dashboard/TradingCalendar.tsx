@@ -2,7 +2,6 @@
 
 import React, { useState } from 'react'
 import { useLanguage } from '@/lib/contexts/LanguageContext'
-import { useCsvTradeData } from '@/hooks/useCsvTradeData'
 
 interface DayData {
   date: string
@@ -27,11 +26,9 @@ export default function TradingCalendar({
   isDemoMode = false
 }: TradingCalendarProps) {
   const { isPortuguese } = useLanguage()
-  const csvData = useCsvTradeData()
   const [selectedDate, setSelectedDate] = useState<string | null>(null)
 
-  // Use real CSV data if available, otherwise fall back to passed data or demo mode
-  const calendarData = isDemoMode ? data : (csvData.hasData ? csvData.calendarData : data)
+  const calendarData = data
 
   // Translations
   const texts = {
@@ -127,12 +124,13 @@ export default function TradingCalendar({
     }
   }
   
-  // Check if we can go forward (not future months)
+  // Check if we can go forward (not past the current month)
   const canGoNext = () => {
-    const nextMonth = new Date(month)
-    nextMonth.setMonth(month.getMonth() + 1)
     const today = new Date()
-    return nextMonth <= new Date(today.getFullYear(), today.getMonth(), 1)
+    return (
+      month.getFullYear() < today.getFullYear() ||
+      (month.getFullYear() === today.getFullYear() && month.getMonth() < today.getMonth())
+    )
   }
   
   // Loading skeleton

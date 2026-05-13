@@ -22,7 +22,7 @@ export default function HeroSection() {
   const userName = getUserName(user)
 
   return (
-    <section className="w-full min-h-[40vh] flex items-center pt-24 sm:pt-28 lg:pt-32 pb-4 sm:pb-8 lg:pb-12">
+    <section className="w-full flex items-center pt-4 sm:pt-6 pb-4 sm:pb-8">
       <div className="container mx-auto px-4 flex flex-col items-center text-center">
         {/* Hero Title - Personalized welcome message */}
         <h1 className="hero-title font-poly font-normal mb-6 sm:mb-8 lg:mb-10 leading-tight">
