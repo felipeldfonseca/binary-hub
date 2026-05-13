@@ -1,5 +1,5 @@
 'use client'
-import React, { useState, useEffect, useMemo } from 'react'
+import React, { useState, useMemo } from 'react'
 import CsvUploadSection from '@/components/dashboard/CsvUploadSection'
 import { useLanguage } from '@/lib/contexts/LanguageContext'
 import { Trade as LegacyTrade } from '@/hooks/useTrades'
@@ -48,10 +48,12 @@ export default function TradesV1Professional() {
   const { isPortuguese } = useLanguage()
   const { activeMarket, marketAccounts, setActiveMarket } = useMarketContext()
   const [activeTab, setActiveTab] = useState<'table' | 'filters' | 'import'>('table')
-  const [selectedTrade, setSelectedTrade] = useState<LegacyTrade | null>(null)
+  const [, setSelectedTrade] = useState<LegacyTrade | null>(null)
   const [selectedIds, setSelectedIds] = useState<string[]>([])
   const [sortField, setSortField] = useState<keyof LegacyTrade>('entryTime')
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc')
+  const [page, setPage] = useState(0)
+  const PAGE_SIZE = 50
   const [filters, setFilters] = useState({
     dateRange: { start: '', end: '' },
     asset: '',
@@ -60,16 +62,6 @@ export default function TradesV1Professional() {
     maxAmount: '',
     marketType: ''
   })
-
-  // Auto-filter by active market when it changes
-  useEffect(() => {
-    if (activeMarket) {
-      setFilters(prev => ({
-        ...prev,
-        marketType: activeMarket.marketType
-      }))
-    }
-  }, [activeMarket])
 
   const supabaseFilters = useMemo(() => ({
     marketType: activeMarket?.marketType,
@@ -81,7 +73,6 @@ export default function TradesV1Professional() {
     isLoading,
     error,
     deleteTrade,
-    refetch,
   } = useTradesSupabase(supabaseFilters)
 
   // Adapt to legacy shape for child components
@@ -153,9 +144,24 @@ export default function TradesV1Professional() {
     URL.revokeObjectURL(url)
   }
 
+  // Reset to first page whenever filters or sort change
   const handleSort = (field: keyof LegacyTrade, direction: 'asc' | 'desc') => {
     setSortField(field)
     setSortDirection(direction)
+    setPage(0)
+  }
+
+  // Paginate after sorting
+  const pagedTrades = useMemo(
+    () => sortedTrades.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE),
+    [sortedTrades, page]
+  )
+
+  const pagination = {
+    total: sortedTrades.length,
+    limit: PAGE_SIZE,
+    offset: page * PAGE_SIZE,
+    hasMore: (page + 1) * PAGE_SIZE < sortedTrades.length,
   }
 
   const tabs = [
@@ -353,7 +359,7 @@ export default function TradesV1Professional() {
             />
 
             <TradesTable
-              trades={sortedTrades}
+              trades={pagedTrades}
               loading={isLoading}
               onTradeSelect={setSelectedTrade}
               onBulkSelect={setSelectedIds}
@@ -361,15 +367,15 @@ export default function TradesV1Professional() {
               onSort={handleSort}
               sortField={sortField}
               sortDirection={sortDirection}
-              pagination={null}
-              onPageChange={() => {}}
+              pagination={pagination}
+              onPageChange={(offset) => setPage(Math.floor(offset / PAGE_SIZE))}
             />
           </>
         )}
 
         {activeTab === 'filters' && (
           <TradeFilters
-            onFiltersChange={(newFilters) => setFilters(newFilters as typeof filters)}
+            onFiltersChange={(newFilters) => { setFilters(newFilters as typeof filters); setPage(0) }}
           />
         )}
 

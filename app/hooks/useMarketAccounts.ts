@@ -1,110 +1,112 @@
-'use client'
-import { useState, useEffect } from 'react'
-import { useAuth } from '@/hooks/useAuth'
-import { auth } from '@/lib/firebase'
-import { MarketAccount, MarketType } from '@/types/markets'
+// Lean rebuild shim - market accounts handled by MarketContextSupabase
+'use client';
+
+import { useState, useEffect, useCallback } from 'react';
+import { MarketAccount, MarketType } from '@/types/markets';
 
 interface UseMarketAccountsReturn {
-  marketAccounts: MarketAccount[]
-  primaryMarket: MarketAccount | null
-  activeMarket: MarketAccount | null
-  isLoading: boolean
-  error: string | null
-  refreshAccounts: () => Promise<void>
-  setActiveMarket: (marketType: MarketType) => void
-  switchToPrimaryMarket: () => void
+  marketAccounts: MarketAccount[];
+  primaryMarket: MarketAccount | null;
+  activeMarket: MarketAccount | null;
+  isLoading: boolean;
+  error: string | null;
+  refreshAccounts: () => Promise<void>;
+  setActiveMarket: (marketType: MarketType) => void;
+  switchToPrimaryMarket: () => void;
 }
 
+// Default market account for lean rebuild
+const defaultAccount: MarketAccount = {
+  id: 'default',
+  userId: 'default-user',
+  marketType: 'binary',
+  displayName: 'Binary Options',
+  isPrimary: true,
+  isActive: true,
+  bankroll: {
+    initial: 1000,
+    current: 1000,
+    currency: 'USD',
+    history: [],
+  },
+  performance: {
+    totalTrades: 0,
+    winRate: 0,
+    profitLoss: 0,
+    roi: 0,
+    bestTrade: 0,
+    worstTrade: 0,
+    averageTrade: 0,
+    currentStreak: 0,
+    bestStreak: 0,
+    worstStreak: 0,
+  },
+  settings: {
+    defaultStakeType: 'fixed',
+    defaultStakeAmount: 10,
+    defaultStakePercentage: 2,
+    maxDailyTrades: 10,
+    maxDailyLoss: 100,
+    maxDailyLossPercentage: 10,
+    stopLossEnabled: true,
+    takeProfitEnabled: true,
+    notifications: {
+      tradeAlerts: true,
+      dailySummary: true,
+      weeklyReport: true,
+      goalProgress: true,
+    },
+    display: {
+      showProfitInPercentage: true,
+      showPerformanceMetrics: true,
+      theme: 'dark',
+      timezone: 'America/New_York',
+      chartType: 'candlestick',
+      defaultTimeframe: '1h',
+    },
+  },
+  brokerConnections: [],
+  createdAt: new Date(),
+  updatedAt: new Date(),
+};
+
 export function useMarketAccounts(): UseMarketAccountsReturn {
-  const { user } = useAuth()
-  const [marketAccounts, setMarketAccounts] = useState<MarketAccount[]>([])
-  const [activeMarket, setActiveMarketState] = useState<MarketAccount | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const [marketAccounts] = useState<MarketAccount[]>([defaultAccount]);
+  const [activeMarket, setActiveMarketState] = useState<MarketAccount | null>(defaultAccount);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error] = useState<string | null>(null);
 
-  const primaryMarket = marketAccounts.find(account => account.isPrimary) || null
+  const primaryMarket = defaultAccount;
 
-  const fetchMarketAccounts = async () => {
-    if (!user) {
-      setMarketAccounts([])
-      setActiveMarketState(null)
-      setIsLoading(false)
-      return
-    }
-
-    try {
-      setIsLoading(true)
-      setError(null)
-
-      const token = await auth.currentUser?.getIdToken()
-      const response = await fetch('/api/v1/markets/setup', {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      })
-
-      if (!response.ok) {
-        throw new Error('Failed to fetch market accounts')
-      }
-
-      const data = await response.json()
-      
-      if (data.success) {
-        const accounts = data.marketAccounts as MarketAccount[]
-        setMarketAccounts(accounts)
-        
-        // Set active market to primary or first account
-        const primary = accounts.find(account => account.isPrimary)
-        setActiveMarketState(primary || accounts[0] || null)
-      } else {
-        throw new Error(data.error || 'Failed to fetch market accounts')
-      }
-    } catch (err) {
-      console.error('Error fetching market accounts:', err)
-      setError(err instanceof Error ? err.message : 'Unknown error')
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  const setActiveMarket = (marketType: MarketType) => {
-    const account = marketAccounts.find(acc => acc.marketType === marketType)
-    if (account) {
-      setActiveMarketState(account)
-      // Store preference in localStorage
-      localStorage.setItem('activeMarketType', marketType)
-    }
-  }
-
-  const switchToPrimaryMarket = () => {
-    if (primaryMarket) {
-      setActiveMarketState(primaryMarket)
-      localStorage.setItem('activeMarketType', primaryMarket.marketType)
-    }
-  }
-
-  // Load accounts when user changes
   useEffect(() => {
-    fetchMarketAccounts()
-  }, [user])
+    // Simulate loading completion
+    const timer = setTimeout(() => setIsLoading(false), 100);
+    return () => clearTimeout(timer);
+  }, []);
 
-  // Restore active market from localStorage
-  useEffect(() => {
-    if (marketAccounts.length > 0 && !activeMarket) {
-      const savedMarketType = localStorage.getItem('activeMarketType') as MarketType
-      if (savedMarketType) {
-        const savedAccount = marketAccounts.find(acc => acc.marketType === savedMarketType)
-        if (savedAccount) {
-          setActiveMarketState(savedAccount)
-          return
+  const refreshAccounts = useCallback(async () => {
+    console.log('useMarketAccounts: Lean rebuild mode - no API calls');
+  }, []);
+
+  const setActiveMarket = useCallback(
+    (marketType: MarketType) => {
+      const account = marketAccounts.find((acc) => acc.marketType === marketType);
+      if (account) {
+        setActiveMarketState(account);
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('activeMarketType', marketType);
         }
       }
-      
-      // Fallback to primary market
-      const primary = marketAccounts.find(account => account.isPrimary)
-      setActiveMarketState(primary || marketAccounts[0])
+    },
+    [marketAccounts]
+  );
+
+  const switchToPrimaryMarket = useCallback(() => {
+    setActiveMarketState(primaryMarket);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('activeMarketType', primaryMarket.marketType);
     }
-  }, [marketAccounts])
+  }, [primaryMarket]);
 
   return {
     marketAccounts,
@@ -112,8 +114,8 @@ export function useMarketAccounts(): UseMarketAccountsReturn {
     activeMarket,
     isLoading,
     error,
-    refreshAccounts: fetchMarketAccounts,
+    refreshAccounts,
     setActiveMarket,
-    switchToPrimaryMarket
-  }
+    switchToPrimaryMarket,
+  };
 }

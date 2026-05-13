@@ -1,7 +1,9 @@
 'use client';
 
-import React, { createContext, useContext, ReactNode, useState, useCallback, useEffect } from 'react';
+import React, { createContext, useContext, ReactNode, useState, useCallback, useEffect, useMemo } from 'react';
 import { MarketAccount, MarketType, MarketSelectionData } from '@/types/markets';
+import { useAuth } from '@/lib/contexts/AuthContextSupabase';
+import { createDataClient } from '@/lib/supabase';
 
 interface MarketContextType {
   marketAccounts: MarketAccount[];
@@ -96,35 +98,105 @@ const FALLBACK_ACCOUNT: MarketAccount = buildAccount({
   isPrimary: true,
 });
 
-function loadAccountsFromStorage(): MarketAccount[] {
+function loadAccountsFromStorage(): MarketSelectionData[] | null {
   try {
     const raw = localStorage.getItem('binaryHub_onboardingData');
-    if (!raw) return [FALLBACK_ACCOUNT];
-
+    if (!raw) return null;
     const data = JSON.parse(raw) as { selectedMarkets?: MarketSelectionData[] };
-    if (!data.selectedMarkets || data.selectedMarkets.length === 0) return [FALLBACK_ACCOUNT];
-
-    return data.selectedMarkets.map(buildAccount);
+    if (!data.selectedMarkets || data.selectedMarkets.length === 0) return null;
+    return data.selectedMarkets;
   } catch {
-    return [FALLBACK_ACCOUNT];
+    return null;
   }
 }
 
+function saveAccountsToStorage(markets: MarketSelectionData[]) {
+  try {
+    const raw = localStorage.getItem('binaryHub_onboardingData');
+    const data = raw ? JSON.parse(raw) : {};
+    data.selectedMarkets = markets;
+    localStorage.setItem('binaryHub_onboardingData', JSON.stringify(data));
+  } catch { /* ignore */ }
+}
+
 export function MarketProvider({ children }: { children: ReactNode }) {
+  const { user, session } = useAuth();
   const [marketAccounts, setMarketAccounts] = useState<MarketAccount[]>([FALLBACK_ACCOUNT]);
   const [activeMarketType, setActiveMarketType] = useState<MarketType>('binary');
+  const [isLoading, setIsLoading] = useState(true);
 
-  // Load saved onboarding data once on mount (client-side only)
+  // Load accounts: Supabase first, localStorage fallback
+  const loadAccounts = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      // Try Supabase if authenticated
+      if (user && session?.access_token) {
+        const db = createDataClient(session.access_token);
+        const { data } = await db
+          .from('profiles')
+          .select('market_accounts')
+          .eq('id', user.id)
+          .single();
+
+        const remote = (data as { market_accounts?: MarketSelectionData[] } | null)?.market_accounts;
+        if (remote && remote.length > 0) {
+          // Sync back to localStorage so offline works
+          saveAccountsToStorage(remote);
+          const accounts = remote.map(buildAccount);
+          setMarketAccounts(accounts);
+
+          const savedType = localStorage.getItem('activeMarketType') as MarketType | null;
+          const primary = accounts.find(a => a.isPrimary) ?? accounts[0];
+          const restored = savedType && accounts.find(a => a.marketType === savedType);
+          setActiveMarketType(restored ? (savedType as MarketType) : primary.marketType);
+          return;
+        }
+      }
+
+      // Fall back to localStorage
+      const local = loadAccountsFromStorage();
+      if (local) {
+        const accounts = local.map(buildAccount);
+        setMarketAccounts(accounts);
+
+        const savedType = localStorage.getItem('activeMarketType') as MarketType | null;
+        const primary = accounts.find(a => a.isPrimary) ?? accounts[0];
+        const restored = savedType && accounts.find(a => a.marketType === savedType);
+        setActiveMarketType(restored ? (savedType as MarketType) : primary.marketType);
+      } else {
+        setMarketAccounts([FALLBACK_ACCOUNT]);
+        setActiveMarketType('binary');
+      }
+    } catch {
+      const local = loadAccountsFromStorage();
+      const accounts = local ? local.map(buildAccount) : [FALLBACK_ACCOUNT];
+      setMarketAccounts(accounts);
+    } finally {
+      setIsLoading(false);
+    }
+  // Depend on user.id (stable string) not the user object, which is recreated
+  // on every auth event even for the same user — avoiding unnecessary reloads.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id, session?.access_token]);
+
   useEffect(() => {
-    const accounts = loadAccountsFromStorage();
-    setMarketAccounts(accounts);
+    loadAccounts();
+  }, [loadAccounts]);
 
-    // Restore previously selected active market, or default to primary
-    const savedType = localStorage.getItem('activeMarketType') as MarketType | null;
-    const primary = accounts.find(a => a.isPrimary) ?? accounts[0];
-    const restored = savedType && accounts.find(a => a.marketType === savedType);
-    setActiveMarketType(restored ? (savedType as MarketType) : primary.marketType);
-  }, []);
+  /** Persist markets array to both localStorage and Supabase */
+  const persistMarkets = useCallback(async (markets: MarketSelectionData[]) => {
+    saveAccountsToStorage(markets);
+    if (user && session?.access_token) {
+      try {
+        const db = createDataClient(session.access_token);
+        await db
+          .from('profiles')
+          .update({ market_accounts: markets as unknown[] } as Record<string, unknown>)
+          .eq('id', user.id);
+      } catch { /* non-fatal */ }
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id, session?.access_token]);
 
   const primaryMarket = marketAccounts.find(a => a.isPrimary) ?? marketAccounts[0] ?? null;
   const activeMarket = marketAccounts.find(a => a.marketType === activeMarketType) ?? primaryMarket;
@@ -137,36 +209,37 @@ export function MarketProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const refreshAccounts = useCallback(async () => {
-    const accounts = loadAccountsFromStorage();
-    setMarketAccounts(accounts);
-  }, []);
+    await loadAccounts();
+  }, [loadAccounts]);
 
   const updateAccountBalance = useCallback((marketType: MarketType, newInitialBankroll: number) => {
-    try {
-      const raw = localStorage.getItem('binaryHub_onboardingData');
-      if (!raw) return;
-      const data = JSON.parse(raw) as { selectedMarkets?: Array<{ marketType: string; initialBankroll: number; [key: string]: unknown }> };
-      if (!data.selectedMarkets) return;
-      data.selectedMarkets = data.selectedMarkets.map(m =>
+    // Update in-memory accounts immediately
+    setMarketAccounts(prev => prev.map(acc =>
+      acc.marketType === marketType
+        ? { ...acc, bankroll: { ...acc.bankroll, initial: newInitialBankroll } }
+        : acc
+    ));
+
+    // Persist: read current markets, update the matching one, save
+    const current = loadAccountsFromStorage();
+    if (current) {
+      const updated = current.map(m =>
         m.marketType === marketType ? { ...m, initialBankroll: newInitialBankroll } : m
       );
-      localStorage.setItem('binaryHub_onboardingData', JSON.stringify(data));
-    } catch { /* ignore */ }
-    // Reload accounts from updated storage
-    const accounts = loadAccountsFromStorage();
-    setMarketAccounts(accounts);
-  }, []);
+      persistMarkets(updated);
+    }
+  }, [persistMarkets]);
 
-  const value: MarketContextType = {
+  const value: MarketContextType = useMemo(() => ({
     marketAccounts,
     primaryMarket,
     activeMarket,
-    isLoading: false,
+    isLoading,
     error: null,
     setActiveMarket,
     refreshAccounts,
     updateAccountBalance,
-  };
+  }), [marketAccounts, primaryMarket, activeMarket, isLoading, setActiveMarket, refreshAccounts, updateAccountBalance]);
 
   return (
     <MarketContext.Provider value={value}>

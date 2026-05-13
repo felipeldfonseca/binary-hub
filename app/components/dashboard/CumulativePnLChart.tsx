@@ -176,8 +176,10 @@ export default function CumulativePnLChart({ isLoading = false }: CumulativePnLC
   const { isPortuguese } = useLanguage()
   const { showSuccess, showError } = useToastHelpers()
   const { marketAccounts, activeMarket, setActiveMarket } = useMarketContext()
-  const { trades, isLoading: tradesLoading } = useTradesSupabase()
-  const { transactions, addTransaction } = useAccountTransactions()
+  const { trades, isLoading: tradesLoading } = useTradesSupabase(
+    activeMarket?.marketType ? { marketType: activeMarket.marketType } : undefined
+  )
+  const { transactions, addTransaction } = useAccountTransactions(activeMarket?.marketType)
 
   const [viewMode, setViewMode] = useState<ViewMode>('pnl')
   const [period, setPeriod] = useState<Period>('all')
@@ -227,10 +229,12 @@ export default function CumulativePnLChart({ isLoading = false }: CumulativePnLC
     : currentBalance
   const isPositive = currentValue >= 0
 
-  const formatDate = (dateStr: string) =>
-    new Date(dateStr).toLocaleDateString(isPortuguese ? 'pt-BR' : 'en-US', {
+  const formatDate = (dateStr: string) => {
+    const [y, m, d] = dateStr.split('-').map(Number)
+    return new Date(y, m - 1, d).toLocaleDateString(isPortuguese ? 'pt-BR' : 'en-US', {
       month: 'short', day: 'numeric',
     })
+  }
 
   const CustomTooltip = ({ active, payload, label }: any) => {
     if (!active || !payload?.length) return null

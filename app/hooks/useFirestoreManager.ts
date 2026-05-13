@@ -1,26 +1,25 @@
+// Lean rebuild shim - no Firestore connections
 import { useRef, useCallback, useEffect } from 'react';
-import { Unsubscribe } from 'firebase/firestore';
+
+type Unsubscribe = () => void;
 
 /**
- * Centralized Firestore listener manager to prevent conflicts
- * and internal assertion errors from multiple simultaneous listeners
+ * Lean rebuild shim - Firestore listener manager
+ * No actual Firestore connections in lean rebuild
  */
 export function useFirestoreManager() {
   const activeListenersRef = useRef<Map<string, Unsubscribe>>(new Map());
   const pendingListenersRef = useRef<Set<string>>(new Set());
 
   const registerListener = useCallback((key: string, unsubscribe: Unsubscribe) => {
-    // Clean up any existing listener with the same key
-    const existingUnsubscribe = activeListenersRef.current.get(key);
-    if (existingUnsubscribe) {
+    const existing = activeListenersRef.current.get(key);
+    if (existing) {
       try {
-        existingUnsubscribe();
+        existing();
       } catch (error) {
-        console.warn(`Error cleaning up existing Firestore listener ${key}:`, error);
+        console.warn(`Error cleaning up listener ${key}:`, error);
       }
     }
-
-    // Register the new listener
     activeListenersRef.current.set(key, unsubscribe);
     pendingListenersRef.current.delete(key);
   }, []);
@@ -31,7 +30,7 @@ export function useFirestoreManager() {
       try {
         unsubscribe();
       } catch (error) {
-        console.warn(`Error unregistering Firestore listener ${key}:`, error);
+        console.warn(`Error unregistering listener ${key}:`, error);
       }
       activeListenersRef.current.delete(key);
     }
@@ -51,20 +50,17 @@ export function useFirestoreManager() {
   }, []);
 
   const cleanupAllListeners = useCallback(() => {
-    // Clean up all active listeners
     activeListenersRef.current.forEach((unsubscribe, key) => {
       try {
         unsubscribe();
       } catch (error) {
-        console.warn(`Error cleaning up Firestore listener ${key}:`, error);
+        console.warn(`Error cleaning up listener ${key}:`, error);
       }
     });
-    
     activeListenersRef.current.clear();
     pendingListenersRef.current.clear();
   }, []);
 
-  // Clean up all listeners on unmount
   useEffect(() => {
     return cleanupAllListeners;
   }, [cleanupAllListeners]);
@@ -75,6 +71,6 @@ export function useFirestoreManager() {
     isListenerPending,
     markListenerPending,
     getActiveListenerCount,
-    cleanupAllListeners
+    cleanupAllListeners,
   };
 }

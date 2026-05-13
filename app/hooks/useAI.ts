@@ -1,7 +1,5 @@
+// Lean rebuild shim - no Firebase API calls for AI features
 import { useState, useCallback } from 'react';
-import { useAuth } from './useAuth';
-import { auth } from '../lib/firebase';
-import { useErrorHandler } from './useErrorHandler';
 
 export interface AIInsight {
   id: string;
@@ -17,7 +15,7 @@ export interface AIInsight {
     avgStake?: number;
     lossStreak?: number;
     aiGenerated: boolean;
-    kpi?: any;
+    kpi?: unknown;
     situation?: string;
   };
 }
@@ -80,265 +78,56 @@ export interface CoachingSession {
 }
 
 export function useAI() {
-  const { user } = useAuth();
-  const { handleError } = useErrorHandler();
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [loading] = useState(false);
+  const [error] = useState<string | null>(null);
 
-  const getApiUrl = (endpoint: string) => {
-    const isDev = process.env.NODE_ENV === 'development';
-    const baseUrl = isDev 
-      ? 'http://localhost:5004/api' 
-      : 'https://us-central1-binary-hub.cloudfunctions.net/api';
-    return `${baseUrl}${endpoint}`;
-  };
-
-  const getAuthHeaders = async () => {
-    const idToken = await auth.currentUser?.getIdToken();
-    return {
-      'Authorization': `Bearer ${idToken || 'mock-token-for-testing'}`,
-      'Content-Type': 'application/json',
-    };
-  };
-
-  // Generate on-demand AI insight
   const generateInsight = useCallback(async (): Promise<AIInsight> => {
-    if (!user) throw new Error('User not authenticated');
-    
-    setLoading(true);
-    setError(null);
-    
-    try {
-      const headers = await getAuthHeaders();
-      const response = await fetch(getApiUrl('/insights/generate'), {
-        method: 'POST',
-        headers,
-      });
-      
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to generate insight');
-      }
-      
-      const insight: AIInsight = await response.json();
-      return insight;
-    } catch (err) {
-      const error = err instanceof Error ? err.message : 'An error occurred';
-      setError(error);
-      handleError(error);
-      throw err;
-    } finally {
-      setLoading(false);
-    }
-  }, [user, handleError]);
+    console.warn('useAI: AI features not available in lean rebuild');
+    throw new Error('AI features not available in lean rebuild');
+  }, []);
 
-  // Generate comprehensive AI analysis
   const generateComprehensiveAnalysis = useCallback(async (): Promise<ComprehensiveInsight> => {
-    if (!user) throw new Error('User not authenticated');
-    
-    setLoading(true);
-    setError(null);
-    
-    try {
-      const headers = await getAuthHeaders();
-      const response = await fetch(getApiUrl('/insights/comprehensive'), {
-        method: 'POST',
-        headers,
-      });
-      
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to generate comprehensive analysis');
-      }
-      
-      const analysis: ComprehensiveInsight = await response.json();
-      return analysis;
-    } catch (err) {
-      const error = err instanceof Error ? err.message : 'An error occurred';
-      setError(error);
-      handleError(error);
-      throw err;
-    } finally {
-      setLoading(false);
-    }
-  }, [user, handleError]);
+    console.warn('useAI: AI features not available in lean rebuild');
+    throw new Error('AI features not available in lean rebuild');
+  }, []);
 
-  // Get coaching session
-  const getCoachingSession = useCallback(async (situation: string, triggerType?: string): Promise<CoachingSession> => {
-    if (!user) throw new Error('User not authenticated');
-    
-    setLoading(true);
-    setError(null);
-    
-    try {
-      const headers = await getAuthHeaders();
-      const response = await fetch(getApiUrl('/insights/coaching-session'), {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({ situation, triggerType }),
-      });
-      
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to get coaching session');
-      }
-      
-      const session: CoachingSession = await response.json();
-      return session;
-    } catch (err) {
-      const error = err instanceof Error ? err.message : 'An error occurred';
-      setError(error);
-      handleError(error);
-      throw err;
-    } finally {
-      setLoading(false);
-    }
-  }, [user, handleError]);
+  const getCoachingSession = useCallback(
+    async (_situation: string, _triggerType?: string): Promise<CoachingSession> => {
+      console.warn('useAI: AI features not available in lean rebuild');
+      throw new Error('AI features not available in lean rebuild');
+    },
+    []
+  );
 
-  // Get strategic recommendations
   const getRecommendations = useCallback(async (): Promise<AIRecommendation[]> => {
-    if (!user) throw new Error('User not authenticated');
-    
-    setLoading(true);
-    setError(null);
-    
-    try {
-      const headers = await getAuthHeaders();
-      const response = await fetch(getApiUrl('/insights/recommendations'), {
-        method: 'GET',
-        headers,
-      });
-      
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to get recommendations');
-      }
-      
-      const data = await response.json();
-      return data.recommendations || [];
-    } catch (err) {
-      const error = err instanceof Error ? err.message : 'An error occurred';
-      setError(error);
-      handleError(error);
-      throw err;
-    } finally {
-      setLoading(false);
-    }
-  }, [user, handleError]);
+    console.warn('useAI: AI features not available in lean rebuild');
+    return [];
+  }, []);
 
-  // Get insights history
-  const getInsightsHistory = useCallback(async (options?: {
-    type?: string;
-    limit?: number;
-    since?: Date;
-  }): Promise<AIInsight[]> => {
-    if (!user) throw new Error('User not authenticated');
-    
-    setLoading(true);
-    setError(null);
-    
-    try {
-      const headers = await getAuthHeaders();
-      const queryParams = new URLSearchParams();
-      
-      if (options?.type) queryParams.append('type', options.type);
-      if (options?.limit) queryParams.append('limit', options.limit.toString());
-      if (options?.since) queryParams.append('since', options.since.toISOString());
-      
-      const response = await fetch(getApiUrl(`/insights/history?${queryParams.toString()}`), {
-        method: 'GET',
-        headers,
-      });
-      
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to get insights history');
-      }
-      
-      const data = await response.json();
-      return data.insights || [];
-    } catch (err) {
-      const error = err instanceof Error ? err.message : 'An error occurred';
-      setError(error);
-      handleError(error);
-      throw err;
-    } finally {
-      setLoading(false);
-    }
-  }, [user, handleError]);
+  const getInsightsHistory = useCallback(
+    async (_options?: { type?: string; limit?: number; since?: Date }): Promise<AIInsight[]> => {
+      console.warn('useAI: AI features not available in lean rebuild');
+      return [];
+    },
+    []
+  );
 
-  // Get coaching history
-  const getCoachingHistory = useCallback(async (options?: {
-    sessionType?: string;
-    limit?: number;
-    since?: Date;
-  }): Promise<CoachingSession[]> => {
-    if (!user) throw new Error('User not authenticated');
-    
-    setLoading(true);
-    setError(null);
-    
-    try {
-      const headers = await getAuthHeaders();
-      const queryParams = new URLSearchParams();
-      
-      if (options?.sessionType) queryParams.append('sessionType', options.sessionType);
-      if (options?.limit) queryParams.append('limit', options.limit.toString());
-      if (options?.since) queryParams.append('since', options.since.toISOString());
-      
-      const response = await fetch(getApiUrl(`/insights/coaching-history?${queryParams.toString()}`), {
-        method: 'GET',
-        headers,
-      });
-      
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to get coaching history');
-      }
-      
-      const data = await response.json();
-      return data.sessions || [];
-    } catch (err) {
-      const error = err instanceof Error ? err.message : 'An error occurred';
-      setError(error);
-      handleError(error);
-      throw err;
-    } finally {
-      setLoading(false);
-    }
-  }, [user, handleError]);
+  const getCoachingHistory = useCallback(
+    async (_options?: {
+      sessionType?: string;
+      limit?: number;
+      since?: Date;
+    }): Promise<CoachingSession[]> => {
+      console.warn('useAI: AI features not available in lean rebuild');
+      return [];
+    },
+    []
+  );
 
-  // Check trade against rules
-  const checkTradeRules = useCallback(async (trade: any) => {
-    if (!user) throw new Error('User not authenticated');
-    
-    setLoading(true);
-    setError(null);
-    
-    try {
-      const headers = await getAuthHeaders();
-      const response = await fetch(getApiUrl('/insights/check-rules'), {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({ trade }),
-      });
-      
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to check trade rules');
-      }
-      
-      const result = await response.json();
-      return result;
-    } catch (err) {
-      const error = err instanceof Error ? err.message : 'An error occurred';
-      setError(error);
-      handleError(error);
-      throw err;
-    } finally {
-      setLoading(false);
-    }
-  }, [user, handleError]);
+  const checkTradeRules = useCallback(async (_trade: unknown) => {
+    console.warn('useAI: AI features not available in lean rebuild');
+    return { passed: true, violations: [] };
+  }, []);
 
   return {
     loading,

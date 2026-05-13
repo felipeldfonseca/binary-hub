@@ -90,10 +90,11 @@ export function parseEbinexCsv(csvText: string): ParsedImport {
     const result: TradeInsert['result'] =
       statusRaw === 'win' ? 'win' : statusRaw === 'lose' ? 'loss' : 'breakeven';
 
-    // Resultado: "+$9.00", "-$20.00", "$10.00" — preserve sign separately
+    // Resultado: "+$9.00", "-$20.00", "$10.00"
+    // parseMoney already preserves the sign (strips $ and leading + only).
+    // Refunded trades return the stake with zero net change — pnl = 0.
     const resultadoRaw = row['Resultado'] ?? '0';
-    const isNegative = resultadoRaw.trim().startsWith('-');
-    const pnl = (isNegative ? -1 : 1) * parseMoney(resultadoRaw);
+    const pnl = statusRaw === 'refunded' ? 0 : parseMoney(resultadoRaw);
     const stakeAmount = parseMoney(row['Valor']);
     const entryPrice = parseMoney(row['P. ABRT']);
     const exitPrice = parseMoney(row['P. FECH']);

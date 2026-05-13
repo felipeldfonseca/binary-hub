@@ -1,4 +1,4 @@
-import { auth } from '@/lib/firebase'
+// Lean rebuild - onboarding service using localStorage only
 
 interface OnboardingState {
   completed: boolean
@@ -21,14 +21,10 @@ export class OnboardingService {
   }
 
   /**
-   * Check if user has completed onboarding by verifying market accounts exist
+   * Check if user has completed onboarding
    */
   async checkOnboardingStatus(userId?: string): Promise<OnboardingState> {
-    const currentUserId = userId || auth.currentUser?.uid
-    
-    if (!currentUserId) {
-      throw new Error('User not authenticated')
-    }
+    const currentUserId = userId || 'default-user'
 
     // Check cache first (valid for 5 minutes)
     const cached = this.cachedState.get(currentUserId)
@@ -36,78 +32,38 @@ export class OnboardingService {
       return cached
     }
 
+    // Try to get from localStorage
     try {
-      // Get auth token
-      const token = await auth.currentUser?.getIdToken()
-      if (!token) {
-        throw new Error('Failed to get authentication token')
+      const cachedData = localStorage.getItem(`${ONBOARDING_STORAGE_KEY}-${currentUserId}`)
+      const onboardingCompleted = localStorage.getItem('binaryHub_onboardingCompleted')
+
+      if (cachedData) {
+        const parsed = JSON.parse(cachedData)
+        const state: OnboardingState = {
+          completed: parsed.completed || onboardingCompleted === 'true',
+          completedAt: parsed.completedAt ? new Date(parsed.completedAt) : undefined,
+          marketAccountsCount: parsed.marketAccountsCount || 1,
+          lastChecked: new Date()
+        }
+        this.cachedState.set(currentUserId, state)
+        return state
       }
 
-      // Check for existing market accounts
-      const response = await fetch('/api/v1/markets/setup', {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      })
-
-      if (!response.ok) {
-        // If unauthorized, user needs to log in again
-        if (response.status === 401) {
-          throw new Error('Authentication expired')
-        }
-        throw new Error('Failed to check onboarding status')
-      }
-
-      const data = await response.json()
-      const marketAccounts = data.marketAccounts || []
-      
+      // Default state - completed if onboardingCompleted flag is set
       const state: OnboardingState = {
-        completed: marketAccounts.length > 0,
-        completedAt: marketAccounts.length > 0 ? new Date() : undefined,
-        marketAccountsCount: marketAccounts.length,
+        completed: onboardingCompleted === 'true',
+        marketAccountsCount: onboardingCompleted === 'true' ? 1 : 0,
         lastChecked: new Date()
       }
 
-      // Cache the result
       this.cachedState.set(currentUserId, state)
-
-      // Store in localStorage for offline access
-      try {
-        localStorage.setItem(`${ONBOARDING_STORAGE_KEY}-${currentUserId}`, JSON.stringify({
-          ...state,
-          lastChecked: state.lastChecked.toISOString(),
-          completedAt: state.completedAt?.toISOString()
-        }))
-      } catch (err) {
-        console.warn('Failed to cache onboarding state in localStorage:', err)
-      }
-
       return state
-    } catch (error) {
-      console.error('Error checking onboarding status:', error)
-      
-      // Try to get cached state from localStorage as fallback
-      try {
-        const cachedData = localStorage.getItem(`${ONBOARDING_STORAGE_KEY}-${currentUserId}`)
-        if (cachedData) {
-          const parsed = JSON.parse(cachedData)
-          return {
-            completed: parsed.completed || false,
-            completedAt: parsed.completedAt ? new Date(parsed.completedAt) : undefined,
-            marketAccountsCount: parsed.marketAccountsCount || 0,
-            lastChecked: new Date(parsed.lastChecked || Date.now())
-          }
-        }
-      } catch (err) {
-        console.warn('Failed to read cached onboarding state:', err)
-      }
-
-      // Default to not completed if we can't determine status
+    } catch (err) {
+      console.warn('Failed to read onboarding state:', err)
+      // Default to completed to avoid onboarding loop
       return {
-        completed: false,
-        marketAccountsCount: 0,
+        completed: true,
+        marketAccountsCount: 1,
         lastChecked: new Date()
       }
     }
@@ -117,16 +73,12 @@ export class OnboardingService {
    * Mark onboarding as completed
    */
   async markOnboardingCompleted(userId?: string): Promise<void> {
-    const currentUserId = userId || auth.currentUser?.uid
-    
-    if (!currentUserId) {
-      throw new Error('User not authenticated')
-    }
+    const currentUserId = userId || 'default-user'
 
     const state: OnboardingState = {
       completed: true,
       completedAt: new Date(),
-      marketAccountsCount: 0, // Will be updated by checkOnboardingStatus
+      marketAccountsCount: 1,
       lastChecked: new Date()
     }
 
@@ -135,6 +87,7 @@ export class OnboardingService {
 
     // Store in localStorage
     try {
+      localStorage.setItem('binaryHub_onboardingCompleted', 'true')
       localStorage.setItem(`${ONBOARDING_STORAGE_KEY}-${currentUserId}`, JSON.stringify({
         ...state,
         lastChecked: state.lastChecked.toISOString(),
@@ -146,28 +99,25 @@ export class OnboardingService {
   }
 
   /**
-   * Clear onboarding cache (useful for testing or when user logs out)
+   * Clear onboarding cache
    */
   clearCache(userId?: string): void {
-    const currentUserId = userId || auth.currentUser?.uid
-    
-    if (currentUserId) {
-      this.cachedState.delete(currentUserId)
-      try {
-        localStorage.removeItem(`${ONBOARDING_STORAGE_KEY}-${currentUserId}`)
-      } catch (err) {
-        console.warn('Failed to clear onboarding cache from localStorage:', err)
-      }
+    const currentUserId = userId || 'default-user'
+
+    this.cachedState.delete(currentUserId)
+    try {
+      localStorage.removeItem(`${ONBOARDING_STORAGE_KEY}-${currentUserId}`)
+    } catch (err) {
+      console.warn('Failed to clear onboarding cache from localStorage:', err)
     }
   }
 
   /**
-   * Clear all cached data (useful when user logs out)
+   * Clear all cached data
    */
   clearAllCache(): void {
     this.cachedState.clear()
     try {
-      // Remove all onboarding state entries from localStorage
       const keys = Object.keys(localStorage)
       keys.forEach(key => {
         if (key.startsWith(ONBOARDING_STORAGE_KEY)) {

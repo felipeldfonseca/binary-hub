@@ -138,14 +138,32 @@ export default function MetricsOverview({
     }
   }, [selectedPeriod])
 
-  const statsFilters = useMemo(() => ({
-    marketType: activeMarket?.marketType,
-    ...(dateFrom ? { dateFrom } : {}),
-  }), [activeMarket?.marketType, dateFrom])
-
-  const { trades, stats, isLoading: dataLoading, error: statsError } = useTradesSupabase(
-    isDemoMode ? undefined : statsFilters
+  // Use the same query key as CumulativePnLChart (marketType only, no dateFrom)
+  // so all components share one cache entry. Filter by date client-side.
+  const accountFilter = useMemo(
+    () => (activeMarket?.marketType ? { marketType: activeMarket.marketType } : undefined),
+    [activeMarket?.marketType]
   )
+
+  const { trades: allAccountTrades, isLoading: dataLoading, error: statsError } = useTradesSupabase(
+    isDemoMode ? undefined : accountFilter
+  )
+
+  // Filter by period client-side — avoids a separate Supabase query per period change
+  const trades = useMemo(() => {
+    if (!dateFrom) return allAccountTrades
+    return allAccountTrades.filter(t => t.entry_time >= dateFrom)
+  }, [allAccountTrades, dateFrom])
+
+  // Compute period-scoped stats from the filtered trades
+  const stats = useMemo(() => {
+    const totalTrades = trades.length
+    const wins = trades.filter(t => t.result === 'win').length
+    const losses = trades.filter(t => t.result === 'loss').length
+    const winRate = totalTrades > 0 ? (wins / totalTrades) * 100 : 0
+    const totalPnl = trades.reduce((sum, t) => sum + (t.pnl ?? 0), 0)
+    return { totalTrades, wins, losses, winRate, totalPnl }
+  }, [trades])
 
   // Generate period-specific demo data
   const generateDemoStats = (period: TimePeriod) => {
@@ -195,8 +213,7 @@ export default function MetricsOverview({
     }
   }
 
-  // Map Supabase stats shape to display shape
-  const mappedStats = stats ? {
+  const mappedStats = {
     totalTrades: stats.totalTrades,
     winTrades: stats.wins,
     lossTrades: stats.losses,
@@ -207,7 +224,7 @@ export default function MetricsOverview({
     maxDrawdown: 0,
     avgStake: 0,
     maxStake: 0,
-  } : null
+  }
 
   // Override stats for demo mode
   const displayStats = isDemoMode ? generateDemoStats(selectedPeriod) : mappedStats

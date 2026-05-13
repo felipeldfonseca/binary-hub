@@ -1,8 +1,7 @@
-import { useState, useEffect, useCallback } from 'react';
-import { useAuth } from './useAuth';
-import { auth } from '../lib/firebase';
-import { useErrorHandler } from './useErrorHandler';
-import { useToastHelpers } from '@/components/ui/Toast';
+// Lean rebuild shim - returns empty data without Firebase API calls
+// For actual trade data, use useTradesSupabase instead
+
+import { useState, useCallback, useEffect } from 'react';
 
 export interface Trade {
   id: string;
@@ -68,276 +67,92 @@ export interface TradesResponse {
   };
 }
 
-export function useTrades(filters: TradeFilters = {}) {
-  const { user } = useAuth();
-  const { handleApiError } = useErrorHandler();
-  const { showSuccess } = useToastHelpers();
+export function useTrades(_filters: TradeFilters = {}) {
   const [trades, setTrades] = useState<Trade[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [pagination, setPagination] = useState<TradesResponse['pagination'] | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error] = useState<string | null>(null);
+  const [pagination] = useState<TradesResponse['pagination']>({
+    total: 0,
+    limit: 100,
+    offset: 0,
+    hasMore: false,
+  });
 
-  const fetchTrades = useCallback(async (newFilters: TradeFilters = {}) => {
-    setLoading(true);
-    setError(null);
-    
-    try {
-      // Check if user has imported data first (skip API call for now since Firebase emulator isn't running)
-      const hasImportedData = localStorage.getItem('binaryHub_hasData') === 'true';
-      const importedTrades = localStorage.getItem('binaryHub_trades');
-      
-      if (hasImportedData && importedTrades) {
-        // Use real imported trades instead of mock data
-        const realTrades = JSON.parse(importedTrades);
-        
-        const formattedTrades: Trade[] = realTrades.map((trade: any, index: number) => {
-          // Safe date parsing
-          let entryTime = new Date();
-          let candleTime = '00:00';
-          
-          if (trade.entryTime) {
-            if (typeof trade.entryTime === 'string') {
-              entryTime = new Date(trade.entryTime);
-              // Safely extract candle time if it's in the format "YYYY-MM-DD HH:MM"
-              if (trade.entryTime.includes(' ')) {
-                candleTime = trade.entryTime.split(' ')[1] || '00:00';
-              }
-            } else {
-              entryTime = new Date(trade.entryTime);
-            }
-          }
-          
-          return {
-            id: trade.id || `imported-${index}`,
-            userId: user?.uid || 'test-user',
-            tradeId: trade.id || `TRADE-${String(index + 1).padStart(3, '0')}`,
-            asset: trade.asset || 'UNKNOWN',
-            direction: trade.direction?.toLowerCase() === 'put' ? 'put' : 'call',
-            amount: trade.amount || 0,
-            entryPrice: trade.entryPrice || 0,
-            exitPrice: trade.exitPrice || 0,
-            entryTime: entryTime,
-            exitTime: entryTime, // Use same time for exit since we don't have separate exit time
-            timeframe: trade.timeframe || '1m',
-            candleTime: trade.candleTime || candleTime,
-            refunded: trade.refunded || 0,
-            executed: trade.executed || 1,
-            status: trade.result === 'win' ? 'WIN' : 'LOSE',
-            result: trade.result || 'tie',
-            profit: trade.pnl || trade.profit || 0,
-            payout: trade.result === 'win' ? (trade.amount || 0) + (trade.pnl || trade.profit || 0) : 0,
+  // Check localStorage for any imported data (from previous Firebase setup)
+  useEffect(() => {
+    const loadLocalData = () => {
+      try {
+        const hasImportedData = localStorage.getItem('binaryHub_hasData') === 'true';
+        const importedTrades = localStorage.getItem('binaryHub_trades');
+
+        if (hasImportedData && importedTrades) {
+          const parsedTrades = JSON.parse(importedTrades);
+          const formattedTrades: Trade[] = parsedTrades.map((trade: Record<string, unknown>, index: number) => ({
+            id: (trade.id as string) || `imported-${index}`,
+            userId: 'local-user',
+            tradeId: (trade.id as string) || `TRADE-${String(index + 1).padStart(3, '0')}`,
+            asset: (trade.asset as string) || 'UNKNOWN',
+            direction: ((trade.direction as string)?.toLowerCase() === 'put' ? 'put' : 'call') as 'call' | 'put',
+            amount: (trade.amount as number) || 0,
+            entryPrice: (trade.entryPrice as number) || 0,
+            exitPrice: (trade.exitPrice as number) || 0,
+            entryTime: trade.entryTime ? new Date(trade.entryTime as string) : new Date(),
+            exitTime: trade.exitTime ? new Date(trade.exitTime as string) : new Date(),
+            timeframe: (trade.timeframe as string) || '1m',
+            candleTime: (trade.candleTime as string) || '00:00',
+            refunded: (trade.refunded as number) || 0,
+            executed: (trade.executed as number) || 1,
+            status: (trade.result === 'win' ? 'WIN' : 'LOSE') as 'WIN' | 'LOSE',
+            result: ((trade.result as string) || 'tie') as 'win' | 'loss' | 'tie',
+            profit: (trade.pnl as number) || (trade.profit as number) || 0,
+            payout: trade.result === 'win' ? ((trade.amount as number) || 0) + ((trade.pnl as number) || (trade.profit as number) || 0) : 0,
             platform: 'Ebinex',
-            marketType: 'binary', // Default to binary for imported trades
+            marketType: 'binary' as const,
             strategy: 'Imported',
             notes: 'Imported from CSV',
             createdAt: new Date(),
             updatedAt: new Date(),
             importedAt: new Date(),
-            importBatch: 'csv-import'
-          };
-        });
-        
-        setTrades(formattedTrades);
-        setPagination({ total: formattedTrades.length, limit: 100, offset: 0, hasMore: false });
-      } else {
-        // Try API call as fallback (though it will likely fail in development)
-        try {
-          const idToken = await auth.currentUser?.getIdToken();
-          const queryParams = new URLSearchParams();
-          
-          if (newFilters.start) {
-            queryParams.append('start', newFilters.start.toISOString());
-          }
-          if (newFilters.end) {
-            queryParams.append('end', newFilters.end.toISOString());
-          }
-          if (newFilters.limit) {
-            queryParams.append('limit', newFilters.limit.toString());
-          }
-          if (newFilters.offset) {
-            queryParams.append('offset', newFilters.offset.toString());
-          }
-          if (newFilters.result) {
-            queryParams.append('result', newFilters.result);
-          }
-          if (newFilters.asset) {
-            queryParams.append('asset', newFilters.asset);
-          }
-          if (newFilters.strategy) {
-            queryParams.append('strategy', newFilters.strategy);
-          }
-          if (newFilters.marketType) {
-            queryParams.append('marketType', newFilters.marketType);
-          }
-          
-          const response = await fetch(`http://localhost:5001/binary-hub/us-central1/api/v1/trades?${queryParams.toString()}`, {
-            headers: {
-              'Authorization': `Bearer ${idToken || 'mock-token-for-testing'}`,
-              'Content-Type': 'application/json',
-            },
-          });
-          
-          if (response.ok) {
-            const data: TradesResponse = await response.json();
-            setTrades(data.trades);
-            setPagination(data.pagination);
-          } else {
-            throw new Error('API not available');
-          }
-        } catch (apiError) {
-          // API failed, show empty state
-          setTrades([]);
-          setPagination({ total: 0, limit: 100, offset: 0, hasMore: false });
+            importBatch: 'csv-import',
+          }));
+          setTrades(formattedTrades);
         }
+      } catch (err) {
+        console.warn('Error loading local trades:', err);
+      } finally {
+        setLoading(false);
       }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred');
-      setTrades([]);
-      setPagination({ total: 0, limit: 100, offset: 0, hasMore: false });
-    } finally {
-      setLoading(false);
-    }
-  }, [user]);
+    };
 
-  const createTrade = useCallback(async (tradeData: Partial<Trade>) => {
-    if (!user) throw new Error('User not authenticated');
-    
-    try {
-      const idToken = await auth.currentUser?.getIdToken();
-      const response = await fetch(`http://localhost:5001/binary-hub/us-central1/api/v1/trades`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${idToken || 'mock-token-for-testing'}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(tradeData),
-      });
-      
-      if (!response.ok) {
-        if (response.status === 404) {
-          throw new Error('API endpoints not yet implemented. This feature will be available in Phase B.');
-        }
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to create trade');
-      }
-      
-      const newTrade: Trade = await response.json();
-      
-      // Add to local state
-      setTrades(prev => [newTrade, ...prev]);
-      
-      return newTrade;
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred');
-      throw err;
-    }
-  }, [user]);
+    // Simulate async loading
+    const timer = setTimeout(loadLocalData, 100);
+    return () => clearTimeout(timer);
+  }, []);
 
-  const updateTrade = useCallback(async (tradeId: string, updates: Partial<Trade>) => {
-    if (!user) throw new Error('User not authenticated');
-    
-    try {
-      const idToken = await auth.currentUser?.getIdToken();
-      const response = await fetch(`http://localhost:5001/binary-hub/us-central1/api/v1/trades/${tradeId}`, {
-        method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${idToken || 'mock-token-for-testing'}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(updates),
-      });
-      
-      if (!response.ok) {
-        if (response.status === 404) {
-          throw new Error('API endpoints not yet implemented. This feature will be available in Phase B.');
-        }
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to update trade');
-      }
-      
-      const updatedTrade: Trade = await response.json();
-      
-      // Update local state
-      setTrades(prev => prev.map(trade => 
-        trade.id === tradeId ? updatedTrade : trade
-      ));
-      
-      return updatedTrade;
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred');
-      throw err;
-    }
-  }, [user]);
+  const fetchTrades = useCallback(async () => {
+    // No-op in lean rebuild - data is loaded from localStorage on mount
+    console.log('useTrades: Lean rebuild mode - no Firebase API calls');
+  }, []);
 
-  const deleteTrade = useCallback(async (tradeId: string) => {
-    if (!user) throw new Error('User not authenticated');
-    
-    try {
-      const idToken = await auth.currentUser?.getIdToken();
-      const response = await fetch(`http://localhost:5001/binary-hub/us-central1/api/v1/trades/${tradeId}`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${idToken || 'mock-token-for-testing'}`,
-          'Content-Type': 'application/json',
-        },
-      });
-      
-      if (!response.ok) {
-        if (response.status === 404) {
-          throw new Error('API endpoints not yet implemented. This feature will be available in Phase B.');
-        }
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to delete trade');
-      }
-      
-      // Remove from local state
-      setTrades(prev => prev.filter(trade => trade.id !== tradeId));
-      
-      return true;
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred');
-      throw err;
-    }
-  }, [user]);
+  const createTrade = useCallback(async (_trade: Partial<Trade>) => {
+    console.warn('useTrades.createTrade: Use useTradesSupabase for new trades');
+    return null;
+  }, []);
 
-  const bulkCreateTrades = useCallback(async (trades: Partial<Trade>[], importBatch?: string) => {
-    if (!user) throw new Error('User not authenticated');
-    
-    try {
-      const idToken = await auth.currentUser?.getIdToken();
-      const response = await fetch(`http://localhost:5001/binary-hub/us-central1/api/v1/trades/bulk`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${idToken || 'mock-token-for-testing'}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ trades, importBatch }),
-      });
-      
-      if (!response.ok) {
-        if (response.status === 404) {
-          throw new Error('API endpoints not yet implemented. This feature will be available in Phase B.');
-        }
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to bulk create trades');
-      }
-      
-      const result = await response.json();
-      
-      // Refresh trades list
-      await fetchTrades();
-      
-      return result;
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred');
-      throw err;
-    }
-  }, [user, fetchTrades]);
+  const updateTrade = useCallback(async (_id: string, _updates: Partial<Trade>) => {
+    console.warn('useTrades.updateTrade: Use useTradesSupabase for updates');
+    return null;
+  }, []);
 
-  // Fetch trades on mount only (filters cause infinite loop)
-  useEffect(() => {
-    fetchTrades();
-  }, []); // Remove fetchTrades dependency to avoid infinite loop
+  const deleteTrade = useCallback(async (_id: string) => {
+    console.warn('useTrades.deleteTrade: Use useTradesSupabase for deletions');
+    return false;
+  }, []);
+
+  const bulkCreateTrades = useCallback(async (_trades: Partial<Trade>[], _importBatch?: string) => {
+    console.warn('useTrades.bulkCreateTrades: Use useTradesSupabase for bulk operations');
+    return { created: 0, failed: 0 };
+  }, []);
 
   return {
     trades,
@@ -350,4 +165,4 @@ export function useTrades(filters: TradeFilters = {}) {
     deleteTrade,
     bulkCreateTrades,
   };
-} 
+}

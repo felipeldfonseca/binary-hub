@@ -3,6 +3,8 @@
 import { useState } from 'react'
 import { useLanguage } from '@/lib/contexts/LanguageContext'
 import { useAuth } from '@/hooks/useAuth'
+import { createDataClient } from '@/lib/supabase'
+import { useAuth as useSupabaseAuth } from '@/lib/contexts/AuthContextSupabase'
 import WelcomeStep from './steps/WelcomeStep'
 import PlatformOverviewStep from './steps/PlatformOverviewStep'
 import MarketSelectionStep from './steps/MarketSelectionStep'
@@ -37,6 +39,7 @@ type OnboardingStep = 'welcome' | 'overview' | 'markets' | 'preferences' | 'comp
 export default function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
   const { isPortuguese } = useLanguage()
   const { user } = useAuth()
+  const { user: supabaseUser, session } = useSupabaseAuth()
   const [currentStep, setCurrentStep] = useState<OnboardingStep>('welcome')
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -83,9 +86,9 @@ export default function OnboardingWizard({ onComplete }: OnboardingWizardProps) 
 
   const handleComplete = async () => {
     console.log('Starting onboarding completion...', onboardingData)
-    
+
     if (onboardingData.selectedMarkets.length === 0) {
-      setError(isPortuguese 
+      setError(isPortuguese
         ? 'Por favor, selecione pelo menos um mercado'
         : 'Please select at least one market'
       )
@@ -96,41 +99,24 @@ export default function OnboardingWizard({ onComplete }: OnboardingWizardProps) 
     setError(null)
 
     try {
-      console.log('Sending market accounts to API:', onboardingData.selectedMarkets)
-      
-      // Get Firebase auth token
-      const token = await (await import('@/lib/firebase')).auth.currentUser?.getIdToken()
-      console.log('Using auth token:', token?.substring(0, 20) + '...')
-      
-      // Create market accounts via API
-      const response = await fetch('/api/v1/markets/setup', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token || 'mock-token-for-testing'}`
-        },
-        body: JSON.stringify({
-          marketAccounts: onboardingData.selectedMarkets
-        })
-      })
+      // Always save to localStorage first (works without auth)
+      localStorage.setItem('binaryHub_onboardingData', JSON.stringify(onboardingData))
+      localStorage.setItem('binaryHub_onboardingCompleted', 'true')
 
-      console.log('API Response status:', response.status)
-      
-      if (!response.ok) {
-        const errorData = await response.json()
-        console.error('API Error:', errorData)
-        throw new Error(errorData.error || 'Failed to create market accounts')
+      // Also persist to Supabase so it survives across sessions/devices
+      if (supabaseUser && session?.access_token) {
+        const db = createDataClient(session.access_token)
+        await db
+          .from('profiles')
+          .update({ market_accounts: onboardingData.selectedMarkets as unknown[] } as Record<string, unknown>)
+          .eq('id', supabaseUser.id)
       }
 
-      const result = await response.json()
-      console.log('API Success:', result)
-
-      // Complete onboarding
-      console.log('Calling onComplete callback...')
       onComplete()
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Onboarding completion failed:', error)
-      setError(error.message || (isPortuguese 
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+      setError(errorMessage || (isPortuguese
         ? 'Erro ao configurar conta. Tente novamente.'
         : 'Failed to setup account. Please try again.'
       ))

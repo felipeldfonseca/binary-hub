@@ -56,18 +56,34 @@ export async function getCurrentSession() {
 // Use this for all table queries inside hooks/components.
 // The JWT is injected via global headers at creation time so the client never
 // calls getSession() (and therefore never waits on the internal auth lock).
+//
+// Clients are cached by token so all hooks in the same render tree share one
+// GoTrueClient instance, eliminating the "Multiple GoTrueClient instances"
+// browser warning.
+const _dataClientCache = new Map<string, SupabaseClient>();
+
 export function createDataClient(accessToken: string | null): SupabaseClient {
   if (!isSupabaseConfigured) return createMockClient();
-  return createClient(supabaseUrl, supabaseAnonKey, {
+  const key = accessToken ?? '__anon__';
+  const cached = _dataClientCache.get(key);
+  if (cached) return cached;
+
+  const client = createClient(supabaseUrl, supabaseAnonKey, {
     auth: {
       persistSession: false,
       autoRefreshToken: false,
       detectSessionInUrl: false,
+      // Use a dedicated storageKey so this client's GoTrueClient instance
+      // doesn't increment the counter tracked by the main auth client,
+      // eliminating the "Multiple GoTrueClient instances" browser warning.
+      storageKey: 'bh-data-client',
     },
     global: {
       headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : {},
     },
   });
+  _dataClientCache.set(key, client);
+  return client;
 }
 
 // Server-side client (for API routes)
