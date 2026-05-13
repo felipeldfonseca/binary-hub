@@ -43,9 +43,9 @@ export default function Navbar() {
   const getDashboardNavItems = (): NavItem[] => [
     { href: isPortuguese ? '/dashboard?lang=pt' : '/dashboard', label: isPortuguese ? 'Início' : 'Home' },
     { href: '/trades', label: isPortuguese ? 'Operações' : 'Trades' },
+    { href: '/analytics', label: isPortuguese ? 'Análises' : 'Analytics' },
     { href: '/market', label: isPortuguese ? 'Mercado' : 'Market' },
     { href: '/social', label: isPortuguese ? 'Social' : 'Social' },
-    { href: '/analytics', label: isPortuguese ? 'Análises' : 'Analytics' },
     { href: '/ai', label: 'AI' },
     { href: '/accomplishments', label: isPortuguese ? 'Conquistas' : 'Accomplishments' },
   ]
