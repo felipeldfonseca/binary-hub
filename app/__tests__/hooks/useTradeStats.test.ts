@@ -84,7 +84,7 @@ describe('useTradeStats', () => {
         json: jest.fn().mockResolvedValue(mockDashboardStats),
       })
 
-      const { result } = renderHook(() => useTradeStats('week'))
+      const { result } = renderHook(() => useTradeStats('weekly'))
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false)
@@ -105,7 +105,7 @@ describe('useTradeStats', () => {
         }),
       })
 
-      renderHook(() => useTradeStats('month'))
+      renderHook(() => useTradeStats('monthly'))
 
       await waitFor(() => {
         expect(mockFetch).toHaveBeenCalled()
@@ -398,7 +398,7 @@ describe('useTradeStats', () => {
       const { result, rerender } = renderHook(
         ({ period }) => useTradeStats(period),
         {
-          initialProps: { period: 'week' as const },
+          initialProps: { period: 'weekly' as 'weekly' | 'monthly' },
         }
       )
 
@@ -407,7 +407,7 @@ describe('useTradeStats', () => {
       })
 
       // Change period
-      rerender({ period: 'month' as const })
+      rerender({ period: 'monthly' })
 
       await waitFor(() => {
         expect(mockFetch).toHaveBeenCalledTimes(2) // Initial call + period change call

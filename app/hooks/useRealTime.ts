@@ -21,7 +21,11 @@ export interface Notification {
   type: 'success' | 'error' | 'info' | 'warning';
   title: string;
   message: string;
-  data?: unknown;
+  data?: {
+    importedRows?: number;
+    duplicateRows?: number;
+    processingTime?: number;
+  };
   createdAt: string;
   read: boolean;
 }
@@ -92,7 +96,7 @@ export function useRealTime(_options: RealTimeOptions = {}) {
     clientId: state.clientId,
     events: state.events,
     notifications: state.notifications,
-    unreadNotifications: [],
+    unreadNotifications: state.notifications.filter(n => !n.read),
     lastHeartbeat: state.lastHeartbeat,
     connect,
     disconnect,

@@ -97,11 +97,11 @@ describe('PerformanceSection', () => {
       loading: true,
     })
 
-    render(<PerformanceSection />)
+    const { container } = render(<PerformanceSection />)
     
     // Should show loading skeletons
     expect(screen.getAllByText('Performance')).toHaveLength(1)
-    const loadingCards = screen.container.querySelectorAll('.animate-pulse')
+    const loadingCards = container.querySelectorAll('.animate-pulse')
     expect(loadingCards.length).toBeGreaterThan(0)
   })
 
@@ -207,7 +207,7 @@ describe('PerformanceSection', () => {
     ]
 
     for (const { button, text } of periodTests) {
-      render(<PerformanceSection />)
+      const { unmount } = render(<PerformanceSection />)
       
       const periodButton = screen.getByRole('button', { name: button })
       await user.click(periodButton)
@@ -215,7 +215,7 @@ describe('PerformanceSection', () => {
       expect(screen.getAllByText(text)[0]).toBeInTheDocument()
       
       // Clean up for next iteration
-      screen.unmount()
+      unmount()
     }
   })
 

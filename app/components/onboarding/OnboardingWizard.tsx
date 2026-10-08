@@ -5,6 +5,7 @@ import { useLanguage } from '@/lib/contexts/LanguageContext'
 import { useAuth } from '@/hooks/useAuth'
 import { createDataClient } from '@/lib/supabase'
 import { useAuth as useSupabaseAuth } from '@/lib/contexts/AuthContextSupabase'
+import { formatUser } from '@/lib/auth'
 import WelcomeStep from './steps/WelcomeStep'
 import PlatformOverviewStep from './steps/PlatformOverviewStep'
 import MarketSelectionStep from './steps/MarketSelectionStep'
@@ -130,7 +131,7 @@ export default function OnboardingWizard({ onComplete }: OnboardingWizardProps) 
       case 'welcome':
         return (
           <WelcomeStep
-            user={user}
+            user={formatUser(user)}
             onNext={goToNextStep}
           />
         )

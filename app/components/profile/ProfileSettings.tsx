@@ -5,7 +5,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { useLanguage } from '@/lib/contexts/LanguageContext'
 import { useAuth } from '@/lib/contexts/AuthContext'
-import { updateUsername, usernameExists } from '@/lib/auth'
+import { formatUser, updateUsername, usernameExists } from '@/lib/auth'
 import Avatar from '@/components/ui/Avatar'
 
 // Validation schema for profile settings
@@ -35,7 +35,8 @@ type ProfileFormData = z.infer<typeof profileSchema>
 
 export default function ProfileSettings() {
   const { isPortuguese } = useLanguage()
-  const { user } = useAuth()
+  const { user: supabaseUser } = useAuth()
+  const user = formatUser(supabaseUser)
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
   const [usernameAvailable, setUsernameAvailable] = useState<boolean | null>(null)

@@ -89,7 +89,7 @@ function buildAccount(market: MarketSelectionData): MarketAccount {
   };
 }
 
-const FALLBACK_ACCOUNT: MarketAccount = buildAccount({
+export const FALLBACK_ACCOUNT: MarketAccount = buildAccount({
   marketType: 'binary',
   displayName: 'Binary Options',
   initialBankroll: 1000,

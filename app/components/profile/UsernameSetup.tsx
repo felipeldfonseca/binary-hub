@@ -5,7 +5,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { useLanguage } from '@/lib/contexts/LanguageContext'
 import { useAuth } from '@/lib/contexts/AuthContext'
-import { createUniqueUsername, usernameExists, updateUsername } from '@/lib/auth'
+import { createUniqueUsername, formatUser, usernameExists, updateUsername } from '@/lib/auth'
 import { User, Check, X, Loader } from 'lucide-react'
 
 const usernameSchema = z.object({
@@ -25,7 +25,8 @@ interface UsernameSetupProps {
 
 export default function UsernameSetup({ onComplete, onSkip, showSkip = false }: UsernameSetupProps) {
   const { isPortuguese } = useLanguage()
-  const { user } = useAuth()
+  const { user: supabaseUser } = useAuth()
+  const user = formatUser(supabaseUser)
   const [loading, setLoading] = useState(false)
   const [checkingUsername, setCheckingUsername] = useState(false)
   const [usernameAvailable, setUsernameAvailable] = useState<boolean | null>(null)

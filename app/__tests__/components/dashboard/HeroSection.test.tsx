@@ -5,7 +5,9 @@ import HeroSection from '@/components/dashboard/HeroSection'
 
 // Mock the hooks
 const mockPush = jest.fn()
-const mockUseAuth = {
+const mockUseAuth: {
+  user: { displayName: string | null; email: string | null; uid: string }
+} = {
   user: {
     displayName: 'John Doe',
     email: 'john.doe@example.com',

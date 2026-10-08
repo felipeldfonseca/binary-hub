@@ -5,6 +5,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { useLanguage } from '@/lib/contexts/LanguageContext'
 import { useAuth } from '@/lib/contexts/AuthContext'
+import { formatUser } from '@/lib/auth'
 import Avatar from '@/components/ui/Avatar'
 import { Send, Image, TrendingUp, Globe, Users, Lock, X, Hash } from 'lucide-react'
 
@@ -39,7 +40,8 @@ export default function CreatePost({
   tradeData
 }: CreatePostProps) {
   const { isPortuguese } = useLanguage()
-  const { user } = useAuth()
+  const { user: supabaseUser } = useAuth()
+  const user = formatUser(supabaseUser)
   // TODO: Get userProfile from context when available
   const userProfile = undefined
   const [loading, setLoading] = useState(false)
