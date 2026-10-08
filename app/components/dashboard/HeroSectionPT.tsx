@@ -3,14 +3,15 @@
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/hooks/useAuth'
+import { AuthUser, formatUser } from '@/lib/auth'
 
 export default function HeroSectionPT() {
   const router = useRouter()
   const { user } = useAuth()
 
   // Get user's display name or email
-  const getUserName = (user: any) => {
-    let name = user?.displayName || user?.email?.split('@')[0] || 'Trader'
+  const getUserName = (user: AuthUser | null) => {
+    let name = user?.displayName?.trim() || user?.email?.split('@')[0] || 'Trader'
     
     // Get only the first name (before any space)
     const firstName = name.split(' ')[0]
@@ -19,7 +20,7 @@ export default function HeroSectionPT() {
     return firstName.charAt(0).toUpperCase() + firstName.slice(1).toLowerCase()
   }
 
-  const userName = getUserName(user)
+  const userName = getUserName(formatUser(user))
 
   return (
     <section className="w-full flex items-center pt-4 sm:pt-6 pb-4 sm:pb-8">

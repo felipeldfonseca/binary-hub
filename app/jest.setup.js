@@ -76,6 +76,13 @@ jest.mock('react-hot-toast', () => ({
 // Global test environment setup
 global.fetch = jest.fn()
 
+// jsdom has no ResizeObserver, which recharts' ResponsiveContainer relies on
+global.ResizeObserver = class {
+  observe() {}
+  unobserve() {}
+  disconnect() {}
+}
+
 // Clean up after each test
 afterEach(() => {
   jest.clearAllMocks()

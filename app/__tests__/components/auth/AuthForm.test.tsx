@@ -67,7 +67,7 @@ describe('AuthForm', () => {
   it('renders signup form when mode is signup', () => {
     render(<AuthForm {...defaultProps} mode="signup" />)
     
-    expect(screen.getByText('Create Account')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Create Account' })).toBeInTheDocument()
     expect(screen.getByText('Full Name')).toBeInTheDocument()
     expect(screen.getByPlaceholderText('Enter your full name')).toBeInTheDocument()
     expect(screen.getByPlaceholderText('Confirm your password')).toBeInTheDocument()
@@ -140,11 +140,12 @@ describe('AuthForm', () => {
 
   it('shows loading state during authentication', () => {
     mockUseAuth.loading = true
-    render(<AuthForm {...defaultProps} />)
+    const { container } = render(<AuthForm {...defaultProps} />)
     
-    const submitButton = screen.getByRole('button', { name: /sign in/i })
-    expect(submitButton).toBeDisabled()
-    expect(submitButton.querySelector('.animate-spin')).toBeInTheDocument()
+    // The label is replaced by the spinner while loading
+    const spinner = container.querySelector('.animate-spin')
+    expect(spinner).toBeInTheDocument()
+    expect(spinner?.closest('button')).toBeDisabled()
   })
 
   it('switches between signin and signup modes', async () => {

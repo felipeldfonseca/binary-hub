@@ -1,18 +1,28 @@
 import React from 'react'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import HeroSection from '@/components/dashboard/HeroSection'
 
 // Mock the hooks
 const mockPush = jest.fn()
-const mockUseAuth: {
-  user: { displayName: string | null; email: string | null; uid: string }
-} = {
-  user: {
-    displayName: 'John Doe',
-    email: 'john.doe@example.com',
-    uid: 'test-uid',
-  },
+
+// Auth user in the shape the Supabase auth context provides
+type MockAuthUser = {
+  id: string
+  email?: string
+  user_metadata: { full_name?: string }
+}
+
+const defaultUser: MockAuthUser = {
+  id: 'test-uid',
+  email: 'john.doe@example.com',
+  user_metadata: { full_name: 'John Doe' },
+}
+
+const mockUseAuth: { user: MockAuthUser } = { user: defaultUser }
+
+const setUser = ({ fullName, email }: { fullName?: string; email?: string }) => {
+  mockUseAuth.user = { id: 'test-uid', email, user_metadata: { full_name: fullName } }
 }
 
 jest.mock('next/navigation', () => ({
@@ -31,90 +41,77 @@ jest.mock('@/hooks/useAuth', () => ({
   useAuth: () => mockUseAuth,
 }))
 
+jest.mock('@/lib/supabase', () => ({
+  supabase: {},
+}))
+
 describe('HeroSection', () => {
   beforeEach(() => {
     jest.clearAllMocks()
+    mockUseAuth.user = defaultUser
   })
 
   it('renders with user display name', () => {
     render(<HeroSection />)
-    
+
     expect(screen.getByText('Hey, John!')).toBeInTheDocument()
     expect(screen.getByText('Have you traded today?')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Add new trades' })).toBeInTheDocument()
   })
 
   it('renders with email username when no display name', () => {
-    mockUseAuth.user = {
-      ...mockUseAuth.user,
-      displayName: null,
-      email: 'jane.smith@example.com',
-    }
+    setUser({ email: 'jane.smith@example.com' })
 
     render(<HeroSection />)
-    
+
     expect(screen.getByText('Hey, Jane.smith!')).toBeInTheDocument()
   })
 
   it('renders with first name only when display name has multiple words', () => {
-    mockUseAuth.user = {
-      ...mockUseAuth.user,
-      displayName: 'John Michael Doe',
-    }
+    setUser({ fullName: 'John Michael Doe', email: 'john.doe@example.com' })
 
     render(<HeroSection />)
-    
+
     expect(screen.getByText('Hey, John!')).toBeInTheDocument()
   })
 
   it('renders default name when no user info available', () => {
-    mockUseAuth.user = {
-      ...mockUseAuth.user,
-      displayName: null,
-      email: null,
-    }
+    setUser({})
 
     render(<HeroSection />)
-    
+
     expect(screen.getByText('Hey, Trader!')).toBeInTheDocument()
   })
 
   it('capitalizes first letter of name', () => {
-    mockUseAuth.user = {
-      ...mockUseAuth.user,
-      displayName: 'john',
-    }
+    setUser({ fullName: 'john', email: 'john.doe@example.com' })
 
     render(<HeroSection />)
-    
+
     expect(screen.getByText('Hey, John!')).toBeInTheDocument()
   })
 
   it('handles lowercase email usernames', () => {
-    mockUseAuth.user = {
-      ...mockUseAuth.user,
-      displayName: null,
-      email: 'jane.doe@example.com',
-    }
+    setUser({ email: 'jane.doe@example.com' })
 
     render(<HeroSection />)
-    
+
     expect(screen.getByText('Hey, Jane.doe!')).toBeInTheDocument()
   })
 
   it('navigates to trades page when button is clicked', async () => {
     const user = userEvent.setup()
     render(<HeroSection />)
-    
+
     const addTradesButton = screen.getByRole('button', { name: 'Add new trades' })
     await user.click(addTradesButton)
-    
+
     expect(mockPush).toHaveBeenCalledWith('/trades')
   })
 
   it('has proper button styling and hover effects', () => {
     render(<HeroSection />)
-    
+
     const button = screen.getByRole('button', { name: 'Add new trades' })
     expect(button).toHaveClass(
       'btn-primary',
@@ -128,45 +125,37 @@ describe('HeroSection', () => {
 
   it('has responsive design classes', () => {
     render(<HeroSection />)
-    
-    const section = screen.getByRole('region', { hidden: true }) || screen.getByText('Hey, John!').closest('section')
-    expect(section).toHaveClass('min-h-[40vh]', 'pt-24', 'sm:pt-28', 'lg:pt-32')
+
+    const section = screen.getByRole('heading', { level: 1 }).closest('section')
+    expect(section).toHaveClass('w-full', 'pt-4', 'sm:pt-6', 'pb-4', 'sm:pb-8')
   })
 
   it('has proper text hierarchy', () => {
     render(<HeroSection />)
-    
+
     const title = screen.getByRole('heading', { level: 1 })
     expect(title).toHaveClass('hero-title', 'font-poly')
-    
+
     const userName = screen.getByText('Hey, John!')
     expect(userName).toHaveClass('text-primary')
-    
+
     const description = screen.getByText('Have you traded today?')
     expect(description).toHaveClass('text-white')
   })
 
   it('handles edge case with empty string display name', () => {
-    mockUseAuth.user = {
-      ...mockUseAuth.user,
-      displayName: '',
-      email: 'test@example.com',
-    }
+    setUser({ fullName: '', email: 'test@example.com' })
 
     render(<HeroSection />)
-    
+
     expect(screen.getByText('Hey, Test!')).toBeInTheDocument()
   })
 
   it('handles edge case with whitespace-only display name', () => {
-    mockUseAuth.user = {
-      ...mockUseAuth.user,
-      displayName: '   ',
-      email: 'user@example.com',
-    }
+    setUser({ fullName: '   ', email: 'user@example.com' })
 
     render(<HeroSection />)
-    
+
     expect(screen.getByText('Hey, User!')).toBeInTheDocument()
   })
 })

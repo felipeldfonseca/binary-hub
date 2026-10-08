@@ -91,11 +91,7 @@ __tests__/
 │   ├── auth/
 │   │   └── AuthForm.test.tsx
 │   └── dashboard/
-│       ├── HeroSection.test.tsx
-│       └── PerformanceSection.test.tsx
-├── hooks/
-│   ├── useTrades.test.ts
-│   └── useTradeStats.test.ts
+│       └── HeroSection.test.tsx
 └── simple.test.ts
 ```
 
@@ -294,11 +290,7 @@ npm test -- --testNamePattern="signin"
 ### Components
 - **AuthForm**: Form validation, user interactions, mode switching, error handling
 - **HeroSection**: User name display, navigation, responsive behavior
-- **PerformanceSection**: Data display, period filtering, loading/error states
-
-### Hooks
-- **useTrades**: CRUD operations, API error handling, loading states
-- **useTradeStats**: Analytics fetching, export functionality, period changes
+- **AnalyticsV1Professional**: Key metrics with trade data, empty state
 
 ## Mock Strategies
 
