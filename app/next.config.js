@@ -93,16 +93,6 @@ const nextConfig = {
 
     return config;
   },
-  async rewrites() {
-    return [
-      {
-        source: '/api/:path*',
-        destination: process.env.NODE_ENV === 'production' 
-          ? `https://us-central1-${process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID}.cloudfunctions.net/api/:path*`
-          : 'http://localhost:5002/binary-hub-dev/us-central1/api/:path*',
-      },
-    ];
-  },
 }
 
 module.exports = nextConfig 
