@@ -1,14 +1,16 @@
 'use client'
 
 import { useState, useCallback } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { useAuth } from '@/hooks/useAuth'
 import { useErrorHandler } from '@/hooks/useErrorHandler'
 import { useToastHelpers } from '@/components/ui/Toast'
 import { ChartErrorBoundary } from '@/components/error/ErrorBoundary'
-import { supabase } from '@/lib/supabase'
+import { useMarketContext } from '@/lib/contexts/MarketContext'
 import { parseEbinexCsv } from '@/lib/utils/ebinexParser'
 import { parseTopOneCsv } from '@/lib/utils/topOneParser'
 import { detectBrokerFormat } from '@/lib/utils/csvBrokerDetect'
+import { importTrades } from '@/lib/utils/importTrades'
 
 interface UploadStatus {
   uploadId: string
@@ -22,13 +24,19 @@ interface UploadStatus {
 }
 
 export default function CsvUploadSection() {
-  const { user } = useAuth()
+  const { user, session } = useAuth()
   const { handleApiError } = useErrorHandler()
   const { showSuccess, showError } = useToastHelpers()
+  const { marketAccounts, activeMarket } = useMarketContext()
+  const queryClient = useQueryClient()
+  const [selectedMarketType, setSelectedMarketType] = useState<string>('')
   const [isDragOver, setIsDragOver] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [uploadStatus, setUploadStatus] = useState<UploadStatus | null>(null)
   const [error, setError] = useState<string | null>(null)
+
+  // Default to the account the Trades page is showing
+  const effectiveMarketType = selectedMarketType || activeMarket?.marketType || ''
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault()
@@ -38,35 +46,6 @@ export default function CsvUploadSection() {
   const handleDragLeave = useCallback((e: React.DragEvent) => {
     e.preventDefault()
     setIsDragOver(false)
-  }, [])
-
-  const handleDrop = useCallback(async (e: React.DragEvent) => {
-    e.preventDefault()
-    setIsDragOver(false)
-
-    const files = Array.from(e.dataTransfer.files)
-    const csvFile = files.find(file => file.type === 'text/csv' || file.name.endsWith('.csv'))
-
-    if (!csvFile) {
-      setError('Please select a valid CSV file')
-      return
-    }
-
-    await uploadFile(csvFile)
-  }, [])
-
-  const handleFileSelect = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    // Reset input so the same file can be re-selected after an error or retry
-    e.target.value = ''
-    if (!file) return
-
-    if (!file.type.includes('csv') && !file.name.endsWith('.csv')) {
-      setError('Please select a valid CSV file')
-      return
-    }
-
-    await uploadFile(file)
   }, [])
 
   const uploadFile = useCallback(async (file: File) => {
@@ -98,18 +77,13 @@ export default function CsvUploadSection() {
         return
       }
 
-      // Single upsert — the unique constraint on (user_id, notes) handles dedup
-      const { data: insertedRows, error: insertError } = await supabase
-        .from('trades')
-        .upsert(
-          parsed.map(t => ({ ...t, user_id: user.id })),
-          { onConflict: 'user_id,notes', ignoreDuplicates: true }
-        )
-        .select('id')
-
-      if (insertError) throw new Error(insertError.message)
-
-      const importedRows = insertedRows?.length ?? 0
+      // The unique constraint on (user_id, notes) handles dedup
+      const importedRows = await importTrades({
+        trades: parsed,
+        userId: user.id,
+        marketType: effectiveMarketType,
+        accessToken: session?.access_token,
+      })
       const duplicateRows = parsed.length - importedRows
 
       setUploadStatus({
@@ -124,6 +98,11 @@ export default function CsvUploadSection() {
       })
 
       showSuccess('Upload concluído', `${importedRows} operações importadas (${duplicateRows} duplicatas ignoradas)`)
+
+      // The trades table and stats on this page read from these caches
+      queryClient.invalidateQueries({ queryKey: ['trades'] })
+      queryClient.invalidateQueries({ queryKey: ['trade-stats'] })
+      queryClient.invalidateQueries({ queryKey: ['trading-sessions'] })
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Upload failed'
       setError(errorMessage)
@@ -131,7 +110,36 @@ export default function CsvUploadSection() {
     } finally {
       setUploading(false)
     }
-  }, [user, showSuccess, showError])
+  }, [user, session, effectiveMarketType, queryClient, showSuccess, showError])
+
+  const handleDrop = useCallback(async (e: React.DragEvent) => {
+    e.preventDefault()
+    setIsDragOver(false)
+
+    const files = Array.from(e.dataTransfer.files)
+    const csvFile = files.find(file => file.type === 'text/csv' || file.name.endsWith('.csv'))
+
+    if (!csvFile) {
+      setError('Please select a valid CSV file')
+      return
+    }
+
+    await uploadFile(csvFile)
+  }, [uploadFile])
+
+  const handleFileSelect = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    // Reset input so the same file can be re-selected after an error or retry
+    e.target.value = ''
+    if (!file) return
+
+    if (!file.type.includes('csv') && !file.name.endsWith('.csv')) {
+      setError('Please select a valid CSV file')
+      return
+    }
+
+    await uploadFile(file)
+  }, [uploadFile])
 
   const resetUpload = useCallback(() => {
     setUploadStatus(null)
@@ -151,6 +159,27 @@ export default function CsvUploadSection() {
             Upload your Ebinex CSV file to import your trading history. 
             We'll automatically detect and skip any duplicate trades.
           </p>
+
+          {/* Account selector */}
+          {marketAccounts.length > 0 && (
+            <div className="mb-5">
+              <label htmlFor="csv-upload-account" className="block text-sm font-medium text-gray-300 mb-1.5 font-comfortaa">
+                Import to account:
+              </label>
+              <select
+                id="csv-upload-account"
+                value={effectiveMarketType}
+                onChange={e => setSelectedMarketType(e.target.value)}
+                className="w-full bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-2 focus:ring-[#E1FFD9]/40 font-comfortaa"
+              >
+                {marketAccounts.map(acc => (
+                  <option key={acc.id} value={acc.marketType}>
+                    {acc.displayName}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
 
           {/* Upload Area */}
           <div

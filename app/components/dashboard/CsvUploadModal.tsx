@@ -6,10 +6,10 @@ import { useErrorHandler } from '@/hooks/useErrorHandler'
 import { useToastHelpers } from '@/components/ui/Toast'
 import { useLanguage } from '@/lib/contexts/LanguageContext'
 import { useMarketContext } from '@/lib/contexts/MarketContext'
-import { supabase } from '@/lib/supabase'
 import { parseEbinexCsv } from '@/lib/utils/ebinexParser'
 import { parseTopOneCsv } from '@/lib/utils/topOneParser'
 import { detectBrokerFormat } from '@/lib/utils/csvBrokerDetect'
+import { importTrades } from '@/lib/utils/importTrades'
 
 interface UploadStatus {
   uploadId: string
@@ -86,11 +86,6 @@ export default function CsvUploadModal({ isOpen, onClose, onSuccess }: CsvUpload
         return
       }
 
-      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
-      const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
-      // Use JWT from auth context — avoids calling getSession() which can deadlock
-      const accessToken = session?.access_token ?? supabaseKey
-
       const timeoutMsg = isPortuguese
         ? 'Conexão com o servidor expirou. Verifique sua conexão e tente novamente.'
         : 'Server connection timed out. Check your connection and try again.'
@@ -98,37 +93,22 @@ export default function CsvUploadModal({ isOpen, onClose, onSuccess }: CsvUpload
       const controller = new AbortController()
       const timeoutId = setTimeout(() => controller.abort(), 20000)
 
-      let insertedRows: Array<{ id: string }> = []
+      let importedRows = 0
       try {
-        const response = await fetch(
-          `${supabaseUrl}/rest/v1/trades?on_conflict=user_id%2Cnotes&select=id`,
-          {
-            method: 'POST',
-            signal: controller.signal,
-            headers: {
-              apikey: supabaseKey,
-              Authorization: `Bearer ${accessToken}`,
-              'Content-Type': 'application/json',
-              Prefer: 'resolution=ignore-duplicates,return=representation',
-            },
-            body: JSON.stringify(parsed.map(t => ({ ...t, user_id: user.id, market_type: effectiveMarketType || null }))),
-          }
-        )
+        importedRows = await importTrades({
+          trades: parsed,
+          userId: user.id,
+          marketType: effectiveMarketType,
+          accessToken: session?.access_token,
+          signal: controller.signal,
+        })
         clearTimeout(timeoutId)
-
-        if (!response.ok) {
-          const errBody = await response.text()
-          throw new Error(`HTTP ${response.status}: ${errBody.slice(0, 200)}`)
-        }
-
-        insertedRows = await response.json() as Array<{ id: string }>
       } catch (e: unknown) {
         clearTimeout(timeoutId)
         if (e instanceof Error && e.name === 'AbortError') throw new Error(timeoutMsg)
         throw e
       }
 
-      const importedRows = insertedRows.length
       const duplicateRows = parsed.length - importedRows
 
       const uploadId = `import-${Date.now()}`
