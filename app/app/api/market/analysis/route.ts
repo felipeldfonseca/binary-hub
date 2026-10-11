@@ -6,6 +6,11 @@ const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
 });
 
+const MODEL = 'claude-opus-5-5';
+
+// A turn with web search can come back paused; each resume re-sends it to continue
+const MAX_CONTINUATIONS = 3;
+
 const SYSTEM_PROMPT = `You are a professional ES/MES futures market analyst. Your job is to provide comprehensive pre-session market analysis that helps traders decide whether to trade today and what to expect.
 
 You have access to web search to gather current market data. Use it to research:
@@ -143,24 +148,60 @@ Use web search to find:
 
 Return ONLY the JSON object, no other text.`;
 
-    const response = await anthropic.messages.create({
-      model: 'claude-sonnet-4-20250514',
-      max_tokens: 4096,
-      tools: [
+    const messages: Anthropic.MessageParam[] = [
+      {
+        role: 'user',
+        content: userPrompt,
+      },
+    ];
+
+    let response: Anthropic.Message;
+    for (let continuations = 0; ; continuations++) {
+      // Streamed so the connection stays active during a long search turn
+      response = await anthropic.messages
+        .stream({
+          model: MODEL,
+          // Thinking is always on for this model and counts toward the limit
+          max_tokens: 16000,
+          output_config: { effort: 'medium' },
+          tools: [
+            {
+              type: 'web_search_20260209',
+              name: 'web_search',
+              max_uses: 10,
+            },
+          ],
+          messages,
+          system: SYSTEM_PROMPT,
+        })
+        .finalMessage();
+
+      // One line per API request, so a resumed turn shows its full cost
+      console.log('Market analysis usage:', JSON.stringify(response.usage));
+
+      if (response.stop_reason !== 'pause_turn' || continuations >= MAX_CONTINUATIONS) break;
+      messages.push({ role: 'assistant', content: response.content });
+    }
+
+    if (response.stop_reason === 'refusal') {
+      return NextResponse.json(
         {
-          type: 'web_search_20250305',
-          name: 'web_search',
-          max_uses: 10,
+          error: 'Analysis declined',
+          message: 'The model declined to generate this analysis. Try again.',
         },
-      ],
-      messages: [
+        { status: 500 }
+      );
+    }
+
+    if (response.stop_reason === 'max_tokens' || response.stop_reason === 'pause_turn') {
+      return NextResponse.json(
         {
-          role: 'user',
-          content: userPrompt,
+          error: 'Incomplete analysis',
+          message: 'The analysis was cut off before it finished. Try again.',
         },
-      ],
-      system: SYSTEM_PROMPT,
-    });
+        { status: 500 }
+      );
+    }
 
     // Extract the text content from the response
     let analysisText = '';
@@ -185,6 +226,13 @@ Return ONLY the JSON object, no other text.`;
         cleanedText = cleanedText.slice(0, -3);
       }
       cleanedText = cleanedText.trim();
+
+      // Short remarks between searches arrive as text too; keep only the JSON object
+      const jsonStart = cleanedText.indexOf('{');
+      const jsonEnd = cleanedText.lastIndexOf('}');
+      if (jsonStart !== -1 && jsonEnd > jsonStart) {
+        cleanedText = cleanedText.slice(jsonStart, jsonEnd + 1);
+      }
 
       analysis = JSON.parse(cleanedText);
     } catch (parseError) {
