@@ -1,6 +1,10 @@
 import { NextResponse } from 'next/server'
+import { requireUser } from '@/lib/apiAuth'
 
 export async function GET(request: Request) {
+  const auth = await requireUser(request)
+  if (auth instanceof NextResponse) return auth
+
   const { searchParams } = new URL(request.url)
   const period = searchParams.get('period') || 'weekly'
   

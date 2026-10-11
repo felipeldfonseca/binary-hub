@@ -2,6 +2,8 @@
 
 import { useState, useCallback, useEffect } from 'react';
 import Navbar from '@/components/layout/Navbar';
+import ProtectedRoute from '@/components/auth/ProtectedRoute';
+import { useAuth } from '@/hooks/useAuth';
 import {
   ConvictionScoreRing,
   MacroCard,
@@ -15,7 +17,8 @@ import { MOCK_ANALYSIS } from '@/lib/mockMarketAnalysis';
 import type { MarketAnalysisResponse } from '@/types/market-analysis';
 import { getConvictionColor } from '@/types/market-analysis';
 
-export default function MarketPage() {
+function MarketPageContent() {
+  const { session } = useAuth();
   const [analysis, setAnalysis] = useState<MarketAnalysisResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -33,7 +36,10 @@ export default function MarketPage() {
       } else {
         const response = await fetch('/api/market/analysis', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${session?.access_token ?? ''}`,
+          },
           body: JSON.stringify({ asset: 'ES' }),
         });
 
@@ -50,7 +56,7 @@ export default function MarketPage() {
     } finally {
       setLoading(false);
     }
-  }, [useMock]);
+  }, [useMock, session?.access_token]);
 
   const handleRefresh = () => {
     fetchAnalysis();
@@ -111,6 +117,7 @@ export default function MarketPage() {
             <button
               onClick={handleRefresh}
               disabled={loading}
+              aria-label="Refresh analysis"
               className="w-10 h-10 rounded-xl border border-white/10 bg-white/5
                          flex items-center justify-center cursor-pointer
                          hover:bg-white/10 transition-colors disabled:opacity-50"
@@ -283,5 +290,13 @@ export default function MarketPage() {
         )}
       </main>
     </div>
+  );
+}
+
+export default function MarketPage() {
+  return (
+    <ProtectedRoute>
+      <MarketPageContent />
+    </ProtectedRoute>
   );
 }

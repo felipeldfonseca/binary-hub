@@ -11,8 +11,8 @@ const nextConfig = {
     },
   },
   compiler: {
-    // Remove console logs in production
-    removeConsole: process.env.NODE_ENV === 'production',
+    // Remove console.log and console.debug in production; route handlers rely on the rest
+    removeConsole: process.env.NODE_ENV === 'production' ? { exclude: ['error', 'warn', 'info'] } : false,
   },
   images: {
     domains: ['firebasestorage.googleapis.com'],

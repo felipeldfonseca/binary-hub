@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useWatchlist } from '@/hooks/useWatchlist';
 import { useMarketData } from '@/hooks/useMarketData';
 import { useTradingSessions } from '@/hooks/useTradingSessions';
+import ProtectedRoute from '@/components/auth/ProtectedRoute';
 import { format } from 'date-fns';
 import {
   ArrowTrendingUpIcon,
@@ -18,7 +19,7 @@ import {
 
 type MarketBias = 'bullish' | 'bearish' | 'neutral' | 'mixed';
 
-export default function PremarketPage() {
+function PremarketPageContent() {
   const { watchlist, primaryInstruments, isLoading: watchlistLoading } = useWatchlist();
   const symbols = watchlist.map((item) => item.symbol);
   const { quotes, summary, isLoading: quotesLoading, isFetching, refreshQuotes } = useMarketData(symbols);
@@ -340,5 +341,13 @@ export default function PremarketPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function PremarketPage() {
+  return (
+    <ProtectedRoute>
+      <PremarketPageContent />
+    </ProtectedRoute>
   );
 }

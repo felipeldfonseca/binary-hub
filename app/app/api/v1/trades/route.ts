@@ -1,6 +1,10 @@
 import { NextResponse } from 'next/server'
+import { requireUser } from '@/lib/apiAuth'
 
 export async function GET(request: Request) {
+  const auth = await requireUser(request)
+  if (auth instanceof NextResponse) return auth
+
   const { searchParams } = new URL(request.url)
   const limit = parseInt(searchParams.get('limit') || '10')
   const offset = parseInt(searchParams.get('offset') || '0')
@@ -130,6 +134,9 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
+  const auth = await requireUser(request)
+  if (auth instanceof NextResponse) return auth
+
   try {
     const body = await request.json()
     

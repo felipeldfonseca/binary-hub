@@ -94,6 +94,8 @@ export function createServerClient(accessToken?: string): SupabaseClient {
       persistSession: false,
     },
     global: {
+      // Session lookups and user data must never come from Next's fetch cache
+      fetch: (input, init) => fetch(input, { ...init, cache: 'no-store' }),
       headers: accessToken
         ? { Authorization: `Bearer ${accessToken}` }
         : undefined,

@@ -6,6 +6,11 @@ import { POST } from '@/app/api/market/analysis/route'
 
 const mockFinalMessage = jest.fn()
 const mockStream = jest.fn((..._args: unknown[]) => ({ finalMessage: mockFinalMessage }))
+const mockGetUser = jest.fn()
+
+jest.mock('@/lib/supabase', () => ({
+  createServerClient: () => ({ auth: { getUser: (...args: unknown[]) => mockGetUser(...args) } }),
+}))
 
 jest.mock('@anthropic-ai/sdk', () => {
   class APIError extends Error {
@@ -39,6 +44,7 @@ const callRoute = () =>
   POST(
     new NextRequest('http://localhost/api/market/analysis', {
       method: 'POST',
+      headers: { Authorization: 'Bearer user-jwt' },
       body: JSON.stringify({ asset: 'ES' }),
     })
   )
@@ -47,13 +53,35 @@ describe('POST /api/market/analysis', () => {
   beforeEach(() => {
     mockStream.mockClear()
     mockFinalMessage.mockReset()
+    mockGetUser.mockReset()
+    mockGetUser.mockResolvedValue({ data: { user: { id: 'user-1', email: 'owner@example.com' } }, error: null })
     process.env.ANTHROPIC_API_KEY = 'test-key'
+    process.env.AI_ALLOWED_USERS = 'owner@example.com'
     jest.spyOn(console, 'error').mockImplementation(() => {})
-    jest.spyOn(console, 'log').mockImplementation(() => {})
+    jest.spyOn(console, 'info').mockImplementation(() => {})
+    jest.spyOn(console, 'warn').mockImplementation(() => {})
   })
 
   afterEach(() => {
     jest.restoreAllMocks()
+  })
+
+  it('refuses an account that is not allowed to spend the AI budget', async () => {
+    mockGetUser.mockResolvedValue({ data: { user: { id: 'user-2', email: 'visitor@example.com' } }, error: null })
+
+    const response = await callRoute()
+
+    expect(response.status).toBe(403)
+    expect(mockStream).not.toHaveBeenCalled()
+  })
+
+  it('refuses everyone while no account has been allowed', async () => {
+    delete process.env.AI_ALLOWED_USERS
+
+    const response = await callRoute()
+
+    expect(response.status).toBe(403)
+    expect(mockStream).not.toHaveBeenCalled()
   })
 
   it('returns the analysis the model wrote', async () => {
@@ -113,13 +141,26 @@ describe('POST /api/market/analysis', () => {
     expect((await response.json()).error).toBe('Incomplete analysis')
   })
 
-  it('passes API errors through with their status', async () => {
+  it('reports an upstream API error as a bad gateway, keeping its status in the body', async () => {
     const { default: Anthropic } = jest.requireMock('@anthropic-ai/sdk')
-    mockFinalMessage.mockRejectedValue(new Anthropic.APIError(404, 'model: not found'))
+    mockFinalMessage.mockRejectedValue(new Anthropic.APIError(401, 'invalid x-api-key'))
 
     const response = await callRoute()
 
-    expect(response.status).toBe(404)
-    expect((await response.json()).message).toBe('model: not found')
+    // 401 on this endpoint means the caller's own session, so it must not leak through
+    expect(response.status).toBe(502)
+    expect(await response.json()).toMatchObject({ message: 'invalid x-api-key', status: 401 })
+  })
+
+  it('logs the token usage of each API request with the account that spent it', async () => {
+    mockFinalMessage.mockResolvedValue(message('end_turn', [textBlock(JSON.stringify(analysis))]))
+
+    await callRoute()
+
+    expect(console.info).toHaveBeenCalledWith(
+      'Market analysis usage:',
+      'user-1',
+      JSON.stringify({ input_tokens: 10, output_tokens: 20 })
+    )
   })
 })

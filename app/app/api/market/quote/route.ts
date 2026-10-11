@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { requireUser } from '@/lib/apiAuth';
 
 // Yahoo Finance API via their unofficial API
 // Note: For production, consider using a paid API like Alpha Vantage, Polygon, or Twelve Data
@@ -40,6 +41,9 @@ interface YahooResponse {
 }
 
 export async function GET(request: NextRequest) {
+  const auth = await requireUser(request);
+  if (auth instanceof NextResponse) return auth;
+
   const searchParams = request.nextUrl.searchParams;
   const symbol = searchParams.get('symbol');
 

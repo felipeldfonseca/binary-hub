@@ -1,5 +1,6 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
+import { useAuth } from '@/lib/contexts/AuthContextSupabase';
 import type { MarketSnapshot } from '@/types/database';
 import { format } from 'date-fns';
 
@@ -34,12 +35,20 @@ interface QuoteData {
   marketStatus: 'pre_market' | 'open' | 'after_hours' | 'closed';
 }
 
+// The quote route turned the request away: surface it instead of showing empty prices
+class QuoteAccessError extends Error {}
+
 // Fetch quote from Yahoo Finance (via a proxy API route)
-async function fetchYahooQuote(symbol: string): Promise<QuoteData | null> {
+async function fetchYahooQuote(symbol: string, accessToken: string): Promise<QuoteData | null> {
   const yahooSymbol = YAHOO_SYMBOLS[symbol] || symbol;
 
   try {
-    const response = await fetch(`/api/market/quote?symbol=${yahooSymbol}`);
+    const response = await fetch(`/api/market/quote?symbol=${yahooSymbol}`, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+    if (response.status === 401 || response.status === 503) {
+      throw new QuoteAccessError('Your session could not be verified. Sign in again.');
+    }
     if (!response.ok) {
       console.error(`Failed to fetch quote for ${symbol}`);
       return null;
@@ -58,6 +67,7 @@ async function fetchYahooQuote(symbol: string): Promise<QuoteData | null> {
       marketStatus: getMarketStatus(data),
     };
   } catch (error) {
+    if (error instanceof QuoteAccessError) throw error;
     console.error(`Error fetching quote for ${symbol}:`, error);
     return null;
   }
@@ -73,15 +83,18 @@ function getMarketStatus(data: Record<string, unknown>): QuoteData['marketStatus
 
 export function useMarketData(symbols: string[]) {
   const queryClient = useQueryClient();
+  const { session } = useAuth();
+  const accessToken = session?.access_token;
 
   // Fetch real-time quotes
   const quotesQuery = useQuery({
     queryKey: ['market-quotes', symbols],
     queryFn: async () => {
-      const quotes = await Promise.all(symbols.map(fetchYahooQuote));
+      const quotes = await Promise.all(symbols.map((symbol) => fetchYahooQuote(symbol, accessToken ?? '')));
       return quotes.filter((q): q is QuoteData => q !== null);
     },
-    enabled: symbols.length > 0,
+    // The quote route requires a session
+    enabled: symbols.length > 0 && !!accessToken,
     refetchInterval: 30000, // Refresh every 30 seconds
     staleTime: 15000, // Consider fresh for 15 seconds
   });

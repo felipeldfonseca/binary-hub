@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { requireUser } from '@/lib/apiAuth'
 
 // Improved CSV parser for Ebinex format with proper quote handling
 function parseEbinexCsv(content: string) {
@@ -111,6 +112,9 @@ function parseEbinexCsv(content: string) {
 }
 
 export async function POST(request: Request) {
+  const auth = await requireUser(request)
+  if (auth instanceof NextResponse) return auth
+
   try {
     const formData = await request.formData()
     const file = formData.get('csv') as File

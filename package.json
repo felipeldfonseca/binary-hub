@@ -9,6 +9,7 @@
     "build": "cd app && npm run build",
     "setup": "chmod +x scripts/dev-setup.sh && ./scripts/dev-setup.sh",
     "test": "cd functions && npm test",
+    "test:app": "cd app && npx jest --ci",
     "lint": "cd app && npm run lint && cd ../functions && npm run lint",
     "deploy:functions": "firebase deploy --only functions",
     "deploy:hosting": "cd app && npm run build && firebase deploy --only hosting",

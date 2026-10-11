@@ -60,7 +60,16 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
 
 # Optional: For AI features
 OPENAI_API_KEY=sk-...
+
+# Market analysis (/market live mode)
+ANTHROPIC_API_KEY=sk-ant-...
+# Accounts allowed to call endpoints that spend the AI budget: comma-separated
+# emails or Supabase user ids. Sign-up is open, so while this is unset nobody
+# can generate an analysis. Set it on Vercel too.
+AI_ALLOWED_USERS=you@example.com
 ```
+
+Every API route requires a signed-in Supabase session (`Authorization: Bearer <access token>`), checked by `requireUser` in `app/lib/apiAuth.ts`. A new route must call it first and be added to the list in `app/__tests__/api/routesRequireAuth.test.ts`.
 
 ### 4. Install Dependencies
 ```bash

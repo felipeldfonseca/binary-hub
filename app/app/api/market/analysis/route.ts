@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Anthropic from '@anthropic-ai/sdk';
 import type { MarketAnalysisResponse } from '@/types/market-analysis';
+import { denyPaidAi, requireUser } from '@/lib/apiAuth';
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
@@ -109,6 +110,12 @@ Conviction score guidelines:
 Write all narratives in concise, professional, trader-oriented language. Focus on actionable insights.`;
 
 export async function POST(request: NextRequest) {
+  const auth = await requireUser(request);
+  if (auth instanceof NextResponse) return auth;
+
+  const denied = denyPaidAi(auth.user);
+  if (denied) return denied;
+
   try {
     // Check for API key
     if (!process.env.ANTHROPIC_API_KEY) {
@@ -177,7 +184,7 @@ Return ONLY the JSON object, no other text.`;
         .finalMessage();
 
       // One line per API request, so a resumed turn shows its full cost
-      console.log('Market analysis usage:', JSON.stringify(response.usage));
+      console.info('Market analysis usage:', auth.user.id, JSON.stringify(response.usage));
 
       if (response.stop_reason !== 'pause_turn' || continuations >= MAX_CONTINUATIONS) break;
       messages.push({ role: 'assistant', content: response.content });
@@ -259,7 +266,8 @@ Return ONLY the JSON object, no other text.`;
           message: error.message,
           status: error.status,
         },
-        { status: error.status || 500 }
+        // 401 and 403 on this endpoint mean the caller's own session or access
+        { status: 502 }
       );
     }
 
@@ -274,7 +282,10 @@ Return ONLY the JSON object, no other text.`;
 }
 
 // Also support GET for simple testing
-export async function GET() {
+export async function GET(request: NextRequest) {
+  const auth = await requireUser(request);
+  if (auth instanceof NextResponse) return auth;
+
   return NextResponse.json({
     message: 'Use POST to generate market analysis',
     example: {
