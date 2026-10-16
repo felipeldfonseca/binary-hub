@@ -98,3 +98,6 @@ jest-coverage/
 .local/
 tmp/
 temp/
+
+# Real trade exports: never commit (the repo is public)
+docs/csv/

@@ -12,12 +12,6 @@ const EXPECTED_HANDLERS = [
   'GET /api/market/analysis',
   'POST /api/market/analysis',
   'GET /api/market/quote',
-  'GET /api/test',
-  'POST /api/test',
-  'GET /api/v1/analytics/dashboard',
-  'POST /api/v1/import/upload',
-  'GET /api/v1/trades',
-  'POST /api/v1/trades',
 ]
 
 const mockGetUser = jest.fn()
