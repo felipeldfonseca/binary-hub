@@ -506,6 +506,39 @@ export function copyAccountSettings(saved: RulesSettings, sourceId: string): Acc
   return JSON.parse(JSON.stringify(src)) as AccountSettings;
 }
 
+/**
+ * A draft carried over to a newer saved base, part by part (each market, each account, «Horários
+ * na tela», the calendars): a part the draft left as it was in `oldBase` takes `newBase`'s value; a
+ * part the draft changed keeps the draft's. `accounts` is the account list of the new
+ * rules_config (an account it no longer lists is dropped; a new one comes in as saved).
+ *
+ * For a refetch that does not move the revision (an import, an archive, a new account) and for
+ * saves made in this tab (useRegras.changedOnlyHere). Never for a revision another tab or device
+ * saved: that draft keeps its old base, and its save is refused with rules_changed.
+ */
+export function rebaseSettings(
+  accounts: readonly Pick<RulesAccount, 'id' | 'market'>[],
+  oldBase: RulesSettings,
+  newBase: RulesSettings,
+  draft: RulesSettings,
+): RulesSettings {
+  const markets = {} as Record<Market, MarketSettings>;
+  for (const m of ['futures', 'binary'] as const) {
+    markets[m] = sameMarket(m, draft.markets[m], oldBase.markets[m]) ? newBase.markets[m] : draft.markets[m];
+  }
+  const out: Record<string, AccountSettings> = {};
+  for (const a of accounts) {
+    const kept = !sameAccount(a.market, draft.accounts[a.id], oldBase.accounts[a.id]);
+    out[a.id] = (kept ? draft.accounts[a.id] : newBase.accounts[a.id]) ?? emptyAccountSettings();
+  }
+  return {
+    markets,
+    accounts: out,
+    displayTz: draft.displayTz === oldBase.displayTz ? newBase.displayTz : draft.displayTz,
+    calendars: canon(normCalendars(draft.calendars)) === canon(normCalendars(oldBase.calendars)) ? newBase.calendars : draft.calendars,
+  };
+}
+
 // ---------------------------------------------------------------------------------------------
 // rules_config()
 // ---------------------------------------------------------------------------------------------
@@ -546,6 +579,14 @@ export interface RulesConfig {
   accounts: AccountConfig[];
   /** The saved settings in the editor's form: the base the page's draft starts from */
   settings: RulesSettings;
+}
+
+/**
+ * The accounts the rules screens show and edit: not archived and not example accounts
+ * (rules_config lists both; Phase 1 hides example accounts everywhere). In list order.
+ */
+export function activeAccounts(config: Pick<RulesConfig, 'accounts'>): AccountConfig[] {
+  return config.accounts.filter((a) => !a.archivedAt && !a.isExample);
 }
 
 /** rules_config() → RulesConfig. Throws RulesAnswerError on any other shape. */
@@ -833,9 +874,15 @@ export interface RulesNow {
   accounts: AccountNow[];
 }
 
+/**
+ * rules_now() → RulesNow. rules_now lists every active account, of any market (a Phase 1 backfill
+ * can hold forex or stocks accounts); only futures and binary accounts have rules, so the others
+ * are left out here instead of failing the whole answer. Throws RulesAnswerError on any other shape.
+ */
 export function parseRulesNow(json: unknown): RulesNow {
   const r = obj(json);
-  const accounts = (Array.isArray(r.accounts) ? r.accounts : bad()).map((x): AccountNow => {
+  const list = Array.isArray(r.accounts) ? r.accounts : bad();
+  const accounts = list.filter((x) => !isObj(x) || x.market === 'futures' || x.market === 'binary').map((x): AccountNow => {
     const a = obj(x);
     let gate: GateResult;
     try {

@@ -9,6 +9,7 @@ import {
   InvalidSettingsError,
   RulesAnswerError,
   accountRulesJson,
+  activeAccounts,
   buildNewAccountPayload,
   buildSavePayload,
   canon,
@@ -23,7 +24,10 @@ import {
   parseSaveResult,
   parseUsdText,
   pendingVersions,
+  rebaseSettings,
   resolveRules,
+  sameAccount,
+  sameMarket,
   sameRules,
   settingsIssues,
   windowError,
@@ -296,6 +300,72 @@ describe('the save', () => {
   });
 });
 
+describe('rebaseSettings (a draft carried to a newer saved base)', () => {
+  const same = (c: ReturnType<typeof configDepois>, a: RulesSettings, b: RulesSettings) =>
+    sameMarket('futures', a.markets.futures, b.markets.futures) &&
+    sameMarket('binary', a.markets.binary, b.markets.binary) &&
+    c.accounts.every((x) => sameAccount(x.market, a.accounts[x.id], b.accounts[x.id])) &&
+    a.displayTz === b.displayTz &&
+    canon(normCalendars(a.calendars)) === canon(normCalendars(b.calendars));
+
+  it('after this tab’s own save, the saved draft is the new base: nothing left to save', () => {
+    const before = configAntes();
+    const after = configDepois();
+    const { topOne } = idsDono();
+    const draft = ownerDraft(before.settings, topOne);
+    const rebased = rebaseSettings(after.accounts, before.settings, after.settings, draft);
+    expect(same(after, rebased, after.settings)).toBe(true);
+    expect(buildSavePayload(after, rebased)).toBeNull();
+  });
+
+  it('takes the new base where the draft did not change, and keeps the draft where it did', () => {
+    const before = configAntes();
+    const after = configDepois();
+    const { topOne, ebinex } = idsDono();
+    // Draft: only «Horários na tela» and the Ebinex limit
+    const draft = clone(before.settings);
+    draft.displayTz = 'both';
+    draft.accounts[ebinex] = { ...emptyAccountSettings(), limit: { cents: 5000, mode: 'conta', atLimit: 'avisar' } };
+    const rebased = rebaseSettings(after.accounts, before.settings, after.settings, draft);
+    expect(rebased.markets).toEqual(after.settings.markets);
+    expect(rebased.accounts[topOne]).toEqual(after.settings.accounts[topOne]);
+    expect(rebased.accounts[ebinex].limit).toEqual({ cents: 5000, mode: 'conta', atLimit: 'avisar' });
+    expect(rebased.displayTz).toBe('both');
+    expect(rebased.calendars).toEqual(after.settings.calendars);
+    // Saved against the new base, only the draft's own changes go
+    expect(buildSavePayload(after, rebased)).toEqual({
+      v: 1,
+      base_rev: after.rev,
+      accounts: { [ebinex]: { rules: { v: 1, limit: { usd: 50, mode: 'conta', at_limit: 'avisar' } }, window: null } },
+      preferences: { display_tz: 'both' },
+    });
+  });
+
+  it('brings in an account the new base lists, and drops one it no longer lists', () => {
+    const c = configDepois();
+    const json = regrasJson('config-depois');
+    const list = json.accounts as Record<string, unknown>[];
+    const novo = { ...clone(list[0]), account_id: '00000000-0000-4000-8000-0000000000a2', label: 'Top One #2', settings: null, versions: [] };
+    list.push(novo);
+    const withNew = parseRulesConfig(json);
+    const rebased = rebaseSettings(withNew.accounts, c.settings, withNew.settings, c.settings);
+    expect(rebased.accounts['00000000-0000-4000-8000-0000000000a2']).toEqual(emptyAccountSettings());
+    const { ebinex } = idsDono();
+    const without = rebaseSettings(withNew.accounts.filter((a) => a.id !== ebinex), c.settings, c.settings, c.settings);
+    expect(Object.keys(without.accounts)).not.toContain(ebinex);
+  });
+});
+
+describe('activeAccounts', () => {
+  it('lists the accounts the rules screens show: not archived, not examples, in list order', () => {
+    const json = regrasJson('config-depois');
+    const list = json.accounts as Record<string, unknown>[];
+    list[0].archived_at = '2026-10-18T12:00:00+00:00';
+    list.push({ ...clone(list[1]), account_id: '00000000-0000-4000-8000-0000000000e1', label: 'Exemplo', is_example: true });
+    expect(activeAccounts(parseRulesConfig(json)).map((a) => a.label)).toEqual(['Ebinex']);
+  });
+});
+
 describe('parseRulesNow', () => {
   const linha = (name: Parameters<typeof agora>[0], market: 'futures' | 'binary') => {
     const a = agora(name).accounts.find((x) => x.market === market)!;
@@ -336,6 +406,18 @@ describe('parseRulesNow', () => {
     expect(nextChangeAt(agora('agora-seg-0930-et'))?.toISOString()).toBe('2026-10-19T14:00:00.000Z');
     expect(nextChangeAt(agora('agora-seg-2030-brt'))?.toISOString()).toBe('2026-10-20T00:00:00.000Z');
     expect(nextChangeAt({ serverNow: new Date(), accounts: [] })).toBeNull();
+  });
+
+  it('leaves out accounts of markets without rules instead of failing the whole answer', () => {
+    // rules_now lists every active account; a Phase 1 backfill can hold a forex account
+    const json = regrasJson('agora-antes-seg-0930-et');
+    const list = json.accounts as Record<string, unknown>[];
+    list.splice(1, 0, { ...clone(list[0]), account_id: '00000000-0000-4000-8000-0000000000f1', label: 'Forex', market: 'forex' });
+    const now = parseRulesNow(json);
+    expect(now.accounts.map((a) => a.label)).toEqual(['Top One #1', 'Ebinex']);
+    // Anything else of another shape still fails
+    list.push(42 as unknown as Record<string, unknown>);
+    expect(() => parseRulesNow(json)).toThrow(RulesAnswerError);
   });
 
   it('refuses an answer of another shape', () => {

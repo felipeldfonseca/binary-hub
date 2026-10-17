@@ -27,6 +27,7 @@ import {
   parseRulesNow,
   parseSaveResult,
   pendingVersions,
+  rebaseSettings,
   resolveRules,
   sameAccount,
   sameMarket,
@@ -390,6 +391,46 @@ values ('${ids.apexB}', '${uid}', 'futures', 'Apex B', 'America/New_York', 1080)
     expect(c.preferences.theme).toBe('escuro');
     // The merge is not a rules save: the revision does not move
     expect(buildSavePayload(c, c.settings)).toBeNull();
+  });
+
+  it('carries a page’s draft over a save this tab made meanwhile (a new account’s v1), and saves it', () => {
+    const page = config();
+    const draft: RulesSettings = JSON.parse(JSON.stringify(page.settings));
+    draft.markets.binary.windowRule.outside = draft.markets.binary.windowRule.outside === 'aviso' ? 'fora' : 'aviso';
+    // Meanwhile the import sheet creates an account and saves its v1
+    ids.apexC = randomUUID();
+    asUserExec(
+      uid,
+      `insert into public.trading_accounts (id, user_id, market, label, day_tz, day_start_min)
+       values ('${ids.apexC}', '${uid}', 'futures', 'Apex C', 'America/New_York', 1080);`,
+    );
+    const sheet = config();
+    const v1 = parseSaveResult(
+      asUser(uid, `public.save_rules(${lit(buildNewAccountPayload(sheet, { accountId: ids.apexC, market: 'futures', settings: copyAccountSettings(sheet.settings, ids.top), copiedFrom: ids.top }))})`),
+    );
+    expect(v1.versions.map((v) => [v.accountId, v.versionNo])).toEqual([[ids.apexC, 1]]);
+    // The page's own payload is now stale
+    expect(codeOf(() => asUser(uid, `public.save_rules(${lit(buildSavePayload(page, draft))})`))).toBe('rules_changed');
+    // Rebased on the new rules_config, it saves only the page's change, with the new account as saved
+    const now = config();
+    const rebased = rebaseSettings(now.accounts, page.settings, now.settings, draft);
+    expect(sameAccount('futures', rebased.accounts[ids.apexC], now.settings.accounts[ids.apexC])).toBe(true);
+    const payload = buildSavePayload(now, rebased)!;
+    expect(Object.keys(payload)).toEqual(['v', 'base_rev', 'defaults']);
+    expect(Object.keys(payload.defaults!)).toEqual(['binary']);
+    const { result } = save(now, rebased, payload);
+    expect(result.versions.map((v) => v.accountId)).toEqual([ids.ebx]);
+  });
+
+  it('rules_now lists accounts of every market; parseRulesNow keeps those with rules', () => {
+    const forex = randomUUID();
+    psql(`insert into public.trading_accounts (id, user_id, market, label, day_tz, day_start_min, sort_order)
+values ('${forex}', '${uid}', 'forex', 'Forex', 'America/Sao_Paulo', 0, 5);`);
+    const json = asUser(uid, 'public.rules_now()') as { accounts: { account_id: string }[] };
+    expect(json.accounts.map((a) => a.account_id)).toContain(forex);
+    const now = parseRulesNow(json);
+    expect(now.accounts.map((a) => a.accountId)).not.toContain(forex);
+    expect(now.accounts.map((a) => a.accountId)).toEqual(expect.arrayContaining([ids.top, ids.ebx]));
   });
 });
 
