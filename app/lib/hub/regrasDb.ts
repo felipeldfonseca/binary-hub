@@ -165,3 +165,35 @@ export interface PreferencesPatch {
 export async function mergePreferences(db: SupabaseClient, patch: PreferencesPatch): Promise<HubPreferences> {
   return (await rpc(db, 'merge_preferences', { p_patch: patch })) as HubPreferences;
 }
+
+/** One account and the start of its rules (version 1's effective_from) */
+export interface RulesSince {
+  accountId: string;
+  since: Date;
+}
+
+/**
+ * How many trades each account has with entry at or after the start of its rules: «{n} operações
+ * do diário desde {d mmm}» and «{n} op. desde então». Every source counts (decisoes.md: imported
+ * trades after «desde» are judged by the version in force); the history before it never does.
+ * Counted by the database (count, head), so the API's row limit never cuts it.
+ */
+export async function fetchTradesSince(db: SupabaseClient, items: readonly RulesSince[]): Promise<Record<string, number>> {
+  const entries = await Promise.all(
+    items.map(async ({ accountId, since }) => {
+      let result: { error: unknown; count?: number | null };
+      try {
+        result = (await db
+          .from('trades')
+          .select('id', { count: 'exact', head: true })
+          .eq('account_id', accountId)
+          .gte('entry_time', since.toISOString())) as { error: unknown; count?: number | null };
+      } catch (e) {
+        throw toRegrasError(e);
+      }
+      if (result.error) throw toRegrasError(result.error);
+      return [accountId, result.count ?? 0] as const;
+    }),
+  );
+  return Object.fromEntries(entries);
+}

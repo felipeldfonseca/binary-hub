@@ -12,6 +12,7 @@ import {
   useRulesConfig,
   useRulesNow,
   useSaveRules,
+  useTradesSinceRules,
 } from '@/hooks/useRegras'
 import { agora, configAntes, configDepois, saveDono } from '@/testing/regras'
 
@@ -27,12 +28,14 @@ jest.mock('@/lib/hub/regrasDb', () => ({
   fetchRulesNow: jest.fn(),
   saveRules: jest.fn(),
   mergePreferences: jest.fn(),
+  fetchTradesSince: jest.fn(),
 }))
 
 const fetchRulesConfig = regrasDb.fetchRulesConfig as jest.MockedFunction<typeof regrasDb.fetchRulesConfig>
 const fetchRulesNow = regrasDb.fetchRulesNow as jest.MockedFunction<typeof regrasDb.fetchRulesNow>
 const saveRules = regrasDb.saveRules as jest.MockedFunction<typeof regrasDb.saveRules>
 const mergePreferences = regrasDb.mergePreferences as jest.MockedFunction<typeof regrasDb.mergePreferences>
+const fetchTradesSince = regrasDb.fetchTradesSince as jest.MockedFunction<typeof regrasDb.fetchTradesSince>
 
 function setup() {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: Infinity } } })
@@ -45,6 +48,7 @@ beforeEach(() => {
   fetchRulesNow.mockReset().mockResolvedValue(agora('agora-seg-0930-et'))
   saveRules.mockReset().mockResolvedValue(saveDono())
   mergePreferences.mockReset().mockResolvedValue({ theme: 'escuro' })
+  fetchTradesSince.mockReset().mockResolvedValue({})
 })
 
 afterEach(() => {
@@ -204,5 +208,29 @@ describe('useMergePreferences', () => {
     // React Query tells the components on its next tick
     await waitFor(() => expect(result.current.config.data?.preferences).toEqual({ theme: 'escuro' }))
     expect(fetchRulesConfig).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('useTradesSinceRules', () => {
+  it('counts only accounts with versions, from their version 1', async () => {
+    const c = configDepois()
+    fetchTradesSince.mockResolvedValue({ [c.accounts[0].id]: 0, [c.accounts[1].id]: 2 })
+    const { wrapper } = setup()
+    const { result } = renderHook(() => useTradesSinceRules(c.accounts), { wrapper })
+    await waitFor(() => expect(result.current.data).toEqual({ [c.accounts[0].id]: 0, [c.accounts[1].id]: 2 }))
+    expect(fetchTradesSince).toHaveBeenCalledWith(
+      expect.anything(),
+      c.accounts.map((a) => ({ accountId: a.id, since: a.versions[0].effectiveFrom })),
+    )
+  })
+
+  it('asks nothing when no account has rules yet', async () => {
+    const { wrapper } = setup()
+    const { result } = renderHook(() => useTradesSinceRules(configAntes().accounts), { wrapper })
+    await act(async () => {
+      await Promise.resolve()
+    })
+    expect(result.current.fetchStatus).toBe('idle')
+    expect(fetchTradesSince).not.toHaveBeenCalled()
   })
 })

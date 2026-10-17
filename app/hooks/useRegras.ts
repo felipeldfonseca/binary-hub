@@ -3,10 +3,11 @@
 import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { hubKeys, useHubDb } from '@/hooks/useContas';
 import type { HubPreferences } from '@/lib/hub/contasDb';
-import { nextChangeAt, type RulesConfig, type RulesNow, type SaveRulesPayload, type SaveRulesResult } from '@/lib/hub/regras';
+import { nextChangeAt, type AccountConfig, type RulesConfig, type RulesNow, type SaveRulesPayload, type SaveRulesResult } from '@/lib/hub/regras';
 import {
   fetchRulesConfig,
   fetchRulesNow,
+  fetchTradesSince,
   mergePreferences,
   saveRules,
   type PreferencesPatch,
@@ -120,5 +121,23 @@ export function useMergePreferences() {
       queryClient.setQueryData(hubKeys.preferencias(userId), merged);
       queryClient.setQueryData<RulesConfig>(regrasKeys.config(userId), (c) => (c ? { ...c, preferences: merged } : c));
     },
+  });
+}
+
+/**
+ * For each account with versions, how many trades it has since its rules started (version 1):
+ * «{n} operações do diário desde {d mmm}», «{n} op. desde então». Accounts without a version are
+ * not in the answer. Under ['hub', uid, 'atividade'], so an import, an archive or a save refresh it.
+ */
+export function useTradesSinceRules(accounts: readonly AccountConfig[] | undefined) {
+  const { db, userId } = useHubDb();
+  const items = (accounts ?? [])
+    .filter((a) => a.versions.length > 0)
+    .map((a) => ({ accountId: a.id, since: a.versions[0].effectiveFrom }));
+  const key = items.map((i) => `${i.accountId}@${i.since.toISOString()}`).join(',');
+  return useQuery<Record<string, number>, RegrasDataError>({
+    queryKey: ['hub', userId, 'atividade', 'desde', key],
+    queryFn: () => fetchTradesSince(db, items),
+    enabled: !!userId && items.length > 0,
   });
 }

@@ -8,6 +8,7 @@ import {
   RegrasDataError,
   fetchRulesConfig,
   fetchRulesNow,
+  fetchTradesSince,
   mergePreferences,
   saveRules,
   toRegrasError,
@@ -107,5 +108,52 @@ describe('rules RPC wrappers', () => {
     expect(toRegrasError(new RegrasDataError('rules_changed')).code).toBe('rules_changed');
     expect(toRegrasError(null).code).toBe('unknown');
     expect(new Set(REGRAS_ERROR_CODES).size).toBe(REGRAS_ERROR_CODES.length);
+  });
+});
+
+describe('fetchTradesSince', () => {
+  it('counts each account’s trades from the start of its rules, in the database', async () => {
+    const calls: unknown[][] = [];
+    const db = {
+      from: (table: string) => {
+        const log: unknown[] = [['from', table]];
+        calls.push(log);
+        const chain: Record<string, unknown> = {};
+        for (const m of ['select', 'eq', 'gte']) {
+          chain[m] = (...args: unknown[]) => {
+            log.push([m, ...args]);
+            return chain;
+          };
+        }
+        chain.then = (resolve: (v: unknown) => unknown) =>
+          Promise.resolve({ data: null, error: null, count: (log[2] as unknown[])[2] === 'a' ? 3 : 0 }).then(resolve);
+        return chain;
+      },
+    } as unknown as SupabaseClient;
+    const since = new Date('2026-10-17T19:48:01.334Z');
+    await expect(
+      fetchTradesSince(db, [
+        { accountId: 'a', since },
+        { accountId: 'b', since },
+      ]),
+    ).resolves.toEqual({ a: 3, b: 0 });
+    expect(calls[0]).toEqual([
+      ['from', 'trades'],
+      ['select', 'id', { count: 'exact', head: true }],
+      ['eq', 'account_id', 'a'],
+      ['gte', 'entry_time', '2026-10-17T19:48:01.334Z'],
+    ]);
+  });
+
+  it('gives a typed error when a count fails', async () => {
+    const db = {
+      from: () => {
+        const chain: Record<string, unknown> = {};
+        for (const m of ['select', 'eq', 'gte']) chain[m] = () => chain;
+        chain.then = (resolve: (v: unknown) => unknown) => Promise.resolve({ error: { code: 'PGRST301', message: 'JWT expired' } }).then(resolve);
+        return chain;
+      },
+    } as unknown as SupabaseClient;
+    await expect(fetchTradesSince(db, [{ accountId: 'a', since: new Date() }])).rejects.toMatchObject({ code: 'not_authenticated' });
   });
 });
