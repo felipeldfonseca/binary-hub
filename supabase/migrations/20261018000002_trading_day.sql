@@ -21,7 +21,9 @@
 -- check at the end stops it if any stored day disagreed).
 
 -- Occurrences of a list of windows (Resolved "windows") that open from p_from to p_to days around
--- the date of p_at on each window's clock, on the window's weekdays.
+-- the date of p_at on each window's clock, on the window's weekdays. Any signed-in user can call it
+-- (the trades trigger runs as the writer), so it reads at most the two windows a Resolved list
+-- holds and at most 7 days back and 14 ahead; its callers use -2..9.
 create or replace function public.window_occurrences(p_windows jsonb, p_at timestamptz, p_from int, p_to int)
 returns table (opens_at timestamptz, closes_at timestamptz)
 language sql
@@ -32,9 +34,11 @@ as $$
          ((d.dt + case when w.e > w.s then 0 else 1 end) + make_interval(mins => w.e)) at time zone w.tz
   from (
     select x->>'tz' as tz, (x->>'start_min')::int as s, (x->>'end_min')::int as e, (x->>'weekdays')::int as wd
-    from jsonb_array_elements(case when jsonb_typeof(p_windows) = 'array' then p_windows else '[]'::jsonb end) x
+    from jsonb_array_elements(case when jsonb_typeof(p_windows) = 'array' then p_windows else '[]'::jsonb end)
+         with ordinality as l(x, ord)
+    where l.ord <= 2
   ) w
-  cross join lateral generate_series(p_from, p_to) k
+  cross join lateral generate_series(greatest(p_from, -7), least(p_to, 14)) k
   cross join lateral (select (p_at at time zone w.tz)::date + k as dt) d
   where ((w.wd >> (extract(isodow from d.dt)::int - 1)) & 1) = 1
 $$;

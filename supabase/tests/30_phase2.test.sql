@@ -292,6 +292,32 @@ select tests.eq((select rules#>>'{states,alinhadas,text}' from public.market_rul
                 'Espero o pullback.', 'the text is kept in the default');
 commit;
 
+-- A save that creates no version still makes an older page stale: the revision follows the
+-- defaults and the account settings too (each save below touches only one of them)
+begin;
+select set_config('request.jwt.claim.sub', :A, true);
+set local role authenticated;
+select public.rules_config()->>'rev' as rev \gset
+select tests.eq(public.save_rules(jsonb_set(jsonb_set(tests.owner_payload(:'rev', :'topone') - 'accounts' - 'preferences',
+                  '{defaults,futures,rules,window_rule,outside}', '"aviso"'),
+                  '{defaults,futures,rules,states}', '{"alinhadas": {"choice": null, "text": "Espero o reteste."}}'))->'versions',
+                '[]'::jsonb, 'only the defaults: a state text, no version');
+select tests.save_fails(jsonb_build_object('v', 1, 'base_rev', :'rev', 'preferences', '{"display_tz": "et"}'::jsonb), 'rules_changed',
+                        'a page loaded before a defaults-only save is refused');
+commit;
+
+begin;
+select set_config('request.jwt.claim.sub', :A, true);
+set local role authenticated;
+select public.rules_config()->>'rev' as rev \gset
+select tests.eq(public.save_rules(jsonb_build_object('v', 1, 'base_rev', :'rev', 'accounts', jsonb_build_object(:'topone',
+                  '{"rules": {"v": 1, "window_rule": {"on": true}, "limit": {"usd": 400, "mode": "conta", "at_limit": "encerrar"}},
+                    "window": null}'::jsonb)))->'versions',
+                '[]'::jsonb, 'only the account settings: «só nesta conta» the value it inherits, no version');
+select tests.save_fails(jsonb_build_object('v', 1, 'base_rev', :'rev', 'preferences', '{"display_tz": "et"}'::jsonb), 'rules_changed',
+                        'a page loaded before a settings-only save is refused');
+commit;
+
 -- A state choice does; a dry run says so and writes nothing
 begin;
 select set_config('request.jwt.claim.sub', :A, true);
@@ -459,6 +485,23 @@ select tests.save_fails(jsonb_set(:'p'::jsonb, '{preferences,calendars}', '["us"
 select tests.save_fails(jsonb_set(:'p'::jsonb, '{preferences,email}', '"x@y"'), 'unknown_key', 'a preference the hub does not own');
 select tests.save_fails('[]'::jsonb, 'bad_payload', 'not an object');
 select tests.save_fails(jsonb_set(:'p'::jsonb, '{base_rev}', '"yesterday"'), 'bad_payload', 'a malformed revision');
+-- Whole numbers written with a decimal point: jsonb keeps 600.0, and the casts to integer would
+-- fail with the value in the message
+select tests.save_fails(jsonb_set(:'p'::jsonb, '{defaults,futures,windows,0,start_min}', '600.0'), 'bad_window',
+                        'a window start written as 600.0');
+select tests.save_fails(jsonb_set(:'p'::jsonb, '{defaults,binary,windows,0,end_min}', '1260.0'), 'bad_window',
+                        'a window end written as 1260.0');
+select tests.save_fails(jsonb_set(:'p'::jsonb, '{defaults,futures,windows,0,weekdays}', '31.0'), 'bad_weekdays',
+                        'the days written as 31.0');
+select tests.save_fails(jsonb_set(:'p'::jsonb, array['accounts', :'topone', 'window'],
+                          '{"tz": "America/New_York", "start_min": 600.0, "end_min": 660, "weekdays": 31}'),
+                        'bad_window', 'an account window written with 600.0');
+select tests.save_fails(jsonb_set(:'p'::jsonb, '{defaults,futures,rules,block,before_min}', '5.0'), 'bad_block',
+                        'a block written as 5.0 in the default');
+select tests.save_fails(jsonb_set(:'p'::jsonb, array['accounts', :'topone', 'rules', 'block'], '{"after_min": 10.0}'), 'bad_block',
+                        'and in an account');
+select tests.eq(public.save_rules(jsonb_set(:'p'::jsonb, '{defaults,futures,windows,0,start_min}', '6e2'), true)->'versions', '[]'::jsonb,
+                '6e2 is stored as 600: accepted, and the same rules');
 
 update public.trading_accounts set archived_at = now() where id = :'ebinex2';
 select tests.save_fails(jsonb_set(:'p'::jsonb, array['accounts', :'ebinex2'], '{"rules": {"v": 1}, "window": null}'),
@@ -539,6 +582,11 @@ select tests.save_fails(jsonb_build_object('v', 1, 'base_rev', 'none', 'accounts
 select tests.raises(format('select public.gate_at(%L, now())', :'topone'), 'unknown_account', 'B cannot ask about A''s account');
 select tests.raises(format('select public.merge_preferences(%L)', jsonb_build_object('conta_atual', :'topone')), 'unknown_account',
                     'B cannot point conta_atual at A''s account');
+-- B has no futures account, so nothing would have resolved this default until one existed; then
+-- every rules_config and save_rules would have failed on the cast
+select tests.save_fails('{"v": 1, "base_rev": "none", "defaults": {"futures": {"rules": {"v": 1, "window_rule": {"on": true, "outside": "fora"},
+                          "block": {"on": true, "before_min": 5.0, "after_min": 10}}, "windows": null}}}', 'bad_block',
+                        'a futures default with a block written as 5.0 is refused even without a futures account');
 select public.save_rules('{"v": 1, "base_rev": "none", "defaults": {"binary": {"rules": {"v": 1, "window_rule": {"on": true, "outside": "aviso"}},
                           "windows": [{"tz": "America/Sao_Paulo", "start_min": 540, "end_min": 600, "weekdays": 127}]}}}') as rb \gset
 select tests.eq((select jsonb_agg(x->'account_id') from jsonb_array_elements((:'rb'::jsonb)->'versions') x), jsonb_build_array(:'b_ebinex'),
@@ -553,6 +601,10 @@ select tests.raises_state(format($$insert into public.operating_windows (user_id
 select tests.raises_state(format($$insert into public.account_rule_versions (user_id, account_id, version_no, resolved)
                                    values (%L, %L, 1, %L)$$, :B, :'topone', tests.topone_v1()),
                           '23503', 'a version cannot pair B with A''s account');
+select tests.raises_state(format($$insert into public.market_rule_defaults (user_id, market, rules)
+                                   values (%L, 'futures', '{"v": 1, "window_rule": {"on": true, "outside": "fora"},
+                                                            "block": {"on": true, "before_min": 5.0, "after_min": 10}}')$$, :B),
+                          '23514', 'not even the table owner stores a block written as 5.0');
 
 -- =============================================================================================
 -- 10. "Desde" and regime
@@ -611,6 +663,11 @@ select tests.eq(public.gate_at(:'ebinex2', tests.br(5, '01:00'))->>'trading_day'
 select tests.eq(public.compute_trading_day(:'topone', tests.ny(0, '17:59')), tests.ny_day(0), 'Top One 17:59 ET → that day');
 select tests.eq(public.compute_trading_day(:'topone', tests.ny(0, '18:00')), tests.ny_day(1), 'Top One 18:00 ET → the next pregão');
 select tests.eq(public.compute_trading_day(:'topone', tests.ny(4, '18:30')), tests.ny_day(5), 'Friday 18:30 ET → Saturday (as Phase 1)');
+-- Two windows of one market that overlap: 22:00–04:00 (opened Monday) and 01:00–05:00 (opened Tuesday)
+select tests.eq(public.trading_day_for('[{"tz": "America/Sao_Paulo", "start_min": 1320, "end_min": 240, "weekdays": 127},
+                                         {"tz": "America/Sao_Paulo", "start_min": 60, "end_min": 300, "weekdays": 127}]',
+                                       'America/Sao_Paulo', 0, '2026-10-20 03:00 America/Sao_Paulo'),
+                '2026-10-19'::date, 'Tue 03:00 inside two overlapping windows → Monday: the occurrence that opened first decides');
 
 -- The old pages' path (trigger) stores the same days
 insert into public.trades (user_id, account_id, symbol, asset_type, direction, entry_time, quantity, result, pnl, market_type)
@@ -765,6 +822,27 @@ select tests.eq((select (got->>'changes_at')::timestamptz from tests.owner_cases
                 '2026-10-19 22:00:00+00'::timestamptz, 'after the window, the next change is the 18:00 ET turn');
 select tests.eq((select got#>>'{block,reason}' from tests.owner_cases where label = 'Ebinex Mon 20:00'), 'so_futuros',
                 'binaries have no data block');
+select tests.eq((public.gate_eval(tests.topone_v1(), '{}'::jsonb, '2026-10-19 10:30 America/New_York',
+                                  '{"trades": 0, "net_usd": 0, "worst_usd": 0, "hit_at": null}')->>'changes_at')::timestamptz,
+                '2026-10-19 11:00 America/New_York'::timestamptz, 'inside the window, the answer changes when it closes');
+select tests.eq((select (got->>'changes_at')::timestamptz from tests.owner_cases where label = 'Ebinex Mon 21:00'),
+                '2026-10-20 00:00 America/Sao_Paulo'::timestamptz, 'after the binary window, the next change is midnight in Brasília');
+select tests.eq((select (got->>'changes_at')::timestamptz from tests.owner_cases where label = 'Ebinex Mon 20:00'),
+                '2026-10-19 21:00 America/Sao_Paulo'::timestamptz, 'and inside it, 21:00');
+
+-- «Perto do limite» from 80% of it
+select tests.eq((select jsonb_agg(public.gate_eval(tests.topone_v1(), '{}'::jsonb, '2026-10-19 10:30 America/New_York',
+                                                   jsonb_build_object('trades', 1, 'net_usd', w, 'worst_usd', w, 'hit_at', null))
+                                  #>'{limit,near}' order by w)
+                 from unnest(array[-320, -319.99]::numeric[]) w),
+                '[true, false]'::jsonb, '−320 of 400 is near the limit; −319.99 is not');
+
+-- Without the day's result the limit is not evaluated: never «ok» with US$ 0
+select tests.eq((select string_agg(coalesce(u::text, 'null'), '; ') from unnest(array[null, '{}', '{"trades": 0}']::jsonb[]) u
+                 where (select g#>>'{limit,state}' <> 'nao_avaliado' or g#>>'{limit,reason}' <> 'sem_dados'
+                               or g->'checks_evaluated' <> '["janela"]'::jsonb or g->>'status' <> 'liberado'
+                        from public.gate_eval(tests.topone_v1(), '{}'::jsonb, '2026-10-19 10:30 America/New_York', u) g)),
+                null, 'a missing day''s result leaves the limit «não avaliado» (sem_dados) and out of the checks');
 
 -- =============================================================================================
 -- 13. The daily limit: worst point in exit order, net of commission, sticky for the pregão
@@ -844,6 +922,40 @@ select tests.eq(public.gate_at(:'topone2', tests.ny(2, '10:30'))->'status', 'nul
                 'the second account has no rules of its own yet');
 commit;
 
+-- Back to «por conta»: only this account's trades count; the running sum goes in exit order; the
+-- limit is reached at the first exit that takes the day there
+begin;
+select set_config('request.jwt.claim.sub', :A, true);
+set local role authenticated;
+select public.rules_config()->>'rev' as rev \gset
+select tests.eq((select jsonb_agg(x->'account_id') from jsonb_array_elements(public.save_rules(tests.owner_payload(:'rev', :'topone'))->'versions') x),
+                jsonb_build_array(:'topone'), 'Top One #1 back to a limit per account');
+select public.gate_at(:'topone', tests.ny(2, '10:30')) as g \gset
+select tests.ok((:'g'::jsonb)->>'status' = 'liberado' and ((:'g'::jsonb)#>>'{limit,worst_usd}')::numeric = -100
+                and (:'g'::jsonb)#>>'{limit,mode}' = 'conta' and (:'g'::jsonb)#>>'{limit,state}' = 'ok',
+                'per account, Top One #2''s −300 on the same day does not count');
+
+insert into public.trades (user_id, account_id, symbol, asset_type, direction, entry_time, exit_time, quantity, result, pnl, commission, market_type)
+values
+  -- Entered first, closed last
+  (:A, :'topone', 'MES', 'futures', 'long', tests.ny(3, '10:00'), tests.ny(3, '10:50'), 1, 'win', 300, 0, 'futures'),
+  (:A, :'topone', 'MES', 'futures', 'long', tests.ny(3, '10:10'), tests.ny(3, '10:20'), 1, 'loss', -400, 0, 'futures'),
+  -- At −400 at 10:10, back to −350, below again at 10:30
+  (:A, :'topone', 'MES', 'futures', 'long', tests.ny(4, '10:01'), tests.ny(4, '10:10'), 1, 'loss', -400, 0, 'futures'),
+  (:A, :'topone', 'MES', 'futures', 'long', tests.ny(4, '10:11'), tests.ny(4, '10:20'), 1, 'win', 50, 0, 'futures'),
+  (:A, :'topone', 'MES', 'futures', 'long', tests.ny(4, '10:21'), tests.ny(4, '10:30'), 1, 'loss', -100, 0, 'futures');
+select tests.eq(public.gate_at(:'topone', tests.ny(3, '10:25'))->>'status', 'encerrado', '10:25: the −400 closed at 10:20 closes the day');
+select public.gate_at(:'topone', tests.ny(3, '10:55')) as g \gset
+select tests.ok((:'g'::jsonb)->>'status' = 'encerrado' and ((:'g'::jsonb)#>>'{limit,worst_usd}')::numeric = -400
+                and ((:'g'::jsonb)#>>'{limit,hit_at}')::timestamptz = tests.ny(3, '10:20')
+                and ((:'g'::jsonb)#>>'{today,net_usd}')::numeric = -100,
+                '10:55: in exit order the day went to −400 before the +300 (in entry order it never would)');
+select public.gate_at(:'topone', tests.ny(4, '10:45')) as g \gset
+select tests.ok((:'g'::jsonb)->>'status' = 'encerrado' and ((:'g'::jsonb)#>>'{limit,worst_usd}')::numeric = -450
+                and ((:'g'::jsonb)#>>'{limit,hit_at}')::timestamptz = tests.ny(4, '10:10'),
+                'reached at 10:10 and again at 10:30: «atingido às» the first time');
+commit;
+
 -- =============================================================================================
 -- 14. Preferences: merged in the database, never overwritten whole
 -- =============================================================================================
@@ -879,6 +991,66 @@ select tests.eq((select resolved#>'{block,calendars}' from public.account_rule_v
 select tests.eq((select preferences->'calendars' from public.profiles where id = :A), '["us", "br"]'::jsonb, 'and saved once');
 select tests.eq((select preferences->>'conta_atual' from public.profiles where id = :A), :'topone', 'the save kept the other preferences');
 commit;
+
+-- Only save_rules changes the calendars: another tab writing its cached preferences whole (the
+-- account switcher does), or any other write, keeps what Personalizar saved, so no later save
+-- versions the futures accounts with calendars nobody chose
+begin;
+select set_config('request.jwt.claim.sub', :A, true);
+set local role authenticated;
+select public.rules_config()->>'rev' as rev \gset
+update public.profiles set preferences = jsonb_build_object('conta_atual', :'topone', 'display_tz', 'et', 'calendars', '["us"]'::jsonb)
+where id = :A;
+select tests.eq((select preferences->'calendars' from public.profiles where id = :A), '["us", "br"]'::jsonb,
+                'a stale tab''s whole-object write keeps the saved calendars');
+select tests.eq((select preferences->>'display_tz' from public.profiles where id = :A), 'et', 'and writes the rest of its object');
+update public.profiles set preferences = preferences - 'calendars' where id = :A;
+select tests.eq((select preferences->'calendars' from public.profiles where id = :A), '["us", "br"]'::jsonb,
+                'a write without them keeps them');
+update public.profiles set preferences = '[]' where id = :A;
+select tests.eq((select preferences from public.profiles where id = :A), '{"calendars": ["us", "br"]}'::jsonb,
+                'even a write that is not an object');
+update public.profiles set preferences_saved_at = '2100-01-01T00:00:00Z' where id = :A;
+select tests.ok((select preferences_saved_at < now() + interval '1 minute' from public.profiles where id = :A)
+                and public.rules_config()->>'rev' = :'rev', 'the API cannot move the save time or the revision');
+select tests.ok(tests.invariant_ok(), 'every account''s last version is still what its settings resolve to');
+select public.save_rules(jsonb_build_object('v', 1, 'base_rev', :'rev', 'defaults', jsonb_build_object('binary',
+         '{"rules": {"v": 1, "window_rule": {"on": true, "outside": "fora"}},
+           "windows": [{"tz": "America/Sao_Paulo", "start_min": 1230, "end_min": 1290, "weekdays": 31}]}'::jsonb))) as r \gset
+select tests.ok((select count(*) > 0 and bool_and(a.market = 'binary')
+                 from jsonb_array_elements((:'r'::jsonb)->'versions') x
+                 join public.trading_accounts a on a.id = (x->>'account_id')::uuid),
+                'a later binary-only save versions only binary accounts');
+rollback;
+
+-- A save of preferences alone moves the revision: a stale page cannot save over it
+begin;
+select set_config('request.jwt.claim.sub', :A, true);
+set local role authenticated;
+select public.rules_config()->>'rev' as rev \gset
+select public.save_rules(jsonb_build_object('v', 1, 'base_rev', :'rev', 'preferences', '{"display_tz": "both"}'::jsonb)) as r \gset
+select tests.ok((:'r'::jsonb)->'versions' = '[]'::jsonb and (:'r'::jsonb)->>'rev' <> :'rev'
+                and (:'r'::jsonb)->>'rev' = public.rules_config()->>'rev', 'a preferences-only save gives a new revision');
+select tests.save_fails(jsonb_build_object('v', 1, 'base_rev', :'rev', 'preferences', '{"display_tz": "et"}'::jsonb), 'rules_changed',
+                        'a page loaded before it is refused');
+select tests.eq((select preferences->>'display_tz' from public.profiles where id = :A), 'both', 'the newer choice stays');
+update public.profiles set preferences = preferences || '{"calendars": ["eu"]}' where id = :A;
+select tests.eq((select preferences->'calendars' from public.profiles where id = :A), '["us", "br"]'::jsonb,
+                'save_rules lets only its own write change the calendars, not the next one in its transaction');
+commit;
+
+-- A profile created through the API starts without calendars or a save time
+\set F '''ffffffff-0000-0000-0000-000000000006'''
+insert into auth.users (id, email) values (:F, 'f@example.test');
+begin;
+select set_config('request.jwt.claim.sub', :F, true);
+set local role authenticated;
+insert into public.profiles (id, preferences, preferences_saved_at)
+values (:F, '{"theme": "claro", "calendars": ["eu"]}', '2020-01-01T00:00:00Z');
+select tests.ok((select preferences = '{"theme": "claro"}'::jsonb and preferences_saved_at is null from public.profiles where id = :F),
+                'an insert through the API keeps neither');
+commit;
+delete from auth.users where id = :F;
 
 -- =============================================================================================
 -- 15. Server answers and the API surface
@@ -924,6 +1096,16 @@ select set_config('request.jwt.claim.sub', :A, true);
 set local role authenticated;
 select tests.raises($$select public.rules_check_payload('aaaaaaaa-0000-0000-0000-000000000001', '{}')$$,
                     'permission denied for function rules_check_payload', 'the validators are internal');
+-- The trades trigger needs window_occurrences as the caller, so any signed-in user can call it: it
+-- stays small whatever it is asked
+select tests.eq((select count(*) from public.window_occurrences(
+                   '[{"tz": "America/Sao_Paulo", "start_min": 600, "end_min": 660, "weekdays": 127}]', now(), -1000000, 1000000)),
+                22::bigint, 'window_occurrences looks at most 7 days back and 14 ahead');
+select tests.eq((select count(*) from public.window_occurrences(
+                   '[{"tz": "America/Sao_Paulo", "start_min": 600, "end_min": 660, "weekdays": 127},
+                     {"tz": "America/Sao_Paulo", "start_min": 700, "end_min": 760, "weekdays": 127},
+                     {"tz": "America/Sao_Paulo", "start_min": 800, "end_min": 860, "weekdays": 127}]', now(), 0, 0)),
+                2::bigint, 'and at most the two windows a version holds');
 commit;
 
 begin;

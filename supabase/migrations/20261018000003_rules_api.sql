@@ -167,8 +167,9 @@ as $$
     (select p.preferences->'calendars' from public.profiles p where p.id = p_account.user_id))
 $$;
 
--- The revision of a user's rules: the last time anything of them was saved ('none' before that).
--- Personalizar sends it back as base_rev, so a save from a stale tab or device is refused.
+-- The revision of a user's rules: the last time anything of them was saved, preferences included
+-- ('none' before that). Personalizar sends it back as base_rev, so a save from a stale tab or device
+-- is refused.
 create or replace function public.rules_rev(p_user uuid)
 returns text
 language sql
@@ -178,7 +179,8 @@ as $$
   select coalesce(to_char(greatest(
            (select max(d.updated_at) from public.market_rule_defaults d where d.user_id = p_user),
            (select max(s.updated_at) from public.account_rule_settings s where s.user_id = p_user),
-           (select max(v.effective_from) from public.account_rule_versions v where v.user_id = p_user))
+           (select max(v.effective_from) from public.account_rule_versions v where v.user_id = p_user),
+           (select p.preferences_saved_at from public.profiles p where p.id = p_user))
          at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"'), 'none')
 $$;
 
@@ -187,7 +189,8 @@ $$;
 -- =============================================================================================
 
 -- Keys of profiles.preferences the hub writes. A null value removes the key. `calendars` feeds the
--- rule versions, so only save_rules writes it (p_with_calendars).
+-- rule versions, so only save_rules writes it (p_with_calendars; profiles_rules_guard keeps it from
+-- every other write).
 create or replace function public.prefs_check(p jsonb, p_with_calendars boolean)
 returns text
 language plpgsql
@@ -522,10 +525,15 @@ begin
     end loop;
 
     if p_payload ? 'preferences' then
-      -- trades and the merge both expect a profile row; the app creates it on first sign-in
-      insert into public.profiles as p (id, preferences)
-      values (uid, public.prefs_apply('{}'::jsonb, p_payload->'preferences'))
-      on conflict (id) do update set preferences = public.prefs_apply(p.preferences, p_payload->'preferences');
+      -- trades and the merge both expect a profile row; the app creates it on first sign-in.
+      -- The setting lets this write, and only this one, change the calendars and the save time
+      -- (profiles_rules_guard).
+      perform pg_catalog.set_config('binary_hub.save_rules', 'on', true);
+      insert into public.profiles as p (id, preferences, preferences_saved_at)
+      values (uid, public.prefs_apply('{}'::jsonb, p_payload->'preferences'), now())
+      on conflict (id) do update set preferences = public.prefs_apply(p.preferences, p_payload->'preferences'),
+                                     preferences_saved_at = now();
+      perform pg_catalog.set_config('binary_hub.save_rules', '', true);
     end if;
 
     -- After: a version for every account whose rules in force changed
@@ -625,7 +633,8 @@ $$;
 
 -- The answer from the rules in force (Resolved, or null before v1), the account's day clock
 -- ({"tz", "start_min"}, used only without a version) and the day's result for the limit's scope
--- (limit_usage). Pure: the truth table of gate.md is tested on it directly.
+-- (limit_usage; without it the limit is not evaluated, reason 'sem_dados'). Pure: the truth table
+-- of gate.md is tested on it directly.
 --
 -- Precedence (gate.md §4.5): nothing evaluated → null; limit reached with "encerrar" →
 -- 'encerrado'; (data block → 'aguardar', Phase 5); outside the window with "fora" → 'fora_janela';
@@ -716,6 +725,9 @@ begin
     l := jsonb_build_object('state', 'nao_avaliado', 'reason', 'sem_versao');
   elsif jsonb_typeof(p_resolved->'limit') <> 'object' then
     l := jsonb_build_object('state', 'nao_avaliado', 'reason', 'sem_limite');
+  elsif jsonb_typeof(p_usage->'worst_usd') is distinct from 'number' then
+    -- The day's result is unknown: never "ok" with US$ 0
+    l := jsonb_build_object('state', 'nao_avaliado', 'reason', 'sem_dados');
   else
     usd := (p_resolved#>>'{limit,usd}')::numeric;
     at_limit := p_resolved#>>'{limit,at_limit}';

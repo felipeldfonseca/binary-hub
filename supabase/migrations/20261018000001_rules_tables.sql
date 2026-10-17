@@ -55,7 +55,8 @@
 --                           "so_fundamentos": …, "em_conflito": …, "sem_direcao": …},
 --                 "day": {"tz": account day_tz, "start_min": account day_start_min}}
 --                `calendars` is the user's preference (profiles.preferences.calendars, default
---                ["us"]) copied into every futures version; state texts never enter a version.
+--                ["us"]) copied into every futures version; only save_rules changes it (the
+--                profiles trigger at the end). State texts never enter a version.
 --
 -- The owner's first versions (Top One 10:00–11:00 ET Mon–Fri with a US$ 400 limit per account that
 -- closes the day; Ebinex 20:00–21:00 Brasília Mon–Fri, no limit):
@@ -76,6 +77,8 @@
 -- Validators (pure)
 -- =============================================================================================
 
+-- A whole number in [p_min, p_max], written as one: jsonb keeps 600.0 as written, and save_rules
+-- casts these values with ::int, which refuses the decimal point (6e2 is stored as 600 and passes)
 create or replace function public.rules_is_int(p jsonb, p_min int, p_max int)
 returns boolean
 language plpgsql
@@ -86,7 +89,7 @@ begin
   if p is null or jsonb_typeof(p) <> 'number' then
     return false;
   end if;
-  return (p::numeric) = trunc(p::numeric) and (p::numeric) between p_min and p_max;
+  return (p::text) ~ '^-?[0-9]+$' and (p::numeric) between p_min and p_max;
 exception when others then
   return false;
 end;
@@ -761,3 +764,53 @@ begin
   end if;
 end;
 $$;
+
+-- =============================================================================================
+-- profiles: what only save_rules writes
+-- =============================================================================================
+-- profiles stays writable through the API as a whole row (the old pages, and the account switcher
+-- writing its cached copy of preferences). Two parts of it belong to the rules:
+--   preferences.calendars   copied into every futures version: changed anywhere else, the next
+--                           save would version the futures accounts with a value nobody chose
+--   preferences_saved_at    when save_rules last saved preferences; part of rules_rev, so a stale
+--                           page cannot save over a newer preferences-only save
+-- Any other write keeps them as save_rules left them: save_rules sets binary_hub.save_rules for its
+-- own write (the API cannot set a setting), and every other insert or update gets the old values.
+
+alter table public.profiles add column if not exists preferences_saved_at timestamptz;
+
+comment on column public.profiles.preferences_saved_at is
+  'When save_rules last saved preferences (part of rules_rev). Written only by save_rules.';
+
+create or replace function public.profiles_rules_guard()
+returns trigger
+language plpgsql
+set search_path = ''
+as $$
+declare
+  old_cal jsonb;
+  prefs jsonb;
+begin
+  if current_setting('binary_hub.save_rules', true) is not distinct from 'on' or new.preferences is null then
+    return new;
+  end if;
+  if tg_op = 'UPDATE' then
+    old_cal := case when jsonb_typeof(old.preferences) = 'object' then old.preferences->'calendars' end;
+    new.preferences_saved_at := old.preferences_saved_at;
+  else
+    new.preferences_saved_at := null;
+  end if;
+  prefs := case when jsonb_typeof(new.preferences) = 'object' then new.preferences else '{}'::jsonb end;
+  if (prefs->'calendars') is distinct from old_cal then
+    new.preferences := case when old_cal is null then prefs - 'calendars'
+                            else jsonb_set(prefs, '{calendars}', old_cal) end;
+  end if;
+  return new;
+end;
+$$;
+
+create trigger profiles_rules_guard
+  before insert or update of preferences, preferences_saved_at on public.profiles
+  for each row execute function public.profiles_rules_guard();
+
+revoke all on function public.profiles_rules_guard() from public, anon, authenticated;

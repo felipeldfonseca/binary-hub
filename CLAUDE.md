@@ -43,7 +43,7 @@ Inside `app/`, `npx jest --ci <path>` runs one suite. Use Node 22 (`.nvmrc`). Be
 - The Supabase session lives in the browser. API routes get the user from the bearer token with `requireUser(request)` and must call it first.
 - Paid AI endpoints also call `denyPaidAi(user)` (env `AI_ALLOWED_USERS`). Hub endpoints call `denyHubAccess(user)` (env `HUB_USERS`). Sign-up is open, so with a list unset nobody is allowed.
 - `__tests__/api/routesRequireAuth.test.ts` discovers every route handler on disk; add new handlers to `EXPECTED_HANDLERS`.
-- Rules are written only by the `save_rules` function (windows, defaults, account settings and the append-only versions); the API may update `trading_accounts` only on the columns the hub edits (label, firm, external_ref, phase, size, is_primary, archived_at).
+- Rules are written only by the `save_rules` function (windows, defaults, account settings and the append-only versions); the API may update `trading_accounts` only on the columns the hub edits (label, firm, external_ref, phase, size, is_primary, archived_at). `profiles.preferences.calendars` feeds the futures versions, so a trigger keeps it (and `profiles.preferences_saved_at`) unchanged on every write except `save_rules`'s own.
 - The server cannot tell who requests a page. Anything a hub page renders on the server reaches every visitor; `ProtectedRoute` and `HubGate` only hide it. Private data is read in the browser with the user's session, where row-level security limits it to the owner, or through API routes that check the session. Anything that costs money or reaches a third party (market data, AI) goes through API routes that also check HUB_USERS.
 
 ## Time zones and trading days
