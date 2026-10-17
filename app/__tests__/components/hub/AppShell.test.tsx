@@ -12,6 +12,9 @@ jest.mock('next/navigation', () => ({
   useRouter: () => ({ push: jest.fn() }),
 }))
 
+// The import sheet the shell holds reaches the data client only once it opens
+jest.mock('@/lib/supabase', () => ({ createDataClient: jest.fn(() => ({})) }))
+
 jest.mock('@/hooks/useAuth', () => ({
   useAuth: () => ({
     user: { id: 'user-1', email: 'felipe@example.com' },
@@ -152,17 +155,32 @@ describe('AppShell', () => {
     expect(screen.getByRole('button', { name: 'Ação da página' })).toHaveFocus()
   })
 
-  it('offers sign-out from the profile menu', async () => {
+  it('offers Personalizar and sign-out from the profile menu', async () => {
     renderShell()
     const profile = screen.getByRole('button', { name: 'Abrir menu do perfil' })
 
     expect(profile).toHaveTextContent('F')
     await userEvent.click(profile)
-    expect(screen.getByText('felipe@example.com')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Sair' })).toHaveFocus()
-    await userEvent.click(screen.getByRole('button', { name: 'Sair' }))
+    const menu = document.getElementById('hub-menu-perfil') as HTMLElement
+    expect(within(menu).getByText('felipe@example.com')).toBeInTheDocument()
+    const personalizar = within(menu).getByRole('link', { name: 'Personalizar' })
+    expect(personalizar).toHaveAttribute('href', '/personalizar')
+    expect(personalizar).toHaveFocus()
+    // Personalizar sits above Sair
+    const items = Array.from(menu.querySelectorAll('a, button')).map((el) => el.textContent)
+    expect(items).toEqual(['Personalizar', 'Sair'])
+    await userEvent.click(within(menu).getByRole('button', { name: 'Sair' }))
 
     expect(mockSignOut).toHaveBeenCalled()
+  })
+
+  it('marks Personalizar in the profile menu while on it', async () => {
+    mockPathname = '/personalizar'
+    renderShell()
+
+    await userEvent.click(screen.getByRole('button', { name: 'Abrir menu do perfil' }))
+
+    expect(screen.getByRole('link', { name: 'Personalizar' })).toHaveAttribute('aria-current', 'page')
   })
 
   it('gives focus back to the profile button when Escape closes its menu', async () => {

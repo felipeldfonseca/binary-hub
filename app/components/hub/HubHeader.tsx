@@ -136,6 +136,14 @@ export default function HubHeader() {
         {open === 'profile' && (
           <div ref={profileMenuRef} id="hub-menu-perfil" className="hub-popover hub-popover--profile">
             {user?.email && <p className="hub-popover__note">{user.email}</p>}
+            <Link
+              href="/personalizar"
+              className="hub-popover__item"
+              aria-current={isCurrent(pathname, '/personalizar') ? 'page' : undefined}
+              onClick={() => setOpen(null)}
+            >
+              Personalizar
+            </Link>
             <button type="button" className="hub-popover__item" onClick={() => void signOut()}>
               Sair
             </button>
