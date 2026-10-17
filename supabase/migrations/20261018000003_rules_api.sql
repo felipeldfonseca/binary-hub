@@ -592,8 +592,9 @@ $$;
 -- =============================================================================================
 
 -- The day's realized result in exit order (net of commission when it is known), on the account or,
--- with p_soma, on every futures account of the owner: trades, net, the worst point of the running
--- sum (≤ 0) and the first instant it reached −p_usd. Only trades realized by p_until count.
+-- with p_soma, on every active futures account of the owner (archived and example accounts are left
+-- out; the account itself always counts): trades, net, the worst point of the running sum (≤ 0) and
+-- the first instant it reached −p_usd. Only trades realized by p_until count.
 create or replace function public.limit_usage(p_account uuid, p_day date, p_soma boolean, p_usd numeric, p_until timestamptz)
 returns jsonb
 language sql
@@ -606,7 +607,8 @@ as $$
   scope as (
     select f.id from public.trading_accounts f, acc
     where f.id = acc.id
-       or (p_soma and acc.market = 'futures' and f.user_id = acc.user_id and f.market = 'futures')
+       or (p_soma and acc.market = 'futures' and f.user_id = acc.user_id and f.market = 'futures'
+           and f.archived_at is null and not f.is_example)
   ),
   t as (
     select coalesce(t.exit_time, t.entry_time) as at, t.entry_time, t.id,

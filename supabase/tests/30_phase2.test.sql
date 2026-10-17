@@ -920,6 +920,23 @@ select tests.ok((:'g'::jsonb)->>'status' = 'encerrado' and ((:'g'::jsonb)#>>'{li
                 'summed −400 closes the day; the binary loss is never summed; «today» stays this account''s own');
 select tests.eq(public.gate_at(:'topone2', tests.ny(2, '10:30'))->'status', 'null'::jsonb,
                 'the second account has no rules of its own yet');
+-- Only active accounts are summed: an example account never counts, an archived one stops counting
+insert into public.trading_accounts (user_id, market, label, platform, day_tz, day_start_min, is_example)
+values (:A, 'futures', 'Exemplo', 'topone', 'America/New_York', 1080, true);
+insert into public.trades (user_id, account_id, symbol, asset_type, direction, entry_time, exit_time, quantity, result, pnl, commission, market_type)
+select :A, id, 'MNQ', 'futures', 'long', tests.ny(2, '10:02'), tests.ny(2, '10:03'), 1, 'loss', -5000, null, 'futures'
+from public.trading_accounts where user_id = :A and label = 'Exemplo';
+select tests.eq((public.gate_at(:'topone', tests.ny(2, '10:30'))#>>'{limit,worst_usd}')::numeric, -400::numeric,
+                'an example account''s loss is never summed');
+update public.trading_accounts set archived_at = now() where id = :'topone2';
+select public.gate_at(:'topone', tests.ny(2, '10:30')) as g \gset
+select tests.ok((:'g'::jsonb)->>'status' = 'liberado' and ((:'g'::jsonb)#>>'{limit,worst_usd}')::numeric = -100,
+                'once Top One #2 is archived its loss stops counting');
+update public.trading_accounts set archived_at = null where id = :'topone2';
+-- (accounts are never deleted through the API; the test removes its example account as the owner)
+reset role;
+delete from public.trades where account_id in (select id from public.trading_accounts where user_id = :A and label = 'Exemplo');
+delete from public.trading_accounts where user_id = :A and label = 'Exemplo';
 commit;
 
 -- Back to «por conta»: only this account's trades count; the running sum goes in exit order; the
