@@ -7,18 +7,22 @@ import { CARREGAR_ERRO, NAO_SALVO } from './copy'
 /** Whether the rules have loaded: the sections show their frame and this until then */
 export type Carga = 'carregando' | 'erro' | 'pronto'
 
-/** «Carregando…» or «Não foi possível carregar as regras.» + «Tentar de novo», inside a card */
-export function EstadoCarga({ carga, onTentar }: { carga: Exclude<Carga, 'pronto'>; onTentar: () => void }) {
+/**
+ * «Carregando…» or «Não foi possível carregar as regras.» + «Tentar de novo», inside a card. The
+ * three cards wait on the same rules_config, so only one of them (`anunciar`, «Quando você opera»)
+ * is a live region: a screen reader hears the state once, not three times.
+ */
+export function EstadoCarga({ carga, onTentar, anunciar = false }: { carga: Exclude<Carga, 'pronto'>; onTentar: () => void; anunciar?: boolean }) {
   if (carga === 'carregando') {
     return (
-      <p role="status" className="hub-nota">
+      <p role={anunciar ? 'status' : undefined} className="hub-nota">
         {LOADING}
       </p>
     )
   }
   return (
     <div className="hub-linha">
-      <p role="alert" className="hub-nota">
+      <p role={anunciar ? 'alert' : undefined} className="hub-nota">
         {CARREGAR_ERRO}
       </p>
       <button type="button" className="hub-btn" onClick={onTentar}>

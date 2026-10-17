@@ -18,6 +18,13 @@ html:has(.hub-pz-corpo),
 html:has(.hub-pz-corpo) body {
   overflow-x: clip;
 }
+/*
+ * While the sticky save bar shows, a control that gets focus (Tab) is scrolled clear of it instead
+ * of landing behind it (WCAG 2.4.11). Below 640px the bar can take two lines (see the breakpoints).
+ */
+html:has(.hub-pz-barra) {
+  scroll-padding-bottom: 96px;
+}
 
 /* Page: header actions, index beside (or above) the cards */
 
@@ -128,12 +135,18 @@ html:has(.hub-pz-corpo) body {
   color: var(--amber);
   text-wrap: pretty;
 }
+/*
+ * The link inside an amber warning: underlined, so it reads as a link in a line of the same colour
+ * and weight (board links are underlined; Tailwind's reset removes it). Inline, so it adds no 44px
+ * line to the paragraph: the vertical padding gives it a 44px hit area without moving the text.
+ */
 .hub .hub-pz-aviso__link,
 .hub .hub-pz-aviso__link:hover {
-  display: inline-flex;
-  align-items: center;
-  min-height: 44px;
+  display: inline;
+  padding: 15px 2px;
   color: var(--amber);
+  text-decoration: underline;
+  text-underline-offset: 2px;
 }
 .hub-pz-sub-rot {
   font-size: 12px;
@@ -145,6 +158,8 @@ html:has(.hub-pz-corpo) body {
   min-height: 44px;
   font-size: 13px;
   font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 2px;
 }
 .hub .hub-pz-link-btn {
   display: inline-flex;
@@ -400,6 +415,10 @@ html:has(.hub-pz-corpo) body {
   align-items: center;
   flex-wrap: wrap;
   gap: 4px 10px;
+}
+/* hub.css pins .hub-chip-fraco to the top of its row; beside «Ligado» it sits on the same line */
+.hub-pz-sw-linha .hub-chip-fraco {
+  align-self: center;
 }
 .hub-pz-campos-l {
   display: flex;
@@ -704,6 +723,9 @@ html:has(.hub-pz-corpo) body {
 @media (max-width: 640px) {
   .hub-pz-regra {
     grid-template-columns: minmax(0, 1fr);
+  }
+  html:has(.hub-pz-barra) {
+    scroll-padding-bottom: 140px;
   }
   .hub-pz-topo-acoes {
     justify-content: flex-start;

@@ -7,9 +7,9 @@ import QuandoVoceOpera from '@/components/hub/personalizar/QuandoVoceOpera'
 import SuasRegras from '@/components/hub/personalizar/SuasRegras'
 import Preferencias from '@/components/hub/personalizar/Preferencias'
 import { BarraSalvar } from '@/components/hub/personalizar/BarraSalvar'
-import type { FormLimite } from '@/components/hub/personalizar/PersonalizarProvider'
+import { entidadesRegrasDe, type FormLimite } from '@/components/hub/personalizar/PersonalizarProvider'
 import { activeAccounts, pendingVersions, type AccountConfig, type RulesConfig, type RulesSettings } from '@/lib/hub/regras'
-import { PADRAO_FUTUROS, comBloqueio, comLimite, comModoLimite, comRegraJanela } from '@/lib/hub/rascunho'
+import { PADRAO_FUTUROS, ajustarSoNestaConta, comBloqueio, comJanelaDoMercado, comLimite, comModoLimite, comRegraJanela } from '@/lib/hub/rascunho'
 import { configAntes, configDepois, idsDono } from '@/testing/regras'
 import { et } from '@/testing/gate'
 
@@ -90,6 +90,38 @@ describe('QuandoVoceOpera', () => {
     await userEvent.click(within(contas).getByRole('button', { name: 'Voltar ao padrão: Apex A' }))
     await waitFor(() => expect(within(contas).getByRole('button', { name: 'Ajustar só nesta conta: Apex A' })).toHaveFocus())
     expect(within(fut).queryByText('não salvo')).not.toBeInTheDocument()
+  })
+
+  it('«Voltar ao padrão» on the market’s only account: focus goes to the market’s start field (the list goes away)', async () => {
+    const c = configDepois()
+    render(<Janelas config={c} inicial={ajustarSoNestaConta(c.settings, { id: ids.topOne, market: 'futures' })} />)
+    const fut = screen.getByRole('group', { name: 'Janela de Futuros' })
+
+    await userEvent.click(within(fut).getByRole('button', { name: 'Voltar ao padrão: Top One #1' }))
+
+    expect(within(fut).queryByRole('list', { name: 'Contas de Futuros' })).not.toBeInTheDocument()
+    expect(within(fut).getByText('Usada por Top One #1.')).toBeInTheDocument()
+    await waitFor(() => expect(within(fut).getByLabelText('Início da janela de Futuros, horário de Nova York')).toHaveFocus())
+  })
+
+  it('lists the accounts only while the market has a window, and offers «Cancelar» only for a window not yet saved', async () => {
+    const { unmount } = render(<Janelas config={comApex(configAntes())} />)
+    const fut = () => screen.getByRole('group', { name: 'Janela de Futuros' })
+    expect(within(fut()).queryByRole('list', { name: 'Contas de Futuros' })).not.toBeInTheDocument()
+    await userEvent.click(within(fut()).getByRole('button', { name: '+ Definir janela' }))
+    expect(within(fut()).getByRole('list', { name: 'Contas de Futuros' })).toBeInTheDocument()
+    expect(within(fut()).getByRole('button', { name: 'Cancelar a janela nova de Futuros' })).toBeInTheDocument()
+    unmount()
+
+    render(<Janelas config={comApex(configDepois())} />)
+    expect(within(fut()).queryByRole('button', { name: 'Cancelar a janela nova de Futuros' })).not.toBeInTheDocument()
+  })
+
+  it('says «do dia seguinte» on a window that ends the next day, and only there', () => {
+    const c = configDepois()
+    render(<Janelas config={c} inicial={comJanelaDoMercado(c.settings, 'binary', 0, { startMin: 1320, endMin: 120 })} />)
+    expect(within(screen.getByRole('group', { name: 'Janela de Opções binárias' })).getByText('do dia seguinte')).toBeInTheDocument()
+    expect(within(screen.getByRole('group', { name: 'Janela de Futuros' })).queryByText('do dia seguinte')).not.toBeInTheDocument()
   })
 
   it('a window with no day: the days group is described by the error', async () => {
@@ -227,6 +259,44 @@ describe('SuasRegras', () => {
     expect(before).toHaveValue('5')
   })
 
+  it('the minutes fields take digits only: a letter never reaches the draft', async () => {
+    render(<Regras config={configDepois()} selecionado={PADRAO_FUTUROS} />)
+    const before = screen.getByLabelText('Minutos antes do dado')
+    expect(before).toHaveValue('5')
+
+    await userEvent.type(before, 'a')
+    expect(before).toHaveValue('5')
+    await userEvent.type(before, '2')
+    expect(before).toHaveValue('52')
+    expect(document.getElementById('r-bloq-hoje')).not.toHaveTextContent('NaN')
+  })
+
+  it('an empty limit field is not «Sem limite»: OK says to type a value and keeps the limit', async () => {
+    render(<Regras config={configDepois()} selecionado={ids.topOne} />)
+    await userEvent.click(screen.getByRole('button', { name: 'Mudar o limite do dia de Top One #1' }))
+    await userEvent.clear(screen.getByLabelText('Limite do dia, em US$'))
+
+    await userEvent.click(screen.getByRole('button', { name: 'OK' }))
+
+    expect(screen.getByRole('alert')).toHaveTextContent('Digite um valor maior que zero.')
+    expect(screen.getByLabelText('Limite do dia, em US$')).toHaveAttribute('aria-invalid', 'true')
+    expect(screen.queryByText('Sem limite')).not.toBeInTheDocument()
+  })
+
+  it('lists the versions newest first, then «Antes de …»', async () => {
+    const c = configDepois()
+    const top = c.accounts.find((a) => a.id === ids.topOne) as AccountConfig
+    const v1 = top.versions[0]
+    const v2 = { ...v1, id: 'v2', versionNo: 2, effectiveFrom: new Date('2026-10-22T16:00:00Z'), effectiveDay: '2026-10-22' }
+    const two = { ...c, accounts: c.accounts.map((a) => (a.id === ids.topOne ? { ...a, versions: [v1, v2] } : a)) }
+    render(<Regras config={two} selecionado={ids.topOne} />)
+
+    await userEvent.click(screen.getByRole('button', { name: 'Versões (2)' }))
+
+    const items = within(document.getElementById('lista-versoes') as HTMLElement).getAllByRole('listitem').map((li) => li.textContent ?? '')
+    expect(items.map((t) => t.slice(0, 2))).toEqual(['v2', 'v1', 'An'])
+  })
+
   it('the limit mode: hidden with one futures account «por conta», shown with two, and kept while «somando»', async () => {
     const c = configDepois()
     const { unmount } = render(<Regras config={c} selecionado={ids.topOne} />)
@@ -316,6 +386,15 @@ describe('SuasRegras', () => {
   })
 })
 
+describe('«Regras de»', () => {
+  it('offers «Padrão Futuros» only with an active futures account', () => {
+    const c = configDepois()
+    expect(entidadesRegrasDe(activeAccounts(c))).toEqual([PADRAO_FUTUROS, ids.topOne, ids.ebinex])
+    const soBinarias = { ...c, accounts: c.accounts.filter((a) => a.market === 'binary') }
+    expect(entidadesRegrasDe(activeAccounts(soBinarias))).toEqual([ids.ebinex])
+  })
+})
+
 describe('Preferencias and the bar', () => {
   it('Tema is instant and «Horários na tela» waits for the rules', async () => {
     const onTema = jest.fn()
@@ -377,6 +456,24 @@ describe('hub-personalizar.css', () => {
     expect(media('max-width: 980px')).toContain('.hub-pz-grade')
     expect(media('max-width: 540px')).toMatch(/\.hub-pz-barra \{\n {4}border-radius: 24px;/)
     expect(media('prefers-reduced-motion: reduce')).toContain('transition: none')
+  })
+
+  it('underlines the links to «Quando você opera»; the one inside a warning stays inline with a 44px hit area', () => {
+    expect(css).toMatch(/\.hub \.hub-pz-link44 \{[^}]*text-decoration: underline;/)
+    const aviso = css.slice(css.indexOf('.hub .hub-pz-aviso__link,'), css.indexOf('}', css.indexOf('.hub .hub-pz-aviso__link,')))
+    expect(aviso).toContain('display: inline;')
+    expect(aviso).toContain('padding: 15px 2px;')
+    expect(aviso).toContain('text-decoration: underline;')
+    expect(aviso).not.toContain('min-height')
+  })
+
+  it('keeps a focused control clear of the sticky save bar (scroll padding while the bar shows)', () => {
+    expect(css).toMatch(/html:has\(\.hub-pz-barra\) \{\n {2}scroll-padding-bottom: 96px;/)
+    expect(media('max-width: 640px')).toMatch(/html:has\(\.hub-pz-barra\) \{\n {4}scroll-padding-bottom: 140px;/)
+  })
+
+  it('centres «ativo na Fase 5» on the switch line', () => {
+    expect(css).toMatch(/\.hub-pz-sw-linha \.hub-chip-fraco \{\n {2}align-self: center;/)
   })
 
   it('keeps sticky positioning working (no scroll container on html/body on this page)', () => {

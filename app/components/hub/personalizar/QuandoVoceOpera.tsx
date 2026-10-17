@@ -69,7 +69,7 @@ export default function QuandoVoceOpera({ carga, onTentar, now, salvo, draft, at
       {info && <InfoPanel id="info-janelas">{JANELAS.info(proximaMudancaNY(now) ?? '—')}</InfoPanel>}
 
       {carga !== 'pronto' || !salvo || !draft ? (
-        <EstadoCarga carga={carga === 'erro' ? 'erro' : 'carregando'} onTentar={onTentar} />
+        <EstadoCarga carga={carga === 'erro' ? 'erro' : 'carregando'} onTentar={onTentar} anunciar />
       ) : (
         <>
           {mercados.length > 0 && (
@@ -297,7 +297,9 @@ function CartaoMercado({
                         className="hub-btn"
                         aria-label={JANELAS.voltarAria(c.label)}
                         onClick={() => {
-                          pedirFoco(`ajustar-${c.id}`)
+                          // With one account the list goes once its own window does («Usada por …»):
+                          // focus moves to the market's first start field instead
+                          pedirFoco(contas.length === 1 ? `j-${mk}0-de` : `ajustar-${c.id}`)
                           onEditar((d) => voltarAoPadrao(d, c.id))
                         }}
                       >
