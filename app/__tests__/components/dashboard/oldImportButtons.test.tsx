@@ -1,7 +1,9 @@
 import React from 'react'
 import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import DiarioImportLink from '@/components/dashboard/DiarioImportLink'
 import DashboardV1Modern from '@/components/dashboard/versions/DashboardV1Modern'
+import TradesV1Professional from '@/components/trades/versions/TradesV1Professional'
 
 // The old pages no longer import: their buttons lead to the hub's import sheet
 
@@ -15,7 +17,11 @@ jest.mock('@/lib/contexts/LanguageContext', () => ({
 }))
 
 jest.mock('@/lib/contexts/MarketContext', () => ({
-  useMarketContext: () => ({ activeMarket: { marketType: 'binary', displayName: 'Binary Options' } }),
+  useMarketContext: () => ({
+    activeMarket: { marketType: 'binary', displayName: 'Binary Options' },
+    marketAccounts: [{ marketType: 'binary', displayName: 'Binary Options' }],
+    setActiveMarket: jest.fn(),
+  }),
 }))
 
 jest.mock('@/hooks/useTradesSupabase', () => ({
@@ -30,6 +36,9 @@ jest.mock('@/components/dashboard/TradingCalendar', () => () => null)
 jest.mock('@/components/dashboard/EconomicCalendar', () => () => null)
 jest.mock('@/components/dashboard/RecentTrades', () => () => null)
 jest.mock('@/components/dashboard/AccountBalanceDisplay', () => () => null)
+jest.mock('@/components/trades/TradesTable', () => () => null)
+jest.mock('@/components/trades/TradeFilters', () => () => null)
+jest.mock('@/components/trades/BulkActions', () => () => null)
 
 beforeEach(() => {
   mockPortuguese = true
@@ -38,6 +47,16 @@ beforeEach(() => {
 })
 
 describe('Trades page · Import tab', () => {
+  it('shows the Diário link on the page’s own Import tab', async () => {
+    const { container } = render(<TradesV1Professional />)
+
+    await userEvent.click(screen.getByRole('button', { name: /Upload de dados/ }))
+
+    expect(screen.getByRole('heading', { level: 2, name: 'Importar Dados' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Importar no Diário' })).toHaveAttribute('href', '/diario?importar=1')
+    expect(container.querySelector('input[type="file"]')).toBeNull()
+  })
+
   it('sends the owner to the Diário to import, in Portuguese', () => {
     render(<DiarioImportLink />)
 
