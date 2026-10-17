@@ -2,9 +2,13 @@ import React from 'react'
 import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import * as data from '@/lib/hub/contasDb'
+import * as regrasDb from '@/lib/hub/regrasDb'
 import SuasContas from '@/components/hub/contas/SuasContas'
-import PersonalizarPage from '@/app/(hub)/personalizar/page'
+import HubRoot from '@/components/hub/HubRoot'
+import PersonalizarPagina from '@/components/hub/personalizar/PersonalizarPagina'
+import type { RulesConfig } from '@/lib/hub/regras'
 import { makeAccount, makeBatch, renderHub } from '@/testing/hubHarness'
+import { configAntes, configDepois, idsDono } from '@/testing/regras'
 
 jest.mock('@/lib/supabase', () => ({ createDataClient: jest.fn(() => ({})) }))
 
@@ -25,7 +29,19 @@ jest.mock('@/lib/hub/contasDb', () => ({
   importFixTz: jest.fn(),
 }))
 
+// Phase 2: the rule parts of a row and «Editar regras» (Personalizar's clock is fixed)
+jest.mock('@/lib/hub/regrasDb', () => ({
+  ...jest.requireActual('@/lib/hub/regrasDb'),
+  fetchRulesConfig: jest.fn(),
+  fetchTradesSince: jest.fn(),
+  saveRules: jest.fn(),
+}))
+const mockAgora = new Date('2026-10-19T16:00:00Z')
+jest.mock('@/hooks/useAgora', () => ({ useAgora: () => mockAgora }))
+
 const fetchAccounts = data.fetchAccounts as jest.MockedFunction<typeof data.fetchAccounts>
+const fetchRulesConfig = regrasDb.fetchRulesConfig as jest.MockedFunction<typeof regrasDb.fetchRulesConfig>
+const fetchTradesSince = regrasDb.fetchTradesSince as jest.MockedFunction<typeof regrasDb.fetchTradesSince>
 const fetchActivity = data.fetchActivity as jest.MockedFunction<typeof data.fetchActivity>
 const fetchImportFormats = data.fetchImportFormats as jest.MockedFunction<typeof data.fetchImportFormats>
 const fetchBatches = data.fetchBatches as jest.MockedFunction<typeof data.fetchBatches>
@@ -53,9 +69,24 @@ const fixTz = (over: Partial<data.FixTzResult> = {}): data.FixTzResult => ({
 })
 
 beforeEach(() => {
-  for (const mock of [fetchAccounts, fetchActivity, fetchImportFormats, fetchBatches, createAccount, updateAccount, setPrimary, importUndo, importFixTz]) {
+  for (const mock of [
+    fetchAccounts,
+    fetchActivity,
+    fetchImportFormats,
+    fetchBatches,
+    createAccount,
+    updateAccount,
+    setPrimary,
+    importUndo,
+    importFixTz,
+    fetchRulesConfig,
+    fetchTradesSince,
+  ]) {
     mock.mockReset()
   }
+  // The Phase 1 rows: no rules read (the Phase 2 block below gives them)
+  fetchRulesConfig.mockRejectedValue(new regrasDb.RegrasDataError('network'))
+  fetchTradesSince.mockResolvedValue({})
   fetchAccounts.mockResolvedValue([topOne, ebinex, apex, closed, example])
   fetchActivity.mockResolvedValue({
     [topOne.id]: { total: 17, imported: 17 },
@@ -77,19 +108,6 @@ async function openMenu(label: string) {
   await userEvent.click(within(li).getByRole('button', { name: `Mais ações: ${label}` }))
   return within(li).getByRole('group', { name: `Ações de ${label}` })
 }
-
-describe('Personalizar page', () => {
-  it('shows only Suas contas in Phase 1, and says the rest comes later', async () => {
-    renderHub(<PersonalizarPage />)
-
-    expect(screen.getByRole('heading', { level: 1, name: 'Personalizar' })).toBeInTheDocument()
-    expect(screen.getByText('Ajuste o Binary Hub às suas contas e ao que você opera.')).toBeInTheDocument()
-    expect(screen.getByText('O resto do Personalizar chega na Fase 2.')).toBeInTheDocument()
-    expect(screen.getAllByRole('heading', { level: 2 }).map((h) => h.textContent)).toEqual(['Suas contas'])
-    expect(screen.queryByRole('button', { name: 'Salvar alterações' })).not.toBeInTheDocument()
-    await row('Ebinex')
-  })
-})
 
 describe('Suas contas', () => {
   it('shows the card with its heading, note and info', async () => {
@@ -548,5 +566,163 @@ describe('Importações', () => {
     await userEvent.click(within(panel).getByRole('button', { name: 'Desfazer e apagar' }))
 
     expect(await within(panel).findByRole('alert')).toHaveTextContent('Esta importação já foi desfeita.')
+  })
+})
+
+describe('Suas contas · the rules of each account (Phase 2)', () => {
+  const ids = idsDono()
+  const topOneDono = makeAccount({ id: ids.topOne, label: 'Top One #1', market: 'futures', platform: 'topone', phase: 'financiada' })
+  const ebinexDono = makeAccount({ id: ids.ebinex, label: 'Ebinex', market: 'binary', platform: 'ebinex', phase: 'pessoal', is_primary: true })
+
+  beforeEach(() => {
+    fetchAccounts.mockResolvedValue([topOneDono, ebinexDono])
+    fetchActivity.mockResolvedValue({
+      [ids.topOne]: { total: 312, imported: 309 },
+      [ids.ebinex]: { total: 317, imported: 317 },
+    })
+    fetchRulesConfig.mockResolvedValue(configDepois())
+    fetchTradesSince.mockResolvedValue({ [ids.topOne]: 3, [ids.ebinex]: 0 })
+  })
+
+  it('adds the window, since when the rules count and the trades since then (board itemConta)', async () => {
+    renderHub(<SuasContas />)
+
+    const top = await row('Top One #1')
+    await waitFor(() => expect(parts(top)).toBe('Financiada · Top One · 10:00–11:00 ET · regras desde 17 out · 3 op. desde então'))
+    expect(parts(await row('Ebinex'))).toBe('Pessoal · Ebinex · 20:00–21:00 de Brasília · regras desde 17 out · 0 op. desde então')
+    // Times are mono
+    expect(within(top).getByText('10:00–11:00')).toHaveClass('hub-rc-num')
+    // Counted since each account's v1
+    const since = configDepois().accounts[0].versions[0].effectiveFrom
+    expect(fetchTradesSince).toHaveBeenCalledWith(expect.anything(), [
+      { accountId: ids.topOne, since },
+      { accountId: ids.ebinex, since },
+    ])
+  })
+
+  it('an own window, and v2 and later', async () => {
+    const c = configDepois()
+    const top = c.accounts[0]
+    const v1 = top.versions[0]
+    const changed: RulesConfig = {
+      ...c,
+      accounts: [
+        {
+          ...top,
+          current: { ...top.current, windows: [{ tz: 'America/New_York', startMin: 570, endMin: 660, weekdays: 31 }], windowsFrom: 'account' },
+          versions: [v1, { ...v1, id: 'v2', versionNo: 2, effectiveDay: '2026-10-21' }],
+        },
+        c.accounts[1],
+      ],
+    }
+    fetchRulesConfig.mockResolvedValue(changed)
+    renderHub(<SuasContas />)
+
+    await waitFor(async () =>
+      expect(parts(await row('Top One #1'))).toBe('Financiada · Top One · 09:30–11:00 ET (própria) · regras desde 17 out · v2 · 3 op. desde então'),
+    )
+  })
+
+  it('before any save: «sem janela», «sem regras salvas» and Phase 1’s activity', async () => {
+    fetchRulesConfig.mockResolvedValue(configAntes())
+    renderHub(<SuasContas />)
+
+    await waitFor(async () => expect(parts(await row('Top One #1'))).toBe('Financiada · Top One · sem janela · sem regras salvas · só histórico importado'))
+    expect(parts(await row('Ebinex'))).toBe('Pessoal · Ebinex · sem janela · sem regras salvas · só histórico importado')
+    // No version, nothing to count
+    expect(fetchTradesSince).not.toHaveBeenCalled()
+  })
+
+  it('keeps the Phase 1 parts while the counts load, and when they or the rules fail', async () => {
+    let finish!: (value: Record<string, number>) => void
+    fetchTradesSince.mockReturnValue(new Promise((resolve) => (finish = resolve)))
+    const view = renderHub(<SuasContas />)
+
+    const top = await row('Top One #1')
+    await waitFor(() => expect(fetchTradesSince).toHaveBeenCalled())
+    expect(parts(top)).toBe('Financiada · Top One · só histórico importado')
+    finish({ [ids.topOne]: 3, [ids.ebinex]: 0 })
+    await waitFor(() => expect(parts(top)).toBe('Financiada · Top One · 10:00–11:00 ET · regras desde 17 out · 3 op. desde então'))
+    view.unmount()
+
+    fetchTradesSince.mockRejectedValue(new regrasDb.RegrasDataError('network'))
+    const failed = renderHub(<SuasContas />)
+    await waitFor(() => expect(fetchTradesSince).toHaveBeenCalledTimes(2))
+    expect(parts(await row('Top One #1'))).toBe('Financiada · Top One · só histórico importado')
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    failed.unmount()
+
+    fetchRulesConfig.mockRejectedValue(new regrasDb.RegrasDataError('network'))
+    renderHub(<SuasContas />)
+    await waitFor(() => expect(fetchRulesConfig).toHaveBeenCalledTimes(3))
+    expect(parts(await row('Ebinex'))).toBe('Pessoal · Ebinex · só histórico importado')
+  })
+
+  it('«Editar regras» (on Personalizar) closes the menu, picks the account in «Regras de» and focuses «Suas regras»', async () => {
+    renderHub(
+      <HubRoot>
+        <PersonalizarPagina>
+          <h1 tabIndex={-1}>Personalizar</h1>
+        </PersonalizarPagina>
+      </HubRoot>,
+    )
+    await screen.findByRole('heading', { level: 3, name: 'Como fica hoje' })
+
+    const menu = await openMenu('Ebinex')
+    expect(within(menu).getAllByRole('button').map((b) => b.textContent)).toEqual([
+      'Importar arquivo',
+      'Editar conta',
+      'Importações',
+      'Editar regras',
+      'Arquivar',
+    ])
+    await userEvent.click(within(menu).getByRole('button', { name: 'Editar regras' }))
+
+    expect(screen.queryByRole('group', { name: 'Ações de Ebinex' })).not.toBeInTheDocument()
+    expect(within(screen.getByRole('group', { name: 'Regras de' })).getByRole('button', { name: 'Ebinex' })).toHaveAttribute('aria-pressed', 'true')
+    await waitFor(() => expect(screen.getByRole('heading', { level: 2, name: 'Suas regras' })).toHaveFocus())
+  })
+
+  it('offers «Editar regras» only for an account «Suas regras» lists (futures and binary)', async () => {
+    const forex = makeAccount({ label: 'Forex antiga', market: 'forex', platform: null, phase: 'pessoal', sort_order: 5 })
+    fetchAccounts.mockResolvedValue([topOneDono, ebinexDono, forex])
+    renderHub(
+      <HubRoot>
+        <PersonalizarPagina>
+          <h1 tabIndex={-1}>Personalizar</h1>
+        </PersonalizarPagina>
+      </HubRoot>,
+    )
+    await screen.findByRole('heading', { level: 3, name: 'Como fica hoje' })
+
+    const menu = await openMenu('Forex antiga')
+    expect(within(menu).queryByRole('button', { name: 'Editar regras' })).not.toBeInTheDocument()
+    expect(within(menu).getByRole('button', { name: 'Arquivar' })).toBeInTheDocument()
+    await userEvent.keyboard('{Escape}')
+    expect(within(await openMenu('Ebinex')).getByRole('button', { name: 'Editar regras' })).toBeInTheDocument()
+  })
+
+  it('counts trades only for active accounts: archived and example ones with versions are left out', async () => {
+    const c = configDepois()
+    const [top, ebx] = c.accounts
+    fetchRulesConfig.mockResolvedValue({
+      ...c,
+      accounts: [top, ebx, { ...top, id: 'arquivada', label: 'Velha', archivedAt: '2026-09-03T12:00:00Z' }, { ...ebx, id: 'exemplo', label: 'Exemplo', isExample: true }],
+    })
+    renderHub(<SuasContas />)
+
+    await waitFor(async () => expect(parts(await row('Top One #1'))).toBe('Financiada · Top One · 10:00–11:00 ET · regras desde 17 out · 3 op. desde então'))
+    const since = top.versions[0].effectiveFrom
+    expect(fetchTradesSince).toHaveBeenCalledTimes(1)
+    expect(fetchTradesSince).toHaveBeenCalledWith(expect.anything(), [
+      { accountId: ids.topOne, since },
+      { accountId: ids.ebinex, since },
+    ])
+  })
+
+  it('has no «Editar regras» outside Personalizar', async () => {
+    renderHub(<SuasContas />)
+    const menu = await openMenu('Ebinex')
+    expect(within(menu).queryByRole('button', { name: 'Editar regras' })).not.toBeInTheDocument()
   })
 })

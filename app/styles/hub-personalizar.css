@@ -3,4 +3,751 @@
  * fica hoje», the versions, «Calendários econômicos», «Preferências», the section index and the
  * sticky save bar. Scoped to .hub like styles/hub.css; tokens and shared classes come from there.
  * Imported by app/(hub)/layout.tsx. Only lane A1 edits this file.
+ *
+ * Measures and colours follow Personalizar.dc.html. Contrast: nothing here puts --surface directly
+ * on --surface (amber, red and text-2 would fall under 4.5:1 in claro); the market cards, «Como
+ * fica hoje», the versions and the fields that sit on a card use --inset.
  */
+
+/*
+ * globals.css hides horizontal overflow on html and body, which makes body a scroll container that
+ * never scrolls, and position: sticky (the save bar, the index) then never sticks. `clip` hides the
+ * same overflow without making a scroll container. Only on this page (the frozen files stay as they are).
+ */
+html:has(.hub-pz-corpo),
+html:has(.hub-pz-corpo) body {
+  overflow-x: clip;
+}
+/*
+ * While the sticky save bar shows, a control that gets focus (Tab) is scrolled clear of it instead
+ * of landing behind it (WCAG 2.4.11). Below 640px the bar can take two lines (see the breakpoints).
+ */
+html:has(.hub-pz-barra) {
+  scroll-padding-bottom: 96px;
+}
+
+/* Page: header actions, index beside (or above) the cards */
+
+.hub-pz-titulo {
+  flex: 1 1 420px;
+  min-width: 0;
+}
+.hub-pz-topo-acoes {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+}
+.hub-pz-status-topo {
+  max-width: 320px;
+  font-size: 13px;
+  text-align: right;
+  text-wrap: pretty;
+  overflow-wrap: anywhere;
+}
+.hub-pz-st--mudou {
+  color: var(--amber);
+  font-weight: 700;
+}
+.hub-pz-st--ok {
+  color: var(--text-2);
+}
+
+.hub-pz-corpo {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 20px;
+}
+.hub-pz-indice {
+  flex: 1 1 200px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px;
+  border-radius: 20px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  box-sizing: border-box;
+}
+.hub .hub-pz-indice__link {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 12px;
+  border-radius: 12px;
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 700;
+  text-decoration: none;
+}
+.hub .hub-pz-indice__link:hover {
+  background: var(--neutral-bg);
+  color: var(--text);
+}
+.hub-pz-indice__nota {
+  margin: 8px 0 0;
+  padding: 10px 12px 4px;
+  border-top: 1px solid var(--border);
+  font-size: 12px;
+  color: var(--text-2);
+  text-wrap: pretty;
+}
+@media (min-width: 900px) {
+  .hub-pz-indice {
+    position: sticky;
+    top: 16px;
+  }
+}
+.hub-pz-conteudo {
+  flex: 999 1 560px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+/* On this page the cards fill the content column (Suas contas keeps 760px elsewhere) */
+.hub-pz-conteudo > .hub-card {
+  max-width: none;
+}
+
+/* Shared bits */
+
+.hub-pz-num {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.hub-pz-forte {
+  font-weight: 700;
+}
+.hub .hub-pz-fraco {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-2);
+}
+.hub-pz-aviso {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--amber);
+  text-wrap: pretty;
+}
+/*
+ * The link inside an amber warning: underlined, so it reads as a link in a line of the same colour
+ * and weight (board links are underlined; Tailwind's reset removes it). Inline, so it adds no 44px
+ * line to the paragraph: the vertical padding gives it a 44px hit area without moving the text, and
+ * `position: relative` keeps that area above the label that follows («Fora da janela, mostrar»).
+ */
+.hub .hub-pz-aviso__link,
+.hub .hub-pz-aviso__link:hover {
+  position: relative;
+  display: inline;
+  padding: 15px 2px;
+  color: var(--amber);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.hub-pz-sub-rot {
+  font-size: 12px;
+  color: var(--text-2);
+}
+.hub .hub-pz-link44 {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  font-size: 13px;
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.hub .hub-pz-link-btn {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 2px;
+  border: 0;
+  background: transparent;
+  color: var(--mint);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  text-decoration: underline;
+  cursor: pointer;
+}
+.hub .hub-pz-link-btn:hover {
+  color: var(--text);
+}
+.hub-pz-campo-grupo {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+/* Switch (board .interruptor): 44px tall, labelled by the rule's name */
+.hub .hub-pz-interruptor {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 4px;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+.hub-pz-interruptor__tr {
+  position: relative;
+  display: block;
+  width: 40px;
+  height: 24px;
+  border-radius: 999px;
+  border: 1px solid var(--neutral-border);
+  background: var(--track);
+  box-sizing: border-box;
+}
+.hub-pz-interruptor__tr::after {
+  content: '';
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 16px;
+  height: 16px;
+  border-radius: 999px;
+  background: var(--text-2);
+  transition: transform 200ms ease;
+}
+.hub-pz-interruptor[aria-checked='true'] .hub-pz-interruptor__tr {
+  border-color: var(--mint);
+  background: var(--mint);
+}
+.hub-pz-interruptor[aria-checked='true'] .hub-pz-interruptor__tr::after {
+  transform: translateX(16px);
+  background: #26301f;
+}
+
+/* «Quando você opera»: market cards (board .mcard) */
+
+.hub-pz-grade {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px;
+  align-items: start;
+}
+.hub-pz-mcard {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+  padding: 16px;
+  border-radius: 18px;
+  background: var(--inset);
+  box-sizing: border-box;
+}
+.hub-pz-mcard--metade {
+  grid-column: auto;
+}
+.hub-pz-mcard h3 {
+  margin: 0;
+  font-family: 'Poly', Georgia, serif;
+  font-size: 19px;
+  font-weight: 400;
+  line-height: 1.2;
+}
+.hub-pz-mcard .hub-cab .hub-tag {
+  align-self: center;
+}
+.hub-pz-jan-vazia {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+}
+.hub-pz-jan {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.hub-pz-jan__linha {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 8px;
+  font-size: 14px;
+}
+.hub-pz-hgrupo {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+}
+.hub .hub-pz-hora {
+  width: 96px;
+  min-height: 44px;
+  padding: 0 6px 0 10px;
+  border-radius: 12px;
+  border: 1px solid var(--field-border);
+  background: var(--surface);
+  color: var(--text);
+  color-scheme: dark;
+  font-family: var(--mono);
+  font-size: 15px;
+  font-weight: 700;
+  box-sizing: border-box;
+}
+.hub .hub-pz-hora[aria-invalid='true'] {
+  border-color: var(--amber);
+}
+.hub-pz-mais {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 4px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+}
+.hub .hub-pz-pill-dia {
+  min-width: 44px;
+  padding: 0 10px;
+  text-align: center;
+}
+.hub-pz-lista {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.hub-pz-ovr {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 0 0;
+  border-top: 1px solid var(--border);
+}
+.hub-pz-ovr__cab {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+}
+.hub-pz-ovr__nome {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  min-width: 0;
+  font-size: 13px;
+}
+.hub-pz-ovr__nome strong {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.hub-pz-falta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0 8px;
+}
+
+/* «Suas regras» (board .regras-de, .regras-cab, .regra) */
+
+.hub-pz-regras-de {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.hub-pz-regras-cab {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+}
+.hub-pz-regras-cab h3 {
+  margin: 0;
+  min-width: 0;
+  font-size: 15px;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+.hub-pz-regras {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.hub-pz-regra {
+  display: grid;
+  grid-template-columns: minmax(132px, 0.75fr) minmax(0, 1.6fr);
+  gap: 6px 16px;
+  padding: 12px 0;
+  border-top: 1px solid var(--border);
+}
+.hub-pz-regra__nome {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  font-size: 13px;
+  font-weight: 700;
+}
+.hub-pz-regra__val {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  font-size: 14px;
+}
+.hub-pz-regra__linha {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+}
+.hub-pz-regra__val .hub-pills {
+  margin-top: 2px;
+}
+.hub-pz-sw-linha {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+}
+/* hub.css pins .hub-chip-fraco to the top of its row; beside «Ligado» it sits on the same line */
+.hub-pz-sw-linha .hub-chip-fraco {
+  align-self: center;
+}
+.hub-pz-campos-l {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 18px;
+}
+.hub-pz-num-grupo {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+  font-size: 13px;
+}
+.hub .hub-pz-campo-num {
+  width: 76px;
+  min-height: 44px;
+  padding: 0 10px;
+  border-radius: 10px;
+  border: 1px solid var(--field-border);
+  background: var(--inset);
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 14px;
+  box-sizing: border-box;
+}
+.hub-pz-form-linha {
+  display: flex;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: 8px 10px;
+}
+.hub-form-inline .hub-pz-campo-lim {
+  flex: 1 1 200px;
+  max-width: 360px;
+}
+
+/* «Regra por estado» */
+.hub-pz-est-lista {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+}
+.hub-pz-est {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.hub-pz-est-chip {
+  display: inline-flex;
+  align-self: flex-start;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+.hub-pz-est-chip--al {
+  background: var(--mint);
+  color: #26301f;
+}
+.hub-pz-est-chip--so {
+  border: 1px solid var(--mint-border);
+  color: var(--mint);
+}
+.hub-pz-est-chip--conf {
+  border: 1px solid var(--amber-border);
+  background: var(--amber-bg);
+  color: var(--amber);
+}
+.hub-pz-est-chip--sem {
+  border: 1px solid var(--neutral-border);
+  background: var(--neutral-bg);
+}
+.hub .hub-pz-ta {
+  width: 100%;
+  min-height: 64px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--field-border);
+  background: var(--inset);
+  color: var(--text);
+  font-family: inherit;
+  font-size: 14px;
+  line-height: 1.5;
+  resize: vertical;
+  box-sizing: border-box;
+}
+.hub .hub-pz-ta::placeholder {
+  color: var(--text-2);
+  opacity: 1;
+}
+
+/* «Como fica hoje» and «Calendários econômicos» (board .bloco) */
+
+.hub-pz-quadro {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+  padding: 16px;
+  border-radius: 16px;
+  background: var(--inset);
+}
+.hub-pz-quadro h3 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+.hub-pz-quadro__cab {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+}
+.hub .hub-pz-quadro__nota {
+  margin-top: -6px;
+}
+.hub-pz-hoje {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.hub-pz-hoje li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 2px 12px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: var(--surface);
+  font-size: 13px;
+}
+.hub-pz-hoje__q {
+  flex: 1 1 220px;
+  min-width: 0;
+  text-wrap: pretty;
+}
+.hub-pz-hoje__s {
+  flex: 0 1 auto;
+  min-width: 0;
+  font-weight: 700;
+  text-align: right;
+  text-wrap: pretty;
+}
+.hub-pz-hoje__s--leve {
+  font-weight: 400;
+}
+.hub-pz-hoje__s small {
+  display: block;
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--text-2);
+}
+.hub-pz-cals {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 18px;
+}
+/* The calendars' live region stays on the page while empty; it takes no room then */
+.hub .hub-pz-quadro > p[role='status']:empty {
+  margin-top: -10px;
+}
+
+/* Version block (board .versao) */
+
+.hub-pz-versao {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+.hub-pz-proxima {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--amber);
+}
+.hub-pz-versoes {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 8px 12px;
+  border-radius: 12px;
+  background: var(--inset);
+  font-size: 13px;
+  list-style: none;
+}
+.hub-pz-versoes li {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.hub-pz-analises {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+/* «Preferências» */
+
+.hub-pz-prefs {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.hub-pz-pref {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+  padding: 12px 0;
+  border-top: 1px solid var(--border);
+}
+.hub-pz-pref:last-child {
+  padding-bottom: 0;
+}
+.hub-pz-pref__txt {
+  flex: 1 1 220px;
+  min-width: 0;
+}
+.hub-pz-pref__nome {
+  font-weight: 700;
+}
+/* Segmented pills in an --inset capsule */
+.hub-pz-seg {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 4px;
+  border-radius: 24px;
+  background: var(--inset);
+}
+.hub-pz-seg--tema {
+  flex-wrap: nowrap;
+  border-radius: 999px;
+}
+.hub .hub-pz-seg .hub-pill {
+  border-color: transparent;
+  white-space: nowrap;
+  text-align: center;
+}
+.hub .hub-pz-seg .hub-pill[aria-pressed='true'] {
+  border-color: var(--mint);
+}
+.hub .hub-pz-seg--tema .hub-pill {
+  min-width: 80px;
+}
+
+/* The sticky save bar (board .barra) */
+
+.hub-pz-barra {
+  position: sticky;
+  bottom: 16px;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 12px 12px 12px 20px;
+  border-radius: 999px;
+  border: 1px solid var(--neutral-border);
+  background: var(--bg);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+.hub-pz-barra--mudou {
+  border-color: var(--amber-border);
+}
+.hub-pz-barra__st {
+  flex: 1 1 220px;
+  min-width: 0;
+  font-size: 13px;
+  text-wrap: pretty;
+  overflow-wrap: anywhere;
+}
+
+/* Breakpoints (personalizar.md §3.7) */
+
+@media (max-width: 980px) {
+  .hub-pz-grade {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .hub-pz-mcard--metade {
+    grid-column: 1 / -1;
+  }
+}
+@media (max-width: 640px) {
+  .hub-pz-regra {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  html:has(.hub-pz-barra) {
+    scroll-padding-bottom: 140px;
+  }
+  .hub-pz-topo-acoes {
+    justify-content: flex-start;
+  }
+  .hub-pz-status-topo {
+    flex: 1 1 100%;
+    max-width: none;
+    text-align: left;
+  }
+  .hub-pz-hoje__s {
+    text-align: left;
+  }
+}
+@media (max-width: 540px) {
+  .hub-pz-barra {
+    border-radius: 24px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hub-pz-interruptor__tr::after {
+    transition: none;
+  }
+}

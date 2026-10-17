@@ -1,11 +1,21 @@
 'use client'
 
-import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useState } from 'react'
+import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { DEFAULT_THEME, THEME_SCRIPT, readTheme, saveTheme, type HubTheme } from '@/lib/hub/tema'
 
 interface HubThemeContextValue {
   theme: HubTheme
+  /**
+   * The user's choice («Modo escuro», Personalizar › Tema): applied at once, kept in this browser
+   * and, once signed in, merged into the profile (the writer TemaDoPerfil registers).
+   */
   setTheme: (theme: HubTheme) => void
+  /** The profile's saved theme, applied once per load: kept in this browser, nothing written */
+  adoptTheme: (theme: HubTheme) => void
+  /** Whether the user changed the theme on this page load (then the profile's older value does not win) */
+  themeChangedThisLoad: () => boolean
+  /** Where setTheme writes the profile (null: nowhere, e.g. before sign-in) */
+  registerThemeWriter: (write: ((theme: HubTheme) => void) | null) => void
 }
 
 const HubThemeContext = createContext<HubThemeContextValue | null>(null)
@@ -19,17 +29,35 @@ const useIsomorphicLayoutEffect = typeof window === 'undefined' ? useEffect : us
  */
 export default function HubRoot({ children }: { children: React.ReactNode }) {
   const [theme, setThemeState] = useState<HubTheme>(DEFAULT_THEME)
+  const changedRef = useRef(false)
+  const writerRef = useRef<((theme: HubTheme) => void) | null>(null)
 
   useIsomorphicLayoutEffect(() => {
     setThemeState(readTheme())
   }, [])
 
   const setTheme = useCallback((next: HubTheme) => {
+    changedRef.current = true
+    setThemeState(next)
+    saveTheme(next)
+    writerRef.current?.(next)
+  }, [])
+
+  const adoptTheme = useCallback((next: HubTheme) => {
     setThemeState(next)
     saveTheme(next)
   }, [])
 
-  const value = useMemo(() => ({ theme, setTheme }), [theme, setTheme])
+  const themeChangedThisLoad = useCallback(() => changedRef.current, [])
+
+  const registerThemeWriter = useCallback((write: ((theme: HubTheme) => void) | null) => {
+    writerRef.current = write
+  }, [])
+
+  const value = useMemo(
+    () => ({ theme, setTheme, adoptTheme, themeChangedThisLoad, registerThemeWriter }),
+    [theme, setTheme, adoptTheme, themeChangedThisLoad, registerThemeWriter],
+  )
 
   return (
     <HubThemeContext.Provider value={value}>
