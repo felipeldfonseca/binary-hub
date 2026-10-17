@@ -138,10 +138,12 @@ html:has(.hub-pz-barra) {
 /*
  * The link inside an amber warning: underlined, so it reads as a link in a line of the same colour
  * and weight (board links are underlined; Tailwind's reset removes it). Inline, so it adds no 44px
- * line to the paragraph: the vertical padding gives it a 44px hit area without moving the text.
+ * line to the paragraph: the vertical padding gives it a 44px hit area without moving the text, and
+ * `position: relative` keeps that area above the label that follows («Fora da janela, mostrar»).
  */
 .hub .hub-pz-aviso__link,
 .hub .hub-pz-aviso__link:hover {
+  position: relative;
   display: inline;
   padding: 15px 2px;
   color: var(--amber);

@@ -462,6 +462,7 @@ describe('hub-personalizar.css', () => {
     expect(css).toMatch(/\.hub \.hub-pz-link44 \{[^}]*text-decoration: underline;/)
     const aviso = css.slice(css.indexOf('.hub .hub-pz-aviso__link,'), css.indexOf('}', css.indexOf('.hub .hub-pz-aviso__link,')))
     expect(aviso).toContain('display: inline;')
+    expect(aviso).toContain('position: relative;')
     expect(aviso).toContain('padding: 15px 2px;')
     expect(aviso).toContain('text-decoration: underline;')
     expect(aviso).not.toContain('min-height')
