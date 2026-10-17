@@ -1119,6 +1119,10 @@ html:has(.hub[data-tema='escuro']) #root {
 .hub[data-tema='escuro'] .hub-folha {
   background: #1e2123;
 }
+/* The dialog takes focus only from a click on its text: no ring for that */
+.hub .hub-folha:focus {
+  outline: none;
+}
 .hub-folha__cab {
   display: flex;
   align-items: center;

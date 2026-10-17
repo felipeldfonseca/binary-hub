@@ -226,6 +226,7 @@ export const ARQUIVO = {
     topone: 'Top One Futures · Trade History',
   } as Record<string, string>,
   rows: (count: number) => `${formatInt(count)} linhas`,
+  noRows: 'nenhuma linha de operação',
   noAccount: 'o arquivo não diz a conta',
 }
 
@@ -414,6 +415,7 @@ export const FIM = {
   undoLater: 'Desfazer depois: Personalizar › Suas contas › Importações.', // ADAPTED: "› Editar." had no destination
   toast: (count: number, label: string) => `${ops(count)} em ${label}.`,
   created: (label: string) => `${label} criada.`,
+  // ADAPTED: the board names the account («…ficaram em {conta}.»); the preview only counts them
   nothingImported: 'Nada importado: as operações ficaram em outra conta.',
 }
 

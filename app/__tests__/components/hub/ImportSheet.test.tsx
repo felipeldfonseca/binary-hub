@@ -50,10 +50,33 @@ function Opener({ mode = 'importar', accountId = null }: { mode?: SheetMode; acc
   )
 }
 
-async function openSheet(props: { mode?: SheetMode; accountId?: string | null } = {}) {
-  renderHub(<Opener {...props} />)
+async function openSheet(props: { mode?: SheetMode; accountId?: string | null } = {}, options: { strict?: boolean } = {}) {
+  renderHub(<Opener {...props} />, options)
   await userEvent.click(screen.getByRole('button', { name: 'Abrir' }))
   return screen.getByRole('dialog')
+}
+
+/** A call that stays pending until the test lets it finish */
+function deferred<T>() {
+  let resolve!: (value: T) => void
+  const promise = new Promise<T>((r) => {
+    resolve = r
+  })
+  return { promise, resolve }
+}
+
+const toastOf = (dialog: HTMLElement) => dialog.querySelector('.hub-toast') as HTMLElement
+
+/** The sheet's one live region */
+const statusOf = (dialog: HTMLElement) => within(dialog).getByRole('status')
+
+async function fillNewFuturesAccount(dialog: HTMLElement, label: string) {
+  await userEvent.click(within(dialog).getByRole('button', { name: 'Futuros' }))
+  await userEvent.click(within(dialog).getByRole('button', { name: 'Continuar' }))
+  await userEvent.click(within(dialog).getByRole('button', { name: 'Rithmic' }))
+  await userEvent.click(within(dialog).getByRole('button', { name: 'Continuar' }))
+  await userEvent.type(within(dialog).getByLabelText('Apelido'), label)
+  await userEvent.click(within(dialog).getByRole('button', { name: 'Avaliação' }))
 }
 
 async function chooseFile(dialog: HTMLElement, name = 'arquivo.csv') {
@@ -86,13 +109,14 @@ beforeEach(() => {
 })
 
 describe('ImportSheet · import a file', () => {
-  it('imports a Top One file into its confirmed account, then undoes it from the toast', async () => {
+  /** The happy path: Top One file → preview → import → undo from the toast */
+  async function importAndUndo({ strict }: { strict: boolean }) {
     readFile.mockResolvedValue(fixtureFile('topone_ok'))
     importPreview.mockResolvedValue(makePreview({ new: 7, rows_total: 7, account_tz: 'UTC' }))
     importCommit.mockResolvedValue({ batch_id: 'batch-1', inserted: 7, duplicate: 0, completed: 0, other_account: 0, errors: [] })
     importUndo.mockResolvedValue({ deleted: 7 })
 
-    const dialog = await openSheet({ accountId: topOne.id })
+    const dialog = await openSheet({ accountId: topOne.id }, { strict })
     expect(dialog).toHaveAttribute('aria-modal', 'true')
     expect(within(dialog).getByRole('heading', { level: 2, name: 'Importar arquivo' })).toBeInTheDocument()
     expect(await within(dialog).findByRole('heading', { name: 'Importar histórico de Top One' })).toHaveFocus()
@@ -116,16 +140,93 @@ describe('ImportSheet · import a file', () => {
     expect(importCommit.mock.calls[0][1]).toMatchObject({ p_account: topOne.id, p_file_name: 'topone_ok.csv', p_file_tz: 'UTC' })
     expect(within(dialog).getByText('7 operações em Histórico importado · só resultado, à parte do Diário.')).toBeInTheDocument()
     expect(within(dialog).getByText('Desfazer depois: Personalizar › Suas contas › Importações.')).toBeInTheDocument()
-    const toast = within(dialog).getAllByRole('status').find((el) => el.classList.contains('hub-toast')) as HTMLElement
+    const toast = toastOf(dialog)
     expect(toast).toHaveTextContent('7 operações em Top One.')
 
     await userEvent.click(within(toast).getByRole('button', { name: 'Desfazer: 7 operações em Top One.' }))
 
-    expect(await within(dialog).findByText('Importação desfeita: nada ficou em Top One.')).toBeInTheDocument()
+    expect(await within(dialog).findByText('Importação desfeita: nada ficou em Top One.', { selector: '.hub-chip-dado' })).toBeInTheDocument()
     expect(importUndo).toHaveBeenCalledWith(expect.anything(), 'batch-1')
     expect(within(dialog).getByRole('heading', { name: 'Prévia' })).toHaveFocus()
     expect(importPreview).toHaveBeenCalledTimes(2)
     expect(within(dialog).getByRole('button', { name: 'Importar 7 operações' })).toBeInTheDocument()
+  }
+
+  it('imports a Top One file into its confirmed account, then undoes it from the toast', async () => {
+    await importAndUndo({ strict: false })
+  })
+
+  it('does the same under React strict mode, which mounts the sheet twice', async () => {
+    await importAndUndo({ strict: true })
+  })
+
+  it('announces progress and results through one status region that is always there', async () => {
+    readFile.mockResolvedValue(fixtureFile('topone_ok'))
+    importPreview.mockResolvedValue(makePreview({ new: 7, rows_total: 7 }))
+    const pending = deferred<data.ImportCommitResult>()
+    importCommit.mockReturnValue(pending.promise)
+
+    const dialog = await openSheet({ accountId: topOne.id })
+    const status = statusOf(dialog)
+    expect(status).toBeEmptyDOMElement()
+    // Nothing in the sheet tells assistive technology to hold its updates back
+    expect(dialog).not.toHaveAttribute('aria-busy')
+
+    await chooseFile(dialog)
+    await within(dialog).findByRole('heading', { name: 'Prévia' })
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Importar 7 operações' }))
+    expect(status).toHaveTextContent('Um momento…')
+
+    await act(async () => {
+      pending.resolve({ batch_id: 'batch-1', inserted: 7, duplicate: 0, completed: 0, other_account: 0, errors: [] })
+    })
+
+    await within(dialog).findByRole('heading', { name: 'Importação feita' })
+    expect(within(dialog).getAllByRole('status')).toEqual([status])
+    expect(status).toHaveTextContent('7 operações em Top One.')
+  })
+
+  it('sends one undo however often the toast’s "Desfazer" is pressed', async () => {
+    readFile.mockResolvedValue(fixtureFile('topone_ok'))
+    importPreview.mockResolvedValue(makePreview({ new: 7, rows_total: 7 }))
+    importCommit.mockResolvedValue({ batch_id: 'batch-1', inserted: 7, duplicate: 0, completed: 0, other_account: 0, errors: [] })
+    const pending = deferred<{ deleted: number }>()
+    importUndo.mockReturnValue(pending.promise)
+
+    const dialog = await openSheet({ accountId: topOne.id })
+    await chooseFile(dialog)
+    await userEvent.click(await within(dialog).findByRole('button', { name: 'Importar 7 operações' }))
+    await within(dialog).findByRole('heading', { name: 'Importação feita' })
+    const undo = within(toastOf(dialog)).getByRole('button')
+
+    await userEvent.dblClick(undo)
+    await userEvent.keyboard('{Enter}')
+
+    expect(importUndo).toHaveBeenCalledTimes(1)
+    expect(undo).toHaveAttribute('aria-disabled', 'true')
+    await act(async () => {
+      pending.resolve({ deleted: 7 })
+    })
+    expect(await within(dialog).findByRole('heading', { name: 'Prévia' })).toHaveFocus()
+    expect(within(dialog).queryByRole('alert')).not.toBeInTheDocument()
+  })
+
+  it('imports nothing when every trade of the file is already in another account', async () => {
+    readFile.mockResolvedValue(fixtureFile('topone_ok'))
+    importPreview.mockResolvedValue(makePreview({ new: 0, completable: 0, other_account: 7, rows_total: 7 }))
+
+    const dialog = await openSheet({ accountId: topOne.id })
+    await chooseFile(dialog)
+
+    expect(await within(dialog).findByRole('heading', { name: 'Prévia' })).toHaveFocus()
+    expect(dialog).toHaveTextContent(/7 linhas ·\s*0 novas ·\s*7 em outra conta ·\s*0 já estavam ·\s*0 com erro/)
+    expect(within(dialog).getByText('7 operações já estão em outra conta: ficam onde estão.')).toBeInTheDocument()
+    expect(within(dialog).queryByText(/^Nada novo/)).not.toBeInTheDocument()
+
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Concluir' }))
+
+    expect(importCommit).not.toHaveBeenCalled()
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
 
   it('shows notices, skipped lines with their reasons, the day changes and the commission', async () => {
@@ -190,6 +291,20 @@ describe('ImportSheet · import a file', () => {
     expect(readFile).toHaveBeenCalledWith(file)
   })
 
+  it('never lets a file dropped outside the drop zone open in the browser', async () => {
+    const dialog = await openSheet({ accountId: topOne.id })
+    const veil = document.querySelector('.hub-veu') as HTMLElement
+    const file = csvFile('Trade-History.csv')
+
+    // fireEvent returns false when the default (opening the file) was prevented
+    for (const target of [dialog, within(dialog).getByRole('heading', { level: 2 }), veil]) {
+      expect(fireEvent.dragOver(target, { dataTransfer: { files: [file] } })).toBe(false)
+      expect(fireEvent.drop(target, { dataTransfer: { files: [file] } })).toBe(false)
+    }
+    expect(readFile).not.toHaveBeenCalled()
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
+  })
+
   it('reads the old Ebinex format, which carries its own offsets, without asking the zone', async () => {
     readFile.mockResolvedValue(fixtureFile('ebinex_iso'))
     importPreview.mockResolvedValue(makePreview({ new: 7, rows_total: 7, tz_confirmed: false }))
@@ -214,6 +329,7 @@ describe('ImportSheet · file time zone', () => {
     importFixTz
       .mockResolvedValueOnce(fixTz({ rows: 612, changed: 612, day_changes: 98, shifts: ['03:00:00'], untouched_with_offset: 22 }))
       .mockResolvedValueOnce(fixTz({ rows: 612, changed: 612, day_changes: 98, shifts: ['03:00:00'], dry_run: false }))
+    importCommit.mockResolvedValue({ batch_id: 'batch-1', inserted: 12, duplicate: 0, completed: 0, other_account: 0, errors: [] })
 
     const dialog = await openSheet({ accountId: ebinex.id })
     await chooseFile(dialog)
@@ -240,6 +356,46 @@ describe('ImportSheet · file time zone', () => {
     expect(importFixTz).toHaveBeenLastCalledWith(expect.anything(), ebinex.id, 'America/Sao_Paulo', false)
     expect(importPreview.mock.calls[1][1]).toMatchObject({ p_file_tz: 'America/Sao_Paulo' })
     expect(within(dialog).getByText('Fuso do arquivo: Brasília · lembrado para Ebinex')).toBeInTheDocument()
+
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Importar 12 operações' }))
+
+    await within(dialog).findByRole('heading', { name: 'Importação feita' })
+    // The commit uses the zone just confirmed, never the account's old guess (UTC)
+    expect(importCommit.mock.calls[0][1]).toMatchObject({ p_account: ebinex.id, p_file_tz: 'America/Sao_Paulo' })
+  })
+
+  it('imports with the zone chosen in step c', async () => {
+    readFile.mockResolvedValue(fixtureFile('ebinex_atual_ok'))
+    importPreview.mockResolvedValue(makePreview({ new: 12, rows_total: 12, tz_confirmed: false, account_tz: 'UTC' }))
+    importCommit.mockResolvedValue({ batch_id: 'batch-1', inserted: 12, duplicate: 0, completed: 0, other_account: 0, errors: [] })
+
+    const dialog = await openSheet({ accountId: ebinex.id })
+    await chooseFile(dialog)
+    await within(dialog).findByRole('radiogroup')
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Continuar' }))
+
+    await within(dialog).findByRole('heading', { name: 'Prévia' })
+    expect(importPreview.mock.calls[0][1]).toMatchObject({ p_file_tz: 'America/Sao_Paulo' })
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Importar 12 operações' }))
+
+    await within(dialog).findByRole('heading', { name: 'Importação feita' })
+    // The account's own zone is still the unconfirmed UTC: the commit must not fall back to it
+    expect(importCommit.mock.calls[0][1]).toMatchObject({ p_account: ebinex.id, p_file_tz: 'America/Sao_Paulo' })
+  })
+
+  it('shows the confirmed zone on "Nada novo", with nothing to confirm', async () => {
+    readFile.mockResolvedValue(fixtureFile('topone_ok'))
+    importPreview.mockResolvedValue(makePreview({ new: 0, duplicate: 7, rows_total: 7, already_imported: true }))
+
+    const dialog = await openSheet({ accountId: topOne.id })
+    await chooseFile(dialog)
+
+    expect(await within(dialog).findByRole('heading', { name: 'Nada novo: as 7 operações já estão em Top One.' })).toHaveFocus()
+    expect(within(dialog).getByText('Fuso do arquivo da Top One: UTC.')).toBeInTheDocument()
+    expect(within(dialog).queryByText(/a confirmar/)).not.toBeInTheDocument()
+    expect(within(dialog).queryByRole('button', { name: 'Confirmar fuso' })).not.toBeInTheDocument()
+    expect(importCommit).not.toHaveBeenCalled()
+    expect(importFixTz).not.toHaveBeenCalled()
   })
 
   it('keeps Continuar blocked until a zone is chosen under "Outro"', async () => {
@@ -315,9 +471,39 @@ describe('ImportSheet · accounts', () => {
     expect(importPreview.mock.calls[0][1]).toMatchObject({ p_account: ebinex.id, p_platform: 'ebinex' })
   })
 
+  it('starts one preview however often a wrong-market button is pressed', async () => {
+    readFile.mockResolvedValue(fixtureFile('ebinex_atual_ok'))
+    fetchAccounts.mockResolvedValue([topOne, { ...ebinex, tz_applied_at: CONFIRMED, file_tz: 'America/Sao_Paulo' }])
+    const pending = deferred<data.ImportPreviewResult>()
+    importPreview.mockReturnValue(pending.promise)
+
+    const dialog = await openSheet({ accountId: topOne.id })
+    await chooseFile(dialog)
+    const into = await within(dialog).findByRole('button', { name: 'Importar em Ebinex' })
+    const create = within(dialog).getByRole('button', { name: 'Criar conta de binárias' })
+
+    await userEvent.dblClick(into)
+    await userEvent.click(create)
+
+    expect(importPreview).toHaveBeenCalledTimes(1)
+    expect(into).toHaveAttribute('aria-disabled', 'true')
+    expect(create).toHaveAttribute('aria-disabled', 'true')
+    await act(async () => {
+      pending.resolve(makePreview({ new: 12, rows_total: 12 }))
+    })
+    await within(dialog).findByRole('heading', { name: 'Prévia' })
+
+    // One step in the history: Voltar goes back to the market question, which shows the account in context
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Voltar' }))
+    expect(within(dialog).getByRole('heading', { name: 'Este arquivo é de binárias (Ebinex).' })).toHaveFocus()
+    expect(within(dialog).getByText('A conta escolhida é de Futuros.')).toBeInTheDocument()
+  })
+
   it('creates a binary account for a file of the other market', async () => {
     readFile.mockResolvedValue(fixtureFile('ebinex_atual_ok'))
     fetchAccounts.mockResolvedValue([topOne])
+    const created = makeAccount({ label: 'Minha Ebinex', market: 'binary', platform: 'ebinex', phase: 'pessoal' })
+    createAccount.mockResolvedValue(created)
 
     const dialog = await openSheet({ accountId: topOne.id })
     await chooseFile(dialog)
@@ -328,6 +514,96 @@ describe('ImportSheet · accounts', () => {
     expect(within(dialog).getByText('Ebinex · arquivo CSV')).toBeInTheDocument()
     expect(within(dialog).getByText('Tipo')).toBeInTheDocument()
     expect(within(dialog).queryByText('Tamanho US$')).not.toBeInTheDocument()
+
+    await userEvent.type(within(dialog).getByLabelText('Apelido'), 'Minha Ebinex')
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Criar Minha Ebinex e continuar' }))
+
+    expect(await within(dialog).findByRole('heading', { name: 'Em que fuso estão os horários deste arquivo?' })).toHaveFocus()
+    // A binary account is always personal; Top One stays the primary account
+    expect(createAccount).toHaveBeenCalledWith(expect.anything(), 'user-1', {
+      market: 'binary',
+      label: 'Minha Ebinex',
+      platform: 'ebinex',
+      firm: null,
+      external_ref: null,
+      phase: 'pessoal',
+      size: null,
+      is_primary: false,
+    })
+
+    // Back past the account it created: the market question still shows the account in context
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Voltar' }))
+    expect(within(dialog).getByRole('heading', { name: 'Este arquivo é de binárias (Ebinex).' })).toHaveFocus()
+    expect(within(dialog).getByText('A conta escolhida é de Futuros.')).toBeInTheDocument()
+    expect(within(dialog).getByRole('button', { name: 'Importar em Minha Ebinex' })).toBeInTheDocument()
+  })
+
+  it('makes the first account the primary one', async () => {
+    fetchAccounts.mockResolvedValue([])
+    createAccount.mockResolvedValue(makeAccount({ label: 'Apex A', market: 'futures', platform: 'rithmic', phase: 'avaliacao' }))
+
+    const dialog = await openSheet({ mode: 'adicionar' })
+    await waitFor(() => expect(fetchAccounts).toHaveBeenCalled())
+    await fillNewFuturesAccount(dialog, 'Apex A')
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Criar Apex A' }))
+
+    await within(dialog).findByRole('heading', { name: 'Apex A criada.' })
+    expect(createAccount).toHaveBeenCalledWith(expect.anything(), 'user-1', expect.objectContaining({ phase: 'avaliacao', is_primary: true }))
+  })
+
+  it('keeps an account it created when the preview then fails, and retries without creating it again', async () => {
+    // The old Ebinex format carries its own offsets: no zone step, the preview comes right after
+    readFile.mockResolvedValue(fixtureFile('ebinex_iso'))
+    fetchAccounts.mockResolvedValue([topOne])
+    const created = makeAccount({ label: 'Minha Ebinex', market: 'binary', platform: 'ebinex', phase: 'pessoal' })
+    createAccount.mockImplementation(async () => {
+      fetchAccounts.mockResolvedValue([topOne, created])
+      return created
+    })
+    importPreview
+      .mockRejectedValueOnce({ message: 'TypeError: Failed to fetch' })
+      .mockResolvedValue(makePreview({ new: 7, rows_total: 7, tz_confirmed: false }))
+
+    const dialog = await openSheet()
+    await chooseFile(dialog)
+    await within(dialog).findByRole('heading', { name: 'Para qual conta?' })
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Continuar' }))
+    await userEvent.type(within(dialog).getByLabelText('Apelido'), 'Minha Ebinex')
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Criar Minha Ebinex e continuar' }))
+
+    expect(await within(dialog).findByRole('alert')).toHaveTextContent('Não foi possível falar com o servidor.')
+    // The refreshed list now has the new account: its own nickname is not "taken"
+    await waitFor(() => expect(fetchAccounts).toHaveBeenCalledTimes(2))
+    expect(dialog).not.toHaveTextContent('Já existe uma conta com esse apelido.')
+    expect(within(dialog).getByLabelText('Apelido')).toBeDisabled()
+    const retry = within(dialog).getByRole('button', { name: 'Continuar' })
+    expect(retry).not.toHaveAttribute('aria-disabled')
+
+    await userEvent.click(retry)
+
+    expect(await within(dialog).findByRole('heading', { name: 'Prévia' })).toHaveFocus()
+    expect(createAccount).toHaveBeenCalledTimes(1)
+    expect(importPreview.mock.calls[1][1]).toMatchObject({ p_account: created.id })
+  })
+
+  it('says "{conta} criada. Nada importado…" when a new account gets nothing from the file', async () => {
+    readFile.mockResolvedValue(fixtureFile('ebinex_iso'))
+    fetchAccounts.mockResolvedValue([topOne])
+    createAccount.mockResolvedValue(makeAccount({ label: 'Minha Ebinex', market: 'binary', platform: 'ebinex', phase: 'pessoal' }))
+    importPreview.mockResolvedValue(makePreview({ new: 0, completable: 0, other_account: 7, rows_total: 7, tz_confirmed: false }))
+
+    const dialog = await openSheet()
+    await chooseFile(dialog)
+    await userEvent.click(await within(dialog).findByRole('button', { name: 'Continuar' }))
+    await userEvent.type(within(dialog).getByLabelText('Apelido'), 'Minha Ebinex')
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Criar Minha Ebinex e continuar' }))
+    await within(dialog).findByRole('heading', { name: 'Prévia' })
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Concluir' }))
+
+    expect(await within(dialog).findByRole('heading', { name: 'Minha Ebinex criada.' })).toHaveFocus()
+    expect(within(dialog).getByText('Nada importado: as operações ficaram em outra conta.')).toBeInTheDocument()
+    expect(importCommit).not.toHaveBeenCalled()
+    expect(toastOf(dialog)).toBeNull()
   })
 
   it('asks for the account when the sheet has none, and creates one before the zone', async () => {
@@ -376,9 +652,16 @@ describe('ImportSheet · accounts', () => {
     expect(within(dialog).getByText('Passo 3 de 4')).toBeInTheDocument()
     // Top One files are in UTC
     expect(within(dialog).getByRole('radio', { name: /^UTC/ })).toBeChecked()
-    // The new account cannot be created twice: Voltar goes back to the account choice
+    // The new account cannot be created twice: Voltar goes back to the account choice, on that account
     await userEvent.click(within(dialog).getByRole('button', { name: 'Voltar' }))
     expect(await within(dialog).findByRole('heading', { name: 'Para qual conta?' })).toBeInTheDocument()
+    expect(within(dialog).getByRole('button', { name: 'Apex B' })).toHaveAttribute('aria-pressed', 'true')
+    expect(within(dialog).getByRole('button', { name: '+ Nova conta de futuros' })).toHaveAttribute('aria-pressed', 'false')
+
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Continuar' }))
+
+    expect(await within(dialog).findByRole('heading', { name: 'Em que fuso estão os horários deste arquivo?' })).toHaveFocus()
+    expect(createAccount).toHaveBeenCalledTimes(1)
   })
 })
 
@@ -428,6 +711,24 @@ describe('ImportSheet · add an account', () => {
     expect(within(dialog).getByRole('heading', { name: 'Importar histórico de Apex A' })).toHaveFocus()
   })
 
+  it('goes back from the drop step to "{conta} criada.", never to a second account form', async () => {
+    createAccount.mockResolvedValue(makeAccount({ label: 'Apex A', market: 'futures', platform: 'rithmic', phase: 'avaliacao' }))
+
+    const dialog = await openSheet({ mode: 'adicionar' })
+    await fillNewFuturesAccount(dialog, 'Apex A')
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Criar Apex A' }))
+    await userEvent.click(await within(dialog).findByRole('button', { name: 'Importar histórico' }))
+
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Voltar' }))
+
+    expect(within(dialog).getByRole('heading', { name: 'Apex A criada.' })).toHaveFocus()
+    expect(within(dialog).getByRole('heading', { level: 2, name: 'Adicionar conta' })).toBeInTheDocument()
+    // An end screen has no Voltar: what came before it is done
+    expect(within(dialog).queryByRole('button', { name: 'Voltar' })).not.toBeInTheDocument()
+    expect(within(dialog).getByRole('button', { name: 'Importar histórico' })).toBeInTheDocument()
+    expect(createAccount).toHaveBeenCalledTimes(1)
+  })
+
   it('shows a taken nickname as a field error and keeps the button blocked', async () => {
     const dialog = await openSheet({ mode: 'adicionar' })
     await waitFor(() => expect(fetchAccounts).toHaveBeenCalled())
@@ -472,16 +773,59 @@ describe('ImportSheet · errors', () => {
     expect(await within(dialog).findByText('Faltam colunas: Vela.')).toBeInTheDocument()
   })
 
-  it('maps a refusal from the import functions to its own copy', async () => {
-    readFile.mockResolvedValue(fixtureFile('topone_ok'))
-    importPreview.mockRejectedValue({ code: '22023', message: 'tz_mismatch', details: 'MNQM6/900000000001 at 06/03/2026 14:32:10' })
+  it('shows the card of a file with no trade line', async () => {
+    readFile.mockResolvedValue({
+      fileName: 'operacoes.csv',
+      size: 10,
+      sha256: 'ab'.repeat(32),
+      outcome: { ok: false, error: 'empty_file', platform: 'ebinex' },
+    })
+
+    const dialog = await openSheet({ accountId: ebinex.id })
+    await chooseFile(dialog)
+
+    expect(await within(dialog).findByRole('heading', { name: 'O arquivo não tem operações.' })).toHaveFocus()
+    expect(within(dialog).getByText('CSV da Ebinex · Opções binárias · nenhuma linha de operação')).toBeInTheDocument()
+    expect(within(dialog).getByRole('button', { name: 'Como ler: arquivo' })).toBeInTheDocument()
+  })
+
+  it('shows no card for a file it could not read at all', async () => {
+    readFile.mockResolvedValue({ fileName: 'x.csv', size: 10, sha256: 'ab'.repeat(32), outcome: { ok: false, error: 'unknown_format' } })
 
     const dialog = await openSheet({ accountId: topOne.id })
     await chooseFile(dialog)
 
-    expect(await within(dialog).findByRole('alert')).toHaveTextContent('Este fuso é diferente do fuso confirmado da conta.')
+    await within(dialog).findByRole('heading', { name: 'Não conseguimos ler o arquivo.' })
+    expect(dialog.querySelector('.hub-arq')).toBeNull()
+  })
+
+  it('maps a refusal from the import functions to its own copy', async () => {
+    readFile.mockResolvedValue(fixtureFile('topone_ok'))
+    importPreview.mockRejectedValue({ code: '22023', message: 'archived_account', details: 'MNQM6/900000000001 at 06/03/2026 14:32:10' })
+
+    const dialog = await openSheet({ accountId: topOne.id })
+    await chooseFile(dialog)
+
+    expect(await within(dialog).findByRole('alert')).toHaveTextContent('Esta conta está arquivada. Reative em Personalizar para importar.')
     expect(dialog).not.toHaveTextContent('MNQM6/900000000001')
     expect(dialog).not.toHaveTextContent('22023')
+  })
+
+  // import_preview never raises a zone code: it answers with tz_status
+  it.each([
+    ['tz_mismatch', 'Este fuso é diferente do fuso confirmado da conta.'],
+    ['invalid_tz', 'Fuso inválido. Escolha outro.'],
+  ] as const)('stops before the preview when the preview answers tz_status %s', async (tzStatus, text) => {
+    readFile.mockResolvedValue(fixtureFile('topone_ok'))
+    importPreview.mockResolvedValue(makePreview({ new: 7, rows_total: 7, tz_status: tzStatus }))
+
+    const dialog = await openSheet({ accountId: topOne.id })
+    await chooseFile(dialog)
+
+    expect(await within(dialog).findByRole('alert')).toHaveTextContent(text)
+    expect(within(dialog).queryByRole('heading', { name: 'Prévia' })).not.toBeInTheDocument()
+    expect(within(dialog).queryByRole('button', { name: /^Importar \d/ })).not.toBeInTheDocument()
+    expect(importCommit).not.toHaveBeenCalled()
   })
 
   it('never shows the text of an error it does not know, which can hold the file’s values', async () => {
@@ -561,6 +905,25 @@ describe('ImportSheet · closing', () => {
     expect(close).toHaveFocus()
     await userEvent.tab({ shift: true })
     expect(choose).toHaveFocus()
+  })
+
+  it('keeps Tab and Escape inside the sheet after a click on its text', async () => {
+    const dialog = await openSheet({ accountId: topOne.id })
+    const text = within(dialog).getByText('Solte para importar')
+
+    await userEvent.click(text)
+    expect(dialog).toContainElement(document.activeElement as HTMLElement)
+    await userEvent.tab()
+    expect(within(dialog).getByRole('button', { name: 'Fechar' })).toHaveFocus()
+
+    await userEvent.click(text)
+    await userEvent.tab({ shift: true })
+    expect(within(dialog).getByRole('button', { name: 'Escolher arquivo' })).toHaveFocus()
+
+    await userEvent.click(text)
+    await userEvent.keyboard('{Escape}')
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Abrir' })).toHaveFocus()
   })
 
   it('hides and freezes the page behind the sheet while it is open', async () => {

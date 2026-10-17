@@ -5,6 +5,7 @@ import { FileText } from 'lucide-react'
 import { buildImportArgs, previewArgs, readImportFile, type ReadImportFileResult } from '@/lib/domain/import'
 import { LABEL_MAX, PLATFORM_UNKNOWN, labelTaken, parseSize, zoneKeyOf, type TradingAccount } from '@/lib/hub/contas'
 import {
+  HubDataError,
   createAccount,
   importCommit,
   importFixTz,
@@ -41,7 +42,7 @@ import {
   zoneName,
 } from '@/components/hub/contas/copy'
 import { InfoButton, InfoPanel, useToggle } from '@/components/hub/contas/ui'
-import { END_STEPS, fileSummary, needsZoneStep, parsedOf, stepIndicator, type Passo } from './flow'
+import { END_STEPS, emptyFileSummary, fileSummary, needsZoneStep, parsedOf, stepIndicator, type Passo } from './flow'
 import {
   EMPTY_FORM,
   PassoConfirmarFuso,
@@ -90,6 +91,10 @@ interface Flow {
   undone: boolean
   /** The account this sheet created, until the account list has it */
   created: TradingAccount | null
+  /** Step b's form already created `created`: the form can only retry what follows */
+  createdFromForm: boolean
+  /** Step g: the account in context, whose market the file is not */
+  wrongFrom: string | null
   /** Zones confirmed in this sheet, until the account list has them */
   confirmedTz: Record<string, string>
   form: AccountForm
@@ -114,6 +119,8 @@ const initialFlow = (mode: SheetMode, accountId: string | null): Flow => ({
   nothingImported: false,
   undone: false,
   created: null,
+  createdFromForm: false,
+  wrongFrom: null,
   confirmedTz: {},
   form: EMPTY_FORM,
 })
@@ -139,7 +146,13 @@ export default function ImportSheet({ mode, accountId, onClose }: { mode: SheetM
   const formats = useImportFormats()
   const refresh = useRefreshAfterWrite()
   const [flow, setFlow] = useState<Flow>(() => initialFlow(mode, accountId))
-  const [busy, setBusy] = useState(false)
+  const [busy, setBusyState] = useState(false)
+  // Read by the click handlers: a second click can arrive before the re-render that shows busy
+  const busyRef = useRef(false)
+  const setBusy = useCallback((value: boolean) => {
+    busyRef.current = value
+    setBusyState(value)
+  }, [])
   const [reading, setReading] = useState(false)
   const [error, setError] = useState<HubErrorCode | null>(null)
   const [leaving, setLeaving] = useState(false)
@@ -216,7 +229,8 @@ export default function ImportSheet({ mode, accountId, onClose }: { mode: SheetM
           return
         }
         if (result.tz_status !== 'ok') {
-          fail({ message: result.tz_status === 'tz_mismatch' ? 'tz_mismatch' : 'invalid_tz' }, { ...patch, accountId: target.id })
+          // import_preview answers a zone problem in tz_status (it raises nothing for it): no preview, no import
+          fail(new HubDataError(result.tz_status === 'tz_mismatch' ? 'tz_mismatch' : 'invalid_tz'), { ...patch, accountId: target.id })
           return
         }
         const nothing = result.new === 0 && result.completable === 0 && result.other_account === 0
@@ -227,7 +241,7 @@ export default function ImportSheet({ mode, accountId, onClose }: { mode: SheetM
         if (alive.current) setBusy(false)
       }
     },
-    [db, move, fail],
+    [db, move, fail, setBusy],
   )
 
   /** With the destination known: ask the zone, or go straight to the preview. */
@@ -267,7 +281,7 @@ export default function ImportSheet({ mode, accountId, onClose }: { mode: SheetM
       return
     }
     if (context) {
-      move('g', { file: result })
+      move('g', { file: result, wrongFrom: context.id })
       return
     }
     const sameMarket = accounts.filter((a) => a.market === p.market)
@@ -283,10 +297,16 @@ export default function ImportSheet({ mode, accountId, onClose }: { mode: SheetM
   const setForm = (patch: Partial<AccountForm>) => setFlow((f) => ({ ...f, form: { ...f.form, ...patch } }))
   const formMarket = parsed?.market ?? form.market ?? 'futures'
   const sizeValue = parseSize(form.size)
-  const taken = labelTaken(form.label, all)
+  // Once the form created its account, that account's nickname is not "taken"
+  const taken = labelTaken(form.label, all, flow.createdFromForm ? flow.created?.id : undefined)
 
   const createFromForm = async () => {
     if (!userId) return
+    if (flow.createdFromForm && flow.created) {
+      // The account exists and only what followed failed (the preview): try that again, never a second account
+      if (flow.file && parsed) await afterAccount(flow.created, flow.file, { accountId: flow.created.id })
+      return
+    }
     setBusy(true)
     setError(null)
     try {
@@ -305,9 +325,10 @@ export default function ImportSheet({ mode, accountId, onClose }: { mode: SheetM
       if (!alive.current) return
       if (flow.file && parsed) {
         setBusy(false)
-        await afterAccount(created, flow.file, { created, accountId: created.id })
+        // The patch is kept even when the preview fails, so the sheet knows the account exists
+        await afterAccount(created, flow.file, { created, createdFromForm: true, accountId: created.id })
       } else {
-        move('fimConta', { created, accountId: created.id })
+        move('fimConta', { created, createdFromForm: true, accountId: created.id })
       }
     } catch (e) {
       fail(e)
@@ -385,7 +406,7 @@ export default function ImportSheet({ mode, accountId, onClose }: { mode: SheetM
 
   const undo = async () => {
     const batch = flow.commit?.batch_id
-    if (!batch || !account || !flow.file || !flow.zoneUsed) return
+    if (busyRef.current || !batch || !account || !flow.file || !flow.zoneUsed) return
     setBusy(true)
     setError(null)
     try {
@@ -407,25 +428,37 @@ export default function ImportSheet({ mode, accountId, onClose }: { mode: SheetM
   // Back and close
   // --------------------------------------------------------------------------------------------
 
-  const canRevisit = (p: Passo, f: Flow) =>
-    !END_STEPS.includes(p) && !(p === 'b' && f.created) && !((p === 'conf' || p === 'c') && f.fixApplied)
+  /** Steps "Voltar" skips: the form of an account already created, and a zone already applied. */
+  const skipOnBack = (p: Passo, f: Flow) => (p === 'b' && !!f.created) || ((p === 'conf' || p === 'c') && f.fixApplied)
 
   const backIndex = (() => {
-    for (let i = flow.history.length - 1; i >= 0; i--) if (canRevisit(flow.history[i], flow)) return i
+    for (let i = flow.history.length - 1; i >= 0; i--) {
+      const p = flow.history[i]
+      // An end screen is as far back as Voltar goes: what came before it is done ("{conta} criada.")
+      if (END_STEPS.includes(p)) return i
+      if (!skipOnBack(p, flow)) return i
+    }
     return -1
   })()
 
   const back = () => {
-    if (busy || backIndex < 0) return
+    if (busyRef.current || backIndex < 0) return
     setError(null)
-    setFlow((f) => ({ ...f, passo: f.history[backIndex], history: f.history.slice(0, backIndex), undone: false }))
+    setFlow((f) => {
+      const passo = f.history[backIndex]
+      const skipped = [...f.history.slice(backIndex + 1), f.passo]
+      // Back past the form that created an account: that account is now the one chosen, so
+      // "Continuar" never opens a second "Nova conta"
+      const choice = passo === 'a' && f.created && f.createdFromForm && skipped.includes('b') ? f.created.id : f.choice
+      return { ...f, passo, history: f.history.slice(0, backIndex), undone: false, choice }
+    })
     setFocusTick((t) => t + 1)
   }
 
   const typed =
     !!(form.label.trim() || form.size.trim() || form.ref.trim() || form.firm.trim() || form.search.trim() || form.phase || form.platform) ||
     (mode === 'adicionar' && !!form.market)
-  const dirty = !flow.created && ['i1', 'i2', 'b'].includes(flow.passo) && typed
+  const dirty = !flow.createdFromForm && ['i1', 'i2', 'b'].includes(flow.passo) && typed
 
   const requestClose = () => {
     if (busy || reading) return
@@ -454,7 +487,8 @@ export default function ImportSheet({ mode, accountId, onClose }: { mode: SheetM
     const first = nodes[0]
     const last = nodes[nodes.length - 1]
     const current = document.activeElement
-    if (event.shiftKey && (current === first || current === headingRef.current)) {
+    // The dialog itself has focus after a click on its text
+    if (event.shiftKey && (current === first || current === headingRef.current || current === sectionRef.current)) {
       event.preventDefault()
       last.focus()
     } else if (!event.shiftKey && current === last) {
@@ -501,7 +535,7 @@ export default function ImportSheet({ mode, accountId, onClose }: { mode: SheetM
       primary = {
         label: FOLHA.next,
         run: () => {
-          if (flow.choice === 'nova') move('b', { form: { ...EMPTY_FORM, market: parsed.market } })
+          if (flow.choice === 'nova') move('b', { form: { ...EMPTY_FORM, market: parsed.market }, createdFromForm: false })
           else if (chosen && flow.file) void afterAccount(chosen, flow.file, { accountId: chosen.id })
         },
       }
@@ -535,6 +569,7 @@ export default function ImportSheet({ mode, accountId, onClose }: { mode: SheetM
         roValue = [futures ? form.firm.trim() : '', platform].filter(Boolean).join(' · ')
       }
       const sizeInvalid = futures && sizeValue === 'invalid'
+      const locked = flow.createdFromForm && !!flow.created
       body = (
         <PassoNovaConta
           headingRef={headingRef}
@@ -545,15 +580,19 @@ export default function ImportSheet({ mode, accountId, onClose }: { mode: SheetM
           roValue={roValue}
           labelTaken={taken}
           sizeInvalid={sizeInvalid}
+          locked={locked}
         />
       )
       const name = form.label.trim()
-      primary = {
-        label: name ? (parsed ? PASSO_B.createAndGo(name) : PASSO_B.create(name)) : PASSO_B.createFallback,
-        run: () => void createFromForm(),
-        blocked: !name ? PASSO_B.needLabel : futures && !form.phase ? PASSO_B.needPhase : undefined,
-        blockedBy: taken ? 'f-apelido-erro' : sizeInvalid ? 'f-tam-erro' : undefined,
-      }
+      primary = locked
+        ? // The account exists; what followed it failed and is tried again
+          { label: FOLHA.next, run: () => void createFromForm() }
+        : {
+            label: name ? (parsed ? PASSO_B.createAndGo(name) : PASSO_B.create(name)) : PASSO_B.createFallback,
+            run: () => void createFromForm(),
+            blocked: !name ? PASSO_B.needLabel : futures && !form.phase ? PASSO_B.needPhase : undefined,
+            blockedBy: taken ? 'f-apelido-erro' : sizeInvalid ? 'f-tam-erro' : undefined,
+          }
       break
     }
     case 'c': {
@@ -613,19 +652,25 @@ export default function ImportSheet({ mode, accountId, onClose }: { mode: SheetM
       break
     }
     case 'g': {
-      if (!parsed || !account) break
+      // The account in context, also when Voltar comes back here after another account was chosen
+      const from = view(flow.wrongFrom)
+      if (!parsed || !from) break
       const targets = accounts.filter((a) => a.market === parsed.market).map((a) => ({ id: a.id, label: a.label }))
       body = (
         <PassoMercadoErrado
           headingRef={headingRef}
           fileMarket={parsed.market}
-          account={{ label: account.label, market: account.market === 'futures' ? 'futures' : 'binary' }}
+          account={{ label: from.label, market: from.market === 'futures' ? 'futures' : 'binary' }}
           targets={targets}
+          busy={busy}
           onImportInto={(id) => {
+            if (busyRef.current) return
             const target = view(id)
             if (target && flow.file) void afterAccount(target, flow.file, { accountId: id })
           }}
-          onCreate={() => move('b', { form: { ...EMPTY_FORM, market: parsed.market } })}
+          onCreate={() => {
+            if (!busyRef.current) move('b', { form: { ...EMPTY_FORM, market: parsed.market }, createdFromForm: false })
+          }}
         />
       )
       break
@@ -668,7 +713,15 @@ export default function ImportSheet({ mode, accountId, onClose }: { mode: SheetM
   }
 
   const title = mode === 'adicionar' && !flow.file && flow.passo !== 'solte' ? FOLHA.titleAdd : FOLHA.titleImport
-  const showFile = !!parsed && flow.passo !== 'solte' && flow.passo !== 'erro'
+  // The file card: a read file, or on the error step a known format with no trade line
+  const fileLine =
+    flow.passo === 'solte'
+      ? null
+      : parsed
+        ? fileSummary(parsed, new Date().getFullYear())
+        : flow.passo === 'erro'
+          ? emptyFileSummary(flow.file)
+          : null
   const indicator = stepIndicator({
     passo: flow.passo,
     history: flow.history,
@@ -681,18 +734,26 @@ export default function ImportSheet({ mode, accountId, onClose }: { mode: SheetM
   const showBack = !END_STEPS.includes(flow.passo) && flow.passo !== 'g' && backIndex >= 0
   const blocked = !!primary && (!!primary.blocked || !!primary.blockedBy)
   const toastText = flow.passo === 'fim' && flow.commit?.batch_id ? FIM.toast(flow.commit.inserted, label) : ''
+  // What the one live region says: the running request, else the latest result
+  const statusText = busy ? BUSY : reading ? SOLTE.reading : toastText || (flow.passo === 'd' && flow.undone ? PASSO_D.undone(label) : '')
+
+  // A file dropped outside the drop zone must not open in the browser and lose the sheet
+  const holdDrop = (event: React.DragEvent) => event.preventDefault()
 
   return (
     <>
-      <div className="hub-veu" aria-hidden="true" onClick={requestClose} />
+      <div className="hub-veu" aria-hidden="true" onClick={requestClose} onDragOver={holdDrop} onDrop={holdDrop} />
       <section
         ref={sectionRef}
         className="hub-folha"
         role="dialog"
         aria-modal="true"
         aria-labelledby="t-folha"
-        aria-busy={busy || reading || undefined}
+        // A click on text inside keeps focus in the dialog, so Escape and the Tab trap still work
+        tabIndex={-1}
         onKeyDown={onKeyDown}
+        onDragOver={holdDrop}
+        onDrop={holdDrop}
       >
         <div className="hub-folha__cab">
           <h2 id="t-folha">{title}</h2>
@@ -707,11 +768,11 @@ export default function ImportSheet({ mode, accountId, onClose }: { mode: SheetM
           </button>
         </div>
 
-        {showFile && parsed && (
+        {fileLine && (
           <div className="hub-arq">
             <div className="hub-arq__linha">
               <FileText size={18} strokeWidth={2} aria-hidden="true" />
-              <span className="hub-arq__txt">{fileSummary(parsed, new Date().getFullYear())}</span>
+              <span className="hub-arq__txt">{fileLine}</span>
               <InfoButton panelId="info-arq" label={ARQUIVO.infoAria} open={infoArq} onToggle={toggleInfoArq} />
             </div>
             {infoArq && <InfoPanel id="info-arq">{ARQUIVO.info}</InfoPanel>}
@@ -736,11 +797,8 @@ export default function ImportSheet({ mode, accountId, onClose }: { mode: SheetM
             {ERROR_TEXT[error]}
           </div>
         )}
-        {busy && (
-          <p role="status" className="hub-nota">
-            {BUSY}
-          </p>
-        )}
+        {/* Announced by the status region below */}
+        {busy && <p className="hub-nota">{BUSY}</p>}
 
         {leaving ? (
           <div className="hub-bloco hub-bloco--atencao" role="group" aria-labelledby="t-sair">
@@ -772,7 +830,7 @@ export default function ImportSheet({ mode, accountId, onClose }: { mode: SheetM
                     aria-disabled={blocked || busy || undefined}
                     aria-describedby={primary.blocked ? 'dica-pri' : primary.blockedBy}
                     onClick={() => {
-                      if (!blocked && !busy) primary?.run()
+                      if (!blocked && !busyRef.current) primary?.run()
                     }}
                   >
                     {primary.label}
@@ -789,13 +847,18 @@ export default function ImportSheet({ mode, accountId, onClose }: { mode: SheetM
         )}
 
         {toastText && (
-          <div className="hub-toast" role="status">
+          <div className="hub-toast">
             <span>{toastText}</span>
-            <button type="button" aria-label={undoAria(toastText)} onClick={() => void undo()}>
+            <button type="button" aria-label={undoAria(toastText)} aria-disabled={busy || undefined} onClick={() => void undo()}>
               {UNDO}
             </button>
           </div>
         )}
+
+        {/* The sheet's one live region: always mounted, so a change of its text is announced */}
+        <p role="status" className="sr-only">
+          {statusText}
+        </p>
       </section>
     </>
   )

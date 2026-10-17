@@ -3,7 +3,7 @@
  * own names (a, b, c, d, f, g, i1, i2, solte, erro, fim…), plus `conf`: the count of what a
  * file zone change moves, shown before the zone is confirmed (owner's decision, no board).
  */
-import type { ParsedFile, ReadImportFileResult } from '@/lib/domain/import'
+import { PLATFORM_MARKET, type FileVariant, type ParsedFile, type Platform, type ReadImportFileResult } from '@/lib/domain/import'
 import { fileDays, tzConfirmed, type TradingAccount } from '@/lib/hub/contas'
 import { formatDateRange } from '@/lib/hub/formato'
 import { ARQUIVO, MARKET_LABEL, ops } from '@/components/hub/contas/copy'
@@ -98,4 +98,29 @@ export function fileSummary(parsed: ParsedFile, currentYear: number): string {
   if (days) parts.push(formatDateRange(days.first, days.last, currentYear))
   if (parsed.platform === 'topone') parts.push(ARQUIVO.noAccount)
   return parts.filter(Boolean).join(' · ')
+}
+
+/**
+ * «CSV da Ebinex · Opções binárias · nenhuma linha de operação» (board): a file of a known
+ * format with no trade to import. Null for any other file.
+ */
+export function emptyFileSummary(file: ReadImportFileResult | null): string | null {
+  const outcome = file?.outcome
+  if (!outcome) return null
+  let platform: Platform
+  let variant: FileVariant
+  if (outcome.ok) {
+    if (outcome.rows.length > 0) return null
+    platform = outcome.platform
+    variant = outcome.variant
+  } else if (outcome.error === 'empty_file' && outcome.platform) {
+    // A header and nothing under it: the format is known, its variant is not
+    platform = outcome.platform
+    variant = platform === 'topone' ? 'topone' : 'ebinex_br'
+  } else {
+    return null
+  }
+  return [ARQUIVO.format[variant] ?? '', platform === 'topone' ? '' : MARKET_LABEL[PLATFORM_MARKET[platform]], ARQUIVO.noRows]
+    .filter(Boolean)
+    .join(' · ')
 }

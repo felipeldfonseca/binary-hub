@@ -5,6 +5,7 @@
  */
 import fs from 'fs'
 import path from 'path'
+import { StrictMode } from 'react'
 import { render } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { parseImportText, type ReadImportFileResult } from '@/lib/domain/import'
@@ -87,13 +88,17 @@ export function csvFile(name = 'arquivo.csv') {
   return new File(['ID,Data\n'], name, { type: 'text/csv' })
 }
 
-/** Renders inside a fresh query cache and the import sheet's provider. */
-export function renderHub(ui: React.ReactElement) {
+/**
+ * Renders inside a fresh query cache and the import sheet's provider. `strict` adds React's
+ * strict mode, which mounts, unmounts and mounts again as `next dev` does.
+ */
+export function renderHub(ui: React.ReactElement, { strict = false }: { strict?: boolean } = {}) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: Infinity } } })
-  const view = render(
+  const tree = (
     <QueryClientProvider client={queryClient}>
       <ImportSheetProvider>{ui}</ImportSheetProvider>
-    </QueryClientProvider>,
+    </QueryClientProvider>
   )
+  const view = render(strict ? <StrictMode>{tree}</StrictMode> : tree)
   return { ...view, queryClient }
 }

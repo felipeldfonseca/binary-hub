@@ -126,11 +126,8 @@ export function PassoSolte({
           {SOLTE.choose}
         </button>
       </div>
-      {reading && (
-        <p role="status" className="hub-nota">
-          {SOLTE.reading}
-        </p>
-      )}
+      {/* Announced by the sheet's status region */}
+      {reading && <p className="hub-nota">{SOLTE.reading}</p>}
     </div>
   )
 }
@@ -296,6 +293,7 @@ export function PassoNovaConta({
   roValue,
   labelTaken,
   sizeInvalid,
+  locked = false,
 }: {
   headingRef: HeadingRef
   market: Market
@@ -305,6 +303,8 @@ export function PassoNovaConta({
   roValue: string
   labelTaken: boolean
   sizeInvalid: boolean
+  /** The account already exists: what was typed can no longer change it */
+  locked?: boolean
 }) {
   const futures = market === 'futures'
   return (
@@ -321,6 +321,7 @@ export function PassoNovaConta({
           autoComplete="off"
           maxLength={LABEL_MAX}
           value={form.label}
+          disabled={locked}
           aria-invalid={labelTaken || undefined}
           aria-describedby={labelTaken ? 'f-apelido-erro' : undefined}
           onChange={(event) => onChange({ label: event.target.value })}
@@ -338,7 +339,14 @@ export function PassoNovaConta({
           </span>
           <div role="group" aria-labelledby="l-fase" className="hub-pills">
             {PHASES_FUTURES.map((phase) => (
-              <button key={phase} type="button" className="hub-pill" aria-pressed={form.phase === phase} onClick={() => onChange({ phase })}>
+              <button
+                key={phase}
+                type="button"
+                className="hub-pill"
+                aria-pressed={form.phase === phase}
+                disabled={locked}
+                onClick={() => onChange({ phase })}
+              >
                 {PHASE_LABEL[phase]}
               </button>
             ))}
@@ -368,6 +376,7 @@ export function PassoNovaConta({
               inputMode="numeric"
               autoComplete="off"
               value={form.size}
+              disabled={locked}
               aria-invalid={sizeInvalid || undefined}
               aria-describedby={sizeInvalid ? 'f-tam-erro' : undefined}
               onChange={(event) => onChange({ size: event.target.value })}
@@ -390,6 +399,7 @@ export function PassoNovaConta({
             autoComplete="off"
             maxLength={REF_MAX}
             value={form.ref}
+            disabled={locked}
             onChange={(event) => onChange({ ref: event.target.value })}
           />
         </div>
@@ -736,11 +746,8 @@ export function PassoPrevia({
   return (
     <div className="hub-passo">
       <Heading headingRef={headingRef}>{PASSO_D.title}</Heading>
-      {undone && (
-        <div role="status" className="hub-chip-dado">
-          {PASSO_D.undone(label)}
-        </div>
-      )}
+      {/* Announced by the sheet's status region */}
+      {undone && <div className="hub-chip-dado">{PASSO_D.undone(label)}</div>}
       <Count items={items} />
       {preview.other_account > 0 && <p className="hub-passo__txt">{PASSO_D.otherNote(preview.other_account)}</p>}
       {preview.completable > 0 && <p className="hub-passo__txt">{PASSO_D.completable(preview.completable)}</p>}
@@ -833,6 +840,7 @@ export function PassoMercadoErrado({
   fileMarket,
   account,
   targets,
+  busy,
   onImportInto,
   onCreate,
 }: {
@@ -840,6 +848,8 @@ export function PassoMercadoErrado({
   fileMarket: Market
   account: { label: string; market: Market }
   targets: { id: string; label: string }[]
+  /** A request is running: the buttons wait for it */
+  busy: boolean
   onImportInto: (id: string) => void
   onCreate: () => void
 }) {
@@ -854,11 +864,22 @@ export function PassoMercadoErrado({
       <p>{PASSO_G.accountIs(account.market)}</p>
       <div className="hub-como">
         {targets.map((t, i) => (
-          <button key={t.id} type="button" className={i === 0 ? 'hub-btn hub-btn--pri' : 'hub-btn'} onClick={() => onImportInto(t.id)}>
+          <button
+            key={t.id}
+            type="button"
+            className={i === 0 ? 'hub-btn hub-btn--pri' : 'hub-btn'}
+            aria-disabled={busy || undefined}
+            onClick={() => onImportInto(t.id)}
+          >
             {PASSO_G.importInto(t.label)}
           </button>
         ))}
-        <button type="button" className={targets.length === 0 ? 'hub-btn hub-btn--pri' : 'hub-btn'} onClick={onCreate}>
+        <button
+          type="button"
+          className={targets.length === 0 ? 'hub-btn hub-btn--pri' : 'hub-btn'}
+          aria-disabled={busy || undefined}
+          onClick={onCreate}
+        >
           {PASSO_G.create(fileMarket)}
         </button>
       </div>
