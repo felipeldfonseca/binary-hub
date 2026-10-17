@@ -2,5 +2,45 @@
   "extends": ["next/core-web-vitals"],
   "rules": {
     "react/no-unescaped-entities": "off"
-  }
-} 
+  },
+  "overrides": [
+    {
+      "files": ["lib/domain/**/*.{ts,tsx,js,jsx}"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "paths": [
+              { "name": "react", "message": "lib/domain is plain TypeScript: no React." },
+              { "name": "react-dom", "message": "lib/domain is plain TypeScript: no React." }
+            ],
+            "patterns": [
+              {
+                "group": [
+                  "@/lib/utils/*Parser",
+                  "@/lib/utils/csvBrokerDetect",
+                  "@/lib/utils/importTrades",
+                  "**/lib/utils/*Parser",
+                  "**/lib/utils/csvBrokerDetect",
+                  "**/lib/utils/importTrades",
+                  "../utils/*",
+                  "../../utils/*",
+                  "../../../utils/*"
+                ],
+                "message": "The legacy CSV readers are frozen until no caller remains; lib/domain must not import them."
+              },
+              {
+                "group": ["@/lib/utils/*", "**/lib/utils/*"],
+                "message": "lib/domain depends only on itself and the standard library."
+              },
+              {
+                "group": ["@supabase/*", "react/*", "react-dom/*"],
+                "message": "lib/domain has no React or Supabase: pass data in, return data out."
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}
