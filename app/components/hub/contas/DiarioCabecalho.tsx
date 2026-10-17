@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { useContaAtual } from '@/hooks/useContas'
 import { useRulesNow } from '@/hooks/useRegras'
 import { janelaLinha } from '@/lib/hub/posso'
+import { rulesNowFailed } from '@/components/hub/posso/rulesNowRead'
 import { useImportSheet } from '@/components/hub/importar/ImportSheetProvider'
 import SeletorConta from './SeletorConta'
 import { ADD_ACCOUNT, CONTAS, DIARIO, IMPORT_FILE, LOADING, TRY_AGAIN } from './copy'
@@ -35,14 +36,16 @@ export default function DiarioCabecalho() {
   const wantsImport = searchParams?.get('importar') === '1'
   const currentId = conta.current?.id ?? null
   const rulesNow = useRulesNow()
+  const rulesFailed = rulesNowFailed(rulesNow)
 
-  // «Janela 10:00–11:00 ET» / «Sem janela salva»; nothing while loading, after a failed read, or
-  // for an account the answer does not have (no placeholder text under the button)
+  // «Janela 10:00–11:00 ET» / «Sem janela salva»; nothing while loading, after a failed read (also
+  // while it is retried or waits offline, as the card), or for an account the answer does not have
+  // (no placeholder text under the button)
   const janela = useMemo(() => {
-    if (rulesNow.isError || !rulesNow.data || !currentId) return null
+    if (rulesFailed || !rulesNow.data || !currentId) return null
     const account = rulesNow.data.accounts.find((a) => a.accountId === currentId)
     return account ? janelaLinha(account.rules) : null
-  }, [rulesNow.isError, rulesNow.data, currentId])
+  }, [rulesFailed, rulesNow.data, currentId])
 
   useEffect(() => {
     if (!wantsImport || handled.current || conta.isLoading) return

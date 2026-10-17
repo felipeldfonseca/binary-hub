@@ -1,5 +1,6 @@
 'use client'
 
+import { useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { InfoButton, InfoPanel, useToggle } from '@/components/hub/contas/ui'
 import { groupByMarket } from '@/lib/hub/contas'
@@ -22,6 +23,9 @@ interface Props {
   onRetry: () => void
 }
 
+/** A «Tentar de novo» was pressed: the button, so its removal can be noticed */
+type RetryHandler = (event: React.MouseEvent<HTMLButtonElement>) => void
+
 /**
  * «Posso operar hoje?» (Início board, on /diario in Phase 2): one line per active account, futures
  * before binaries, each answered by its own rules on the server (rules_now). The words are
@@ -30,6 +34,23 @@ interface Props {
  */
 export default function PossoOperarHoje({ state, onRetry }: Props) {
   const [infoOpen, toggleInfo] = useToggle()
+  const titleRef = useRef<HTMLHeadingElement>(null)
+  const pressedRetry = useRef<HTMLButtonElement | null>(null)
+
+  const retry: RetryHandler = (event) => {
+    pressedRetry.current = event.currentTarget
+    onRetry()
+  }
+
+  // When the answer replaces the «Tentar de novo» that had focus, focus would fall to the page's
+  // start; it goes to the card's title instead, so the next Tab continues from the card
+  useEffect(() => {
+    const pressed = pressedRetry.current
+    if (!pressed || pressed.isConnected) return
+    pressedRetry.current = null
+    const active = document.activeElement
+    if (!active || active === document.body) titleRef.current?.focus()
+  })
 
   // No active account: the Diário header already shows the empty state
   if (state.status === 'ready' && state.accounts.length === 0) return null
@@ -47,7 +68,7 @@ export default function PossoOperarHoje({ state, onRetry }: Props) {
         <p role="alert" className="hub-nota">
           {POSSO.loadError}
         </p>
-        <button type="button" className="hub-btn" onClick={onRetry}>
+        <button type="button" className="hub-btn" onClick={retry}>
           {TRY_AGAIN}
         </button>
       </div>
@@ -58,7 +79,7 @@ export default function PossoOperarHoje({ state, onRetry }: Props) {
     body = (
       <ul aria-labelledby="t-posso" className="hub-posso__lista">
         {accounts.map((account) => (
-          <LinhaConta key={account.accountId} label={account.label} linha={possoLinha(account.label, account.gate, account.rules)} onRetry={onRetry} />
+          <LinhaConta key={account.accountId} label={account.label} linha={possoLinha(account.label, account.gate, account.rules)} onRetry={retry} />
         ))}
       </ul>
     )
@@ -67,7 +88,8 @@ export default function PossoOperarHoje({ state, onRetry }: Props) {
   return (
     <section aria-labelledby="t-posso" className="hub-posso">
       <div className="hub-posso__cab">
-        <h2 id="t-posso" className="hub-posso__titulo">
+        {/* Takes focus when a pressed «Tentar de novo» is replaced by the answer */}
+        <h2 ref={titleRef} id="t-posso" tabIndex={-1} className="hub-posso__titulo hub-alvo-foco">
           {POSSO.title}
         </h2>
         <InfoButton panelId="info-posso" label={POSSO.infoLabel} open={infoOpen} onToggle={toggleInfo} />
@@ -78,7 +100,7 @@ export default function PossoOperarHoje({ state, onRetry }: Props) {
   )
 }
 
-function RetryLink({ onRetry }: { onRetry: () => void }) {
+function RetryLink({ onRetry }: { onRetry: RetryHandler }) {
   return (
     <button type="button" className="hub-posso__acao" onClick={onRetry}>
       {TRY_AGAIN}
@@ -87,7 +109,7 @@ function RetryLink({ onRetry }: { onRetry: () => void }) {
 }
 
 /** `li.conta-hoje` of the board: {apelido} · state · sub or action · «Limite do dia US$ 0 de US$ 400» */
-function LinhaConta({ label, linha, onRetry }: { label: string; linha: PossoLinha; onRetry: () => void }) {
+function LinhaConta({ label, linha, onRetry }: { label: string; linha: PossoLinha; onRetry: RetryHandler }) {
   const unavailable = linha.limite?.indisponivel === true
   // «Limite do dia indisponível · Tentar de novo»; with a window answer, the retry sits by the limit
   const retryInState = unavailable && !linha.sub && !linha.acao

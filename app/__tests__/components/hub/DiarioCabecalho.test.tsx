@@ -1,9 +1,12 @@
 import React from 'react'
-import { act, screen, waitFor, within } from '@testing-library/react'
+import { act, render, screen, waitFor, within } from '@testing-library/react'
+import { focusManager, onlineManager } from '@tanstack/react-query'
 import userEvent from '@testing-library/user-event'
 import * as data from '@/lib/hub/contasDb'
 import * as regrasDb from '@/lib/hub/regrasDb'
 import DiarioCabecalho from '@/components/hub/contas/DiarioCabecalho'
+import ImportSheetProvider from '@/components/hub/importar/ImportSheetProvider'
+import { QueryProvider } from '@/lib/providers/QueryProvider'
 import { makeAccount, renderHub } from '@/testing/hubHarness'
 import { agora, idsDono } from '@/testing/regras'
 import { regrasKeys } from '@/hooks/useRegras'
@@ -291,6 +294,66 @@ describe('Diário header window line', () => {
 
     await waitFor(() => expect(line()).toBeNull())
     expect(await selectorButton()).not.toHaveAttribute('aria-describedby')
+  })
+
+  describe('with the app’s query defaults (QueryProvider: three retries, staleTime 60 s)', () => {
+    afterEach(() => {
+      jest.useRealTimers()
+      focusManager.setFocused(undefined)
+      onlineManager.setOnline(true)
+    })
+
+    const renderApp = () =>
+      render(
+        <QueryProvider>
+          <ImportSheetProvider>
+            <DiarioCabecalho />
+          </ImportSheetProvider>
+        </QueryProvider>,
+      )
+
+    it('drops the line while a read waits offline, as the card drops its lines', async () => {
+      renderApp()
+      await waitFor(() => expect(line()).toHaveTextContent('Janela 20:00–21:00 · Brasília'))
+
+      act(() => {
+        onlineManager.setOnline(false)
+        focusManager.setFocused(false)
+        focusManager.setFocused(true)
+      })
+
+      await waitFor(() => expect(line()).toBeNull())
+      expect(await selectorButton()).not.toHaveAttribute('aria-describedby')
+      expect(fetchRulesNow).toHaveBeenCalledTimes(1)
+
+      act(() => onlineManager.setOnline(true))
+      await waitFor(() => expect(line()).toHaveTextContent('Janela 20:00–21:00 · Brasília'))
+    })
+
+    it('drops the line as soon as a read fails, while the retries still run', async () => {
+      jest.useFakeTimers()
+      fetchRulesNow
+        .mockReset()
+        .mockResolvedValueOnce(agora('agora-seg-0930-et'))
+        .mockRejectedValueOnce(new regrasDb.RegrasDataError('network'))
+        .mockResolvedValue(agora('agora-seg-0930-et'))
+      renderApp()
+      await waitFor(() => expect(line()).toHaveTextContent('Janela 20:00–21:00 · Brasília'))
+
+      act(() => {
+        focusManager.setFocused(false)
+        focusManager.setFocused(true)
+      })
+
+      await waitFor(() => expect(line()).toBeNull())
+      // Before the first retry (1 s later)
+      expect(fetchRulesNow).toHaveBeenCalledTimes(2)
+      await act(async () => {
+        jest.advanceTimersByTime(1000)
+      })
+      await waitFor(() => expect(line()).toHaveTextContent('Janela 20:00–21:00 · Brasília'))
+      expect(fetchRulesNow).toHaveBeenCalledTimes(3)
+    })
   })
 
   it('shows nothing for an account the answer does not have', async () => {

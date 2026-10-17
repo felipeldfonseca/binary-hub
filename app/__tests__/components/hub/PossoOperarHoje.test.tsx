@@ -5,12 +5,14 @@
 import React from 'react'
 import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { focusManager } from '@tanstack/react-query'
+import { focusManager, onlineManager } from '@tanstack/react-query'
 import * as contasDb from '@/lib/hub/contasDb'
 import * as regrasDb from '@/lib/hub/regrasDb'
 import { parseRulesNow } from '@/lib/hub/regras'
 import PossoOperarHoje, { type PossoEstado } from '@/components/hub/posso/PossoOperarHoje'
 import PossoOperarHojeDiario from '@/components/hub/posso/PossoOperarHojeDiario'
+import { rulesNowFailed } from '@/components/hub/posso/rulesNowRead'
+import { QueryProvider } from '@/lib/providers/QueryProvider'
 import DiarioPage from '@/app/(hub)/diario/page'
 import { makeAccount, renderHub } from '@/testing/hubHarness'
 import { agora, idsDono, regrasJson, type AgoraFixture } from '@/testing/regras'
@@ -57,6 +59,7 @@ beforeEach(() => {
 afterEach(() => {
   jest.useRealTimers()
   focusManager.setFocused(undefined)
+  onlineManager.setOnline(true)
 })
 
 /** Recorded JSON, edited field by field */
@@ -67,6 +70,34 @@ function edited(name: AgoraFixture, edit: (accounts: Json[]) => Json[]) {
   const json = regrasJson(name)
   json.accounts = edit(json.accounts as Json[])
   return parseRulesNow(json)
+}
+
+/** A recorded rules_now() answer, as if the server had answered it at `serverNow` */
+function answeredAt(name: AgoraFixture, serverNow: string) {
+  const json = regrasJson(name)
+  json.server_now = serverNow
+  return parseRulesNow(json)
+}
+
+/**
+ * Renders inside the app's own QueryClient (lib/providers/QueryProvider: staleTime 60 s, three
+ * retries), not the harness's (no retry, staleTime 0), which hid how the card behaves in production
+ */
+function renderApp(ui: React.ReactElement) {
+  const view = render(<QueryProvider>{ui}</QueryProvider>)
+  return { ...view, rerender: (next: React.ReactElement) => view.rerender(<QueryProvider>{next}</QueryProvider>) }
+}
+
+/** The card, mounted or not (leaving /diario and coming back, with the same query cache) */
+function CardOn({ shown }: { shown: boolean }) {
+  return shown ? <PossoOperarHojeDiario /> : null
+}
+
+/** Moves the fake clock (and the timers due on the way) */
+async function advance(ms: number) {
+  await act(async () => {
+    jest.advanceTimersByTime(ms)
+  })
 }
 
 function ready(name: AgoraFixture): PossoEstado {
@@ -101,6 +132,7 @@ const usd = (amount: string) => `US$\u00a0${amount}`
 const limite = (used: string, of: string) => `${used === '—' ? used : usd(used)} de ${usd(of)}`
 
 const list = () => screen.getByRole('list', { name: 'Posso operar hoje?' })
+const title = () => screen.getByRole('heading', { level: 2, name: 'Posso operar hoje?' })
 const items = () => within(list()).getAllByRole('listitem')
 const lines = () => items().map(readLine)
 
@@ -150,6 +182,21 @@ describe('PossoOperarHoje (the card, from props)', () => {
     expect(within(top).getByText('Top One #1').tagName).toBe('STRONG')
     expect(top.querySelector('.hub-posso__sep')).toHaveAttribute('aria-hidden', 'true')
     expect(top.querySelector('.hub-posso__estado')).toHaveClass('hub-posso__estado--empilha')
+  })
+
+  it('draws the sub and «de US$ 400» in text-2, the amount used in text, and gives the limit no title', () => {
+    render(<PossoOperarHoje state={ready('agora-seg-0930-et')} onRetry={jest.fn()} />)
+
+    const [top] = items()
+    const sub = top.querySelector('.hub-posso__estado')?.lastElementChild as HTMLElement
+    expect(sub).toHaveTextContent('abre às 10:00 ET')
+    expect(sub).toHaveClass('hub-tom--muted')
+    const [used, of] = Array.from((top.querySelector('.hub-posso__valores') as HTMLElement).children)
+    expect(used.textContent).toBe(usd('0'))
+    expect(used).not.toHaveClass('hub-tom--muted')
+    expect(of.textContent).toBe(`de ${usd('400')}`)
+    expect(of).toHaveClass('hub-tom--muted')
+    expect(top.querySelector('[title]')).toBeNull()
   })
 
   it('shows the limit as plain text: «Limite do dia» and the amounts, no link and no aria-label', () => {
@@ -283,6 +330,57 @@ describe('PossoOperarHoje (the card, from props)', () => {
     expect(onRetry).toHaveBeenCalledTimes(1)
   })
 
+  it('gives focus to the title when the answer replaces the «Tentar de novo» that had it', async () => {
+    const unavailable = edited('agora-seg-0930-et', ([top, ebinex]) => [
+      {
+        ...top,
+        status: null,
+        checks_evaluated: [],
+        window: { state: 'nao_avaliado', reason: 'regra_desligada' },
+        limit: { state: 'nao_avaliado', reason: 'sem_dados' },
+        rules: { ...top.rules, window_rule: { on: false, outside: 'fora' } },
+      },
+      ebinex,
+    ])
+    const onRetry = jest.fn()
+    const { rerender } = render(<PossoOperarHoje state={{ status: 'ready', accounts: unavailable.accounts }} onRetry={onRetry} />)
+
+    // The title takes focus from the page only, never from Tab, and shows its ring only from the keyboard
+    expect(title()).toHaveAttribute('tabindex', '-1')
+    expect(title()).toHaveClass('hub-alvo-foco')
+
+    const retry = within(items()[0]).getByRole('button', { name: 'Tentar de novo' })
+    retry.focus()
+    await userEvent.keyboard('{Enter}')
+    expect(onRetry).toHaveBeenCalledTimes(1)
+
+    // The limit still did not load: «Tentar de novo» stays, and keeps focus
+    rerender(<PossoOperarHoje state={{ status: 'ready', accounts: [...unavailable.accounts] }} onRetry={onRetry} />)
+    expect(retry).toHaveFocus()
+
+    await userEvent.keyboard('{Enter}')
+    rerender(<PossoOperarHoje state={ready('agora-seg-0930-et')} onRetry={onRetry} />)
+
+    expect(retry).not.toBeInTheDocument()
+    expect(title()).toHaveFocus()
+    // The next Tab goes on from the card: the «i» button
+    await userEvent.tab()
+    expect(screen.getByRole('button', { name: 'Como ler: Posso operar hoje?' })).toHaveFocus()
+  })
+
+  it('leaves focus alone when it moved on before the answer came', async () => {
+    const onRetry = jest.fn()
+    const { rerender } = render(<PossoOperarHoje state={{ status: 'error' }} onRetry={onRetry} />)
+
+    screen.getByRole('button', { name: 'Tentar de novo' }).focus()
+    await userEvent.keyboard('{Enter}')
+    const info = screen.getByRole('button', { name: 'Como ler: Posso operar hoje?' })
+    info.focus()
+    rerender(<PossoOperarHoje state={ready('agora-seg-0930-et')} onRetry={onRetry} />)
+
+    expect(info).toHaveFocus()
+  })
+
   it('says «Carregando…» in the card’s frame while the answers load', () => {
     render(<PossoOperarHoje state={{ status: 'loading' }} onRetry={jest.fn()} />)
 
@@ -394,6 +492,19 @@ describe('PossoOperarHojeDiario (the card, from rules_now)', () => {
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
   })
 
+  it('gives focus to the title when «Tentar de novo» brings the answer, so the next Tab does not restart the page', async () => {
+    fetchRulesNow.mockReset().mockRejectedValueOnce(new regrasDb.RegrasDataError('network')).mockResolvedValue(agora('agora-seg-1005-et'))
+    renderHub(<PossoOperarHojeDiario />)
+    await screen.findByRole('alert')
+
+    screen.getByRole('button', { name: 'Tentar de novo' }).focus()
+    await userEvent.keyboard('{Enter}')
+
+    await waitFor(() => expect(lines()[0].texto).toBe('Liberado · até 11:00 ET'))
+    expect(title()).toHaveFocus()
+    expect(document.activeElement).not.toBe(document.body)
+  })
+
   it('shows the error when the first read fails', async () => {
     fetchRulesNow.mockReset().mockRejectedValue(new regrasDb.RegrasDataError('bad_answer'))
     renderHub(<PossoOperarHojeDiario />)
@@ -408,6 +519,128 @@ describe('PossoOperarHojeDiario (the card, from rules_now)', () => {
 
     await waitFor(() => expect(screen.queryByRole('region', { name: 'Posso operar hoje?' })).not.toBeInTheDocument())
     expect(screen.queryByRole('status')).not.toBeInTheDocument()
+  })
+})
+
+describe('rulesNowFailed', () => {
+  it.each([
+    [{ isError: false, isPaused: false, failureCount: 0 }, false],
+    [{ isError: true, isPaused: false, failureCount: 1 }, true],
+    // Status still 'success' while the app's default retries run
+    [{ isError: false, isPaused: false, failureCount: 1 }, true],
+    // Offline: the read waits, it never fails
+    [{ isError: false, isPaused: true, failureCount: 0 }, true],
+  ])('%o → %s', (read, failed) => {
+    expect(rulesNowFailed(read)).toBe(failed)
+  })
+})
+
+describe('PossoOperarHojeDiario with the app’s query defaults (QueryProvider)', () => {
+  beforeEach(() => {
+    jest.useFakeTimers()
+    focusManager.setFocused(true)
+  })
+
+  it('shows the error as soon as the read at changes_at fails, not after the retries; the retry brings the new line', async () => {
+    jest.setSystemTime(new Date('2026-10-19T14:05:00Z'))
+    fetchRulesNow
+      .mockReset()
+      .mockResolvedValueOnce(agora('agora-seg-1005-et'))
+      .mockRejectedValueOnce(new regrasDb.RegrasDataError('network'))
+      .mockResolvedValue(agora('agora-seg-1045-et'))
+    renderApp(<PossoOperarHojeDiario />)
+    await waitFor(() => expect(lines()[0].texto).toBe('Liberado · até 11:00 ET'))
+
+    // 11:00:01 ET: the read fails; the default retry waits 1 s
+    await advance(55 * 60_000 + 1000)
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Não foi possível carregar o “Posso operar hoje?”.')
+    expect(screen.queryByText('Liberado')).not.toBeInTheDocument()
+    expect(fetchRulesNow).toHaveBeenCalledTimes(2)
+
+    await advance(1000)
+    await waitFor(() => expect(lines()[0].texto).toBe('Encerrado por hoje · limite atingido às 10:31'))
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    expect(fetchRulesNow).toHaveBeenCalledTimes(3)
+  })
+
+  it('shows the error when the read at changes_at waits offline, and the new line once back online', async () => {
+    jest.setSystemTime(new Date('2026-10-19T14:05:00Z'))
+    fetchRulesNow.mockReset().mockResolvedValueOnce(agora('agora-seg-1005-et')).mockResolvedValue(agora('agora-seg-1045-et'))
+    renderApp(<PossoOperarHojeDiario />)
+    await waitFor(() => expect(lines()[0].texto).toBe('Liberado · até 11:00 ET'))
+
+    act(() => onlineManager.setOnline(false))
+    // Still before 11:00: the answer holds
+    await advance(25 * 60_000)
+    expect(lines()[0].texto).toBe('Liberado · até 11:00 ET')
+
+    // 11:10 ET, offline since 10:30: the read at 11:00:01 is paused, never failed
+    await advance(40 * 60_000)
+    expect(screen.getByRole('alert')).toHaveTextContent('Não foi possível carregar o “Posso operar hoje?”.')
+    expect(screen.queryByText('Liberado')).not.toBeInTheDocument()
+    expect(fetchRulesNow).toHaveBeenCalledTimes(1)
+
+    act(() => onlineManager.setOnline(true))
+    await waitFor(() => expect(lines()[0].texto).toBe('Encerrado por hoje · limite atingido às 10:31'))
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+
+  it('shows the error, not «Carregando…» for ever, when the first read waits offline', async () => {
+    onlineManager.setOnline(false)
+    renderApp(<PossoOperarHojeDiario />)
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Não foi possível carregar o “Posso operar hoje?”.')
+    expect(screen.queryByText('Carregando…')).not.toBeInTheDocument()
+    expect(fetchRulesNow).not.toHaveBeenCalled()
+
+    act(() => onlineManager.setOnline(true))
+    await waitFor(() => expect(lines()).toEqual([TOP_FORA, EBX_FORA]))
+  })
+
+  it('does not show an answer that was due before the card came back (left at 10:59:40, back at 11:00:20)', async () => {
+    jest.setSystemTime(new Date('2026-10-19T14:59:30Z'))
+    fetchRulesNow
+      .mockReset()
+      .mockResolvedValueOnce(answeredAt('agora-seg-1005-et', '2026-10-19T14:59:30+00:00'))
+      .mockResolvedValue(answeredAt('agora-seg-1045-et', '2026-10-19T15:00:20+00:00'))
+    const view = renderApp(<CardOn shown />)
+    await waitFor(() => expect(lines()[0].texto).toBe('Liberado · até 11:00 ET'))
+
+    await advance(10_000)
+    view.rerender(<CardOn shown={false} />)
+    await advance(40_000)
+    // 50 s old: still fresh for the app's staleTime (60 s), but past its 11:00
+    view.rerender(<CardOn shown />)
+
+    expect(screen.queryByText('Liberado')).not.toBeInTheDocument()
+    expect(screen.getByRole('status')).toHaveTextContent('Carregando…')
+    await waitFor(() => expect(lines()[0].texto).toBe('Encerrado por hoje · limite atingido às 10:31'))
+    expect(fetchRulesNow).toHaveBeenCalledTimes(2)
+  })
+
+  it('asks when the cached answer is due, counted from its arrival, not from the card’s return', async () => {
+    jest.setSystemTime(new Date('2026-10-19T14:59:30Z'))
+    fetchRulesNow
+      .mockReset()
+      .mockResolvedValueOnce(answeredAt('agora-seg-1005-et', '2026-10-19T14:59:30+00:00'))
+      .mockResolvedValue(answeredAt('agora-seg-1045-et', '2026-10-19T15:00:01+00:00'))
+    const view = renderApp(<CardOn shown />)
+    await waitFor(() => expect(lines()[0].texto).toBe('Liberado · até 11:00 ET'))
+
+    await advance(5000)
+    view.rerender(<CardOn shown={false} />)
+    await advance(15_000)
+    // Back at 10:59:50 ET: the answer still holds until 11:00
+    view.rerender(<CardOn shown />)
+    expect(lines()[0].texto).toBe('Liberado · até 11:00 ET')
+
+    await advance(10_000)
+    expect(fetchRulesNow).toHaveBeenCalledTimes(1)
+    // 11:00:01, one second after changes_at as the hook does (it would wait until 11:00:21)
+    await advance(1000)
+    await waitFor(() => expect(lines()[0].texto).toBe('Encerrado por hoje · limite atingido às 10:31'))
+    expect(fetchRulesNow).toHaveBeenCalledTimes(2)
   })
 })
 
