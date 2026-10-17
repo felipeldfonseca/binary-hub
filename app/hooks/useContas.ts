@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useMemo, useState } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
 import { createDataClient } from '@/lib/supabase';
@@ -15,6 +15,7 @@ import {
   type HubPreferences,
 } from '@/lib/hub/contasDb';
 import { mergePreferences } from '@/lib/hub/regrasDb';
+import type { RulesConfig } from '@/lib/hub/regras';
 
 /** Cache keys of the hub's account data; everything sits under ['hub', userId]. */
 export const hubKeys = {
@@ -101,6 +102,17 @@ export function usePreferences() {
 }
 
 /**
+ * What merge_preferences answered (the whole merged object), put in every cached copy of
+ * profiles.preferences: usePreferences' and the one inside the cached rules_config, so «Regras de»
+ * in Personalizar starts on the account just chosen in the Diário. The rules_config key is
+ * regrasKeys.config of hooks/useRegras (which imports this module, so it is spelled out here).
+ */
+export function storeMergedPreferences(queryClient: QueryClient, uid: string | undefined, merged: HubPreferences): void {
+  queryClient.setQueryData<HubPreferences>(hubKeys.preferencias(uid), merged);
+  queryClient.setQueryData<RulesConfig>([...hubKeys.all(uid), 'regras', 'config'], (c) => (c ? { ...c, preferences: merged } : c));
+}
+
+/**
  * Refreshes what an account change or an import touches: the hub's own data and the old pages'
  * trade lists (they read the same trades).
  */
@@ -151,7 +163,7 @@ export function useContaAtual() {
         // Merged in the database (merge_preferences): only conta_atual changes, so a stale copy
         // of the other keys (theme, «Horários na tela») can never be written back
         const merged = await mergePreferences(db, { conta_atual: id });
-        queryClient.setQueryData<HubPreferences>(hubKeys.preferencias(userId), merged);
+        storeMergedPreferences(queryClient, userId, merged);
       } catch {
         // The choice still holds on this page; it is only not remembered for the next visit
       }

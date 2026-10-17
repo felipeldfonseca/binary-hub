@@ -1,7 +1,7 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
-import { hubKeys, useHubDb } from '@/hooks/useContas';
+import { hubKeys, storeMergedPreferences, useHubDb } from '@/hooks/useContas';
 import type { HubPreferences } from '@/lib/hub/contasDb';
 import { nextChangeAt, type AccountConfig, type RulesConfig, type RulesNow, type SaveRulesPayload, type SaveRulesResult } from '@/lib/hub/regras';
 import {
@@ -25,10 +25,12 @@ export const regrasKeys = {
 };
 
 /**
- * rules_config(): what Personalizar edits. Read once per page and on purpose only: never on focus
- * or on a timer, because the page's draft is a diff against it and its `rev` is what makes a save
- * from a stale page fail with rules_changed. It refreshes after a save, an archive or an import
- * (invalidation); the page keeps an unsaved draft on its old base when the `rev` moved meanwhile.
+ * rules_config(): what Personalizar edits. Read when a screen that uses it mounts (also when the
+ * cache already holds an older answer: another tab may have saved since) and after a save, an
+ * archive or an import (invalidation); never on focus, on reconnect or on a timer, because the
+ * page's draft is a diff against it and its `rev` is what makes a save from a stale page fail
+ * with rules_changed. A page rebases its draft when the `rev` did not move or moved only by saves
+ * of this tab (changedOnlyHere), and keeps the draft on its old base otherwise.
  */
 export function useRulesConfig({ enabled = true }: { enabled?: boolean } = {}) {
   const { db, userId } = useHubDb();
@@ -37,9 +39,39 @@ export function useRulesConfig({ enabled = true }: { enabled?: boolean } = {}) {
     queryFn: () => fetchRulesConfig(db),
     enabled: !!userId && enabled,
     staleTime: Infinity,
+    refetchOnMount: 'always',
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,
   });
+}
+
+/** Saves made through useSaveRules with each QueryClient (one per tab): base_rev → the new rev */
+const ownSaves = new WeakMap<QueryClient, Map<string, string>>();
+
+function recordOwnSave(queryClient: QueryClient, fromRev: string, toRev: string): void {
+  if (fromRev === toRev) return;
+  let saves = ownSaves.get(queryClient);
+  if (!saves) ownSaves.set(queryClient, (saves = new Map()));
+  saves.set(fromRev, toRev);
+}
+
+/**
+ * Whether the rules went from revision `fromRev` to `toRev` only through saves made in this tab
+ * (useSaveRules: Personalizar's save bar, a new account's v1 in the import sheet), or did not
+ * move at all. Then a page whose draft was made against `fromRev` may rebase it on the new
+ * rules_config (rebaseSettings) and save with the new rev. False when any step came from another
+ * tab or device: the draft then keeps its old base, and its save is refused with rules_changed.
+ */
+export function changedOnlyHere(queryClient: QueryClient, fromRev: string, toRev: string): boolean {
+  if (fromRev === toRev) return true;
+  const saves = ownSaves.get(queryClient);
+  const seen = new Set<string>();
+  for (let rev = fromRev; saves?.has(rev) && !seen.has(rev); ) {
+    seen.add(rev);
+    rev = saves.get(rev) as string;
+    if (rev === toRev) return true;
+  }
+  return false;
 }
 
 /** At least this long between two automatic refreshes of rules_now */
@@ -96,15 +128,22 @@ export interface SaveRulesVariables {
 }
 
 /**
- * save_rules. After a real save the rules, accounts and preferences are refetched before the
- * mutation settles, so the page can take the fresh rules_config as its new base right away.
+ * save_rules. Every rules save of the hub goes through this hook (Personalizar's save bar and a
+ * new account's v1), so the save is known as this tab's (changedOnlyHere) and, after a real save,
+ * the rules, accounts and preferences are refetched before the mutation settles: the page can take
+ * the fresh rules_config as its new base right away. (When that refetch fails, the cached
+ * rules_config still has the old rev: compare it with the answer's `rev`.)
  */
 export function useSaveRules() {
   const { db, userId } = useHubDb();
   const queryClient = useQueryClient();
   return useMutation<SaveRulesResult, RegrasDataError, SaveRulesVariables>({
     mutationFn: ({ payload, dryRun = false }) => saveRules(db, payload, { dryRun }),
-    onSuccess: (result) => (result.dryRun ? undefined : invalidateAfterSave(queryClient, userId)),
+    onSuccess: (result, { payload }) => {
+      if (result.dryRun) return undefined;
+      if (payload.base_rev !== undefined) recordOwnSave(queryClient, payload.base_rev, result.rev);
+      return invalidateAfterSave(queryClient, userId);
+    },
   });
 }
 
@@ -117,10 +156,7 @@ export function useMergePreferences() {
   const queryClient = useQueryClient();
   return useMutation<HubPreferences, RegrasDataError, PreferencesPatch>({
     mutationFn: (patch) => mergePreferences(db, patch),
-    onSuccess: (merged) => {
-      queryClient.setQueryData(hubKeys.preferencias(userId), merged);
-      queryClient.setQueryData<RulesConfig>(regrasKeys.config(userId), (c) => (c ? { ...c, preferences: merged } : c));
-    },
+    onSuccess: (merged) => storeMergedPreferences(queryClient, userId, merged),
   });
 }
 
