@@ -31,7 +31,8 @@ Inside `app/`, `npx jest --ci <path>` runs one suite. Use Node 22 (`.nvmrc`). Be
   - `app/app/api/`: route handlers.
   - `app/components/hub/`: the hub frame (`HubRoot` theme, `HubGate`, `AppShell`, `HubHeader`, `ThemeSwitch`).
   - `app/lib/apiAuth.ts`: session and allow-list checks for API routes.
-  - `app/lib/domain/tempo.ts`: time-zone helpers (see below).
+  - `app/lib/domain/tempo.ts`: time-zone helpers (see below). `tradingDayOn` and `tradingDayFor` mirror the database's `trading_day_on` and `trading_day_for`.
+  - `app/lib/domain/gate/`: "Posso operar hoje?" and the plan marks of a trade, from an account's stored rules (`parseRules` accepts exactly what `rules_check_resolved` accepts). It mirrors the database's `gate_eval` and `limit_usage`; `__tests__/domain/gate/cases.json` holds cases whose expected values were computed by the SQL, so change both sides together. The pt-BR words live in `app/lib/hub/posso.ts`.
   - `app/lib/utils/`: CSV parsers for Ebinex and Top One, and the import path.
   - `app/styles/hub.css`: the boards' design tokens, scoped to `.hub`.
 - `supabase/`: local config and SQL migrations. There is a single Supabase project (no separate test project); migrations run on it.
