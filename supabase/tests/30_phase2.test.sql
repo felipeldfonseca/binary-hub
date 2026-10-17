@@ -1106,6 +1106,8 @@ select tests.raises($$select public.gate_at('00000000-0000-0000-0000-00000000000
                     'anon cannot call gate_at');
 select tests.raises($$select public.merge_preferences('{}')$$, 'permission denied for function merge_preferences',
                     'anon cannot merge preferences');
+select tests.raises($$select public.compute_trading_day('00000000-0000-0000-0000-000000000000', now())$$,
+                    'permission denied for function compute_trading_day', 'anon cannot compute trading days');
 commit;
 
 begin;

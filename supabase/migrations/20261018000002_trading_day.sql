@@ -93,9 +93,11 @@ $$;
 revoke all on function public.window_occurrences(jsonb, timestamptz, int, int) from public, anon;
 revoke all on function public.trading_day_for(jsonb, text, int, timestamptz) from public, anon;
 revoke all on function public.rule_version_at(uuid, timestamptz) from public, anon;
+revoke all on function public.compute_trading_day(uuid, timestamptz) from public, anon;
 grant execute on function public.window_occurrences(jsonb, timestamptz, int, int) to authenticated;
 grant execute on function public.trading_day_for(jsonb, text, int, timestamptz) to authenticated;
 grant execute on function public.rule_version_at(uuid, timestamptz) to authenticated;
+grant execute on function public.compute_trading_day(uuid, timestamptz) to authenticated;
 
 -- ---------------------------------------------------------------------------------------------
 -- Phase 1 functions, redefined: only the trading-day line changes in each
