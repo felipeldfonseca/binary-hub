@@ -111,6 +111,18 @@ interface Line {
   limite: string | null
 }
 
+/** The texts a screen reader reads in `el`, in order: every text outside aria-hidden */
+function spoken(el: HTMLElement): string[] {
+  const out: string[] = []
+  const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT)
+  for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+    if (node.parentElement?.closest('[aria-hidden="true"]')) continue
+    const text = node.textContent?.trim()
+    if (text) out.push(text)
+  }
+  return out
+}
+
 /** One `li`: «{apelido}», «{state} · {sub or action}», its tone, «US$ 0 de US$ 400» */
 function readLine(li: HTMLElement): Line {
   const estado = li.querySelector('.hub-posso__estado') as HTMLElement
@@ -118,10 +130,7 @@ function readLine(li: HTMLElement): Line {
   const limit = li.querySelector('.hub-posso__limite')
   return {
     conta: li.querySelector('.hub-posso__nome')?.textContent ?? '',
-    texto: Array.from(estado.children)
-      .filter((el) => el.getAttribute('aria-hidden') !== 'true')
-      .map((el) => el.textContent)
-      .join(' · '),
+    texto: spoken(estado).join(' · '),
     tom: Array.from(word.classList).find((c) => c.startsWith('hub-tom--'))?.slice('hub-tom--'.length) ?? '',
     limite: limit ? Array.from((limit.querySelector('.hub-posso__valores') as HTMLElement).children).map((el) => el.textContent).join(' ') : null,
   }
@@ -184,11 +193,34 @@ describe('PossoOperarHoje (the card, from props)', () => {
     expect(top.querySelector('.hub-posso__estado')).toHaveClass('hub-posso__estado--empilha')
   })
 
+  it.each<[AgoraFixture, number, string[]]>([
+    ['agora-seg-0930-et', 1, ['Fora da sua janela', 'abre às 20:00 de Brasília']],
+    ['agora-seg-1045-et', 0, ['Encerrado por hoje', 'limite atingido às 10:31']],
+    ['agora-antes-seg-0930-et', 0, ['Sem janela salva', 'Definir']],
+  ])('%s: keeps « · » with what follows it, so it wraps with it; a screen reader still reads only the words', (name, index, words) => {
+    render(<PossoOperarHoje state={ready(name)} onRetry={jest.fn()} />)
+
+    const estado = items()[index].querySelector('.hub-posso__estado') as HTMLElement
+    // Two pieces: the answer, then the separator and the detail together (hub-posso.css clips a
+    // separator whose piece starts a line)
+    const [word, mais] = Array.from(estado.children) as HTMLElement[]
+    expect(estado.children).toHaveLength(2)
+    expect(word).toHaveClass('hub-posso__palavra')
+    expect(mais).toHaveClass('hub-posso__mais')
+    const [sep, detail] = Array.from(mais.children) as HTMLElement[]
+    expect(mais.children).toHaveLength(2)
+    expect(sep).toHaveClass('hub-posso__sep')
+    expect(sep).toHaveAttribute('aria-hidden', 'true')
+    expect(sep).toHaveTextContent(/^·$/)
+    expect(detail).toHaveTextContent(words[1])
+    expect(spoken(estado)).toEqual(words)
+  })
+
   it('draws the sub and «de US$ 400» in text-2, the amount used in text, and gives the limit no title', () => {
     render(<PossoOperarHoje state={ready('agora-seg-0930-et')} onRetry={jest.fn()} />)
 
     const [top] = items()
-    const sub = top.querySelector('.hub-posso__estado')?.lastElementChild as HTMLElement
+    const sub = top.querySelector('.hub-posso__sep')?.nextElementSibling as HTMLElement
     expect(sub).toHaveTextContent('abre às 10:00 ET')
     expect(sub).toHaveClass('hub-tom--muted')
     const [used, of] = Array.from((top.querySelector('.hub-posso__valores') as HTMLElement).children)

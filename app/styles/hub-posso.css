@@ -70,14 +70,41 @@
   font-size: 14px;
   overflow-wrap: anywhere;
 }
+/*
+ * «answer · detail» on one line when it fits, spaced as the board's `.conta-hoje-st` (6px, «·», 6px).
+ * The « · » belongs to the detail (`.hub-posso__mais`) and sits in the room every piece keeps on
+ * its left; the box starts that room further left and clips its left edge, so when the detail
+ * wraps to its own line its separator falls outside and no line ends or starts with «·». The clip
+ * keeps the 4px of a focus ring (hub.css: outline 2px, offset 2px) and cuts the separator, 6px out.
+ */
 .hub-posso__estado {
+  /* 6px + «·» (0.196em in Comfortaa) + 6px */
+  --posso-sep: calc(12px + 0.196em);
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 0 6px;
+  gap: 0;
+  min-width: 0;
+  margin-left: calc(-1 * var(--posso-sep));
+  clip-path: inset(-100vmax -100vmax -100vmax calc(var(--posso-sep) - 5px));
+}
+.hub-posso__estado > * {
+  margin-left: var(--posso-sep);
+}
+.hub-posso__mais {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
   min-width: 0;
 }
 .hub-posso__sep {
+  position: absolute;
+  top: 0;
+  right: 100%;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  padding-right: 6px;
   color: var(--text-2);
 }
 /*
@@ -137,7 +164,7 @@
     flex-direction: column;
     align-items: flex-start;
   }
-  .hub-posso__estado--empilha > .hub-posso__sep {
+  .hub-posso__estado--empilha .hub-posso__sep {
     display: none;
   }
 }

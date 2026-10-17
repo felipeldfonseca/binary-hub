@@ -133,12 +133,14 @@ function LinhaConta({ label, linha, onRetry }: { label: string; linha: PossoLinh
       <span className={linha.sub ? 'hub-posso__estado hub-posso__estado--empilha' : 'hub-posso__estado'}>
         <Word className={`hub-posso__palavra hub-tom--${linha.tom}`}>{linha.palavra}</Word>
         {detail && (
-          <>
+          // The « · » travels with what follows it: when that wraps to its own line, the separator
+          // falls outside the line's clipped edge (hub-posso.css), so no line ends or starts with it
+          <span className="hub-posso__mais">
             <span className="hub-posso__sep" aria-hidden="true">
               {POSSO.separator}
             </span>
             {detail}
-          </>
+          </span>
         )}
       </span>
       {linha.limite && (
