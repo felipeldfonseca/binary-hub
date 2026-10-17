@@ -31,3 +31,27 @@ jobs:
 
       - name: Type check
         run: npx tsc --noEmit
+
+  db:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        # Same major version as the Supabase project
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Database tests (migrations, backfill, RLS, import functions)
+        env:
+          DATABASE_URL: postgres://postgres:postgres@localhost:5432/postgres
+        run: supabase/tests/run.sh
