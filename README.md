@@ -1,128 +1,68 @@
 # Binary Hub
 
-> *Connect. Collaborate. Conquer.*  – The social trading platform for binary options traders
+Diário de operações e central de mercado para quem opera opções binárias (Ebinex) e futuros (Top One). O app está sendo reconstruído tela a tela a partir de um protótipo aprovado, em fases.
 
-![Build](https://img.shields.io/github/actions/workflow/status/binaryhub/binaryhub/ci.yml?branch=main)
-![License](https://img.shields.io/github/license/binaryhub/binaryhub)
+## Stack
 
-Binary Hub é a **primeira plataforma social** dedicada a traders de opções binárias, combinando networking entre traders, ferramentas de colaboração em tempo real e journaling inteligente. Transformamos o trading solitário em uma experiência colaborativa onde traders conectam, compartilham estratégias e evoluem juntos.
+| Camada | Tecnologia |
+|---|---|
+| App | Next.js 14 (app router), TypeScript, Tailwind |
+| Dados e login | Supabase (Postgres com RLS, Auth) |
+| Publicação | Vercel, pelo GitHub Actions a cada push na `main` |
+| Análise de mercado | API da Anthropic |
+| Testes | Jest e Testing Library |
 
-> **Visão MVP:** Lançar plataforma social completa com profiles de trader, networking e ferramentas de análise colaborativa.
-> Para o escopo detalhado consulte [`docs/dev/mvp_scope.md`](docs/dev/mvp_scope.md).
+## Rodar localmente
 
----
+Requer Node 22.
 
-## ✨ Funcionalidades Principais (MVP)
-
-### Core Social Features
-| Feature                              | Estado |
-| ------------------------------------ | ------ |
-| Profiles públicos de traders        | 🔄     |
-| Sistema de follow/followers          | 🔄     |
-| Feed social de trading               | 🔄     |
-| Compartilhamento de trades           | 🔄     |
-| Sistema de achievements/badges       | 🔄     |
-
-### Core Trading Features  
-| Feature                              | Estado |
-| ------------------------------------ | ------ |
-| Autenticação (Email, Google)         | ✅      |
-| Log manual / CSV upload de trades    | ✅      |
-| Dashboard com Win Rate, P&L, streak | ✅      |
-| Calendário de performance (heat-map) | ✅      |
-| Regras pessoais & aderência          | 🟡 (β) |
-| Billing & subscription system        | 🔄     |
-
-### Future Premium Features
-| Feature                              | Estado |
-| ------------------------------------ | ------ |
-| Live Trading Collaboration          | 📋     |
-| Real-time chart sharing              | 📋     |
-| Voice communication                  | 📋     |
-| AI-powered chart analysis            | 📋     |
-| Collaborative AI insights            | 📋     |
-
-**Legend**: ✅ Complete | 🟡 Partial | 🔄 In Development | 📋 Planned
-
----
-
-## 🏗️ Stack Técnica
-
-| Camada       | Tech                               | Notas               |
-| ------------ | ---------------------------------- | ------------------- |
-| Front-end    | **Next.js 14**, Tailwind CSS       | Deploy Vercel       |
-| Back-end     | **Firebase** (Auth, Firestore, CF) | NoSQL, serverless   |
-| Real-time    | **WebSocket**, Firebase listeners  | Social features     |
-| AI Platform  | **OpenAI GPT-4o**                  | Chart analysis     |
-| CI / CD      | GitHub Actions                     | Lint, test, preview |
-| Testes       | Jest, Playwright                   | Cobertura ≥ 80 %    |
-
----
-
-## 📂 Estrutura do Repositório
-
-```
-.
-├─ app/               # Next.js front-end
-│  ├─ components/     # React components (dashboard, social, trades)
-│  ├─ hooks/          # Custom React hooks
-│  ├─ lib/            # Utilities, Firebase config, contexts
-│  └─ types/          # TypeScript type definitions
-├─ functions/         # Firebase Functions backend (Node.js 20)
-│  ├─ src/
-│  │  ├─ routes/      # Express route handlers
-│  │  ├─ services/    # Business logic (social, AI, CSV parser)
-│  │  └─ index.ts     # Main Functions export
-├─ docs/              # Architecture and business documentation
-│  ├─ dev/            # Development guides (PRD, MVP scope, etc.)
-│  ├─ features/       # Future feature specifications
-│  └─ ui/             # UI/UX documentation
-├─ design/            # UI/UX assets and brand guidelines
-└─ tests/             # Testing strategy and suites
+```bash
+npm run setup
+cp -n app/.env.example app/.env.local   # só cria se não existir; preencha os valores
+npm run dev                          # http://localhost:3000
 ```
 
----
+Para ver as telas novas (`/diario`), coloque o e-mail da sua conta em `HUB_USERS` no `app/.env.local`.
 
-## 🚀 Product Roadmap
+Outros comandos, todos a partir da raiz:
 
-### Phase 1: Social Trading Platform MVP (3-4 months)
-- ✅ Core trading journal functionality
-- 🔄 Social profiles and networking
-- 🔄 Community features and feed
-- 🔄 Billing and subscription system
+```bash
+npm test             # testes
+npm run type-check   # tipos
+npm run lint         # lint
+npm run build        # build de produção
+```
 
-### Phase 2: Live Collaboration Tools (3-4 months)
-- 📋 Real-time presence system
-- 📋 Voice communication integration
-- 📋 Shared chart functionality
-- 📋 Collaborative session recording
+## Estrutura
 
-### Phase 3: AI-Powered Analysis (4-5 months)
-- 📋 Real-time AI chart analysis
-- 📋 Visual AI annotations on shared charts
-- 📋 Collaborative AI insights
-- 📋 Advanced strategy templates
+```
+app/                 # o aplicativo (Next.js)
+├── app/(hub)/       # telas novas, com a moldura das pranchas
+├── app/api/         # rotas de API (todas exigem login)
+├── components/hub/  # moldura: cabeçalho, tema, acesso
+├── lib/             # autenticação, Supabase, fusos, leitores de CSV
+├── styles/hub.css   # tokens de cor das telas novas
+└── __tests__/       # testes
+supabase/            # configuração e migrações SQL
+design/              # logos e fontes
+docs/arquivo/        # documentos de antes da reconstrução, só para consulta
+```
 
----
+## Fases
 
-## 🎯 Vision Statement
+| Fase | Conteúdo |
+|---|---|
+| 0 | Base segura e moldura (concluída) |
+| 1 | Contas e importação |
+| 2 | Regras e janelas |
+| 3 | Registrar operação |
+| 4 | Diário |
+| 5 | Estado do mercado |
+| 6 | Análises |
+| 7 | Padrões |
+| 8 | Mercado, página do ativo, Início e IA |
+| 9 | Troca e limpeza |
 
-**Binary Hub está transformando o trading de opções binárias de uma atividade solitária em uma experiência social e colaborativa.**
+## Repositório público
 
-Nossa plataforma conecta traders através de profiles públicos, permite colaboração em tempo real com ferramentas de comunicação integradas, e oferece análise de gráficos assistida por IA para potencializar o aprendizado conjunto.
-
-**Nota importante**: Binary Hub é uma plataforma de análise e networking - traders discutem estratégias e analisam gráficos juntos, mas executam suas operações nas exchanges de sua preferência.
-
----
-
-## 🤝 Contributing
-
-Ver [`docs/project/CONTRIBUTING.md`](docs/project/CONTRIBUTING.md) para guidelines de desenvolvimento.
-
-## 📄 License
-
-MIT License - ver [`LICENSE`](LICENSE) para detalhes.
-
----
-
-*"Connecting traders worldwide through technology, collaboration, and shared success."*
+Nunca envie para o Git exportações reais das corretoras nem arquivos `.env`. A pasta `docs/csv/` é ignorada pelo Git justamente para guardar os arquivos reais.

@@ -1,8 +1,3 @@
-# Firebase Functions compiled artifacts
-functions/lib/
-functions/lib/**/*
-functions/.firebase/
-
 # Node modules
 node_modules/
 */node_modules/
@@ -56,7 +51,7 @@ Thumbs.db
 # Vercel
 .vercel
 
-# Firebase
+# Local leftovers from the old Firebase setup
 .firebase/
 firebase-debug.log
 firestore-debug.log
@@ -85,11 +80,6 @@ service-account.json
 *.pfx
 secrets.json
 .env.production.local
-
-# Firebase Functions
-functions/lib/
-functions/.firebase/
-functions/functions/
 
 # Testing
 coverage/
