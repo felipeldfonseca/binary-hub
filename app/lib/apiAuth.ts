@@ -60,24 +60,48 @@ function unavailable() {
  * valid session alone must not be enough; with the list unset nobody is allowed.
  */
 export function canUsePaidAi(user: User): boolean {
-  const allowed = allowedAiUsers();
-  const email = user.email?.toLowerCase();
-  return allowed.includes(user.id.toLowerCase()) || (!!email && allowed.includes(email));
+  return isListed(user, 'AI_ALLOWED_USERS');
 }
 
 /** The response to send when the account may not spend the AI budget, or null when it may. */
 export function denyPaidAi(user: User): NextResponse | null {
   if (canUsePaidAi(user)) return null;
 
-  if (allowedAiUsers().length === 0) {
+  if (listedUsers('AI_ALLOWED_USERS').length === 0) {
     console.warn('AI_ALLOWED_USERS is not set: every request to a paid AI endpoint is refused.');
     return reject(403, 'Forbidden', 'AI access is not configured on this server.');
   }
   return reject(403, 'Forbidden', 'This account is not allowed to use AI features.');
 }
 
-function allowedAiUsers(): string[] {
-  return (process.env.AI_ALLOWED_USERS ?? '')
+/**
+ * The new hub screens (and the market data and AI they will use) are limited to the accounts
+ * listed in HUB_USERS (comma-separated emails or user ids) while they are being built.
+ * Sign-up is open, so with the list unset nobody gets in.
+ */
+export function canUseHub(user: User): boolean {
+  return isListed(user, 'HUB_USERS');
+}
+
+/** The response to send when the account may not use the hub, or null when it may. */
+export function denyHubAccess(user: User): NextResponse | null {
+  if (canUseHub(user)) return null;
+
+  if (listedUsers('HUB_USERS').length === 0) {
+    console.warn('HUB_USERS is not set: every request to a hub endpoint is refused.');
+    return reject(403, 'Forbidden', 'Hub access is not configured on this server.');
+  }
+  return reject(403, 'Forbidden', 'This account is not allowed to use the hub yet.');
+}
+
+function isListed(user: User, variable: 'AI_ALLOWED_USERS' | 'HUB_USERS'): boolean {
+  const allowed = listedUsers(variable);
+  const email = user.email?.toLowerCase();
+  return allowed.includes(user.id.toLowerCase()) || (!!email && allowed.includes(email));
+}
+
+function listedUsers(variable: 'AI_ALLOWED_USERS' | 'HUB_USERS'): string[] {
+  return (process.env[variable] ?? '')
     .split(',')
     .map((entry) => entry.trim().toLowerCase())
     .filter(Boolean);

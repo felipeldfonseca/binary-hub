@@ -9,6 +9,7 @@ import { NextRequest } from 'next/server'
 // valid session. Handlers are discovered from disk and compared with the list
 // below, so adding or removing one is a deliberate edit to this file.
 const EXPECTED_HANDLERS = [
+  'GET /api/hub/acesso',
   'GET /api/market/analysis',
   'POST /api/market/analysis',
   'GET /api/market/quote',
