@@ -1249,6 +1249,12 @@ describe('ImportSheet · the rules of a new account (step b)', () => {
     expect(create).toHaveAttribute('aria-disabled', 'true')
     expect(create).toHaveAccessibleDescription('Use só números, como 400 ou 400,50.')
     expect(limite).toHaveAccessibleDescription('Use só números, como 400 ou 400,50.')
+    // Without a nickname the hint asks for it: the limit field is not described by that
+    await userEvent.clear(within(dialog).getByLabelText('Apelido'))
+    const createFallback = within(dialog).getByRole('button', { name: 'Criar conta' })
+    expect(createFallback).toHaveAccessibleDescription('Dê um apelido à conta.')
+    expect(limite).toHaveAccessibleDescription('')
+    await userEvent.type(within(dialog).getByLabelText('Apelido'), 'Apex B')
     await userEvent.clear(limite)
     await userEvent.type(limite, '0')
     expect(create).toHaveAccessibleDescription('Digite um valor maior que zero.')

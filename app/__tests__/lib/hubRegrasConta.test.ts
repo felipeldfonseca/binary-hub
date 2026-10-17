@@ -171,7 +171,7 @@ describe('the summary line', () => {
     expect(r.limiteErro).toBe('invalid')
     expect(r.settings.limit).toBeNull()
     expect(r.bloqueado).toBe(true)
-    expect(linhaResumo(r, letras)).toMatch(/limite do dia: US\$ abc por conta$/)
+    expect(linhaResumo(r, letras)).toMatch(new RegExp(`limite do dia: US\\$${NBSP}abc por conta$`))
     expect(regrasDaNovaConta(c, 'futures', form({ limite: '0' })).limiteErro).toBe('not_positive')
     expect(regrasDaNovaConta(c, 'futures', form({ limite: '2.000.000' })).limiteErro).toBe('too_large')
     expect(regrasDaNovaConta(c, 'futures', form({ limite: '' })).limiteErro).toBeNull()

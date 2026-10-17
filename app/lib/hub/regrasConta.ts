@@ -183,8 +183,9 @@ function limiteResumo(r: RegrasDaNovaConta, form: RegrasForm): string {
   const sufixo = r.market === 'futures' ? (r.modo === 'soma' ? REGRAS_CONTA.somando : REGRAS_CONTA.porConta) : ''
   if (r.limite.ok) return dinheiroCompacto(r.limite.cents) + sufixo
   const texto = r.limiteTexto.trim()
-  // Board: what was typed, even before it is valid (the creation button says what is wrong)
-  if (texto) return `US$ ${texto}${sufixo}`
+  // Board: what was typed, even before it is valid (the creation button says what is wrong); the
+  // non-breaking space keeps «US$» with the amount, as dinheiroCompacto does
+  if (texto) return `US$ ${texto}${sufixo}`
   return r.copiar && form.limite === undefined ? REGRAS_CONTA.semLimite : REGRAS_CONTA.definir
 }
 

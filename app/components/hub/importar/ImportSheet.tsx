@@ -631,6 +631,18 @@ export default function ImportSheet({ mode, accountId, onClose }: { mode: SheetM
       }
       const sizeInvalid = futures && sizeValue === 'invalid'
       const locked = flow.createdFromForm && !!flow.created
+      const name = form.label.trim()
+      // What «Criar» waits for first: a nickname and, for futures, the phase
+      const basics = !name ? PASSO_B.needLabel : futures && !form.phase ? PASSO_B.needPhase : undefined
+      // Then the rules block: the saved rules, and a limit or a window that can be saved
+      let rulesBlocked: string | undefined
+      let rulesBlockedBy: string | undefined
+      if (rulesLoad === 'carregando') rulesBlockedBy = 'regras-carga'
+      else if (rules?.limiteErro) rulesBlocked = REGRAS.limiteErro[rules.limiteErro]
+      else if (rules?.janelaErro) {
+        if (form.rules.aberto) rulesBlockedBy = 'j-erro'
+        else rulesBlocked = ERRO_JANELA[rules.janelaErro]
+      }
       body = (
         <PassoNovaConta
           headingRef={headingRef}
@@ -652,28 +664,19 @@ export default function ImportSheet({ mode, accountId, onClose }: { mode: SheetM
               now={now}
               desde={config && rules ? desdeDaNovaConta(config, rules, now) : null}
               locked={locked}
-              limiteErroId="dica-pri"
+              // The hint under «Criar» says the limit's error once nothing comes before it
+              limiteErroId={basics ? undefined : 'dica-pri'}
             />
           }
         />
       )
-      const name = form.label.trim()
-      // The rules block: wait for the saved rules; a limit or a window that cannot be saved blocks too
-      let rulesBlocked: string | undefined
-      let rulesBlockedBy: string | undefined
-      if (rulesLoad === 'carregando') rulesBlockedBy = 'regras-carga'
-      else if (rules?.limiteErro) rulesBlocked = REGRAS.limiteErro[rules.limiteErro]
-      else if (rules?.janelaErro) {
-        if (form.rules.aberto) rulesBlockedBy = 'j-erro'
-        else rulesBlocked = ERRO_JANELA[rules.janelaErro]
-      }
       primary = locked
         ? // The account exists; what followed it failed and is tried again
           { label: FOLHA.next, run: () => void createFromForm() }
         : {
             label: name ? (parsed ? PASSO_B.createAndGo(name) : PASSO_B.create(name)) : PASSO_B.createFallback,
             run: () => void createFromForm(),
-            blocked: !name ? PASSO_B.needLabel : futures && !form.phase ? PASSO_B.needPhase : rulesBlocked,
+            blocked: basics ?? rulesBlocked,
             blockedBy: taken ? 'f-apelido-erro' : sizeInvalid ? 'f-tam-erro' : rulesBlockedBy,
           }
       break
