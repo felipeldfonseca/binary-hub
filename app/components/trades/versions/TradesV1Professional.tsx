@@ -4,7 +4,7 @@ import {
   BarChart2, ArrowLeftRight, Coins, TrendingUp, Target,
   Table2, SlidersHorizontal, Upload, AlertTriangle, Inbox,
 } from 'lucide-react'
-import CsvUploadSection from '@/components/dashboard/CsvUploadSection'
+import DiarioImportLink from '@/components/dashboard/DiarioImportLink'
 import { useLanguage } from '@/lib/contexts/LanguageContext'
 import { Trade as LegacyTrade } from '@/hooks/useTrades'
 import { useTradesSupabase } from '@/hooks/useTradesSupabase'
@@ -383,7 +383,7 @@ export default function TradesV1Professional() {
                   : 'Import your Ebinex or other platform data via CSV.'}
               </p>
             </div>
-            <CsvUploadSection />
+            <DiarioImportLink />
           </div>
         )}
       </div>

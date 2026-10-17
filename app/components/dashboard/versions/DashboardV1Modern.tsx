@@ -1,5 +1,6 @@
 'use client'
 import React, { useState, useMemo } from 'react'
+import Link from 'next/link'
 import HeroSection from '@/components/dashboard/HeroSection'
 import HeroSectionPT from '@/components/dashboard/HeroSectionPT'
 import MetricsOverview from '@/components/dashboard/MetricsOverview'
@@ -7,8 +8,8 @@ import CumulativePnLChart from '@/components/dashboard/CumulativePnLChart'
 import TradingCalendar from '@/components/dashboard/TradingCalendar'
 import EconomicCalendar from '@/components/dashboard/EconomicCalendar'
 import RecentTrades from '@/components/dashboard/RecentTrades'
-import CsvUploadModal from '@/components/dashboard/CsvUploadModal'
 import AccountBalanceDisplay from '@/components/dashboard/AccountBalanceDisplay'
+import { IMPORT_HREF, IMPORT_LABEL } from '@/components/dashboard/DiarioImportLink'
 import { useLanguage } from '@/lib/contexts/LanguageContext'
 import { useMarketContext } from '@/lib/contexts/MarketContext'
 import { useTradesSupabase } from '@/hooks/useTradesSupabase'
@@ -20,12 +21,11 @@ export default function DashboardV1Modern() {
   const [selectedPeriod, setSelectedPeriod] = useState<TimePeriod>('weekly')
   const [selectedCalendarMonth, setSelectedCalendarMonth] = useState<Date>(new Date())
   const [isDemoMode, setIsDemoMode] = useState(false)
-  const [showCsvUploadModal, setShowCsvUploadModal] = useState(false)
-  
+
   const { activeMarket } = useMarketContext()
 
   // Load trades for the active account
-  const { trades, stats, isLoading: tradesLoading, refetch } = useTradesSupabase(
+  const { trades, isLoading: tradesLoading } = useTradesSupabase(
     activeMarket?.marketType ? { marketType: activeMarket.marketType } : undefined
   )
   // Load ALL trades (no filter) to detect whether the user is brand new
@@ -34,15 +34,6 @@ export default function DashboardV1Modern() {
   const thisAccountEmpty = !tradesLoading && trades.length === 0
   // Only treat as first-time if there is no data in ANY account
   const isFirstTimeUser = !allTradesLoading && allTrades.length === 0
-
-  const handleImportData = () => {
-    setShowCsvUploadModal(true)
-  }
-
-  const handleCsvUploadSuccess = () => {
-    setShowCsvUploadModal(false)
-    refetch()
-  }
 
   const handleResetData = () => {
     localStorage.removeItem('binaryHub_hasData')
@@ -99,12 +90,12 @@ export default function DashboardV1Modern() {
                   : 'Import your trading data to unlock professional analytics'}
               </p>
               <div className="flex flex-col sm:flex-row gap-4 items-center justify-center">
-                <button
-                  onClick={handleImportData}
+                <Link
+                  href={IMPORT_HREF}
                   className="bg-gradient-to-r from-[#E1FFD9] to-[#C4F5A8] text-[#2D3748] font-semibold px-8 py-3 rounded-lg hover:shadow-xl transition-all duration-200 shadow-lg font-comfortaa transform hover:scale-105"
                 >
-                  {isPortuguese ? 'Importar Dados CSV' : 'Import CSV Data'}
-                </button>
+                  {isPortuguese ? IMPORT_LABEL.pt : IMPORT_LABEL.en}
+                </Link>
                 <button
                   onClick={() => setIsDemoMode(true)}
                   className="text-[#E1FFD9] hover:text-[#C4F5A8] transition-colors duration-200 font-comfortaa px-4 py-2 rounded-lg border border-[#E1FFD9]/30 hover:border-[#C4F5A8]/50 bg-[#E1FFD9]/5"
@@ -121,12 +112,12 @@ export default function DashboardV1Modern() {
                   ? `Nenhuma operação importada para ${activeMarket?.displayName ?? 'esta conta'} ainda.`
                   : `No trades imported for ${activeMarket?.displayName ?? 'this account'} yet.`}
               </p>
-              <button
-                onClick={handleImportData}
-                className="bg-gradient-to-r from-[#E1FFD9] to-[#C4F5A8] text-[#2D3748] font-semibold px-6 py-2.5 rounded-lg hover:shadow-lg transition-all duration-200 font-comfortaa text-sm"
+              <Link
+                href={IMPORT_HREF}
+                className="inline-block bg-gradient-to-r from-[#E1FFD9] to-[#C4F5A8] text-[#2D3748] font-semibold px-6 py-2.5 rounded-lg hover:shadow-lg transition-all duration-200 font-comfortaa text-sm"
               >
-                {isPortuguese ? 'Importar CSV' : 'Import CSV'}
-              </button>
+                {isPortuguese ? IMPORT_LABEL.pt : IMPORT_LABEL.en}
+              </Link>
             </div>
           ) : (
             /* Regular Chart Display */
@@ -187,15 +178,15 @@ export default function DashboardV1Modern() {
                     : 'After importing your CSV data, you\'ll see a detailed table with all your trades.'
                   }
                 </p>
-                <button 
-                  onClick={handleImportData}
-                  className="text-[#E1FFD9] hover:text-[#C4F5A8] transition-colors font-comfortaa hover:scale-105 transform transition-all duration-200 flex items-center gap-2 justify-center mx-auto"
+                <Link
+                  href={IMPORT_HREF}
+                  className="text-[#E1FFD9] hover:text-[#C4F5A8] transition-colors font-comfortaa hover:scale-105 transform transition-all duration-200 flex items-center gap-2 justify-center mx-auto w-fit"
                 >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                   </svg>
-                  {isPortuguese ? 'Importar Dados Agora' : 'Import Data Now'}
-                </button>
+                  {isPortuguese ? IMPORT_LABEL.pt : IMPORT_LABEL.en}
+                </Link>
               </div>
             ) : (
               <RecentTrades />
@@ -340,25 +331,18 @@ export default function DashboardV1Modern() {
                   >
                     Reset to Empty State
                   </button>
-                  <button 
-                    onClick={handleImportData}
+                  <Link
+                    href={IMPORT_HREF}
                     className="px-3 py-1 bg-green-500/20 text-green-400 rounded text-xs hover:bg-green-500/30 transition-colors"
                   >
-                    Load Sample Data
-                  </button>
+                    {IMPORT_LABEL.en}
+                  </Link>
                 </div>
               </div>
             )}
           </div>
         </div>
       </div>
-
-      {/* CSV Upload Modal */}
-      <CsvUploadModal 
-        isOpen={showCsvUploadModal}
-        onClose={() => setShowCsvUploadModal(false)}
-        onSuccess={handleCsvUploadSuccess}
-      />
     </>
   )
 }
