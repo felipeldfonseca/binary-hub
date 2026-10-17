@@ -610,6 +610,71 @@ html:has(.hub[data-tema='escuro']) #root {
   text-wrap: pretty;
 }
 
+/*
+ * Phase 2, shared by the rules screens (Personalizar, the «Posso operar hoje?» card, account
+ * creation). Each screen's own rules live in its lane's file: hub-personalizar.css,
+ * hub-posso.css, hub-regras-conta.css.
+ */
+
+/* The answer's colour (lib/hub/posso `Tom`; boards g-lib, g-agu/g-fora, g-enc, g-neu): text, never colour alone */
+.hub .hub-tom--mint {
+  color: var(--mint);
+}
+.hub .hub-tom--amber {
+  color: var(--amber);
+}
+.hub .hub-tom--red {
+  color: var(--red);
+}
+.hub .hub-tom--neutral {
+  color: var(--text);
+}
+.hub .hub-tom--muted {
+  color: var(--text-2);
+}
+
+/* Rule tags: «padrão de Futuros», «só nesta conta», «não salvo», «todas as contas (de Futuros)» */
+.hub-tag {
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start;
+  padding: 1px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.5;
+  white-space: nowrap;
+}
+.hub-tag--padrao {
+  border: 1px solid var(--neutral-border);
+  color: var(--text-2);
+}
+.hub-tag--propria {
+  border: 1px solid var(--mint-border);
+  color: var(--mint);
+}
+.hub-tag--mudou {
+  border: 1px solid var(--amber-border);
+  color: var(--amber);
+}
+.hub-tag--todas {
+  border: 1px solid var(--blue);
+  color: var(--blue);
+}
+
+/* «ativo na Fase 5»: dashed, for what is saved but does not act yet */
+.hub-chip-fraco {
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px dashed var(--text-2);
+  color: var(--text-2);
+  font-size: 11px;
+  font-weight: 700;
+}
+
 /* Disclosure: ▸ turns 90° when open */
 .hub .hub-abre {
   display: inline-flex;

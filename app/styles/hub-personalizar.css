@@ -1,0 +1,6 @@
+/*
+ * Personalizar beyond «Suas contas» (Phase 2, lane A1): «Quando você opera», «Suas regras», «Como
+ * fica hoje», the versions, «Calendários econômicos», «Preferências», the section index and the
+ * sticky save bar. Scoped to .hub like styles/hub.css; tokens and shared classes come from there.
+ * Imported by app/(hub)/layout.tsx. Only lane A1 edits this file.
+ */

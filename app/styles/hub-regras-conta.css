@@ -1,0 +1,5 @@
+/*
+ * Rules in account creation (the import sheet's step b), «Editar regras» and the rule parts of a
+ * «Suas contas» row, and the import preview's «Antes de …» line (Phase 2, lane A2). Scoped to .hub
+ * like styles/hub.css. Imported by app/(hub)/layout.tsx. Only lane A2 edits this file.
+ */
