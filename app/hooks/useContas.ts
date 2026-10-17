@@ -12,9 +12,9 @@ import {
   fetchBatches,
   fetchImportFormats,
   fetchPreferences,
-  savePreferences,
   type HubPreferences,
 } from '@/lib/hub/contasDb';
+import { mergePreferences } from '@/lib/hub/regrasDb';
 
 /** Cache keys of the hub's account data; everything sits under ['hub', userId]. */
 export const hubKeys = {
@@ -118,7 +118,8 @@ export function useRefreshAfterWrite() {
 /**
  * "Conta atual", shared by every hub screen: `?conta=` in the URL, else the last choice
  * (profiles.preferences.conta_atual), else the primary account, else the first active one.
- * Choosing saves the choice, merged into the stored preferences; a `?conta=` in the URL follows it.
+ * Choosing saves the choice with merge_preferences (only conta_atual changes); a `?conta=` in the
+ * URL follows it.
  */
 export function useContaAtual() {
   const accounts = useAccounts();
@@ -146,16 +147,11 @@ export function useContaAtual() {
         params.set('conta', id);
         router.replace(`${pathname ?? ''}?${params.toString()}`);
       }
-      const key = hubKeys.preferencias(userId);
       try {
-        // The save replaces the whole object: without the stored one, read it again first, and
-        // never write when it cannot be read
-        const stored =
-          queryClient.getQueryData<HubPreferences>(key) ??
-          (await queryClient.fetchQuery({ queryKey: key, queryFn: () => fetchPreferences(db, userId), retry: false }));
-        const next: HubPreferences = { ...stored, conta_atual: id };
-        queryClient.setQueryData(key, next);
-        await savePreferences(db, userId, next);
+        // Merged in the database (merge_preferences): only conta_atual changes, so a stale copy
+        // of the other keys (theme, «Horários na tela») can never be written back
+        const merged = await mergePreferences(db, { conta_atual: id });
+        queryClient.setQueryData<HubPreferences>(hubKeys.preferencias(userId), merged);
       } catch {
         // The choice still holds on this page; it is only not remembered for the next visit
       }

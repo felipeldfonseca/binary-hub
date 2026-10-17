@@ -2,6 +2,7 @@ import React from 'react'
 import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import * as data from '@/lib/hub/contasDb'
+import * as regrasDb from '@/lib/hub/regrasDb'
 import DiarioCabecalho from '@/components/hub/contas/DiarioCabecalho'
 import { makeAccount, renderHub } from '@/testing/hubHarness'
 
@@ -24,14 +25,18 @@ jest.mock('@/lib/hub/contasDb', () => ({
   ...jest.requireActual('@/lib/hub/contasDb'),
   fetchAccounts: jest.fn(),
   fetchPreferences: jest.fn(),
-  savePreferences: jest.fn(),
   fetchImportFormats: jest.fn(),
   createAccount: jest.fn(),
 }))
 
+jest.mock('@/lib/hub/regrasDb', () => ({
+  ...jest.requireActual('@/lib/hub/regrasDb'),
+  mergePreferences: jest.fn(),
+}))
+
 const fetchAccounts = data.fetchAccounts as jest.MockedFunction<typeof data.fetchAccounts>
 const fetchPreferences = data.fetchPreferences as jest.MockedFunction<typeof data.fetchPreferences>
-const savePreferences = data.savePreferences as jest.MockedFunction<typeof data.savePreferences>
+const mergePreferences = regrasDb.mergePreferences as jest.MockedFunction<typeof regrasDb.mergePreferences>
 const fetchImportFormats = data.fetchImportFormats as jest.MockedFunction<typeof data.fetchImportFormats>
 const createAccount = data.createAccount as jest.MockedFunction<typeof data.createAccount>
 
@@ -48,7 +53,7 @@ beforeEach(() => {
   mockReplace.mockReset()
   fetchAccounts.mockReset().mockResolvedValue([topOne, ebinex, apex, example, closed])
   fetchPreferences.mockReset().mockResolvedValue({ tema: 'escuro' })
-  savePreferences.mockReset().mockResolvedValue(undefined)
+  mergePreferences.mockReset().mockImplementation(async (_db, patch) => ({ tema: 'escuro', ...patch }) as data.HubPreferences)
   fetchImportFormats.mockReset().mockResolvedValue({})
   createAccount.mockReset()
 })
@@ -96,40 +101,36 @@ describe('Diário header', () => {
     expect(within(list).queryByText('Velha')).not.toBeInTheDocument()
   })
 
-  it('saves the choice in the preferences, keeping what else is there', async () => {
+  it('saves the choice by merging conta_atual alone into the preferences', async () => {
     renderHub(<DiarioCabecalho />)
 
     await userEvent.click(await selectorButton())
     await userEvent.click(screen.getByRole('button', { name: /Top One/ }))
 
     expect(await selectorButton()).toHaveTextContent('Conta: Top One')
-    expect(savePreferences).toHaveBeenCalledWith(expect.anything(), 'user-1', { tema: 'escuro', conta_atual: topOne.id })
+    expect(mergePreferences).toHaveBeenCalledWith(expect.anything(), { conta_atual: topOne.id })
     expect(mockReplace).not.toHaveBeenCalled()
   })
 
-  it('never saves the choice over preferences it could not read, which would erase them', async () => {
+  it('saves the choice even when the preferences could not be read: the merge never writes the other keys', async () => {
     fetchPreferences.mockRejectedValue(new data.HubDataError('network'))
     renderHub(<DiarioCabecalho />)
 
     await userEvent.click(await selectorButton())
     await userEvent.click(screen.getByRole('button', { name: /Top One/ }))
 
-    // The choice still holds on the page
     expect(await selectorButton()).toHaveTextContent('Conta: Top One')
-    await waitFor(() => expect(fetchPreferences).toHaveBeenCalledTimes(2))
-    expect(savePreferences).not.toHaveBeenCalled()
+    await waitFor(() => expect(mergePreferences).toHaveBeenCalledWith(expect.anything(), { conta_atual: topOne.id }))
   })
 
-  it('reads the preferences again before saving when the first read failed, keeping what else is there', async () => {
-    fetchPreferences.mockRejectedValueOnce(new data.HubDataError('network')).mockResolvedValue({ tema: 'escuro' })
+  it('keeps the choice on the page when it cannot be saved', async () => {
+    mergePreferences.mockRejectedValue(new regrasDb.RegrasDataError('network'))
     renderHub(<DiarioCabecalho />)
 
     await userEvent.click(await selectorButton())
     await userEvent.click(screen.getByRole('button', { name: /Top One/ }))
 
-    await waitFor(() =>
-      expect(savePreferences).toHaveBeenCalledWith(expect.anything(), 'user-1', { tema: 'escuro', conta_atual: topOne.id }),
-    )
+    await waitFor(() => expect(mergePreferences).toHaveBeenCalled())
     expect(await selectorButton()).toHaveTextContent('Conta: Top One')
   })
 

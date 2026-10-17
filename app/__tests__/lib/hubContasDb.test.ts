@@ -12,7 +12,6 @@ import {
   importFixTz,
   importPreview,
   importUndo,
-  savePreferences,
   setPrimary,
   toHubError,
 } from '@/lib/hub/contasDb';
@@ -159,13 +158,12 @@ describe('accounts', () => {
     await expect(fetchImportFormats(db)).resolves.toEqual({ a: ['topone'], b: ['ebinex'] });
   });
 
-  it('reads and writes the preferences object whole', async () => {
+  it('reads the preferences object, an empty one when none is saved', async () => {
     const read = fakeDb(() => ({ data: { preferences: null } }));
     await expect(fetchPreferences(read.db, 'u')).resolves.toEqual({});
-    const write = fakeDb();
-    await savePreferences(write.db, 'u', { tema: 'escuro', conta_atual: 'a' });
-    expect(write.log[0]).toContainEqual(['update', { preferences: { tema: 'escuro', conta_atual: 'a' } }]);
-    expect(write.log[0]).toContainEqual(['eq', 'id', 'u']);
+    const saved = fakeDb(() => ({ data: { preferences: { theme: 'escuro', conta_atual: 'a' } } }));
+    await expect(fetchPreferences(saved.db, 'u')).resolves.toEqual({ theme: 'escuro', conta_atual: 'a' });
+    expect(saved.log[0]).toContainEqual(['eq', 'id', 'u']);
   });
 });
 
