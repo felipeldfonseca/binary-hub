@@ -34,8 +34,13 @@ export interface RegrasDaContaProps {
   desde: string | null
   /** The account exists already (what followed its creation failed): nothing here can change it */
   locked?: boolean
-  /** The element that explains a limit error (the sheet's blocked hint) */
+  /**
+   * The element that explains a limit error (the sheet's blocked hint). Without it (the hint asks
+   * for the nickname or the phase first), the error shows under the field itself.
+   */
   limiteErroId?: string
+  /** «Ao criar, esta janela passa a ser a de …»: the market's other accounts that get a version too */
+  outras?: string | null
 }
 
 /**
@@ -44,7 +49,7 @@ export interface RegrasDaContaProps {
  * limit and its mode) and «Regras valem desde hoje». Presentational: the sheet holds the form
  * and the rules (personalizar.md §11.1, contrato §6.1).
  */
-export default function RegrasDaConta({ carga, regras: r, form, onForm, label, now, desde, locked = false, limiteErroId }: RegrasDaContaProps) {
+export default function RegrasDaConta({ carga, regras: r, form, onForm, label, now, desde, locked = false, limiteErroId, outras = null }: RegrasDaContaProps) {
   const [infoDesde, toggleInfoDesde] = useToggle()
   const pedirFoco = useFocoPendente()
 
@@ -67,6 +72,8 @@ export default function RegrasDaConta({ carga, regras: r, form, onForm, label, n
   // An own window when the market has one; else the window the form gives the market
   const daConta = !!pergunta
   const nota = notaCopiar(r)
+  // The limit's error is said by the sheet's hint, or here when the hint says something else first
+  const limiteErroAqui = !!r.limiteErro && !limiteErroId
 
   return (
     <div className="hub-rc">
@@ -179,9 +186,14 @@ export default function RegrasDaConta({ carga, regras: r, form, onForm, label, n
               autoComplete="off"
               value={r.limiteTexto}
               aria-invalid={!!r.limiteErro || undefined}
-              aria-describedby={r.limiteErro ? limiteErroId : undefined}
+              aria-describedby={r.limiteErro ? (limiteErroAqui ? 'f-lim-erro' : limiteErroId) : undefined}
               onChange={(event) => mudar({ limite: event.target.value })}
             />
+            {limiteErroAqui && r.limiteErro && (
+              <p id="f-lim-erro" className="hub-erro">
+                {REGRAS.limiteErro[r.limiteErro]}
+              </p>
+            )}
           </div>
           {r.temModo && (
             <Pilulas<LimitMode>
@@ -192,6 +204,12 @@ export default function RegrasDaConta({ carga, regras: r, form, onForm, label, n
             />
           )}
         </div>
+      )}
+
+      {outras && !locked && (
+        <p id="rc-outras" className="hub-nota">
+          {outras}
+        </p>
       )}
 
       {desde && (

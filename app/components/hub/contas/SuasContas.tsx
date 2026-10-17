@@ -296,7 +296,8 @@ export default function SuasContas() {
                         <button type="button" className="hub-btn" onClick={() => openPanel(account.id, 'importacoes')}>
                           {CONTAS.menuBatches}
                         </button>
-                        {editarRegras && (
+                        {/* Only for an account «Suas regras» lists (futures and binary, as rules_config reads them) */}
+                        {editarRegras && ativasRegras?.some((a) => a.id === account.id) && (
                           <button
                             type="button"
                             className="hub-btn"

@@ -27,9 +27,12 @@ import {
   linhaAntesDasRegras,
   linhaImportadas,
   novaContaNaConfig,
+  outrasContasComVersao,
   regrasDaNovaConta,
   regrasEditadas,
+  type RegrasDaNovaConta,
 } from '@/lib/hub/regrasConta'
+import { formatDiaMes } from '@/lib/hub/formato'
 import {
   ARQUIVO,
   BUSY,
@@ -115,6 +118,11 @@ interface Flow {
   form: AccountForm
   /** The account this sheet created could not get its rules (v1): its nickname, for the notice */
   rulesNotSaved: string | null
+  /**
+   * Step b's rules block as it was when «Criar» created the account (null: the rules had not
+   * loaded). The locked form shows this, not the rules read since, which list the new account.
+   */
+  rulesAtCreation: { regras: RegrasDaNovaConta; desde: string } | null
 }
 
 const initialFlow = (mode: SheetMode, accountId: string | null): Flow => ({
@@ -141,6 +149,7 @@ const initialFlow = (mode: SheetMode, accountId: string | null): Flow => ({
   confirmedTz: {},
   form: EMPTY_FORM,
   rulesNotSaved: null,
+  rulesAtCreation: null,
 })
 
 interface Primary {
@@ -150,6 +159,8 @@ interface Primary {
   blocked?: string
   /** Blocks the action; a field's own error explains why */
   blockedBy?: string
+  /** Does not block; an element says something about the action (the rules that failed to load) */
+  describedBy?: string
 }
 
 const FOCUSABLE = 'a[href], button, input, select, textarea, [tabindex]:not([tabindex="-1"])'
@@ -357,6 +368,8 @@ export default function ImportSheet({ mode, accountId, onClose }: { mode: SheetM
     }
     setBusy(true)
     setError(null)
+    // What the rules block shows as «Criar» is pressed: the locked form keeps showing it
+    const rulesAtCreation = config && rules ? { regras: rules, desde: desdeDaNovaConta(config, rules, now) } : null
     try {
       const futures = formMarket === 'futures'
       const created = await createAccount(db, userId, {
@@ -370,6 +383,9 @@ export default function ImportSheet({ mode, accountId, onClose }: { mode: SheetM
         is_primary: active.length === 0,
       })
       refresh()
+      // The account exists from here on, also while its rules save: the form is locked and its own
+      // nickname, now in the refreshed list, is not «taken»
+      if (alive.current) setFlow((f) => ({ ...f, created, createdFromForm: true, accountId: created.id, rulesAtCreation }))
       // Its rules (v1) before the preview, so the preview already counts from «desde»
       let rulesSaved = true
       if (config && rules) {
@@ -631,6 +647,22 @@ export default function ImportSheet({ mode, accountId, onClose }: { mode: SheetM
       }
       const sizeInvalid = futures && sizeValue === 'invalid'
       const locked = flow.createdFromForm && !!flow.created
+      // Locked, the block shows what it showed at creation; «desde» is v1's own day once saved (none
+      // when it could not be saved), and the prediction while it saves
+      const snapshot = locked ? flow.rulesAtCreation : null
+      const blockLoad = locked ? (snapshot ? 'pronto' : 'erro') : rulesLoad
+      const blockRules = locked ? (snapshot?.regras ?? null) : rules
+      const v1 = locked ? config?.accounts.find((a) => a.id === flow.created?.id)?.versions[0] : undefined
+      const desde = locked
+        ? flow.rulesNotSaved || !snapshot
+          ? null
+          : v1
+            ? formatDiaMes(v1.effectiveDay)
+            : snapshot.desde
+        : config && rules
+          ? desdeDaNovaConta(config, rules, now)
+          : null
+      const outras = !locked && config && rules ? outrasContasComVersao(config, rules, now) : null
       const name = form.label.trim()
       // What «Criar» waits for first: a nickname and, for futures, the phase
       const basics = !name ? PASSO_B.needLabel : futures && !form.phase ? PASSO_B.needPhase : undefined
@@ -656,16 +688,18 @@ export default function ImportSheet({ mode, accountId, onClose }: { mode: SheetM
           locked={locked}
           regras={
             <RegrasDaConta
-              carga={rulesLoad}
-              regras={rules}
+              carga={blockLoad}
+              regras={blockRules}
               form={form.rules}
               onForm={(next) => setForm({ rules: next })}
               label={form.label}
               now={now}
-              desde={config && rules ? desdeDaNovaConta(config, rules, now) : null}
+              desde={desde}
               locked={locked}
-              // The hint under «Criar» says the limit's error once nothing comes before it
+              // The hint under «Criar» says the limit's error once nothing comes before it; until
+              // then the block says it under the field
               limiteErroId={basics ? undefined : 'dica-pri'}
+              outras={outras}
             />
           }
         />
@@ -678,6 +712,8 @@ export default function ImportSheet({ mode, accountId, onClose }: { mode: SheetM
             run: () => void createFromForm(),
             blocked: basics ?? rulesBlocked,
             blockedBy: taken ? 'f-apelido-erro' : sizeInvalid ? 'f-tam-erro' : rulesBlockedBy,
+            // Created without rules when they failed to load; the market's other accounts get a version
+            describedBy: rulesLoad === 'erro' ? 'regras-carga' : outras ? 'rc-outras' : undefined,
           }
       break
     }
@@ -828,8 +864,14 @@ export default function ImportSheet({ mode, accountId, onClose }: { mode: SheetM
   const toastText = flow.passo === 'fim' && flow.commit?.batch_id ? FIM.toast(flow.commit.inserted, label) : ''
   // What the one live region says: the running request, else the latest result
   const rulesNotice = flow.rulesNotSaved ? REGRAS_CONTA.naoSalvas(flow.rulesNotSaved) : ''
+  // Step b before the account exists: the rules could not be read, so it will be created without them
+  const rulesLoadNotice = flow.passo === 'b' && !flow.createdFromForm && rulesLoad === 'erro' ? REGRAS_CONTA.carregarErro : ''
   const statusText =
-    busy ? BUSY : reading ? SOLTE.reading : toastText || (flow.passo === 'd' && flow.undone ? PASSO_D.undone(label) : '') || rulesNotice
+    busy
+      ? BUSY
+      : reading
+        ? SOLTE.reading
+        : toastText || (flow.passo === 'd' && flow.undone ? PASSO_D.undone(label) : '') || rulesNotice || rulesLoadNotice
 
   // A file dropped outside the drop zone must not open in the browser and lose the sheet
   const holdDrop = (event: React.DragEvent) => event.preventDefault()
@@ -924,7 +966,7 @@ export default function ImportSheet({ mode, accountId, onClose }: { mode: SheetM
                     type="button"
                     className="hub-btn hub-btn--pri"
                     aria-disabled={blocked || busy || undefined}
-                    aria-describedby={primary.blocked ? 'dica-pri' : primary.blockedBy}
+                    aria-describedby={primary.blocked ? 'dica-pri' : (primary.blockedBy ?? primary.describedBy)}
                     onClick={() => {
                       if (!blocked && !busyRef.current) primary?.run()
                     }}

@@ -1216,16 +1216,20 @@ describe('ImportSheet · the rules of a new account (step b)', () => {
     expect(createAccount).toHaveBeenCalledTimes(1)
   })
 
-  it('creates the account without v1 when the rules cannot be read', async () => {
+  it('creates the account without v1 when the rules cannot be read, and says so to a screen reader too', async () => {
     fetchRulesConfig.mockRejectedValue(new regrasDb.RegrasDataError('network'))
     const { dialog } = await openRules({ mode: 'adicionar' })
     await fillNewFuturesAccount(dialog, 'Apex B')
-    expect(
-      await within(dialog).findByText('Não foi possível carregar as regras. A conta é criada sem regras; salve em Personalizar › Suas regras.'),
-    ).toBeInTheDocument()
+    const text = 'Não foi possível carregar as regras. A conta é criada sem regras; salve em Personalizar › Suas regras.'
+    expect(await within(dialog).findByText(text, { selector: '#regras-carga' })).toBeInTheDocument()
     expect(within(dialog).queryByLabelText('Copiar regras de')).not.toBeInTheDocument()
+    // The sheet's one live region says it, and «Criar» is described by it (it does not block)
+    expect(statusOf(dialog)).toHaveTextContent(text)
+    const create = within(dialog).getByRole('button', { name: 'Criar Apex B' })
+    expect(create).not.toHaveAttribute('aria-disabled')
+    expect(create).toHaveAccessibleDescription(text)
 
-    await userEvent.click(within(dialog).getByRole('button', { name: 'Criar Apex B' }))
+    await userEvent.click(create)
 
     await within(dialog).findByRole('heading', { name: 'Apex B criada.' })
     expect(saveRules).not.toHaveBeenCalled()
@@ -1260,12 +1264,15 @@ describe('ImportSheet · the rules of a new account (step b)', () => {
     expect(create).toHaveAttribute('aria-disabled', 'true')
     expect(create).toHaveAccessibleDescription('Use só números, como 400 ou 400,50.')
     expect(limite).toHaveAccessibleDescription('Use só números, como 400 ou 400,50.')
-    // Without a nickname the hint asks for it: the limit field is not described by that
+    expect(dialog.querySelector('#f-lim-erro')).toBeNull()
+    // Without a nickname the hint asks for it: the limit's error then shows under the field
     await userEvent.clear(within(dialog).getByLabelText('Apelido'))
     const createFallback = within(dialog).getByRole('button', { name: 'Criar conta' })
     expect(createFallback).toHaveAccessibleDescription('Dê um apelido à conta.')
-    expect(limite).toHaveAccessibleDescription('')
+    expect(limite).toHaveAccessibleDescription('Use só números, como 400 ou 400,50.')
+    expect(within(dialog).getByText('Use só números, como 400 ou 400,50.', { selector: '#f-lim-erro' })).toBeVisible()
     await userEvent.type(within(dialog).getByLabelText('Apelido'), 'Apex B')
+    expect(dialog.querySelector('#f-lim-erro')).toBeNull()
     await userEvent.clear(limite)
     await userEvent.type(limite, '0')
     expect(create).toHaveAccessibleDescription('Digite um valor maior que zero.')
@@ -1276,12 +1283,57 @@ describe('ImportSheet · the rules of a new account (step b)', () => {
     fireEvent.change(within(dialog).getByLabelText('Fim da janela só de Apex B, horário de Nova York'), { target: { value: '10:00' } })
     expect(create).toHaveAttribute('aria-disabled', 'true')
     expect(create).toHaveAccessibleDescription('Início e fim iguais: mude um dos dois.')
+    // Open, the editor shows the error by the fields: «Criar» points there, and no hint repeats it
+    expect(create).toHaveAttribute('aria-describedby', 'j-erro')
+    expect(dialog.querySelector('#dica-pri')).toBeNull()
+    // A limit that can be saved is not described by anything
+    expect(limite).toHaveAccessibleDescription('')
     // Closed, the editor no longer shows the error: the button's hint says it
     await userEvent.click(within(dialog).getByRole('button', { name: 'Mudar' }))
     expect(create).toHaveAccessibleDescription('Início e fim iguais: mude um dos dois.')
     expect(within(dialog).getByText('Início e fim iguais: mude um dos dois.', { selector: '#dica-pri' })).toBeInTheDocument()
     await userEvent.click(create)
     expect(createAccount).not.toHaveBeenCalled()
+  })
+
+  it('no false «apelido» error while the new account’s v1 saves', async () => {
+    const pending = deferred<SaveRulesResult>()
+    saveRules.mockReturnValue(pending.promise)
+    // The refreshed list already has the new account while its rules save
+    createAccount.mockImplementation(async () => {
+      fetchAccounts.mockResolvedValue([topOneDono, ebinexDono, apexB])
+      return apexB
+    })
+    const { dialog } = await openRules({ mode: 'adicionar' })
+    await fillNewFuturesAccount(dialog, 'Apex B')
+
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Criar Apex B' }))
+
+    await waitFor(() => expect(saveRules).toHaveBeenCalled())
+    await waitFor(() => expect(fetchAccounts.mock.calls.length).toBeGreaterThanOrEqual(2))
+    await act(() => new Promise((r) => setTimeout(r, 30)))
+    expect(within(dialog).queryByRole('alert')).not.toBeInTheDocument()
+    expect(dialog).not.toHaveTextContent('Já existe uma conta com esse apelido.')
+    expect(within(dialog).getByLabelText('Apelido')).not.toHaveAttribute('aria-invalid', 'true')
+
+    await act(async () => pending.resolve(savedV1('rev-2')))
+    await within(dialog).findByRole('heading', { name: 'Apex B criada.' })
+  })
+
+  it('«+ Definir janela» names the market’s other accounts that get a version on the same save', async () => {
+    fetchRulesConfig.mockResolvedValue(configAntes())
+    const { dialog } = await openRules({ mode: 'adicionar' })
+    await fillNewFuturesAccount(dialog, 'Apex B')
+    expect(within(dialog).queryByText(/Ao criar, esta janela/)).not.toBeInTheDocument()
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Mudar' }))
+
+    await userEvent.click(within(dialog).getByRole('button', { name: '+ Definir janela' }))
+
+    const text = 'Ao criar, esta janela passa a ser a de Futuros: Top One #1 também ganha versão nova das regras desde 19 out.'
+    expect(within(dialog).getByText(text)).toBeInTheDocument()
+    expect(within(dialog).getByRole('button', { name: 'Criar Apex B' })).toHaveAccessibleDescription(text)
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Cancelar a janela nova de Futuros' }))
+    expect(within(dialog).queryByText(text)).not.toBeInTheDocument()
   })
 
   it('changing the market starts the rules block again', async () => {
@@ -1314,6 +1366,74 @@ describe('ImportSheet · the rules of a new account (step b)', () => {
 
     await userEvent.keyboard('{Escape}')
     expect(within(dialog).getByText('Fechar sem salvar?')).toBeInTheDocument()
+  })
+
+  describe('the form locked after the account was created (the preview failed)', () => {
+    /** Ebinex's v1 as rules_config lists it, for an account of that market created now */
+    function comBinariaNova(base: RulesConfig, day: string): RulesConfig {
+      const ebx = configDepois().accounts.find((a) => a.market === 'binary') as AccountConfig
+      const nova: AccountConfig = {
+        ...ebx,
+        id: 'bin-nova',
+        label: 'Minha Ebinex',
+        versions: [{ ...ebx.versions[0], id: 'v1-bin-nova', effectiveFrom: brt(`${day} 23:59`), effectiveDay: day, origin: 'criar', copiedFrom: null }],
+      }
+      return { ...base, accounts: [...base.accounts, nova] }
+    }
+    const minhaEbinex = makeAccount({ id: 'bin-nova', label: 'Minha Ebinex', market: 'binary', platform: 'ebinex', phase: 'pessoal' })
+
+    async function criarMinhaEbinex() {
+      // The old Ebinex format: no zone step, the preview comes right after (and fails)
+      readFile.mockResolvedValue(fixtureFile('ebinex_iso'))
+      importPreview.mockRejectedValue({ message: 'TypeError: Failed to fetch' })
+      createAccount.mockImplementation(async () => {
+        fetchAccounts.mockResolvedValue([topOneDono, minhaEbinex])
+        return minhaEbinex
+      })
+      const { dialog } = await openRules()
+      await chooseFile(dialog)
+      await within(dialog).findByRole('heading', { name: 'Para qual conta?' })
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Continuar' }))
+      await userEvent.type(await within(dialog).findByLabelText('Apelido'), 'Minha Ebinex')
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Criar Minha Ebinex e continuar' }))
+      await within(dialog).findByRole('alert')
+      return dialog
+    }
+
+    it('without v1 saved: no «Regras valem desde hoje», and the notice says the rules were not saved', async () => {
+      fetchAccounts.mockResolvedValue([topOneDono])
+      const semBinarias = { ...configDepois(), accounts: configDepois().accounts.filter((a) => a.market === 'futures') }
+      fetchRulesConfig.mockResolvedValue(semBinarias)
+      saveRules.mockRejectedValue(new regrasDb.RegrasDataError('network'))
+      mockAgora.at = brt('2026-10-19 12:00')
+
+      const dialog = await criarMinhaEbinex()
+
+      expect(within(dialog).getByLabelText('Apelido')).toBeDisabled()
+      expect(within(dialog).getByText('Minha Ebinex criada, mas as regras não foram salvas. Salve em Personalizar › Suas regras.', { selector: '.hub-alerta' })).toBeInTheDocument()
+      expect(within(dialog).queryByText(/Regras valem desde hoje/)).not.toBeInTheDocument()
+    })
+
+    it('with v1 saved: the block it showed at creation, and «desde» is v1’s own day, whatever the clock says now', async () => {
+      fetchAccounts.mockResolvedValue([topOneDono])
+      const semBinarias = { ...configDepois(), accounts: configDepois().accounts.filter((a) => a.market === 'futures') }
+      // Read again after the save: the new account is now the market's only account, with its v1
+      fetchRulesConfig.mockResolvedValueOnce(semBinarias).mockResolvedValue(comBinariaNova(semBinarias, '2026-10-19'))
+      saveRules.mockResolvedValue(savedV1('rev-2', 'bin-nova'))
+      mockAgora.at = brt('2026-10-19 23:59')
+
+      const dialog = await criarMinhaEbinex()
+      await waitFor(() => expect(fetchRulesConfig.mock.calls.length).toBeGreaterThanOrEqual(2))
+      // Midnight in Brasília passes: a fresh prediction would say 20 out
+      mockAgora.at = brt('2026-10-20 00:05')
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Como ler: Regras valem desde hoje' }))
+
+      expect(within(dialog).getByText('Regras valem desde hoje, 19 out')).toBeInTheDocument()
+      // As at creation: nothing to copy from (never «Copiar regras de: Minha Ebinex»)
+      expect(within(dialog).queryByLabelText('Copiar regras de')).not.toBeInTheDocument()
+      expect(within(dialog).getByText('Começa com o padrão do mercado.')).toBeInTheDocument()
+      expect(within(dialog).queryByRole('button', { name: 'Mudar' })).not.toBeInTheDocument()
+    })
   })
 
   it('saves v1 before the preview, so the preview already counts from «desde»', async () => {

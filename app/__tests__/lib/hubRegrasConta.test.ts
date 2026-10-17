@@ -5,7 +5,7 @@ import { MON_TO_FRI } from '@/lib/domain/tempo'
 import type { ImportRow } from '@/lib/domain/import'
 import { brt, et, topOneRules } from '@/testing/gate'
 import { configAntes, configDepois, idsDono } from '@/testing/regras'
-import type { AccountSettings, RulesConfig, WindowSetting } from '@/lib/hub/regras'
+import { resolveRules, type AccountSettings, type RulesConfig, type WindowSetting } from '@/lib/hub/regras'
 import {
   NAO_COPIAR,
   REGRAS_FORM_VAZIO,
@@ -17,8 +17,10 @@ import {
   linhaImportadas,
   linhaResumo,
   notaCopiar,
+  mesmaJanela,
   novaContaNaConfig,
   opcoesCopiar,
+  outrasContasComVersao,
   partesRegras,
   perguntaJanela,
   regrasDaNovaConta,
@@ -56,6 +58,14 @@ describe('«Copiar regras de»', () => {
     expect(opcoesCopiar(archived, 'futures')).toEqual([])
     const example = { ...c, accounts: c.accounts.map((a) => (a.id === ids.ebinex ? { ...a, isExample: true } : a)) }
     expect(opcoesCopiar(example, 'binary')).toEqual([])
+  })
+
+  it('a chosen source that is no longer offered (archived meanwhile) falls back to the first account of the market', () => {
+    const c = configDepois()
+    const apex = { ...c.accounts[0], id: 'acc-apex', label: 'Apex A', archivedAt: '2026-10-18T12:00:00Z' }
+    const comApex = { ...c, accounts: [...c.accounts, apex], settings: { ...c.settings, accounts: { ...c.settings.accounts, 'acc-apex': c.settings.accounts[ids.topOne] } } }
+    expect(regrasDaNovaConta(comApex, 'futures', form({ copiar: 'acc-apex' })).copiar).toBe(ids.topOne)
+    expect(regrasDaNovaConta(comApex, 'futures', form({ copiar: ids.ebinex })).copiar).toBe(ids.topOne)
   })
 
   it('starts on the first account of the market, and «Não copiar» starts from the market default', () => {
@@ -226,6 +236,32 @@ describe('«Regras valem desde hoje, {d}»', () => {
   })
 })
 
+describe('the market’s other accounts when the form gives it its first window', () => {
+  it('names the active accounts that use the market’s window, with the day', () => {
+    const c = configAntes()
+    const r = regrasDaNovaConta(c, 'futures', form({ definir: true }))
+    expect(outrasContasComVersao(c, r, et('2026-10-19 12:00'))).toBe(
+      'Ao criar, esta janela passa a ser a de Futuros: Top One #1 também ganha versão nova das regras desde 19 out.',
+    )
+    const b = regrasDaNovaConta(c, 'binary', form({ definir: true }))
+    expect(outrasContasComVersao(c, b, brt('2026-10-19 12:00'))).toBe(
+      'Ao criar, esta janela passa a ser a de Binárias: Ebinex também ganha versão nova das regras desde 19 out.',
+    )
+  })
+
+  it('nothing when the market already has a window, the form sets none, or the others have their own', () => {
+    expect(outrasContasComVersao(configDepois(), regrasDaNovaConta(configDepois(), 'futures', form()), et('2026-10-19 12:00'))).toBeNull()
+    const c = configAntes()
+    expect(outrasContasComVersao(c, regrasDaNovaConta(c, 'futures', form()), et('2026-10-19 12:00'))).toBeNull()
+    // Top One with its own window (rules_config's `current` resolves it so)
+    const comPropria = comConta(c, ids.topOne, { window: w(NY, 570, 660) })
+    const propria = { ...comPropria, accounts: comPropria.accounts.map((a) => ({ ...a, current: resolveRules(a, comPropria.settings) })) }
+    expect(outrasContasComVersao(propria, regrasDaNovaConta(propria, 'futures', form({ definir: true })), et('2026-10-19 12:00'))).toBeNull()
+    const arquivada = { ...c, accounts: c.accounts.map((a) => (a.id === ids.topOne ? { ...a, archivedAt: '2026-10-18T12:00:00Z' } : a)) }
+    expect(outrasContasComVersao(arquivada, regrasDaNovaConta(arquivada, 'futures', form({ definir: true })), et('2026-10-19 12:00'))).toBeNull()
+  })
+})
+
 describe('v1 again after rules_changed', () => {
   const input = {
     accountId: 'nova',
@@ -250,6 +286,21 @@ describe('v1 again after rules_changed', () => {
     const out = novaContaNaConfig(c, input)
     expect(out.marketWindows).toBeUndefined()
     expect(out.settings.window).toEqual(w(NY, 600, 660))
+  })
+
+  it('the same times but other days, another clock, or a market with two windows: the form’s becomes the account’s own', () => {
+    const c = configDepois()
+    // seg–sáb in the form, seg–sex in the market: Saturday must not be lost
+    const segSab = { ...input, marketWindows: [w(NY, 600, 660, 0b0111111)] }
+    expect(novaContaNaConfig(c, segSab).settings.window).toEqual(w(NY, 600, 660, 0b0111111))
+    // 10:00–11:00 on Brasília's clock is another window than 10:00–11:00 ET
+    const br = { ...input, marketWindows: [w(SP, 600, 660)] }
+    expect(novaContaNaConfig(c, br).settings.window).toEqual(w(SP, 600, 660))
+    // The market got two windows, the first equal to the form's: the account keeps only its own
+    const dois = configDepois()
+    dois.settings.markets.futures.windows = [w(NY, 600, 660), w(NY, 840, 900)]
+    expect(novaContaNaConfig(dois, input).settings.window).toEqual(w(NY, 600, 660))
+    expect(mesmaJanela(w(NY, 600, 660), w(NY, 600, 660))).toBe(true)
   })
 
   it('an account that used the market’s window keeps doing so', () => {
@@ -313,6 +364,11 @@ describe('rows before the rules started (import preview, «Importação feita»)
     // Read on the wrong clock, the same wall time is another instant
     expect(contarAntesDasRegras([antesBr], 'UTC', since)).toEqual({ antes: 1, depois: 0 })
     expect(contarAntesDasRegras([row('2026-10-17T19:00:00')], SP, since)).toEqual({ antes: 0, depois: 1 })
+  })
+
+  it('a row exactly at «desde» is judged by the rules (at or after counts as after)', () => {
+    const since = new Date('2026-10-17T20:06:02Z')
+    expect(contarAntesDasRegras([row('2026-10-17T17:06:02'), row('2026-10-17T17:06:01')], SP, since)).toEqual({ antes: 1, depois: 1 })
   })
 
   it('every row before: «Antes de 17 out (início das regras): {novas} vão …»', () => {

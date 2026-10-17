@@ -11,7 +11,7 @@
  */
 import type { Market, WindowTz } from '@/lib/domain/gate'
 import { formatInt } from '@/lib/hub/formato'
-import { JANELAS, MERCADO_NOME, RELOGIO } from '@/components/hub/personalizar/copy'
+import { JANELAS, MERCADO_NOME, RELOGIO, lista } from '@/components/hub/personalizar/copy'
 
 // ------------------------------------------------------------------------------------------------
 // Step b: «Copiar regras de», the summary line, the editor, the «desde» chip
@@ -78,6 +78,11 @@ export const REGRAS_CONTA = {
   desdeAria: 'Como ler: Regras valem desde hoje',
   desdeInfo:
     'As comparações desta conta contam a partir desta data. Mudou uma regra? A versão anterior continua valendo para o passado.',
+
+  // NEW (review of personalizar.md §11.1): the form gives the market its first window, so the
+  // market's other active accounts, which use the market's window, get a version on the same save
+  outrasContas: (market: Market, d: string, contas: readonly string[]) =>
+    `Ao criar, esta janela passa a ser a de ${NOME_CURTO[market]}: ${lista(contas)} também ${contas.length > 1 ? 'ganham' : 'ganha'} versão nova das regras desde ${d}.`,
 
   // NEW: rules_config did not load; the account is still created (without v1)
   carregarErro: 'Não foi possível carregar as regras. A conta é criada sem regras; salve em Personalizar › Suas regras.',

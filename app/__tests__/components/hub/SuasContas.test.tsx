@@ -683,6 +683,43 @@ describe('Suas contas · the rules of each account (Phase 2)', () => {
     await waitFor(() => expect(screen.getByRole('heading', { level: 2, name: 'Suas regras' })).toHaveFocus())
   })
 
+  it('offers «Editar regras» only for an account «Suas regras» lists (futures and binary)', async () => {
+    const forex = makeAccount({ label: 'Forex antiga', market: 'forex', platform: null, phase: 'pessoal', sort_order: 5 })
+    fetchAccounts.mockResolvedValue([topOneDono, ebinexDono, forex])
+    renderHub(
+      <HubRoot>
+        <PersonalizarPagina>
+          <h1 tabIndex={-1}>Personalizar</h1>
+        </PersonalizarPagina>
+      </HubRoot>,
+    )
+    await screen.findByRole('heading', { level: 3, name: 'Como fica hoje' })
+
+    const menu = await openMenu('Forex antiga')
+    expect(within(menu).queryByRole('button', { name: 'Editar regras' })).not.toBeInTheDocument()
+    expect(within(menu).getByRole('button', { name: 'Arquivar' })).toBeInTheDocument()
+    await userEvent.keyboard('{Escape}')
+    expect(within(await openMenu('Ebinex')).getByRole('button', { name: 'Editar regras' })).toBeInTheDocument()
+  })
+
+  it('counts trades only for active accounts: archived and example ones with versions are left out', async () => {
+    const c = configDepois()
+    const [top, ebx] = c.accounts
+    fetchRulesConfig.mockResolvedValue({
+      ...c,
+      accounts: [top, ebx, { ...top, id: 'arquivada', label: 'Velha', archivedAt: '2026-09-03T12:00:00Z' }, { ...ebx, id: 'exemplo', label: 'Exemplo', isExample: true }],
+    })
+    renderHub(<SuasContas />)
+
+    await waitFor(async () => expect(parts(await row('Top One #1'))).toBe('Financiada · Top One · 10:00–11:00 ET · regras desde 17 out · 3 op. desde então'))
+    const since = top.versions[0].effectiveFrom
+    expect(fetchTradesSince).toHaveBeenCalledTimes(1)
+    expect(fetchTradesSince).toHaveBeenCalledWith(expect.anything(), [
+      { accountId: ids.topOne, since },
+      { accountId: ids.ebinex, since },
+    ])
+  })
+
   it('has no «Editar regras» outside Personalizar', async () => {
     renderHub(<SuasContas />)
     const menu = await openMenu('Ebinex')

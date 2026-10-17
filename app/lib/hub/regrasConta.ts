@@ -19,6 +19,7 @@ import {
   effectiveDayAt,
   emptyAccountSettings,
   parseUsdText,
+  pendingVersions,
   resolveRules,
   windowError,
   type AccountConfig,
@@ -262,6 +263,29 @@ export function regrasResolvidas(config: Pick<RulesConfig, 'settings'>, r: Regra
  */
 export function desdeDaNovaConta(config: Pick<RulesConfig, 'settings'>, r: RegrasDaNovaConta, now: Date): string {
   return formatDiaMes(effectiveDayAt(now, regrasResolvidas(config, r)))
+}
+
+/**
+ * The form gives the market its first window (`marketWindows`): every active account of that
+ * market that uses the market's window gets a version on the same save (save_rules versions
+ * whatever changed). The note names them and the day: «Ao criar, esta janela passa a ser a de
+ * Futuros: Top One #1 também ganha versão nova das regras desde 19 out.»; null when no other
+ * account is affected.
+ */
+export function outrasContasComVersao(config: RulesConfig, r: RegrasDaNovaConta, now: Date): string | null {
+  if (!r.marketWindows) return null
+  const settings: RulesSettings = {
+    ...config.settings,
+    markets: { ...config.settings.markets, [r.market]: { ...config.settings.markets[r.market], windows: r.marketWindows } },
+  }
+  const ativas = new Map(activeAccounts(config).map((a) => [a.id, a.label]))
+  const outras = pendingVersions(config, settings).filter((p) => ativas.has(p.accountId))
+  if (!outras.length) return null
+  return REGRAS_CONTA.outrasContas(
+    r.market,
+    formatDiaMes(effectiveDayAt(now, outras[0].rules)),
+    outras.map((p) => ativas.get(p.accountId) as string),
+  )
 }
 
 // ---------------------------------------------------------------------------------------------

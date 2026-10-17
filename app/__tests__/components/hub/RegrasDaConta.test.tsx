@@ -18,6 +18,8 @@ function Bloco({
   inicial = REGRAS_FORM_VAZIO,
   locked = false,
   onForm,
+  limiteErroId = 'dica',
+  outras = null,
 }: {
   config: RulesConfig
   market?: 'futures' | 'binary'
@@ -26,6 +28,9 @@ function Bloco({
   inicial?: RegrasForm
   locked?: boolean
   onForm?: (f: RegrasForm) => void
+  /** null: the sheet's hint says something else first (no nickname or phase yet) */
+  limiteErroId?: string | null
+  outras?: string | null
 }) {
   const [form, setForm] = useState(inicial)
   const r = regrasDaNovaConta(config, market, form)
@@ -43,7 +48,8 @@ function Bloco({
         now={now}
         desde={desdeDaNovaConta(config, r, now)}
         locked={locked}
-        limiteErroId="dica"
+        limiteErroId={limiteErroId ?? undefined}
+        outras={outras}
       />
       <p id="dica">dica</p>
     </div>
@@ -187,6 +193,43 @@ describe('RegrasDaConta · «Mudar»', () => {
     // Empty is no limit, not an error
     expect(limite).not.toHaveAttribute('aria-invalid')
     expect(linha()).toHaveTextContent('limite do dia: definir')
+  })
+
+  it('a limit that cannot be saved while the hint asks for the nickname first: its error shows under the field', async () => {
+    render(<Bloco config={configDepois()} inicial={{ aberto: true }} limiteErroId={null} />)
+    const limite = screen.getByLabelText('Limite do dia, US$')
+    expect(document.getElementById('f-lim-erro')).toBeNull()
+    await userEvent.clear(limite)
+    await userEvent.type(limite, 'abc')
+
+    expect(screen.getByText('Use só números, como 400 ou 400,50.', { selector: '#f-lim-erro' })).toHaveClass('hub-erro')
+    expect(limite).toHaveAccessibleDescription('Use só números, como 400 ou 400,50.')
+    await userEvent.clear(limite)
+    expect(document.getElementById('f-lim-erro')).toBeNull()
+  })
+
+  it('a limit that can be saved is described by nothing (never by the hint’s other errors)', () => {
+    render(<Bloco config={configDepois()} inicial={{ aberto: true }} />)
+    const limite = screen.getByLabelText('Limite do dia, US$')
+    expect(limite).toHaveValue('400')
+    expect(limite).not.toHaveAttribute('aria-describedby')
+    expect(limite).toHaveAccessibleDescription('')
+  })
+
+  it('binaries have no mode: their limit is always per account', () => {
+    render(<Bloco config={configDepois()} market="binary" inicial={{ aberto: true, limite: '50' }} />)
+    expect(screen.getByLabelText('Limite do dia, US$')).toHaveValue('50')
+    expect(screen.queryByRole('group', { name: 'Como o limite conta' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'somando as contas de Futuros' })).not.toBeInTheDocument()
+  })
+
+  it('names the market’s other accounts that get a version, until the account exists', () => {
+    const text = 'Ao criar, esta janela passa a ser a de Futuros: Top One #1 também ganha versão nova das regras desde 19 out.'
+    const { unmount } = render(<Bloco config={configAntes()} inicial={{ aberto: false, definir: true }} outras={text} />)
+    expect(screen.getByText(text)).toHaveAttribute('id', 'rc-outras')
+    unmount()
+    render(<Bloco config={configAntes()} inicial={{ aberto: false, definir: true }} outras={text} locked />)
+    expect(screen.queryByText(text)).not.toBeInTheDocument()
   })
 
   it('changing the source starts the window choice and the limit again', async () => {
