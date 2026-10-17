@@ -1,11 +1,15 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { groupByMarket, type TradingAccount } from '@/lib/hub/contas'
 import { toHubError, updateAccount, type AccountActivity, type HubErrorCode } from '@/lib/hub/contasDb'
 import { formatDay } from '@/lib/hub/formato'
+import { activeAccounts } from '@/lib/hub/regras'
+import { partesRegras, type Trecho } from '@/lib/hub/regrasConta'
 import { useAccountActivity, useAccounts, useHubDb, useRefreshAfterWrite } from '@/hooks/useContas'
+import { useRulesConfig, useTradesSinceRules } from '@/hooks/useRegras'
 import { useImportSheet } from '@/components/hub/importar/ImportSheetProvider'
+import { useEditarRegras } from '@/components/hub/personalizar/PersonalizarProvider'
 import EditarConta from './EditarConta'
 import Importacoes from './Importacoes'
 import {
@@ -22,6 +26,7 @@ import {
   platformLabel,
   undoAria,
 } from './copy'
+import { LINHA_CONTA } from './copyRegras'
 import { Disclosure, InfoButton, InfoPanel, useToggle } from './ui'
 
 type Panel = { id: string; kind: 'editar' | 'importacoes' }
@@ -34,14 +39,40 @@ function activityText(activity: AccountActivity | undefined): string {
   return CONTAS.noTrades
 }
 
+/** One part of a row; times are mono (board `segsJan`) */
+function Parte({ trechos }: { trechos: Trecho[] }) {
+  return (
+    <span>
+      {trechos.map((t, i) =>
+        t.mono ? (
+          <span key={i} className="hub-rc-num">
+            {t.t}
+          </span>
+        ) : (
+          t.t
+        ),
+      )}
+    </span>
+  )
+}
+
 /**
- * "Suas contas" (Personalizar #contas), Phase 1 cut: one row per active account grouped by
- * market, import, edit, the account's imports, archive with undo, and the closed accounts.
- * Actions apply at once.
+ * "Suas contas" (Personalizar #contas): one row per active account grouped by market, import,
+ * edit, the account's imports, archive with undo, and the closed accounts. Actions apply at once.
+ * Phase 2: each row also says its window, since when its rules count and what it traded since,
+ * and the menu opens its rules in «Suas regras».
  */
 export default function SuasContas() {
   const { all, active, archived, isLoading, isError, refetch } = useAccounts()
   const activity = useAccountActivity(active)
+  // The rule parts (contrato §6.2): the same list as Personalizar's version block, so one query
+  const rulesConfig = useRulesConfig()
+  const config = rulesConfig.isSuccess ? rulesConfig.data : undefined
+  const ativasRegras = useMemo(() => (config ? activeAccounts(config) : undefined), [config])
+  const trades = useTradesSinceRules(ativasRegras)
+  const counts = trades.isSuccess ? trades.data : undefined
+  // Only on Personalizar, which holds «Suas regras»
+  const editarRegras = useEditarRegras()
   const sheet = useImportSheet()
   const { db } = useHubDb()
   const refresh = useRefreshAfterWrite()
@@ -184,12 +215,19 @@ export default function SuasContas() {
             <h3 id={`g-${group.market}`}>{MARKET_LABEL[group.market]}</h3>
             <ul className="hub-lista" aria-labelledby={`g-${group.market}`}>
               {group.accounts.map((account) => {
-                // Board: phase · platform · activity (the mesa is in Editar conta)
-                const parts = [
+                // Board: phase · platform · window · rules · activity (the mesa is in Editar conta). Until
+                // the rules and the counts are here, the Phase 1 parts: phase · platform · activity
+                const atividade = activityText(activity.data?.[account.id])
+                const regras = config?.accounts.find((a) => a.id === account.id)
+                const regraPartes = regras ? partesRegras(regras, counts?.[account.id], atividade) : null
+                const parts: Trecho[][] = [
                   account.phase ? PHASE_LABEL[account.phase] : '',
                   platformLabel(account.platform),
-                  activityText(activity.data?.[account.id]),
-                ].filter(Boolean)
+                  ...(regraPartes ? [] : [atividade]),
+                ]
+                  .filter(Boolean)
+                  .map((t): Trecho[] => [{ t }])
+                  .concat(regraPartes ?? [])
                 const menuId = `menu-${account.id}`
                 const menuOpen = menuFor === account.id
                 return (
@@ -200,8 +238,8 @@ export default function SuasContas() {
                       </div>
                       {parts.length > 0 && (
                         <div className="hub-partes">
-                          {parts.map((p) => (
-                            <span key={p}>{p}</span>
+                          {parts.map((p, i) => (
+                            <Parte key={i} trechos={p} />
                           ))}
                         </div>
                       )}
@@ -258,6 +296,18 @@ export default function SuasContas() {
                         <button type="button" className="hub-btn" onClick={() => openPanel(account.id, 'importacoes')}>
                           {CONTAS.menuBatches}
                         </button>
+                        {editarRegras && (
+                          <button
+                            type="button"
+                            className="hub-btn"
+                            onClick={() => {
+                              setMenuFor(null)
+                              editarRegras(account.id)
+                            }}
+                          >
+                            {LINHA_CONTA.editarRegras}
+                          </button>
+                        )}
                         <button type="button" className="hub-btn" onClick={() => void archive(account)}>
                           {CONTAS.menuArchive}
                         </button>
