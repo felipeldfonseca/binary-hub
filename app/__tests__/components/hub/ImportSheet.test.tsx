@@ -40,8 +40,31 @@ jest.mock('@/lib/hub/regrasDb', () => ({
   saveRules: jest.fn(),
   fetchTradesSince: jest.fn(),
 }))
-const mockAgora = { at: new Date('2026-10-19T16:00:00Z') }
-jest.mock('@/hooks/useAgora', () => ({ useAgora: () => mockAgora.at }))
+const mockAgora = { at: new Date('2026-10-19T16:00:00Z'), redraws: new Set<() => void>() }
+// Like the real hook, every component that reads the clock redraws when it moves (moveClock)
+jest.mock('@/hooks/useAgora', () => {
+  const { useEffect, useReducer } = jest.requireActual('react')
+  return {
+    useAgora: () => {
+      const [, redraw] = useReducer((n: number) => n + 1, 0)
+      useEffect(() => {
+        mockAgora.redraws.add(redraw)
+        return () => {
+          mockAgora.redraws.delete(redraw)
+        }
+      }, [])
+      return mockAgora.at
+    },
+  }
+})
+
+/** The device clock moves on: useAgora's tick, which redraws the sheet with the new time */
+function moveClock(at: Date) {
+  act(() => {
+    mockAgora.at = at
+    mockAgora.redraws.forEach((redraw) => redraw())
+  })
+}
 
 const fetchAccounts = data.fetchAccounts as jest.MockedFunction<typeof data.fetchAccounts>
 const fetchImportFormats = data.fetchImportFormats as jest.MockedFunction<typeof data.fetchImportFormats>
@@ -1369,20 +1392,21 @@ describe('ImportSheet · the rules of a new account (step b)', () => {
   })
 
   describe('the form locked after the account was created (the preview failed)', () => {
-    /** Ebinex's v1 as rules_config lists it, for an account of that market created now */
-    function comBinariaNova(base: RulesConfig, day: string): RulesConfig {
+    /** Ebinex's v1 as rules_config lists it, for an account of that market created at `from` */
+    function comBinariaNova(base: RulesConfig, day: string, from = brt(`${day} 23:59`)): RulesConfig {
       const ebx = configDepois().accounts.find((a) => a.market === 'binary') as AccountConfig
       const nova: AccountConfig = {
         ...ebx,
         id: 'bin-nova',
         label: 'Minha Ebinex',
-        versions: [{ ...ebx.versions[0], id: 'v1-bin-nova', effectiveFrom: brt(`${day} 23:59`), effectiveDay: day, origin: 'criar', copiedFrom: null }],
+        versions: [{ ...ebx.versions[0], id: 'v1-bin-nova', effectiveFrom: from, effectiveDay: day, origin: 'criar', copiedFrom: null }],
       }
       return { ...base, accounts: [...base.accounts, nova] }
     }
     const minhaEbinex = makeAccount({ id: 'bin-nova', label: 'Minha Ebinex', market: 'binary', platform: 'ebinex', phase: 'pessoal' })
 
-    async function criarMinhaEbinex() {
+    /** Fills step b for «Minha Ebinex»; `beforeCreate` sees the form as «Criar» is about to be pressed */
+    async function criarMinhaEbinex(beforeCreate?: (dialog: HTMLElement) => void) {
       // The old Ebinex format: no zone step, the preview comes right after (and fails)
       readFile.mockResolvedValue(fixtureFile('ebinex_iso'))
       importPreview.mockRejectedValue({ message: 'TypeError: Failed to fetch' })
@@ -1395,6 +1419,7 @@ describe('ImportSheet · the rules of a new account (step b)', () => {
       await within(dialog).findByRole('heading', { name: 'Para qual conta?' })
       await userEvent.click(within(dialog).getByRole('button', { name: 'Continuar' }))
       await userEvent.type(await within(dialog).findByLabelText('Apelido'), 'Minha Ebinex')
+      beforeCreate?.(dialog)
       await userEvent.click(within(dialog).getByRole('button', { name: 'Criar Minha Ebinex e continuar' }))
       await within(dialog).findByRole('alert')
       return dialog
@@ -1424,15 +1449,34 @@ describe('ImportSheet · the rules of a new account (step b)', () => {
 
       const dialog = await criarMinhaEbinex()
       await waitFor(() => expect(fetchRulesConfig.mock.calls.length).toBeGreaterThanOrEqual(2))
-      // Midnight in Brasília passes: a fresh prediction would say 20 out
-      mockAgora.at = brt('2026-10-20 00:05')
-      await userEvent.click(within(dialog).getByRole('button', { name: 'Como ler: Regras valem desde hoje' }))
+      // Midnight in Brasília passes and the clock's tick redraws the sheet: a fresh prediction
+      // would now say 20 out
+      moveClock(brt('2026-10-20 00:05'))
 
       expect(within(dialog).getByText('Regras valem desde hoje, 19 out')).toBeInTheDocument()
       // As at creation: nothing to copy from (never «Copiar regras de: Minha Ebinex»)
       expect(within(dialog).queryByLabelText('Copiar regras de')).not.toBeInTheDocument()
       expect(within(dialog).getByText('Começa com o padrão do mercado.')).toBeInTheDocument()
       expect(within(dialog).queryByRole('button', { name: 'Mudar' })).not.toBeInTheDocument()
+    })
+
+    it('with v1 saved after midnight: «desde» is the day the server gave v1, not the one shown at «Criar»', async () => {
+      fetchAccounts.mockResolvedValue([topOneDono])
+      const semBinarias = { ...configDepois(), accounts: configDepois().accounts.filter((a) => a.market === 'futures') }
+      // «Criar» is pressed at 23:59:59 in Brasília and save_rules runs after midnight: v1 is on 20 out
+      fetchRulesConfig.mockResolvedValueOnce(semBinarias).mockResolvedValue(comBinariaNova(semBinarias, '2026-10-20', brt('2026-10-20 00:00:01')))
+      saveRules.mockResolvedValue(savedV1('rev-2', 'bin-nova'))
+      mockAgora.at = brt('2026-10-19 23:59:59')
+
+      const dialog = await criarMinhaEbinex((form) => {
+        // The prediction the locked form keeps until v1 is read back
+        expect(within(form).getByText('Regras valem desde hoje, 19 out')).toBeInTheDocument()
+      })
+      await waitFor(() => expect(fetchRulesConfig.mock.calls.length).toBeGreaterThanOrEqual(2))
+
+      // The device clock has not ticked yet (it still says 23:59:59): only v1's own day says 20 out
+      expect(await within(dialog).findByText('Regras valem desde hoje, 20 out')).toBeInTheDocument()
+      expect(within(dialog).queryByText('Regras valem desde hoje, 19 out')).not.toBeInTheDocument()
     })
   })
 
