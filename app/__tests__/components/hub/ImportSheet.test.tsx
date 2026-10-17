@@ -1173,6 +1173,17 @@ describe('ImportSheet · the rules of a new account (step b)', () => {
     expect(within(dialog).queryByText(/as regras não foram salvas/)).not.toBeInTheDocument()
   })
 
+  it('tries again only once: a second rules_changed leaves the account without rules, and says so', async () => {
+    saveRules.mockRejectedValue(new regrasDb.RegrasDataError('rules_changed'))
+    const { dialog } = await openRules({ mode: 'adicionar' })
+    await fillNewFuturesAccount(dialog, 'Apex B')
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Criar Apex B' }))
+
+    await within(dialog).findByRole('heading', { name: 'Apex B criada.' })
+    expect(saveRules).toHaveBeenCalledTimes(2)
+    expect(within(dialog).getByText('Apex B criada, mas as regras não foram salvas. Salve em Personalizar › Suas regras.', { selector: '.hub-alerta' })).toBeInTheDocument()
+  })
+
   it('rules_changed after the market got a window meanwhile: the form’s window goes as the account’s own', async () => {
     fetchRulesConfig.mockResolvedValueOnce(configAntes()).mockResolvedValue(configDepois())
     saveRules.mockRejectedValueOnce(new regrasDb.RegrasDataError('rules_changed')).mockResolvedValueOnce(savedV1('rev-3'))
