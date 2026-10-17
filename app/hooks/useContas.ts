@@ -53,6 +53,11 @@ export function useAccounts() {
     archived,
     isLoading: query.isLoading,
     isError: query.isError,
+    /**
+     * A read after a failed one has not answered yet («Tentar de novo»): without data the query goes
+     * back to pending, so `isError` turns false until that read fails again
+     */
+    isRetrying: query.isPending && query.errorUpdateCount > 0,
     refetch: query.refetch,
   };
 }
@@ -176,6 +181,7 @@ export function useContaAtual() {
     active: accounts.active,
     isLoading: accounts.isLoading || (preferences.isLoading && !!userId),
     isError: accounts.isError,
+    isRetrying: accounts.isRetrying,
     refetch: accounts.refetch,
     choose,
   };

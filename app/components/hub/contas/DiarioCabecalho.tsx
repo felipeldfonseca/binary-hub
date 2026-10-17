@@ -32,6 +32,9 @@ export default function DiarioCabecalho() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const importRef = useRef<HTMLButtonElement>(null)
+  const titleRef = useRef<HTMLHeadingElement>(null)
+  const selectorRef = useRef<HTMLButtonElement>(null)
+  const pressedRetry = useRef<HTMLButtonElement | null>(null)
   const handled = useRef(false)
   const wantsImport = searchParams?.get('importar') === '1'
   const currentId = conta.current?.id ?? null
@@ -58,23 +61,49 @@ export default function DiarioCabecalho() {
     router.replace(query ? `/diario?${query}` : '/diario')
   }, [wantsImport, conta.isLoading, currentId, sheet, router, searchParams])
 
+  // «Tentar de novo» stays, with its focus, while its read runs. When the accounts replace it, focus
+  // would fall to the page's start; it goes to the account selector that took its place (the H1
+  // when there is no account, as when the empty state that opened the sheet is gone). Left alone
+  // if it moved on meanwhile.
+  useEffect(() => {
+    const pressed = pressedRetry.current
+    if (!pressed || pressed.isConnected) return
+    pressedRetry.current = null
+    const active = document.activeElement
+    if (!active || active === document.body) (selectorRef.current ?? titleRef.current)?.focus()
+  })
+
   const openImport = (opener: HTMLElement | null) => sheet.open({ mode: 'importar', accountId: currentId, opener })
   const openAdd = (opener: HTMLElement | null) => sheet.open({ mode: 'adicionar', opener })
 
   let selector: React.ReactNode
-  if (conta.isLoading) {
+  if (conta.isLoading && !conta.isRetrying) {
     selector = (
       <p role="status" className="hub-nota">
         {LOADING}
       </p>
     )
-  } else if (conta.isError) {
+  } else if (conta.isError || conta.isRetrying) {
+    // While «Tentar de novo» reads again, «Carregando…» takes the error's place and the button stays
     selector = (
       <div className="hub-linha">
-        <p role="alert" className="hub-nota">
-          {CONTAS.loadError}
-        </p>
-        <button type="button" className="hub-btn" onClick={() => void conta.refetch()}>
+        {conta.isRetrying ? (
+          <p key="carregando" role="status" className="hub-nota">
+            {LOADING}
+          </p>
+        ) : (
+          <p key="erro" role="alert" className="hub-nota">
+            {CONTAS.loadError}
+          </p>
+        )}
+        <button
+          type="button"
+          className="hub-btn"
+          onClick={(event) => {
+            pressedRetry.current = event.currentTarget
+            void conta.refetch()
+          }}
+        >
           {TRY_AGAIN}
         </button>
       </div>
@@ -87,6 +116,7 @@ export default function DiarioCabecalho() {
         onChoose={(id) => void conta.choose(id)}
         onAdd={openAdd}
         janela={janela}
+        buttonRef={selectorRef}
       />
     )
   } else {
@@ -109,8 +139,11 @@ export default function DiarioCabecalho() {
     <>
       <div className="hub-pg-topo">
         <div style={{ flex: '1 1 420px', minWidth: 0 }}>
-          {/* Takes focus when the control that opened the import sheet is gone (the empty state) */}
-          <h1 tabIndex={-1}>{DIARIO.title}</h1>
+          {/* Takes focus when the control that opened the import sheet, or «Tentar de novo», is gone
+              and no account selector took its place (the empty state) */}
+          <h1 ref={titleRef} tabIndex={-1}>
+            {DIARIO.title}
+          </h1>
         </div>
         <div className="hub-acoes">
           <button ref={importRef} type="button" className="hub-btn" onClick={(event) => openImport(event.currentTarget)}>

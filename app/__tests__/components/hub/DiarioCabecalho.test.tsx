@@ -10,6 +10,7 @@ import { QueryProvider } from '@/lib/providers/QueryProvider'
 import { makeAccount, renderHub } from '@/testing/hubHarness'
 import { agora, idsDono } from '@/testing/regras'
 import { regrasKeys } from '@/hooks/useRegras'
+import type { TradingAccount } from '@/lib/hub/contas'
 
 let mockSearch = ''
 const mockReplace = jest.fn()
@@ -217,6 +218,117 @@ describe('Diário header', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('Não foi possível carregar as contas.')
     await userEvent.click(screen.getByRole('button', { name: 'Tentar de novo' }))
     expect(await selectorButton()).toHaveTextContent('Conta: Top One')
+  })
+
+  describe('focus after «Tentar de novo»', () => {
+    const accountsError = () => screen.getByText('Não foi possível carregar as contas.')
+
+    /** The first read fails; «Tentar de novo» is pressed from the keyboard; `next` answers the second read */
+    async function retryFromKeyboard(next: () => Promise<TradingAccount[]>) {
+      fetchAccounts.mockReset().mockRejectedValueOnce(new data.HubDataError('network')).mockImplementation(next)
+      renderHub(<DiarioCabecalho />)
+      await screen.findByRole('alert')
+      const retry = screen.getByRole('button', { name: 'Tentar de novo' })
+      retry.focus()
+      await userEvent.keyboard('{Enter}')
+      await waitFor(() => expect(fetchAccounts).toHaveBeenCalledTimes(2))
+      return retry
+    }
+
+    it('keeps «Tentar de novo» and its focus while it reads again, with «Carregando…» in place of the error', async () => {
+      let answer!: (accounts: TradingAccount[]) => void
+      const retry = await retryFromKeyboard(() => new Promise((resolve) => (answer = resolve)))
+
+      expect(screen.getByRole('status')).toHaveTextContent('Carregando…')
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+      expect(retry).toBeInTheDocument()
+      expect(retry).toHaveFocus()
+
+      await act(async () => answer([topOne]))
+      expect(await selectorButton()).toHaveFocus()
+    })
+
+    it('gives focus to the account selector that replaces it, so the next Tab does not restart the page', async () => {
+      const retry = await retryFromKeyboard(async () => [topOne])
+
+      const selector = await selectorButton()
+      expect(retry).not.toBeInTheDocument()
+      expect(selector).toHaveFocus()
+      expect(document.activeElement).not.toBe(document.body)
+    })
+
+    it('gives focus to the H1 when the accounts come back empty (no selector takes its place)', async () => {
+      await retryFromKeyboard(async () => [example])
+
+      expect(await screen.findByText('Traga o histórico da sua corretora.')).toBeInTheDocument()
+      expect(screen.getByRole('heading', { level: 1, name: 'Diário' })).toHaveFocus()
+    })
+
+    it('keeps focus on «Tentar de novo» when the accounts still cannot be read', async () => {
+      const retry = await retryFromKeyboard(async () => {
+        throw new data.HubDataError('network')
+      })
+
+      await waitFor(() => expect(screen.getByRole('alert')).toBe(accountsError()))
+      expect(retry).toBeInTheDocument()
+      expect(retry).toHaveFocus()
+    })
+
+    it('leaves focus alone when it moved on before the accounts came', async () => {
+      let answer!: (accounts: TradingAccount[]) => void
+      await retryFromKeyboard(() => new Promise((resolve) => (answer = resolve)))
+      const importFile = screen.getByRole('button', { name: 'Importar arquivo' })
+      importFile.focus()
+
+      await act(async () => answer([topOne]))
+
+      await selectorButton()
+      expect(importFile).toHaveFocus()
+    })
+
+    it('with the app’s query defaults (three retries): keeps focus while its read is retried, then gives it to the selector', async () => {
+      jest.useFakeTimers()
+      try {
+        const user = userEvent.setup({ advanceTimers: jest.advanceTimersByTime })
+        const network = new data.HubDataError('network')
+        fetchAccounts
+          .mockReset()
+          // The first read and its three retries (1 s, 2 s, 4 s)
+          .mockRejectedValueOnce(network)
+          .mockRejectedValueOnce(network)
+          .mockRejectedValueOnce(network)
+          .mockRejectedValueOnce(network)
+          // «Tentar de novo»: fails once, and its retry 1 s later answers
+          .mockRejectedValueOnce(network)
+          .mockResolvedValue([topOne])
+        render(
+          <QueryProvider>
+            <ImportSheetProvider>
+              <DiarioCabecalho />
+            </ImportSheetProvider>
+          </QueryProvider>,
+        )
+        // The first load says «Carregando…» alone while it is retried
+        expect(screen.getByRole('status')).toHaveTextContent('Carregando…')
+        expect(screen.queryByRole('button', { name: 'Tentar de novo' })).not.toBeInTheDocument()
+        // waitFor moves the fake clock on while it waits
+        await waitFor(() => expect(screen.getByRole('alert')).toBe(accountsError()), { timeout: 10_000 })
+        expect(fetchAccounts).toHaveBeenCalledTimes(4)
+
+        const retry = screen.getByRole('button', { name: 'Tentar de novo' })
+        retry.focus()
+        await user.keyboard('{Enter}')
+        await waitFor(() => expect(fetchAccounts).toHaveBeenCalledTimes(5))
+        // Its read failed and waits for the retry: the button keeps focus
+        expect(screen.getByRole('status')).toHaveTextContent('Carregando…')
+        expect(retry).toHaveFocus()
+
+        await waitFor(() => expect(fetchAccounts).toHaveBeenCalledTimes(6), { timeout: 3000 })
+        expect(await selectorButton()).toHaveFocus()
+      } finally {
+        jest.useRealTimers()
+      }
+    })
   })
 })
 
