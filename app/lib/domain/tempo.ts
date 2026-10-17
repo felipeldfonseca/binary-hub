@@ -193,9 +193,30 @@ function assertWindow(w: TradingWindow): void {
 }
 
 function previousDate(date: string): string {
-  const [y, m, d] = date.split('-').map(Number);
-  const t = new Date(Date.UTC(y, m - 1, d) - DAY_MS);
+  return addDays(date, -1);
+}
+
+function parseDate(date: string): { y: number; m: number; d: number } {
+  const match = typeof date === 'string' ? /^(\d{4})-(\d{2})-(\d{2})$/.exec(date) : null;
+  if (!match) throw new RangeError('Invalid date');
+  const [y, m, d] = [Number(match[1]), Number(match[2]), Number(match[3])];
+  const t = new Date(Date.UTC(y, m - 1, d));
+  if (t.getUTCFullYear() !== y || t.getUTCMonth() + 1 !== m || t.getUTCDate() !== d) throw new RangeError('Invalid date');
+  return { y, m, d };
+}
+
+/** Calendar arithmetic on 'YYYY-MM-DD' (no zone involved): addDays('2026-10-31', 1) = '2026-11-01'. */
+export function addDays(date: string, days: number): string {
+  if (!Number.isInteger(days)) throw new RangeError('Invalid day count');
+  const { y, m, d } = parseDate(date);
+  const t = new Date(Date.UTC(y, m - 1, d) + days * DAY_MS);
   return isoDate(t.getUTCFullYear(), t.getUTCMonth() + 1, t.getUTCDate());
+}
+
+/** 1 = Monday … 7 = Sunday, of a 'YYYY-MM-DD' calendar date. */
+export function isoWeekdayOf(date: string): number {
+  const { y, m, d } = parseDate(date);
+  return ((new Date(Date.UTC(y, m - 1, d)).getUTCDay() + 6) % 7) + 1;
 }
 
 /** Whether the instant falls inside the window. An overnight window belongs to the day it opened. */
@@ -213,13 +234,232 @@ export function inWindow(instant: Date, w: TradingWindow): boolean {
 
 /**
  * The trading day (YYYY-MM-DD) an instant belongs to, on the clock of the window or zone given.
- * With an overnight window the day turns over when the window ends instead of at midnight,
- * whether or not the window opens that day, so one night's session never splits in two.
+ *
+ * - With a zone, the day is the date on that zone's clock. `dayStartMin` turns the day over
+ *   earlier, as SQL trading_day_on does: from that minute on, the date is the next one (1080 =
+ *   18:00, the futures day on New York's clock). Without it the day turns at midnight, as before.
+ * - With an overnight window the day turns over when the window ends instead of at midnight,
+ *   whether or not the window opens that day, so one night's session never splits in two. The
+ *   "Posso operar hoje?" gate does not use this form: see tradingDayFor.
  */
-export function tradingDay(instant: Date, clock: TradingWindow | string): string {
-  if (typeof clock === 'string') return utcToLocal(instant, clock).date;
+export function tradingDay(instant: Date, clock: string, options?: { dayStartMin?: number }): string;
+export function tradingDay(instant: Date, clock: TradingWindow): string;
+export function tradingDay(instant: Date, clock: TradingWindow | string, options?: { dayStartMin?: number }): string {
+  if (typeof clock === 'string') return tradingDayOn(instant, { tz: clock, startMin: options?.dayStartMin ?? 0 });
   assertWindow(clock);
   const local = utcToLocal(instant, clock.tz);
   const overnight = clock.endMin < clock.startMin;
   return overnight && local.minuteOfDay < clock.endMin ? previousDate(local.date) : local.date;
+}
+
+// ---------------------------------------------------------------------------------------------
+// The account's day clock and window occurrences (Phase 2: the same rules as the database)
+// ---------------------------------------------------------------------------------------------
+
+/**
+ * The clock an account's trading day runs on: trading_accounts.day_tz and day_start_min (frozen
+ * in each rule version as `day`). Futures: New York, turning at 18:00 (1080). Binaries:
+ * Brasília, turning at midnight (0).
+ */
+export interface DayClock {
+  tz: string;
+  /** 0 = midnight; from this minute of the day on, the trading day is the next date */
+  startMin: number;
+}
+
+function assertDayClock(clock: DayClock): void {
+  if (!clock || !Number.isInteger(clock.startMin) || clock.startMin < 0 || clock.startMin >= MINUTES_PER_DAY) {
+    throw new RangeError('Invalid day clock');
+  }
+  assertTimeZone(clock.tz);
+}
+
+/** The instant a wall-clock minute of a date names in `tz` (Postgres rules, as localToUtc). */
+function wallClock(date: string, minute: number, tz: string): Date {
+  const { y, m, d } = parseDate(date);
+  return localToUtc({ year: y, month: m, day: d, hour: Math.floor(minute / 60), minute: minute % 60 }, tz);
+}
+
+/**
+ * The trading day of an instant on an account's day clock. Same rule as SQL
+ * trading_day_on(at, day_tz, day_start_min): the date on day_tz, plus one day from
+ * day_start_min on (when it is not 0). Seconds do not count: 17:59:59 is still 17:59.
+ * Friday 18:30 New York is Saturday's day, and Sunday 18:00 is Monday's.
+ */
+export function tradingDayOn(instant: Date, clock: DayClock): string {
+  assertDayClock(clock);
+  const local = utcToLocal(instant, clock.tz);
+  return clock.startMin > 0 && local.minuteOfDay >= clock.startMin ? addDays(local.date, 1) : local.date;
+}
+
+/** [start, end) of a trading day on an account's day clock, as instants. */
+export function tradingDayBounds(day: string, clock: DayClock): { start: Date; end: Date } {
+  assertDayClock(clock);
+  return clock.startMin > 0
+    ? { start: wallClock(addDays(day, -1), clock.startMin, clock.tz), end: wallClock(day, clock.startMin, clock.tz) }
+    : { start: wallClock(day, 0, clock.tz), end: wallClock(addDays(day, 1), 0, clock.tz) };
+}
+
+/** One opening of a window: from `start` (inclusive) to `end` (exclusive), as instants. */
+export interface WindowOccurrence {
+  window: TradingWindow;
+  /** The date, on the window's clock, the occurrence opens (one of the window's weekdays) */
+  opensOn: string;
+  start: Date;
+  end: Date;
+}
+
+/**
+ * The occurrences of the windows that open from `fromDays` to `toDays` days around the instant's
+ * date on each window's clock, on the window's weekdays, sorted by opening. Same as SQL
+ * window_occurrences(windows, at, from, to): an occurrence opens at start_min of its date and
+ * closes at end_min of the same date, or of the next one when end_min < start_min.
+ */
+export function windowOccurrences(
+  instant: Date,
+  windows: readonly TradingWindow[],
+  fromDays = -2,
+  toDays = 9,
+): WindowOccurrence[] {
+  const out: WindowOccurrence[] = [];
+  for (const w of windows) {
+    assertWindow(w);
+    const base = utcToLocal(instant, w.tz).date;
+    for (let k = fromDays; k <= toDays; k++) {
+      const date = addDays(base, k);
+      if (!opensOn(w.weekdays, isoWeekdayOf(date))) continue;
+      out.push({
+        window: w,
+        opensOn: date,
+        start: wallClock(date, w.startMin, w.tz),
+        end: wallClock(w.endMin > w.startMin ? date : addDays(date, 1), w.endMin, w.tz),
+      });
+    }
+  }
+  // Array.prototype.sort is stable: equal openings keep the windows' order
+  return out.sort((a, b) => a.start.getTime() - b.start.getTime());
+}
+
+/** An occurrence read on an account's day clock. */
+export interface ClockedOccurrence extends WindowOccurrence {
+  /** The trading day of the opening on the account clock: tradingDayOn(start, clock) */
+  tradingDay: string;
+  /** `start` and `end` on the account clock */
+  startOnClock: LocalParts;
+  endOnClock: LocalParts;
+}
+
+function onClock(o: WindowOccurrence, clock: DayClock): ClockedOccurrence {
+  return {
+    ...o,
+    tradingDay: tradingDayOn(o.start, clock),
+    startOnClock: utcToLocal(o.start, clock.tz),
+    endOnClock: utcToLocal(o.end, clock.tz),
+  };
+}
+
+/**
+ * The occurrence holding the instant (the earliest opening, when two overlap) and the first one
+ * opening after it, from two days before to nine days after, as SQL gate_eval looks for them.
+ */
+export function windowOccurrenceAt(
+  instant: Date,
+  windows: readonly TradingWindow[],
+  clock: DayClock,
+): { current: ClockedOccurrence | null; next: ClockedOccurrence | null } {
+  assertDayClock(clock);
+  const t = instant.getTime();
+  const all = windowOccurrences(instant, windows);
+  const current = all.find((o) => o.start.getTime() <= t && t < o.end.getTime()) ?? null;
+  const next = all.find((o) => o.start.getTime() > t) ?? null;
+  return { current: current && onClock(current, clock), next: next && onClock(next, clock) };
+}
+
+/**
+ * The unified trading day (SQL trading_day_for): an instant inside an occurrence of one of the
+ * windows counts on the trading day of the instant that occurrence opened (the earliest, when two
+ * overlap); any other instant counts on the account's day clock. A window that crosses midnight
+ * therefore keeps its night on the day it opened, and only on the days it opens.
+ */
+export function tradingDayFor(instant: Date, clock: DayClock, windows: readonly TradingWindow[]): string {
+  const t = instant.getTime();
+  let opened: number | null = null;
+  for (const o of windowOccurrences(instant, windows, -1, 0)) {
+    const s = o.start.getTime();
+    if (s <= t && t < o.end.getTime() && (opened === null || s < opened)) opened = s;
+  }
+  return tradingDayOn(opened === null ? instant : new Date(opened), clock);
+}
+
+// ---------------------------------------------------------------------------------------------
+// Offsets and "HH:MM"
+// ---------------------------------------------------------------------------------------------
+
+/** The zone's offset from UTC at an instant, in minutes (New York in winter: −300). */
+export function utcOffsetMinutes(instant: Date, tz: string): number {
+  if (Number.isNaN(instant.getTime())) throw new RangeError('Invalid date');
+  return Math.round(offsetMs(instant.getTime(), tz) / 60000);
+}
+
+/** A change of a zone's UTC offset (daylight saving starting or ending). */
+export interface OffsetChange {
+  /** The first instant with the new offset */
+  at: Date;
+  offsetBeforeMin: number;
+  offsetAfterMin: number;
+}
+
+/**
+ * The first change of the zone's offset after `from` and at most `withinDays` days later, or null.
+ * New York changes on 1 Nov 2026 at 06:00 UTC (−240 → −300) and 8 Mar 2026 at 07:00 UTC; Brasília
+ * has had none since 2019. Assumes at most one change per day, as every real zone has.
+ */
+export function nextOffsetChange(from: Date, tz: string, withinDays = 14): OffsetChange | null {
+  assertTimeZone(tz);
+  const start = from.getTime();
+  if (Number.isNaN(start)) throw new RangeError('Invalid date');
+  if (!(withinDays >= 0)) throw new RangeError('Invalid day count');
+  const limit = start + withinDays * DAY_MS;
+  const before = offsetMs(start, tz);
+  for (let lo = start; lo < limit; ) {
+    let hi = Math.min(lo + DAY_MS, limit);
+    if (offsetMs(hi, tz) !== before) {
+      // Offsets change on whole seconds: narrow (lo, hi] down to the first second with the new one
+      while (hi - lo > 1000) {
+        const mid = Math.floor((lo + hi) / 2000) * 1000;
+        if (mid <= lo) break;
+        if (offsetMs(mid, tz) === before) lo = mid;
+        else hi = mid;
+      }
+      return {
+        at: new Date(hi),
+        offsetBeforeMin: Math.round(before / 60000),
+        offsetAfterMin: Math.round(offsetMs(hi, tz) / 60000),
+      };
+    }
+    lo = hi;
+  }
+  return null;
+}
+
+/**
+ * '10:00' → 600, without Date (a Date would read it on the browser's zone). Takes what an
+ * `<input type="time">` gives: 'HH:MM', or 'HH:MM:00'; one-digit hours are accepted. Anything
+ * else, including '24:00', is null.
+ */
+export function parseHhMm(text: string): number | null {
+  const m = typeof text === 'string' ? /^(\d{1,2}):(\d{2})(?::(\d{2}))?$/.exec(text.trim()) : null;
+  if (!m) return null;
+  const hour = Number(m[1]);
+  const minute = Number(m[2]);
+  if (hour > 23 || minute > 59 || (m[3] !== undefined && m[3] !== '00')) return null;
+  return hour * 60 + minute;
+}
+
+/** 600 → '10:00' (a minute of the day, 0–1439). */
+export function formatHhMm(minuteOfDay: number): string {
+  if (!Number.isInteger(minuteOfDay) || minuteOfDay < 0 || minuteOfDay >= MINUTES_PER_DAY) {
+    throw new RangeError('Invalid minute of day');
+  }
+  return `${pad(Math.floor(minuteOfDay / 60))}:${pad(minuteOfDay % 60)}`;
 }
