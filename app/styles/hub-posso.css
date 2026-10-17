@@ -3,3 +3,149 @@
  * B). Scoped to .hub like styles/hub.css; tokens and shared classes (.hub-tom--*) come from there.
  * Imported by app/(hub)/layout.tsx. Only lane B edits this file.
  */
+
+/* The card (Início board `section[aria-labelledby=t-posso]`): title block beside the lines */
+
+.hub-posso {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 0 28px;
+  padding: 8px 24px;
+  border-radius: 20px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+}
+.hub-posso__cab {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 48px;
+}
+.hub .hub-posso__titulo {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.5;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-2);
+}
+.hub-posso__lista {
+  flex: 1 1 560px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+/* «Carregando…» and the load error take the place of the lines */
+.hub-posso__aviso {
+  flex: 1 1 560px;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  min-height: 48px;
+}
+.hub .hub-posso .hub-info-painel {
+  flex: 1 1 100%;
+  margin: 0 0 12px;
+}
+
+/* One account (board `li.conta-hoje`): name · answer · limit */
+.hub-posso__conta {
+  display: grid;
+  grid-template-columns: 84px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0 16px;
+  min-height: 48px;
+  font-size: 13px;
+}
+.hub-posso__conta + .hub-posso__conta {
+  border-top: 1px solid var(--border);
+}
+.hub-posso__nome {
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+.hub-posso__estado {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0 6px;
+  min-width: 0;
+}
+.hub-posso__sep {
+  color: var(--text-2);
+}
+/*
+ * «Definir», «Ajustar», «Tentar de novo» inside a line: bold, underlined links with a 44px target
+ * (the board keeps the browser's underline, which the app's Tailwind reset removes)
+ */
+.hub .hub-posso__acao {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--mint);
+  font-family: inherit;
+  font-size: inherit;
+  font-weight: 700;
+  text-decoration: underline;
+  cursor: pointer;
+}
+.hub .hub-posso__acao:hover {
+  color: var(--text);
+}
+.hub-posso__limite {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0 8px;
+  min-height: 44px;
+  justify-self: end;
+}
+.hub-posso__valores {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+}
+.hub-posso__usado {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}
+
+@media (max-width: 640px) {
+  .hub-posso__conta {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0;
+    padding: 8px 0;
+  }
+  .hub-posso__limite {
+    justify-self: start;
+  }
+}
+/* Narrow phones and tablets: the answer and its sub stack (board `.conta-hoje-st.empilha`) */
+@media (max-width: 359px), (min-width: 641px) and (max-width: 1000px) {
+  .hub-posso__estado--empilha {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .hub-posso__estado--empilha > .hub-posso__sep {
+    display: none;
+  }
+}
+
+/* The window line under the account selector (Diário board `{{ contaAtual.janela }}`) */
+
+.hub-seletor__janela {
+  padding-left: 16px;
+  font-size: 11px;
+  color: var(--text-2);
+}

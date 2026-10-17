@@ -1,8 +1,11 @@
 'use client'
 
-import { useEffect, useRef } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useContaAtual } from '@/hooks/useContas'
+import { useRulesNow } from '@/hooks/useRegras'
+import { janelaLinha } from '@/lib/hub/posso'
+import { rulesNowFailed } from '@/components/hub/posso/rulesNowRead'
 import { useImportSheet } from '@/components/hub/importar/ImportSheetProvider'
 import SeletorConta from './SeletorConta'
 import { ADD_ACCOUNT, CONTAS, DIARIO, IMPORT_FILE, LOADING, TRY_AGAIN } from './copy'
@@ -19,7 +22,8 @@ export function DiarioTitulo() {
 }
 
 /**
- * The Diário header of the boards: H1, "Importar arquivo" and the account selector. Opening
+ * The Diário header of the boards: H1, "Importar arquivo" and the account selector, with the
+ * current account's window under it (from the rules in force, rules_now). Opening
  * /diario?importar=1 opens the import sheet for the current account.
  */
 export default function DiarioCabecalho() {
@@ -31,6 +35,17 @@ export default function DiarioCabecalho() {
   const handled = useRef(false)
   const wantsImport = searchParams?.get('importar') === '1'
   const currentId = conta.current?.id ?? null
+  const rulesNow = useRulesNow()
+  const rulesFailed = rulesNowFailed(rulesNow)
+
+  // «Janela 10:00–11:00 ET» / «Sem janela salva»; nothing while loading, after a failed read (also
+  // while it is retried or waits offline, as the card), or for an account the answer does not have
+  // (no placeholder text under the button)
+  const janela = useMemo(() => {
+    if (rulesFailed || !rulesNow.data || !currentId) return null
+    const account = rulesNow.data.accounts.find((a) => a.accountId === currentId)
+    return account ? janelaLinha(account.rules) : null
+  }, [rulesFailed, rulesNow.data, currentId])
 
   useEffect(() => {
     if (!wantsImport || handled.current || conta.isLoading) return
@@ -65,7 +80,15 @@ export default function DiarioCabecalho() {
       </div>
     )
   } else if (conta.current) {
-    selector = <SeletorConta accounts={conta.active} current={conta.current} onChoose={(id) => void conta.choose(id)} onAdd={openAdd} />
+    selector = (
+      <SeletorConta
+        accounts={conta.active}
+        current={conta.current}
+        onChoose={(id) => void conta.choose(id)}
+        onAdd={openAdd}
+        janela={janela}
+      />
+    )
   } else {
     selector = (
       <div className="hub-vazio" style={{ flex: '1 1 100%' }}>

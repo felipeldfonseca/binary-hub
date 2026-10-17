@@ -1,10 +1,15 @@
 import React from 'react'
-import { screen, waitFor, within } from '@testing-library/react'
+import { act, render, screen, waitFor, within } from '@testing-library/react'
+import { focusManager, onlineManager } from '@tanstack/react-query'
 import userEvent from '@testing-library/user-event'
 import * as data from '@/lib/hub/contasDb'
 import * as regrasDb from '@/lib/hub/regrasDb'
 import DiarioCabecalho from '@/components/hub/contas/DiarioCabecalho'
+import ImportSheetProvider from '@/components/hub/importar/ImportSheetProvider'
+import { QueryProvider } from '@/lib/providers/QueryProvider'
 import { makeAccount, renderHub } from '@/testing/hubHarness'
+import { agora, idsDono } from '@/testing/regras'
+import { regrasKeys } from '@/hooks/useRegras'
 
 let mockSearch = ''
 const mockReplace = jest.fn()
@@ -32,11 +37,13 @@ jest.mock('@/lib/hub/contasDb', () => ({
 jest.mock('@/lib/hub/regrasDb', () => ({
   ...jest.requireActual('@/lib/hub/regrasDb'),
   mergePreferences: jest.fn(),
+  fetchRulesNow: jest.fn(),
 }))
 
 const fetchAccounts = data.fetchAccounts as jest.MockedFunction<typeof data.fetchAccounts>
 const fetchPreferences = data.fetchPreferences as jest.MockedFunction<typeof data.fetchPreferences>
 const mergePreferences = regrasDb.mergePreferences as jest.MockedFunction<typeof regrasDb.mergePreferences>
+const fetchRulesNow = regrasDb.fetchRulesNow as jest.MockedFunction<typeof regrasDb.fetchRulesNow>
 const fetchImportFormats = data.fetchImportFormats as jest.MockedFunction<typeof data.fetchImportFormats>
 const createAccount = data.createAccount as jest.MockedFunction<typeof data.createAccount>
 
@@ -56,6 +63,8 @@ beforeEach(() => {
   mergePreferences.mockReset().mockImplementation(async (_db, patch) => ({ tema: 'escuro', ...patch }) as data.HubPreferences)
   fetchImportFormats.mockReset().mockResolvedValue({})
   createAccount.mockReset()
+  // rules_now() recorded for the owner's accounts (random ids, not these): no window line for them
+  fetchRulesNow.mockReset().mockResolvedValue(agora('agora-seg-0930-et'))
 })
 
 describe('Diário header', () => {
@@ -208,5 +217,153 @@ describe('Diário header', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('Não foi possível carregar as contas.')
     await userEvent.click(screen.getByRole('button', { name: 'Tentar de novo' }))
     expect(await selectorButton()).toHaveTextContent('Conta: Top One')
+  })
+})
+
+describe('Diário header window line', () => {
+  // The accounts of the recorded rules_now() answers
+  const ids = idsDono()
+  const dTop = makeAccount({ id: ids.topOne, label: 'Top One #1', market: 'futures', phase: 'financiada' })
+  const dEbx = makeAccount({ id: ids.ebinex, label: 'Ebinex', market: 'binary', is_primary: true })
+  const line = () => document.getElementById('janela-conta')
+
+  beforeEach(() => {
+    fetchAccounts.mockResolvedValue([dTop, dEbx])
+  })
+
+  it('shows the current account’s window under the selector, which it describes', async () => {
+    renderHub(<DiarioCabecalho />)
+
+    const button = await selectorButton()
+    expect(button).toHaveTextContent('Conta: Ebinex')
+    await waitFor(() => expect(line()).toHaveTextContent('Janela 20:00–21:00 · Brasília'))
+    expect(button).toHaveAttribute('aria-describedby', 'janela-conta')
+    expect(button).toHaveAccessibleDescription('Janela 20:00–21:00 · Brasília')
+  })
+
+  it('switches the line with the account', async () => {
+    renderHub(<DiarioCabecalho />)
+    await waitFor(() => expect(line()).toHaveTextContent('Janela 20:00–21:00 · Brasília'))
+
+    await userEvent.click(await selectorButton())
+    await userEvent.click(screen.getByRole('button', { name: /Top One #1/ }))
+
+    expect(await selectorButton()).toHaveTextContent('Conta: Top One #1')
+    expect(line()).toHaveTextContent('Janela 10:00–11:00 ET')
+    expect(await selectorButton()).toHaveAccessibleDescription('Janela 10:00–11:00 ET')
+    expect(fetchRulesNow).toHaveBeenCalledTimes(1)
+  })
+
+  it('says «Sem janela salva» before the rules have a version', async () => {
+    fetchRulesNow.mockResolvedValue(agora('agora-antes-seg-0930-et'))
+    renderHub(<DiarioCabecalho />)
+
+    await waitFor(() => expect(line()).toHaveTextContent('Sem janela salva'))
+  })
+
+  it('shows nothing while the rules load', async () => {
+    fetchRulesNow.mockReturnValue(new Promise(() => {}))
+    renderHub(<DiarioCabecalho />)
+
+    const button = await selectorButton()
+    expect(line()).toBeNull()
+    expect(button).not.toHaveAttribute('aria-describedby')
+    expect(screen.queryByText(/Janela|Sem janela salva|Carregando/)).not.toBeInTheDocument()
+  })
+
+  it('shows nothing when the rules cannot be read', async () => {
+    fetchRulesNow.mockRejectedValue(new regrasDb.RegrasDataError('network'))
+    const { queryClient } = renderHub(<DiarioCabecalho />)
+
+    const button = await selectorButton()
+    await waitFor(() => expect(queryClient.getQueryState(regrasKeys.agora('user-1'))?.status).toBe('error'))
+    await act(async () => {})
+    expect(line()).toBeNull()
+    expect(button).not.toHaveAttribute('aria-describedby')
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+
+  it('drops the line when a later read fails, as the card drops its lines', async () => {
+    fetchRulesNow.mockResolvedValueOnce(agora('agora-seg-0930-et')).mockRejectedValue(new regrasDb.RegrasDataError('network'))
+    const { queryClient } = renderHub(<DiarioCabecalho />)
+    await waitFor(() => expect(line()).toHaveTextContent('Janela 20:00–21:00 · Brasília'))
+
+    await act(async () => {
+      await queryClient.refetchQueries({ queryKey: regrasKeys.agora('user-1') })
+    })
+
+    await waitFor(() => expect(line()).toBeNull())
+    expect(await selectorButton()).not.toHaveAttribute('aria-describedby')
+  })
+
+  describe('with the app’s query defaults (QueryProvider: three retries, staleTime 60 s)', () => {
+    afterEach(() => {
+      jest.useRealTimers()
+      focusManager.setFocused(undefined)
+      onlineManager.setOnline(true)
+    })
+
+    const renderApp = () =>
+      render(
+        <QueryProvider>
+          <ImportSheetProvider>
+            <DiarioCabecalho />
+          </ImportSheetProvider>
+        </QueryProvider>,
+      )
+
+    it('drops the line while a read waits offline, as the card drops its lines', async () => {
+      renderApp()
+      await waitFor(() => expect(line()).toHaveTextContent('Janela 20:00–21:00 · Brasília'))
+
+      act(() => {
+        onlineManager.setOnline(false)
+        focusManager.setFocused(false)
+        focusManager.setFocused(true)
+      })
+
+      await waitFor(() => expect(line()).toBeNull())
+      expect(await selectorButton()).not.toHaveAttribute('aria-describedby')
+      expect(fetchRulesNow).toHaveBeenCalledTimes(1)
+
+      act(() => onlineManager.setOnline(true))
+      await waitFor(() => expect(line()).toHaveTextContent('Janela 20:00–21:00 · Brasília'))
+    })
+
+    it('drops the line as soon as a read fails, while the retries still run', async () => {
+      jest.useFakeTimers()
+      fetchRulesNow
+        .mockReset()
+        .mockResolvedValueOnce(agora('agora-seg-0930-et'))
+        .mockRejectedValueOnce(new regrasDb.RegrasDataError('network'))
+        .mockResolvedValue(agora('agora-seg-0930-et'))
+      renderApp()
+      await waitFor(() => expect(line()).toHaveTextContent('Janela 20:00–21:00 · Brasília'))
+
+      act(() => {
+        focusManager.setFocused(false)
+        focusManager.setFocused(true)
+      })
+
+      await waitFor(() => expect(line()).toBeNull())
+      // Before the first retry (1 s later)
+      expect(fetchRulesNow).toHaveBeenCalledTimes(2)
+      await act(async () => {
+        jest.advanceTimersByTime(1000)
+      })
+      await waitFor(() => expect(line()).toHaveTextContent('Janela 20:00–21:00 · Brasília'))
+      expect(fetchRulesNow).toHaveBeenCalledTimes(3)
+    })
+  })
+
+  it('shows nothing for an account the answer does not have', async () => {
+    fetchAccounts.mockResolvedValue([dTop, dEbx, apex])
+    fetchPreferences.mockResolvedValue({ conta_atual: apex.id })
+    const { queryClient } = renderHub(<DiarioCabecalho />)
+
+    expect(await selectorButton()).toHaveTextContent('Conta: Apex A')
+    await waitFor(() => expect(queryClient.getQueryState(regrasKeys.agora('user-1'))?.status).toBe('success'))
+    await act(async () => {})
+    expect(line()).toBeNull()
   })
 })
