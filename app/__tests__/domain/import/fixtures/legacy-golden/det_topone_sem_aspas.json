@@ -1,0 +1,26 @@
+{
+  "format": "topone",
+  "parsed": {
+    "trades": [
+      {
+        "symbol": "MNQM6",
+        "asset_type": "futures",
+        "direction": "short",
+        "entry_price": 21500,
+        "exit_price": 21495,
+        "quantity": 1,
+        "stake_amount": null,
+        "result": "win",
+        "pnl": 10,
+        "entry_time": "2026-03-13T14:20:00.000Z",
+        "exit_time": "2026-03-13T14:21:00.000Z",
+        "timeframe": null,
+        "notes": "topone:MNQM6/900000000401"
+      }
+    ],
+    "topOneIds": [
+      "MNQM6/900000000401"
+    ],
+    "parseErrors": []
+  }
+}

@@ -1,0 +1,163 @@
+{
+  "format": "topone",
+  "parsed": {
+    "trades": [
+      {
+        "symbol": "MNQM6",
+        "asset_type": "futures",
+        "direction": "long",
+        "entry_price": 21500,
+        "exit_price": null,
+        "quantity": 1,
+        "stake_amount": null,
+        "result": "breakeven",
+        "pnl": 0,
+        "entry_time": "2026-03-12T14:30:00.000Z",
+        "exit_time": null,
+        "timeframe": null,
+        "notes": "topone:MNQM6/900000000101"
+      },
+      {
+        "symbol": "MNQM6",
+        "asset_type": "futures",
+        "direction": "short",
+        "entry_price": 21500,
+        "exit_price": 21490,
+        "quantity": 1,
+        "stake_amount": null,
+        "result": "win",
+        "pnl": 20,
+        "entry_time": "2026-03-12T15:00:00.000Z",
+        "exit_time": "2026-03-12T14:59:00.000Z",
+        "timeframe": null,
+        "notes": "topone:MNQM6/900000000102"
+      },
+      {
+        "symbol": "MNQM6",
+        "asset_type": "futures",
+        "direction": "long",
+        "entry_price": 21500,
+        "exit_price": 21505,
+        "quantity": 1,
+        "stake_amount": null,
+        "result": "win",
+        "pnl": 10,
+        "entry_time": "2026-03-12T15:10:00.000Z",
+        "exit_time": "2026-03-12T15:11:00.000Z",
+        "timeframe": null,
+        "notes": "topone:MESM6/900000000103"
+      },
+      {
+        "symbol": "MNQM6",
+        "asset_type": "futures",
+        "direction": "long",
+        "entry_price": 21500,
+        "exit_price": 21505,
+        "quantity": 1,
+        "stake_amount": null,
+        "result": "win",
+        "pnl": 10,
+        "entry_time": "2026-03-12T15:20:00.000Z",
+        "exit_time": "2026-03-12T15:21:00.000Z",
+        "timeframe": null,
+        "notes": "topone:MNQM6/900000000104"
+      },
+      {
+        "symbol": "MNQM6",
+        "asset_type": "futures",
+        "direction": "short",
+        "entry_price": 21500,
+        "exit_price": 21505,
+        "quantity": 1,
+        "stake_amount": null,
+        "result": "win",
+        "pnl": 10,
+        "entry_time": "2026-03-12T15:30:00.000Z",
+        "exit_time": "2026-03-12T15:31:00.000Z",
+        "timeframe": null,
+        "notes": "topone:MNQM6/900000000105"
+      },
+      {
+        "symbol": "MNQM6",
+        "asset_type": "futures",
+        "direction": "long",
+        "entry_price": 21500,
+        "exit_price": 21505,
+        "quantity": 1,
+        "stake_amount": null,
+        "result": "win",
+        "pnl": 10,
+        "entry_time": "2026-03-12T15:40:00.000Z",
+        "exit_time": "2026-03-12T15:41:00.000Z",
+        "timeframe": null,
+        "notes": "topone:MNQM6/900000000106"
+      },
+      {
+        "symbol": "MNQM6",
+        "asset_type": "futures",
+        "direction": "long",
+        "entry_price": 21500,
+        "exit_price": 21505,
+        "quantity": 1,
+        "stake_amount": null,
+        "result": "win",
+        "pnl": 10,
+        "entry_time": "2026-03-12T15:45:00.000Z",
+        "exit_time": "2026-03-12T15:46:00.000Z",
+        "timeframe": null,
+        "notes": "topone:MNQM6/900000000101"
+      },
+      {
+        "symbol": "MNQM6",
+        "asset_type": "futures",
+        "direction": "short",
+        "entry_price": 21500,
+        "exit_price": 21490,
+        "quantity": 1,
+        "stake_amount": null,
+        "result": "win",
+        "pnl": 20,
+        "entry_time": "2026-03-13T14:00:00.000Z",
+        "exit_time": "2026-03-13T14:10:00.000Z",
+        "timeframe": null,
+        "notes": "topone:MNQM6/900000000108"
+      },
+      {
+        "symbol": "MNQM6",
+        "asset_type": "futures",
+        "direction": "short",
+        "entry_price": 21500,
+        "exit_price": 21495,
+        "quantity": 1,
+        "stake_amount": null,
+        "result": "win",
+        "pnl": 10,
+        "entry_time": "2026-03-13T14:20:00.000Z",
+        "exit_time": "2026-03-13T14:21:00.000Z",
+        "timeframe": null,
+        "notes": "topone:MNQM6/900000000109"
+      }
+    ],
+    "topOneIds": [
+      "MNQM6/900000000101",
+      "MNQM6/900000000102",
+      "MESM6/900000000103",
+      "MNQM6/900000000104",
+      "MNQM6/900000000105",
+      "MNQM6/900000000106",
+      "MNQM6/900000000101",
+      "MNQM6/900000000108",
+      "MNQM6/900000000109"
+    ],
+    "parseErrors": [
+      {
+        "row": 7,
+        "error": "Missing Ticket # field"
+      },
+      {
+        "row": 10,
+        "error": "Row 10: Invalid Open Time \"13/03/2026 25:00:00\""
+      }
+    ]
+  }
+}

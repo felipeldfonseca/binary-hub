@@ -1,0 +1,4 @@
+# Import fixtures are byte-exact: CRLF line ends, BOMs, windows-1252 bytes and missing final
+# newlines are what the readers are tested on, so git must never convert them.
+app/__tests__/domain/import/fixtures/*.csv -text
+app/__tests__/domain/import/fixtures/legacy-golden/*.json text eol=lf
