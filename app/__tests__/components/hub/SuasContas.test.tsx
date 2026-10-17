@@ -3,7 +3,6 @@ import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import * as data from '@/lib/hub/contasDb'
 import SuasContas from '@/components/hub/contas/SuasContas'
-import PersonalizarPage from '@/app/(hub)/personalizar/page'
 import { makeAccount, makeBatch, renderHub } from '@/testing/hubHarness'
 
 jest.mock('@/lib/supabase', () => ({ createDataClient: jest.fn(() => ({})) }))
@@ -77,19 +76,6 @@ async function openMenu(label: string) {
   await userEvent.click(within(li).getByRole('button', { name: `Mais ações: ${label}` }))
   return within(li).getByRole('group', { name: `Ações de ${label}` })
 }
-
-describe('Personalizar page', () => {
-  it('shows only Suas contas in Phase 1, and says the rest comes later', async () => {
-    renderHub(<PersonalizarPage />)
-
-    expect(screen.getByRole('heading', { level: 1, name: 'Personalizar' })).toBeInTheDocument()
-    expect(screen.getByText('Ajuste o Binary Hub às suas contas e ao que você opera.')).toBeInTheDocument()
-    expect(screen.getByText('O resto do Personalizar chega na Fase 2.')).toBeInTheDocument()
-    expect(screen.getAllByRole('heading', { level: 2 }).map((h) => h.textContent)).toEqual(['Suas contas'])
-    expect(screen.queryByRole('button', { name: 'Salvar alterações' })).not.toBeInTheDocument()
-    await row('Ebinex')
-  })
-})
 
 describe('Suas contas', () => {
   it('shows the card with its heading, note and info', async () => {

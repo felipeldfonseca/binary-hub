@@ -85,7 +85,6 @@ export const n = formatInt
 export const PERSONALIZAR = {
   title: 'Personalizar',
   sub: 'Ajuste o Binary Hub às suas contas e ao que você opera.',
-  phase2: 'O resto do Personalizar chega na Fase 2.', // NEW
 }
 
 export const CONTAS = {
