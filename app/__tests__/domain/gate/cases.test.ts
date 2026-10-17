@@ -48,6 +48,12 @@ const trades: (DayTrade & { account: string })[] = cases.trades.rows.map((t) => 
   result: t.result,
 }));
 const FUTURES_ACCOUNTS = ['F1', 'F2'];
+/**
+ * With a version, gate_eval ignores the account clock it is given and uses the version's `day`.
+ * The TS account then gets this clock, unlike any version's, so reading the account's clock where
+ * the version's belongs changes the answer and fails the case.
+ */
+const DECOY_CLOCK = { tz: 'America/Sao_Paulo', startMin: 720 };
 
 describe('gate_eval (SQL) = evaluateGate (TS)', () => {
   it('has the 46 rows the database test asserts', () => {
@@ -58,11 +64,10 @@ describe('gate_eval (SQL) = evaluateGate (TS)', () => {
     const at = new Date(c.at);
     const version: RuleVersion | null = c.resolved ? { rules: parseRules(c.resolved) } : null;
     // gate_eval reads p_clock only without a version (the SQL test passes '{}' with one)
-    const clock = (c.resolved ? c.resolved.day : c.clock) as Clock;
-    const account: GateAccount = {
-      market: version?.rules.market ?? (clock.tz === 'America/Sao_Paulo' ? 'binary' : 'futures'),
-      dayClock: clockOf(clock),
-    };
+    const clock = c.clock as Clock;
+    const account: GateAccount = version
+      ? { market: version.rules.market, dayClock: DECOY_CLOCK }
+      : { market: clock.tz === 'America/Sao_Paulo' ? 'binary' : 'futures', dayClock: clockOf(clock) };
     const limit = version?.rules.limit ?? null;
     const usage = c.usage as { trades: number; net_usd: number; worst_usd: number; hit_at: string | null };
     // The usage was summed for this rule's limit, as gate_at does
@@ -100,16 +105,18 @@ describe('limit_usage (SQL) = dayUsage (TS)', () => {
     const scope = trades.filter((t) => (c.soma ? FUTURES_ACCOUNTS.includes(t.account) : t.account === c.account));
     const until = new Date(c.until);
     const limitCents = c.usd === null ? null : cents(c.usd);
-    const got = dayUsage(scope, { tradingDay: c.day, until, limitCents });
     const e = c.expected as { trades: number; net_usd: number; worst_usd: number; hit_at: string | null };
-    expect(got).toEqual({
+    const want = {
       tradingDay: c.day,
       until,
       trades: e.trades,
       netCents: cents(e.net_usd),
       worstCents: cents(e.worst_usd),
       hit: e.hit_at && limitCents ? { limitCents, at: new Date(e.hit_at) } : null,
-    });
+    };
+    // The rows come in id order: reversed, a tie left to the input order would come out wrong
+    expect(dayUsage(scope, { tradingDay: c.day, until, limitCents })).toEqual(want);
+    expect(dayUsage([...scope].reverse(), { tradingDay: c.day, until, limitCents })).toEqual(want);
   });
 });
 
@@ -117,7 +124,7 @@ describe("gate_at's composition (SQL) = gateTradingDay + dayUsage + evaluateGate
   it.each(cases.gateAt.cases.map((c) => [c.label, c] as const))('%s', (_label, c) => {
     const at = new Date(c.at);
     const rules = parseRules(c.resolved);
-    const account: GateAccount = { market: rules.market, dayClock: rules.day };
+    const account: GateAccount = { market: rules.market, dayClock: DECOY_CLOCK };
     const version: RuleVersion = { rules };
     const scope = trades.filter((t) =>
       rules.limit?.mode === 'soma' ? FUTURES_ACCOUNTS.includes(t.account) : t.account === c.account,

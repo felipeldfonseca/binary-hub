@@ -24,7 +24,7 @@ import { formatMoney } from './formato';
 export type Tom = 'mint' | 'amber' | 'red' | 'neutral' | 'muted';
 
 export interface PossoLinha {
-  /** «Liberado», «Fora da sua janela», «Encerrado por hoje», «Aguardar até 08:40», «Sem janela salva» */
+  /** «Liberado», «Fora da sua janela», «Encerrado por hoje», «Aguardar até 08:40», «Sem janela salva», «Limite do dia indisponível» */
   palavra: string;
   tom: Tom;
   /** What follows « · »: «abre às 10:00 ET», «até 11:00 ET», «com aviso do limite» */
@@ -135,6 +135,9 @@ export function possoLinha(conta: string, r: GateResult, rules: Rules | null): P
         sub: aviso ?? (a.until ? `até ${horaNoRelogio(a.until, wtz)}${sufixoRelogio(wtz)}` : null),
       };
     }
+    case 'indisponivel':
+      // The screen offers «Tentar de novo» from `limite.indisponivel`
+      return { ...base, palavra: 'Limite do dia indisponível', tom: 'muted', sub: null };
     case 'sem_janela':
       return a.reason === 'regra_desligada'
         ? {

@@ -232,6 +232,9 @@ export function evaluateGate(
 
   // Data block (Phase 5)
   const events = options.events ?? NOT_YET;
+  // Every merged interval, not only today's: inside a window that opened before the day turned,
+  // the instant is past the day's bounds
+  let blocks: BlockInterval[] = [];
   let block: BlockCheck;
   if (!rules) block = notEvaluated('sem_versao');
   else if (rules.market !== 'futures') block = notEvaluated('so_futuros');
@@ -241,17 +244,17 @@ export function evaluateGate(
   else if (rules.block.calendars.length === 0) block = notEvaluated('sem_calendario');
   else {
     const marked = rules.block.calendars;
-    const merged = mergeBlocks(
+    blocks = mergeBlocks(
       events.value.filter((e) => marked.includes(e.calendar)),
       rules.block.beforeMin,
       rules.block.afterMin,
     );
-    const active = merged.find((m) => m.start.getTime() <= t && t < m.end.getTime()) ?? null;
+    const active = blocks.find((m) => m.start.getTime() <= t && t < m.end.getTime()) ?? null;
     block = {
       evaluated: true,
       state: active ? 'no_bloqueio' : 'ok',
       active,
-      today: merged.filter((m) => m.end.getTime() > bounds.start.getTime() && m.start.getTime() < bounds.end.getTime()),
+      today: blocks.filter((m) => m.end.getTime() > bounds.start.getTime() && m.start.getTime() < bounds.end.getTime()),
     };
   }
 
@@ -310,7 +313,9 @@ export function evaluateGate(
     if (window.current) edges.push(window.current.end.getTime());
     if (window.next) edges.push(window.next.start.getTime());
   }
-  if (block.evaluated) for (const b of block.today) edges.push(b.start.getTime(), b.end.getTime());
+  // Every edge of the intervals `active` is looked for in, so «Aguardar até» ends on time even
+  // when the instant is past the day's bounds (a window open across the 18:00 turn)
+  for (const b of blocks) edges.push(b.start.getTime(), b.end.getTime());
   const future = edges.filter((x) => x > t);
 
   return {
@@ -345,11 +350,20 @@ export type Answer =
    * «Sem janela salva · Definir»: nothing was evaluated (no version, no window, or the window rule
    * off with no limit), or only a limit with no window saved and nothing to warn about
    */
-  | { kind: 'sem_janela'; reason: 'sem_versao' | 'sem_janela' | 'regra_desligada' };
+  | { kind: 'sem_janela'; reason: 'sem_versao' | 'sem_janela' | 'regra_desligada' }
+  /**
+   * «Limite do dia indisponível»: the window rule is off, so the limit is the only rule that can
+   * answer, and the day's result is not loaded (or is for another trading day, right after the
+   * turn). Never «Sem regra ativa» (there is a rule) and never «Liberado» (it was not checked).
+   */
+  | { kind: 'indisponivel'; reason: 'sem_dados' };
 
 export function answerOf(r: GateResult): Answer {
   const w = r.window;
   if (r.status === null) {
+    if (!w.evaluated && w.reason === 'regra_desligada' && !r.limit.evaluated && r.limit.reason === 'sem_dados') {
+      return { kind: 'indisponivel', reason: 'sem_dados' };
+    }
     return { kind: 'sem_janela', reason: w.evaluated ? 'sem_janela' : (w.reason as 'sem_versao' | 'sem_janela' | 'regra_desligada') };
   }
   if (r.status === 'encerrado' && r.limit.evaluated) {

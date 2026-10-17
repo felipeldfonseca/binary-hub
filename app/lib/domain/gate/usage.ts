@@ -5,6 +5,10 @@
  *
  * The status "agora" comes from the server (rules_now), which sums in SQL. dayUsage is the same
  * computation for one day's trades in the browser (the plan of a trade, previews), never floats.
+ *
+ * The scope is the caller's, and dayUsage sums whatever it is given: one account's trades, or,
+ * with «somando as contas de Futuros», the trades of the owner's active futures accounts (not
+ * archived, not examples; gate.md §4.3), never binaries.
  */
 import { usdToCents } from './rules';
 
@@ -58,18 +62,27 @@ function assertCents(x: number | null): void {
 /**
  * The day's result from its trades: those of `tradingDay` with a P&L, not 'pending', realized
  * (exit, else entry) at or before `until`, in exit order (then entry, then id). `limitCents`
- * gives `hit`: the first exit at which the running sum is at or below −limit.
+ * gives `hit`: the first exit at which the running sum is at or below −limit. `excludeId` leaves
+ * one trade out: the one whose plan is evaluated, which a missing exit (or an exit equal to the
+ * entry) would otherwise count as realized by its own entry.
  */
 export function dayUsage(
   trades: readonly DayTrade[],
-  options: { tradingDay: string; until: Date; limitCents?: number | null },
+  options: { tradingDay: string; until: Date; limitCents?: number | null; excludeId?: string | null },
 ): DayResult {
   const until = options.until.getTime();
   if (Number.isNaN(until)) throw new RangeError('Invalid date');
   const limit = options.limitCents ?? null;
   if (limit !== null && !(Number.isSafeInteger(limit) && limit > 0)) throw new RangeError('Invalid limit');
+  const exclude = options.excludeId ?? null;
   const rows = trades
-    .filter((t) => t.tradingDay === options.tradingDay && t.pnlCents !== null && t.result !== 'pending')
+    .filter(
+      (t) =>
+        t.tradingDay === options.tradingDay &&
+        t.pnlCents !== null &&
+        t.result !== 'pending' &&
+        (exclude === null || t.id !== exclude),
+    )
     .map((t) => {
       assertCents(t.pnlCents);
       assertCents(t.commissionCents);

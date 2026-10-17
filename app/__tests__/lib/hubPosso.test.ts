@@ -49,6 +49,18 @@ describe('the owner\'s Phase 2 test, line by line (gate.md §7.4)', () => {
     expect(l.limite).toEqual({ usado: 'US$ 0', de: 'de US$ 400', aria: 'Top One, limite do dia: US$ 0 de US$ 400.', indisponivel: false });
   });
 
+  it('1º dez: the limit shows the worst moment (US$ 45), not the net (+US$ 2)', () => {
+    const d1 = [
+      trade('2026-12-01 10:04', '2026-12-01 10:06', -45),
+      trade('2026-12-01 10:33', '2026-12-01 10:49', 95),
+      trade('2026-12-01 10:52', '2026-12-01 10:58', 64.5),
+      trade('2026-12-01 11:09', '2026-12-01 11:16', -112.5),
+    ];
+    const l = linha('Top One', et('2026-12-01 17:00'), topOneRules(), TOP_ONE, d1);
+    expect(possoTexto(l)).toBe('Fora da sua janela · abre amanhã às 10:00 ET');
+    expect(l.limite).toEqual({ usado: 'US$ 45', de: 'de US$ 400', aria: 'Top One, limite do dia: US$ 45 de US$ 400.', indisponivel: false });
+  });
+
   it('Top One after a −US$ 400 day: «Encerrado por hoje · limite atingido às 10:12»', () => {
     const l = linha('Top One', et('2026-10-19 10:30'), topOneRules(), TOP_ONE, [trade('2026-10-19 10:00', '2026-10-19 10:12', -415.5)]);
     expect([possoTexto(l), l.tom, l.limite?.usado]).toEqual(['Encerrado por hoje · limite atingido às 10:12', 'red', 'US$ 415,50']);
@@ -114,6 +126,34 @@ describe('«Liberado, com aviso» and the other answers', () => {
     expect([possoTexto(l), l.acao?.href]).toEqual(['Sem regra ativa · Ajustar', '/personalizar#regras']);
   });
 
+  it('the window rule off and the day not loaded: «Limite do dia indisponível», never «Sem regra ativa»', () => {
+    const r = { ...topOneRules(), windowRule: { on: false, outside: 'fora' as const } };
+    const l = possoLinha('Top One', evaluateGate(et('2026-10-19 10:30'), TOP_ONE, version(r), null), r);
+    expect(l).toEqual({
+      palavra: 'Limite do dia indisponível',
+      tom: 'muted',
+      sub: null,
+      acao: null,
+      limite: { usado: '—', de: 'de US$ 400', aria: 'Top One, limite do dia indisponível.', indisponivel: true },
+    });
+    expect(possoTexto(l)).toBe('Limite do dia indisponível');
+    // Loaded, the limit answers alone
+    expect(possoTexto(linha('Top One', et('2026-10-19 10:30'), r, TOP_ONE))).toBe('Liberado');
+  });
+
+  it('a window on Brasília\'s clock for a futures account: window times on Brasília, the hit and block times on ET', () => {
+    // 11:00–12:00 Brasília is 10:00–11:00 ET in October
+    const r = { ...topOneRules(), windows: [{ tz: SP, startMin: 660, endMin: 720, weekdays: 31 }], windowsFrom: 'account' as const };
+    expect(possoTexto(linha('Top One', et('2026-10-19 10:30'), r, TOP_ONE))).toBe('Liberado · até 12:00 de Brasília');
+    expect(possoTexto(linha('Top One', et('2026-10-19 09:30'), r, TOP_ONE))).toBe('Fora da sua janela · abre às 11:00 de Brasília');
+    const lost = [trade('2026-10-19 10:00', '2026-10-19 10:12', -400)];
+    expect(possoTexto(linha('Top One', et('2026-10-19 10:30'), r, TOP_ONE, lost))).toBe('Encerrado por hoje · limite atingido às 10:12');
+    const g = evaluateGate(et('2026-10-14 08:30'), TOP_ONE, version(r), null, {
+      events: { available: true, value: [{ at: et('2026-10-14 08:30'), label: 'CPI', calendar: 'us' }] },
+    });
+    expect(possoTexto(possoLinha('Top One', g, r))).toBe('Aguardar até 08:40 · bloqueio: CPI');
+  });
+
   it('the day not loaded: the limit says so instead of «US$ 0»', () => {
     const r = topOneRules();
     const l = possoLinha('Top One', evaluateGate(et('2026-10-19 10:30'), TOP_ONE, version(r), null), r);
@@ -167,11 +207,11 @@ describe('plan marks', () => {
       trade('2026-11-19 10:33', '2026-11-19 10:38', -107.5),
     ];
     const plan = (entry: string, extra: Partial<Parameters<typeof evaluatePlan>[0]> = {}) =>
-      evaluatePlan({ entryAt: et(entry), account: TOP_ONE, version: version(rules()), trades: d19, direction: -1, ...extra });
+      evaluatePlan({ tradeId: null, entryAt: et(entry), account: TOP_ONE, version: version(rules()), trades: d19, direction: -1, ...extra });
     expect(marcaDoPlano(plan('2026-11-19 10:05'))).toEqual({ texto: 'No plano', tom: 'mint' });
     const after = plan('2026-11-19 11:52', { state: { available: true, value: { name: 'alinhadas', direction: 1, suspended: false } } });
     expect(marcaDoPlano(after)).toEqual({ texto: '● fora da janela · depois do limite · contra a regra', tom: 'amber' });
-    expect(marcaDoPlano(evaluatePlan({ entryAt: et('2026-11-19 10:05'), account: TOP_ONE, version: null, trades: [], direction: 1 }))).toEqual({
+    expect(marcaDoPlano(evaluatePlan({ tradeId: null, entryAt: et('2026-11-19 10:05'), account: TOP_ONE, version: null, trades: [], direction: 1 }))).toEqual({
       texto: 'Histórico importado · só resultado',
       tom: 'muted',
     });
@@ -200,13 +240,16 @@ describe('plan marks', () => {
     expect(regraDoEstado(ev('ok', 'opero'))).toBe('ok · opero');
     expect(regraDoEstado(ev('contra', 'nao_opero'))).toBe('contra · não opero');
     expect(regraDoEstado(skip('comparacao_suspensa'))).toBe('não conferida');
+    expect(regraDoEstado(skip('sem_direcao'))).toBe('não conferida');
+    expect(regraDoEstado(skip('sem_estado'))).toBe('sem estado na entrada');
+    expect(regraDoEstado(skip('sem_versao'))).toBeNull();
     expect(regraDoEstado(skip('sem_escolha'))).toBe('sem regra escolhida');
     expect(regraDoEstado(skip('fase5'))).toBe('ativo na Fase 5');
     expect(regraDoEstado(skip('so_futuros'))).toBeNull();
   });
 
   it('a Phase 2 plan says the state rule waits for Phase 5', () => {
-    const p = evaluatePlan({ entryAt: et('2026-10-19 10:30'), account: TOP_ONE, version: version(topOneRules()), trades: [], direction: 1, state: NOT_YET });
+    const p = evaluatePlan({ tradeId: null, entryAt: et('2026-10-19 10:30'), account: TOP_ONE, version: version(topOneRules()), trades: [], direction: 1, state: NOT_YET });
     expect(regraDoEstado(p.stateRule)).toBe('ativo na Fase 5');
   });
 });

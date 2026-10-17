@@ -32,14 +32,22 @@ export interface StateAtEntry {
 }
 
 export interface PlanInput {
+  /**
+   * trades.id of the trade whose plan this is, or null for one not stored yet. It is left out of
+   * `trades`: a trade is never "after the limit" because of its own result, even when it has no
+   * exit (then it counts as realized at its entry) or exits at its entry second.
+   */
+  tradeId: string | null;
   /** Entry instant (registered_at for a live trade) */
   entryAt: Date;
   account: GateAccount;
   /** The version in force at the entry (versionAt(versions, entryAt)); null before version 1 */
   version: RuleVersion | null;
   /**
-   * The trades of the limit's scope on the entry's trading day (this account, or every futures
-   * account with «somando»); only those realized by the entry count. null = not loaded.
+   * The trades of the limit's scope on the entry's trading day: this account's, or with «somando»
+   * those of the owner's active futures accounts (not archived, not examples; never binaries).
+   * Only those realized at or before the entry count, and never the trade itself (`tradeId`).
+   * null = not loaded.
    */
   trades: readonly DayTrade[] | null;
   /** 1 compra/alta, −1 venda/baixa */
@@ -82,7 +90,7 @@ export function evaluatePlan(input: PlanInput): PlanResult {
   const rules = version?.rules ?? null;
   const tradingDay = gateTradingDay(entryAt, account, version);
   const day = input.trades
-    ? dayUsage(input.trades, { tradingDay, until: entryAt, limitCents: rules?.limit?.cents ?? null })
+    ? dayUsage(input.trades, { tradingDay, until: entryAt, limitCents: rules?.limit?.cents ?? null, excludeId: input.tradeId })
     : null;
   const gate = evaluateGate(entryAt, account, version, day, { events: input.events ?? NOT_YET });
 
@@ -107,7 +115,7 @@ export function evaluatePlan(input: PlanInput): PlanResult {
   const breaks: PlanBreak[] = [];
   if (gate.window.evaluated && gate.window.state === 'fora') breaks.push('fora_da_janela');
   if (gate.block.evaluated && gate.block.active) breaks.push('no_bloqueio');
-  // The limit was reached by a trade realized at or before this entry (the trade whose exit
+  // The limit was reached by another trade realized at or before this entry (the trade whose exit
   // reached it is not "after"), whatever «Ao chegar no limite» says
   if (gate.limit.evaluated && gate.limit.state === 'atingido') breaks.push('depois_do_limite');
   if (stateRule.evaluated && stateRule.state === 'contra') breaks.push('contra_a_regra');
@@ -126,9 +134,9 @@ export interface EntryContext {
   in_window: boolean | null;
   in_block: boolean | null;
   after_limit: boolean | null;
-  /** The day's net result realized before the entry */
+  /** The day's net result realized by the entry (at or before it), the trade itself left out */
   day_pnl_at_entry_cents: number | null;
-  /** The worst point of the day before the entry (what the limit compares) */
+  /** The worst point of the day by the entry, the trade itself left out (what the limit compares) */
   day_worst_at_entry_cents: number | null;
   state_choice: StateChoice | null;
   rule_ok: boolean | null;

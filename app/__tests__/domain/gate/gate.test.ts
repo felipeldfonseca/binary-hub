@@ -32,6 +32,7 @@ import {
   EBINEX,
   ebinexRules,
   et,
+  NY,
   SP,
   TOP_CLOCK,
   TOP_ONE,
@@ -96,6 +97,7 @@ describe('the boards, 14 out (Wednesday): CPI 08:30 with a 5/10 min block', () =
 
   it('10:07 buy: no plan break; window, block and limit checked; no state rule chosen', () => {
     const p = evaluatePlan({
+      tradeId: d14[0].id!,
       entryAt: et('2026-10-14 10:07'),
       account: TOP_ONE,
       version: version(topOneRules()),
@@ -110,6 +112,7 @@ describe('the boards, 14 out (Wednesday): CPI 08:30 with a 5/10 min block', () =
 
   it('11:12 buy: «● fora da janela»', () => {
     const p = evaluatePlan({
+      tradeId: d14[2].id!,
       entryAt: et('2026-10-14 11:12'),
       account: TOP_ONE,
       version: version(topOneRules()),
@@ -133,8 +136,18 @@ describe('the boards, 19 nov (Thursday): the limit reached at 10:38', () => {
     trade('2026-11-19 10:33', '2026-11-19 10:38', -107.5),
     trade('2026-11-19 10:52', '2026-11-19 10:57', -37.5),
   ];
+  /** The plan of the day's trade entered at `entry`, or of a new entry when none was */
   const plan = (entry: string, direction: 1 | -1, st: ReturnType<typeof state>) =>
-    evaluatePlan({ entryAt: et(entry), account: TOP_ONE, version: version(rules()), trades: d19, direction, state: st, events: { available: true, value: [] } });
+    evaluatePlan({
+      tradeId: d19.find((t) => t.entryAt.getTime() === et(entry).getTime())?.id ?? null,
+      entryAt: et(entry),
+      account: TOP_ONE,
+      version: version(rules()),
+      trades: d19,
+      direction,
+      state: st,
+      events: { available: true, value: [] },
+    });
 
   it('10:33 sell in «Em conflito» with «Opero»: Liberado, no plan break (the trade that reaches the limit is not "after" it)', () => {
     const p = plan('2026-11-19 10:33', -1, state('em_conflito', 0));
@@ -146,6 +159,24 @@ describe('the boards, 19 nov (Thursday): the limit reached at 10:38', () => {
     const p = plan('2026-11-19 10:52', -1, state('alinhadas', 1));
     expect([p.gate.status, p.breaks]).toEqual(['encerrado', ['depois_do_limite', 'contra_a_regra']]);
     expect(p.gate.limit).toMatchObject({ state: 'atingido', worstCents: -41550, hitAt: et('2026-11-19 10:38') });
+    expect(toEntryContext(p)).toEqual({
+      gate: 'encerrado',
+      in_window: true,
+      in_block: false,
+      after_limit: true,
+      day_pnl_at_entry_cents: -41550,
+      day_worst_at_entry_cents: -41550,
+      state_choice: 'so_a_favor',
+      rule_ok: false,
+      checks_evaluated: ['janela', 'bloqueio', 'limite', 'estado'],
+    });
+  });
+
+  it('a new entry at 10:38:00, the exit that reached the limit, is «depois do limite»; at 10:37:59 it is not', () => {
+    const at = plan('2026-11-19 10:38', -1, state('em_conflito', 0));
+    expect([at.gate.status, at.breaks]).toEqual(['encerrado', ['depois_do_limite']]);
+    const before = plan('2026-11-19 10:37:59', -1, state('em_conflito', 0));
+    expect([before.gate.status, before.breaks]).toEqual(['liberado', []]);
   });
 
   it('the day: worst US$ 453,00; still Encerrado at 17:59 ET; at 18:00 ET the next pregão starts clean', () => {
@@ -175,6 +206,7 @@ describe('the boards, 1º dez (Tuesday): ISM 10:00 inside the window', () => {
 
   it('10:04 sell during the block, comparison suspended: «Aguardar até 10:10», «● no bloqueio», state rule not checked', () => {
     const p = evaluatePlan({
+      tradeId: d1[0].id!,
       entryAt: et('2026-12-01 10:04'),
       account: TOP_ONE,
       version: version(rules()),
@@ -187,10 +219,22 @@ describe('the boards, 1º dez (Tuesday): ISM 10:00 inside the window', () => {
     expect(answerOf(p.gate)).toMatchObject({ kind: 'aguardar', until: et('2026-12-01 10:10'), label: 'ISM industrial' });
     expect(p.breaks).toEqual(['no_bloqueio']);
     expect(p.stateRule).toEqual({ evaluated: false, state: 'nao_avaliado', reason: 'comparacao_suspensa' });
+    expect(toEntryContext(p)).toEqual({
+      gate: 'aguardar',
+      in_window: true,
+      in_block: true,
+      after_limit: false,
+      day_pnl_at_entry_cents: 0,
+      day_worst_at_entry_cents: 0,
+      state_choice: null,
+      rule_ok: null,
+      checks_evaluated: ['janela', 'bloqueio', 'limite'],
+    });
   });
 
   it('11:09 buy in «Em conflito» with «Opero»: «● fora da janela»', () => {
     const p = evaluatePlan({
+      tradeId: d1[3].id!,
       entryAt: et('2026-12-01 11:09'),
       account: TOP_ONE,
       version: version(rules()),
@@ -200,6 +244,18 @@ describe('the boards, 1º dez (Tuesday): ISM 10:00 inside the window', () => {
       state: state('em_conflito', 0),
     });
     expect([p.gate.status, p.breaks]).toEqual(['fora_janela', ['fora_da_janela']]);
+    // Net +US$ 114,50 by the entry, but the limit compares the worst moment, −US$ 45
+    expect(toEntryContext(p)).toEqual({
+      gate: 'fora_janela',
+      in_window: false,
+      in_block: false,
+      after_limit: false,
+      day_pnl_at_entry_cents: 11450,
+      day_worst_at_entry_cents: -4500,
+      state_choice: 'opero',
+      rule_ok: true,
+      checks_evaluated: ['janela', 'bloqueio', 'limite', 'estado'],
+    });
   });
 
   it('worst moment US$ 45,00 (−45, +95, +64,50, −112,50)', () => {
@@ -210,6 +266,7 @@ describe('the boards, 1º dez (Tuesday): ISM 10:00 inside the window', () => {
 describe('Ebinex (binary): no data block, no state rule', () => {
   it('only the window is checked, whatever the state', () => {
     const p = evaluatePlan({
+      tradeId: null,
       entryAt: brt('2026-10-19 20:30'),
       account: EBINEX,
       version: version(ebinexRules()),
@@ -339,6 +396,18 @@ describe('when the answer changes (changesAt)', () => {
   it('with nothing evaluated, the end of the trading day', () => {
     expect(gate(et('2026-10-19 10:00'), null).changesAt).toEqual(et('2026-10-19 18:00'));
   });
+
+  it('a block inside a window open across the 18:00 turn (Phase 5): «Aguardar» ends when the block does', () => {
+    const across = { ...topOneRules(), windows: [{ tz: NY, startMin: 1020, endMin: 1140, weekdays: MON_TO_FRI }] };
+    const at = et('2026-10-19 18:27');
+    const g = gate(at, across, [], [{ at: et('2026-10-19 18:30'), label: 'Discurso', calendar: 'us' }]);
+    // Still Monday's trading day (the window opened at 17:00), whose bounds ended at 18:00
+    expect([g.tradingDay, g.status, g.changesAt]).toEqual(['2026-10-19', 'aguardar', et('2026-10-19 18:40')]);
+    expect(answerOf(g)).toMatchObject({ kind: 'aguardar', until: et('2026-10-19 18:40') });
+    // A block that starts before the window closes is an edge too
+    const later = gate(at, across, [], [{ at: et('2026-10-19 18:50'), label: 'Discurso', calendar: 'us' }]);
+    expect([later.status, later.changesAt]).toEqual(['liberado', et('2026-10-19 18:45')]);
+  });
 });
 
 describe('the data block (Phase 5 input)', () => {
@@ -351,6 +420,28 @@ describe('the data block (Phase 5 input)', () => {
   it('overlapping and touching blocks are one, so «Aguardar até» names the real end', () => {
     const g = gate(et('2026-10-14 08:41'), topOneRules(), [], [ev('08:30', 'CPI'), ev('08:35', 'Auxílio'), ev('08:50', 'Varejo')]);
     expect(g.block).toMatchObject({ state: 'no_bloqueio', active: { start: et('2026-10-14 08:25'), end: et('2026-10-14 09:00'), label: 'CPI e Auxílio e Varejo' } });
+  });
+
+  it('merges events given in any order, and names a repeated event once', () => {
+    const two = gate(et('2026-10-14 08:30'), topOneRules(), [], [ev('08:50', 'Varejo'), ev('08:30', 'CPI')]);
+    expect(two.block).toMatchObject({ active: { start: et('2026-10-14 08:25'), end: et('2026-10-14 08:40'), label: 'CPI' } });
+    expect(answerOf(two)).toMatchObject({ kind: 'aguardar', until: et('2026-10-14 08:40') });
+    const chain = gate(et('2026-10-14 08:30'), topOneRules(), [], [ev('08:50', 'Varejo'), ev('08:35', 'Auxílio'), ev('08:30', 'CPI')]);
+    expect(answerOf(chain)).toMatchObject({ kind: 'aguardar', until: et('2026-10-14 09:00'), label: 'CPI e Auxílio e Varejo' });
+    const repeated = gate(et('2026-10-14 08:30'), topOneRules(), [], [ev('08:35', 'CPI'), ev('08:30', 'CPI')]);
+    expect(repeated.block).toMatchObject({ active: { start: et('2026-10-14 08:25'), end: et('2026-10-14 08:45'), label: 'CPI' } });
+  });
+
+  it('lists as today\'s the blocks that touch the trading day (18:00 to 18:00 ET), and only those', () => {
+    const today = (events: EconomicEvent[]) => {
+      const b = gate(et('2026-10-14 12:00'), topOneRules(), [], events).block;
+      return b.evaluated ? b.today.map((x) => x.label) : null;
+    };
+    const at = (text: string, label: string): EconomicEvent => ({ at: et(text), label, calendar: 'us' });
+    // 17:45–18:00 the day before ends as the day starts; 18:00–18:15 starts as it ends
+    expect(today([at('2026-10-13 17:50', 'Véspera'), at('2026-10-14 08:30', 'CPI'), at('2026-10-14 18:05', 'Noite')])).toEqual(['CPI']);
+    // 17:51–18:06 on either side of the day crosses a turn; the next day's 08:30 does not touch it
+    expect(today([at('2026-10-13 17:56', 'Véspera'), at('2026-10-14 17:56', 'Fim'), at('2026-10-15 08:30', 'Amanhã')])).toEqual(['Véspera', 'Fim']);
   });
 
   it('events of calendars not marked do not block', () => {
@@ -438,9 +529,23 @@ describe('the daily limit', () => {
 
   it('a result summed for another limit amount (an unsaved draft) still decides, without a hit time', () => {
     const now = et('2026-10-19 10:30');
-    const day = dayUsage([trade('2026-10-19 10:05', '2026-10-19 10:10', -350)], { tradingDay: '2026-10-19', until: now, limitCents: 40000 });
+    const trades = [trade('2026-10-19 10:00', '2026-10-19 10:05', -320), trade('2026-10-19 10:10', '2026-10-19 10:20', -130)];
+    // Summed for the saved US$ 400: reached at 10:20
+    const day = dayUsage(trades, { tradingDay: '2026-10-19', until: now, limitCents: 40000 });
+    expect(day.hit).toEqual({ limitCents: 40000, at: et('2026-10-19 10:20') });
+    // A draft of US$ 300 was really reached at 10:05: 10:20 is not its time, so none is shown
     const draft = { ...topOneRules(), limit: { cents: 30000, mode: 'conta' as const, atLimit: 'encerrar' as const } };
     expect(evaluateGate(now, TOP_ONE, version(draft), day).limit).toMatchObject({ state: 'atingido', hitAt: null });
+    const own = dayUsage(trades, { tradingDay: '2026-10-19', until: now, limitCents: 30000 });
+    expect(evaluateGate(now, TOP_ONE, version(draft), own).limit).toMatchObject({ state: 'atingido', hitAt: et('2026-10-19 10:05') });
+  });
+
+  it('leaves out one trade by id (excludeId: the trade whose plan is evaluated)', () => {
+    const other = trade('2026-10-19 10:00', '2026-10-19 10:02', -10);
+    const own = trade('2026-10-19 10:05', null, -400);
+    expect(day19([other, own], '10:05')).toMatchObject({ trades: 2, worstCents: -41000, hit: { at: et('2026-10-19 10:05') } });
+    const without = dayUsage([other, own], { tradingDay: '2026-10-19', until: et('2026-10-19 10:05'), limitCents: 40000, excludeId: own.id });
+    expect(without).toMatchObject({ trades: 1, netCents: -1000, worstCents: -1000, hit: null });
   });
 
   it('takes the server\'s day result (gate_at `limit` or `today`) for a preview of unsaved rules', () => {
@@ -474,7 +579,7 @@ describe('the daily limit', () => {
 
 describe('the plan of a trade', () => {
   it('before version 1: nothing evaluated («Histórico importado · só resultado»)', () => {
-    const p = evaluatePlan({ entryAt: et('2026-10-19 10:30'), account: TOP_ONE, version: null, trades: [], direction: 1 });
+    const p = evaluatePlan({ tradeId: null, entryAt: et('2026-10-19 10:30'), account: TOP_ONE, version: null, trades: [], direction: 1 });
     expect([p.verdict, p.breaks, p.checksEvaluated, p.gate.status]).toEqual(['nao_avaliado', [], [], null]);
     expect(toEntryContext(p)).toEqual({
       gate: null,
@@ -492,6 +597,7 @@ describe('the plan of a trade', () => {
   it('«Só avisar» and “Liberado”, com aviso change what the screen said, not the marks', () => {
     const rules = { ...topOneRules(), windowRule: { on: true, outside: 'aviso' as const }, limit: { cents: 40000, mode: 'conta' as const, atLimit: 'avisar' as const } };
     const p = evaluatePlan({
+      tradeId: null,
       entryAt: et('2026-10-19 11:30'),
       account: TOP_ONE,
       version: version(rules),
@@ -509,6 +615,7 @@ describe('the plan of a trade', () => {
 
   it('the entry context: a check that ran gives true or false, one that did not gives null (never false)', () => {
     const p = evaluatePlan({
+      tradeId: null,
       entryAt: et('2026-10-19 10:30'),
       account: TOP_ONE,
       version: version(topOneRules()),
@@ -528,8 +635,44 @@ describe('the plan of a trade', () => {
     });
   });
 
+  describe('the trade itself never counts before its own entry', () => {
+    // Ebinex with a US$ 100 limit «Encerrar»; old rows without an exit count as realized at their entry
+    const rules = (): Rules => ({ ...ebinexRules(), limit: { cents: 10000, mode: 'conta', atLimit: 'encerrar' } });
+    const bin = (n: number, entry: string, exit: string | null, usd: number): DayTrade => ({
+      id: `00000000-0000-4000-8000-0000000000b${n}`,
+      tradingDay: '2026-10-19',
+      entryAt: brt(entry),
+      exitAt: exit === null ? null : brt(exit),
+      pnlCents: usd * 100,
+      commissionCents: null,
+      result: usd < 0 ? 'loss' : 'win',
+    });
+    const first = bin(1, '2026-10-19 20:05', null, -60);
+    const second = bin(2, '2026-10-19 20:10', null, -50);
+    const plan = (t: DayTrade, trades: DayTrade[]) =>
+      evaluatePlan({ tradeId: t.id!, entryAt: t.entryAt, account: EBINEX, version: version(rules()), trades, direction: 1 });
+
+    it('a trade without an exit whose loss reaches the limit is not «depois do limite»', () => {
+      const p = plan(second, [first, second]);
+      expect([p.gate.status, p.breaks, p.verdict]).toEqual(['liberado', [], 'no_plano']);
+      expect(toEntryContext(p)).toMatchObject({ gate: 'liberado', after_limit: false, day_pnl_at_entry_cents: -6000, day_worst_at_entry_cents: -6000 });
+    });
+
+    it('nor one that exits at its entry second', () => {
+      const same = { ...second, exitAt: second.entryAt };
+      expect(plan(same, [first, same]).breaks).toEqual([]);
+    });
+
+    it('the next trade is after the limit, and so is another one entered in the same second', () => {
+      const third = bin(3, '2026-10-19 20:20', null, 10);
+      expect(plan(third, [first, second, third])).toMatchObject({ breaks: ['depois_do_limite'], gate: { status: 'encerrado' } });
+      const twin = bin(4, '2026-10-19 20:10', null, 10);
+      expect(plan(twin, [first, second, twin]).breaks).toEqual(['depois_do_limite']);
+    });
+  });
+
   it('trades not loaded: the limit is not evaluated and is no break', () => {
-    const p = evaluatePlan({ entryAt: et('2026-10-19 10:30'), account: TOP_ONE, version: version(topOneRules()), trades: null, direction: 1 });
+    const p = evaluatePlan({ tradeId: null, entryAt: et('2026-10-19 10:30'), account: TOP_ONE, version: version(topOneRules()), trades: null, direction: 1 });
     expect([p.checksEvaluated, p.verdict, toEntryContext(p).after_limit]).toEqual([['janela'], 'no_plano', null]);
   });
 });
@@ -558,6 +701,15 @@ describe('versions and the trading day of an entry', () => {
     const r = { ...topOneRules(), day: { tz: 'America/New_York', startMin: 0 } };
     expect(gate(et('2026-10-19 18:30'), r).tradingDay).toBe('2026-10-19');
     expect(gate(et('2026-10-19 18:30'), topOneRules()).tradingDay).toBe('2026-10-20');
+  });
+
+  it('the day ends on the version\'s clock, not the account\'s: «Encerrado» lasts until midnight', () => {
+    const r = { ...topOneRules(), day: { tz: 'America/New_York', startMin: 0 } };
+    const lost = [trade('2026-10-19 10:00', '2026-10-19 10:10', -400)];
+    // TOP_ONE's own clock turns at 18:00; the version's at midnight
+    const g = evaluateGate(et('2026-10-19 18:30'), TOP_ONE, version(r), dayUsage(lost, { tradingDay: '2026-10-19', until: et('2026-10-19 18:30'), limitCents: 40000 }));
+    expect([g.tradingDay, g.status, g.changesAt]).toEqual(['2026-10-19', 'encerrado', et('2026-10-20 00:00')]);
+    expect(gate(et('2026-10-19 18:30'), r).changesAt).toEqual(et('2026-10-20 00:00'));
   });
 });
 
@@ -589,6 +741,21 @@ describe('answerOf', () => {
   it('the window rule off and no limit: nothing evaluated, reason regra_desligada', () => {
     const off = { ...topOneRules(), windowRule: { on: false, outside: 'fora' as const }, limit: null };
     expect(answerOf(gate(et('2026-10-19 10:15'), off))).toEqual({ kind: 'sem_janela', reason: 'regra_desligada' });
+  });
+
+  it('the window rule off and the limit\'s day not loaded: «indisponível», never «Sem regra ativa»', () => {
+    const off = { ...topOneRules(), windowRule: { on: false, outside: 'fora' as const } };
+    const now = et('2026-10-19 10:15');
+    expect(answerOf(evaluateGate(now, TOP_ONE, version(off), null))).toEqual({ kind: 'indisponivel', reason: 'sem_dados' });
+    // Right after the 18:00 turn, before a refetch: the result is the day before's
+    const turn = et('2026-10-19 18:01');
+    const before = dayUsage([], { tradingDay: '2026-10-19', until: turn, limitCents: 40000 });
+    expect(answerOf(evaluateGate(turn, TOP_ONE, version(off), before))).toEqual({ kind: 'indisponivel', reason: 'sem_dados' });
+    // Loaded, the limit answers alone
+    expect(answerOf(gate(now, off))).toMatchObject({ kind: 'liberado', position: null, warnings: [] });
+    // No window saved: still «Sem janela salva», which is true whatever the limit says
+    const noWindow = { ...topOneRules(), windows: [], windowsFrom: null };
+    expect(answerOf(evaluateGate(now, TOP_ONE, version(noWindow), null))).toEqual({ kind: 'sem_janela', reason: 'sem_janela' });
   });
 });
 
@@ -622,6 +789,12 @@ describe('parseServerGate', () => {
     ['an evaluated data block (not before Phase 5)', (s: Record<string, any>) => { s.block = { state: 'ok' }; }],
     ['a bad instant', (s: Record<string, any>) => { s.at = 'ontem'; }],
     ['an unknown check', (s: Record<string, any>) => { s.checks_evaluated = ['janela', 'humor']; }],
+    ['an unknown window position', (s: Record<string, any>) => { s.window.position = 'quase'; }],
+    ['an unknown limit mode', (s: Record<string, any>) => { s.limit.mode = 'todas'; }],
+    ['an unknown «Ao chegar no limite»', (s: Record<string, any>) => { s.limit.at_limit = 'pausar'; }],
+    ['a trade count that is not a number', (s: Record<string, any>) => { s.limit.trades = '1'; }],
+    ['a use that is not a number', (s: Record<string, any>) => { s.limit.used = '0.625'; }],
+    ['«near» that is not a boolean', (s: Record<string, any>) => { s.limit.near = 'false'; }],
   ])('throws on %s, never reading it as "no rule"', (_label, mutate) => {
     const s = sample();
     mutate(s);

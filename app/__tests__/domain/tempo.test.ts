@@ -355,6 +355,13 @@ describe('window occurrences', () => {
     expect([after.current, iso(after.next?.start), after.next?.tradingDay]).toEqual([null, '2026-10-20T23:00:00Z', '2026-10-20']);
   });
 
+  it('at the exact opening the occurrence is current and the next is the following one; at its close, none is current', () => {
+    const open = windowOccurrenceAt(new Date('2026-10-19T14:00:00Z'), [topOne], TOP_CLOCK); // Mon 10:00:00 ET
+    expect([iso(open.current?.start), iso(open.next?.start)]).toEqual(['2026-10-19T14:00:00Z', '2026-10-20T14:00:00Z']);
+    const close = windowOccurrenceAt(new Date('2026-10-19T15:00:00Z'), [topOne], TOP_CLOCK); // Mon 11:00:00 ET
+    expect([close.current, iso(close.next?.start)]).toEqual([null, '2026-10-20T14:00:00Z']);
+  });
+
   it('gives the current and the next occurrence on the account clock', () => {
     const at = windowOccurrenceAt(new Date('2026-10-23T15:30:00Z'), [topOne], TOP_CLOCK); // Fri 11:30 ET
     expect(at.current).toBeNull();
@@ -426,6 +433,11 @@ describe('offsets and the next daylight-saving change', () => {
   it('says nothing when the change is further away, and Brasília has none', () => {
     expect(nextOffsetChange(new Date('2026-10-17T00:00:00Z'), NY, 14)).toBeNull();
     expect(nextOffsetChange(new Date('2026-10-17T00:00:00Z'), SP, 365)).toBeNull();
+  });
+
+  it('refuses a negative range; a range of 0 days finds nothing', () => {
+    expect(() => nextOffsetChange(new Date('2026-10-31T12:00:00Z'), NY, -1)).toThrow(RangeError);
+    expect(nextOffsetChange(new Date('2026-11-01T05:59:59Z'), NY, 0)).toBeNull();
   });
 
   it('includes a change exactly at the end of the range', () => {

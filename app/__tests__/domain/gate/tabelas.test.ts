@@ -52,7 +52,7 @@ function gateRow(janela: string, bloqueio: string, limite: string) {
     limitCents: rules?.limit?.cents ?? null,
   });
   const gate = evaluateGate(now, TOP_ONE, ver, day, { events });
-  const plan = evaluatePlan({ entryAt: now, account: TOP_ONE, version: ver, trades, direction: 1, events, state: NOT_YET });
+  const plan = evaluatePlan({ tradeId: null, entryAt: now, account: TOP_ONE, version: ver, trades, direction: 1, events, state: NOT_YET });
   return { gate, plan };
 }
 
@@ -108,6 +108,7 @@ describe('gate.md §A2: state rule × state × direction (plan)', () => {
         ? NOT_YET
         : { available: true, value: r.disponivel === 'sem leitura' ? null : { name, direction, suspended: r.disponivel === 'suspensa' } };
     const plan = evaluatePlan({
+      tradeId: null,
       entryAt: et('2026-10-19 10:30'),
       account: TOP_ONE,
       version: version(rules),
