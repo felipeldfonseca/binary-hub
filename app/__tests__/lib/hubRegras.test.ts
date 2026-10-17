@@ -311,6 +311,11 @@ describe('parseRulesNow', () => {
     expect(linha('agora-seg-2030-brt', 'binary')).toBe('Liberado · até 21:00 de Brasília');
     expect(linha('agora-sab-1200-et', 'futures')).toBe('Fora da sua janela · hoje não é dia da janela');
     expect(linha('agora-sab-1200-et', 'binary')).toBe('Fora da sua janela · hoje não é dia da janela');
+    // Before the first save nothing is evaluated: never «Liberado»
+    expect(linha('agora-antes-seg-0930-et', 'futures')).toBe('Sem janela salva · Definir');
+    expect(linha('agora-antes-seg-0930-et', 'binary')).toBe('Sem janela salva · Definir');
+    const antes = agora('agora-antes-seg-0930-et').accounts[0];
+    expect([antes.version, antes.rules, antes.desde, antes.desdeDay]).toEqual([null, null, null, null]);
   });
 
   it('carries the version in force, «desde», the limit and the day of each account', () => {

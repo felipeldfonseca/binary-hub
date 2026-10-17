@@ -417,6 +417,14 @@ insert into public.trading_accounts (id, user_id, market, label, phase, day_tz, 
   ('${ebx}', '${uid}', 'binary', 'Ebinex', 'pessoal', 'America/Sao_Paulo', 0, true, 1);`);
     const antes = asUser(uid, 'public.rules_config()');
     write('config-antes', antes);
+    // Before any save: no version, nothing evaluated («Sem janela salva · Definir»)
+    write(
+      'agora-antes-seg-0930-et',
+      asUser(
+        uid,
+        `jsonb_build_object('server_now', '2026-10-19T13:30:00Z'::timestamptz, 'accounts', jsonb_build_array(public.gate_at('${top}', '2026-10-19T13:30:00Z'), public.gate_at('${ebx}', '2026-10-19T13:30:00Z')))`,
+      ),
+    );
     const before = parseRulesConfig(antes);
     const draft: RulesSettings = JSON.parse(JSON.stringify(before.settings));
     draft.markets.futures.windows = [{ tz: 'America/New_York', startMin: 600, endMin: 660, weekdays: MON_TO_FRI }];

@@ -6,7 +6,7 @@
         "state": "nao_avaliado",
         "reason": "fase5"
       },
-      "desde": "2026-10-17T19:48:01.334828+00:00",
+      "desde": "2026-10-17T20:06:02.469178+00:00",
       "label": "Top One #1",
       "limit": {
         "usd": 400,
@@ -81,14 +81,14 @@
         "position": "antes"
       },
       "version": {
-        "id": "d8bf5a66-60dd-460d-8361-8c6ceae87c11",
+        "id": "5194c71d-6938-4d56-b7a1-af5407df0f77",
         "origin": "salvar",
         "version_no": 1,
-        "effective_from": "2026-10-17T19:48:01.334828+00:00"
+        "effective_from": "2026-10-17T20:06:02.469178+00:00"
       },
       "warnings": [],
       "desde_day": "2026-10-17",
-      "account_id": "f4b838a9-99d5-4a1f-90d4-56679ed01a37",
+      "account_id": "9ed5828e-8f80-442d-aed3-1459aa18613a",
       "changes_at": "2026-10-19T14:00:00+00:00",
       "state_rule": {
         "state": "nao_avaliado",
@@ -106,7 +106,7 @@
         "state": "nao_avaliado",
         "reason": "so_futuros"
       },
-      "desde": "2026-10-17T19:48:01.334828+00:00",
+      "desde": "2026-10-17T20:06:02.469178+00:00",
       "label": "Ebinex",
       "limit": {
         "state": "nao_avaliado",
@@ -155,14 +155,14 @@
         "position": "antes"
       },
       "version": {
-        "id": "d3406247-1af3-4147-9442-5c2e4c483db7",
+        "id": "71942601-c8b9-4a42-9ab8-de12cabd71f9",
         "origin": "salvar",
         "version_no": 1,
-        "effective_from": "2026-10-17T19:48:01.334828+00:00"
+        "effective_from": "2026-10-17T20:06:02.469178+00:00"
       },
       "warnings": [],
       "desde_day": "2026-10-17",
-      "account_id": "65da7e2c-cc06-4cbb-aaa2-3177b3f3743c",
+      "account_id": "db040b78-5447-4653-8d4f-5edcd19c027f",
       "changes_at": "2026-10-19T23:00:00+00:00",
       "state_rule": {
         "state": "nao_avaliado",

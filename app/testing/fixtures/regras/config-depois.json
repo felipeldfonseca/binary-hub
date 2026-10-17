@@ -1,5 +1,5 @@
 {
-  "rev": "2026-10-17T19:48:01.334828Z",
+  "rev": "2026-10-17T20:06:02.469178Z",
   "builtin": {
     "binary": {
       "v": 1,
@@ -81,11 +81,11 @@
             "at_limit": "encerrar"
           }
         },
-        "updated_at": "2026-10-17T19:48:01.334828+00:00"
+        "updated_at": "2026-10-17T20:06:02.469178+00:00"
       },
       "versions": [
         {
-          "id": "d8bf5a66-60dd-460d-8361-8c6ceae87c11",
+          "id": "5194c71d-6938-4d56-b7a1-af5407df0f77",
           "origin": "salvar",
           "resolved": {
             "v": 1,
@@ -131,10 +131,10 @@
           "version_no": 1,
           "copied_from": null,
           "effective_day": "2026-10-17",
-          "effective_from": "2026-10-17T19:48:01.334828+00:00"
+          "effective_from": "2026-10-17T20:06:02.469178+00:00"
         }
       ],
-      "account_id": "f4b838a9-99d5-4a1f-90d4-56679ed01a37",
+      "account_id": "9ed5828e-8f80-442d-aed3-1459aa18613a",
       "is_example": false,
       "archived_at": null
     },
@@ -173,7 +173,7 @@
       "settings": null,
       "versions": [
         {
-          "id": "d3406247-1af3-4147-9442-5c2e4c483db7",
+          "id": "71942601-c8b9-4a42-9ab8-de12cabd71f9",
           "origin": "salvar",
           "resolved": {
             "v": 1,
@@ -202,10 +202,10 @@
           "version_no": 1,
           "copied_from": null,
           "effective_day": "2026-10-17",
-          "effective_from": "2026-10-17T19:48:01.334828+00:00"
+          "effective_from": "2026-10-17T20:06:02.469178+00:00"
         }
       ],
-      "account_id": "65da7e2c-cc06-4cbb-aaa2-3177b3f3743c",
+      "account_id": "db040b78-5447-4653-8d4f-5edcd19c027f",
       "is_example": false,
       "archived_at": null
     }
@@ -227,7 +227,7 @@
           "start_min": 1200
         }
       ],
-      "updated_at": "2026-10-17T19:48:01.334828+00:00"
+      "updated_at": "2026-10-17T20:06:02.469178+00:00"
     },
     "futures": {
       "rules": {
@@ -251,9 +251,9 @@
           "start_min": 600
         }
       ],
-      "updated_at": "2026-10-17T19:48:01.334828+00:00"
+      "updated_at": "2026-10-17T20:06:02.469178+00:00"
     }
   },
-  "server_now": "2026-10-17T19:48:01.354009+00:00",
+  "server_now": "2026-10-17T20:06:02.487848+00:00",
   "preferences": {}
 }

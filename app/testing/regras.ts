@@ -11,6 +11,7 @@
  *                       limit US$ 400 «por conta», «Encerrar o dia no app»; Ebinex 20:00–21:00 de
  *                       Brasília seg–sex, no limit), saved on Sat 17 Oct 2026
  *   config-depois       rules_config() right after it (v1 of both accounts)
+ *   agora-antes-seg-0930-et  rules_now() shape before the save: both «Sem janela salva · Definir»
  *   agora-*             rules_now() shapes (gate_at of both accounts) on the following days, with two
  *                       invented Top One losses on Mon 19 Oct (−US$ 250 out at 10:12 ET, −US$ 180
  *                       out at 10:31 ET):
@@ -34,7 +35,13 @@ import {
 
 const DIR = path.join(__dirname, 'fixtures/regras');
 
-export type AgoraFixture = 'agora-seg-0930-et' | 'agora-seg-1005-et' | 'agora-seg-1045-et' | 'agora-seg-2030-brt' | 'agora-sab-1200-et';
+export type AgoraFixture =
+  | 'agora-antes-seg-0930-et'
+  | 'agora-seg-0930-et'
+  | 'agora-seg-1005-et'
+  | 'agora-seg-1045-et'
+  | 'agora-seg-2030-brt'
+  | 'agora-sab-1200-et';
 
 /** The recorded JSON, as the database answered it (a fresh copy each call) */
 export function regrasJson(name: 'config-antes' | 'config-depois' | 'save-dono' | AgoraFixture): Record<string, unknown> {
