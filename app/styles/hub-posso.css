@@ -3,3 +3,11 @@
  * B). Scoped to .hub like styles/hub.css; tokens and shared classes (.hub-tom--*) come from there.
  * Imported by app/(hub)/layout.tsx. Only lane B edits this file.
  */
+
+/* The window line under the account selector (Diário board `{{ contaAtual.janela }}`) */
+
+.hub-seletor__janela {
+  padding-left: 16px;
+  font-size: 11px;
+  color: var(--text-2);
+}

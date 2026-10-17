@@ -10,10 +10,10 @@ const topOne = makeAccount({ label: 'Top One', market: 'futures', phase: 'financ
 const apex = makeAccount({ label: 'Apex A', market: 'futures', phase: 'avaliacao' })
 const ebinex = makeAccount({ label: 'Ebinex', market: 'binary', phase: null })
 
-function renderSelector(current = topOne) {
+function renderSelector(current = topOne, janela?: string | null) {
   const onChoose = jest.fn()
   const onAdd = jest.fn()
-  render(<SeletorConta accounts={[topOne, apex, ebinex]} current={current} onChoose={onChoose} onAdd={onAdd} />)
+  render(<SeletorConta accounts={[topOne, apex, ebinex]} current={current} onChoose={onChoose} onAdd={onAdd} janela={janela} />)
   return { onChoose, onAdd, button: screen.getByRole('button', { name: /^Conta: / }) }
 }
 
@@ -124,5 +124,36 @@ describe('SeletorConta', () => {
 
     expect(onAdd).toHaveBeenCalledWith(button)
     expect(document.getElementById('lista-contas')).not.toBeInTheDocument()
+  })
+})
+
+describe('SeletorConta window line', () => {
+  it('shows the current account’s window under its button, which it describes', () => {
+    const { button } = renderSelector(topOne, 'Janela 10:00–11:00 ET')
+
+    const line = document.getElementById('janela-conta') as HTMLElement
+    expect(line).toHaveTextContent('Janela 10:00–11:00 ET')
+    expect(line).toHaveClass('hub-seletor__janela')
+    expect(button).toHaveAttribute('aria-describedby', 'janela-conta')
+    expect(button).toHaveAccessibleDescription('Janela 10:00–11:00 ET')
+    // Under the button, before the list
+    expect(button.compareDocumentPosition(line) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+
+  it('keeps the line while the list is open', async () => {
+    const { button } = renderSelector(ebinex, 'Sem janela salva')
+
+    await userEvent.click(button)
+
+    expect(document.getElementById('janela-conta')).toHaveTextContent('Sem janela salva')
+    const list = document.getElementById('lista-contas') as HTMLElement
+    expect(within(list).queryByText('Sem janela salva')).not.toBeInTheDocument()
+  })
+
+  it.each([undefined, null, ''])('shows nothing, and describes nothing, without a line (%p)', (janela) => {
+    const { button } = renderSelector(topOne, janela)
+
+    expect(document.getElementById('janela-conta')).toBeNull()
+    expect(button).not.toHaveAttribute('aria-describedby')
   })
 })
