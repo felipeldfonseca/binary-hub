@@ -1,0 +1,13 @@
+{
+  "format": "ebinex",
+  "parsed": {
+    "trades": [],
+    "ebinexIds": [],
+    "parseErrors": [
+      {
+        "row": 0,
+        "error": "CSV file is empty or has no data rows"
+      }
+    ]
+  }
+}

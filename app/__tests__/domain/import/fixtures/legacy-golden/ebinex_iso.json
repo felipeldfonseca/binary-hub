@@ -1,0 +1,115 @@
+{
+  "format": "ebinex",
+  "parsed": {
+    "trades": [
+      {
+        "symbol": "BTC/USDT",
+        "asset_type": "binary_option",
+        "direction": "put",
+        "entry_price": 118250.5,
+        "exit_price": 118240,
+        "stake_amount": 10,
+        "quantity": 1,
+        "result": "win",
+        "pnl": 9.2,
+        "entry_time": "2025-08-12T23:41:57.318Z",
+        "timeframe": "M1",
+        "notes": "ebinex:feedface0000000000000301"
+      },
+      {
+        "symbol": "BTC/USDT",
+        "asset_type": "binary_option",
+        "direction": "call",
+        "entry_price": 118300,
+        "exit_price": 118280.75,
+        "stake_amount": 10,
+        "quantity": 1,
+        "result": "loss",
+        "pnl": 10,
+        "entry_time": "2025-08-12T23:48:03.950Z",
+        "timeframe": "M1",
+        "notes": "ebinex:feedface0000000000000302"
+      },
+      {
+        "symbol": "MEMEIDX",
+        "asset_type": "binary_option",
+        "direction": "put",
+        "entry_price": 0.4321,
+        "exit_price": 0.43,
+        "stake_amount": 5,
+        "quantity": 1,
+        "result": "win",
+        "pnl": 4.5,
+        "entry_time": "2025-08-13T00:05:12.004Z",
+        "timeframe": "M1",
+        "notes": "ebinex:feedface0000000000000303"
+      },
+      {
+        "symbol": "BTC/USDT",
+        "asset_type": "binary_option",
+        "direction": "call",
+        "entry_price": 118100,
+        "exit_price": 118150,
+        "stake_amount": 20,
+        "quantity": 1,
+        "result": "win",
+        "pnl": 18,
+        "entry_time": "2025-08-13T00:20:40.500Z",
+        "timeframe": "M1",
+        "notes": "ebinex:feedface0000000000000304"
+      },
+      {
+        "symbol": "BTC/USDT",
+        "asset_type": "binary_option",
+        "direction": "call",
+        "entry_price": 118000,
+        "exit_price": 118010,
+        "stake_amount": 10,
+        "quantity": 1,
+        "result": "win",
+        "pnl": 9,
+        "entry_time": "2025-08-12T23:30:10.250Z",
+        "timeframe": "M1",
+        "notes": "ebinex:feedface0000000000000305"
+      },
+      {
+        "symbol": "BTC/USDT",
+        "asset_type": "binary_option",
+        "direction": "put",
+        "entry_price": 118000,
+        "exit_price": 117990,
+        "stake_amount": 10,
+        "quantity": 1,
+        "result": "win",
+        "pnl": 9,
+        "entry_time": "2025-08-12T23:59:30.100Z",
+        "timeframe": "M1",
+        "notes": "ebinex:feedface0000000000000306"
+      },
+      {
+        "symbol": "BTC/USDT",
+        "asset_type": "binary_option",
+        "direction": "call",
+        "entry_price": 118000,
+        "exit_price": 117950,
+        "stake_amount": 20,
+        "quantity": 1,
+        "result": "loss",
+        "pnl": 20,
+        "entry_time": "2025-08-12T23:35:00.000Z",
+        "timeframe": "M1",
+        "notes": "ebinex:feedface0000000000000307"
+      }
+    ],
+    "ebinexIds": [
+      "feedface0000000000000301",
+      "feedface0000000000000302",
+      "feedface0000000000000303",
+      "feedface0000000000000304",
+      "feedface0000000000000305",
+      "feedface0000000000000306",
+      "feedface0000000000000307"
+    ],
+    "parseErrors": []
+  }
+}
