@@ -35,6 +35,8 @@ describe('faixaJanela and the days', () => {
     expect(resumoDias(0b0000111)).toBe('seg–qua')
     expect(resumoDias(0b0000101)).toBe('seg, qua')
     expect(resumoDias(0b1100000)).toBe('sáb, dom')
+    // Three days that are not consecutive are listed, never a range
+    expect(resumoDias(0b0010101)).toBe('seg, qua, sex')
     expect(resumoDias(EVERY_DAY)).toBe('todos os dias')
     expect(resumoDias(0)).toBe('nenhum dia marcado')
   })
@@ -76,6 +78,10 @@ describe('captions on the other clock', () => {
     expect(legendaJanela(w(NY, 1350, 1410), now)).toBe('23:30–00:30 em Brasília, até o dia seguinte')
     expect(legendaJanela(w(NY, 1410, 30), now)).toBe('00:30–01:30 em Brasília, já no dia seguinte')
     expect(legendaJanela(w(BR, 30, 90), now)).toBe('23:30–00:30 ET, ainda no dia anterior')
+    // Exactly at midnight: a start at 00:00 on the other clock is already the next day; an end at
+    // 00:00 does not reach into it
+    expect(legendaJanela(w(NY, 1380, 1410), now)).toBe('00:00–00:30 em Brasília, já no dia seguinte')
+    expect(legendaJanela(w(NY, 1320, 1380), now)).toBe('23:00–00:00 em Brasília')
   })
 
   it('start = end: no other clock, the days only', () => {

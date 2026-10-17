@@ -7,8 +7,10 @@ import { activeAccounts, emptyAccountSettings, type AccountConfig, type RulesCon
 import {
   PADRAO_FUTUROS,
   ajustarSoNestaConta,
+  aposSalvar,
   alternarDia,
   cancelarJanela,
+  comAoChegar,
   comBloqueio,
   comCalendario,
   comEscolhaEstado,
@@ -120,6 +122,62 @@ describe('a new rules_config while the page is open (contrato §4.2)', () => {
     expect(receberConfig(r, semVersaoEbinex, true).force).toEqual([ids.ebinex])
   })
 
+  it('after this tab’s save: the sent draft is the old side of the rebase, so a part set back while it ran stays set back', () => {
+    const c = configDepois()
+    const enviado = comHorarios(c.settings, 'br')
+    const r: Rascunho = { base: c, draft: enviado, force: [] }
+    // While the save ran, «Horários na tela» went back to what was saved before it
+    const durante = comDraft(r, (d) => comHorarios(d, c.settings.displayTz))
+    const salvo = aposSalvar(durante, { baseRev: c.rev, draft: enviado, force: [] }, 'rev-2')
+    expect(salvo.salvo).toEqual({ rev: 'rev-2', draft: enviado })
+    expect(rascunhoSujo(salvo)).toBe(true)
+
+    const novo = { ...configDepois(), rev: 'rev-2', settings: enviado }
+    const out = receberConfig(salvo, novo, true)
+    expect(out.base).toBe(novo)
+    expect(out.salvo).toBeUndefined()
+    expect(out.draft.displayTz).toBe(c.settings.displayTz)
+    expect(rascunhoSujo(out)).toBe(true)
+    // Untouched since the save: clean on the new rules
+    const limpo = receberConfig(aposSalvar(r, { baseRev: c.rev, draft: enviado, force: [] }, 'rev-2'), novo, true)
+    expect(limpo.draft).toEqual(enviado)
+    expect(rascunhoSujo(limpo)).toBe(false)
+  })
+
+  it('after this tab’s save: only the v1s it sent leave «force»; one asked for while it ran stays', () => {
+    const c = configAntes()
+    const r: Rascunho = { ...iniciarRascunho(c), force: [ids.topOne, ids.ebinex] }
+    const out = aposSalvar(r, { baseRev: c.rev, draft: c.settings, force: [ids.topOne] }, 'rev-2')
+    expect(out.force).toEqual([ids.ebinex])
+  })
+
+  it('after this tab’s save: an answer still on the old revision is not the save’s, and the page keeps waiting', () => {
+    const c = configDepois()
+    const enviado = comLimite(c.settings, ids.topOne, 50000)
+    const salvo = aposSalvar({ base: c, draft: enviado, force: [] }, { baseRev: c.rev, draft: enviado, force: [] }, 'rev-2')
+    expect(receberConfig(salvo, { ...configDepois() }, true)).toBe(salvo)
+    // A save that did not move the revision waits for nothing
+    expect(aposSalvar({ base: c, draft: enviado, force: [] }, { baseRev: c.rev, draft: enviado, force: [] }, c.rev).salvo).toBeUndefined()
+  })
+
+  it('after this tab’s save, another tab saved too: untouched, the draft adopts the newest rules; edited since, it keeps its old base and waits for nothing', () => {
+    const c = configDepois()
+    const enviado = comLimite(c.settings, ids.topOne, 50000)
+    const salvo = aposSalvar({ base: c, draft: enviado, force: [] }, { baseRev: c.rev, draft: enviado, force: [] }, 'rev-2')
+    const outra = { ...configDepois(), rev: 'rev-3', settings: comHorarios(enviado, 'both') }
+
+    const adotado = receberConfig(salvo, outra, false)
+    expect(adotado.base).toBe(outra)
+    expect(adotado.salvo).toBeUndefined()
+    expect(rascunhoSujo(adotado)).toBe(false)
+
+    const editado = comDraft(salvo, (d) => comCalendario(d, 'eu', true))
+    const mantido = receberConfig(editado, outra, false)
+    expect(mantido.base).toBe(c)
+    expect(mantido.salvo).toBeUndefined()
+    expect(mantido.draft).toBe(editado.draft)
+  })
+
   it('semOcultos leaves active accounts alone', () => {
     const c = configDepois()
     const d = comLimite(c.settings, ids.topOne, 1000)
@@ -156,6 +214,9 @@ describe('edits of «Quando você opera»', () => {
     expect(own.accounts[ids.topOne].window).toEqual({ tz: 'America/New_York', startMin: 600, endMin: 660, weekdays: MON_TO_FRI })
     expect(voltarAoPadrao(own, ids.topOne).accounts[ids.topOne].window).toBeNull()
     expect(janelasEfetivas(own, top(salvo))).toEqual({ windows: [own.accounts[ids.topOne].window], propria: true })
+    // The market's own days are copied (seg–sáb here), not seg–sex
+    const segSab = ajustarSoNestaConta(comJanelaDoMercado(salvo.settings, 'futures', 0, { weekdays: 0b0111111 }), { id: ids.topOne, market: 'futures' })
+    expect(segSab.accounts[ids.topOne].window?.weekdays).toBe(0b0111111)
   })
 
   it('«não salvo» on a market card: its windows or an own window of one of its accounts', () => {
@@ -197,6 +258,12 @@ describe('edits of «Suas regras»', () => {
     const own = comBloqueio(c.settings, top(c), { afterMin: 30 })
     expect(own.accounts[ids.topOne].block).toEqual({ afterMin: 30 })
     expect(restaurarMinutos(own, c.settings, top(c), 'afterMin').accounts[ids.topOne].block).toEqual({})
+    // The saved value, not the built-in one (saved 20 before the field was emptied)
+    const saved20 = comBloqueio(c.settings, { tipo: 'padrao' }, { beforeMin: 20 })
+    const emptied = comBloqueio(saved20, { tipo: 'padrao' }, { beforeMin: 0 })
+    expect(restaurarMinutos(emptied, saved20, { tipo: 'padrao' }, 'beforeMin').markets.futures.block?.beforeMin).toBe(20)
+    const ownSaved = comBloqueio(c.settings, top(c), { beforeMin: 15 })
+    expect(restaurarMinutos(comBloqueio(ownSaved, top(c), { beforeMin: 0 }), ownSaved, top(c), 'beforeMin').accounts[ids.topOne].block).toEqual({ beforeMin: 15 })
   })
 
   it('the limit keeps its mode and «Ao chegar» when the amount changes; null = «Sem limite»', () => {
@@ -205,6 +272,9 @@ describe('edits of «Suas regras»', () => {
     expect(s.accounts[ids.topOne].limit).toEqual({ cents: 45050, mode: 'soma', atLimit: 'encerrar' })
     expect(comLimite(s, ids.topOne, null).accounts[ids.topOne].limit).toBeNull()
     expect(comLimite(c.settings, ids.ebinex, 5000).accounts[ids.ebinex].limit).toEqual({ cents: 5000, mode: 'conta', atLimit: 'encerrar' })
+    // «Só avisar» stays when the amount changes
+    const avisar = comAoChegar(c.settings, ids.topOne, 'avisar')
+    expect(comLimite(avisar, ids.topOne, 30000).accounts[ids.topOne].limit).toEqual({ cents: 30000, mode: 'conta', atLimit: 'avisar' })
   })
 
   it('a state choice toggles; texts are cut at 500; empty states are dropped', () => {

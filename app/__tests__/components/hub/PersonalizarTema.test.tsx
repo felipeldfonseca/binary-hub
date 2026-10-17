@@ -94,24 +94,36 @@ describe('the theme, saved to the profile (contrato §4.11)', () => {
     expect(window.localStorage.getItem(THEME_STORAGE_KEY)).toBe('escuro')
     expect(mergePreferences).not.toHaveBeenCalled()
 
-    // Later reads of the preferences never switch the theme again
+    // Later reads of the preferences never switch the theme again. React Query tells its observers
+    // on a timer: wait until the new answer is in the cache and the page had time to draw it.
     fetchPreferences.mockResolvedValue({ theme: 'claro' })
     await act(async () => {
       await queryClient.refetchQueries({ queryKey: ['hub', 'user-1', 'preferencias'] })
     })
+    expect(queryClient.getQueryData(['hub', 'user-1', 'preferencias'])).toEqual({ theme: 'claro' })
+    await act(() => new Promise((r) => setTimeout(r, 50)))
     expect(hub).toHaveAttribute('data-tema', 'escuro')
   })
 
   it('a theme changed before the preferences answer stands: the older profile value does not undo it', async () => {
     let answer: (p: contasDb.HubPreferences) => void = () => {}
     fetchPreferences.mockReturnValue(new Promise((r) => (answer = r)))
-    const { hub } = renderHubPage()
+    // The merge answers only after the preferences do, so the older profile value is what arrives first
+    let merged: (p: contasDb.HubPreferences) => void = () => {}
+    mergePreferences.mockReturnValue(new Promise((r) => (merged = r)))
+    const { hub, queryClient } = renderHubPage()
 
     await userEvent.click(switchEscuro())
-    await act(async () => answer({ theme: 'claro' }))
+    await act(async () => {
+      answer({ theme: 'claro' })
+      await new Promise((r) => setTimeout(r, 50))
+    })
+    expect(queryClient.getQueryData(['hub', 'user-1', 'preferencias'])).toEqual({ theme: 'claro' })
 
     expect(hub).toHaveAttribute('data-tema', 'escuro')
     expect(mergePreferences).toHaveBeenCalledWith(expect.anything(), { theme: 'escuro' })
+    await act(async () => merged({ theme: 'escuro' }))
+    expect(hub).toHaveAttribute('data-tema', 'escuro')
   })
 
   it('a failed merge keeps the local choice, silently', async () => {

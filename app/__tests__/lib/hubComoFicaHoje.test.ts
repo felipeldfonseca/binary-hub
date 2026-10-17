@@ -254,6 +254,14 @@ describe('«Ao salvar …» from pendingVersions', () => {
     expect(aoSalvarPadrao(pendingVersions(c, c.settings), futuros, et('2026-10-22 12:00'))).toBeNull()
   })
 
+  it('inside an overnight window, the day a save would carry is the day the window opened', () => {
+    const c = configDepois()
+    // Ebinex 22:00–02:00 de Brasília; saved at 01:00 on Fri 23 Oct, inside Thursday's window
+    const d = { ...c.settings, accounts: { ...c.settings.accounts, [ids.ebinex]: { ...c.settings.accounts[ids.ebinex], window: sp(1320, 120) } } }
+    expect(aoSalvarConta(pendingVersions(c, d), ids.ebinex, brt('2026-10-23 01:00'))).toBe('Ao salvar: Regras v2 desde 22 out.')
+    expect(aoSalvarConta(pendingVersions(c, d), ids.ebinex, brt('2026-10-23 03:00'))).toBe('Ao salvar: Regras v2 desde 23 out.')
+  })
+
   it('an account without versions: v1 when forced', () => {
     const c = configAntes()
     expect(aoSalvarConta(pendingVersions(c, c.settings), ids.ebinex, brt('2026-10-22 12:00'))).toBeNull()

@@ -57,17 +57,26 @@ export interface Rascunho {
   draft: RulesSettings;
   /** Accounts without versions that get v1 on the next save («Começar as regras hoje») */
   force: string[];
+  /**
+   * This tab saved `draft` against `base` and save_rules answered revision `rev`, but that
+   * rules_config has not been taken in yet (its refetch is running or failed). Until it is, what
+   * is saved is this draft, not `base.settings`.
+   */
+  salvo?: { rev: string; draft: RulesSettings };
 }
 
 export const iniciarRascunho = (config: RulesConfig): Rascunho => ({ base: config, draft: config.settings, force: [] });
 
 const activeIds = (config: RulesConfig) => activeAccounts(config).map((a) => a.id);
 
+/** What the database holds as far as the page knows: the draft of a save not yet taken in, else the base */
+const salvoAgora = (r: Rascunho): RulesSettings => r.salvo?.draft ?? r.base.settings;
+
 /** Any market, any active account, «Horários na tela» or the calendars differ from saved, or a v1 is asked for */
 export function rascunhoSujo(r: Rascunho): boolean {
   const { base, draft, force } = r;
   if (force.length) return true;
-  const saved = base.settings;
+  const saved = salvoAgora(r);
   if (MARKETS.some((m) => !sameMarket(m, saved.markets[m], draft.markets[m]))) return true;
   if (activeAccounts(base).some((a) => !sameAccount(a.market, saved.accounts[a.id], draft.accounts[a.id]))) return true;
   if (draft.displayTz !== saved.displayTz) return true;
@@ -101,19 +110,46 @@ export function semOcultos(config: RulesConfig, draft: RulesSettings): RulesSett
  * Then the draft is carried onto it part by part, accounts that left the list are reverted, and
  * accounts that now have versions leave `force`. Otherwise (another tab or device saved) a dirty
  * draft keeps its old base, so its save is refused with rules_changed; a clean one adopts it.
+ *
+ * After this tab's own save (`salvo`), the old side of the rebase is the draft that was sent, not
+ * the base: a part changed while the save ran (even back to its old value) is an edit and stays.
+ * An answer still on the base's revision is not the save's: the page keeps waiting for it. And
+ * when another tab saved too, a draft untouched since the save adopts the newest rules (everything
+ * in it is saved), while one edited since keeps its old base without `salvo`, so nothing waits on
+ * a revision that will not come back.
  */
 export function receberConfig(r: Rascunho | null, config: RulesConfig, soDaqui: boolean): Rascunho {
   if (!r) return iniciarRascunho(config);
   if (config === r.base) return r;
+  if (r.salvo && config.rev === r.base.rev) return r;
   if (soDaqui) {
-    const draft = semOcultos(config, rebaseSettings(config.accounts, r.base.settings, config.settings, r.draft));
+    const draft = semOcultos(config, rebaseSettings(config.accounts, salvoAgora(r), config.settings, r.draft));
     const force = r.force.filter((id) => {
       const a = config.accounts.find((x) => x.id === id);
       return !!a && a.versions.length === 0 && !a.archivedAt && !a.isExample;
     });
     return { base: config, draft, force };
   }
-  return rascunhoSujo(r) ? r : iniciarRascunho(config);
+  if (rascunhoSujo(r)) return r.salvo ? { base: r.base, draft: r.draft, force: r.force } : r;
+  return iniciarRascunho(config);
+}
+
+/** What a save sent: the base revision it was made on, the draft and the v1s it asked for */
+export interface Enviado {
+  baseRev: string;
+  draft: RulesSettings;
+  force: readonly string[];
+}
+
+/**
+ * This tab's save went through as revision `rev`. Only the v1s it sent leave `force` (one asked
+ * for while it ran stays), and the draft it sent is what is saved until its rules_config arrives
+ * (receberConfig). A save that did not move the revision has nothing to wait for.
+ */
+export function aposSalvar(r: Rascunho, enviado: Enviado, rev: string): Rascunho {
+  const force = r.force.filter((id) => !enviado.force.includes(id));
+  if (r.base.rev !== enviado.baseRev || rev === enviado.baseRev) return { ...r, force };
+  return { ...r, force, salvo: { rev, draft: enviado.draft } };
 }
 
 // ---------------------------------------------------------------------------------------------

@@ -8,6 +8,8 @@ import PersonalizarPage from '@/app/(hub)/personalizar/page'
 import PersonalizarPagina from '@/components/hub/personalizar/PersonalizarPagina'
 import { useEditarRegras } from '@/components/hub/personalizar/PersonalizarProvider'
 import { changedOnlyHere, useSaveRules } from '@/hooks/useRegras'
+import { storeMergedPreferences } from '@/hooks/useContas'
+import { ERRO_REGRAS } from '@/components/hub/personalizar/copy'
 import { buildSavePayload, type ConfigVersion, type RulesConfig, type RulesSettings, type SaveRulesResult } from '@/lib/hub/regras'
 import { comLimite } from '@/lib/hub/rascunho'
 import { makeAccount, renderHub } from '@/testing/hubHarness'
@@ -75,6 +77,17 @@ const salvarTopo = () => botao('Salvar alterações')[0]
 const descartarTopo = () => botao('Descartar')[0]
 const barra = () => document.querySelector('.hub-pz-barra') as HTMLElement | null
 const ready = () => screen.findByRole('heading', { level: 3, name: 'Como fica hoje' })
+const horarios = () => within(screen.getByRole('group', { name: 'Horários na tela' }))
+const RULE_CARDS = ['Quando você opera', 'Suas regras', 'Preferências']
+
+/** A call that stays pending until the test lets it finish */
+function deferred<T>() {
+  let resolve!: (value: T) => void
+  const promise = new Promise<T>((r) => {
+    resolve = r
+  })
+  return { promise, resolve }
+}
 /** The amount on the «Limite do dia» row («Como fica hoje» repeats it) */
 const valorLimite = () => (document.getElementById('r-lim')?.closest('li') as HTMLElement).querySelector('.hub-pz-regra__linha > span')
 
@@ -141,9 +154,13 @@ describe('the page', () => {
     fetchRulesConfig.mockReturnValue(new Promise(() => {}))
     renderPage()
 
-    for (const name of ['Quando você opera', 'Suas regras', 'Preferências']) {
+    for (const name of RULE_CARDS) {
       expect(within(screen.getByRole('region', { name })).getByText('Carregando…')).toBeInTheDocument()
     }
+    // One live region for the three cards (they wait on the same rules), not three
+    const vivas = RULE_CARDS.flatMap((name) => within(screen.getByRole('region', { name })).queryAllByRole('status'))
+    expect(vivas).toHaveLength(1)
+    expect(vivas[0]).toHaveTextContent('Carregando…')
     expect(salvarTopo()).toHaveAttribute('aria-disabled', 'true')
     expect(descartarTopo()).toHaveAttribute('aria-disabled', 'true')
     // The theme does not wait for the rules
@@ -156,6 +173,9 @@ describe('the page', () => {
 
     await waitFor(() => expect(within(regras()).getByText('Não foi possível carregar as regras.')).toBeInTheDocument())
     expect(within(janelas()).getByText('Não foi possível carregar as regras.')).toBeInTheDocument()
+    // Said once to a screen reader, not once per card
+    expect(screen.getAllByRole('alert')).toHaveLength(1)
+    expect(within(janelas()).getByRole('alert')).toHaveTextContent('Não foi possível carregar as regras.')
     await userEvent.click(within(regras()).getByRole('button', { name: 'Tentar de novo' }))
     await ready()
     expect(within(regras()).queryByText('Não foi possível carregar as regras.')).not.toBeInTheDocument()
@@ -189,6 +209,48 @@ describe('the page', () => {
     expect(salvarTopo()).toHaveAttribute('aria-disabled', 'true')
     await act(async () => resolve(configDepois()))
     await ready()
+  })
+
+  it('merged preferences written into the cache while the first read runs do not start the draft on the cached answer', async () => {
+    let resolve: (c: RulesConfig) => void = () => {}
+    function Alterna() {
+      const [on, setOn] = React.useState(true)
+      return (
+        <>
+          <button type="button" onClick={() => setOn((v) => !v)}>
+            alternar
+          </button>
+          {on && <PersonalizarPage />}
+        </>
+      )
+    }
+    const view = renderHub(
+      <HubRoot>
+        <Alterna />
+      </HubRoot>,
+    )
+    await ready()
+    await userEvent.click(screen.getByRole('button', { name: 'alternar' }))
+    fetchRulesConfig.mockReturnValueOnce(new Promise((r) => (resolve = r)))
+    await userEvent.click(screen.getByRole('button', { name: 'alternar' }))
+
+    // A theme click (merge_preferences) lands while the read runs: still the old cached rules.
+    // React Query tells its observers on a timer, so wait for that before looking.
+    await act(async () => {
+      storeMergedPreferences(view.queryClient, 'user-1', { theme: 'escuro' })
+      await new Promise((r) => setTimeout(r, 30))
+    })
+    expect(view.queryClient.getQueryData<RulesConfig>(['hub', 'user-1', 'regras', 'config'])?.preferences).toEqual({ theme: 'escuro' })
+    expect(within(regras()).getByText('Carregando…')).toBeInTheDocument()
+    expect(salvarTopo()).toHaveAttribute('aria-disabled', 'true')
+
+    await act(async () => resolve({ ...configDepois(), rev: 'rev-de-outra-aba' }))
+    await ready()
+    saveRules.mockResolvedValue(resultado('rev-3'))
+    await mudarLimite('500')
+    await userEvent.click(salvarTopo())
+    await waitFor(() => expect(saveRules).toHaveBeenCalled())
+    expect(saveRules.mock.calls[0][1].base_rev).toBe('rev-de-outra-aba')
   })
 })
 
@@ -554,6 +616,196 @@ describe('save, discard and the bar', () => {
 
     await waitFor(() => expect(statusTopo()).toHaveTextContent('As regras foram salvas em outra aba. Recarregue para ver a versão salva.'))
     expect(valorLimite()).toHaveTextContent('US$ 500')
+  })
+
+  it('rules_changed: the rules are read again, and «Descartar» starts from what the other tab saved', async () => {
+    const outra: RulesConfig = { ...configDepois(), rev: 'rev-de-outra-aba', settings: { ...configDepois().settings, displayTz: 'both' } }
+    saveRules.mockRejectedValueOnce(new regrasDb.RegrasDataError('rules_changed'))
+    renderPage()
+    await ready()
+    expect(horarios().getByRole('button', { name: 'Nova York (ET)' })).toHaveAttribute('aria-pressed', 'true')
+    await userEvent.click(horarios().getByRole('button', { name: 'Brasília' }))
+    fetchRulesConfig.mockResolvedValue(outra)
+    const reads = fetchRulesConfig.mock.calls.length
+
+    await userEvent.click(salvarTopo())
+
+    await waitFor(() => expect(statusTopo()).toHaveTextContent('As regras foram salvas em outra aba.'))
+    await waitFor(() => expect(fetchRulesConfig.mock.calls.length).toBeGreaterThan(reads))
+    // The dirty draft keeps its old base (a save stays refused) …
+    expect(horarios().getByRole('button', { name: 'Brasília' })).toHaveAttribute('aria-pressed', 'true')
+    // … and «Descartar» shows what the database holds now
+    await userEvent.click(descartarTopo())
+    expect(horarios().getByRole('button', { name: 'Os dois' })).toHaveAttribute('aria-pressed', 'true')
+    expect(statusTopo()).toHaveTextContent('Alterações descartadas.')
+
+    saveRules.mockResolvedValueOnce(resultado('rev-4'))
+    await userEvent.click(horarios().getByRole('button', { name: 'Brasília' }))
+    await userEvent.click(salvarTopo())
+    await waitFor(() => expect(saveRules).toHaveBeenCalledTimes(2))
+    expect(saveRules.mock.calls[1][1].base_rev).toBe('rev-de-outra-aba')
+  })
+
+  it('«Descartar» takes a newer answer that already arrived (the draft kept its old base)', async () => {
+    const view = renderPage()
+    await ready()
+    await mudarLimite('500')
+    fetchRulesConfig.mockResolvedValue({ ...configDepois(), rev: 'rev-de-outra-aba', settings: { ...configDepois().settings, displayTz: 'br' } })
+    await act(async () => {
+      await view.queryClient.invalidateQueries({ queryKey: ['hub', 'user-1', 'regras'] })
+    })
+    expect(horarios().getByRole('button', { name: 'Nova York (ET)' })).toHaveAttribute('aria-pressed', 'true')
+
+    await userEvent.click(descartarTopo())
+
+    expect(valorLimite()).toHaveTextContent('US$ 400')
+    expect(horarios().getByRole('button', { name: 'Brasília' })).toHaveAttribute('aria-pressed', 'true')
+  })
+
+  it('the rules read after a save carry another tab’s newer save too: nothing stays locked', async () => {
+    const base = configDepois()
+    const saved = comLimite(base.settings, ids.topOne, 50000)
+    saveRules.mockResolvedValue(
+      resultado('rev-2', [{ accountId: ids.topOne, versionNo: 2, effectiveFrom: new Date('2026-10-22T16:00:00Z'), effectiveDay: '2026-10-22', origin: 'salvar' }]),
+    )
+    renderPage()
+    await ready()
+    await mudarLimite('500')
+    // Between this save and its read, another tab saved «Os dois»
+    fetchRulesConfig.mockResolvedValue(configSalva(base, { ...saved, displayTz: 'both' }, 'rev-3', { [ids.topOne]: v2TopOne(50000) }))
+
+    await userEvent.click(salvarTopo())
+
+    await waitFor(() => expect(statusTopo()).toHaveTextContent('Salvo. Regras novas desde 22 out: Top One #1 v2.'))
+    // Untouched since the save, the draft takes the newest rules
+    await waitFor(() => expect(horarios().getByRole('button', { name: 'Os dois' })).toHaveAttribute('aria-pressed', 'true'))
+    expect(valorLimite()).toHaveTextContent('US$ 500')
+    await userEvent.click(horarios().getByRole('button', { name: 'Brasília' }))
+    expect(statusTopo()).toHaveTextContent('Alterações não salvas')
+    expect(salvarTopo()).toHaveAttribute('aria-disabled', 'false')
+    expect(descartarTopo()).toHaveAttribute('aria-disabled', 'false')
+    saveRules.mockResolvedValueOnce(resultado('rev-4'))
+    await userEvent.click(salvarTopo())
+    await waitFor(() => expect(saveRules).toHaveBeenCalledTimes(2))
+    expect(saveRules.mock.calls[1][1].base_rev).toBe('rev-3')
+  })
+
+  it('after a failed read, «Tentar de novo» that brings another tab’s newer save unlocks the buttons', async () => {
+    const base = configDepois()
+    const saved = comLimite(base.settings, ids.topOne, 50000)
+    saveRules.mockResolvedValue(
+      resultado('rev-2', [{ accountId: ids.topOne, versionNo: 2, effectiveFrom: new Date('2026-10-22T16:00:00Z'), effectiveDay: '2026-10-22', origin: 'salvar' }]),
+    )
+    renderPage()
+    await ready()
+    await mudarLimite('500')
+    fetchRulesConfig.mockRejectedValueOnce(new regrasDb.RegrasDataError('network'))
+    await userEvent.click(salvarTopo())
+    await waitFor(() => expect(within(regras()).getByText('Não foi possível carregar as regras.')).toBeInTheDocument())
+
+    fetchRulesConfig.mockResolvedValue(configSalva(base, { ...saved, displayTz: 'br' }, 'rev-3', { [ids.topOne]: v2TopOne(50000) }))
+    await userEvent.click(within(regras()).getByRole('button', { name: 'Tentar de novo' }))
+    await ready()
+
+    await waitFor(() => expect(horarios().getByRole('button', { name: 'Brasília' })).toHaveAttribute('aria-pressed', 'true'))
+    await userEvent.click(horarios().getByRole('button', { name: 'Os dois' }))
+    expect(salvarTopo()).toHaveAttribute('aria-disabled', 'false')
+  })
+
+  it('«Começar as regras hoje» pressed while a save runs is kept for the next save', async () => {
+    const antes = configAntes()
+    const pending = deferred<SaveRulesResult>()
+    fetchRulesConfig.mockResolvedValue(antes)
+    saveRules.mockReturnValueOnce(pending.promise)
+    renderPage()
+    await ready()
+    await userEvent.click(horarios().getByRole('button', { name: 'Os dois' }))
+    await userEvent.click(salvarTopo())
+    await escolher('Ebinex')
+    await userEvent.click(screen.getByRole('button', { name: 'Começar as regras hoje' }))
+
+    fetchRulesConfig.mockResolvedValue({ ...antes, rev: 'rev-2', settings: { ...antes.settings, displayTz: 'both' } })
+    await act(async () => pending.resolve(resultado('rev-2')))
+
+    await waitFor(() => expect(statusTopo()).toHaveTextContent('Alterações não salvas'))
+    expect(screen.getByText('Ao salvar: Regras v1 desde 22 out.')).toBeInTheDocument()
+    saveRules.mockResolvedValueOnce(resultado('rev-3'))
+    await userEvent.click(salvarTopo())
+    await waitFor(() => expect(saveRules).toHaveBeenCalledTimes(2))
+    expect(saveRules.mock.calls[1][1].base_rev).toBe('rev-2')
+    expect(saveRules.mock.calls[1][1].accounts?.[ids.ebinex]).toMatchObject({ version: 'force' })
+  })
+
+  it('a part set back to its saved value while a save runs stays as set', async () => {
+    const base = configDepois()
+    const pending = deferred<SaveRulesResult>()
+    saveRules.mockReturnValueOnce(pending.promise)
+    renderPage()
+    await ready()
+    await userEvent.click(horarios().getByRole('button', { name: 'Brasília' }))
+    await userEvent.click(salvarTopo())
+    await userEvent.click(horarios().getByRole('button', { name: 'Nova York (ET)' }))
+
+    fetchRulesConfig.mockResolvedValue(configSalva(base, { ...base.settings, displayTz: 'br' }, 'rev-2'))
+    await act(async () => pending.resolve(resultado('rev-2')))
+
+    await waitFor(() => expect(statusTopo()).toHaveTextContent('Alterações não salvas'))
+    expect(horarios().getByRole('button', { name: 'Nova York (ET)' })).toHaveAttribute('aria-pressed', 'true')
+    saveRules.mockResolvedValueOnce(resultado('rev-3'))
+    await userEvent.click(salvarTopo())
+    await waitFor(() => expect(saveRules).toHaveBeenCalledTimes(2))
+    expect(saveRules.mock.calls[1][1]).toEqual({ v: 1, base_rev: 'rev-2', preferences: { display_tz: 'et' } })
+  })
+
+  it('one save however fast «Salvar alterações» is pressed twice', async () => {
+    const pending = deferred<SaveRulesResult>()
+    saveRules.mockReturnValue(pending.promise)
+    renderPage()
+    await ready()
+    await mudarLimite('500')
+    const salvar = salvarTopo()
+
+    // Both clicks before React draws «Salvando…»
+    act(() => {
+      salvar.click()
+      salvar.click()
+    })
+
+    await waitFor(() => expect(saveRules).toHaveBeenCalled())
+    await act(async () => pending.resolve(resultado('rev-2')))
+    expect(saveRules).toHaveBeenCalledTimes(1)
+  })
+
+  it('discard closes the limit form and drops a v1 asked for', async () => {
+    fetchRulesConfig.mockResolvedValue(configAntes())
+    renderPage()
+    await ready()
+    await escolher('Ebinex')
+    await userEvent.click(screen.getByRole('button', { name: 'Começar as regras hoje' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Definir o limite do dia de Ebinex' }))
+    expect(screen.getByLabelText('Limite do dia, em US$')).toBeInTheDocument()
+
+    await userEvent.click(descartarTopo())
+
+    expect(screen.queryByLabelText('Limite do dia, em US$')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Começar as regras hoje' })).toBeInTheDocument()
+    expect(screen.queryByText(/Ao salvar/)).not.toBeInTheDocument()
+    expect(statusTopo()).toHaveTextContent('Alterações descartadas.')
+  })
+
+  it('unknown_account: its own copy, and the rules and accounts are read again', async () => {
+    saveRules.mockRejectedValue(new regrasDb.RegrasDataError('unknown_account'))
+    renderPage()
+    await ready()
+    await mudarLimite('500')
+    const configCalls = fetchRulesConfig.mock.calls.length
+    const accountCalls = fetchAccounts.mock.calls.length
+
+    await userEvent.click(salvarTopo())
+
+    await waitFor(() => expect(statusTopo()).toHaveTextContent(ERRO_REGRAS.unknown_account))
+    await waitFor(() => expect(fetchRulesConfig.mock.calls.length).toBeGreaterThan(configCalls))
+    expect(fetchAccounts.mock.calls.length).toBeGreaterThan(accountCalls)
   })
 
   it('archived_account: its own copy, and the rules and accounts are read again', async () => {

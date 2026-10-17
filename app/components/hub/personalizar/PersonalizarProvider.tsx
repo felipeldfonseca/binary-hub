@@ -3,8 +3,8 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useAgora } from '@/hooks/useAgora'
-import { useAccounts, useHubDb } from '@/hooks/useContas'
-import { changedOnlyHere, regrasKeys, useRulesConfig, useSaveRules, useTradesSinceRules } from '@/hooks/useRegras'
+import { useAccounts } from '@/hooks/useContas'
+import { changedOnlyHere, useRulesConfig, useSaveRules, useTradesSinceRules } from '@/hooks/useRegras'
 import { PHASE_LABEL } from '@/components/hub/contas/copy'
 import {
   activeAccounts,
@@ -20,6 +20,8 @@ import {
 import { toRegrasError } from '@/lib/hub/regrasDb'
 import {
   PADRAO_FUTUROS,
+  aposSalvar,
+  iniciarRascunho,
   problemasDoRascunho,
   rascunhoSujo,
   receberConfig,
@@ -121,15 +123,12 @@ export default function PersonalizarProvider({ children }: { children: React.Rea
   const contas = useAccounts()
   const save = useSaveRules()
   const queryClient = useQueryClient()
-  const { userId } = useHubDb()
   const now = useAgora()
 
   const [rascunho, setRascunho] = useState<Rascunho | null>(null)
   const [mensagem, setMensagem] = useState<MensagemSalvar>(null)
   const [salvando, setSalvando] = useState(false)
   const salvandoRef = useRef(false)
-  /** After a save whose rules_config refetch failed: the rev the page waits for */
-  const [aguardando, setAguardando] = useState<string | null>(null)
   const [barraFixa, setBarraFixa] = useState(false)
   const [selecionadoPedido, setSelecionadoPedido] = useState<string | null>(null)
   const [formLimite, setFormLimite] = useState<FormLimite | null>(null)
@@ -137,15 +136,20 @@ export default function PersonalizarProvider({ children }: { children: React.Rea
   const leuEndereco = useRef(false)
 
   // A new answer: the first one (read after this mount, never an older cached one), a refetch after
-  // an import, an archive or a save (this tab's, or another's)
+  // an import, an archive or a save (this tab's, or another's). The first draft waits until no read
+  // is running: an answer written into the cache meanwhile (merged preferences) also counts as
+  // "fetched after mount", but it is the old cached rules. While a save runs, answers wait for it to
+  // settle, so the draft it sent is known when its rules arrive (receberConfig).
   const config = query.data
-  const fresco = query.isFetchedAfterMount && query.isSuccess
+  const primeiro = rascunho === null
+  const fresco = query.isFetchedAfterMount && query.isSuccess && !(primeiro && query.isFetching)
   useEffect(() => {
-    if (!config || !fresco) return
+    if (!config || !fresco || salvando) return
     setRascunho((r) => receberConfig(r, config, r ? changedOnlyHere(queryClient, r.base.rev, config.rev) : true))
-    setAguardando((rev) => (rev && rev === config.rev ? null : rev))
-  }, [config, fresco, queryClient])
+  }, [config, fresco, salvando, queryClient])
 
+  /** A save went through and its rules_config has not been taken in yet */
+  const aguardando = !!rascunho?.salvo
   const base = rascunho?.base ?? null
   const draft = rascunho?.draft ?? null
   const force = useMemo(() => rascunho?.force ?? [], [rascunho])
@@ -206,20 +210,24 @@ export default function PersonalizarProvider({ children }: { children: React.Rea
       }
       if (!payload) return
       const feitoSobre = rascunho.base
+      // What this save sends: edits made while it runs stay edits after it (aposSalvar, receberConfig)
+      const enviado = { baseRev: rascunho.base.rev, draft: rascunho.draft, force: rascunho.force }
       salvandoRef.current = true
       setSalvando(true)
       setMensagem(null)
       try {
         const result = await mutateAsync({ payload })
-        setRascunho((r) => (r ? { ...r, force: [] } : r))
+        setRascunho((r) => (r ? aposSalvar(r, enviado, result.rev) : r))
         setMensagem({ tipo: 'salvo', texto: textoSalvo(result, feitoSobre) })
-        const cached = queryClient.getQueryData<RulesConfig>(regrasKeys.config(userId))
-        if (!cached || cached.rev !== result.rev) setAguardando(result.rev)
         setBarraFixa(naBarra)
       } catch (e) {
         const code = toRegrasError(e).code
         setMensagem({ tipo: 'erro', code })
-        if (code === 'archived_account' || code === 'unknown_account') {
+        if (code === 'rules_changed') {
+          // Another tab saved: read the rules again. A dirty draft keeps its old base (so a save stays
+          // refused), and «Descartar» then starts from what is saved now.
+          void refetchConfig()
+        } else if (code === 'archived_account' || code === 'unknown_account') {
           // An account was archived or removed in another tab: the rebase reverts its entries
           void refetchConfig()
           void refetchContas()
@@ -229,18 +237,21 @@ export default function PersonalizarProvider({ children }: { children: React.Rea
         setSalvando(false)
       }
     },
-    [rascunho, podeSalvar, mutateAsync, queryClient, userId, refetchConfig, refetchContas],
+    [rascunho, podeSalvar, mutateAsync, refetchConfig, refetchContas],
   )
 
+  // «Descartar» starts again from the newest rules read, not from the draft's base: after another
+  // tab saved, the base is older than what the database holds
+  const ultimo = query.data
   const descartar = useCallback(
     (naBarra: boolean) => {
       if (!podeDescartar) return
-      setRascunho((r) => (r ? { ...r, draft: r.base.settings, force: [] } : r))
+      setRascunho((r) => (r ? iniciarRascunho(ultimo ?? r.base) : r))
       setFormLimite(null)
       setMensagem({ tipo: 'descartado' })
       setBarraFixa(naBarra)
     },
-    [podeDescartar],
+    [podeDescartar, ultimo],
   )
 
   const soltarBarra = useCallback(() => setBarraFixa(false), [])
