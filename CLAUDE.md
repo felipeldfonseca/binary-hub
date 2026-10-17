@@ -43,7 +43,7 @@ Inside `app/`, `npx jest --ci <path>` runs one suite. Use Node 22 (`.nvmrc`). Be
 - The Supabase session lives in the browser. API routes get the user from the bearer token with `requireUser(request)` and must call it first.
 - Paid AI endpoints also call `denyPaidAi(user)` (env `AI_ALLOWED_USERS`). Hub endpoints call `denyHubAccess(user)` (env `HUB_USERS`). Sign-up is open, so with a list unset nobody is allowed.
 - `__tests__/api/routesRequireAuth.test.ts` discovers every route handler on disk; add new handlers to `EXPECTED_HANDLERS`.
-- The server cannot tell who requests a page. Anything a hub page renders on the server reaches every visitor; `ProtectedRoute` and `HubGate` only hide it. Private data must come from API routes that check the session and the list.
+- The server cannot tell who requests a page. Anything a hub page renders on the server reaches every visitor; `ProtectedRoute` and `HubGate` only hide it. Private data is read in the browser with the user's session, where row-level security limits it to the owner, or through API routes that check the session. Anything that costs money or reaches a third party (market data, AI) goes through API routes that also check HUB_USERS.
 
 ## Time zones and trading days
 
