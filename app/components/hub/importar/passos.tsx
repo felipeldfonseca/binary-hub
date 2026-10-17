@@ -44,7 +44,9 @@ import {
   rowErrorReason,
   zoneName,
 } from '@/components/hub/contas/copy'
+import { ANTES_DAS_REGRAS } from '@/components/hub/contas/copyRegras'
 import { Disclosure, InfoButton, InfoPanel, useToggle } from '@/components/hub/contas/ui'
+import { REGRAS_FORM_VAZIO, type RegrasForm } from '@/lib/hub/regrasConta'
 
 type HeadingRef = React.RefObject<HTMLHeadingElement>
 
@@ -271,6 +273,8 @@ export interface AccountForm {
   phase: AccountPhase | null
   size: string
   ref: string
+  /** The rules block (Phase 2): what the owner changed; a new market starts it again */
+  rules: RegrasForm
 }
 
 export const EMPTY_FORM: AccountForm = {
@@ -282,6 +286,7 @@ export const EMPTY_FORM: AccountForm = {
   phase: null,
   size: '',
   ref: '',
+  rules: REGRAS_FORM_VAZIO,
 }
 
 export function PassoNovaConta({
@@ -294,6 +299,7 @@ export function PassoNovaConta({
   labelTaken,
   sizeInvalid,
   locked = false,
+  regras = null,
 }: {
   headingRef: HeadingRef
   market: Market
@@ -305,6 +311,8 @@ export function PassoNovaConta({
   sizeInvalid: boolean
   /** The account already exists: what was typed can no longer change it */
   locked?: boolean
+  /** The rules block (RegrasDaConta), after «Tamanho US$ / Número na plataforma» (board) */
+  regras?: React.ReactNode
 }) {
   const futures = market === 'futures'
   return (
@@ -404,6 +412,7 @@ export function PassoNovaConta({
           />
         </div>
       </div>
+      {regras}
     </div>
   )
 }
@@ -701,6 +710,7 @@ export function PassoPrevia({
   zoneUsed,
   zoneChosen,
   undone,
+  antesDasRegras = null,
 }: {
   headingRef: HeadingRef
   preview: ImportPreviewResult
@@ -710,8 +720,11 @@ export function PassoPrevia({
   /** Chosen in step c («lembrado para»), or the account's own («lembrado de») */
   zoneChosen: boolean
   undone: boolean
+  /** «Antes de {d} (início das regras): …» (lib/hub/regrasConta.linhaAntesDasRegras) */
+  antesDasRegras?: string | null
 }) {
   const [commissionInfo, toggleCommission] = useToggle()
+  const [beforeInfo, toggleBefore] = useToggle()
   const errors = preview.errors.length
   const items: [number, string][] = [
     [preview.rows_total, PASSO_D.lines],
@@ -780,6 +793,15 @@ export function PassoPrevia({
         <div className="hub-linha-i">
           <span>{PASSO_D.dayChanges(preview.day_changes, parsed.market)}</span>
         </div>
+      )}
+      {antesDasRegras && (
+        <>
+          <div className="hub-linha-i">
+            <span>{antesDasRegras}</span>
+            <InfoButton panelId="info-antes" label={ANTES_DAS_REGRAS.infoAria} open={beforeInfo} onToggle={toggleBefore} />
+          </div>
+          {beforeInfo && <InfoPanel id="info-antes">{ANTES_DAS_REGRAS.info}</InfoPanel>}
+        </>
       )}
       {zoneLine && <p className="hub-nota">{zoneLine}</p>}
     </div>
