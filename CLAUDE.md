@@ -2,238 +2,89 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Essential Development Commands
+## What this is
 
-### Development Setup
+Binary Hub is a personal trading journal and market hub, used by its owner for binary options (Ebinex) and futures (Top One). It is being rebuilt screen by screen from an approved prototype, in phases (see "Plan" below). The owner speaks Brazilian Portuguese: UI text and conversation are in pt-BR; code, identifiers and comments are in English.
+
+The old Firebase backend is gone. Everything runs on Next.js + Supabase + Vercel. Documents from before the rebuild are archived in `docs/arquivo/` and describe a product that no longer exists; do not treat them as current.
+
+## Commands
+
+From the repository root (they all run in `app/`):
+
 ```bash
-npm run setup           # Initial setup: installs dependencies for frontend and functions
-npm run dev             # Start Firebase emulators + Next.js frontend concurrently
-npm run dev:emulator    # Start Firebase emulators only (auth, functions, firestore, storage)
-npm run dev:frontend    # Start Next.js dev server only (from app directory)
+npm run setup        # install app dependencies (npm ci)
+npm run dev          # Next.js dev server on :3000
+npm test             # Jest (CI mode)
+npm run type-check   # tsc --noEmit
+npm run lint         # next lint
+npm run build        # production build
 ```
 
-### Build & Testing
-```bash
-npm run build           # Build Next.js frontend
-npm run lint            # Lint both app and functions
-npm run test            # Run Jest tests in functions directory
-cd app && npm run type-check    # TypeScript type checking for frontend
-cd functions && npm run test:watch    # Jest tests with watch mode
-```
+Inside `app/`, `npx jest --ci <path>` runs one suite. Use Node 22 (`.nvmrc`). Before opening a PR, run the tests, the type check and lint; CI (`.github/workflows/ci.yml`) runs Jest and `tsc --noEmit` on every PR.
 
-### Deployment
-```bash
-npm run deploy          # Full deployment: build + deploy all Firebase services
-npm run deploy:functions     # Deploy Firebase Functions only
-npm run deploy:hosting       # Build Next.js app + deploy Firebase Hosting
-```
+## Stack and layout
 
-## Architecture Overview
+- `app/`: the only application. Next.js 14 (app router), TypeScript, Tailwind, Jest + Testing Library.
+  - `app/app/(hub)/`: the new screens, built from the approved boards (today only `/diario`, a placeholder).
+  - `app/app/*`: the old pages (`/dashboard`, `/trades`, `/analytics`, `/market`, ...). They stay until each one is replaced; they are removed in the last phase.
+  - `app/app/api/`: route handlers.
+  - `app/components/hub/`: the hub frame (`HubRoot` theme, `HubGate`, `AppShell`, `HubHeader`, `ThemeSwitch`).
+  - `app/lib/apiAuth.ts`: session and allow-list checks for API routes.
+  - `app/lib/domain/tempo.ts`: time-zone helpers (see below).
+  - `app/lib/utils/`: CSV parsers for Ebinex and Top One, and the import path.
+  - `app/styles/hub.css`: the boards' design tokens, scoped to `.hub`.
+- `supabase/`: local config and SQL migrations. There is a single Supabase project (no separate test project); migrations run on it.
+- `design/`: logos and fonts.
+- Deploy: the GitHub workflow `deploy_frontend.yml` builds and deploys to Vercel on push to `main`. Day-to-day work merges into `feature/rebuild-lean`; `main` still holds the pre-rebuild app until the rebuild is promoted.
 
-Binary Hub is the first social trading platform for binary options traders with AI-powered insights, featuring:
+## Auth and access
 
-**Frontend:** Next.js 14 with TypeScript, Tailwind CSS, deployed on Vercel
-- Social components for profiles, feeds, discovery, and networking
-- Trading components enhanced with social sharing capabilities
-- AI insight components for daily/weekly analysis and recommendations
-- Real-time updates via WebSocket connections
-- Components use React Hook Form + Zod validation
-- State management: React Query (server state) + Zustand (client state)
-- Authentication via Firebase Auth context
+- The Supabase session lives in the browser. API routes get the user from the bearer token with `requireUser(request)` and must call it first.
+- Paid AI endpoints also call `denyPaidAi(user)` (env `AI_ALLOWED_USERS`). Hub endpoints call `denyHubAccess(user)` (env `HUB_USERS`). Sign-up is open, so with a list unset nobody is allowed.
+- `__tests__/api/routesRequireAuth.test.ts` discovers every route handler on disk; add new handlers to `EXPECTED_HANDLERS`.
+- The server cannot tell who requests a page. Anything a hub page renders on the server reaches every visitor; `ProtectedRoute` and `HubGate` only hide it. Private data must come from API routes that check the session and the list.
 
-**Backend:** Firebase Functions v2 (Node.js 20) with TypeScript
-- Main API at `/functions/src/index.ts` exports `api` function
-- Express.js server with authentication middleware and rate limiting
-- Social interaction APIs for follow/follower systems, posts, and feeds
-- AI analysis APIs for pattern recognition and insight generation
-- OpenAI GPT-4o integration for daily/weekly trading analysis
+## Time zones and trading days
 
-**Database:** Firestore NoSQL with enhanced social and AI collections:
-- `users/{uid}` - User profiles and subscription data
-- `profiles/{uid}` - Public trader profiles with performance metrics
-- `follows/{uid}/{targetUid}` - Follow/follower relationships
-- `posts/{uid}/{postId}` - Social content and trade sharing
-- `feed/{uid}/{feedItemId}` - Personalized social feeds
-- `trades/{uid}/{tradeId}` - Individual trade records with social integration
-- `ai_reports/{uid}/{reportId}` - AI-generated daily/weekly analysis
-- `ai_insights/{uid}/{insightId}` - AI pattern recognition and recommendations
-- `rules/{uid}/{ruleId}` - Personal trading rules
-- `uploads/{uid}/{uploadId}` - CSV upload metadata
+- Broker files differ by format:
+  - Current Ebinex exports (`operacoes_*.csv`, `DD/MM/YYYY HH:MM:SS`) carry Brasília wall-clock time (America/Sao_Paulo). The current parser reads them as UTC, so those trades show 3 h early.
+  - Old Ebinex exports (ISO `Data` with an explicit offset such as `+00:00`) already name the right instant: keep the offset, never reinterpret it. Their losses are written without a sign (the unsigned stake).
+  - Top One exports are in UTC; `PnL` is gross, `Commissions` is a positive cost, `Gain` is a percentage of the account.
+- Only offset-less wall-clock values go through `AT TIME ZONE`; casting a string with an offset to `timestamp` would drop the offset.
+- Postgres (`timestamp AT TIME ZONE tz`) is the canonical conversion. `localToUtc` in `lib/domain/tempo.ts` follows the same rules (skipped times use the offset from before the change; repeated times take the later occurrence) and only accepts `UTC` or Area/Location zone names.
+- A trading day is the date on the clock of the account's window; an overnight window counts on the day it opened (`tradingDay`, `inWindow`). Never derive a day from `toISOString()` or the browser's zone.
 
-**Storage:** Firebase Storage for CSV file uploads with processing triggers
+## Hub UI
 
-### Project Structure
-```
-app/                    # Next.js 14 frontend application
-├── components/         # React components
-│   ├── auth/          # Authentication components
-│   ├── dashboard/     # Trading dashboard and analytics
-│   ├── social/        # Social features (profiles, feeds, discovery)
-│   ├── ai/            # AI insights and analysis components
-│   ├── trades/        # Trade logging and management
-│   └── shared/        # Shared UI components
-├── hooks/              # Custom React hooks
-├── lib/                # Utilities, Firebase config, contexts
-└── types/              # TypeScript type definitions
+- Tokens: `.hub[data-tema="claro"]` (`--bg #505050`) and `.hub[data-tema="escuro"]` (`--bg #17191A`), matching the approved boards. Tailwind exposes them as `hub-*` colours. New colours apply only inside `.hub`; do not change `globals.css` or the old pages' look.
+- The theme is saved in `localStorage` (`lib/hub/tema.ts`) and applied before the first paint by an inline script in `HubRoot`.
+- Menu: Início · Diário · Análises · Mercado · Social · AI · Conquistas. The last three are "em breve" (not designed yet).
+- Check text contrast (4.5:1) in both themes, touch targets of 44px and keyboard use; verify layouts at 375, 768 and desktop widths.
 
-functions/              # Firebase Functions backend (Node.js 20)
-├── src/
-│   ├── routes/         # Express route handlers
-│   │   ├── social.ts  # Social interaction APIs
-│   │   ├── ai.ts      # AI analysis APIs
-│   │   ├── trades.ts  # Enhanced trading APIs
-│   │   └── dashboard.ts # Dashboard APIs
-│   ├── services/       # Business logic
-│   │   ├── socialService.ts     # Social features logic
-│   │   ├── aiAnalysisService.ts # AI pattern recognition
-│   │   ├── openai.ts           # OpenAI integration
-│   │   └── csvParser.ts        # CSV processing
-│   └── index.ts        # Main Functions export
-└── lib/                # Compiled JavaScript output
+## Environment variables
 
-docs/                   # Architecture and business documentation
-├── dev/               # Development guides (PRD, MVP scope, business plan)
-├── features/          # Future feature specifications (collaborative, AI)
-└── ui/                # UI/UX documentation
-design/                 # UI/UX assets and brand guidelines
-```
+Names are listed in `app/.env.example` (names only, never values). The server-side values live in the Vercel project (`ANTHROPIC_API_KEY`, `AI_ALLOWED_USERS`, `HUB_USERS`). `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` are GitHub secrets: `deploy_frontend.yml` passes them to both the check build and the `vercel build` step, whose output is what gets deployed; they are not in the Vercel project, so a build Vercel runs on its own would lack them. Never print or commit values from `.env` files.
 
-### Firebase Configuration
-The project uses Firebase emulators for local development:
-- **Auth:** localhost:9089  
-- **Functions:** localhost:5004
-- **Firestore:** localhost:8889
-- **Hosting:** localhost:3002
-- **Storage:** localhost:9189
+## The repository is public
 
-Emulator ports are defined in `firebase.json` and differ from the existing CLAUDE.md ports.
+- Never commit real broker exports. `docs/csv/` is gitignored and holds the owner's real files; when reading them, report only headers, counts and totals.
+- Scan outgoing commits for keys and personal data before pushing.
+- Tests use invented data only.
 
-### API Authentication
-- **Development:** Mock token `mock-token-for-testing` for user `test-user-123`
-- **Production:** Firebase Auth ID tokens with Bearer authentication
-- All API endpoints require authentication via middleware
+## Plan
 
-### Key API Endpoints (require auth)
+The approved plan has ten phases, each ending with a screen the owner tests and approves before the next starts:
 
-#### Social APIs
-```
-/profiles/{username}    # GET public profile, PUT update own profile
-/social/follow/{uid}    # POST follow user, DELETE unfollow
-/social/followers/{uid} # GET followers list
-/social/following/{uid} # GET following list
-/posts                  # GET feed posts, POST create post
-/posts/{postId}         # GET/PUT/DELETE specific post
-/posts/{postId}/like    # POST like/unlike post
-/discovery/trending     # GET trending content/users
-```
+0. Safe base and frame (done): CI, cleanup, time helpers, hub frame, `/diario` placeholder.
+1. Accounts and import: real accounts, an import that can be undone, per-broker fields (Top One stop, target, commission; Ebinex exit and payout), correct time zones.
+2. Rules and windows: operating windows per account or market, versioned rules, "Posso operar hoje?".
+3. Log a trade: setup, marks with server time, window and limit warnings, images and a note.
+4. Diário: calendar, the day, the week.
+5. Market state, computed by rules.
+6. Análises (KPIs per account).
+7. Padrões (evidence engine with levels).
+8. Mercado, asset page, Início and AI readings.
+9. Switch-over: redirects, remove old pages and columns.
 
-#### AI Analysis APIs  
-```
-/ai/analyze-daily       # POST trigger daily AI analysis
-/ai/reports/{reportId}  # GET AI analysis report
-/ai/insights/{id}/share # POST share AI insight socially
-/ai/patterns/me         # GET personal pattern analysis
-```
-
-#### Enhanced Trading APIs
-```
-/trades                 # GET/POST trade management with social integration
-/trades/bulk            # POST bulk import with sharing prompts
-/dashboard/stats        # Performance KPIs with privacy controls
-/dashboard/performance  # Chart data
-/rules                  # GET/POST personal trading rules with sharing options
-/trades/validate-csv    # CSV header validation
-```
-
-#### Platform APIs
-```
-/billing/subscription   # GET/PUT subscription management
-/privacy/settings       # GET/PUT privacy controls
-/notifications          # GET user notifications
-/admin/moderation       # Content moderation tools
-```
-
-### Background Functions
-- `processCSVUpload` - Triggered on Cloud Storage CSV uploads
-- `generateDailyAIAnalysis` - Daily AI analysis for Pro users using Gemini 2.5 Flash Light (8am local time)
-- `generateWeeklyInsights` - Weekly AI reports for all users using Gemini 2.5 Flash Light (Monday 8am)
-- `analyzeIndividualTrade` - On-demand individual trade analysis using GPT-4o (triggered by user request)
-- `updateSocialMetrics` - Real-time updates for follower counts, post metrics
-- `moderateContent` - AI-powered content moderation for posts and comments
-- `calculateAchievements` - Achievement badge attribution based on milestones
-- `cleanupOldData` - Daily cleanup of old upload records and expired data
-
-## Development Guidelines
-
-### Frontend Development
-- Follow existing component patterns in `/app/components/`
-- **Social Components**: Build reusable profile, feed, and discovery components
-- **AI Components**: Create engaging UI for AI insights and recommendations  
-- **Real-time Features**: Implement WebSocket connections for live updates
-- Use TypeScript strictly - check types with `npm run type-check`
-- Components use Tailwind CSS with custom Comfortaa font
-- Form handling: React Hook Form + Zod validation
-- API calls: Use React Query hooks in `/app/hooks/`
-- State management: Zustand for complex social state, React Query for server state
-
-### Backend Development  
-- Functions use Express.js with middleware in `/functions/src/index.ts`
-- All routes require authentication middleware
-- **Social APIs**: Implement follow/follower systems, feed generation, content management
-- **AI Integration**: Multi-model approach for cost-effective analysis
-  - Gemini 2.5 Flash Light for daily/weekly reports (cost-effective, fast)
-  - GPT-4o for individual trade analysis (higher quality, detailed insights)
-- **Real-time Updates**: Use Firestore real-time listeners for social features
-- **Performance**: Implement caching for social feeds and AI reports
-- Data validation using Joi schemas
-- Error logging via Firebase Logger
-
-### Testing
-- Frontend: No test framework currently configured
-- Backend: Jest configured with TypeScript in `/functions/jest.config.js`
-- Test files in `/functions/src/__tests__/`
-- **Always run `npm run test` after backend changes**
-
-### Type Checking & Linting
-- **Always run `npm run lint` after code changes**  
-- **Always run `cd app && npm run type-check` for frontend TypeScript errors**
-- ESLint configured for both frontend and backend
-- Follow existing code style and naming conventions
-
-### CSV Processing
-- Ebinex CSV format with specific headers (see validation in functions)
-- Uploads stored temporarily in Firebase Storage
-- Processing triggered by Cloud Functions with deduplication
-- Supports Portuguese column headers for Brazilian users
-
-### AI Features
-- **Multi-Model Strategy**: Cost-effective AI analysis approach
-  - Gemini 2.5 Flash Light: Daily/weekly automated reports (fast & economical)
-  - GPT-4o: Individual trade analysis (high-quality, detailed insights)
-- **Free Tier**: Weekly AI reports + 5 individual trade analyses per week
-- **Pro Tier**: Daily AI reports + unlimited individual trade analyses
-- **Social Integration**: AI insights can be shared with privacy controls
-- AI feedback system with like/dislike buttons for continuous improvement
-- API keys managed via Firebase secrets
-- Prompts and responses in Portuguese for Brazilian market
-
-## Important Notes
-
-- **Product Vision:** Social trading platform with AI-powered insights, not just a personal journal
-- **Node.js Version:** Functions require Node.js 20 runtime
-- **Bilingual Support:** UI supports English/Portuguese via Language Context
-- **Social-First Development:** All features should consider social integration and sharing
-- **AI Cost Management:** Use Gemini 2.5 Flash Light for bulk analysis, GPT-4o for premium individual insights
-- **Real-time Features:** Social interactions require WebSocket or Firestore real-time listeners
-- **Privacy by Design:** Granular privacy controls for all social and performance data
-- **Emulator Development:** Always use emulators for local development
-- **Security:** All data access scoped by Firebase Auth UID
-- **Rate Limiting:** API endpoints have request limits for security
-- **Mock Data:** Available in `/app/lib/mockData.ts` for development
-- **Environment Variables:** Firebase config required for production builds
-- **Branch:** Currently on `feature/api-infrastructure` branch
-
-**Roadmap Phases:**
-- **Phase 1** (3-4 months): Social Trading Platform MVP with AI analysis
-- **Phase 2** (3-4 months): Live Trading Collaboration (voice, shared charts)
-- **Phase 3** (4-5 months): AI-Powered Collaborative Analysis (real-time AI on shared charts)
+Do not start a phase, or implement a screen, before the owner approves it.
