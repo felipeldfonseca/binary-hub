@@ -21,23 +21,6 @@ jest.mock('next/navigation', () => ({
   },
 }))
 
-// Mock Firebase
-jest.mock('./lib/firebase', () => ({
-  auth: {
-    currentUser: {
-      getIdToken: jest.fn().mockResolvedValue('mock-token'),
-      uid: 'mock-user-id',
-      email: 'test@example.com',
-      displayName: 'Test User',
-    },
-    signInWithEmailAndPassword: jest.fn(),
-    createUserWithEmailAndPassword: jest.fn(),
-    signOut: jest.fn(),
-    onAuthStateChanged: jest.fn(),
-  },
-  db: {},
-}))
-
 // Mock framer-motion
 jest.mock('framer-motion', () => ({
   motion: {
