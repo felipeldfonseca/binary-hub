@@ -4,15 +4,27 @@
 import {
   EVERY_DAY,
   MON_TO_FRI,
+  addDays,
   assertTimeZone,
   classifyLocalTime,
+  formatHhMm,
   inWindow,
   isValidWindow,
+  isoWeekdayOf,
   localToUtc,
+  nextOffsetChange,
   opensOn,
+  parseHhMm,
   tradingDay,
+  tradingDayBounds,
+  tradingDayFor,
+  tradingDayOn,
+  utcOffsetMinutes,
   utcToLocal,
   weekdayMask,
+  windowOccurrenceAt,
+  windowOccurrences,
+  type DayClock,
   type LocalDateTime,
   type TradingWindow,
 } from '@/lib/domain';
@@ -219,5 +231,230 @@ describe('tradingDay', () => {
   it('turns the month and the year over correctly', () => {
     expect(tradingDay(new Date('2027-01-01T04:00:00Z'), ebinexNight)).toBe('2026-12-31'); // Fri 1 Jan 01:00
     expect(tradingDay(new Date('2026-03-01T04:00:00Z'), ebinexNight)).toBe('2026-02-28'); // Sun 1 Mar 01:00
+  });
+
+  it('turns at 18:00 with the dayStartMin option, and at midnight without it (as before)', () => {
+    const at1830 = new Date('2026-10-19T22:30:00Z'); // Mon 18:30 EDT
+    expect(tradingDay(at1830, NY)).toBe('2026-10-19');
+    expect(tradingDay(at1830, NY, { dayStartMin: 1080 })).toBe('2026-10-20');
+    expect(tradingDay(at1830, NY, { dayStartMin: 0 })).toBe('2026-10-19');
+  });
+});
+
+// ---------------------------------------------------------------------------------------------
+// Phase 2: the account's day clock, window occurrences, offsets, "HH:MM"
+// ---------------------------------------------------------------------------------------------
+
+const TOP_CLOCK: DayClock = { tz: NY, startMin: 1080 };
+const BIN_CLOCK: DayClock = { tz: SP, startMin: 0 };
+
+describe('calendar dates', () => {
+  it('adds days across months, years and leap days', () => {
+    expect(addDays('2026-10-31', 1)).toBe('2026-11-01');
+    expect(addDays('2026-01-01', -1)).toBe('2025-12-31');
+    expect(addDays('2028-02-28', 1)).toBe('2028-02-29');
+    expect(addDays('2026-11-01', 0)).toBe('2026-11-01');
+  });
+
+  it('gives the ISO weekday of a date', () => {
+    expect(isoWeekdayOf('2026-10-19')).toBe(1);
+    expect(isoWeekdayOf('2026-10-24')).toBe(6);
+    expect(isoWeekdayOf('2026-10-25')).toBe(7);
+  });
+
+  it('refuses dates that do not exist', () => {
+    expect(() => addDays('2026-02-30', 1)).toThrow(RangeError);
+    expect(() => isoWeekdayOf('19/10/2026')).toThrow(RangeError);
+    expect(() => addDays('2026-10-19', 0.5)).toThrow(RangeError);
+  });
+});
+
+describe('tradingDayOn matches Postgres trading_day_on', () => {
+  // Recorded from PostgreSQL 15.13: select trading_day_on('<instant>', '<tz>', <start_min>)
+  const postgres: Array<[string, DayClock, string, string]> = [
+    ['Mon 17:59 ET', TOP_CLOCK, '2026-10-19T21:59:00Z', '2026-10-19'],
+    ['Mon 17:59:59 ET', TOP_CLOCK, '2026-10-19T21:59:59Z', '2026-10-19'],
+    ['Mon 18:00 ET', TOP_CLOCK, '2026-10-19T22:00:00Z', '2026-10-20'],
+    ['Mon 18:30 ET', TOP_CLOCK, '2026-10-19T22:30:00Z', '2026-10-20'],
+    ['Fri 18:30 ET → Saturday', TOP_CLOCK, '2026-10-23T22:30:00Z', '2026-10-24'],
+    ['Sun 17:59 ET', TOP_CLOCK, '2026-10-25T21:59:00Z', '2026-10-25'],
+    ['Sun 18:00 ET → Monday', TOP_CLOCK, '2026-10-25T22:00:00Z', '2026-10-26'],
+    ['Sat 31 Oct 18:00 EDT', TOP_CLOCK, '2026-10-31T22:00:00Z', '2026-11-01'],
+    ['Sun 1 Nov 01:30 EDT (first)', TOP_CLOCK, '2026-11-01T05:30:00Z', '2026-11-01'],
+    ['Sun 1 Nov 01:30 EST (second)', TOP_CLOCK, '2026-11-01T06:30:00Z', '2026-11-01'],
+    ['Sun 1 Nov 17:59 EST', TOP_CLOCK, '2026-11-01T22:59:00Z', '2026-11-01'],
+    ['Sun 1 Nov 18:00 EST', TOP_CLOCK, '2026-11-01T23:00:00Z', '2026-11-02'],
+    ['Sat 7 Mar 18:00 EST', TOP_CLOCK, '2026-03-07T23:00:00Z', '2026-03-08'],
+    ['Sun 8 Mar 03:30 EDT', TOP_CLOCK, '2026-03-08T07:30:00Z', '2026-03-08'],
+    ['Sun 8 Mar 17:59 EDT', TOP_CLOCK, '2026-03-08T21:59:00Z', '2026-03-08'],
+    ['Sun 8 Mar 18:00 EDT', TOP_CLOCK, '2026-03-08T22:00:00Z', '2026-03-09'],
+    ['Mon 9 Mar 18:00 EDT', TOP_CLOCK, '2026-03-09T22:00:00Z', '2026-03-10'],
+    ['Mon 23:59 Brasília', BIN_CLOCK, '2026-10-20T02:59:00Z', '2026-10-19'],
+    ['Tue 00:00 Brasília', BIN_CLOCK, '2026-10-20T03:00:00Z', '2026-10-20'],
+    ['Mon 21:00 Brasília = Tue 00:00 UTC', BIN_CLOCK, '2026-10-20T00:00:00Z', '2026-10-19'],
+    ['Mon 22:30 Brasília = Tue 01:30 UTC', BIN_CLOCK, '2026-10-20T01:30:00Z', '2026-10-19'],
+  ];
+
+  it.each(postgres)('%s', (_label, clock, instant, expected) => {
+    expect(tradingDayOn(new Date(instant), clock)).toBe(expected);
+  });
+
+  it('refuses a day clock it cannot compute', () => {
+    expect(() => tradingDayOn(new Date(), { tz: NY, startMin: 1440 })).toThrow(RangeError);
+    expect(() => tradingDayOn(new Date(), { tz: 'EST5EDT', startMin: 1080 })).toThrow(RangeError);
+  });
+});
+
+describe('tradingDayBounds', () => {
+  const iso = (d: Date) => d.toISOString().replace('.000Z', 'Z');
+
+  it.each([
+    ['futures Mon 19 Oct', TOP_CLOCK, '2026-10-19', '2026-10-18T22:00:00Z', '2026-10-19T22:00:00Z'],
+    ['futures Sun 1 Nov (25 hours: the clock goes back)', TOP_CLOCK, '2026-11-01', '2026-10-31T22:00:00Z', '2026-11-01T23:00:00Z'],
+    ['futures Mon 2 Nov', TOP_CLOCK, '2026-11-02', '2026-11-01T23:00:00Z', '2026-11-02T23:00:00Z'],
+    ['futures Sun 8 Mar (23 hours)', TOP_CLOCK, '2026-03-08', '2026-03-07T23:00:00Z', '2026-03-08T22:00:00Z'],
+    ['futures Mon 9 Mar', TOP_CLOCK, '2026-03-09', '2026-03-08T22:00:00Z', '2026-03-09T22:00:00Z'],
+    ['binary Mon 19 Oct', BIN_CLOCK, '2026-10-19', '2026-10-19T03:00:00Z', '2026-10-20T03:00:00Z'],
+  ])('%s', (_label, clock, day, start, end) => {
+    const b = tradingDayBounds(day, clock);
+    expect([iso(b.start), iso(b.end)]).toEqual([start, end]);
+    expect(tradingDayOn(b.start, clock)).toBe(day);
+    expect(tradingDayOn(new Date(b.end.getTime() - 1000), clock)).toBe(day);
+    expect(tradingDayOn(b.end, clock)).toBe(addDays(day, 1));
+  });
+});
+
+describe('window occurrences', () => {
+  const topOne: TradingWindow = { tz: NY, startMin: 600, endMin: 660, weekdays: MON_TO_FRI };
+  const ebinex: TradingWindow = { tz: SP, startMin: 1200, endMin: 1260, weekdays: MON_TO_FRI };
+  const night: TradingWindow = { tz: SP, startMin: 1320, endMin: 120, weekdays: MON_TO_FRI };
+  const iso = (d: Date | undefined) => d?.toISOString().replace('.000Z', 'Z');
+
+  it('opens on the window weekdays only, from two days before to nine after', () => {
+    const occ = windowOccurrences(new Date('2026-10-21T15:00:00Z'), [topOne]); // Wed
+    expect(occ.map((o) => o.opensOn)).toEqual([
+      '2026-10-19', '2026-10-20', '2026-10-21', '2026-10-22', '2026-10-23', '2026-10-26', '2026-10-27', '2026-10-28', '2026-10-29', '2026-10-30',
+    ]);
+  });
+
+  it('follows each change of offset: 10:00 ET is 14:00 UTC on Fri 30 Oct and 15:00 UTC on Mon 2 Nov', () => {
+    const occ = windowOccurrences(new Date('2026-10-30T12:00:00Z'), [topOne], 0, 3);
+    expect(occ.map((o) => [o.opensOn, iso(o.start), iso(o.end)])).toEqual([
+      ['2026-10-30', '2026-10-30T14:00:00Z', '2026-10-30T15:00:00Z'],
+      ['2026-11-02', '2026-11-02T15:00:00Z', '2026-11-02T16:00:00Z'],
+    ]);
+  });
+
+  it('Ebinex 20:00–21:00 Brasília ends at midnight UTC', () => {
+    const at = windowOccurrenceAt(new Date('2026-10-19T23:59:59Z'), [ebinex], BIN_CLOCK);
+    expect([iso(at.current?.start), iso(at.current?.end), at.current?.tradingDay]).toEqual([
+      '2026-10-19T23:00:00Z', '2026-10-20T00:00:00Z', '2026-10-19',
+    ]);
+    expect([at.current?.endOnClock.date, at.current?.endOnClock.hour]).toEqual(['2026-10-19', 21]);
+    const after = windowOccurrenceAt(new Date('2026-10-20T00:00:00Z'), [ebinex], BIN_CLOCK);
+    expect([after.current, iso(after.next?.start), after.next?.tradingDay]).toEqual([null, '2026-10-20T23:00:00Z', '2026-10-20']);
+  });
+
+  it('gives the current and the next occurrence on the account clock', () => {
+    const at = windowOccurrenceAt(new Date('2026-10-23T15:30:00Z'), [topOne], TOP_CLOCK); // Fri 11:30 ET
+    expect(at.current).toBeNull();
+    expect([iso(at.next?.start), at.next?.tradingDay, at.next?.startOnClock.isoWeekday, at.next?.startOnClock.hour]).toEqual([
+      '2026-10-26T14:00:00Z', '2026-10-26', 1, 10,
+    ]);
+  });
+
+  it('a window across midnight closes the next day', () => {
+    const at = windowOccurrenceAt(new Date('2026-10-24T04:00:00Z'), [night], BIN_CLOCK); // Sat 01:00 Brasília
+    expect([at.current?.opensOn, iso(at.current?.start), iso(at.current?.end), at.current?.tradingDay]).toEqual([
+      '2026-10-23', '2026-10-24T01:00:00Z', '2026-10-24T05:00:00Z', '2026-10-23',
+    ]);
+  });
+});
+
+describe('tradingDayFor (the unified trading day) matches Postgres trading_day_for', () => {
+  const ebinex: TradingWindow = { tz: SP, startMin: 1200, endMin: 1260, weekdays: MON_TO_FRI };
+  const topOne: TradingWindow = { tz: NY, startMin: 600, endMin: 660, weekdays: MON_TO_FRI };
+  const night: TradingWindow = { tz: SP, startMin: 1320, endMin: 120, weekdays: MON_TO_FRI };
+  const across: TradingWindow = { tz: NY, startMin: 1020, endMin: 1140, weekdays: MON_TO_FRI };
+  // Recorded from PostgreSQL 15.13: select trading_day_for('<windows>', '<tz>', <start_min>, '<instant>')
+  const postgres: Array<[string, DayClock, TradingWindow, string, string]> = [
+    ['Ebinex 20–21 Mon 20:59:59 (23:59:59 UTC)', BIN_CLOCK, ebinex, '2026-10-19T23:59:59Z', '2026-10-19'],
+    ['Ebinex 20–21 Mon 21:00 (00:00 UTC Tue)', BIN_CLOCK, ebinex, '2026-10-20T00:00:00Z', '2026-10-19'],
+    ['Top One 10–11 Mon 10:30 ET', TOP_CLOCK, topOne, '2026-10-19T14:30:00Z', '2026-10-19'],
+    ['Top One 10–11 Mon 18:30 ET (outside: the 18:00 turn)', TOP_CLOCK, topOne, '2026-10-19T22:30:00Z', '2026-10-20'],
+    ['Overnight 22–02 Mon 23:00', BIN_CLOCK, night, '2026-10-20T02:00:00Z', '2026-10-19'],
+    ['Overnight 22–02 Tue 01:00 → Monday', BIN_CLOCK, night, '2026-10-20T04:00:00Z', '2026-10-19'],
+    ['Overnight 22–02 Tue 02:00 → Tuesday (end exclusive)', BIN_CLOCK, night, '2026-10-20T05:00:00Z', '2026-10-20'],
+    ['Overnight 22–02 Tue 03:00', BIN_CLOCK, night, '2026-10-20T06:00:00Z', '2026-10-20'],
+    ['Overnight 22–02 Sat 01:00 → Friday', BIN_CLOCK, night, '2026-10-24T04:00:00Z', '2026-10-23'],
+    ['Overnight 22–02 Mon 01:00 → Monday (no Sunday window)', BIN_CLOCK, night, '2026-10-19T04:00:00Z', '2026-10-19'],
+    ['Across 18:00 ET 17–19 Mon 18:30 → Monday', TOP_CLOCK, across, '2026-10-19T22:30:00Z', '2026-10-19'],
+    ['Across 18:00 ET 17–19 Mon 19:00 → Tuesday', TOP_CLOCK, across, '2026-10-19T23:00:00Z', '2026-10-20'],
+    ['Across 18:00 ET 17–19 Fri 18:30 → Friday', TOP_CLOCK, across, '2026-10-23T22:30:00Z', '2026-10-23'],
+    ['Across 18:00 ET 17–19 Sun 18:30 → Monday (no Sunday window)', TOP_CLOCK, across, '2026-10-25T22:30:00Z', '2026-10-26'],
+  ];
+
+  it.each(postgres)('%s', (_label, clock, window, instant, expected) => {
+    expect(tradingDayFor(new Date(instant), clock, [window])).toBe(expected);
+  });
+
+  it('is the account day with no window', () => {
+    expect(tradingDayFor(new Date('2026-10-19T22:30:00Z'), TOP_CLOCK, [])).toBe('2026-10-20');
+  });
+});
+
+describe('offsets and the next daylight-saving change', () => {
+  it('reads the offset in minutes', () => {
+    expect(utcOffsetMinutes(new Date('2026-10-19T12:00:00Z'), NY)).toBe(-240);
+    expect(utcOffsetMinutes(new Date('2026-11-02T12:00:00Z'), NY)).toBe(-300);
+    expect(utcOffsetMinutes(new Date('2026-10-19T12:00:00Z'), SP)).toBe(-180);
+  });
+
+  it('finds New York\'s 1 Nov 2026 change within 14 days, to the second', () => {
+    const change = nextOffsetChange(new Date('2026-10-18T12:00:00Z'), NY);
+    expect(change).toEqual({ at: new Date('2026-11-01T06:00:00Z'), offsetBeforeMin: -240, offsetAfterMin: -300 });
+  });
+
+  it('finds the 8 Mar 2026 change', () => {
+    expect(nextOffsetChange(new Date('2026-03-01T00:00:00Z'), NY, 14)).toEqual({
+      at: new Date('2026-03-08T07:00:00Z'),
+      offsetBeforeMin: -300,
+      offsetAfterMin: -240,
+    });
+  });
+
+  it('says nothing when the change is further away, and Brasília has none', () => {
+    expect(nextOffsetChange(new Date('2026-10-17T00:00:00Z'), NY, 14)).toBeNull();
+    expect(nextOffsetChange(new Date('2026-10-17T00:00:00Z'), SP, 365)).toBeNull();
+  });
+
+  it('includes a change exactly at the end of the range', () => {
+    const from = new Date(Date.parse('2026-11-01T06:00:00Z') - 14 * 86_400_000);
+    expect(nextOffsetChange(from, NY, 14)?.at).toEqual(new Date('2026-11-01T06:00:00Z'));
+  });
+});
+
+describe('"HH:MM" without Date', () => {
+  it.each([
+    ['10:00', 600],
+    ['00:00', 0],
+    ['23:59', 1439],
+    ['9:05', 545],
+    ['20:00:00', 1200],
+    [' 18:00 ', 1080],
+  ])('%s → %s', (text, minutes) => {
+    expect(parseHhMm(text)).toBe(minutes);
+  });
+
+  it.each(['24:00', '10:60', '10', '10h00', '10:5', '10:00:30', '', '-1:00', '10:00 AM'])('refuses %p', (text) => {
+    expect(parseHhMm(text)).toBeNull();
+  });
+
+  it('formats a minute of the day back', () => {
+    expect(formatHhMm(600)).toBe('10:00');
+    expect(formatHhMm(545)).toBe('09:05');
+    expect(formatHhMm(1439)).toBe('23:59');
+    expect(() => formatHhMm(1440)).toThrow(RangeError);
+    for (let m = 0; m < 1440; m += 7) expect(parseHhMm(formatHhMm(m))).toBe(m);
   });
 });
