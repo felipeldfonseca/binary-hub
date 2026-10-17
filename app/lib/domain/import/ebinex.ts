@@ -87,6 +87,8 @@ function price(text: string): Decimal | null | 'bad' {
 }
 
 const cents = (n: Num) => toUnits({ ...n, neg: false }, 2);
+/** The magnitude at a given scale; exact when the scale is at least the number's own. */
+const exact = (n: Num, scale: number) => toUnits({ ...n, neg: false }, scale);
 const money = (units: bigint) => toDecimal(fromUnits(units, 2), 2);
 
 export function parseEbinexRecords(records: CsvRecord[], index: EbinexIndex, width: number): PlatformParse {
@@ -169,14 +171,19 @@ export function parseEbinexRecords(records: CsvRecord[], index: EbinexIndex, wid
     }
 
     const valor = cents(valorN);
-    const estornado = cents(estornadoN);
     const executado = cents(executadoN);
     const resultAbs = cents(resultado);
-    if (valor === ZERO) {
+    // The checks compare the amounts as written; only what is stored is rounded to cents
+    const scale = Math.max(2, valorN.scale, estornadoN.scale, executadoN.scale, resultado.scale);
+    const valorX = exact(valorN, scale);
+    const estornadoX = exact(estornadoN, scale);
+    const executadoX = exact(executadoN, scale);
+    const resultX = exact(resultado, scale);
+    if (valorX === ZERO) {
       out.error(line, 'zero_stake');
       continue;
     }
-    if (estornado + executado !== valor) {
+    if (estornadoX + executadoX !== valorX) {
       out.error(line, 'inconsistent_amounts');
       continue;
     }
@@ -191,7 +198,7 @@ export function parseEbinexRecords(records: CsvRecord[], index: EbinexIndex, wid
         out.error(line, 'sign_mismatch', 'Resultado');
         continue;
       }
-      if (executado === ZERO) {
+      if (executadoX === ZERO) {
         out.error(line, 'inconsistent_amounts');
         continue;
       }
@@ -203,21 +210,21 @@ export function parseEbinexRecords(records: CsvRecord[], index: EbinexIndex, wid
       result = 'win';
       pnl = money(resultAbs);
       stake = executado;
-      if (estornado > ZERO) warn('partial_refund');
+      if (estornadoX > ZERO) warn('partial_refund');
     } else if (status === 'lose') {
       if (resultado.sign === '+') {
         out.error(line, 'sign_mismatch', 'Resultado');
         continue;
       }
-      if (executado === ZERO) {
+      if (executadoX === ZERO) {
         out.error(line, 'inconsistent_amounts');
         continue;
       }
       result = 'loss';
       pnl = money(-resultAbs);
       stake = executado;
-      if (resultAbs !== executado) warn('loss_not_full_stake');
-      if (estornado > ZERO) warn('partial_refund');
+      if (resultX !== executadoX) warn('loss_not_full_stake');
+      if (estornadoX > ZERO) warn('partial_refund');
     } else {
       if (resultado.sign === '-') {
         out.error(line, 'sign_mismatch', 'Resultado');
@@ -226,7 +233,7 @@ export function parseEbinexRecords(records: CsvRecord[], index: EbinexIndex, wid
       result = 'breakeven';
       pnl = '0.00';
       stake = valor;
-      if (resultAbs !== estornado) warn('refund_amount_mismatch');
+      if (resultX !== estornadoX) warn('refund_amount_mismatch');
     }
 
     const open = price(cell('P. ABRT'));

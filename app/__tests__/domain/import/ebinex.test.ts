@@ -105,6 +105,12 @@ describe('status, sign and amounts', () => {
     expect(codes(one({ Estornado: '$ 10', Executado: '$ 0' }).errors)).toEqual(['inconsistent_amounts']);
   });
 
+  it('the parts are checked as written, before rounding to cents', () => {
+    const out = one({ Valor: '$ 10.01', Estornado: '$ 5.005', Executado: '$ 5.005', Resultado: '+$4.50' });
+    expect(out.errors).toEqual([]);
+    expect(codes(out.warnings)).toEqual(['partial_refund']);
+  });
+
   it('amounts beyond numeric(18,2) or a payout beyond numeric(8,4) fail alone', () => {
     expect(codes(one({ Valor: '12345678901234567', Executado: '12345678901234567' }).errors)).toEqual([
       'bad_number(Valor)',

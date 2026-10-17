@@ -36,6 +36,10 @@
               {
                 "group": ["@supabase/*", "react/*", "react-dom/*"],
                 "message": "lib/domain has no React or Supabase: pass data in, return data out."
+              },
+              {
+                "group": ["@/lib/supabase", "@/lib/contexts/*", "@/lib/providers/*", "@/hooks/*", "@/components/*", "@/app/*"],
+                "message": "lib/domain has no React or Supabase, not even through the app's own wrappers: pass data in, return data out."
               }
             ]
           }
