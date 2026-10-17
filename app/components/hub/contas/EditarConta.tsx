@@ -66,8 +66,12 @@ export default function EditarConta({ account, accounts, primaryId, onSaved, onC
 
   const trimmed = label.trim()
   const taken = labelTaken(trimmed, accounts, id)
+  // A nickname from the old data can be longer than the field allows: it stays as it is until
+  // changed, and a change must fit (never cut on save)
+  const labelChanged = trimmed !== account.label
+  const tooLong = labelChanged && trimmed.length > LABEL_MAX
   const sizeValue = futures ? parseSize(size) : null
-  const labelError = taken ? PASSO_B.labelTaken : tried && !trimmed ? EDITAR.needLabel : ''
+  const labelError = taken ? PASSO_B.labelTaken : tried && !trimmed ? EDITAR.needLabel : tooLong ? EDITAR.labelTooLong : ''
   const sizeError = tried && sizeValue === 'invalid' ? PASSO_B.badSize : ''
   const zoneOptions = ALL_FILE_ZONES.some((z) => z.tz === account.file_tz) || !confirmed
     ? ALL_FILE_ZONES.map((z) => z.tz)
@@ -81,7 +85,7 @@ export default function EditarConta({ account, accounts, primaryId, onSaved, onC
 
   const save = async () => {
     setTried(true)
-    if (!trimmed || taken) {
+    if (!trimmed || taken || tooLong) {
       labelRef.current?.focus()
       return
     }
@@ -93,7 +97,7 @@ export default function EditarConta({ account, accounts, primaryId, onSaved, onC
     setError(null)
     try {
       const patch: AccountPatch = {}
-      if (trimmed !== account.label) patch.label = trimmed.slice(0, LABEL_MAX)
+      if (labelChanged) patch.label = trimmed
       const nextPhase = futures ? phase : account.phase ?? 'pessoal'
       if (nextPhase !== account.phase) patch.phase = nextPhase
       if (futures && (firm.trim() || null) !== account.firm) patch.firm = firm.trim() || null
@@ -169,7 +173,7 @@ export default function EditarConta({ account, accounts, primaryId, onSaved, onC
           className="hub-entrada"
           type="text"
           autoComplete="off"
-          maxLength={Math.max(LABEL_MAX, account.label.length)}
+          maxLength={LABEL_MAX}
           value={label}
           disabled={!!dry}
           aria-invalid={labelError ? true : undefined}

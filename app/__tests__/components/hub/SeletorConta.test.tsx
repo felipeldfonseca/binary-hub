@@ -74,6 +74,31 @@ describe('SeletorConta', () => {
     expect(button).toHaveFocus()
   })
 
+  it('gives focus back to its button when the backdrop is clicked', async () => {
+    const { button } = renderSelector()
+
+    await userEvent.click(button)
+    await userEvent.click(document.querySelector('.hub-seletor__fundo') as HTMLElement)
+
+    expect(document.getElementById('lista-contas')).not.toBeInTheDocument()
+    expect(button).toHaveFocus()
+  })
+
+  it('closes with Escape while focus is back on its button', async () => {
+    const { button } = renderSelector()
+
+    await userEvent.click(button)
+    // From the first option back to the button: the list stays open
+    await userEvent.tab({ shift: true })
+    expect(button).toHaveFocus()
+    expect(document.getElementById('lista-contas')).toBeInTheDocument()
+
+    await userEvent.keyboard('{Escape}')
+
+    expect(document.getElementById('lista-contas')).not.toBeInTheDocument()
+    expect(button).toHaveFocus()
+  })
+
   it('closes when focus leaves it, so it never covers the focused control', async () => {
     render(
       <>

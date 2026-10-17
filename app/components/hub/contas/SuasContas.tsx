@@ -56,6 +56,9 @@ export default function SuasContas() {
   const toastUndoRef = useRef<HTMLButtonElement>(null)
   const moreRefs = useRef<Record<string, HTMLButtonElement | null>>({})
   const [focusToast, setFocusToast] = useState(0)
+  // The latest list, for an undo that runs after the list changed (an account added meanwhile)
+  const activeRef = useRef(active)
+  activeRef.current = active
 
   useEffect(() => {
     if (focusToast > 0) toastUndoRef.current?.focus()
@@ -88,8 +91,18 @@ export default function SuasContas() {
       setToast({
         text: CONTAS.archived(account.label),
         undo: async () => {
-          const otherPrimary = active.some((a) => a.id !== account.id && a.is_primary)
-          await updateAccount(db, account.id, { archived_at: null, ...(wasPrimary && !otherPrimary ? { is_primary: true } : {}) })
+          const otherPrimary = activeRef.current.some((a) => a.id !== account.id && a.is_primary)
+          if (wasPrimary && !otherPrimary) {
+            try {
+              await updateAccount(db, account.id, { archived_at: null, is_primary: true })
+            } catch (e) {
+              // Another account became the primary after the list was read: bring this one back without the mark
+              if (toHubError(e).code !== 'duplicate_primary') throw e
+              await updateAccount(db, account.id, { archived_at: null })
+            }
+          } else {
+            await updateAccount(db, account.id, { archived_at: null })
+          }
           refresh()
           setToast(null)
           headingRef.current?.focus()
@@ -145,10 +158,19 @@ export default function SuasContas() {
       <div className="hub-vazio">
         <strong>{CONTAS.empty}</strong>
         <div className="hub-acoes">
-          <button type="button" className="hub-btn hub-btn--pri" onClick={(event) => sheet.open({ mode: 'importar', opener: event.currentTarget })}>
+          {/* The empty state goes away once an account exists: focus then returns to the heading */}
+          <button
+            type="button"
+            className="hub-btn hub-btn--pri"
+            onClick={(event) => sheet.open({ mode: 'importar', opener: event.currentTarget, fallback: headingRef.current })}
+          >
             {IMPORT_FILE}
           </button>
-          <button type="button" className="hub-btn" onClick={(event) => sheet.open({ mode: 'adicionar', opener: event.currentTarget })}>
+          <button
+            type="button"
+            className="hub-btn"
+            onClick={(event) => sheet.open({ mode: 'adicionar', opener: event.currentTarget, fallback: headingRef.current })}
+          >
             {ADD_ACCOUNT}
           </button>
         </div>
@@ -162,9 +184,9 @@ export default function SuasContas() {
             <h3 id={`g-${group.market}`}>{MARKET_LABEL[group.market]}</h3>
             <ul className="hub-lista" aria-labelledby={`g-${group.market}`}>
               {group.accounts.map((account) => {
+                // Board: phase · platform · activity (the mesa is in Editar conta)
                 const parts = [
                   account.phase ? PHASE_LABEL[account.phase] : '',
-                  account.firm ?? '',
                   platformLabel(account.platform),
                   activityText(activity.data?.[account.id]),
                 ].filter(Boolean)

@@ -26,12 +26,14 @@ jest.mock('@/lib/hub/contasDb', () => ({
   fetchPreferences: jest.fn(),
   savePreferences: jest.fn(),
   fetchImportFormats: jest.fn(),
+  createAccount: jest.fn(),
 }))
 
 const fetchAccounts = data.fetchAccounts as jest.MockedFunction<typeof data.fetchAccounts>
 const fetchPreferences = data.fetchPreferences as jest.MockedFunction<typeof data.fetchPreferences>
 const savePreferences = data.savePreferences as jest.MockedFunction<typeof data.savePreferences>
 const fetchImportFormats = data.fetchImportFormats as jest.MockedFunction<typeof data.fetchImportFormats>
+const createAccount = data.createAccount as jest.MockedFunction<typeof data.createAccount>
 
 const topOne = makeAccount({ label: 'Top One', market: 'futures', sort_order: 1 })
 const ebinex = makeAccount({ label: 'Ebinex', market: 'binary', is_primary: true })
@@ -48,6 +50,7 @@ beforeEach(() => {
   fetchPreferences.mockReset().mockResolvedValue({ tema: 'escuro' })
   savePreferences.mockReset().mockResolvedValue(undefined)
   fetchImportFormats.mockReset().mockResolvedValue({})
+  createAccount.mockReset()
 })
 
 describe('Diário header', () => {
@@ -104,6 +107,32 @@ describe('Diário header', () => {
     expect(mockReplace).not.toHaveBeenCalled()
   })
 
+  it('never saves the choice over preferences it could not read, which would erase them', async () => {
+    fetchPreferences.mockRejectedValue(new data.HubDataError('network'))
+    renderHub(<DiarioCabecalho />)
+
+    await userEvent.click(await selectorButton())
+    await userEvent.click(screen.getByRole('button', { name: /Top One/ }))
+
+    // The choice still holds on the page
+    expect(await selectorButton()).toHaveTextContent('Conta: Top One')
+    await waitFor(() => expect(fetchPreferences).toHaveBeenCalledTimes(2))
+    expect(savePreferences).not.toHaveBeenCalled()
+  })
+
+  it('reads the preferences again before saving when the first read failed, keeping what else is there', async () => {
+    fetchPreferences.mockRejectedValueOnce(new data.HubDataError('network')).mockResolvedValue({ tema: 'escuro' })
+    renderHub(<DiarioCabecalho />)
+
+    await userEvent.click(await selectorButton())
+    await userEvent.click(screen.getByRole('button', { name: /Top One/ }))
+
+    await waitFor(() =>
+      expect(savePreferences).toHaveBeenCalledWith(expect.anything(), 'user-1', { tema: 'escuro', conta_atual: topOne.id }),
+    )
+    expect(await selectorButton()).toHaveTextContent('Conta: Top One')
+  })
+
   it('moves ?conta= along with a new choice', async () => {
     mockSearch = `conta=${apex.id}`
     renderHub(<DiarioCabecalho />)
@@ -122,6 +151,32 @@ describe('Diário header', () => {
     expect(screen.queryByRole('button', { name: /^Conta: / })).not.toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: '+ Adicionar conta' }))
     expect(screen.getByRole('dialog', { name: 'Adicionar conta' })).toBeInTheDocument()
+  })
+
+  it('gives focus to the H1 when the empty state that opened the sheet is gone', async () => {
+    fetchAccounts.mockResolvedValue([example])
+    const created = makeAccount({ label: 'Ebx', market: 'binary', platform: 'pocket', phase: 'pessoal', is_primary: true })
+    createAccount.mockImplementation(async () => {
+      fetchAccounts.mockResolvedValue([example, created])
+      return created
+    })
+    renderHub(<DiarioCabecalho />)
+
+    await userEvent.click(await screen.findByRole('button', { name: '+ Adicionar conta' }))
+    const dialog = screen.getByRole('dialog', { name: 'Adicionar conta' })
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Opções binárias' }))
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Continuar' }))
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Pocket Option' }))
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Continuar' }))
+    await userEvent.type(within(dialog).getByLabelText('Apelido'), 'Ebx')
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Criar Ebx' }))
+    await within(dialog).findByRole('heading', { name: 'Ebx criada.' })
+    // The selector replaces the empty state
+    expect(await screen.findByRole('button', { name: /^Conta: /, hidden: true })).toHaveTextContent('Conta: Ebx')
+
+    await userEvent.keyboard('{Escape}')
+
+    expect(screen.getByRole('heading', { level: 1, name: 'Diário' })).toHaveFocus()
   })
 
   it('opens the import sheet for the current account', async () => {

@@ -18,6 +18,7 @@ jest.mock('@/lib/hub/contasDb', () => ({
   fetchActivity: jest.fn(),
   fetchImportFormats: jest.fn(),
   fetchBatches: jest.fn(),
+  createAccount: jest.fn(),
   updateAccount: jest.fn(),
   setPrimary: jest.fn(),
   importUndo: jest.fn(),
@@ -28,6 +29,7 @@ const fetchAccounts = data.fetchAccounts as jest.MockedFunction<typeof data.fetc
 const fetchActivity = data.fetchActivity as jest.MockedFunction<typeof data.fetchActivity>
 const fetchImportFormats = data.fetchImportFormats as jest.MockedFunction<typeof data.fetchImportFormats>
 const fetchBatches = data.fetchBatches as jest.MockedFunction<typeof data.fetchBatches>
+const createAccount = data.createAccount as jest.MockedFunction<typeof data.createAccount>
 const updateAccount = data.updateAccount as jest.MockedFunction<typeof data.updateAccount>
 const setPrimary = data.setPrimary as jest.MockedFunction<typeof data.setPrimary>
 const importUndo = data.importUndo as jest.MockedFunction<typeof data.importUndo>
@@ -51,7 +53,7 @@ const fixTz = (over: Partial<data.FixTzResult> = {}): data.FixTzResult => ({
 })
 
 beforeEach(() => {
-  for (const mock of [fetchAccounts, fetchActivity, fetchImportFormats, fetchBatches, updateAccount, setPrimary, importUndo, importFixTz]) {
+  for (const mock of [fetchAccounts, fetchActivity, fetchImportFormats, fetchBatches, createAccount, updateAccount, setPrimary, importUndo, importFixTz]) {
     mock.mockReset()
   }
   fetchAccounts.mockResolvedValue([topOne, ebinex, apex, closed, example])
@@ -111,12 +113,13 @@ describe('Suas contas', () => {
     expect(screen.queryByText('Velha')).not.toBeInTheDocument()
   })
 
-  it('describes each account: phase · mesa · platform · activity', async () => {
+  it('describes each account as the board does: phase · platform · activity', async () => {
     renderHub(<SuasContas />)
 
     const ebinexRow = await row('Ebinex')
     await waitFor(() => expect(parts(ebinexRow)).toBe('Pessoal · Ebinex · só histórico importado'))
-    expect(parts(await row('Apex A'))).toBe('Avaliação · Apex · Rithmic · sem operações')
+    // The mesa (Apex) is not on the row
+    expect(parts(await row('Apex A'))).toBe('Avaliação · Rithmic · sem operações')
     expect(parts(await row('Top One #1'))).toBe('Top One · só histórico importado')
   })
 
@@ -158,6 +161,65 @@ describe('Suas contas', () => {
     expect(updateAccount).toHaveBeenLastCalledWith(expect.anything(), ebinex.id, { archived_at: null, is_primary: true })
     await waitFor(() => expect(screen.getByRole('heading', { level: 2, name: 'Suas contas' })).toHaveFocus())
     expect(screen.queryByText(/arquivada: o histórico fica guardado/)).not.toBeInTheDocument()
+  })
+
+  it('brings an archived primary back without the mark when another account became the primary meanwhile', async () => {
+    const only = makeAccount({ label: 'Única', market: 'binary', platform: 'ebinex', phase: 'pessoal', is_primary: true })
+    const added = makeAccount({ label: 'Nova', market: 'futures', platform: 'rithmic', is_primary: true })
+    fetchAccounts.mockResolvedValue([only])
+    renderHub(<SuasContas />)
+
+    const menu = await openMenu('Única')
+    // Once it is archived, another account is added and, being the only active one, becomes the primary
+    fetchAccounts.mockResolvedValue([{ ...only, archived_at: '2026-10-17T12:00:00Z', is_primary: false }, added])
+    await userEvent.click(within(menu).getByRole('button', { name: 'Arquivar' }))
+    await row('Nova')
+
+    await userEvent.click(screen.getByRole('button', { name: 'Desfazer: Única arquivada: o histórico fica guardado.' }))
+
+    expect(updateAccount).toHaveBeenLastCalledWith(expect.anything(), only.id, { archived_at: null })
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+
+  it('retries the undo without the primary mark when the database says another account has it', async () => {
+    renderHub(<SuasContas />)
+
+    await userEvent.click(within(await openMenu('Ebinex')).getByRole('button', { name: 'Arquivar' }))
+    updateAccount.mockRejectedValueOnce({ code: '23505', message: 'violates "trading_accounts_one_primary"' })
+    await userEvent.click(await screen.findByRole('button', { name: 'Desfazer: Ebinex arquivada: o histórico fica guardado.' }))
+
+    await waitFor(() => expect(updateAccount).toHaveBeenLastCalledWith(expect.anything(), ebinex.id, { archived_at: null }))
+    expect(updateAccount).toHaveBeenNthCalledWith(2, expect.anything(), ebinex.id, { archived_at: null, is_primary: true })
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    await waitFor(() => expect(screen.getByRole('heading', { level: 2, name: 'Suas contas' })).toHaveFocus())
+  })
+
+  it('gives focus to "Suas contas" when the button that opened the sheet is gone', async () => {
+    fetchAccounts.mockResolvedValue([closed])
+    const created = makeAccount({ label: 'Ebx', market: 'binary', platform: 'pocket', phase: 'pessoal', is_primary: true })
+    createAccount.mockImplementation(async () => {
+      fetchAccounts.mockResolvedValue([closed, created])
+      return created
+    })
+    renderHub(<SuasContas />)
+
+    await userEvent.click(await screen.findByRole('button', { name: '+ Adicionar conta' }))
+    const dialog = screen.getByRole('dialog', { name: 'Adicionar conta' })
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Opções binárias' }))
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Continuar' }))
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Pocket Option' }))
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Continuar' }))
+    await userEvent.type(within(dialog).getByLabelText('Apelido'), 'Ebx')
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Criar Ebx' }))
+    await within(dialog).findByRole('heading', { name: 'Ebx criada.' })
+    // The list now has the account: the empty state with its button is gone
+    await row('Ebx')
+    expect(screen.queryByText('Traga o histórico da sua corretora.')).not.toBeInTheDocument()
+
+    await userEvent.keyboard('{Escape}')
+
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(screen.getByRole('heading', { level: 2, name: 'Suas contas' })).toHaveFocus()
   })
 
   it('lists closed accounts and reactivates them', async () => {
@@ -265,6 +327,40 @@ describe('Editar conta', () => {
     expect(updateAccount).not.toHaveBeenCalled()
   })
 
+  it('never cuts a long nickname: the field takes 24 characters and a longer change is not saved', async () => {
+    // Accounts from the old data can have longer names
+    const long = makeAccount({ label: 'Conta Futuros Principal Apex', market: 'futures', platform: 'rithmic' })
+    fetchAccounts.mockResolvedValue([long])
+    renderHub(<SuasContas />)
+
+    await userEvent.click(within(await openMenu(long.label)).getByRole('button', { name: 'Editar conta' }))
+    const form = screen.getByRole('form')
+    const label = within(form).getByLabelText('Apelido')
+    expect(label).toHaveAttribute('maxLength', '24')
+    expect(label).toHaveValue('Conta Futuros Principal Apex')
+
+    await userEvent.type(label, '{Backspace}')
+    expect(within(form).getByRole('alert')).toHaveTextContent('Use no máximo 24 caracteres.')
+    await userEvent.click(within(form).getByRole('button', { name: 'Salvar' }))
+
+    expect(label).toHaveFocus()
+    expect(updateAccount).not.toHaveBeenCalled()
+    expect(screen.getByRole('form')).toBeInTheDocument()
+  })
+
+  it('saves the other fields of an account whose long nickname stays as it is', async () => {
+    const long = makeAccount({ label: 'Conta Futuros Principal Apex', market: 'futures', platform: 'rithmic' })
+    fetchAccounts.mockResolvedValue([long])
+    renderHub(<SuasContas />)
+
+    await userEvent.click(within(await openMenu(long.label)).getByRole('button', { name: 'Editar conta' }))
+    const form = screen.getByRole('form')
+    await userEvent.click(within(form).getByRole('button', { name: 'Financiada' }))
+    await userEvent.click(within(form).getByRole('button', { name: 'Salvar' }))
+
+    expect(updateAccount).toHaveBeenCalledWith(expect.anything(), long.id, { phase: 'financiada' })
+  })
+
   it('makes an account the primary one, clearing the old primary', async () => {
     renderHub(<SuasContas />)
 
@@ -317,6 +413,48 @@ describe('Editar conta', () => {
 
     expect(importFixTz).toHaveBeenCalledTimes(1)
     expect(within(form).getByLabelText('Fuso do arquivo')).toHaveValue('')
+  })
+
+  it('counts and confirms the current guess too, since a guess is not a confirmed zone', async () => {
+    importFixTz
+      .mockResolvedValueOnce(fixTz({ rows: 17, changed: 0, tz: 'UTC' }))
+      .mockResolvedValueOnce(fixTz({ rows: 17, changed: 0, tz: 'UTC', dry_run: false }))
+    renderHub(<SuasContas />)
+
+    // Top One #1 is still on the database's default guess, UTC
+    await userEvent.click(within(await openMenu('Top One #1')).getByRole('button', { name: 'Editar conta' }))
+    const form = screen.getByRole('form')
+    await userEvent.selectOptions(within(form).getByLabelText('Fuso do arquivo'), 'UTC')
+    await userEvent.click(within(form).getByRole('button', { name: 'Salvar' }))
+
+    expect(importFixTz).toHaveBeenCalledWith(expect.anything(), topOne.id, 'UTC', true)
+    expect(await within(form).findByText('Nenhuma operação muda de horário.')).toBeInTheDocument()
+    await userEvent.click(within(form).getByRole('button', { name: 'Confirmar fuso' }))
+
+    expect(importFixTz).toHaveBeenLastCalledWith(expect.anything(), topOne.id, 'UTC', false)
+    expect(await screen.findByText('Top One #1 salva. Fuso confirmado: UTC.')).toBeInTheDocument()
+  })
+
+  it('keeps the fields already saved when the zone count is cancelled', async () => {
+    importFixTz.mockResolvedValueOnce(fixTz({ rows: 17, changed: 17, shifts: ['-05:00:00'] }))
+    renderHub(<SuasContas />)
+
+    await userEvent.click(within(await openMenu('Top One #1')).getByRole('button', { name: 'Editar conta' }))
+    const form = screen.getByRole('form')
+    const label = within(form).getByLabelText('Apelido')
+    await userEvent.clear(label)
+    await userEvent.type(label, 'Top One')
+    await userEvent.selectOptions(within(form).getByLabelText('Fuso do arquivo'), 'Nova York (ET)')
+    await userEvent.click(within(form).getByRole('button', { name: 'Salvar' }))
+
+    expect(await within(form).findByText('17 operações mudam de horário (−5 h).')).toBeInTheDocument()
+    expect(updateAccount).toHaveBeenCalledWith(expect.anything(), topOne.id, { label: 'Top One' })
+    await userEvent.click(within(form).getByRole('button', { name: 'Cancelar' }))
+
+    // The nickname was saved before the count; only the zone is left as it was
+    expect(await screen.findByText('Top One salva.')).toBeInTheDocument()
+    expect(screen.queryByRole('form')).not.toBeInTheDocument()
+    expect(importFixTz).toHaveBeenCalledTimes(1)
   })
 
   it('just saves the zone of an account with no trade on the file’s clock', async () => {

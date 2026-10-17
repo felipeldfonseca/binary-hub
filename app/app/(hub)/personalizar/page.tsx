@@ -12,7 +12,8 @@ export default function PersonalizarPage() {
     <div className="hub-pagina">
       <div className="hub-pg-topo">
         <div style={{ flex: '1 1 420px', minWidth: 0 }}>
-          <h1>{PERSONALIZAR.title}</h1>
+          {/* Takes focus when the control that opened the import sheet is gone */}
+          <h1 tabIndex={-1}>{PERSONALIZAR.title}</h1>
           <p className="hub-pg-topo__sub">{PERSONALIZAR.sub}</p>
           <p className="hub-nota" style={{ marginTop: 6 }}>
             {PERSONALIZAR.phase2}

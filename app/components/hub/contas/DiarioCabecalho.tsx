@@ -12,7 +12,7 @@ export function DiarioTitulo() {
   return (
     <div className="hub-pg-topo">
       <div style={{ flex: '1 1 420px', minWidth: 0 }}>
-        <h1>{DIARIO.title}</h1>
+        <h1 tabIndex={-1}>{DIARIO.title}</h1>
       </div>
     </div>
   )
@@ -86,7 +86,8 @@ export default function DiarioCabecalho() {
     <>
       <div className="hub-pg-topo">
         <div style={{ flex: '1 1 420px', minWidth: 0 }}>
-          <h1>{DIARIO.title}</h1>
+          {/* Takes focus when the control that opened the import sheet is gone (the empty state) */}
+          <h1 tabIndex={-1}>{DIARIO.title}</h1>
         </div>
         <div className="hub-acoes">
           <button ref={importRef} type="button" className="hub-btn" onClick={(event) => openImport(event.currentTarget)}>

@@ -47,7 +47,17 @@ export default function SeletorConta({ accounts, current, onChoose, onAdd }: Pro
   }
 
   return (
-    <div ref={wrapRef} className="hub-seletor">
+    // Escape closes the list wherever focus is in it, the button included
+    <div
+      ref={wrapRef}
+      className="hub-seletor"
+      onKeyDown={(event) => {
+        if (open && event.key === 'Escape') {
+          event.stopPropagation()
+          close()
+        }
+      }}
+    >
       <button
         ref={buttonRef}
         type="button"
@@ -66,18 +76,8 @@ export default function SeletorConta({ accounts, current, onChoose, onAdd }: Pro
       </button>
       {open && (
         <>
-          <div className="hub-seletor__fundo" aria-hidden="true" onClick={() => setOpen(false)} />
-          <div
-            ref={listRef}
-            id="lista-contas"
-            className="hub-seletor__lista"
-            onKeyDown={(event) => {
-              if (event.key === 'Escape') {
-                event.stopPropagation()
-                close()
-              }
-            }}
-          >
+          <div className="hub-seletor__fundo" aria-hidden="true" onClick={close} />
+          <div ref={listRef} id="lista-contas" className="hub-seletor__lista">
             {groupByMarket(accounts).map((group) => (
               <Fragment key={group.market}>
                 <span className="hub-seletor__grupo">{MARKET_LABEL[group.market]}</span>

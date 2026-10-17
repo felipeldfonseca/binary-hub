@@ -827,7 +827,8 @@ html:has(.hub[data-tema='escuro']) #root {
   outline-offset: 4px;
   border-radius: 4px;
 }
-.hub-card__sub {
+/* `.hub .hub-nota` sets margin 0: the same specificity, later in the file, pulls the note up */
+.hub .hub-card__sub {
   margin-top: -8px;
 }
 .hub-cab {
@@ -1255,7 +1256,7 @@ html:has(.hub[data-tema='escuro']) #root {
   gap: 8px;
   margin-left: auto;
 }
-.hub-dica {
+.hub .hub-dica {
   margin-top: -10px;
   text-align: right;
 }

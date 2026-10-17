@@ -6,7 +6,7 @@
  *   ADAPTED  a board string changed for Phase 1 (the comment says what changed)
  */
 import type { AccountMarket, AccountPhase, ZoneKey } from '@/lib/hub/contas'
-import { ALL_FILE_ZONES } from '@/lib/hub/contas'
+import { ALL_FILE_ZONES, LABEL_MAX } from '@/lib/hub/contas'
 import type { HubErrorCode } from '@/lib/hub/contasDb'
 import { formatInt } from '@/lib/hub/formato'
 
@@ -140,6 +140,8 @@ export const EDITAR = {
   saved: (label: string) => `${label} salva.`, // NEW
   zoneConfirmed: (zone: string) => `Fuso confirmado: ${zone}.`,
   confirmZone: 'Confirmar fuso',
+  // NEW: an old nickname can be longer than the field allows; a change must fit, never cut silently
+  labelTooLong: `Use no máximo ${LABEL_MAX} caracteres.`,
 }
 
 /** "N operações mudam de horário (+3 h) e M mudam de dia." The owner's wording. */

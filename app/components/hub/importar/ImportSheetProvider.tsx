@@ -12,6 +12,11 @@ export interface OpenSheetOptions {
   accountId?: string | null
   /** Gets focus back when the sheet closes; defaults to whatever had focus */
   opener?: HTMLElement | null
+  /**
+   * Gets focus when the opener is gone after the sheet closes (an empty state replaced by the
+   * account just added); defaults to the page's H1
+   */
+  fallback?: HTMLElement | null
 }
 
 interface SheetContextValue {
@@ -33,26 +38,31 @@ interface Session {
   accountId: string | null
 }
 
+interface FocusReturn {
+  opener: HTMLElement | null
+  fallback: HTMLElement | null
+}
+
 /**
  * Holds the import sheet for every hub screen. While it is open the page behind it is hidden
  * from assistive technology and made inert, the page does not scroll, and on close focus goes
- * back to the control that opened it.
+ * back to the control that opened it (or, when that control is gone, to a heading of the page).
  */
 export default function ImportSheetProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null)
-  const openerRef = useRef<HTMLElement | null>(null)
-  const returnFocus = useRef<HTMLElement | null>(null)
+  const focusRef = useRef<FocusReturn>({ opener: null, fallback: null })
+  const returnFocus = useRef<FocusReturn | null>(null)
   const pageRef = useRef<HTMLDivElement>(null)
 
   const open = useCallback((options: OpenSheetOptions) => {
     const active = typeof document !== 'undefined' ? (document.activeElement as HTMLElement | null) : null
-    openerRef.current = options.opener ?? active
+    focusRef.current = { opener: options.opener ?? active, fallback: options.fallback ?? null }
     setSession({ key: Date.now(), mode: options.mode, accountId: options.accountId ?? null })
   }, [])
 
   const close = useCallback(() => {
-    returnFocus.current = openerRef.current
-    openerRef.current = null
+    returnFocus.current = focusRef.current
+    focusRef.current = { opener: null, fallback: null }
     setSession(null)
   }, [])
 
@@ -66,9 +76,14 @@ export default function ImportSheetProvider({ children }: { children: React.Reac
     const previous = root.style.overflow
     if (session) root.style.overflow = 'hidden'
     if (!session && returnFocus.current) {
-      const target = returnFocus.current
+      const { opener, fallback } = returnFocus.current
       returnFocus.current = null
-      if (target.isConnected) target.focus()
+      const target = opener?.isConnected
+        ? opener
+        : fallback?.isConnected
+          ? fallback
+          : page?.querySelector<HTMLElement>('h1[tabindex="-1"]')
+      target?.focus()
     }
     return () => {
       root.style.overflow = previous

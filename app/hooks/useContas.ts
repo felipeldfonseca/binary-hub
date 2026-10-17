@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useMemo } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
@@ -85,19 +85,18 @@ export function useImportBatches(accountId: string) {
   });
 }
 
-/** profiles.preferences; an unreadable value counts as empty, so the screens still work. */
+/**
+ * profiles.preferences. A failed read stays an error (never an empty object): saving over it
+ * would replace every other key. The screens go on without the saved values.
+ */
 export function usePreferences() {
   const { db, userId } = useHubDb();
   return useQuery({
     queryKey: hubKeys.preferencias(userId),
-    queryFn: async () => {
-      try {
-        return await fetchPreferences(db, userId as string);
-      } catch {
-        return {} as HubPreferences;
-      }
-    },
+    queryFn: () => fetchPreferences(db, userId as string),
     enabled: !!userId,
+    // No saved choice is a usable answer: do not hold the screen while retrying
+    retry: false,
   });
 }
 
@@ -119,7 +118,7 @@ export function useRefreshAfterWrite() {
 /**
  * "Conta atual", shared by every hub screen: `?conta=` in the URL, else the last choice
  * (profiles.preferences.conta_atual), else the primary account, else the first active one.
- * Choosing saves the choice; a `?conta=` in the URL follows it.
+ * Choosing saves the choice, merged into the stored preferences; a `?conta=` in the URL follows it.
  */
 export function useContaAtual() {
   const accounts = useAccounts();
@@ -130,24 +129,32 @@ export function useContaAtual() {
   const router = useRouter();
   const pathname = usePathname();
   const fromUrl = searchParams?.get('conta') ?? null;
+  // The last choice made on this page, which holds even when it could not be saved
+  const [chosen, setChosen] = useState<string | null>(null);
 
   const current = useMemo(
-    () => resolveContaAtual(accounts.active, { fromUrl, saved: preferences.data?.conta_atual ?? null }),
-    [accounts.active, fromUrl, preferences.data],
+    () => resolveContaAtual(accounts.active, { fromUrl, saved: chosen ?? preferences.data?.conta_atual ?? null }),
+    [accounts.active, fromUrl, chosen, preferences.data],
   );
 
   const choose = useCallback(
     async (id: string) => {
       if (!userId) return;
-      const key = hubKeys.preferencias(userId);
-      const next: HubPreferences = { ...(queryClient.getQueryData<HubPreferences>(key) ?? {}), conta_atual: id };
-      queryClient.setQueryData(key, next);
+      setChosen(id);
       if (fromUrl && fromUrl !== id) {
         const params = new URLSearchParams(searchParams?.toString() ?? '');
         params.set('conta', id);
         router.replace(`${pathname ?? ''}?${params.toString()}`);
       }
+      const key = hubKeys.preferencias(userId);
       try {
+        // The save replaces the whole object: without the stored one, read it again first, and
+        // never write when it cannot be read
+        const stored =
+          queryClient.getQueryData<HubPreferences>(key) ??
+          (await queryClient.fetchQuery({ queryKey: key, queryFn: () => fetchPreferences(db, userId), retry: false }));
+        const next: HubPreferences = { ...stored, conta_atual: id };
+        queryClient.setQueryData(key, next);
         await savePreferences(db, userId, next);
       } catch {
         // The choice still holds on this page; it is only not remembered for the next visit
