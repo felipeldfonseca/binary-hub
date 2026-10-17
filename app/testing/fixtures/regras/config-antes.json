@@ -1,0 +1,108 @@
+{
+  "rev": "none",
+  "builtin": {
+    "binary": {
+      "v": 1,
+      "window_rule": {
+        "on": true,
+        "outside": "fora"
+      }
+    },
+    "futures": {
+      "v": 1,
+      "block": {
+        "on": true,
+        "after_min": 10,
+        "before_min": 5
+      },
+      "states": {},
+      "window_rule": {
+        "on": true,
+        "outside": "fora"
+      }
+    }
+  },
+  "accounts": [
+    {
+      "day": {
+        "tz": "America/New_York",
+        "start_min": 1080
+      },
+      "label": "Top One #1",
+      "market": "futures",
+      "window": null,
+      "current": {
+        "v": 1,
+        "day": {
+          "tz": "America/New_York",
+          "start_min": 1080
+        },
+        "block": {
+          "on": true,
+          "after_min": 10,
+          "calendars": [
+            "us"
+          ],
+          "before_min": 5
+        },
+        "limit": null,
+        "market": "futures",
+        "states": {
+          "alinhadas": null,
+          "so_tecnica": null,
+          "em_conflito": null,
+          "sem_direcao": null,
+          "so_fundamentos": null
+        },
+        "windows": [],
+        "window_rule": {
+          "on": true,
+          "outside": "fora"
+        },
+        "windows_from": null
+      },
+      "settings": null,
+      "versions": [],
+      "account_id": "f4b838a9-99d5-4a1f-90d4-56679ed01a37",
+      "is_example": false,
+      "archived_at": null
+    },
+    {
+      "day": {
+        "tz": "America/Sao_Paulo",
+        "start_min": 0
+      },
+      "label": "Ebinex",
+      "market": "binary",
+      "window": null,
+      "current": {
+        "v": 1,
+        "day": {
+          "tz": "America/Sao_Paulo",
+          "start_min": 0
+        },
+        "block": null,
+        "limit": null,
+        "market": "binary",
+        "states": null,
+        "windows": [],
+        "window_rule": {
+          "on": true,
+          "outside": "fora"
+        },
+        "windows_from": null
+      },
+      "settings": null,
+      "versions": [],
+      "account_id": "65da7e2c-cc06-4cbb-aaa2-3177b3f3743c",
+      "is_example": false,
+      "archived_at": null
+    }
+  ],
+  "defaults": {
+    "binary": null,
+    "futures": null
+  },
+  "server_now": "2026-10-17T19:48:01.320907+00:00",
+  "preferences": {}
+}
