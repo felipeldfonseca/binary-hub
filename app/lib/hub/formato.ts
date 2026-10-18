@@ -2,6 +2,7 @@
  * pt-BR formatting for the hub screens: counts, money from exact decimal strings, short dates,
  * UTC offsets and the shifts `import_fix_tz` reports. Pure functions, no React.
  */
+import type { Currency } from '@/lib/domain/markets';
 
 const MONTHS = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
 const NBSP = ' ';
@@ -16,18 +17,26 @@ export function formatInt(n: number): string {
 
 const groupThousands = (digits: string) => digits.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
 
+/** The symbol written before an amount: US$ (USDT and USDC count as dollars) or R$ (B3) */
+export const SIMBOLO_MOEDA: Readonly<Record<Currency, string>> = { USD: 'US$', BRL: 'R$' };
+
 /**
- * An exact decimal string ('1272.5', '-484.84') as 'US$ 1.272,50'. With `signed`, a '+' or '−'
- * goes before the currency ('+US$ 1.272,50', '−US$ 484,84'); zero gets no sign.
+ * An exact decimal string ('1272.5', '-484.84') as 'US$ 1.272,50', or 'R$ 1.272,50' with
+ * `currency: 'BRL'`. With `signed`, a '+' or '−' goes before the symbol ('+US$ 1.272,50',
+ * '−R$ 484,84'); zero gets no sign. The currency defaults to USD: the Top One file previews call
+ * it without one.
  */
-export function formatMoney(decimal: string, { signed = false }: { signed?: boolean } = {}): string {
+export function formatMoney(
+  decimal: string,
+  { signed = false, currency = 'USD' }: { signed?: boolean; currency?: Currency } = {},
+): string {
   const m = /^([+-]?)(\d+)(?:\.(\d+))?$/.exec(decimal.trim());
   if (!m) return decimal;
   const cents = ((m[3] ?? '') + '00').slice(0, 2);
   const integer = m[2].replace(/^0+(?=\d)/, '');
   const zero = /^0+$/.test(integer) && /^0+$/.test(cents);
   const sign = !signed || zero ? '' : m[1] === '-' ? MINUS : '+';
-  const body = `US$${NBSP}${groupThousands(integer)},${cents}`;
+  const body = `${SIMBOLO_MOEDA[currency]}${NBSP}${groupThousands(integer)},${cents}`;
   return m[1] === '-' && !signed && !zero ? `${MINUS}${body}` : `${sign}${body}`;
 }
 

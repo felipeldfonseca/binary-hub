@@ -191,7 +191,7 @@ export default function RegrasDaConta({ carga, regras: r, form, onForm, label, n
             />
             {limiteErroAqui && r.limiteErro && (
               <p id="f-lim-erro" className="hub-erro">
-                {REGRAS.limiteErro[r.limiteErro]}
+                {REGRAS.limiteErro(r.limiteErro, 'USD' /* lane A: currency */)}
               </p>
             )}
           </div>

@@ -2,7 +2,8 @@
 
 import { useMemo, useRef, useState } from 'react'
 import { Upload } from 'lucide-react'
-import type { FailedFile, Market, ParsedFile, RowIssue, RowErrorCode } from '@/lib/domain/import'
+import type { FailedFile, ImportMarket, ParsedFile, RowIssue, RowErrorCode } from '@/lib/domain/import'
+import type { AccountMarket } from '@/lib/domain/markets'
 import { entrySpan, totals } from '@/lib/domain/import'
 import {
   FILE_ZONES,
@@ -246,7 +247,7 @@ export function PassoConta({
   onChoose,
 }: {
   headingRef: HeadingRef
-  market: Market
+  market: ImportMarket
   options: { id: string; label: string }[]
   choice: string | null
   reason: string
@@ -275,7 +276,7 @@ export function PassoConta({
 // ------------------------------------------------------------------------------------------------
 
 export interface AccountForm {
-  market: Market | null
+  market: AccountMarket | null
   platform: string | null
   firm: string
   search: string
@@ -313,7 +314,7 @@ export function PassoNovaConta({
   firmRemovable = false,
 }: {
   headingRef: HeadingRef
-  market: Market
+  market: AccountMarket
   form: AccountForm
   onChange: (patch: Partial<AccountForm>) => void
   roLabel: string
@@ -465,8 +466,8 @@ export function PassoMercado({
   onChoose,
 }: {
   headingRef: HeadingRef
-  market: Market | null
-  onChoose: (market: Market) => void
+  market: AccountMarket | null
+  onChoose: (market: AccountMarket) => void
 }) {
   return (
     <div className="hub-passo">
@@ -969,8 +970,8 @@ export function PassoMercadoErrado({
   onCreate,
 }: {
   headingRef: HeadingRef
-  fileMarket: Market
-  account: { label: string; market: Market }
+  fileMarket: ImportMarket
+  account: { label: string; market: ImportMarket }
   targets: { id: string; label: string }[]
   /** A request is running: the buttons wait for it */
   busy: boolean

@@ -39,7 +39,7 @@ describe('SeletorConta', () => {
     expect(current).toHaveTextContent('Financiada')
     expect(current).toHaveFocus()
     expect(within(list).getByRole('button', { name: /Apex A/ })).not.toHaveAttribute('aria-current')
-    expect(within(list).getByText('Futuros e binárias nunca são somados.')).toBeInTheDocument()
+    expect(within(list).getByText('Contas de mercados diferentes nunca são somadas.')).toBeInTheDocument()
     expect(within(list).queryByText(/Todas as contas/)).not.toBeInTheDocument()
   })
 

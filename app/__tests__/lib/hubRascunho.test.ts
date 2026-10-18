@@ -4,8 +4,12 @@
 import { MON_TO_FRI } from '@/lib/domain/tempo'
 import { configAntes, configDepois, idsDono, saveDono } from '@/testing/regras'
 import { activeAccounts, emptyAccountSettings, type AccountConfig, type RulesConfig, type RulesSettings } from '@/lib/hub/regras'
+import { ACCOUNT_MARKETS } from '@/lib/domain/markets'
+import { configMercados, idsMercados } from '@/testing/regras'
 import {
+  MARKETS,
   PADRAO_FUTUROS,
+  PADRAO_FUTUROS_CONTA,
   ajustarSoNestaConta,
   aposSalvar,
   alternarDia,
@@ -337,4 +341,39 @@ describe('the save status (contrato §4.3)', () => {
 it('PADRAO_FUTUROS is not an account id of the fixtures', () => {
   expect(activeAccounts(configDepois()).map((a) => a.id)).not.toContain(PADRAO_FUTUROS)
   expect(emptyAccountSettings()).toEqual({ windowRule: {}, block: {}, limit: null, window: null })
+})
+
+describe('every market (Fase 2b)', () => {
+  const c = configMercados()
+  const m = idsMercados()
+
+  it('holds the seven markets; «Padrão Futuros» is still futures only, on its day clock', () => {
+    expect(MARKETS).toEqual(ACCOUNT_MARKETS)
+    expect(PADRAO_FUTUROS_CONTA).toEqual({ id: PADRAO_FUTUROS, market: 'futures', day: { tz: 'America/New_York', startMin: 1080 } })
+  })
+
+  it('«+ Definir janela» and «+ Segunda janela» bring each market’s suggestion (crypto every day)', () => {
+    const s = cancelarJanela(c.settings, 'crypto', [m.binance])
+    expect(definirJanela(s, 'crypto').markets.crypto.windows).toEqual([{ tz: 'America/Sao_Paulo', startMin: 1200, endMin: 1320, weekdays: 127 }])
+    expect(definirJanela(c.settings, 'stocks').markets.stocks.windows).toEqual([{ tz: 'America/New_York', startMin: 570, endMin: 630, weekdays: MON_TO_FRI }])
+    expect(segundaJanela(c.settings, 'forex').markets.forex.windows[1]).toEqual({ tz: 'America/New_York', startMin: 180, endMin: 300, weekdays: MON_TO_FRI })
+    expect(segundaJanela(c.settings, 'crypto').markets.crypto.windows[1]).toEqual({ tz: 'America/Sao_Paulo', startMin: 540, endMin: 660, weekdays: 127 })
+  })
+
+  it('counts a change in any market as unsaved, and a window error in any market as a problem', () => {
+    const r = iniciarRascunho(c)
+    expect(rascunhoSujo(r)).toBe(false)
+    const d = alternarDia(c.settings, 'b3', 0, 5)
+    expect(rascunhoSujo({ ...r, draft: d })).toBe(true)
+    expect(janelasDoMercadoMudaram(c.settings, d, 'b3', [m.clear])).toBe(true)
+    expect(janelasDoMercadoMudaram(c.settings, d, 'crypto', [m.binance])).toBe(false)
+    const bad = comJanelaDoMercado(c.settings, 'forex', 0, { endMin: 480 })
+    expect(problemasDoRascunho({ ...r, draft: bad })).toEqual([{ place: { market: 'forex', index: 0 }, error: 'same_start_end' }])
+  })
+
+  it('reverts a market left without an active account to its saved default', () => {
+    const archived = { ...c, accounts: c.accounts.map((a) => (a.id === m.clear ? { ...a, archivedAt: '2026-10-18T12:00:00Z' } : a)) }
+    const d = semOcultos(archived, alternarDia(c.settings, 'b3', 0, 5))
+    expect(d.markets.b3).toEqual(c.settings.markets.b3)
+  })
 })

@@ -16,11 +16,6 @@ export type Platform = 'ebinex' | 'topone';
  * Built from AccountMarket, so a file's market is always one an account can be in.
  */
 export type ImportMarket = Extract<AccountMarket, 'binary' | 'futures'>;
-/**
- * @deprecated The old name of ImportMarket, still imported by lib/hub and the import sheet; it goes
- * when they move to ImportMarket / AccountMarket (Fase 2b, foundation).
- */
-export type Market = ImportMarket;
 
 /**
  * - `ebinex_br`: current Ebinex export, `DD/MM/YYYY HH:MM:SS` on the Brasília clock, no offset.

@@ -5,24 +5,21 @@
  *   NEW      not on any board (screens or states the boards do not draw)
  *   ADAPTED  a board string changed for Phase 1 (the comment says what changed)
  */
+import type { ImportMarket } from '@/lib/domain/import'
 import type { AccountMarket, AccountPhase, ZoneKey } from '@/lib/hub/contas'
-import { ALL_FILE_ZONES, LABEL_MAX } from '@/lib/hub/contas'
+import { ALL_FILE_ZONES, LABEL_MAX, MARKET_ORDER } from '@/lib/hub/contas'
 import type { HubErrorCode } from '@/lib/hub/contasDb'
 import { formatInt } from '@/lib/hub/formato'
+import { MERCADO } from '@/components/hub/copyMercados'
 
 // ------------------------------------------------------------------------------------------------
 // Shared
 // ------------------------------------------------------------------------------------------------
 
-export const MARKET_LABEL: Record<AccountMarket, string> = {
-  futures: 'Futuros',
-  binary: 'Opções binárias',
-  forex: 'Forex', // NEW (no board shows other markets; only old data can have them)
-  stocks: 'Ações', // NEW
-  crypto: 'Cripto', // NEW
-  b3: 'B3', // NEW
-  options: 'Opções', // NEW
-}
+/** Group headers, chips and the selector (Fase 2b: copyMercados MERCADO[m].nome, values unchanged) */
+export const MARKET_LABEL: Record<AccountMarket, string> = Object.fromEntries(
+  MARKET_ORDER.map((m) => [m, MERCADO[m].nome]),
+) as Record<AccountMarket, string>
 
 export const PHASE_LABEL: Record<AccountPhase, string> = {
   avaliacao: 'Avaliação',
@@ -46,6 +43,32 @@ export const PLATFORM_LABEL: Record<string, string> = {
   iq: 'IQ Option',
   outra: 'Outra',
   topone: 'Top One', // NEW (key the old imports left on the Top One account)
+  // Fase 2b (board ImportarConta `X.PLAT`): Forex
+  mt5: 'MetaTrader 5',
+  mt4: 'MetaTrader 4',
+  ctrader: 'cTrader',
+  matchtrader: 'Match-Trader',
+  tradelocker: 'TradeLocker',
+  dxtrade: 'DXtrade',
+  // Cripto
+  binance: 'Binance',
+  bybit: 'Bybit',
+  okx: 'OKX',
+  coinbase: 'Coinbase',
+  kraken: 'Kraken',
+  bitget: 'Bitget',
+  mercadobitcoin: 'Mercado Bitcoin',
+  // Ações e opções (EUA)
+  ibkr: 'Interactive Brokers',
+  thinkorswim: 'thinkorswim (Schwab)',
+  webull: 'Webull',
+  tastytrade: 'tastytrade',
+  tradier: 'Tradier',
+  avenue: 'Avenue',
+  nomad: 'Nomad',
+  // B3
+  profit: 'Profit (Nelogica)',
+  tryd: 'Tryd',
 }
 
 export const platformLabel = (key: string | null) => (key ? PLATFORM_LABEL[key] ?? key : '')
@@ -64,7 +87,7 @@ export const zoneName = (tz: string) => {
   return key ? ZONE_LABEL[key] : tz
 }
 
-export const NEVER_SUMMED = 'Futuros e binárias nunca são somados.'
+export const NEVER_SUMMED = 'Contas de mercados diferentes nunca são somadas.' // Fase 2b (board ImportarConta l.242, Personalizar l.353)
 export const LOADING = 'Carregando…'
 export const TRY_AGAIN = 'Tentar de novo'
 export const UNDO = 'Desfazer'
@@ -258,12 +281,12 @@ export const ERRO = {
 
 export const PASSO_A = {
   title: 'Para qual conta?',
-  newAccount: (market: 'futures' | 'binary') => (market === 'futures' ? '+ Nova conta de futuros' : '+ Nova conta de binárias'),
+  newAccount: (market: ImportMarket) => (market === 'futures' ? '+ Nova conta de futuros' : '+ Nova conta de binárias'),
   sameFormat: (label: string) => `${label} já recebeu este formato.`,
 }
 
 export const PASSO_B = {
-  title: (market: 'futures' | 'binary') => (market === 'futures' ? 'Nova conta de futuros' : 'Nova conta de binárias'),
+  title: (market: AccountMarket) => MERCADO[market].titulo,
   label: 'Apelido',
   phase: 'Fase',
   type: 'Tipo',
@@ -382,7 +405,7 @@ export const PASSO_D = {
   seeLines: 'Ver linhas',
   line: (line: number, reason: string) => `Linha ${formatInt(line)}: ${reason}`,
   // NEW: the day-change count (not on the board)
-  dayChanges: (count: number, market: 'futures' | 'binary') =>
+  dayChanges: (count: number, market: ImportMarket) =>
     `${count === 1 ? '1 operação fica' : `${formatInt(count)} operações ficam`} em outro dia que o do arquivo: ${
       market === 'futures' ? 'o dia de Futuros vira às 18:00 de Nova York.' : 'o dia de binárias vira à meia-noite de Brasília.'
     }`,
@@ -461,14 +484,14 @@ export const FIM_FUSO = {
 }
 
 export const PASSO_G = {
-  title: (market: 'futures' | 'binary') =>
+  title: (market: ImportMarket) =>
     market === 'binary' ? 'Este arquivo é de binárias (Ebinex).' : 'Este arquivo é de futuros (Top One).', // the second is NEW (symmetric)
   infoAria: 'Como ler: mercado do arquivo',
   info: (label: string) => `Futuros e binárias nunca são somados: este arquivo não entra em ${label}.`,
   accountIs: (market: 'futures' | 'binary') =>
     market === 'futures' ? 'A conta escolhida é de Futuros.' : 'A conta escolhida é de binárias.', // the second is NEW (symmetric)
   importInto: (label: string) => `Importar em ${label}`,
-  create: (market: 'futures' | 'binary') => (market === 'binary' ? 'Criar conta de binárias' : 'Criar conta de futuros'), // the second is NEW
+  create: (market: ImportMarket) => (market === 'binary' ? 'Criar conta de binárias' : 'Criar conta de futuros'), // the second is NEW
 }
 
 export const FIM_CONTA = {

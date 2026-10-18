@@ -8,7 +8,7 @@
  * An account stores the firm's name as text (trading_accounts.firm), never an id: a firm that
  * leaves this list only stops being suggested, and the accounts keep it.
  */
-import type { Market, Platform } from '@/lib/domain/import';
+import type { Platform } from '@/lib/domain/import';
 import { PLATFORMS, type AccountMarket } from './contas';
 
 export interface PropFirm {
@@ -238,7 +238,7 @@ export function firmByName(market: AccountMarket, name: string | null | undefine
  * The platform pills of a market with the firm's platforms first, each part in the boards'
  * order. Nothing is hidden (the list can be stale) and the last pill («Não sei», «Outra») stays last.
  */
-export function platformsFor(market: Market, firm: PropFirm | null): readonly string[] {
+export function platformsFor(market: AccountMarket, firm: PropFirm | null): readonly string[] {
   const list = PLATFORMS[market];
   if (!firm || firm.market !== market) return list;
   const last = list[list.length - 1];

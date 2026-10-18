@@ -1,8 +1,8 @@
 /**
  * @jest-environment node
  *
- * The rules data layer against the real SQL (migrations 20261018000001..3), on a throwaway local
- * Postgres. Skipped unless BH_PG_URL points at one: never the hosted project.
+ * The rules data layer against the real SQL (migrations 20261018000001..3 and 20261019000001), on
+ * a throwaway local Postgres. Skipped unless BH_PG_URL points at one: never the hosted project.
  *
  *   # a cluster with the Supabase stub and every migration, as supabase/tests/run.sh builds it
  *   BH_PG_URL=postgres://postgres@127.0.0.1:PORT/postgres npx jest --ci __tests__/lib/hubRegras.pg.test.ts
@@ -13,8 +13,10 @@
  * versions save_rules creates must be the ones pendingVersions predicted; then rules_config() must
  * parse, its `current` of every account must equal resolveRules on the draft (SQL rules_resolve =
  * TS resolveRules), and its settings must read back as the draft (the round trip).
+ *
+ * The fixtures in testing/fixtures/regras are recorded here (BH_PG_RECORD=<dir>), with the
+ * server's clock at Sat 17 Oct 2026 about 20:06 UTC (see the describeRecord blocks).
  */
-import { execFileSync } from 'child_process';
 import { randomUUID } from 'crypto';
 import fs from 'fs';
 import {
@@ -37,65 +39,16 @@ import {
   type RulesSettings,
   type SaveRulesPayload,
 } from '@/lib/hub/regras';
-import { toResolvedJson } from '@/lib/domain/gate';
-import { MON_TO_FRI } from '@/lib/domain';
+import { ACCOUNT_MARKETS, MARKET_SPEC, toResolvedJson } from '@/lib/domain/gate';
+import { EVERY_DAY, MON_TO_FRI } from '@/lib/domain';
+import { ACCOUNT_COLUMNS } from '@/lib/hub/contasDb';
+import { JANELA_SUGERIDA } from '@/lib/hub/janelas';
+import { possoLinha, possoTexto } from '@/lib/hub/posso';
+import { PG_URL as URL, asUser, asUserExec, codeOf, createAccountAsUser, lit, psql } from '@/testing/pg';
 
-const URL = process.env.BH_PG_URL;
-const PSQL = process.env.BH_PSQL || '/opt/homebrew/opt/postgresql@15/bin/psql';
 const RECORD = process.env.BH_PG_RECORD;
 
 const describePg = URL ? describe : describe.skip;
-
-function psql(sql: string): string {
-  try {
-    return execFileSync(PSQL, [URL as string, '-X', '-q', '-t', '-A', '-v', 'ON_ERROR_STOP=1', '-P', 'pager=off'], {
-      input: sql,
-      stdio: ['pipe', 'pipe', 'pipe'],
-      env: { ...process.env, LC_ALL: 'C', LANG: 'C', PGOPTIONS: '-c timezone=UTC' },
-    }).toString();
-  } catch (e) {
-    const stderr = String((e as { stderr?: Buffer }).stderr ?? '');
-    const m = /ERROR:\s+(\S+)/.exec(stderr);
-    const err = new Error(m ? m[1] : stderr);
-    (err as Error & { code?: string }).code = m ? m[1] : 'psql';
-    throw err;
-  }
-}
-
-const lastLine = (out: string) => out.trim().split('\n').filter(Boolean).pop() ?? '';
-
-/** A call as the signed-in user, in its own transaction, returning the JSON answer */
-function asUser(uid: string, expr: string): unknown {
-  return JSON.parse(
-    lastLine(
-      psql(`begin;
-select set_config('request.jwt.claim.sub', '${uid}', true);
-set local role authenticated;
-select (${expr})::text;
-commit;`),
-    ),
-  );
-}
-
-/** Statements as the signed-in user (an insert through the API's row-level security) */
-function asUserExec(uid: string, sql: string): void {
-  psql(`begin;
-select set_config('request.jwt.claim.sub', '${uid}', true);
-set local role authenticated;
-${sql}
-commit;`);
-}
-
-const lit = (json: unknown) => `$bh$${JSON.stringify(json)}$bh$::jsonb`;
-
-function codeOf(fn: () => unknown): string | null {
-  try {
-    fn();
-    return null;
-  } catch (e) {
-    return (e as { code?: string }).code ?? 'thrown';
-  }
-}
 
 describePg('rules data layer × the real SQL', () => {
   const uid = randomUUID();
@@ -126,8 +79,8 @@ describePg('rules data layer × the real SQL', () => {
       expect(sameRules(a.versions[a.versions.length - 1].rules, a.current)).toBe(true);
       expect(v.effectiveDay).toMatch(/^\d{4}-\d{2}-\d{2}$/);
     }
-    // The round trip: the saved settings read back as the draft
-    for (const m of ['futures', 'binary'] as const) expect(sameMarket(m, after.settings.markets[m], draft.markets[m])).toBe(true);
+    // The round trip: the saved settings read back as the draft (every market)
+    for (const m of ACCOUNT_MARKETS) expect(sameMarket(m, after.settings.markets[m], draft.markets[m])).toBe(true);
     for (const a of after.accounts.filter((x) => !x.archivedAt)) {
       expect(sameAccount(a.market, after.settings.accounts[a.id], draft.accounts[a.id])).toBe(true);
     }
@@ -154,7 +107,7 @@ insert into public.trading_accounts (id, user_id, market, label, day_tz, day_sta
   it('reads the empty configuration, and resolves it as the database does', () => {
     const c = config();
     expect(c.rev).toBe('none');
-    expect(c.savedMarkets).toEqual({ futures: false, binary: false });
+    expect(c.savedMarkets).toEqual({ futures: false, binary: false, forex: false, stocks: false, crypto: false, b3: false, options: false });
     expect(c.settings.markets.futures).toEqual({
       windowRule: { on: true, outside: 'fora' },
       block: { on: true, beforeMin: 5, afterMin: 10 },
@@ -422,15 +375,192 @@ values ('${ids.apexB}', '${uid}', 'futures', 'Apex B', 'America/New_York', 1080)
     expect(result.versions.map((v) => v.accountId)).toEqual([ids.ebx]);
   });
 
-  it('rules_now lists accounts of every market; parseRulesNow keeps those with rules', () => {
+  it('rules_now lists accounts of every market, and parseRulesNow keeps every one (Fase 2b)', () => {
     const forex = randomUUID();
     psql(`insert into public.trading_accounts (id, user_id, market, label, day_tz, day_start_min, sort_order)
 values ('${forex}', '${uid}', 'forex', 'Forex', 'America/Sao_Paulo', 0, 5);`);
+    // The insert trigger sets the market's day clock, whatever the insert sent
+    expect(psql(`select day_tz || ' ' || day_start_min || ' ' || currency from public.trading_accounts where id = '${forex}';`).trim()).toBe(
+      'America/New_York 1020 USD',
+    );
     const json = asUser(uid, 'public.rules_now()') as { accounts: { account_id: string }[] };
     expect(json.accounts.map((a) => a.account_id)).toContain(forex);
     const now = parseRulesNow(json);
-    expect(now.accounts.map((a) => a.accountId)).not.toContain(forex);
-    expect(now.accounts.map((a) => a.accountId)).toEqual(expect.arrayContaining([ids.top, ids.ebx]));
+    expect(now.accounts.map((a) => a.accountId)).toEqual(json.accounts.map((a) => a.account_id));
+    const fx = now.accounts.find((a) => a.accountId === forex)!;
+    expect([fx.market, fx.version, fx.rules, fx.gate.status]).toEqual(['forex', null, null, null]);
+    // rules_config lists it too, with its own day clock, and resolves it as the TS side does
+    const c = config();
+    const a = c.accounts.find((x) => x.id === forex)!;
+    expect(a.day).toEqual({ tz: 'America/New_York', startMin: 1020 });
+    expect(sameRules(a.current, resolveRules(a, c.settings))).toBe(true);
+  });
+});
+
+describePg('seven markets × the real SQL (Fase 2b)', () => {
+  const uid = randomUUID();
+  const ids: Record<string, string> = {};
+  const config = () => parseRulesConfig(asUser(uid, 'public.rules_config()'));
+  const NY = 'America/New_York' as const;
+  const SP = 'America/Sao_Paulo' as const;
+
+  /** Saves for real; every account's SQL current must equal TS resolveRules on the draft */
+  function save(before: RulesConfig, draft: RulesSettings, payload: SaveRulesPayload, force: string[] = []) {
+    const predicted = pendingVersions(before, draft, { force })
+      .map((p) => `${p.accountId}:v${p.versionNo}`)
+      .sort();
+    const real = parseSaveResult(asUser(uid, `public.save_rules(${lit(payload)})`));
+    expect(real.versions.map((v) => `${v.accountId}:v${v.versionNo}`).sort()).toEqual(predicted);
+    const after = config();
+    for (const a of after.accounts) expect(canon(toResolvedJson(a.current))).toBe(canon(toResolvedJson(resolveRules(a, draft))));
+    for (const m of ACCOUNT_MARKETS) expect(sameMarket(m, after.settings.markets[m], draft.markets[m])).toBe(true);
+    for (const a of after.accounts) expect(sameAccount(a.market, after.settings.accounts[a.id], draft.accounts[a.id])).toBe(true);
+    expect(buildSavePayload(after, draft)).toBeNull();
+    return { result: real, after };
+  }
+
+  beforeAll(async () => {
+    ids.top = randomUUID();
+    ids.ebx = randomUUID();
+    psql(`insert into auth.users (id, email) values ('${uid}', 'mercados-${uid}@example.test');
+insert into public.profiles (id, email) values ('${uid}', 'mercados-${uid}@example.test');
+insert into public.trading_accounts (id, user_id, market, label, day_tz, day_start_min, is_primary, sort_order) values
+  ('${ids.top}', '${uid}', 'futures', 'Top One #1', 'America/New_York', 1080, false, 0),
+  ('${ids.ebx}', '${uid}', 'binary', 'Ebinex', 'America/Sao_Paulo', 0, true, 0);`);
+    // The owner's Phase 2 rules first: futures and binary windows, Top One US$ 400
+    const before = config();
+    const draft: RulesSettings = JSON.parse(JSON.stringify(before.settings));
+    draft.markets.futures.windows = [{ tz: NY, startMin: 600, endMin: 660, weekdays: MON_TO_FRI }];
+    draft.markets.binary.windows = [{ tz: SP, startMin: 1200, endMin: 1260, weekdays: MON_TO_FRI }];
+    draft.accounts[ids.top] = { ...draft.accounts[ids.top], limit: { cents: 40000, mode: 'conta', atLimit: 'encerrar' } };
+    parseSaveResult(asUser(uid, `public.save_rules(${lit(buildSavePayload(before, draft))})`));
+    // Then one account in each new market, created as the hub creates them
+    for (const [key, market, label] of [
+      ['fx', 'forex', 'FTMO'],
+      ['us', 'stocks', 'IBKR'],
+      ['cr', 'crypto', 'Binance'],
+      ['b3', 'b3', 'Clear'],
+    ] as const) {
+      ids[key] = await createAccountAsUser(uid, {
+        market,
+        label,
+        platform: null,
+        firm: null,
+        external_ref: null,
+        phase: 'pessoal',
+        size: null,
+        is_primary: false,
+      });
+    }
+  });
+
+  afterAll(() => {
+    if (URL) psql(`delete from auth.users where id = '${uid}';`);
+  });
+
+  it('reads a builtin and a default for every market, and every account with its market’s day clock', () => {
+    const c = config();
+    expect(Object.keys(c.builtin).sort()).toEqual([...ACCOUNT_MARKETS].sort());
+    expect(c.savedMarkets).toEqual({ futures: true, binary: true, forex: false, stocks: false, crypto: false, b3: false, options: false });
+    for (const m of ACCOUNT_MARKETS.filter((x) => x !== 'futures')) {
+      expect(c.builtin[m]).toEqual({ windowRule: { on: true, outside: 'fora' }, block: null, states: {}, windows: [] });
+    }
+    for (const key of ['fx', 'us', 'cr', 'b3']) {
+      const a = c.accounts.find((x) => x.id === ids[key])!;
+      expect(a.day).toEqual(MARKET_SPEC[a.market].day);
+      expect(a.versions).toEqual([]);
+      expect(sameRules(a.current, resolveRules(a, c.settings))).toBe(true);
+    }
+    // Nothing to save: no spurious defaults for the markets never saved (C13)
+    expect(buildSavePayload(c, c.settings)).toBeNull();
+  });
+
+  it('gives each new account v1 at creation with the market’s window and a limit in the market’s currency', () => {
+    const plan: [string, 'forex' | 'stocks' | 'crypto' | 'b3', number | null][] = [
+      ['fx', 'forex', 100000],
+      ['us', 'stocks', 25000],
+      ['cr', 'crypto', null],
+      ['b3', 'b3', 50000],
+    ];
+    for (const [key, market, cents] of plan) {
+      const before = config();
+      const w = { ...JANELA_SUGERIDA[market] };
+      const settings = { windowRule: {}, block: {}, limit: cents === null ? null : { cents, mode: 'conta' as const, atLimit: 'encerrar' as const }, window: null };
+      const payload = buildNewAccountPayload(before, { accountId: ids[key], market, settings, marketWindows: [w] });
+      const draft: RulesSettings = JSON.parse(JSON.stringify(before.settings));
+      draft.markets[market].windows = [w];
+      draft.accounts[ids[key]] = settings;
+      const { result, after } = save(before, draft, payload, [ids[key]]);
+      // Only this account is versioned: the owner's futures and binary accounts are untouched
+      expect(result.versions.map((v) => [v.accountId, v.versionNo, v.origin])).toEqual([[ids[key], 1, 'criar']]);
+      expect(result.unchanged).toEqual(expect.arrayContaining([ids.top, ids.ebx]));
+      const a = after.accounts.find((x) => x.id === ids[key])!;
+      expect(a.current.block).toBeNull();
+      expect(a.current.states).toBeNull();
+      expect(a.current.windowsFrom).toBe('market');
+    }
+    // The B3 limit is stored in reais (`brl`), the others in dollars
+    const stored = (id: string) =>
+      JSON.parse(psql(`select jsonb_build_object('s', s.rules->'limit', 'v', v.resolved->'limit')::text from public.account_rule_settings s
+        join public.account_rule_versions v on v.account_id = s.account_id where s.account_id = '${id}';`).trim());
+    expect(stored(ids.b3)).toEqual({ s: { brl: 500, mode: 'conta', at_limit: 'encerrar' }, v: { brl: 500, mode: 'conta', at_limit: 'encerrar' } });
+    expect(stored(ids.fx)).toEqual({ s: { usd: 1000, mode: 'conta', at_limit: 'encerrar' }, v: { usd: 1000, mode: 'conta', at_limit: 'encerrar' } });
+    // Crypto's suggested window opens every day
+    expect(config().settings.markets.crypto.windows).toEqual([{ tz: SP, startMin: 1200, endMin: 1320, weekdays: EVERY_DAY }]);
+  });
+
+  it('saves a later change of one market without versioning the accounts of the others', () => {
+    const before = config();
+    const draft: RulesSettings = JSON.parse(JSON.stringify(before.settings));
+    draft.markets.forex.windows.push({ tz: NY, startMin: 180, endMin: 300, weekdays: MON_TO_FRI });
+    draft.accounts[ids.b3] = { ...draft.accounts[ids.b3], limit: { cents: 75050, mode: 'conta', atLimit: 'avisar' } };
+    const payload = buildSavePayload(before, draft)!;
+    expect(Object.keys(payload.defaults!)).toEqual(['forex']);
+    expect(payload.accounts![ids.b3].rules.limit).toEqual({ brl: 750.5, mode: 'conta', at_limit: 'avisar' });
+    const { result, after } = save(before, draft, payload);
+    expect(result.versions.map((v) => [v.accountId, v.versionNo]).sort()).toEqual([[ids.b3, 2], [ids.fx, 2]].sort());
+    expect(result.unchanged).toEqual(expect.arrayContaining([ids.top, ids.ebx, ids.us, ids.cr]));
+    expect(after.accounts.find((a) => a.id === ids.b3)!.current.limit).toEqual({ cents: 75050, mode: 'conta', atLimit: 'avisar' });
+  });
+
+  it('refuses what the market does not have: a block or «somando» outside futures, the wrong currency key', () => {
+    const before = config();
+    const fx = (rules: unknown) => ({ v: 1, base_rev: before.rev, accounts: { [ids.fx]: { rules, window: null } } });
+    expect(codeOf(() => asUser(uid, `public.save_rules(${lit(fx({ v: 1, block: { on: true } }))}, true)`))).toBe('not_for_market');
+    expect(codeOf(() => asUser(uid, `public.save_rules(${lit(fx({ v: 1, limit: { usd: 100, mode: 'soma', at_limit: 'encerrar' } }))}, true)`))).toBe(
+      'not_for_market',
+    );
+    expect(codeOf(() => asUser(uid, `public.save_rules(${lit(fx({ v: 1, limit: { brl: 100, mode: 'conta', at_limit: 'encerrar' } }))}, true)`))).toBe(
+      'bad_limit',
+    );
+    const b3 = { v: 1, base_rev: before.rev, accounts: { [ids.b3]: { rules: { v: 1, limit: { usd: 100, mode: 'conta', at_limit: 'encerrar' } }, window: null } } };
+    expect(codeOf(() => asUser(uid, `public.save_rules(${lit(b3)}, true)`))).toBe('bad_limit');
+  });
+
+  it('answers «Posso operar hoje?» for every account, the B3 limit in reais', () => {
+    // Two invented Clear losses on Mon 19 Oct, in reais: −R$ 300 out at 10:20 and −R$ 500 out at 10:40 de Brasília
+    psql(`insert into public.trades (user_id, account_id, symbol, asset_type, direction, entry_time, exit_time,
+  entry_price, exit_price, quantity, result, pnl, commission, source) values
+  ('${uid}', '${ids.b3}', 'WINZ26', 'futures', 'long', '2026-10-19 13:05:00+00', '2026-10-19 13:20:00+00', 130000, 129850, 1, 'loss', -300, null, 'after'),
+  ('${uid}', '${ids.b3}', 'WINZ26', 'futures', 'short', '2026-10-19 13:25:00+00', '2026-10-19 13:40:00+00', 129800, 130050, 1, 'loss', -500, null, 'after');`);
+    const at = '2026-10-19T13:45:00Z';
+    const now = parseRulesNow(
+      asUser(uid, `jsonb_build_object('server_now', '${at}'::timestamptz, 'accounts', jsonb_build_array(${['top', 'ebx', 'fx', 'us', 'cr', 'b3'].map((k) => `public.gate_at('${ids[k]}', '${at}')`).join(', ')}))`),
+    );
+    expect(now.accounts.map((a) => a.market)).toEqual(['futures', 'binary', 'forex', 'stocks', 'crypto', 'b3']);
+    const clear = now.accounts.find((a) => a.accountId === ids.b3)!;
+    // v2 (R$ 750,50, «Só avisar»): the worst point −R$ 800 is past it, reached at the second exit
+    expect(clear.today).toEqual({ trades: 2, netCents: -80000, worstCents: -80000 });
+    expect(clear.gate.limit).toMatchObject({ evaluated: true, state: 'atingido', cents: 75050, worstCents: -80000, hitAt: new Date('2026-10-19T13:40:00Z') });
+    expect(possoLinha('Clear', clear.gate, clear.rules).limite).toEqual({
+      usado: 'R$ 800',
+      de: 'de R$ 750,50',
+      aria: 'Clear, limite do dia: R$ 800 de R$ 750,50.',
+      indisponivel: false,
+    });
+    // FTMO inside its 08:00–10:00 ET window (09:45 ET), the window clock New York
+    const ftmo = now.accounts.find((a) => a.accountId === ids.fx)!;
+    expect(possoTexto(possoLinha('FTMO', ftmo.gate, ftmo.rules))).toBe('Liberado · até 10:00 ET');
   });
 });
 
@@ -489,6 +619,94 @@ insert into public.trading_accounts (id, user_id, market, label, phase, day_tz, 
     write('agora-seg-1045-et', at('2026-10-19T14:45:00Z'));
     write('agora-seg-2030-brt', at('2026-10-19T23:30:00Z'));
     write('agora-sab-1200-et', at('2026-10-24T16:00:00Z'));
+    expect(true).toBe(true);
+  });
+});
+
+/**
+ * BH_PG_RECORD=<dir>, Fase 2b: the owner's two accounts beside one account in each new market,
+ * invented as the boards draw them (Início «Posso operar hoje?», Personalizar), for the screens'
+ * tests of the new markets:
+ *
+ *   contas-mercados                   the trading_accounts rows as fetchAccounts reads them
+ *   config-mercados                   rules_config()
+ *   agora-mercados-seg-0830-et        gate_at of every account at Mon 19 Oct 2026 08:30 ET
+ *
+ * Top One #1 (futures, Financiada, v1 10:00–11:00 ET seg–sex, US$ 400) and Ebinex (binary, no
+ * version) as Phase 2; FTMO (forex, Avaliação, firm FTMO, MetaTrader 5, v1 08:00–10:00 ET seg–sex,
+ * US$ 1.000), IBKR (stocks, Pessoal, Interactive Brokers, no version), Binance (crypto, Pessoal,
+ * v1 20:00–22:00 de Brasília every day, no limit), Clear (b3, Pessoal, Profit, v1 10:00–11:00 de
+ * Brasília seg–sex, R$ 500). The four are created as the hub creates them (createAccount's row,
+ * then buildNewAccountPayload with the market's suggested window), and no trade is recorded.
+ */
+describeRecord('fixtures for the screens: new markets', () => {
+  const uid = randomUUID();
+  const ids: Record<string, string> = {};
+  const write = (name: string, json: unknown) => fs.writeFileSync(`${RECORD}/${name}.json`, JSON.stringify(json, null, 2) + '\n');
+  const config = () => parseRulesConfig(asUser(uid, 'public.rules_config()'));
+
+  afterAll(() => {
+    psql(`delete from auth.users where id = '${uid}';`);
+  });
+
+  it('records the owner’s accounts in six markets and their answers', async () => {
+    ids.top = randomUUID();
+    ids.ebx = randomUUID();
+    psql(`insert into auth.users (id, email) values ('${uid}', 'mercados-${uid}@example.test');
+insert into public.profiles (id, email) values ('${uid}', 'mercados-${uid}@example.test');
+insert into public.trading_accounts (id, user_id, market, label, phase, day_tz, day_start_min, is_primary, sort_order) values
+  ('${ids.top}', '${uid}', 'futures', 'Top One #1', 'financiada', 'America/New_York', 1080, false, 0),
+  ('${ids.ebx}', '${uid}', 'binary', 'Ebinex', 'pessoal', 'America/Sao_Paulo', 0, true, 0);`);
+    // Top One's v1 (Ebinex keeps no version: no binary window is saved)
+    let before = config();
+    const draft: RulesSettings = JSON.parse(JSON.stringify(before.settings));
+    draft.markets.futures.windows = [{ ...JANELA_SUGERIDA.futures }];
+    draft.accounts[ids.top] = { ...draft.accounts[ids.top], limit: { cents: 40000, mode: 'conta', atLimit: 'encerrar' } };
+    parseSaveResult(asUser(uid, `public.save_rules(${lit(buildSavePayload(before, draft))})`));
+
+    const novas = [
+      { key: 'fx', market: 'forex', label: 'FTMO', phase: 'avaliacao', firm: 'FTMO', platform: 'mt5', cents: 100000, v1: true },
+      { key: 'us', market: 'stocks', label: 'IBKR', phase: 'pessoal', firm: null, platform: 'ibkr', cents: null, v1: false },
+      { key: 'cr', market: 'crypto', label: 'Binance', phase: 'pessoal', firm: null, platform: 'binance', cents: null, v1: true },
+      { key: 'b3', market: 'b3', label: 'Clear', phase: 'pessoal', firm: null, platform: 'profit', cents: 50000, v1: true },
+    ] as const;
+    for (const n of novas) {
+      ids[n.key] = await createAccountAsUser(uid, {
+        market: n.market,
+        label: n.label,
+        platform: n.platform,
+        firm: n.firm,
+        external_ref: null,
+        phase: n.phase,
+        size: null,
+        is_primary: false,
+      });
+      if (!n.v1) continue;
+      before = config();
+      const settings = {
+        windowRule: {},
+        block: {},
+        limit: n.cents === null ? null : { cents: n.cents, mode: 'conta' as const, atLimit: 'encerrar' as const },
+        window: null,
+      };
+      const payload = buildNewAccountPayload(before, { accountId: ids[n.key], market: n.market, settings, marketWindows: [{ ...JANELA_SUGERIDA[n.market] }] });
+      parseSaveResult(asUser(uid, `public.save_rules(${lit(payload)})`));
+    }
+
+    write(
+      'contas-mercados',
+      JSON.parse(
+        psql(`select coalesce(jsonb_agg(to_jsonb(t) order by t.sort_order, t.created_at), '[]')::text
+from (select ${ACCOUNT_COLUMNS} from public.trading_accounts where user_id = '${uid}') t;`).trim(),
+      ),
+    );
+    write('config-mercados', asUser(uid, 'public.rules_config()'));
+    const at = '2026-10-19T12:30:00Z';
+    const order = ['top', 'ebx', 'fx', 'us', 'cr', 'b3'];
+    write(
+      'agora-mercados-seg-0830-et',
+      asUser(uid, `jsonb_build_object('server_now', '${at}'::timestamptz, 'accounts', jsonb_build_array(${order.map((k) => `public.gate_at('${ids[k]}', '${at}')`).join(', ')}))`),
+    );
     expect(true).toBe(true);
   });
 });

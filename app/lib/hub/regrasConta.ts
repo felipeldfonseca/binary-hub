@@ -7,9 +7,8 @@
  */
 import { MON_TO_FRI, formatHhMm } from '@/lib/domain/tempo'
 import { previewInstant, type ImportRow } from '@/lib/domain/import'
-import type { LimitMode, Market, Rules } from '@/lib/domain/gate'
+import { MARKET_SPEC, type AccountMarket, type LimitMode, type Rules } from '@/lib/domain/gate'
 import { ANTES_DAS_REGRAS, LINHA_CONTA, REGRAS_CONTA, RELOGIO_NOME } from '@/components/hub/contas/copyRegras'
-import { MARKET_DAY } from './contas'
 import { formatDiaMes } from './formato'
 import { JANELA_SUGERIDA, faixaJanela } from './janelas'
 import { dinheiroCompacto, sufixoRelogio } from './posso'
@@ -83,7 +82,7 @@ export function textoLimite(cents: number): string {
 }
 
 /** The accounts a new account of `market` can copy its rules from: active ones of the same market, in list order */
-export function opcoesCopiar(config: Pick<RulesConfig, 'accounts'>, market: Market): { id: string; label: string }[] {
+export function opcoesCopiar(config: Pick<RulesConfig, 'accounts'>, market: AccountMarket): { id: string; label: string }[] {
   return activeAccounts(config)
     .filter((a) => a.market === market)
     .map((a) => ({ id: a.id, label: a.label }))
@@ -91,7 +90,7 @@ export function opcoesCopiar(config: Pick<RulesConfig, 'accounts'>, market: Mark
 
 /** What the rules block of step b resolves to */
 export interface RegrasDaNovaConta {
-  market: Market
+  market: AccountMarket
   /** «Copiar regras de» options (without «Não copiar») */
   opcoes: { id: string; label: string }[]
   /** The source account; null = «Não copiar» (or nothing to copy) */
@@ -119,7 +118,7 @@ export interface RegrasDaNovaConta {
 }
 
 /** The form against the saved rules (rules_config): defaults from the copy source, then the owner's changes */
-export function regrasDaNovaConta(config: Pick<RulesConfig, 'accounts' | 'settings'>, market: Market, form: RegrasForm): RegrasDaNovaConta {
+export function regrasDaNovaConta(config: Pick<RulesConfig, 'accounts' | 'settings'>, market: AccountMarket, form: RegrasForm): RegrasDaNovaConta {
   const opcoes = opcoesCopiar(config, market)
   const copiar =
     form.copiar === NAO_COPIAR ? null : form.copiar && opcoes.some((o) => o.id === form.copiar) ? form.copiar : (opcoes[0]?.id ?? null)
@@ -182,11 +181,11 @@ export function faixaResumo(w: WindowSetting): string {
 /** The limit part of the summary line */
 function limiteResumo(r: RegrasDaNovaConta, form: RegrasForm): string {
   const sufixo = r.market === 'futures' ? (r.modo === 'soma' ? REGRAS_CONTA.somando : REGRAS_CONTA.porConta) : ''
-  if (r.limite.ok) return dinheiroCompacto(r.limite.cents) + sufixo
+  if (r.limite.ok) return dinheiroCompacto(r.limite.cents, 'USD') + sufixo // lane A: currency
   const texto = r.limiteTexto.trim()
   // Board: what was typed, even before it is valid (the creation button says what is wrong); the
   // non-breaking space keeps «US$» with the amount, as dinheiroCompacto does
-  if (texto) return `US$ ${texto}${sufixo}`
+  if (texto) return `US$ ${texto}${sufixo}` // lane A: currency
   return r.copiar && form.limite === undefined ? REGRAS_CONTA.semLimite : REGRAS_CONTA.definir
 }
 
@@ -252,8 +251,9 @@ export function regrasResolvidas(config: Pick<RulesConfig, 'settings'>, r: Regra
       : config.settings.markets,
     accounts: { ...config.settings.accounts, [NOVA]: r.settings },
   }
-  const day = MARKET_DAY[r.market]
-  return resolveRules({ id: NOVA, market: r.market, day: { tz: day.day_tz, startMin: day.day_start_min } }, s)
+  // An account not created yet: the market's day clock (the database's insert trigger sets the same)
+  const day = MARKET_SPEC[r.market].day
+  return resolveRules({ id: NOVA, market: r.market, day: { tz: day.tz, startMin: day.startMin } }, s)
 }
 
 /**

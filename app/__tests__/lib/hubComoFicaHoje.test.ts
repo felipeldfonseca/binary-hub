@@ -270,3 +270,50 @@ describe('«Ao salvar …» from pendingVersions', () => {
     )
   })
 })
+
+describe('the new markets (Fase 2b)', () => {
+  const clear = (): Rules => ({
+    market: 'b3',
+    windows: [sp(600, 660)],
+    windowsFrom: 'market',
+    windowRule: { on: true, outside: 'fora' },
+    block: null,
+    limit: { cents: 50000, mode: 'conta', atLimit: 'encerrar' },
+    states: null,
+    day: { tz: 'America/Sao_Paulo', startMin: 0 },
+  })
+  const ftmo = (): Rules => ({ ...clear(), market: 'forex', windows: [ny(480, 600)], limit: { cents: 100000, mode: 'conta', atLimit: 'avisar' }, day: { tz: 'America/New_York', startMin: 1020 } })
+
+  it('«Se a perda do dia chegar a R$ 500» on B3; no block line, no «somando»', () => {
+    const r = clear()
+    const h = comoFicaHoje(r, brt('2026-10-22 12:00'), win(r))
+    expect(linhas(h)).toEqual([
+      '10:00–11:00 Brasília · sua janela → Liberado [mint]',
+      'No resto do dia → Fora da sua janela [amber]',
+      'Se a perda do dia chegar a R$\u00a0500 → Encerrado por hoje [red]',
+    ])
+    expect(h.sub).toBe('no relógio de Brasília')
+    // «somando» is futures only, even on a value the database would refuse
+    const soma = comoFicaHoje({ ...r, limit: { ...r.limit!, mode: 'soma' } }, brt('2026-10-22 12:00'), win(r))
+    expect(soma.linhas[2].esquerda.map((t) => t.t)).toEqual(['Se a perda do dia chegar a ', 'R$\u00a0500'])
+  })
+
+  it('writes the notes of a forex or B3 version: window and limit only, money in the market’s currency', () => {
+    expect(partesVersao(clear())).toEqual({
+      janela: 'janela 10:00–11:00 de Brasília · seg–sex',
+      gate: 'só dentro da janela',
+      fora: 'fora da janela: “Fora da sua janela”',
+      lim: 'limite R$\u00a0500',
+    })
+    expect(partesVersao(ftmo())).toEqual({
+      janela: 'janela 08:00–10:00 ET · seg–sex',
+      gate: 'só dentro da janela',
+      fora: 'fora da janela: “Fora da sua janela”',
+      lim: 'limite US$\u00a01.000, só avisa',
+    })
+    expect(notaVersao([versao(clear(), '2026-10-17')], 0, labelOf)).toBe('janela 10:00–11:00 de Brasília · seg–sex · limite R$\u00a0500')
+    expect(notaVersao([versao(clear(), '2026-10-17'), versao({ ...clear(), limit: { cents: 75050, mode: 'conta', atLimit: 'encerrar' } }, '2026-10-18')], 1, labelOf)).toBe(
+      'limite R$\u00a0750,50',
+    )
+  })
+})

@@ -15,6 +15,7 @@ import {
   setPrimary,
   toHubError,
 } from '@/lib/hub/contasDb';
+import { CREATABLE_MARKETS, MARKET_SPEC } from '@/lib/domain/markets';
 
 type Call = unknown[];
 type Answer = { data?: unknown; error?: unknown; count?: number };
@@ -124,6 +125,26 @@ describe('accounts', () => {
     });
     const insert = log[0].find((c) => c[0] === 'insert')?.[1] as Record<string, unknown>;
     expect(insert).toMatchObject({ day_tz: 'America/Sao_Paulo', day_start_min: 0, is_primary: true });
+  });
+
+  it('sends each creatable market’s day clock and currency (Fase 2b; the insert trigger sets the same)', async () => {
+    for (const market of CREATABLE_MARKETS) {
+      const { db, log } = fakeDb(() => ({ data: { id: 'new' } }));
+      await createAccount(db, 'user-1', { market, label: 'Nova', platform: null, firm: null, external_ref: null, phase: 'pessoal', size: null, is_primary: false });
+      const insert = log[0].find((c) => c[0] === 'insert')?.[1] as Record<string, unknown>;
+      expect(insert).toMatchObject({
+        market,
+        day_tz: MARKET_SPEC[market].day.tz,
+        day_start_min: MARKET_SPEC[market].day.startMin,
+        currency: MARKET_SPEC[market].currency,
+      });
+    }
+    const brl = { forex: 'USD', stocks: 'USD', crypto: 'USD', b3: 'BRL' } as const;
+    for (const [market, currency] of Object.entries(brl)) expect(MARKET_SPEC[market as keyof typeof brl].currency).toBe(currency);
+  });
+
+  it('reads the database refusing an options account as a refused field', () => {
+    expect(toHubError({ code: '23514', message: 'market_not_creatable' }).code).toBe('invalid_field');
   });
 
   it('turns a refused insert into a code', async () => {

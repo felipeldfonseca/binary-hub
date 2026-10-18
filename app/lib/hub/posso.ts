@@ -4,12 +4,15 @@
  * hoje», the window line under the account selector) render what these return.
  *
  * Window times are always on the window's own clock («10:00 ET», «20:00 de Brasília»); the time
- * a limit was reached or a block ends is on the account's day clock.
+ * a limit was reached or a block ends is on the account's day clock. Money is in the currency of
+ * the rules' market (currencyOf: R$ on B3, US$ everywhere else).
  */
 import { formatHhMm, utcToLocal } from '@/lib/domain';
 import {
   answerOf,
   centsToUsd,
+  currencyOf,
+  type Currency,
   type CheckKey,
   type GateResult,
   type GateWarning,
@@ -31,7 +34,7 @@ export interface PossoLinha {
   sub: string | null;
   /** «Definir» → Personalizar, when nothing was evaluated */
   acao: { texto: string; href: string; aria: string } | null;
-  /** «Limite do dia US$ 0 de US$ 400»; null when the account has no limit */
+  /** «Limite do dia US$ 0 de US$ 400» («R$ 0 de R$ 500» on B3); null when the account has no limit */
   limite: { usado: string; de: string; aria: string; indisponivel: boolean } | null;
 }
 
@@ -48,9 +51,12 @@ export function horaNoRelogio(instant: Date, tz: string): string {
   return formatHhMm(utcToLocal(instant, tz).minuteOfDay);
 }
 
-/** 'US$ 400', 'US$ 11,50', 'US$ 1.000': the compact form (no ',00') of a positive amount */
-export function dinheiroCompacto(cents: number): string {
-  return formatMoney(String(centsToUsd(Math.abs(cents)))).replace(/,00$/, '');
+/**
+ * 'US$ 400', 'US$ 11,50', 'R$ 1.000': the compact form (no ',00') of a positive amount. The
+ * currency has no default, so every caller names it (currencyOf(rules.market) for an account).
+ */
+export function dinheiroCompacto(cents: number, currency: Currency): string {
+  return formatMoney(String(centsToUsd(Math.abs(cents))), { currency }).replace(/,00$/, '');
 }
 
 function faixa(startMin: number, endMin: number): string {
@@ -94,9 +100,10 @@ export function possoLinha(conta: string, r: GateResult, rules: Rules | null): P
 
   let limite: PossoLinha['limite'] = null;
   if (rules?.limit) {
-    const de = `de ${dinheiroCompacto(rules.limit.cents)}`;
+    const moeda = currencyOf(rules.market);
+    const de = `de ${dinheiroCompacto(rules.limit.cents, moeda)}`;
     if (r.limit.evaluated) {
-      const usado = dinheiroCompacto(r.limit.worstCents);
+      const usado = dinheiroCompacto(r.limit.worstCents, moeda);
       limite = { usado, de, aria: `${conta}, limite do dia: ${usado} ${de}.`, indisponivel: false };
     } else {
       limite = { usado: '—', de, aria: `${conta}, limite do dia indisponível.`, indisponivel: true };

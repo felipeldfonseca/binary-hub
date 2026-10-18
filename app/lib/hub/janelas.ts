@@ -4,12 +4,12 @@
  * suggested windows, and switching a market's clock. Pure: time is an input, the words come from
  * components/hub/personalizar/copy.ts.
  *
- * Window minutes always live on the window's own clock (America/New_York for futures,
- * America/Sao_Paulo for binaries by default); «today's offsets» are the two zones' UTC offsets at
- * `now`, as on the board (`OFF.agora`).
+ * Window minutes always live on the window's own clock (by default America/New_York for futures,
+ * Forex and Ações, America/Sao_Paulo for binaries, Cripto and B3: MARKET_SPEC[m].windowTz);
+ * «today's offsets» are the two zones' UTC offsets at `now`, as on the board (`OFF.agora`).
  */
-import { MON_TO_FRI, formatHhMm, nextOffsetChange, utcOffsetMinutes, utcToLocal } from '@/lib/domain/tempo';
-import type { Market, WindowTz } from '@/lib/domain/gate';
+import { formatHhMm, nextOffsetChange, utcOffsetMinutes, utcToLocal } from '@/lib/domain/tempo';
+import { ACCOUNT_MARKETS, MARKET_SPEC, type AccountMarket, type WindowTz } from '@/lib/domain/gate';
 import { DIAS_CURTOS, DIAS_NENHUM, DIAS_TODOS, LEGENDA, RELOGIO } from '@/components/hub/personalizar/copy';
 import { formatDiaMes } from './formato';
 import type { RulesSettings, WindowSetting } from './regras';
@@ -18,20 +18,31 @@ export const NY: WindowTz = 'America/New_York';
 export const BR: WindowTz = 'America/Sao_Paulo';
 export const WINDOW_CLOCKS: readonly WindowTz[] = [NY, BR];
 
-/** The clock a market's window starts on (board `relPadrao`) */
-export const RELOGIO_PADRAO: Record<Market, WindowTz> = { futures: NY, binary: BR };
+const byMarket = <T>(f: (m: AccountMarket) => T) => Object.fromEntries(ACCOUNT_MARKETS.map((m) => [m, f(m)])) as Record<AccountMarket, T>;
 
-/** «+ Definir janela» (board `janSugestao`): the owner's windows, seg–sex */
-export const JANELA_SUGERIDA: Record<Market, WindowSetting> = {
-  futures: { tz: NY, startMin: 600, endMin: 660, weekdays: MON_TO_FRI },
-  binary: { tz: BR, startMin: 1200, endMin: 1260, weekdays: MON_TO_FRI },
-};
+/** The clock a market's window starts on (board `relPadrao`; MARKET_SPEC[m].windowTz) */
+export const RELOGIO_PADRAO: Record<AccountMarket, WindowTz> = byMarket((m) => MARKET_SPEC[m].windowTz);
 
-/** «+ Segunda janela» (board `SEG`): Futuros 14:00–15:00, Binárias 09:00–10:00, on the market's clock */
-export const SEGUNDA_SUGERIDA: Record<Market, { startMin: number; endMin: number }> = {
-  futures: { startMin: 840, endMin: 900 },
-  binary: { startMin: 540, endMin: 600 },
-};
+/**
+ * «+ Definir janela» (board `janSugestao`, ImportarConta `X.MK[*].sug`; MARKET_SPEC[m].window):
+ * the owner's windows, seg–sex (Futuros 10:00–11:00 ET, Binárias 20:00–21:00 de Brasília); Forex
+ * 08:00–10:00 ET, Ações 09:30–10:30 ET, B3 10:00–11:00 de Brasília, seg–sex; Cripto 20:00–22:00 de
+ * Brasília, every day
+ */
+export const JANELA_SUGERIDA: Record<AccountMarket, WindowSetting> = byMarket((m) => {
+  const s = MARKET_SPEC[m];
+  return { tz: s.windowTz, startMin: s.window.startMin, endMin: s.window.endMin, weekdays: s.window.weekdays };
+});
+
+/**
+ * «+ Segunda janela» (board `SEG`; MARKET_SPEC[m].secondWindow), on the market's clock: Futuros
+ * 14:00–15:00, Binárias 09:00–10:00, Forex 03:00–05:00, Ações 15:00–16:00, Cripto 09:00–11:00, B3
+ * 14:00–15:00
+ */
+export const SEGUNDA_SUGERIDA: Record<AccountMarket, { startMin: number; endMin: number }> = byMarket((m) => ({
+  startMin: MARKET_SPEC[m].secondWindow.startMin,
+  endMin: MARKET_SPEC[m].secondWindow.endMin,
+}));
 
 const DAY = 1440;
 const norm = (m: number) => ((m % DAY) + DAY) % DAY;
@@ -139,7 +150,7 @@ export function converterJanela(w: WindowSetting, tz: WindowTz, now: Date): Wind
  */
 export function trocarRelogio(
   s: RulesSettings,
-  market: Market,
+  market: AccountMarket,
   tz: WindowTz,
   now: Date,
   accountIds: readonly string[],
@@ -158,6 +169,6 @@ export function trocarRelogio(
 }
 
 /** The clock a market's windows are on (its first window's), or the market's default */
-export function relogioDoMercado(s: RulesSettings, market: Market): WindowTz {
+export function relogioDoMercado(s: RulesSettings, market: AccountMarket): WindowTz {
   return s.markets[market].windows[0]?.tz ?? RELOGIO_PADRAO[market];
 }

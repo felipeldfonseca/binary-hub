@@ -3,10 +3,18 @@
  * one is "conta atual", the file zones the import offers, and the checks on what the owner types.
  * Pure functions; data access is in contasDb.ts and the pt-BR copy in components/hub/contas/copy.ts.
  */
-import { entryHistogram, entrySpan, previewInstant, type ImportRow, type Market } from '@/lib/domain/import';
+import { entryHistogram, entrySpan, previewInstant, type ImportMarket, type ImportRow } from '@/lib/domain/import';
+import { ACCOUNT_MARKETS, type AccountMarket } from '@/lib/domain/markets';
 import { utcToLocal } from '@/lib/domain/tempo';
 
-export type AccountMarket = 'futures' | 'binary' | 'forex' | 'stocks' | 'crypto' | 'b3' | 'options';
+/**
+ * The seven markets, the six offered at creation and the guard: one definition, in
+ * lib/domain/markets. What each market is (currency, day clock, rules) is MARKET_SPEC there.
+ */
+export { CREATABLE_MARKETS, isAccountMarket, type AccountMarket } from '@/lib/domain/markets';
+/** Fixed group order: Futuros, Opções binárias, Forex, Ações, Cripto, B3, then options (ACCOUNT_MARKETS) */
+export const MARKET_ORDER: readonly AccountMarket[] = ACCOUNT_MARKETS;
+
 export type AccountPhase = 'avaliacao' | 'financiada' | 'pessoal' | 'demo';
 
 /** A row of trading_accounts, with the columns the hub reads. */
@@ -30,36 +38,35 @@ export interface TradingAccount {
   created_at: string;
 }
 
-/** Fixed group order: Futuros, then Opções binárias, then markets no board shows yet. */
-export const MARKET_ORDER: readonly AccountMarket[] = ['futures', 'binary', 'forex', 'stocks', 'crypto', 'b3', 'options'];
-
-/** Markets an account can be created for in Phase 1 (the boards offer only these two). */
-export const CREATABLE_MARKETS: readonly Market[] = ['futures', 'binary'];
-
+/** The phases offered wherever the market has firms (lib/hub/mesas.ts hasFirms); the name is Phase 1's. */
 export const PHASES_FUTURES: readonly AccountPhase[] = ['avaliacao', 'financiada', 'pessoal'];
 
 /**
- * Platform keys offered in "Onde você opera?", in the boards' order. The last one always stays.
- * BlackArrow and WealthCharts are not on the board: the owner accepted them on 2026-10-18 (Top
- * One Futures offers both, and three firms of lib/hub/mesas.ts offer only BlackArrow). They are
- * labels only: no reader of their files is implied.
+ * Platform keys offered in "Onde você opera?", in the boards' order (ImportarConta `X.PLAT`). The
+ * last one («Não sei», «Outra») always stays. BlackArrow and WealthCharts are not on the board: the
+ * owner accepted them on 2026-10-18 (Top One Futures offers both, and three firms of
+ * lib/hub/mesas.ts offer only BlackArrow). They are labels only: no reader of their files is
+ * implied. `options` is never offered; an existing options account lists the stocks keys.
  */
-export const PLATFORMS: Readonly<Record<Market, readonly string[]>> = {
+export const PLATFORMS: Readonly<Record<AccountMarket, readonly string[]>> = {
   futures: ['tradovate', 'rithmic', 'ninja', 'topstepx', 'quantower', 'tradingview', 'blackarrow', 'wealthcharts', 'naosei'],
   binary: ['ebinex', 'pocket', 'iq', 'outra'],
+  forex: ['mt5', 'mt4', 'ctrader', 'matchtrader', 'tradelocker', 'dxtrade', 'tradingview', 'outra'],
+  stocks: ['ibkr', 'thinkorswim', 'webull', 'tastytrade', 'tradier', 'avenue', 'nomad', 'outra'],
+  crypto: ['binance', 'bybit', 'okx', 'coinbase', 'kraken', 'bitget', 'mercadobitcoin', 'mt5', 'outra'],
+  b3: ['profit', 'tryd', 'mt5', 'outra'],
+  options: ['ibkr', 'thinkorswim', 'webull', 'tastytrade', 'tradier', 'avenue', 'nomad', 'outra'],
 };
 
 /** "Não sei" is stored as no platform at all. */
 export const PLATFORM_UNKNOWN = 'naosei';
 
-/** The trading day of each market: futures turn at 18:00 New York (CME Globex), binaries at midnight in Brasília. */
-export const MARKET_DAY: Readonly<Record<Market, { day_tz: string; day_start_min: number }>> = {
-  futures: { day_tz: 'America/New_York', day_start_min: 1080 },
-  binary: { day_tz: 'America/Sao_Paulo', day_start_min: 0 },
-};
-
-/** The clock the zone step draws its strips on: New York for futures, Brasília for binaries. */
-export const REFERENCE_TZ: Readonly<Record<Market, string>> = {
+/**
+ * The clock the zone step draws its strips on: New York for futures, Brasília for binaries. Only
+ * the two file formats (Top One, Ebinex) reach that step. A new account's trading day comes from
+ * MARKET_SPEC[market].day (lib/domain/markets); an existing account's is its own.
+ */
+export const REFERENCE_TZ: Readonly<Record<ImportMarket, string>> = {
   futures: 'America/New_York',
   binary: 'America/Sao_Paulo',
 };
@@ -133,10 +140,6 @@ export function resolveContaAtual(
 /** Whether the file zone of the account has been confirmed (by an import or by the owner). */
 export const tzConfirmed = (a: Pick<TradingAccount, 'tz_applied_at'>) => a.tz_applied_at !== null;
 
-export function isAccountMarket(m: string): m is Market {
-  return m === 'futures' || m === 'binary';
-}
-
 const sameLabel = (a: string, b: string) => a.trim().toLocaleLowerCase('pt-BR') === b.trim().toLocaleLowerCase('pt-BR');
 
 /** A nickname in use by another account, archived ones included (the database index covers them all). */
@@ -145,7 +148,7 @@ export function labelTaken(label: string, accounts: readonly Pick<TradingAccount
 }
 
 /**
- * "Tamanho US$": digits with optional pt-BR thousand dots and decimal comma ('50.000', '2500',
+ * "Tamanho US$" / "Tamanho R$": digits with optional pt-BR thousand dots and decimal comma ('50.000', '2500',
  * '1.250,50'). Returns the decimal for numeric(14,2), null for an empty field, or 'invalid'.
  */
 export function parseSize(text: string): string | null | 'invalid' {

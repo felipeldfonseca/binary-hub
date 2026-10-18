@@ -5,10 +5,13 @@ import { MON_TO_FRI, EVERY_DAY } from '@/lib/domain/tempo'
 import { brt, et } from '@/testing/gate'
 import { configDepois, idsDono } from '@/testing/regras'
 import type { WindowSetting } from '@/lib/hub/regras'
+import { ACCOUNT_MARKETS, MARKET_SPEC } from '@/lib/domain/markets'
 import {
   BR,
   JANELA_SUGERIDA,
   NY,
+  RELOGIO_PADRAO,
+  SEGUNDA_SUGERIDA,
   captionJanela,
   converterJanela,
   faixaJanela,
@@ -49,6 +52,28 @@ describe('faixaJanela and the days', () => {
   it('suggests the owner’s windows', () => {
     expect(JANELA_SUGERIDA.futures).toEqual(topOne)
     expect(JANELA_SUGERIDA.binary).toEqual(ebinex)
+  })
+
+  it('suggests each market’s window and clock from MARKET_SPEC (Fase 2b; crypto every day)', () => {
+    expect(JANELA_SUGERIDA.forex).toEqual(w(NY, 480, 600))
+    expect(JANELA_SUGERIDA.stocks).toEqual(w(NY, 570, 630))
+    expect(JANELA_SUGERIDA.crypto).toEqual(w(BR, 1200, 1320, EVERY_DAY))
+    expect(JANELA_SUGERIDA.b3).toEqual(w(BR, 600, 660))
+    expect(JANELA_SUGERIDA.options).toEqual(JANELA_SUGERIDA.stocks)
+    expect(RELOGIO_PADRAO).toEqual({ futures: NY, binary: BR, forex: NY, stocks: NY, crypto: BR, b3: BR, options: NY })
+    expect(SEGUNDA_SUGERIDA).toEqual({
+      futures: { startMin: 840, endMin: 900 },
+      binary: { startMin: 540, endMin: 600 },
+      forex: { startMin: 180, endMin: 300 },
+      stocks: { startMin: 900, endMin: 960 },
+      crypto: { startMin: 540, endMin: 660 },
+      b3: { startMin: 840, endMin: 900 },
+      options: { startMin: 900, endMin: 960 },
+    })
+    for (const m of ACCOUNT_MARKETS) expect(MARKET_SPEC[m].windowTzs).toContain(JANELA_SUGERIDA[m].tz)
+    // A market without a window is on its default clock
+    expect(relogioDoMercado(configDepois().settings, 'crypto')).toBe(BR)
+    expect(relogioDoMercado(configDepois().settings, 'stocks')).toBe(NY)
   })
 })
 

@@ -684,7 +684,7 @@ export default function ImportSheet({ mode, accountId, onClose }: { mode: SheetM
       let rulesBlocked: string | undefined
       let rulesBlockedBy: string | undefined
       if (rulesLoad === 'carregando') rulesBlockedBy = 'regras-carga'
-      else if (rules?.limiteErro) rulesBlocked = REGRAS.limiteErro[rules.limiteErro]
+      else if (rules?.limiteErro) rulesBlocked = REGRAS.limiteErro(rules.limiteErro, 'USD') // lane A: currency
       else if (rules?.janelaErro) {
         if (form.rules.aberto) rulesBlockedBy = 'j-erro'
         else rulesBlocked = ERRO_JANELA[rules.janelaErro]

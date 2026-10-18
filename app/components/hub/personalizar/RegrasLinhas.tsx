@@ -346,7 +346,7 @@ export function RegraLimite({
       }
     >
       <div className="hub-pz-regra__linha">
-        <span className={lim ? 'hub-pz-num' : 'hub-pz-fraco'}>{lim ? dinheiroCompacto(lim.cents) : REGRAS.semLimite}</span>
+        <span className={lim ? 'hub-pz-num' : 'hub-pz-fraco'}>{lim ? dinheiroCompacto(lim.cents, 'USD' /* lane B: currency */) : REGRAS.semLimite}</span>
         <button
           id="lim-def"
           type="button"
@@ -403,7 +403,7 @@ export function RegraLimite({
           </div>
           {form.erro && (
             <p id="lim-erro" className="hub-erro" role="alert">
-              {REGRAS.limiteErro[form.erro]}
+              {REGRAS.limiteErro(form.erro, 'USD' /* lane B: currency */)}
             </p>
           )}
           {lim && (

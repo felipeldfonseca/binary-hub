@@ -9,10 +9,11 @@
  *
  * Lane A2 reuses the window strings, the day names and ERRO_REGRAS (read-only).
  */
-import type { CalendarCode, Market, StateChoice, StateName, WindowTz } from '@/lib/domain/gate'
+import { ACCOUNT_MARKETS, type AccountMarket, type CalendarCode, type Currency, type StateChoice, type StateName, type WindowTz } from '@/lib/domain/gate'
 import { REGRAS_ERROR_CODES, type RegrasErrorCode } from '@/lib/hub/regrasDb'
-import type { DisplayTz, WindowError } from '@/lib/hub/regras'
-import { formatInt } from '@/lib/hub/formato'
+import type { DisplayTz, UsdTextResult, WindowError } from '@/lib/hub/regras'
+import { SIMBOLO_MOEDA, formatInt } from '@/lib/hub/formato'
+import { MERCADO } from '@/components/hub/copyMercados'
 
 /** «a, b e c» (board `lista`) */
 export const lista = (xs: readonly string[]): string =>
@@ -24,11 +25,10 @@ export const PADRAO_DE_FUTUROS = 'padrão de Futuros'
 export const ATIVO_NA_FASE_5 = 'ativo na Fase 5' // NEW (plan: "O bloqueio aparece como 'ativo na Fase 5'")
 export const CARREGAR_ERRO = 'Não foi possível carregar as regras.' // NEW
 
-/** The market as the boards name it in these sections */
-export const MERCADO_NOME: Record<Market, string> = {
-  futures: 'Futuros',
-  binary: 'Opções binárias',
-}
+/** The market as the boards name it in these sections (Fase 2b: copyMercados MERCADO[m].nome) */
+export const MERCADO_NOME: Record<AccountMarket, string> = Object.fromEntries(
+  ACCOUNT_MARKETS.map((m) => [m, MERCADO[m].nome]),
+) as Record<AccountMarket, string>
 
 // ------------------------------------------------------------------------------------------------
 // Clocks and days (the board's TZ table, DN and DL)
@@ -148,7 +148,8 @@ export const JANELAS = {
   // ADAPTED: drops «e para as Leituras da IA» (Phase 8); the next clock change is computed
   info: (proximaMudanca: string) =>
     `Elas valem para “Só operar dentro da sua janela”, em Suas regras. Futuros seguem o pregão de Nova York: a janela fica no relógio de Nova York (ET) e, em Brasília, anda 1 hora quando os EUA mudam o horário. Binárias abrem 24 h: a janela fica no relógio de Brasília, que não muda. Em cinza, a mesma janela no outro relógio; nos 14 dias antes de uma mudança (a próxima é ${proximaMudanca}), aparece também a hora nova. Fim antes do início: a janela termina no dia seguinte, e as operações contam no dia em que ela abre. O dia de Futuros começa às 18:00 ET; o de binárias, à meia-noite de Brasília. Os campos de hora usam sempre o relógio da janela, qualquer que seja “Horários na tela”. Com uma segunda conta no mercado, dá para ajustar a janela só nela. Ao salvar, cada conta cuja janela mudou ganha uma versão nova das regras, com a data do dia.`,
-  grupoAria: (mercado: string) => `Janela de ${mercado}`,
+  // Fase 2b: the market's «de» form («Janela de Futuros», «Janela da B3»)
+  grupoAria: (market: AccountMarket) => `Janela ${MERCADO[market].de}`,
   semJanelaChip: 'sem janela',
   // ADAPTED: drops «e nenhum dado gera leitura» (Phase 8)
   semJanelaUma: (label: string) => `Sem janela: na ${label}, a regra da janela não age.`,
@@ -156,30 +157,30 @@ export const JANELAS = {
   semJanela: 'Sem janela.',
   definir: '+ Definir janela',
   cancelar: 'Cancelar esta janela',
-  cancelarAria: (mercado: string) => `Cancelar a janela nova de ${mercado}`,
+  cancelarAria: (market: AccountMarket) => `Cancelar a janela nova ${MERCADO[market].de}`,
   das: 'das',
   eDas: 'e das',
   as: 'às',
   doDiaSeguinte: 'do dia seguinte',
-  inicioAria: (mercado: string, segunda: boolean, relogio: string) =>
-    `Início da ${segunda ? 'segunda janela' : 'janela'} de ${mercado}, ${relogio}`,
-  fimAria: (mercado: string, segunda: boolean, relogio: string) =>
-    `Fim da ${segunda ? 'segunda janela' : 'janela'} de ${mercado}, ${relogio}`,
+  inicioAria: (market: AccountMarket, segunda: boolean, relogio: string) =>
+    `Início da ${segunda ? 'segunda janela' : 'janela'} ${MERCADO[market].de}, ${relogio}`,
+  fimAria: (market: AccountMarket, segunda: boolean, relogio: string) =>
+    `Fim da ${segunda ? 'segunda janela' : 'janela'} ${MERCADO[market].de}, ${relogio}`,
   inicioContaAria: (label: string, relogio: string) => `Início da janela só de ${label}, ${relogio}`,
   fimContaAria: (label: string, relogio: string) => `Fim da janela só de ${label}, ${relogio}`,
   mais: 'Relógio, dias e segunda janela',
-  maisAria: (mercado: string) => `Relógio, dias e segunda janela de ${mercado}`,
+  maisAria: (market: AccountMarket) => `Relógio, dias e segunda janela ${MERCADO[market].de}`,
   relogioRotulo: 'Relógio da janela',
   dias: 'Dias',
   diasPrimeira: 'Dias da primeira janela',
   diasSegunda: 'Dias da segunda janela',
   segunda: '+ Segunda janela',
-  segundaAria: (mercado: string) => `Segunda janela de ${mercado}`,
+  segundaAria: (market: AccountMarket) => `Segunda janela ${MERCADO[market].de}`,
   remover: 'Remover a segunda janela',
-  removerAria: (mercado: string) => `Remover a segunda janela de ${mercado}`,
+  removerAria: (market: AccountMarket) => `Remover a segunda janela ${MERCADO[market].de}`,
   maximo: 'Máximo de 2 janelas por mercado.',
   usadaPor: (label: string) => `Usada por ${label}.`,
-  contasAria: (mercado: string) => `Contas de ${mercado}`,
+  contasAria: (market: AccountMarket) => `Contas ${MERCADO[market].de}`,
   usaEsta: 'usa esta janela',
   ajustar: 'Ajustar só nesta conta',
   ajustarAria: (label: string) => `Ajustar só nesta conta: ${label}`,
@@ -251,12 +252,14 @@ export const REGRAS = {
   ok: 'OK',
   cancelar: 'Cancelar',
   ficarSemLimite: 'Ficar sem limite',
-  limiteErro: {
-    empty: 'Digite um valor maior que zero.',
-    not_positive: 'Digite um valor maior que zero.',
-    too_large: 'Use um valor até US$ 1.000.000.', // NEW (the database's maximum)
-    invalid: 'Use só números, como 400 ou 400,50.', // NEW (the board's number field could not get letters)
-  },
+  // Fase 2b: a function of the account's currency (too_large names US$ or R$)
+  limiteErro: (reason: Extract<UsdTextResult, { ok: false }>['reason'], currency: Currency): string =>
+    ({
+      empty: 'Digite um valor maior que zero.',
+      not_positive: 'Digite um valor maior que zero.',
+      too_large: `Use um valor até ${SIMBOLO_MOEDA[currency]} 1.000.000.`, // NEW (the database's maximum)
+      invalid: 'Use só números, como 400 ou 400,50.', // NEW (the board's number field could not get letters)
+    })[reason],
   modoAria: (label: string) => `Como o limite de ${label} conta`,
   modos: [
     { valor: 'conta', texto: 'por conta' },

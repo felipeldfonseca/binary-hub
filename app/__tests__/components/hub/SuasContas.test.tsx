@@ -118,7 +118,7 @@ describe('Suas contas', () => {
     expect(screen.getByText('Cada conta é de um mercado só e tem as suas regras.')).toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: 'Como ler: Suas contas' }))
     expect(screen.getByText(/^Uma linha por conta\./)).toBeInTheDocument()
-    expect(screen.getByText('Futuros e binárias nunca são somados.')).toBeInTheDocument()
+    expect(screen.getByText('Contas de mercados diferentes nunca são somadas.')).toBeInTheDocument()
   })
 
   it('groups active accounts by market, never showing example ones', async () => {

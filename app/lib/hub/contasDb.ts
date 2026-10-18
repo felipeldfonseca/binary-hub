@@ -10,7 +10,8 @@
  */
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { ImportCommitArgs, ImportPreviewArgs } from '@/lib/domain/import';
-import { MARKET_DAY, type AccountMarket, type AccountPhase, type TradingAccount } from './contas';
+import { MARKET_SPEC } from '@/lib/domain/markets';
+import type { AccountMarket, AccountPhase, TradingAccount } from './contas';
 
 /** Codes the import functions raise, by name. */
 export const RPC_ERROR_CODES = [
@@ -110,7 +111,8 @@ export async function fetchAccounts(db: SupabaseClient): Promise<TradingAccount[
 }
 
 export interface NewAccount {
-  market: AccountMarket & ('futures' | 'binary');
+  /** One of CREATABLE_MARKETS (the database refuses `options`: market_not_creatable → invalid_field) */
+  market: AccountMarket;
   label: string;
   platform: string | null;
   firm: string | null;
@@ -121,7 +123,14 @@ export interface NewAccount {
   is_primary: boolean;
 }
 
+/**
+ * Inserts the account under row-level security. The day clock and the currency are the market's
+ * (MARKET_SPEC): the database's insert trigger (trading_accounts_by_market, migration
+ * 20261019000001) sets the same values whatever is sent, so they are sent only to keep a database
+ * without that trigger right.
+ */
 export async function createAccount(db: SupabaseClient, userId: string, input: NewAccount): Promise<TradingAccount> {
+  const spec = MARKET_SPEC[input.market];
   const row = await run<TradingAccount>(
     db
       .from('trading_accounts')
@@ -135,7 +144,9 @@ export async function createAccount(db: SupabaseClient, userId: string, input: N
         phase: input.phase,
         size: input.size,
         is_primary: input.is_primary,
-        ...MARKET_DAY[input.market],
+        day_tz: spec.day.tz,
+        day_start_min: spec.day.startMin,
+        currency: spec.currency,
       })
       .select(ACCOUNT_COLUMNS)
       .single(),

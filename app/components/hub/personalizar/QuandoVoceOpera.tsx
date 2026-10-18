@@ -1,7 +1,7 @@
 'use client'
 
 import { formatHhMm, parseHhMm } from '@/lib/domain/tempo'
-import type { Market, WindowTz } from '@/lib/domain/gate'
+import type { AccountMarket, WindowTz } from '@/lib/domain/gate'
 import { windowError, type AccountConfig, type RulesSettings, type WindowSetting } from '@/lib/hub/regras'
 import {
   WINDOW_CLOCKS,
@@ -29,8 +29,8 @@ import { InfoButton, InfoPanel, useToggle } from '@/components/hub/contas/ui'
 import { DIAS_CURTOS, DIAS_LONGOS, ERRO_JANELA, JANELAS, MERCADO_NOME, RELOGIO, SO_NESTA_CONTA } from './copy'
 import { EstadoCarga, Pilulas, TagNaoSalvo, useFocoPendente, type Carga } from './ui'
 
-/** Short market keys for element ids (board: j-fut0-de, mais-bin) */
-const MK: Record<Market, string> = { futures: 'fut', binary: 'bin' }
+/** Short market keys for element ids (board: j-fut0-de, mais-bin, j-fx0-de, mais-cri) */
+const MK: Record<AccountMarket, string> = { futures: 'fut', binary: 'bin', forex: 'fx', stocks: 'eua', crypto: 'cri', b3: 'b3', options: 'opc' }
 
 type Editar = (fn: (draft: RulesSettings) => RulesSettings) => void
 
@@ -117,7 +117,7 @@ function CartaoMercado({
   onEditar,
   pedirFoco,
 }: {
-  market: Market
+  market: AccountMarket
   contas: readonly AccountConfig[]
   salvo: RulesSettings
   draft: RulesSettings
@@ -144,7 +144,7 @@ function CartaoMercado({
   const podeCancelar = temJanela && salvo.markets[market].windows.length === 0
 
   return (
-    <div className={metade ? 'hub-pz-mcard hub-pz-mcard--metade' : 'hub-pz-mcard'} role="group" aria-label={JANELAS.grupoAria(nome)}>
+    <div className={metade ? 'hub-pz-mcard hub-pz-mcard--metade' : 'hub-pz-mcard'} role="group" aria-label={JANELAS.grupoAria(market)}>
       <div className="hub-cab">
         <h3>{nome}</h3>
         <span className="hub-titulo-i">
@@ -177,8 +177,8 @@ function CartaoMercado({
               prefixo={k === 0 ? JANELAS.das : JANELAS.eDas}
               w={w}
               now={now}
-              rotuloInicio={JANELAS.inicioAria(nome, k === 1, RELOGIO[w.tz].nome)}
-              rotuloFim={JANELAS.fimAria(nome, k === 1, RELOGIO[w.tz].nome)}
+              rotuloInicio={JANELAS.inicioAria(market, k === 1, RELOGIO[w.tz].nome)}
+              rotuloFim={JANELAS.fimAria(market, k === 1, RELOGIO[w.tz].nome)}
               onInicio={(v) => onEditar((d) => comJanelaDoMercado(d, market, k, { startMin: v }))}
               onFim={(v) => onEditar((d) => comJanelaDoMercado(d, market, k, { endMin: v }))}
             />
@@ -189,7 +189,7 @@ function CartaoMercado({
               className="hub-abre"
               aria-expanded={mais}
               aria-controls={`mais-${mk}`}
-              aria-label={JANELAS.maisAria(nome)}
+              aria-label={JANELAS.maisAria(market)}
               onClick={toggleMais}
             >
               <span className="hub-seta" aria-hidden="true">
@@ -226,7 +226,7 @@ function CartaoMercado({
                           <button
                             type="button"
                             className="hub-btn"
-                            aria-label={JANELAS.removerAria(nome)}
+                            aria-label={JANELAS.removerAria(market)}
                             onClick={() => {
                               pedirFoco(`add-${mk}`)
                               onEditar((d) => removerSegunda(d, market))
@@ -245,7 +245,7 @@ function CartaoMercado({
                       id={`add-${mk}`}
                       type="button"
                       className="hub-btn"
-                      aria-label={JANELAS.segundaAria(nome)}
+                      aria-label={JANELAS.segundaAria(market)}
                       onClick={() => {
                         pedirFoco(`j-${mk}1-de`)
                         onEditar((d) => segundaJanela(d, market))
@@ -265,7 +265,7 @@ function CartaoMercado({
               <button
                 type="button"
                 className="hub-btn"
-                aria-label={JANELAS.cancelarAria(nome)}
+                aria-label={JANELAS.cancelarAria(market)}
                 onClick={() => {
                   pedirFoco(`definir-${mk}`)
                   onEditar((d) => cancelarJanela(d, market, ids))
@@ -280,7 +280,7 @@ function CartaoMercado({
 
       {temJanela && !temLinhas && contas.length === 1 && <p className="hub-nota">{JANELAS.usadaPor(contas[0].label)}</p>}
       {temLinhas && (
-        <ul className="hub-pz-lista" aria-label={JANELAS.contasAria(nome)}>
+        <ul className="hub-pz-lista" aria-label={JANELAS.contasAria(market)}>
           {contas.map((c) => {
             const own = draft.accounts[c.id]?.window ?? null
             return (

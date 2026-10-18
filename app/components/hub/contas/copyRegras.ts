@@ -9,16 +9,17 @@
  * The window strings shared with Personalizar (field labels, errors, days, clocks) are lane A1's,
  * in components/hub/personalizar/copy.ts, and are imported from there, never copied.
  */
-import type { Market, WindowTz } from '@/lib/domain/gate'
+import type { AccountMarket, WindowTz } from '@/lib/domain/gate'
 import { formatInt } from '@/lib/hub/formato'
-import { JANELAS, MERCADO_NOME, RELOGIO, lista } from '@/components/hub/personalizar/copy'
+import { JANELAS, RELOGIO, lista } from '@/components/hub/personalizar/copy'
+import { MERCADO } from '@/components/hub/copyMercados'
 
 // ------------------------------------------------------------------------------------------------
 // Step b: «Copiar regras de», the summary line, the editor, the «desde» chip
 // ------------------------------------------------------------------------------------------------
 
-/** The market as the creation form names it (board PAD.nome) */
-const NOME_CURTO: Record<Market, string> = { futures: 'Futuros', binary: 'Binárias' }
+/** The market as the creation form names it, after «de» (board PAD.nome; Fase 2b: copyMercados MERCADO[m].deCurto) */
+const deCurto = (market: AccountMarket) => MERCADO[market].deCurto
 
 /** The window's clock in the summary line: «(Nova York)», «(Brasília)» (board relNome) */
 export const RELOGIO_NOME: Record<WindowTz, string> = {
@@ -30,7 +31,7 @@ export const REGRAS_CONTA = {
   copiar: 'Copiar regras de',
   naoCopiar: 'Não copiar',
   notaPadrao: 'Começa com o padrão do mercado.',
-  notaCopia: (market: Market) =>
+  notaCopia: (market: AccountMarket) =>
     market === 'futures' ? 'Copia janela, limite do dia, bloqueio de dados e regra do estado.' : 'Copia janela e limite do dia.',
 
   mudar: 'Mudar',
@@ -42,7 +43,7 @@ export const REGRAS_CONTA = {
   /** «20:00 → 02:00 do dia seguinte» */
   faixaNoite: (inicio: string, fim: string) => `${inicio} → ${fim} do dia seguinte`,
   aDefinir: 'a definir',
-  padraoDe: (market: Market) => `padrão de ${NOME_CURTO[market]}`,
+  padraoDe: (market: AccountMarket) => `padrão ${deCurto(market)}`,
   soNestaConta: 'só nesta conta',
   porConta: ' por conta',
   somando: ' somando as contas de Futuros',
@@ -50,8 +51,8 @@ export const REGRAS_CONTA = {
   definir: 'definir',
 
   /** «Usar a janela de Futuros (10:00–11:00 ET)?» (two windows: «10:00–11:00 e 14:00–15:00 ET») */
-  pergunta: (market: Market, faixas: readonly string[], tz: WindowTz) =>
-    `Usar a janela de ${NOME_CURTO[market]} (${faixas.join(' e ')} ${RELOGIO[tz].de})?`,
+  pergunta: (market: AccountMarket, faixas: readonly string[], tz: WindowTz) =>
+    `Usar a janela ${deCurto(market)} (${faixas.join(' e ')} ${RELOGIO[tz].de})?`,
   sim: 'Sim',
   outra: 'Outra',
   relogio: JANELAS.relogioRotulo,
@@ -64,12 +65,12 @@ export const REGRAS_CONTA = {
   fimAria: (label: string, tz: WindowTz) =>
     label ? JANELAS.fimContaAria(label, RELOGIO[tz].nome) : `Fim da janela só desta conta, ${RELOGIO[tz].nome}`, // fallback NEW
   /** The market has no window: the form's window becomes the market's (Personalizar's labels) */
-  inicioMercadoAria: (market: Market, tz: WindowTz) => JANELAS.inicioAria(MERCADO_NOME[market], false, RELOGIO[tz].nome),
-  fimMercadoAria: (market: Market, tz: WindowTz) => JANELAS.fimAria(MERCADO_NOME[market], false, RELOGIO[tz].nome),
+  inicioMercadoAria: (market: AccountMarket, tz: WindowTz) => JANELAS.inicioAria(market, false, RELOGIO[tz].nome),
+  fimMercadoAria: (market: AccountMarket, tz: WindowTz) => JANELAS.fimAria(market, false, RELOGIO[tz].nome),
   // NEW here (Personalizar's «+ Definir janela» / «Cancelar esta janela»): the market has no window yet
   definirJanela: JANELAS.definir,
   cancelarJanela: JANELAS.cancelar,
-  cancelarJanelaAria: (market: Market) => JANELAS.cancelarAria(MERCADO_NOME[market]),
+  cancelarJanelaAria: (market: AccountMarket) => JANELAS.cancelarAria(market),
 
   limite: 'Limite do dia, US$',
   modoAria: 'Como o limite conta',
@@ -81,8 +82,8 @@ export const REGRAS_CONTA = {
 
   // NEW (review of personalizar.md §11.1): the form gives the market its first window, so the
   // market's other active accounts, which use the market's window, get a version on the same save
-  outrasContas: (market: Market, d: string, contas: readonly string[]) =>
-    `Ao criar, esta janela passa a ser a de ${NOME_CURTO[market]}: ${lista(contas)} também ${contas.length > 1 ? 'ganham' : 'ganha'} versão nova das regras desde ${d}.`,
+  outrasContas: (market: AccountMarket, d: string, contas: readonly string[]) =>
+    `Ao criar, esta janela passa a ser a ${deCurto(market)}: ${lista(contas)} também ${contas.length > 1 ? 'ganham' : 'ganha'} versão nova das regras desde ${d}.`,
 
   // NEW: rules_config did not load; the account is still created (without v1)
   carregarErro: 'Não foi possível carregar as regras. A conta é criada sem regras; salve em Personalizar › Suas regras.',

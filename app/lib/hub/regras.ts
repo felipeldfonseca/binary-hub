@@ -1,34 +1,45 @@
 /**
  * The rules as Personalizar edits them and as the database keeps them (migrations
- * 20261018000001..3): the saved settings in the editor's form (market defaults, account settings,
- * windows, and the two preferences only save_rules writes), what they resolve to (Resolved v1, the
- * same as SQL rules_resolve), which accounts a save would version, the save_rules payload, and the
- * parsed answers of rules_config(), rules_now() and save_rules().
+ * 20261018000001..3, and 20261019000001 for the seven markets): the saved settings in the
+ * editor's form (market defaults, account settings, windows, and the two preferences only
+ * save_rules writes), what they resolve to (Resolved v1, the same as SQL rules_resolve), which
+ * accounts a save would version, the save_rules payload, and the parsed answers of rules_config(),
+ * rules_now() and save_rules().
  *
  * Pure: no React, no Supabase, no clock (time is an input). Data access is in regrasDb.ts and the
  * React Query hooks in hooks/useRegras.ts; the pt-BR copy lives in each screen's copy file.
  *
- * Stored JSON (snake_case, dollars) is turned into the camelCase editor form (cents) on the way in
- * and back on the way out. Nothing here invents a default the database does not have: a market
- * with no saved row uses rules_config().builtin, exactly as rules_resolve does.
+ * Stored JSON (snake_case, units of the market's currency) is turned into the camelCase editor
+ * form (cents) on the way in and back on the way out. Nothing here invents a default the database
+ * does not have: a market with no saved row uses rules_config().builtin, exactly as rules_resolve
+ * does.
+ *
+ * Every market of ACCOUNT_MARKETS has a window rule, windows and a daily limit; the data block,
+ * the state rule and «somando» exist where MARKET_SPEC[m].rules says (futures only until Phase 5).
+ * The limit's amount is in the market's currency, under its key: `brl` on B3, `usd` elsewhere.
  */
 import {
+  ACCOUNT_MARKETS,
   CALENDAR_CODES,
+  MARKET_SPEC,
   STATE_NAMES,
   STATES_WITHOUT_DIRECTION,
   MAX_LIMIT_CENTS,
   RulesError,
   WINDOW_TZS,
   centsToUsd,
+  currencyOf,
+  isAccountMarket,
+  limitKey,
   parseRules,
   parseServerGate,
   toResolvedJson,
   usdToCents,
+  type AccountMarket,
   type AtLimit,
   type CalendarCode,
   type GateResult,
   type LimitMode,
-  type Market,
   type OutsideShows,
   type RuleVersion,
   type Rules,
@@ -87,21 +98,24 @@ export interface StateSetting {
   text: string;
 }
 
-/** A market's default («Padrão Futuros», and the binary default the boards never name): market_rule_defaults + its windows */
+/**
+ * A market's default («Padrão Futuros», and the defaults of the other markets the boards never
+ * name): market_rule_defaults + its windows
+ */
 export interface MarketSettings {
   windowRule: WindowRuleSetting;
-  /** Futures only; null for binaries */
+  /** Where the market has the data block (MARKET_SPEC[m].rules.block: futures); null elsewhere */
   block: BlockSetting | null;
-  /** Futures only ({} for binaries). A state with no choice and no text is left out. */
+  /** Where the market has the state rule (futures); {} elsewhere. A state with no choice and no text is left out. */
   states: Partial<Record<StateName, StateSetting>>;
   /** 0–2 windows on one clock; [] = «Sem janela» */
   windows: WindowSetting[];
 }
 
-/** «Limite do dia» of one account. Never inherited from a market. */
+/** «Limite do dia» of one account, in cents of its market's currency (currencyOf). Never inherited from a market. */
 export interface LimitSetting {
   cents: number;
-  /** «por conta» | «somando as contas de Futuros» (futures only) */
+  /** «por conta» | «somando as contas de Futuros» (only where MARKET_SPEC[m].rules.soma: futures) */
   mode: LimitMode;
   /** «Encerrar o dia no app» | «Só avisar» */
   atLimit: AtLimit;
@@ -113,7 +127,7 @@ export interface LimitSetting {
  */
 export interface AccountSettings {
   windowRule: Partial<WindowRuleSetting>;
-  /** Futures only */
+  /** Where the market has the data block (futures) */
   block: Partial<BlockSetting>;
   /** null = «Sem limite» */
   limit: LimitSetting | null;
@@ -123,7 +137,8 @@ export interface AccountSettings {
 
 /** Everything «Salvar alterações» saves, in one value: the page-wide draft (and the saved base) */
 export interface RulesSettings {
-  markets: Record<Market, MarketSettings>;
+  /** Every market of ACCOUNT_MARKETS (a market never saved holds its builtin) */
+  markets: Record<AccountMarket, MarketSettings>;
   /** Every account rules_config() lists (archived and example ones too); missing = nothing set */
   accounts: Record<string, AccountSettings>;
   /** profiles.preferences.display_tz */
@@ -161,7 +176,7 @@ function date(x: unknown): Date {
   return Number.isNaN(d.getTime()) ? bad() : d;
 }
 const dateOrNull = (x: unknown) => (x === null || x === undefined ? null : date(x));
-const market = (x: unknown): Market => (x === 'futures' || x === 'binary' ? x : bad());
+const market = (x: unknown): AccountMarket => (isAccountMarket(x) ? x : bad());
 const day = (x: unknown): string => (typeof x === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(x) ? x : bad());
 function cents(x: unknown): number {
   const c = usdToCents(x);
@@ -193,19 +208,32 @@ export interface WindowSpecJson {
 export interface MarketRulesJson {
   v: 1;
   window_rule: { on: boolean; outside: OutsideShows };
-  /** futures only */
+  /** where the market has the data block (futures) */
   block?: { on: boolean; before_min: number; after_min: number };
-  /** futures only */
+  /** where the market has the state rule (futures) */
   states?: Partial<Record<StateName, { choice: StateChoice | null; text?: string }>>;
 }
+
+/**
+ * A stored limit (AccountRules and Resolved v1): one amount under the key of the market's currency,
+ * `usd` (US$ markets) or `brl` (B3), in units with at most two decimals
+ */
+export type LimitJson = ({ usd: number; brl?: never } | { brl: number; usd?: never }) & { mode: LimitMode; at_limit: AtLimit };
 
 /** account_rule_settings.rules (AccountRules v1): keys present are «só nesta conta» */
 export interface AccountRulesJson {
   v: 1;
   window_rule?: Partial<{ on: boolean; outside: OutsideShows }>;
-  /** futures only */
+  /** where the market has the data block (futures) */
   block?: Partial<{ on: boolean; before_min: number; after_min: number }>;
-  limit?: { usd: number; mode: LimitMode; at_limit: AtLimit } | null;
+  limit?: LimitJson | null;
+}
+
+/** The stored limit of a market's account: its amount under the currency's key */
+export function limitJson(m: AccountMarket, l: LimitSetting): LimitJson {
+  const amount = centsToUsd(l.cents);
+  const head = limitKey(currencyOf(m)) === 'brl' ? { brl: amount } : { usd: amount };
+  return { ...head, mode: l.mode, at_limit: l.atLimit };
 }
 
 export const toWindowSpec = (w: WindowSetting): WindowSpecJson => ({
@@ -252,21 +280,25 @@ function statesFromJson(x: unknown): Partial<Record<StateName, StateSetting>> {
 }
 
 /** MarketRules JSON (a saved row, or rules_config().builtin) + the market's windows → MarketSettings */
-export function marketSettingsFromJson(m: Market, rulesJson: unknown, windowsJson: unknown, builtinJson: unknown): MarketSettings {
+export function marketSettingsFromJson(m: AccountMarket, rulesJson: unknown, windowsJson: unknown, builtinJson: unknown): MarketSettings {
   const r = obj(rulesJson ?? builtinJson);
   const b = obj(builtinJson);
   const wr = obj(r.window_rule);
-  const fut = m === 'futures';
+  const caps = MARKET_SPEC[m].rules;
   return {
     windowRule: { on: bool(wr.on), outside: outside(wr.outside) },
-    block: fut ? (blockFromJson(r.block ?? b.block, false) as BlockSetting) : null,
-    states: fut ? statesFromJson(r.states) : {},
+    block: caps.block ? (blockFromJson(r.block ?? b.block, false) as BlockSetting) : null,
+    states: caps.states ? statesFromJson(r.states) : {},
     windows: (Array.isArray(windowsJson) ? windowsJson : windowsJson == null ? [] : bad()).map(windowFromJson),
   };
 }
 
-/** AccountRules JSON (account_rule_settings.rules, or null) + the account's own window → AccountSettings */
-export function accountSettingsFromJson(rulesJson: unknown, windowJson: unknown): AccountSettings {
+/**
+ * AccountRules JSON (account_rule_settings.rules, or null) + the account's own window →
+ * AccountSettings. The limit's amount must be under the key of the market's currency (`brl` on
+ * B3, `usd` elsewhere); any other shape is not the as-built one.
+ */
+export function accountSettingsFromJson(m: AccountMarket, rulesJson: unknown, windowJson: unknown): AccountSettings {
   const out = emptyAccountSettings();
   out.window = windowJson === null || windowJson === undefined ? null : windowFromJson(windowJson);
   if (rulesJson === null || rulesJson === undefined) return out;
@@ -279,19 +311,24 @@ export function accountSettingsFromJson(rulesJson: unknown, windowJson: unknown)
   if (r.block !== undefined) out.block = blockFromJson(r.block, true);
   if (r.limit !== undefined && r.limit !== null) {
     const l = obj(r.limit);
+    const key = limitKey(currencyOf(m));
+    if (l[key === 'brl' ? 'usd' : 'brl'] !== undefined) bad();
     const mode = l.mode === 'conta' || l.mode === 'soma' ? l.mode : bad();
     const atLimit = l.at_limit === 'encerrar' || l.at_limit === 'avisar' ? l.at_limit : bad();
-    out.limit = { cents: cents(l.usd), mode, atLimit };
+    out.limit = { cents: cents(l[key]), mode, atLimit };
   }
   return out;
 }
 
 /** The MarketRules JSON save_rules stores for a market (the whole row) */
-export function marketRulesJson(m: Market, s: MarketSettings): MarketRulesJson {
+export function marketRulesJson(m: AccountMarket, s: MarketSettings): MarketRulesJson {
   const out: MarketRulesJson = { v: 1, window_rule: { on: s.windowRule.on, outside: s.windowRule.outside } };
-  if (m === 'futures') {
+  const caps = MARKET_SPEC[m].rules;
+  if (caps.block) {
     const b = s.block ?? { on: true, beforeMin: 5, afterMin: 10 };
     out.block = { on: b.on, before_min: b.beforeMin, after_min: b.afterMin };
+  }
+  if (caps.states) {
     const states: NonNullable<MarketRulesJson['states']> = {};
     for (const k of STATE_NAMES) {
       const st = s.states[k];
@@ -302,21 +339,21 @@ export function marketRulesJson(m: Market, s: MarketSettings): MarketRulesJson {
   return out;
 }
 
-/** The AccountRules JSON save_rules stores for an account (the whole row) */
-export function accountRulesJson(m: Market, s: AccountSettings): AccountRulesJson {
+/** The AccountRules JSON save_rules stores for an account (the whole row); the limit under the market's currency key */
+export function accountRulesJson(m: AccountMarket, s: AccountSettings): AccountRulesJson {
   const out: AccountRulesJson = { v: 1 };
   const wr: NonNullable<AccountRulesJson['window_rule']> = {};
   if (s.windowRule.on !== undefined) wr.on = s.windowRule.on;
   if (s.windowRule.outside !== undefined) wr.outside = s.windowRule.outside;
   if (Object.keys(wr).length) out.window_rule = wr;
-  if (m === 'futures') {
+  if (MARKET_SPEC[m].rules.block) {
     const b: NonNullable<AccountRulesJson['block']> = {};
     if (s.block.on !== undefined) b.on = s.block.on;
     if (s.block.beforeMin !== undefined) b.before_min = s.block.beforeMin;
     if (s.block.afterMin !== undefined) b.after_min = s.block.afterMin;
     if (Object.keys(b).length) out.block = b;
   }
-  out.limit = s.limit && { usd: centsToUsd(s.limit.cents), mode: s.limit.mode, at_limit: s.limit.atLimit };
+  out.limit = s.limit && limitJson(m, s.limit);
   return out;
 }
 
@@ -349,14 +386,14 @@ export function canon(x: unknown): string {
   );
 }
 
-const normMarket = (m: Market, s: MarketSettings) => ({ rules: marketRulesJson(m, s), windows: s.windows.map(toWindowSpec) });
-const normAccount = (m: Market, s: AccountSettings | undefined) => {
+const normMarket = (m: AccountMarket, s: MarketSettings) => ({ rules: marketRulesJson(m, s), windows: s.windows.map(toWindowSpec) });
+const normAccount = (m: AccountMarket, s: AccountSettings | undefined) => {
   const a = s ?? emptyAccountSettings();
   return { rules: accountRulesJson(m, a), window: a.window && toWindowSpec(a.window) };
 };
 
-export const sameMarket = (m: Market, a: MarketSettings, b: MarketSettings) => canon(normMarket(m, a)) === canon(normMarket(m, b));
-export const sameAccount = (m: Market, a: AccountSettings | undefined, b: AccountSettings | undefined) =>
+export const sameMarket = (m: AccountMarket, a: MarketSettings, b: MarketSettings) => canon(normMarket(m, a)) === canon(normMarket(m, b));
+export const sameAccount = (m: AccountMarket, a: AccountSettings | undefined, b: AccountSettings | undefined) =>
   canon(normAccount(m, a)) === canon(normAccount(m, b));
 
 // ---------------------------------------------------------------------------------------------
@@ -373,7 +410,7 @@ export function windowError(w: WindowSetting): WindowError | null {
 }
 
 /** Where a window lives: a market default (index 0 or 1) or an account's own window */
-export type WindowPlace = { market: Market; index: number } | { accountId: string };
+export type WindowPlace = { market: AccountMarket; index: number } | { accountId: string };
 
 export interface SettingsIssue {
   place: WindowPlace;
@@ -386,7 +423,7 @@ export interface SettingsIssue {
  */
 export function settingsIssues(s: RulesSettings, activeIds: readonly string[]): SettingsIssue[] {
   const out: SettingsIssue[] = [];
-  for (const m of ['futures', 'binary'] as const) {
+  for (const m of ACCOUNT_MARKETS) {
     s.markets[m].windows.forEach((w, index) => {
       const error = windowError(w);
       if (error) out.push({ place: { market: m, index }, error });
@@ -406,7 +443,7 @@ export function settingsIssues(s: RulesSettings, activeIds: readonly string[]): 
 
 export interface RulesAccount {
   id: string;
-  market: Market;
+  market: AccountMarket;
   /** trading_accounts.day_tz / day_start_min */
   day: DayClock;
 }
@@ -415,7 +452,8 @@ export interface RulesAccount {
  * What an account's settings resolve to: the same value SQL rules_resolve gives (and so the
  * `resolved` of the version a save would create). Its own window wins over the market's; each
  * rule key comes from the account, else the market default; the limit only from the account;
- * the block carries the calendars; the state choices come from the market.
+ * the block carries the calendars; the state choices come from the market. The block and the
+ * states exist only where the market has them (MARKET_SPEC[m].rules).
  *
  * For previews of a draft («Como fica hoje»): a window with an error does not act, so it is left
  * out, and an account whose own window has an error has no window at all (it does not fall back
@@ -424,7 +462,7 @@ export interface RulesAccount {
 export function resolveRules(account: RulesAccount, s: RulesSettings): Rules {
   const m = s.markets[account.market];
   const o = s.accounts[account.id] ?? emptyAccountSettings();
-  const fut = account.market === 'futures';
+  const caps = MARKET_SPEC[account.market].rules;
   const ok = (w: WindowSetting) => windowError(w) === null;
 
   let windows: WindowSetting[];
@@ -446,7 +484,7 @@ export function resolveRules(account: RulesAccount, s: RulesSettings): Rules {
       on: o.windowRule.on ?? m.windowRule.on,
       outside: o.windowRule.outside ?? m.windowRule.outside,
     },
-    block: fut
+    block: caps.block
       ? {
           on: o.block.on ?? mb.on,
           beforeMin: o.block.beforeMin ?? mb.beforeMin,
@@ -455,7 +493,7 @@ export function resolveRules(account: RulesAccount, s: RulesSettings): Rules {
         }
       : null,
     limit: o.limit && { ...o.limit },
-    states: fut
+    states: caps.states
       ? (Object.fromEntries(STATE_NAMES.map((k) => [k, m.states[k]?.choice ?? null])) as Record<StateName, StateChoice | null>)
       : null,
     day: { tz: account.day.tz, startMin: account.day.startMin },
@@ -522,8 +560,8 @@ export function rebaseSettings(
   newBase: RulesSettings,
   draft: RulesSettings,
 ): RulesSettings {
-  const markets = {} as Record<Market, MarketSettings>;
-  for (const m of ['futures', 'binary'] as const) {
+  const markets = {} as Record<AccountMarket, MarketSettings>;
+  for (const m of ACCOUNT_MARKETS) {
     markets[m] = sameMarket(m, draft.markets[m], oldBase.markets[m]) ? newBase.markets[m] : draft.markets[m];
   }
   const out: Record<string, AccountSettings> = {};
@@ -569,13 +607,13 @@ export interface RulesConfig {
   rev: string;
   /** The server clock when it answered */
   serverNow: Date;
-  /** What a market defaults to before anything is saved (rules_builtin) */
-  builtin: Record<Market, MarketSettings>;
+  /** What each market defaults to before anything is saved (rules_builtin) */
+  builtin: Record<AccountMarket, MarketSettings>;
   /** Whether a market default row exists (saved at least once) */
-  savedMarkets: Record<Market, boolean>;
+  savedMarkets: Record<AccountMarket, boolean>;
   /** profiles.preferences as stored (theme, conta_atual, display_tz, calendars …) */
   preferences: HubPreferences;
-  /** Every futures and binary account of the user (archived and example ones too), in list order */
+  /** Every account of the user, of every market (archived and example ones too), in list order */
   accounts: AccountConfig[];
   /** The saved settings in the editor's form: the base the page's draft starts from */
   settings: RulesSettings;
@@ -589,16 +627,20 @@ export function activeAccounts(config: Pick<RulesConfig, 'accounts'>): AccountCo
   return config.accounts.filter((a) => !a.archivedAt && !a.isExample);
 }
 
-/** rules_config() → RulesConfig. Throws RulesAnswerError on any other shape. */
+/**
+ * rules_config() → RulesConfig. Every market of ACCOUNT_MARKETS must have its builtin (the database
+ * with migration 20261019000001 gives one per market); a missing one, or any other shape, throws
+ * RulesAnswerError.
+ */
 export function parseRulesConfig(json: unknown): RulesConfig {
   const c = obj(json);
   const builtinJson = obj(c.builtin);
   const defaults = obj(c.defaults);
   const prefs = c.preferences === null || c.preferences === undefined ? {} : obj(c.preferences);
-  const markets = {} as Record<Market, MarketSettings>;
-  const builtin = {} as Record<Market, MarketSettings>;
-  const savedMarkets = {} as Record<Market, boolean>;
-  for (const m of ['futures', 'binary'] as const) {
+  const markets = {} as Record<AccountMarket, MarketSettings>;
+  const builtin = {} as Record<AccountMarket, MarketSettings>;
+  const savedMarkets = {} as Record<AccountMarket, boolean>;
+  for (const m of ACCOUNT_MARKETS) {
     builtin[m] = marketSettingsFromJson(m, null, [], builtinJson[m]);
     const d = defaults[m];
     savedMarkets[m] = d !== null && d !== undefined;
@@ -611,9 +653,10 @@ export function parseRulesConfig(json: unknown): RulesConfig {
   for (const x of accountsJson) {
     const a = obj(x);
     const id = str(a.account_id);
+    const m = market(a.market);
     const d = obj(a.day);
     const settings = a.settings === null || a.settings === undefined ? null : obj(a.settings).rules;
-    settingsAccounts[id] = accountSettingsFromJson(settings, a.window);
+    settingsAccounts[id] = accountSettingsFromJson(m, settings, a.window);
     const versions = (Array.isArray(a.versions) ? a.versions : bad()).map((vx): ConfigVersion => {
       const v = obj(vx);
       const origin = v.origin === 'salvar' || v.origin === 'criar' || v.origin === 'copiar' ? v.origin : bad();
@@ -630,7 +673,7 @@ export function parseRulesConfig(json: unknown): RulesConfig {
     accounts.push({
       id,
       label: str(a.label),
-      market: market(a.market),
+      market: m,
       archivedAt: strOrNull(a.archived_at),
       isExample: bool(a.is_example),
       day: { tz: str(d.tz), startMin: int(d.start_min) },
@@ -695,7 +738,7 @@ export interface SaveRulesPayload {
   /** rules_config().rev of the page that edits; a newer save in between → rules_changed */
   base_rev?: string;
   /** A market present is replaced whole (its rules row and its windows) */
-  defaults?: Partial<Record<Market, { rules: MarketRulesJson; windows: WindowSpecJson[] }>>;
+  defaults?: Partial<Record<AccountMarket, { rules: MarketRulesJson; windows: WindowSpecJson[] }>>;
   /** An account present is replaced whole (its settings and its own window) */
   accounts?: Record<
     string,
@@ -739,7 +782,7 @@ export function buildSavePayload(
   const base = config.settings;
   const payload: SaveRulesPayload = { v: 1, base_rev: config.rev };
 
-  for (const m of ['futures', 'binary'] as const) {
+  for (const m of ACCOUNT_MARKETS) {
     if (!sameMarket(m, base.markets[m], draft.markets[m])) {
       (payload.defaults ??= {})[m] = normMarket(m, draft.markets[m]);
     }
@@ -766,14 +809,14 @@ export function buildSavePayload(
 export interface NewAccountRules {
   /** The account just created (trading_accounts.id) */
   accountId: string;
-  market: Market;
+  market: AccountMarket;
   /** The account's settings: a copy (copyAccountSettings) and/or what the creation form set */
   settings: AccountSettings;
   /** «Copiar regras de»: the source account, recorded on v1 */
   copiedFrom?: string | null;
   /**
    * NEW (personalizar.md §11.1): the market has no window yet and the form entered one, so it
-   * becomes the market's window (the account then reads «padrão de Futuros|Binárias»).
+   * becomes the market's window (the account then reads «padrão de Futuros|Binárias|…»).
    */
   marketWindows?: WindowSetting[];
 }
@@ -853,7 +896,7 @@ export function parseSaveResult(json: unknown): SaveRulesResult {
 export interface AccountNow {
   accountId: string;
   label: string;
-  market: Market;
+  market: AccountMarket;
   /** effective_from of version 1 («regras desde»); null before it */
   desde: Date | null;
   /** Its trading day on the account's clock */
@@ -875,14 +918,14 @@ export interface RulesNow {
 }
 
 /**
- * rules_now() → RulesNow. rules_now lists every active account, of any market (a Phase 1 backfill
- * can hold forex or stocks accounts); only futures and binary accounts have rules, so the others
- * are left out here instead of failing the whole answer. Throws RulesAnswerError on any other shape.
+ * rules_now() → RulesNow. rules_now lists every active account, of every market, and every one is
+ * kept: «Posso operar hoje?» never drops an account. A market outside ACCOUNT_MARKETS, or any other
+ * shape, throws RulesAnswerError.
  */
 export function parseRulesNow(json: unknown): RulesNow {
   const r = obj(json);
   const list = Array.isArray(r.accounts) ? r.accounts : bad();
-  const accounts = list.filter((x) => !isObj(x) || x.market === 'futures' || x.market === 'binary').map((x): AccountNow => {
+  const accounts = list.map((x): AccountNow => {
     const a = obj(x);
     let gate: GateResult;
     try {
@@ -927,12 +970,13 @@ export type UsdTextResult =
   | { ok: false; reason: 'empty' | 'invalid' | 'not_positive' | 'too_large' };
 
 /**
- * pt-BR money as typed: '400', '400,50', '1.000', '1.000,50' (and '400.5' as a decimal point).
- * Rounded half up to cents. 'not_positive' → «Digite um valor maior que zero.»; 'too_large' →
- * «Use um valor até US$ 1.000.000.» (MAX_LIMIT_CENTS).
+ * pt-BR money as typed: '400', '400,50', '1.000', '1.000,50' (and '400.5' as a decimal point), in
+ * any currency (the name is Phase 2's): a leading 'US$' or 'R$' is dropped. Rounded half up to
+ * cents. 'not_positive' → «Digite um valor maior que zero.»; 'too_large' → «Use um valor até US$
+ * 1.000.000.» or «… R$ 1.000.000.» (MAX_LIMIT_CENTS).
  */
 export function parseUsdText(text: string): UsdTextResult {
-  const t = (text ?? '').trim().replace(/^US\$\s*/i, '');
+  const t = (text ?? '').trim().replace(/^(?:US|R)\$\s*/i, '');
   if (t === '') return { ok: false, reason: 'empty' };
   let integer: string;
   let fraction = '';
