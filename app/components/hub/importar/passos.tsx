@@ -309,6 +309,7 @@ export function PassoNovaConta({
   sizeInvalid,
   locked = false,
   regras = null,
+  firmRemovable = false,
 }: {
   headingRef: HeadingRef
   market: Market
@@ -322,8 +323,13 @@ export function PassoNovaConta({
   locked?: boolean
   /** The rules block (RegrasDaConta), after «Tamanho US$ / Número na plataforma» (board) */
   regras?: React.ReactNode
+  /** The firm came from the file (only a suggestion): «Tirar» next to the read-only row clears it */
+  firmRemovable?: boolean
 }) {
   const futures = market === 'futures'
+  const sizeRef = useRef<HTMLInputElement>(null)
+  const refRef = useRef<HTMLInputElement>(null)
+  const firm = form.firm.trim()
   return (
     <div className="hub-passo">
       <Heading headingRef={headingRef}>{PASSO_B.title(market)}</Heading>
@@ -372,7 +378,27 @@ export function PassoNovaConta({
       )}
       <div className="hub-campo">
         <span className="hub-rot-campo">{roLabel}</span>
-        <span className="hub-ro">{roValue}</span>
+        {firmRemovable && firm && !locked ? (
+          <div className="hub-linha" style={{ gap: 8, flexWrap: 'nowrap' }}>
+            <span className="hub-ro" style={{ flex: '1 1 auto', minWidth: 0 }}>
+              {roValue}
+            </span>
+            <button
+              type="button"
+              className="hub-btn"
+              aria-label={PASSO_I2.removeFirmAria(firm)}
+              onClick={() => {
+                onChange({ firm: '' })
+                // The button goes away with the firm: focus moves on to the next field
+                setTimeout(() => (sizeRef.current ?? refRef.current)?.focus(), 0)
+              }}
+            >
+              {PASSO_I2.removeFirm}
+            </button>
+          </div>
+        ) : (
+          <span className="hub-ro">{roValue}</span>
+        )}
       </div>
       {!futures && (
         <div className="hub-campo">
@@ -387,6 +413,7 @@ export function PassoNovaConta({
               {PASSO_B.size} <span className="hub-opc">{OPTIONAL}</span>
             </label>
             <input
+              ref={sizeRef}
               id="f-tam"
               className="hub-entrada hub-entrada--mono"
               type="text"
@@ -410,6 +437,7 @@ export function PassoNovaConta({
             {PASSO_B.ref} <span className="hub-opc">{OPTIONAL}</span>
           </label>
           <input
+            ref={refRef}
             id="f-num"
             className="hub-entrada hub-entrada--mono"
             type="text"

@@ -33,7 +33,7 @@ import {
   type RegrasDaNovaConta,
 } from '@/lib/hub/regrasConta'
 import { formatDiaMes } from '@/lib/hub/formato'
-import { hasFirms } from '@/lib/hub/mesas'
+import { firmOfFile, hasFirms } from '@/lib/hub/mesas'
 import {
   ARQUIVO,
   BUSY,
@@ -330,6 +330,11 @@ export default function ImportSheet({ mode, accountId, onClose }: { mode: SheetM
   const form = flow.form
   const setForm = (patch: Partial<AccountForm>) => setFlow((f) => ({ ...f, form: { ...f.form, ...patch } }))
   const formMarket = parsed?.market ?? form.market ?? 'futures'
+  // A file's own firm (Top One file → «Top One Futures»): step b starts with it, removable, since
+  // the file's format is not proof of the firm (lib/hub/mesas firmOfFile)
+  const firmFromFile = parsed && hasFirms(parsed.market) ? firmOfFile(parsed.platform) ?? '' : ''
+  /** Step b's empty form for the file's market */
+  const newFormForFile = (market: AccountForm['market']): AccountForm => ({ ...EMPTY_FORM, market, firm: firmFromFile })
   const sizeValue = parseSize(form.size)
   // Once the form created its account, that account's nickname is not "taken"
   const taken = labelTaken(form.label, all, flow.createdFromForm ? flow.created?.id : undefined)
@@ -377,7 +382,8 @@ export default function ImportSheet({ mode, accountId, onClose }: { mode: SheetM
         market: formMarket,
         label: form.label.trim().slice(0, LABEL_MAX),
         platform: parsed ? parsed.platform : form.platform === PLATFORM_UNKNOWN ? null : form.platform,
-        firm: parsed || !hasFirms(formMarket) ? null : form.firm.trim() || null,
+        // Chosen in i2, or the file's firm unless the owner took it out in step b
+        firm: hasFirms(formMarket) ? form.firm.trim() || null : null,
         external_ref: form.ref.trim() || null,
         phase: futures ? form.phase : 'pessoal',
         size: futures && sizeValue !== 'invalid' ? sizeValue : null,
@@ -533,7 +539,9 @@ export default function ImportSheet({ mode, accountId, onClose }: { mode: SheetM
   }
 
   const typed =
-    !!(form.label.trim() || form.size.trim() || form.ref.trim() || form.firm.trim() || form.search.trim() || form.phase || form.platform) ||
+    // The file's firm, left as it came, is not something the owner typed
+    form.firm.trim() !== firmFromFile ||
+    !!(form.label.trim() || form.size.trim() || form.ref.trim() || form.search.trim() || form.phase || form.platform) ||
     regrasEditadas(form.rules) ||
     (mode === 'adicionar' && !!form.market)
   const dirty = !flow.createdFromForm && ['i1', 'i2', 'b'].includes(flow.passo) && typed
@@ -613,7 +621,7 @@ export default function ImportSheet({ mode, accountId, onClose }: { mode: SheetM
       primary = {
         label: FOLHA.next,
         run: () => {
-          if (flow.choice === 'nova') move('b', { form: { ...EMPTY_FORM, market: parsed.market }, createdFromForm: false })
+          if (flow.choice === 'nova') move('b', { form: newFormForFile(parsed.market), createdFromForm: false })
           else if (chosen && flow.file) void afterAccount(chosen, flow.file, { accountId: chosen.id })
         },
       }
@@ -692,6 +700,7 @@ export default function ImportSheet({ mode, accountId, onClose }: { mode: SheetM
           labelTaken={taken}
           sizeInvalid={sizeInvalid}
           locked={locked}
+          firmRemovable={!!parsed}
           regras={
             <RegrasDaConta
               carga={blockLoad}
@@ -798,7 +807,7 @@ export default function ImportSheet({ mode, accountId, onClose }: { mode: SheetM
             if (target && flow.file) void afterAccount(target, flow.file, { accountId: id })
           }}
           onCreate={() => {
-            if (!busyRef.current) move('b', { form: { ...EMPTY_FORM, market: parsed.market }, createdFromForm: false })
+            if (!busyRef.current) move('b', { form: newFormForFile(parsed.market), createdFromForm: false })
           }}
         />
       )
