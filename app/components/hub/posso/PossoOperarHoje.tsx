@@ -27,9 +27,11 @@ interface Props {
 type RetryHandler = (event: React.MouseEvent<HTMLButtonElement>) => void
 
 /**
- * «Posso operar hoje?» (Início board, on /diario in Phase 2): one line per active account, futures
- * before binaries, each answered by its own rules on the server (rules_now). The words are
- * lib/hub/posso's; nothing is computed on the device clock here. No aria-live: a window opening
+ * «Posso operar hoje?» (Início board, on /diario in Phase 2): one line per active account of every
+ * market, never dropped, grouped in ACCOUNT_MARKETS order (Futuros, binárias, Forex, Ações, Cripto,
+ * B3), each answered by its own rules on the server (rules_now). The words are lib/hub/posso's,
+ * money in the account's currency («US$ 0 de US$ 1.000», «R$ 0 de R$ 500»); nothing is computed
+ * on the device clock here. No aria-live: a window opening
  * must not interrupt a screen reader; the line's text is the state.
  */
 export default function PossoOperarHoje({ state, onRetry }: Props) {
@@ -74,7 +76,7 @@ export default function PossoOperarHoje({ state, onRetry }: Props) {
       </div>
     )
   } else {
-    // Grouped by market (Futuros, then Opções binárias), the server's order inside a group
+    // Grouped by market in ACCOUNT_MARKETS order, the server's order inside a group
     const accounts = groupByMarket(state.accounts).flatMap((group) => group.accounts)
     body = (
       <ul aria-labelledby="t-posso" className="hub-posso__lista">
@@ -108,7 +110,7 @@ function RetryLink({ onRetry }: { onRetry: RetryHandler }) {
   )
 }
 
-/** `li.conta-hoje` of the board: {apelido} · state · sub or action · «Limite do dia US$ 0 de US$ 400» */
+/** `li.conta-hoje` of the board: {apelido} · state · sub or action · «Limite do dia US$ 0 de US$ 400» (R$ on B3) */
 function LinhaConta({ label, linha, onRetry }: { label: string; linha: PossoLinha; onRetry: RetryHandler }) {
   const unavailable = linha.limite?.indisponivel === true
   // «Limite do dia indisponível · Tentar de novo»; with a window answer, the retry sits by the limit
