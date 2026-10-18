@@ -9,7 +9,7 @@
  * The window strings shared with Personalizar (field labels, errors, days, clocks) are lane A1's,
  * in components/hub/personalizar/copy.ts, and are imported from there, never copied.
  */
-import type { AccountMarket, WindowTz } from '@/lib/domain/gate'
+import { MARKET_SPEC, type AccountMarket, type WindowTz } from '@/lib/domain/gate'
 import { formatInt } from '@/lib/hub/formato'
 import { JANELAS, RELOGIO, lista } from '@/components/hub/personalizar/copy'
 import { MERCADO } from '@/components/hub/copyMercados'
@@ -31,8 +31,9 @@ export const REGRAS_CONTA = {
   copiar: 'Copiar regras de',
   naoCopiar: 'Não copiar',
   notaPadrao: 'Começa com o padrão do mercado.',
+  /** What a copy brings: the market's rules (MARKET_SPEC: block and states only in Futuros) */
   notaCopia: (market: AccountMarket) =>
-    market === 'futures' ? 'Copia janela, limite do dia, bloqueio de dados e regra do estado.' : 'Copia janela e limite do dia.',
+    MARKET_SPEC[market].rules.block ? 'Copia janela, limite do dia, bloqueio de dados e regra do estado.' : 'Copia janela e limite do dia.',
 
   mudar: 'Mudar',
   /** «Janela 10:00–11:00 (Nova York) · padrão de Futuros · limite do dia: US$ 400 por conta» */
@@ -50,7 +51,11 @@ export const REGRAS_CONTA = {
   semLimite: 'sem limite',
   definir: 'definir',
 
-  /** «Usar a janela de Futuros (10:00–11:00 ET)?» (two windows: «10:00–11:00 e 14:00–15:00 ET») */
+  /**
+   * «Usar a janela de Futuros (10:00–11:00 ET)?» (two windows: «10:00–11:00 e 14:00–15:00 ET»).
+   * Board for futures and binaries; NEW for a second account in a Fase 2b market («Usar a janela da
+   * B3 (10:00–11:00 de Brasília)?»), which the board does not draw
+   */
   pergunta: (market: AccountMarket, faixas: readonly string[], tz: WindowTz) =>
     `Usar a janela ${deCurto(market)} (${faixas.join(' e ')} ${RELOGIO[tz].de})?`,
   sim: 'Sim',
@@ -71,8 +76,11 @@ export const REGRAS_CONTA = {
   definirJanela: JANELAS.definir,
   cancelarJanela: JANELAS.cancelar,
   cancelarJanelaAria: (market: AccountMarket) => JANELAS.cancelarAria(market),
+  /** Under the days while a market's suggested window is set (board `X.MK.cr.diasNota`): crypto opens every day */
+  diasNota: { crypto: 'Cripto abre todos os dias: sábado e domingo já vêm marcados.' } as Partial<Record<AccountMarket, string>>,
 
-  limite: 'Limite do dia, US$',
+  /** «Limite do dia, US$», «Limite do dia, R$» (board: `Limite do dia, {{ B.moeda }}`) */
+  limite: (simbolo: string) => `Limite do dia, ${simbolo}`,
   modoAria: 'Como o limite conta',
 
   desde: (d: string) => `Regras valem desde hoje, ${d}`,

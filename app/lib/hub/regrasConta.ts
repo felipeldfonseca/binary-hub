@@ -5,11 +5,12 @@
  * count of the file's rows before the account's rules started. Pure: time is an input, the words
  * come from components/hub/contas/copyRegras.ts.
  */
-import { MON_TO_FRI, formatHhMm } from '@/lib/domain/tempo'
+import { MON_TO_FRI, formatHhMm, localToUtc, utcToLocal, type DayClock } from '@/lib/domain/tempo'
 import { previewInstant, type ImportRow } from '@/lib/domain/import'
-import { MARKET_SPEC, type AccountMarket, type LimitMode, type Rules } from '@/lib/domain/gate'
+import { MARKET_SPEC, currencyOf, type AccountMarket, type LimitMode, type Rules } from '@/lib/domain/gate'
 import { ANTES_DAS_REGRAS, LINHA_CONTA, REGRAS_CONTA, RELOGIO_NOME } from '@/components/hub/contas/copyRegras'
-import { formatDiaMes } from './formato'
+import { PASSO_B } from '@/components/hub/contas/copy'
+import { SIMBOLO_MOEDA, formatDiaMes } from './formato'
 import { JANELA_SUGERIDA, faixaJanela } from './janelas'
 import { dinheiroCompacto, sufixoRelogio } from './posso'
 import {
@@ -52,9 +53,9 @@ export interface RegrasForm {
   propria?: WindowSetting
   /** The market has no window: whether the form sets one («+ Definir janela») */
   definir?: boolean
-  /** «Limite do dia, US$» as typed */
+  /** «Limite do dia, US$» (R$ on B3) as typed */
   limite?: string
-  /** «por conta» | «somando as contas de Futuros» */
+  /** «por conta» | «somando as contas de Futuros» (only where MARKET_SPEC[m].rules.soma) */
   modo?: LimitMode
   /** «Mudar» is open */
   aberto: boolean
@@ -107,7 +108,7 @@ export interface RegrasDaNovaConta {
   /** A typed limit that cannot be saved (empty is no limit, not an error) */
   limiteErro: Exclude<Extract<UsdTextResult, { ok: false }>['reason'], 'empty'> | null
   modo: LimitMode
-  /** The mode pills: futures, with a second futures account once this one exists */
+  /** The mode pills: a market that sums (futures), with a second account of it once this one exists */
   temModo: boolean
   /** The new account's settings, for v1 (buildNewAccountPayload) */
   settings: AccountSettings
@@ -141,8 +142,9 @@ export function regrasDaNovaConta(config: Pick<RulesConfig, 'accounts' | 'settin
   const limiteTexto = form.limite ?? (fonte.limit ? textoLimite(fonte.limit.cents) : '')
   const limite = parseUsdText(limiteTexto)
   const limiteErro = limite.ok || limite.reason === 'empty' ? null : limite.reason
-  const fut = market === 'futures'
-  const modo: LimitMode = fut ? (form.modo ?? fonte.limit?.mode ?? 'conta') : 'conta'
+  // «por conta / somando» only where the market sums its accounts (Futuros)
+  const soma = MARKET_SPEC[market].rules.soma
+  const modo: LimitMode = soma ? (form.modo ?? fonte.limit?.mode ?? 'conta') : 'conta'
 
   const settings: AccountSettings = {
     ...fonte,
@@ -163,7 +165,7 @@ export function regrasDaNovaConta(config: Pick<RulesConfig, 'accounts' | 'settin
     limite,
     limiteErro,
     modo,
-    temModo: fut && opcoes.length > 0,
+    temModo: soma && opcoes.length > 0,
     settings,
     marketWindows: !temJanelaMercado && janela ? [janela] : undefined,
     bloqueado: !!janelaErro || !!limiteErro,
@@ -178,14 +180,15 @@ export function faixaResumo(w: WindowSetting): string {
     : faixaJanela(w.startMin, w.endMin)
 }
 
-/** The limit part of the summary line */
+/** The limit part of the summary line, in the market's currency («US$ 400 por conta», «R$ 400») */
 function limiteResumo(r: RegrasDaNovaConta, form: RegrasForm): string {
-  const sufixo = r.market === 'futures' ? (r.modo === 'soma' ? REGRAS_CONTA.somando : REGRAS_CONTA.porConta) : ''
-  if (r.limite.ok) return dinheiroCompacto(r.limite.cents, 'USD') + sufixo // lane A: currency
+  const sufixo = MARKET_SPEC[r.market].rules.soma ? (r.modo === 'soma' ? REGRAS_CONTA.somando : REGRAS_CONTA.porConta) : ''
+  const moeda = currencyOf(r.market)
+  if (r.limite.ok) return dinheiroCompacto(r.limite.cents, moeda) + sufixo
   const texto = r.limiteTexto.trim()
   // Board: what was typed, even before it is valid (the creation button says what is wrong); the
-  // non-breaking space keeps «US$» with the amount, as dinheiroCompacto does
-  if (texto) return `US$ ${texto}${sufixo}` // lane A: currency
+  // non-breaking space keeps the symbol with the amount, as dinheiroCompacto does
+  if (texto) return `${SIMBOLO_MOEDA[moeda]}\u00a0${texto}${sufixo}`
   return r.copiar && form.limite === undefined ? REGRAS_CONTA.semLimite : REGRAS_CONTA.definir
 }
 
@@ -286,6 +289,36 @@ export function outrasContasComVersao(config: RulesConfig, r: RegrasDaNovaConta,
     formatDiaMes(effectiveDayAt(now, outras[0].rules)),
     outras.map((p) => ativas.get(p.accountId) as string),
   )
+}
+
+// ---------------------------------------------------------------------------------------------
+// Step b: «Moeda e virada do dia» of a market without a file reader (Fase 2b)
+// ---------------------------------------------------------------------------------------------
+
+const BRASILIA = 'America/Sao_Paulo'
+
+/**
+ * When a day clock's turn falls in Brasília today, at today's offsets: 17:00 ET → '18:00' in
+ * October, '19:00' after the US clocks change on 1 Nov. «Today» is the date on the day clock at
+ * `now`. Null when the day already turns on Brasília's clock.
+ */
+export function viradaEmBrasilia(day: DayClock, now: Date): string | null {
+  if (day.tz === BRASILIA) return null
+  const hoje = utcToLocal(now, day.tz)
+  const virada = localToUtc(
+    { year: hoje.year, month: hoje.month, day: hoje.day, hour: Math.floor(day.startMin / 60), minute: day.startMin % 60 },
+    day.tz,
+  )
+  return formatHhMm(utcToLocal(virada, BRASILIA).minuteOfDay)
+}
+
+/**
+ * The «Moeda e virada do dia» row of a new account (board `B.moedaDia`): «US$ · o dia vira às 17:00
+ * ET (18:00 em Brasília hoje)», «R$ · o dia vira à meia-noite de Brasília». An account not created
+ * yet, so the market's day clock (the database's insert trigger sets the same).
+ */
+export function moedaEViradaDoDia(market: AccountMarket, now: Date): string {
+  return PASSO_B.moedaDiaValor(market, viradaEmBrasilia(MARKET_SPEC[market].day, now))
 }
 
 // ---------------------------------------------------------------------------------------------
