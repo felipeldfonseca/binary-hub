@@ -39,14 +39,26 @@ import {
   type RulesSettings,
   type SaveRulesPayload,
 } from '@/lib/hub/regras';
-import { ACCOUNT_MARKETS, MARKET_SPEC, toResolvedJson } from '@/lib/domain/gate';
+import { ACCOUNT_MARKETS, MARKET_SPEC, MAX_LIMIT_CENTS, checkRules, toResolvedJson } from '@/lib/domain/gate';
 import { EVERY_DAY, MON_TO_FRI } from '@/lib/domain';
 import { ACCOUNT_COLUMNS } from '@/lib/hub/contasDb';
-import { JANELA_SUGERIDA } from '@/lib/hub/janelas';
+import { JANELA_SUGERIDA, trocarRelogio } from '@/lib/hub/janelas';
 import { possoLinha, possoTexto } from '@/lib/hub/posso';
+import { partesVersao } from '@/lib/hub/comoFicaHoje';
+import {
+  ajustarSoNestaConta,
+  alternarDia,
+  comAoChegar,
+  comJanelaDaConta,
+  comLimite,
+  comRegraJanela,
+  definirJanela,
+  segundaJanela,
+} from '@/lib/hub/rascunho';
 import { PG_URL as URL, asUser, asUserExec, codeOf, createAccountAsUser, lit, psql } from '@/testing/pg';
 
 const RECORD = process.env.BH_PG_RECORD;
+const NBSP = ' ';
 
 const describePg = URL ? describe : describe.skip;
 
@@ -561,6 +573,162 @@ insert into public.trading_accounts (id, user_id, market, label, day_tz, day_sta
     // FTMO inside its 08:00–10:00 ET window (09:45 ET), the window clock New York
     const ftmo = now.accounts.find((a) => a.accountId === ids.fx)!;
     expect(possoTexto(possoLinha('FTMO', ftmo.gate, ftmo.rules))).toBe('Liberado · até 10:00 ET');
+  });
+});
+
+describePg('seven markets × the real SQL: every Personalizar edit, a copy, legacy accounts (Fase 2b)', () => {
+  const uid = randomUUID();
+  const ids: Record<string, string> = {};
+  const config = () => parseRulesConfig(asUser(uid, 'public.rules_config()'));
+  const clone = (s: RulesSettings): RulesSettings => JSON.parse(JSON.stringify(s));
+  const NY = 'America/New_York' as const;
+  const SP = 'America/Sao_Paulo' as const;
+
+  /** Dry run then for real: the predicted versions, SQL = TS for every account and version, the round trip */
+  function save(before: RulesConfig, draft: RulesSettings, payload: SaveRulesPayload, force: string[] = []) {
+    const predicted = pendingVersions(before, draft, { force })
+      .map((p) => `${p.accountId}:v${p.versionNo}`)
+      .sort();
+    const dry = parseSaveResult(asUser(uid, `public.save_rules(${lit(payload)}, true)`));
+    expect(dry.versions.map((v) => `${v.accountId}:v${v.versionNo}`).sort()).toEqual(predicted);
+    const real = parseSaveResult(asUser(uid, `public.save_rules(${lit(payload)})`));
+    expect(real.versions.map((v) => `${v.accountId}:v${v.versionNo}`).sort()).toEqual(predicted);
+    const after = config();
+    for (const a of after.accounts) {
+      expect(canon(toResolvedJson(a.current))).toBe(canon(toResolvedJson(resolveRules(a, draft))));
+      // The TS validator accepts what the SQL one stored
+      for (const v of a.versions) expect(checkRules(toResolvedJson(v.rules))).toBeNull();
+    }
+    for (const m of ACCOUNT_MARKETS) expect(sameMarket(m, after.settings.markets[m], draft.markets[m])).toBe(true);
+    for (const a of after.accounts) expect(sameAccount(a.market, after.settings.accounts[a.id], draft.accounts[a.id])).toBe(true);
+    expect(buildSavePayload(after, draft)).toBeNull();
+    return { result: real, after };
+  }
+
+  beforeAll(async () => {
+    psql(`insert into auth.users (id, email) values ('${uid}', 'edicoes-${uid}@example.test');
+insert into public.profiles (id, email) values ('${uid}', 'edicoes-${uid}@example.test');`);
+    for (const [key, market, label] of [
+      ['fx', 'forex', 'FTMO'],
+      ['us', 'stocks', 'IBKR'],
+      ['cr', 'crypto', 'Binance'],
+      ['b3', 'b3', 'Clear'],
+    ] as const) {
+      ids[key] = await createAccountAsUser(uid, {
+        market,
+        label,
+        platform: null,
+        firm: null,
+        external_ref: null,
+        phase: 'pessoal',
+        size: null,
+        is_primary: false,
+      });
+    }
+    // Phase 1 backfill accounts made before migration 20261019000001 (its trigger would refuse
+    // `options` and reset the clock): midnight in Brasília, as the backfill wrote them
+    ids.op = randomUUID();
+    ids.fxOld = randomUUID();
+    psql(`begin;
+alter table public.trading_accounts disable trigger trading_accounts_by_market;
+insert into public.trading_accounts (id, user_id, market, label, day_tz, day_start_min, legacy_market_type, sort_order) values
+  ('${ids.op}', '${uid}', 'options', 'Opções antigas', 'America/Sao_Paulo', 0, 'options', 9),
+  ('${ids.fxOld}', '${uid}', 'forex', 'Forex antigo', 'America/Sao_Paulo', 0, 'forex', 8);
+alter table public.trading_accounts enable trigger trading_accounts_by_market;
+commit;`);
+  });
+
+  afterAll(() => {
+    if (URL) psql(`delete from auth.users where id = '${uid}';`);
+  });
+
+  it('reads legacy options and forex accounts on their own clock (C19)', () => {
+    const c = config();
+    expect(c.accounts.find((a) => a.id === ids.op)).toMatchObject({ market: 'options', day: { tz: SP, startMin: 0 } });
+    expect(c.accounts.find((a) => a.id === ids.fxOld)).toMatchObject({ market: 'forex', day: { tz: SP, startMin: 0 } });
+    for (const a of c.accounts) expect(sameRules(a.current, resolveRules(a, c.settings))).toBe(true);
+    expect(buildSavePayload(c, c.settings)).toBeNull();
+  });
+
+  it('saves each Personalizar edit of a new market as the SQL resolves it', () => {
+    const now = new Date('2026-10-19T12:00:00Z');
+    for (const [m, key] of [
+      ['forex', 'fx'],
+      ['stocks', 'us'],
+      ['crypto', 'cr'],
+      ['b3', 'b3'],
+    ] as const) {
+      // «+ Definir janela», «+ Segunda janela»
+      let before = config();
+      let draft = segundaJanela(definirJanela(clone(before.settings), m), m);
+      save(before, draft, buildSavePayload(before, draft)!);
+      // «Relógio da janela» to the other clock (every window and the own windows), a day pill
+      before = config();
+      const other = before.settings.markets[m].windows[0].tz === NY ? SP : NY;
+      draft = alternarDia(trocarRelogio(clone(before.settings), m, other, now, [ids[key]]), m, 0, 6);
+      save(before, draft, buildSavePayload(before, draft)!);
+      // An own overnight window every day, «Fora da janela, mostrar» aviso, a limit that only warns
+      before = config();
+      const acc = before.accounts.find((a) => a.id === ids[key])!;
+      draft = ajustarSoNestaConta(clone(before.settings), acc);
+      draft = comJanelaDaConta(draft, acc.id, { startMin: 1320, endMin: 120, weekdays: EVERY_DAY });
+      draft = comRegraJanela(draft, { tipo: 'conta', conta: acc }, { outside: 'aviso' });
+      draft = comAoChegar(comLimite(draft, acc.id, 123456), acc.id, 'avisar');
+      const payload = buildSavePayload(before, draft)!;
+      expect(payload.accounts![acc.id].rules.limit).toEqual({ [m === 'b3' ? 'brl' : 'usd']: 1234.56, mode: 'conta', at_limit: 'avisar' });
+      save(before, draft, payload);
+      // The largest limit, then the window rule off
+      before = config();
+      draft = comLimite(clone(before.settings), acc.id, MAX_LIMIT_CENTS);
+      save(before, draft, buildSavePayload(before, draft)!);
+      before = config();
+      draft = comRegraJanela(clone(before.settings), { tipo: 'conta', conta: acc }, { on: false });
+      const { after } = save(before, draft, buildSavePayload(before, draft)!);
+      // A version note of a new market has no block, state or calendar part; B3 money in reais
+      const partes = partesVersao(after.accounts.find((a) => a.id === acc.id)!.current);
+      expect([partes.bloq, partes.est, partes.cal]).toEqual([undefined, undefined, undefined]);
+      expect(partes.lim).toBe(`limite ${m === 'b3' ? 'R$' : 'US$'}${NBSP}1.000.000, só avisa`);
+    }
+  });
+
+  it('copies a B3 account into a new one: v1 «copiar», the limit stored in reais', async () => {
+    const id = await createAccountAsUser(uid, {
+      market: 'b3',
+      label: 'XP',
+      platform: 'profit',
+      firm: null,
+      external_ref: null,
+      phase: 'pessoal',
+      size: '5000',
+      is_primary: false,
+    });
+    const before = config();
+    const settings = copyAccountSettings(before.settings, ids.b3);
+    const draft = clone(before.settings);
+    draft.accounts[id] = settings;
+    const { result } = save(before, draft, buildNewAccountPayload(before, { accountId: id, market: 'b3', settings, copiedFrom: ids.b3 }), [id]);
+    expect(result.versions.map((v) => [v.accountId, v.versionNo, v.origin])).toEqual([[id, 1, 'copiar']]);
+    expect(JSON.parse(psql(`select (rules->'limit')::text from public.account_rule_settings where account_id = '${id}';`).trim())).toEqual({
+      brl: 1000000,
+      mode: 'conta',
+      at_limit: 'avisar',
+    });
+  });
+
+  it('versions a legacy forex account on its own clock when the forex default changes; an options limit in dollars', () => {
+    let before = config();
+    let draft = definirJanela(comLimite(clone(before.settings), ids.op, 50000), 'options');
+    save(before, draft, buildSavePayload(before, draft)!);
+    before = config();
+    draft = clone(before.settings);
+    draft.markets.forex.windows = [{ tz: NY, startMin: 420, endMin: 600, weekdays: MON_TO_FRI }];
+    const { result, after } = save(before, draft, buildSavePayload(before, draft)!);
+    expect(result.versions.map((v) => v.accountId)).toEqual([ids.fxOld]);
+    expect(after.accounts.find((a) => a.id === ids.fxOld)!.current.day).toEqual({ tz: SP, startMin: 0 });
+    const now = parseRulesNow(asUser(uid, 'public.rules_now()'));
+    expect(new Set(now.accounts.map((a) => a.market))).toEqual(new Set(['forex', 'stocks', 'crypto', 'b3', 'options']));
+    const op = now.accounts.find((a) => a.accountId === ids.op)!;
+    expect(possoLinha(op.label, op.gate, op.rules).limite?.de).toBe(`de US$${NBSP}500`);
   });
 });
 
