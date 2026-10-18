@@ -326,14 +326,15 @@ export const PROP_FIRMS: readonly PropFirm[] = [
   { id: 'for-traders-crypto', name: 'For Traders Crypto', market: 'crypto', platforms: ['mt5'], otherPlatforms: true },
   { id: 'leveraged-crypto', name: 'Leveraged Crypto', market: 'crypto', platforms: ['mt5'], otherPlatforms: true },
   {
-    // As the approved board and the site write it; the firm's own site (tradeify247.co) writes
-    // «Tradeify247», kept as an alias. Not the futures firm «Tradeify»
-    id: 'tradeify-247',
-    name: 'Tradeify 247',
+    // As the firm's own site (tradeify247.co) writes it: a name is the firm's own spelling. The
+    // approved board, the site and tradeifyfx.co write «Tradeify 247», kept as an alias. Not the
+    // futures firm «Tradeify»
+    id: 'tradeify247',
+    name: 'Tradeify247',
     market: 'crypto',
     platforms: ['mt5'],
     otherPlatforms: true,
-    aliases: ['Tradeify247'],
+    aliases: ['Tradeify 247'],
   },
   { id: 'wencrypto', name: 'WenCrypto', market: 'crypto', platforms: [], otherPlatforms: true },
   // stocks: Trade The Pool (in the site's futures list; shares and ETFs only), search only. Its

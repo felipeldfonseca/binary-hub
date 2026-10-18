@@ -955,7 +955,8 @@ describe('Editar conta · Fase 2b markets', () => {
     renderHub(<SuasContas />)
     const binance = await editar('Binance')
     expect(suggestions(binance)).toEqual(firmNames('crypto'))
-    expect(suggestions(binance)).toContain('Tradeify 247')
+    expect(suggestions(binance)).toContain('Tradeify247')
+    expect(suggestions(binance)).not.toContain('Tradeify 247')
     await userEvent.click(within(binance).getByRole('button', { name: 'Cancelar' }))
 
     const ibkr = await editar('IBKR')

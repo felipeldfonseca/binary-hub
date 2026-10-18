@@ -338,7 +338,7 @@ describe('the forex, crypto and stocks lists (Fase 2b, mesas_mercados.md, seen 2
       ['E8 Perpetuals', [], ['E8 Markets'], !F, F],
       ['For Traders Crypto', ['mt5'], [], !F, F],
       ['Leveraged Crypto', ['mt5'], [], !F, F],
-      ['Tradeify 247', ['mt5'], ['Tradeify247'], !F, F],
+      ['Tradeify247', ['mt5'], ['Tradeify 247'], !F, F],
       ['WenCrypto', [], [], !F, F],
     ]);
     expect(table('stocks')).toEqual([['Trade The Pool', [], ['TTP'], !F, F]]);
@@ -351,7 +351,7 @@ describe('the forex, crypto and stocks lists (Fase 2b, mesas_mercados.md, seen 2
     expect(firmByName('forex', 'BrightFunded')?.id).toBe('brightfunded');
     expect(firmByName('crypto', 'Crypto Fund Trader')?.id).toBe('crypto-fund-trader-crypto');
     expect(firmByName('crypto', 'BEM Funding')?.id).toBe('bem-funding-crypto');
-    expect(firmByName('crypto', 'Tradeify 247')?.id).toBe('tradeify-247');
+    expect(firmByName('crypto', 'Tradeify247')?.id).toBe('tradeify247');
   });
 
   it('features the 10 forex firms of the rule, in pt-BR order; none in crypto or stocks', () => {
@@ -372,9 +372,11 @@ describe('the forex, crypto and stocks lists (Fase 2b, mesas_mercados.md, seen 2
   });
 
   it('searches each market’s whole list, by name or alias, case and accents ignored', () => {
-    expect(names(firmsFor('crypto', 'tradeify247'))).toEqual(['Tradeify 247']);
-    expect(names(firmsFor('crypto', 'tradeify 247'))).toEqual(['Tradeify 247']);
-    expect(names(firmsFor('crypto', 'TRADEÍFY'))).toEqual(['Tradeify 247']);
+    // «Tradeify247», as the firm writes it, found by the board's «Tradeify 247» too
+    expect(names(firmsFor('crypto', 'tradeify247'))).toEqual(['Tradeify247']);
+    expect(names(firmsFor('crypto', 'tradeify 247'))).toEqual(['Tradeify247']);
+    expect(names(firmsFor('crypto', 'Tradeify 2'))).toEqual(['Tradeify247']);
+    expect(names(firmsFor('crypto', 'TRADEÍFY'))).toEqual(['Tradeify247']);
     expect(names(firmsFor('stocks', 'ttp'))).toEqual(['Trade The Pool']);
     expect(names(firmsFor('forex', 'top one'))).toEqual(['Top One Trader']);
     expect(names(firmsFor('forex', 'ftmo'))).toEqual(['FTMO']);
@@ -391,7 +393,7 @@ describe('the forex, crypto and stocks lists (Fase 2b, mesas_mercados.md, seen 2
     expect(onlyPlatform(firmByName('forex', 'Atmos Funded')!)).toBe('mt5');
     expect(onlyPlatform(firmByName('forex', 'Tradeify FX')!)).toBe('mt5');
     expect(onlyPlatform(firmByName('crypto', 'BrightFunded')!)).toBeNull();
-    expect(onlyPlatform(firmByName('crypto', 'Tradeify 247')!)).toBeNull();
+    expect(onlyPlatform(firmByName('crypto', 'Tradeify247')!)).toBeNull();
     expect(onlyPlatform(firmByName('stocks', 'Trade The Pool')!)).toBeNull();
     expect(onlyPlatform(firmByName('futures', 'Topstep')!)).toBe('topstepx');
     expect(onlyPlatform(firmByName('futures', 'AquaFunded Futures')!)).toBe('tradovate');

@@ -2216,12 +2216,13 @@ describe('ImportSheet · Fase 2b · «Onde você opera?» (i2)', () => {
       'Outra',
     ])
 
-    // «Tradeify 247», never the futures «Tradeify»; it offers other platforms, so MetaTrader 5 is not chosen for the owner
+    // «Tradeify247» (as the firm writes it), never the futures «Tradeify»; it offers other platforms,
+    // so MetaTrader 5 is not chosen for the owner
     await userEvent.type(search, 'tradeify')
-    expect(pillNames(firmGroup(dialog))).toEqual(['Tradeify 247'])
+    expect(pillNames(firmGroup(dialog))).toEqual(['Tradeify247'])
     expect(within(dialog).queryByText('Opera numa mesa? Digite o nome na busca.')).not.toBeInTheDocument()
-    await userEvent.click(within(firmGroup(dialog)).getByRole('button', { name: 'Tradeify 247' }))
-    expect(within(dialog).getByText('Mesa: Tradeify 247')).toBeInTheDocument()
+    await userEvent.click(within(firmGroup(dialog)).getByRole('button', { name: 'Tradeify247' }))
+    expect(within(dialog).getByText('Mesa: Tradeify247')).toBeInTheDocument()
     expect(within(dialog).getByText('Agora escolha a corretora ou a plataforma.')).toBeInTheDocument()
     expect(within(dialog).getByRole('button', { name: 'MetaTrader 5' })).toHaveAttribute('aria-pressed', 'false')
     // With a firm chosen, the note is gone too: the chip stands for the group
