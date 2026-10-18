@@ -34,6 +34,10 @@
                 "message": "lib/domain depends only on itself and the standard library."
               },
               {
+                "group": ["@/lib/hub", "@/lib/hub/*", "**/lib/hub", "**/lib/hub/*", "../hub", "../hub/*", "../../hub", "../../hub/*", "../../../hub", "../../../hub/*"],
+                "message": "lib/domain never imports lib/hub: the hub reads the domain, not the other way round."
+              },
+              {
                 "group": ["@supabase/*", "react/*", "react-dom/*"],
                 "message": "lib/domain has no React or Supabase: pass data in, return data out."
               },
