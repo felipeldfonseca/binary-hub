@@ -65,10 +65,16 @@
   gap: 8px;
   white-space: nowrap;
 }
+/*
+ * A time field as wide as its «10:00» and clock icon, with 8px before the time (board `.horas input`)
+ * and 4px after the icon: «das [10:00] às [11:00] [Brasília]» then fits on one row of the sheet at
+ * 480px (392 of its 401px; the board's 94px fields leave 1px), and at 375px only the clock menu goes
+ * to the next row, as on the board. A fixed 96px made the row 405px and sent the menu down at 1280.
+ */
 .hub .hub-rc-hora {
-  width: 96px;
+  width: auto;
   min-height: 44px;
-  padding: 0 6px 0 10px;
+  padding: 0 4px 0 8px;
   border-radius: 10px;
   border: 1px solid var(--field-border);
   background: var(--inset);
