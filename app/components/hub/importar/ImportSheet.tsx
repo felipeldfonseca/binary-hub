@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { FileText } from 'lucide-react'
 import { buildImportArgs, previewArgs, readImportFile, type ReadImportFileResult } from '@/lib/domain/import'
-import { LABEL_MAX, PLATFORM_UNKNOWN, labelTaken, parseSize, zoneKeyOf, type TradingAccount } from '@/lib/hub/contas'
+import { FIRM_MAX, LABEL_MAX, PLATFORM_UNKNOWN, labelTaken, parseSize, zoneKeyOf, type TradingAccount } from '@/lib/hub/contas'
 import {
   HubDataError,
   createAccount,
@@ -383,7 +383,7 @@ export default function ImportSheet({ mode, accountId, onClose }: { mode: SheetM
         label: form.label.trim().slice(0, LABEL_MAX),
         platform: parsed ? parsed.platform : form.platform === PLATFORM_UNKNOWN ? null : form.platform,
         // Chosen in i2, or the file's firm unless the owner took it out in step b
-        firm: hasFirms(formMarket) ? form.firm.trim() || null : null,
+        firm: hasFirms(formMarket) ? form.firm.trim().slice(0, FIRM_MAX) || null : null,
         external_ref: form.ref.trim() || null,
         phase: futures ? form.phase : 'pessoal',
         size: futures && sizeValue !== 'invalid' ? sizeValue : null,

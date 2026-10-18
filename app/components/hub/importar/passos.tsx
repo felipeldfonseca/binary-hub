@@ -6,6 +6,7 @@ import type { FailedFile, Market, ParsedFile, RowIssue, RowErrorCode } from '@/l
 import { entrySpan, totals } from '@/lib/domain/import'
 import {
   FILE_ZONES,
+  FIRM_MAX,
   LABEL_MAX,
   OTHER_FILE_ZONES,
   PHASES_FUTURES,
@@ -552,6 +553,8 @@ export function PassoPlataforma({
         autoComplete="off"
         aria-label={PASSO_I2.search}
         placeholder={PASSO_I2.search}
+        // «Usar “x” como mesa» stores the text as the firm, and trading_accounts.firm takes FIRM_MAX
+        maxLength={FIRM_MAX}
         value={form.search}
         onChange={(event) => onChange({ search: event.target.value })}
       />
@@ -570,7 +573,8 @@ export function PassoPlataforma({
           >
             {PASSO_I2.removeFirm}
           </button>
-          <span className="hub-nota">{PASSO_I2.nowPlatform}</span>
+          {/* Only while no platform is chosen: a one-platform firm (Topstep) brings its own */}
+          {!form.platform && <span className="hub-nota">{PASSO_I2.nowPlatform}</span>}
         </div>
       )}
       {firmPills.length > 0 && (
