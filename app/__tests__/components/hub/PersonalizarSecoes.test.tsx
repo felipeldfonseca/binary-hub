@@ -39,6 +39,17 @@ function comDia(c: RulesConfig, id: string, day: AccountConfig['day']): RulesCon
   return { ...c, accounts: c.accounts.map((a) => (a.id === id ? { ...a, day } : a)) }
 }
 
+/** The six-market config with a second futures account («Apex A», no version), so «somando» could apply */
+function comApexMercados(c: RulesConfig): RulesConfig {
+  const top = c.accounts.find((a) => a.id === im.topOne) as AccountConfig
+  const apex: AccountConfig = { ...top, id: 'acc-apex', label: 'Apex A', versions: [] }
+  return {
+    ...c,
+    accounts: [...c.accounts, apex],
+    settings: { ...c.settings, accounts: { ...c.settings.accounts, 'acc-apex': { windowRule: {}, block: {}, limit: null, window: null } } },
+  }
+}
+
 /** The config with a market's saved windows removed */
 function semJanela(c: RulesConfig, m: keyof RulesSettings['markets']): RulesConfig {
   return { ...c, settings: { ...c.settings, markets: { ...c.settings.markets, [m]: { ...c.settings.markets[m], windows: [] } } } }
@@ -643,8 +654,14 @@ describe('SuasRegras in six markets (Fase 2b)', () => {
     expect(screen.queryByRole('button', { name: 'somando as contas de Futuros' })).not.toBeInTheDocument()
   })
 
-  it('a forex limit in US$: no «só nesta conta» tag and no mode pills', () => {
-    render(<Regras config={configMercados()} selecionado={im.ftmo} fases={FASES_MERCADOS} />)
+  it('a forex limit in US$: no «só nesta conta» tag and no mode pills, even beside two futures accounts', () => {
+    const c = comApexMercados(configMercados())
+    const { unmount } = render(<Regras config={c} selecionado={im.topOne} fases={FASES_MERCADOS} />)
+    // The futures account beside Apex A gets the pills; FTMO never does
+    expect(screen.getByRole('group', { name: 'Como o limite de Top One #1 conta' })).toBeInTheDocument()
+    unmount()
+
+    render(<Regras config={c} selecionado={im.ftmo} fases={FASES_MERCADOS} />)
     expect(screen.getByText('Forex · Avaliação')).toBeInTheDocument()
     expect(limiteValor()?.textContent).toBe('US$\u00a01.000')
     expect(screen.queryByText('só nesta conta')).not.toBeInTheDocument()
