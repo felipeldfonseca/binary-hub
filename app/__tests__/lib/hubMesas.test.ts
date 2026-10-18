@@ -82,14 +82,15 @@ describe('the prop-firm list', () => {
       const list = PLATFORMS[market];
       expect(list).toBeDefined();
       const offered = list.slice(0, -1);
-      expect(firm.platforms.length).toBeGreaterThan(0);
+      // A firm with no platform key offers only platforms without one (it says so)
+      if (firm.platforms.length === 0) expect(firm.otherPlatforms).toBe(true);
       for (const key of firm.platforms) expect(offered).toContain(key);
       expect(firm.platforms).toEqual(offered.filter((k) => firm.platforms.includes(k)));
     }
   });
 
   it('features 9 futures firms: the rule’s 8 plus Apex Trader Funding', () => {
-    expect(names(PROP_FIRMS.filter((f) => f.featured))).toHaveLength(9);
+    expect(names(PROP_FIRMS.filter((f) => f.market === 'futures' && f.featured))).toHaveLength(9);
     expect(names(firmsFor('futures', ''))).toEqual([
       'Apex Trader Funding',
       'Blue Guardian Futures',
@@ -169,9 +170,19 @@ describe('firmsFor', () => {
     expect(hasFirms('binary')).toBe(false);
     expect(hasFirms('futures')).toBe(true);
     expect(hasFirms(null)).toBe(false);
-    expect(FIRM_MARKETS).toEqual(['futures']);
     expect(firmsFor('binary', '')).toEqual([]);
     expect(firmsFor('binary', 'top')).toEqual([]);
+  });
+
+  it('gives a «Mesa», a «Fase» and a «Tamanho» to futures and the four Fase 2b markets; B3 by free text only', () => {
+    expect(FIRM_MARKETS).toEqual(['futures', 'forex', 'crypto', 'stocks', 'b3']);
+    for (const m of ['forex', 'crypto', 'stocks', 'b3'] as const) expect(hasFirms(m)).toBe(true);
+    // Never offered: an old options account keeps «Tipo: Pessoal»
+    expect(hasFirms('options')).toBe(false);
+    // B3 has firms but no list: nothing featured, nothing found, no suggestion
+    expect(firmsFor('b3', '')).toEqual([]);
+    expect(firmsFor('b3', 'xp')).toEqual([]);
+    expect(firmNames('b3')).toEqual([]);
   });
 });
 
@@ -236,11 +247,169 @@ describe('firm copy', () => {
     expect(firmAndPlatform(null, null)).toBe('');
   });
 
-  it('the ⓘ names the source, the day and the rule, mentions Apex, and gives no score', () => {
-    const text = PASSO_I2.firmsInfo(PROP_FIRMS_CHECKED);
-    expect(text).toContain('Prop Firm Match em 18/10/2026');
-    expect(text).toContain('nota 4 ou mais e pelo menos 50 avaliações verificadas');
-    expect(text).toContain('Apex Trader Funding, que incluímos por escolha');
-    expect(text).not.toMatch(/\d[.,]\d/);
+  it('the ⓘ names the source, the month and the rule, mentions Apex, and gives no score (board `X.MK.fut.infoMesa`)', () => {
+    expect(PASSO_I2.firmsInfo('futures', PROP_FIRMS_CHECKED)).toBe(
+      'Mesas de futuros com nota 4 ou mais e pelo menos 50 avaliações verificadas na Prop Firm Match, vistas em outubro de 2026, mais a Apex Trader Funding, em ordem alfabética. Não é recomendação nem parceria. A sua não está aqui? Digite o nome.',
+    );
+    // The month follows the list's date when it is refreshed
+    expect(PASSO_I2.firmsInfo('futures', '2027-01-09')).toContain('vistas em janeiro de 2027');
+  });
+
+  it('forex has its own rule; crypto, stocks and B3, with no featured firm, have no ⓘ (board `X.MK.fx.infoMesa`)', () => {
+    const forex = PASSO_I2.firmsInfo('forex', PROP_FIRMS_CHECKED);
+    expect(forex).toBe(
+      'Mesas de forex com nota 4,4 ou mais e pelo menos 100 avaliações verificadas na Prop Firm Match, vistas em outubro de 2026, em ordem alfabética. Não é recomendação nem parceria. A sua não está aqui? Digite o nome.',
+    );
+    // The rule's threshold is the only number with a decimal: no firm's score
+    expect(forex!.replace('4,4', '')).not.toMatch(/\d[.,]\d/);
+    for (const m of ['crypto', 'stocks', 'b3', 'binary'] as const) expect(PASSO_I2.firmsInfo(m, PROP_FIRMS_CHECKED)).toBeNull();
+    // Only the markets that feature firms explain a featured list
+    for (const m of ['futures', 'forex', 'crypto', 'stocks', 'b3'] as const) {
+      expect(firmsFor(m, '').length > 0).toBe(PASSO_I2.firmsInfo(m, PROP_FIRMS_CHECKED) !== null);
+    }
+  });
+});
+
+describe('the forex, crypto and stocks lists (Fase 2b, mesas_mercados.md, seen 2026-10-18)', () => {
+  type Row = [name: string, platforms: string[], aliases: string[], featured: boolean, otherPlatforms: boolean];
+  const table = (market: string) =>
+    PROP_FIRMS.filter((f) => f.market === market)
+      .map((f): Row => [f.name, [...f.platforms], [...(f.aliases ?? [])], !!f.featured, !!f.otherPlatforms])
+      .sort((a, b) => a[0].localeCompare(b[0], 'pt-BR'));
+  const F = true;
+
+  it('counts 25 futures, 39 forex, 9 crypto and 1 stocks firm; none for B3 or binaries', () => {
+    const count = (m: string) => PROP_FIRMS.filter((f) => f.market === m).length;
+    expect([count('futures'), count('forex'), count('crypto'), count('stocks'), count('b3'), count('binary'), count('options')]).toEqual([25, 39, 9, 1, 0, 0, 0]);
+    expect(firmNames('b3')).toEqual([]);
+    expect(firmsFor('b3', 'xp')).toEqual([]);
+  });
+
+  it('pins every forex firm by hand', () => {
+    expect(table('forex')).toEqual([
+      ['Alpha Capital', ['mt5', 'ctrader', 'tradelocker', 'dxtrade'], ['Alpha Capital Group', 'ACG'], F, !F],
+      ['AquaFunded', ['mt5', 'ctrader', 'matchtrader', 'tradelocker'], [], F, !F],
+      ['Atmos Funded', ['mt5'], [], !F, !F],
+      ['Audacity Capital', ['mt5', 'dxtrade'], [], !F, !F],
+      ['Axi Select', ['mt5', 'mt4'], [], !F, !F],
+      ['BEM Funding', ['mt5', 'ctrader'], [], !F, !F],
+      ['Blue Guardian', ['mt5', 'matchtrader', 'tradelocker'], [], !F, !F],
+      ['Blueberry Funded', ['mt5', 'tradelocker'], [], !F, !F],
+      ['BrightFunded', ['mt5', 'ctrader', 'dxtrade'], [], F, !F],
+      ['City Traders Imperium', ['mt5', 'matchtrader'], ['CTI'], !F, !F],
+      ['Crypto Fund Trader', ['mt5', 'matchtrader'], ['CFT'], !F, F],
+      ['Darwinex Zero', ['mt5', 'mt4', 'tradingview'], [], !F, !F],
+      ['E8 Markets', ['mt5', 'ctrader', 'matchtrader', 'tradelocker'], [], F, !F],
+      ['Finotive Funding', ['mt5', 'matchtrader'], [], !F, !F],
+      ['Fintokei', ['mt5', 'mt4', 'ctrader', 'tradingview'], [], !F, !F],
+      ['For Traders', ['mt5', 'ctrader', 'tradelocker'], [], F, !F],
+      ['FTMO', ['mt5', 'mt4', 'ctrader', 'tradingview'], [], F, !F],
+      ['Funded Trading Plus', ['mt5', 'matchtrader'], ['FTP'], !F, !F],
+      ['FundedElite', ['mt5', 'matchtrader'], [], F, !F],
+      ['FundedNext', ['mt5', 'mt4', 'ctrader', 'matchtrader'], [], !F, !F],
+      ['FundingPips', ['mt5', 'ctrader', 'matchtrader'], [], !F, !F],
+      ['FXIFY', ['mt5', 'dxtrade', 'tradingview'], [], !F, !F],
+      ['Goat Funded Trader', ['mt5', 'ctrader', 'matchtrader', 'tradelocker'], ['GFT'], !F, !F],
+      ['Hantec Trader', ['mt5', 'mt4'], [], !F, !F],
+      ['Hola Prime', ['mt5', 'ctrader', 'matchtrader', 'tradelocker'], [], !F, !F],
+      ['Instant Funding', ['mt5', 'ctrader', 'matchtrader'], [], !F, !F],
+      ['Lark Funding', ['ctrader', 'matchtrader', 'dxtrade'], [], !F, !F],
+      ['Leveraged', ['mt5', 'ctrader'], [], !F, !F],
+      ['Maven', ['mt5', 'matchtrader'], ['Maven Trading'], !F, !F],
+      ['Ment Funding', ['ctrader', 'matchtrader', 'dxtrade'], [], !F, F],
+      ['Moneta Funded', ['mt5', 'matchtrader'], [], F, !F],
+      ['Nordic Funder', ['ctrader', 'matchtrader', 'dxtrade'], [], !F, F],
+      ['Orion Funded', ['mt5', 'matchtrader'], [], !F, !F],
+      ['The Trading Pit', ['mt5', 'mt4', 'ctrader'], [], !F, !F],
+      ['The5ers', ['mt5', 'ctrader', 'tradingview'], [], F, !F],
+      ['ThinkCapital', [], [], !F, F],
+      ['Top One Trader', ['mt5', 'matchtrader', 'tradelocker'], [], F, !F],
+      ['Tradeify FX', ['mt5'], [], !F, !F],
+      ['WSFunded', ['mt5', 'ctrader', 'matchtrader'], [], !F, !F],
+    ]);
+  });
+
+  it('pins every crypto firm and Trade The Pool by hand', () => {
+    expect(table('crypto')).toEqual([
+      ['BEM Funding', ['mt5'], [], !F, F],
+      ['Breakout', [], [], !F, F],
+      ['BrightFunded', ['mt5'], [], !F, F],
+      ['Crypto Fund Trader', ['bybit', 'mt5'], ['CFT'], !F, F],
+      ['E8 Perpetuals', [], ['E8 Markets'], !F, F],
+      ['For Traders Crypto', ['mt5'], [], !F, F],
+      ['Leveraged Crypto', ['mt5'], [], !F, F],
+      ['Tradeify247', ['mt5'], ['Tradeify 247'], !F, F],
+      ['WenCrypto', [], [], !F, F],
+    ]);
+    expect(table('stocks')).toEqual([['Trade The Pool', [], ['TTP'], !F, F]]);
+    // otherPlatforms never on a futures firm: Phase 2's preselection stays
+    expect(PROP_FIRMS.filter((f) => f.market === 'futures' && f.otherPlatforms)).toEqual([]);
+  });
+
+  it('gives a firm of another market its own id', () => {
+    expect(firmByName('crypto', 'BrightFunded')?.id).toBe('brightfunded-crypto');
+    expect(firmByName('forex', 'BrightFunded')?.id).toBe('brightfunded');
+    expect(firmByName('crypto', 'Crypto Fund Trader')?.id).toBe('crypto-fund-trader-crypto');
+    expect(firmByName('crypto', 'BEM Funding')?.id).toBe('bem-funding-crypto');
+    expect(firmByName('crypto', 'Tradeify247')?.id).toBe('tradeify247');
+  });
+
+  it('features the 10 forex firms of the rule, in pt-BR order; none in crypto or stocks', () => {
+    expect(names(firmsFor('forex', ''))).toEqual([
+      'Alpha Capital',
+      'AquaFunded',
+      'BrightFunded',
+      'E8 Markets',
+      'For Traders',
+      'FTMO',
+      'FundedElite',
+      'Moneta Funded',
+      'The5ers',
+      'Top One Trader',
+    ]);
+    expect(firmsFor('crypto', '')).toEqual([]);
+    expect(firmsFor('stocks', '')).toEqual([]);
+  });
+
+  it('searches each market’s whole list, by name or alias, case and accents ignored', () => {
+    // «Tradeify247», as the firm writes it, found by the board's «Tradeify 247» too
+    expect(names(firmsFor('crypto', 'tradeify247'))).toEqual(['Tradeify247']);
+    expect(names(firmsFor('crypto', 'tradeify 247'))).toEqual(['Tradeify247']);
+    expect(names(firmsFor('crypto', 'Tradeify 2'))).toEqual(['Tradeify247']);
+    expect(names(firmsFor('crypto', 'TRADEÍFY'))).toEqual(['Tradeify247']);
+    expect(names(firmsFor('stocks', 'ttp'))).toEqual(['Trade The Pool']);
+    expect(names(firmsFor('forex', 'top one'))).toEqual(['Top One Trader']);
+    expect(names(firmsFor('forex', 'ftmo'))).toEqual(['FTMO']);
+    expect(names(firmsFor('forex', 'acg'))).toEqual(['Alpha Capital']);
+    expect(names(firmsFor('forex', 'the 5ers'))).toEqual(['The5ers']);
+    expect(names(firmsFor('crypto', 'cft'))).toEqual(['Crypto Fund Trader']);
+    // Never a firm of another market
+    expect(names(firmsFor('futures', 'tradeify'))).toEqual(['Tradeify']);
+    expect(firmByName('futures', 'Trade The Pool')).toBeNull();
+    expect(firmByName('forex', 'Top One Futures')).toBeNull();
+  });
+
+  it('preselects a platform only when the firm offers just that one', () => {
+    expect(onlyPlatform(firmByName('forex', 'Atmos Funded')!)).toBe('mt5');
+    expect(onlyPlatform(firmByName('forex', 'Tradeify FX')!)).toBe('mt5');
+    expect(onlyPlatform(firmByName('crypto', 'BrightFunded')!)).toBeNull();
+    expect(onlyPlatform(firmByName('crypto', 'Tradeify247')!)).toBeNull();
+    expect(onlyPlatform(firmByName('stocks', 'Trade The Pool')!)).toBeNull();
+    expect(onlyPlatform(firmByName('futures', 'Topstep')!)).toBe('topstepx');
+    expect(onlyPlatform(firmByName('futures', 'AquaFunded Futures')!)).toBe('tradovate');
+  });
+
+  it('puts a forex firm’s platforms first, «Outra» last', () => {
+    expect(platformsFor('forex', firmByName('forex', 'Lark Funding'))).toEqual([
+      'ctrader',
+      'matchtrader',
+      'dxtrade',
+      'mt5',
+      'mt4',
+      'tradelocker',
+      'tradingview',
+      'outra',
+    ]);
+    expect(platformsFor('stocks', firmByName('stocks', 'Trade The Pool'))).toEqual(PLATFORMS.stocks);
   });
 });

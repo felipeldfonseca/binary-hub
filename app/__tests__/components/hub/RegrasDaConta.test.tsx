@@ -4,8 +4,12 @@ import userEvent from '@testing-library/user-event'
 import RegrasDaConta from '@/components/hub/importar/RegrasDaConta'
 import type { RulesConfig } from '@/lib/hub/regras'
 import { NAO_COPIAR, REGRAS_FORM_VAZIO, desdeDaNovaConta, regrasDaNovaConta, type RegrasForm } from '@/lib/hub/regrasConta'
-import { configAntes, configDepois } from '@/testing/regras'
+import type { AccountMarket } from '@/lib/domain/markets'
+import { configAntes, configDepois, configMercados } from '@/testing/regras'
 import { brt, et } from '@/testing/gate'
+
+/** « · » with a no-break space on each side (personalizar/copy.ts SEP): it never starts or ends a line */
+const SEP = '\u00a0·\u00a0'
 
 const NBSP = ' '
 
@@ -22,7 +26,7 @@ function Bloco({
   outras = null,
 }: {
   config: RulesConfig
-  market?: 'futures' | 'binary'
+  market?: AccountMarket
   now?: Date
   label?: string
   inicial?: RegrasForm
@@ -83,7 +87,7 @@ describe('RegrasDaConta · «Copiar regras de»', () => {
     expect(within(select).getAllByRole('option').map((o) => o.textContent)).toEqual(['Top One #1', 'Não copiar'])
     expect(select).toHaveDisplayValue('Top One #1')
     expect(select).toHaveAccessibleDescription('Copia janela, limite do dia, bloqueio de dados e regra do estado.')
-    expect(linha().textContent).toBe(`Janela 10:00–11:00 (Nova York) · padrão de Futuros · limite do dia: US$${NBSP}400 por conta`)
+    expect(linha().textContent).toBe(`Janela 10:00–11:00 (Nova York)${SEP}padrão de Futuros${SEP}limite do dia: US$${NBSP}400 por conta`)
 
     await userEvent.selectOptions(select, 'Não copiar')
 
@@ -129,7 +133,8 @@ describe('RegrasDaConta · «Mudar»', () => {
     // An account window is on the market's clock: the clock is text, not a choice
     expect(within(editor).queryByLabelText('Relógio da janela')).not.toBeInTheDocument()
     expect(within(editor).getByText('ET')).toBeInTheDocument()
-    expect(inicio).toHaveAccessibleDescription('11:00–12:00 em Brasília · seg–sex')
+    // The board's caption: the hours on the other clock; the days are the pills under it
+    expect(inicio).toHaveAccessibleDescription('11:00–12:00 em Brasília')
     const dias = within(editor).getByRole('group', { name: 'Dias da janela' })
     expect(within(dias).getAllByRole('button').map((b) => b.getAttribute('aria-label'))).toEqual([
       'segunda',
@@ -140,7 +145,7 @@ describe('RegrasDaConta · «Mudar»', () => {
       'sábado',
       'domingo',
     ])
-    expect(linha().textContent).toBe(`Janela 10:00–11:00 (Nova York) · só nesta conta · limite do dia: US$${NBSP}400 por conta`)
+    expect(linha().textContent).toBe(`Janela 10:00–11:00 (Nova York)${SEP}só nesta conta${SEP}limite do dia: US$${NBSP}400 por conta`)
 
     fireEvent.change(inicio, { target: { value: '09:30' } })
     expect(linha()).toHaveTextContent(/^Janela 09:30–11:00 \(Nova York\) · só nesta conta/)
@@ -171,7 +176,9 @@ describe('RegrasDaConta · «Mudar»', () => {
 
     expect(screen.getByRole('alert')).toHaveTextContent('Início e fim iguais: mude um dos dois.')
     expect(inicio).toHaveAttribute('aria-invalid', 'true')
-    expect(inicio).toHaveAccessibleDescription('seg–sex Início e fim iguais: mude um dos dois.')
+    // No caption for a window with no length: the error says what to do
+    expect(document.getElementById('j-cap')).toBeNull()
+    expect(inicio).toHaveAccessibleDescription('Início e fim iguais: mude um dos dois.')
     expect(linha()).toHaveTextContent(/^Janela a definir \(Nova York\)/)
 
     fireEvent.change(inicio, { target: { value: '09:00' } })
@@ -313,5 +320,140 @@ describe('RegrasDaConta · an account already created', () => {
     expect(screen.getByLabelText('Copiar regras de')).toBeDisabled()
     expect(screen.queryByRole('button', { name: 'Mudar' })).not.toBeInTheDocument()
     expect(document.getElementById('ed-regras')).toBeNull()
+  })
+})
+
+// Fase 2b: the limit in the market's money and the crypto days (board ImportarConta scenarios 12 and 14)
+describe('RegrasDaConta · the Fase 2b markets', () => {
+  it('B3: «Limite do dia, R$», the summary in R$ and the errors in R$', async () => {
+    render(<Bloco config={configAntes()} market="b3" inicial={{ aberto: true }} limiteErroId={null} />)
+    const limite = screen.getByLabelText('Limite do dia, R$')
+    expect(screen.queryByLabelText('Limite do dia, US$')).not.toBeInTheDocument()
+    await userEvent.type(limite, '400')
+    expect(linha().textContent).toBe(`Janela: sem janela${SEP}limite do dia: R$${NBSP}400`)
+
+    await userEvent.clear(limite)
+    await userEvent.type(limite, '2.000.000')
+    expect(limite).toHaveAccessibleDescription(`Use um valor até R$${NBSP}1.000.000.`)
+    expect(screen.getByText('Use um valor até R$ 1.000.000.', { selector: '#f-lim-erro' })).toBeInTheDocument()
+    await userEvent.clear(limite)
+    await userEvent.type(limite, '0')
+    expect(limite).toHaveAccessibleDescription('Digite um valor maior que zero.')
+  })
+
+  it('the other currency’s symbol is an error under the field: «US$ 400» on B3, «R$ 400» on Forex', async () => {
+    for (const [market, rotulo, outro, proprio] of [
+      ['b3', 'Limite do dia, R$', 'US$ 400', 'R$ 400'],
+      ['forex', 'Limite do dia, US$', 'R$ 400', 'US$ 400'],
+    ] as const) {
+      const { unmount } = render(<Bloco config={configAntes()} market={market} inicial={{ aberto: true }} limiteErroId={null} />)
+      const limite = screen.getByLabelText(rotulo)
+      await userEvent.type(limite, outro)
+      expect(limite).toHaveAttribute('aria-invalid', 'true')
+      expect(screen.getByText('Use só números, como 400 ou 400,50.', { selector: '#f-lim-erro' })).toHaveClass('hub-erro')
+      expect(limite).toHaveAccessibleDescription('Use só números, como 400 ou 400,50.')
+      await userEvent.clear(limite)
+      await userEvent.type(limite, proprio)
+      expect(limite).not.toHaveAttribute('aria-invalid')
+      expect(document.getElementById('f-lim-erro')).toBeNull()
+      await userEvent.clear(limite)
+      await userEvent.type(limite, '400')
+      expect(document.getElementById('f-lim-erro')).toBeNull()
+      unmount()
+    }
+  })
+
+  it('a new market’s first window: the caption is the board’s, the hours on the other clock and no days (Personalizar names them)', async () => {
+    // Mon 19 Oct: the US clocks change on 1 Nov, inside the 14 days, so the new hours come too
+    const { unmount } = render(<Bloco config={configAntes()} market="b3" now={brt('2026-10-19 13:00')} inicial={{ aberto: true }} />)
+    await userEvent.click(screen.getByRole('button', { name: '+ Definir janela' }))
+    const inicio = screen.getByLabelText('Início da janela da B3, horário de Brasília')
+    const legenda = document.getElementById('j-cap') as HTMLElement
+    expect(legenda.textContent).toBe('09:00–10:00 ET; a partir de 1º nov: 08:00–09:00 ET')
+    expect(legenda).toHaveClass('hub-nota')
+    expect(inicio).toHaveAccessibleDescription('09:00–10:00 ET; a partir de 1º nov: 08:00–09:00 ET')
+    expect(screen.getByLabelText('Fim da janela da B3, horário de Brasília')).toHaveAccessibleDescription('09:00–10:00 ET; a partir de 1º nov: 08:00–09:00 ET')
+    // The days are the pills right under it
+    const dias = screen.getByRole('group', { name: 'Dias da janela' })
+    expect(legenda.compareDocumentPosition(dias) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    unmount()
+
+    // Wed 14 Oct: 1 Nov is 18 days away, today's hours only
+    render(<Bloco config={configAntes()} market="forex" now={et('2026-10-14 12:00')} inicial={{ aberto: true, definir: true }} />)
+    expect(document.getElementById('j-cap')?.textContent).toBe('09:00–11:00 em Brasília')
+    expect(screen.getByLabelText('Início da janela de Forex, horário de Nova York')).toHaveAccessibleDescription('09:00–11:00 em Brasília')
+  })
+
+  it('the dollar markets keep «Limite do dia, US$» and say US$ in their errors', async () => {
+    for (const market of ['forex', 'stocks', 'crypto'] as const) {
+      const { unmount } = render(<Bloco config={configAntes()} market={market} inicial={{ aberto: true }} limiteErroId={null} />)
+      await userEvent.type(screen.getByLabelText('Limite do dia, US$'), '1.000.001')
+      expect(screen.getByLabelText('Limite do dia, US$')).toHaveAccessibleDescription(`Use um valor até US$${NBSP}1.000.000.`)
+      unmount()
+    }
+  })
+
+  it('no mode and no block or state rows outside Futuros, even with another account of the market', () => {
+    for (const market of ['forex', 'stocks', 'crypto', 'b3'] as const) {
+      const { unmount } = render(<Bloco config={configMercados()} market={market} inicial={{ aberto: true }} />)
+      expect(screen.queryByRole('group', { name: 'Como o limite conta' })).not.toBeInTheDocument()
+      expect(screen.queryByText(/bloqueio de dados|regra do estado/)).not.toBeInTheDocument()
+      unmount()
+    }
+  })
+
+  it('crypto: «+ Definir janela» marks every day and says so under the days', async () => {
+    render(<Bloco config={configAntes()} market="crypto" inicial={{ aberto: true }} />)
+    expect(screen.queryByText('Cripto abre todos os dias: sábado e domingo já vêm marcados.')).not.toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('button', { name: '+ Definir janela' }))
+
+    const dias = screen.getByRole('group', { name: 'Dias da janela' })
+    expect(within(dias).getAllByRole('button').map((b) => [b.getAttribute('aria-label'), b.getAttribute('aria-pressed')])).toEqual([
+      ['segunda', 'true'],
+      ['terça', 'true'],
+      ['quarta', 'true'],
+      ['quinta', 'true'],
+      ['sexta', 'true'],
+      ['sábado', 'true'],
+      ['domingo', 'true'],
+    ])
+    expect(screen.getByText('Cripto abre todos os dias: sábado e domingo já vêm marcados.')).toHaveAttribute('id', 'j-dias-nota')
+    expect(dias).toHaveAccessibleDescription('Cripto abre todos os dias: sábado e domingo já vêm marcados.')
+    // With no day left the error describes the days too
+    for (const d of within(dias).getAllByRole('button')) await userEvent.click(d)
+    expect(dias).toHaveAttribute('aria-describedby', 'j-dias-nota j-erro')
+
+    await userEvent.click(screen.getByRole('button', { name: 'Cancelar a janela nova de Cripto' }))
+    expect(screen.queryByText('Cripto abre todos os dias: sábado e domingo já vêm marcados.')).not.toBeInTheDocument()
+  })
+
+  it('a second crypto account: the question and its own window, with no days note (it is no suggested window)', async () => {
+    // config-mercados: Binance already gave Cripto its window (20:00–22:00 de Brasília, every day)
+    render(<Bloco config={configMercados()} market="crypto" label="Bybit" inicial={{ aberto: true, copiar: NAO_COPIAR }} />)
+    const nota = 'Cripto abre todos os dias: sábado e domingo já vêm marcados.'
+    const pergunta = screen.getByRole('group', { name: /^Usar a janela de Cripto/ })
+    expect(screen.queryByText(nota)).not.toBeInTheDocument()
+
+    await userEvent.click(within(pergunta).getByRole('button', { name: 'Outra' }))
+
+    // The account's own window is open to edit, every day still marked, and nothing says why
+    const dias = screen.getByRole('group', { name: 'Dias da janela' })
+    expect(within(dias).getAllByRole('button').every((b) => b.getAttribute('aria-pressed') === 'true')).toBe(true)
+    expect(screen.getByLabelText(/^Início da janela só de Bybit/)).toBeInTheDocument()
+    expect(screen.queryByText(nota)).not.toBeInTheDocument()
+    expect(document.getElementById('j-dias-nota')).toBeNull()
+    expect(dias).not.toHaveAttribute('aria-describedby')
+    expect(screen.queryByRole('button', { name: '+ Definir janela' })).not.toBeInTheDocument()
+  })
+
+  it('the other markets’ suggested windows have no days note', async () => {
+    for (const market of ['forex', 'stocks', 'b3'] as const) {
+      const { unmount } = render(<Bloco config={configAntes()} market={market} inicial={{ aberto: true }} />)
+      await userEvent.click(screen.getByRole('button', { name: '+ Definir janela' }))
+      expect(screen.getByRole('group', { name: 'Dias da janela' })).not.toHaveAttribute('aria-describedby')
+      expect(document.getElementById('j-dias-nota')).toBeNull()
+      unmount()
+    }
   })
 })

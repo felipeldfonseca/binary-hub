@@ -4,7 +4,7 @@ import { formatDiaMes } from '@/lib/hub/formato'
 import type { AccountConfig, PendingVersion } from '@/lib/hub/regras'
 import { aoSalvarConta, aoSalvarPadrao, notaVersao, quandoVersao } from '@/lib/hub/comoFicaHoje'
 import { Disclosure, useToggle } from '@/components/hub/contas/ui'
-import { VERSAO } from './copy'
+import { SEP, VERSAO } from './copy'
 import { useFocoPendente } from './ui'
 
 /**
@@ -97,10 +97,13 @@ export default function BlocoVersao({
               const nota = notaVersao(vs, i, labelOf)
               return (
                 <li key={v.id}>
-                  <strong className="hub-pz-num">v{v.versionNo}</strong> · {quandoVersao(vs, i, now)}
+                  {/* The « · » never starts or ends a line (SEP), as in the note itself */}
+                  <strong className="hub-pz-num">v{v.versionNo}</strong>
+                  {SEP}
+                  {quandoVersao(vs, i, now)}
                   {nota && (
                     <>
-                      {' · '}
+                      {SEP}
                       <span className="hub-tom--muted">{nota}</span>
                     </>
                   )}

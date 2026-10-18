@@ -5,10 +5,13 @@ import { MON_TO_FRI, EVERY_DAY } from '@/lib/domain/tempo'
 import { brt, et } from '@/testing/gate'
 import { configDepois, idsDono } from '@/testing/regras'
 import type { WindowSetting } from '@/lib/hub/regras'
+import { ACCOUNT_MARKETS, MARKET_SPEC } from '@/lib/domain/markets'
 import {
   BR,
   JANELA_SUGERIDA,
   NY,
+  RELOGIO_PADRAO,
+  SEGUNDA_SUGERIDA,
   captionJanela,
   converterJanela,
   faixaJanela,
@@ -19,6 +22,9 @@ import {
   trocarRelogio,
   viraODia,
 } from '@/lib/hub/janelas'
+
+/** « · » with a no-break space on each side (personalizar/copy.ts SEP): it never starts or ends a line */
+const SEP = '\u00a0·\u00a0'
 
 const topOne: WindowSetting = { tz: NY, startMin: 600, endMin: 660, weekdays: MON_TO_FRI }
 const ebinex: WindowSetting = { tz: BR, startMin: 1200, endMin: 1260, weekdays: MON_TO_FRI }
@@ -50,27 +56,49 @@ describe('faixaJanela and the days', () => {
     expect(JANELA_SUGERIDA.futures).toEqual(topOne)
     expect(JANELA_SUGERIDA.binary).toEqual(ebinex)
   })
+
+  it('suggests each market’s window and clock from MARKET_SPEC (Fase 2b; crypto every day)', () => {
+    expect(JANELA_SUGERIDA.forex).toEqual(w(NY, 480, 600))
+    expect(JANELA_SUGERIDA.stocks).toEqual(w(NY, 570, 630))
+    expect(JANELA_SUGERIDA.crypto).toEqual(w(BR, 1200, 1320, EVERY_DAY))
+    expect(JANELA_SUGERIDA.b3).toEqual(w(BR, 600, 660))
+    expect(JANELA_SUGERIDA.options).toEqual(JANELA_SUGERIDA.stocks)
+    expect(RELOGIO_PADRAO).toEqual({ futures: NY, binary: BR, forex: NY, stocks: NY, crypto: BR, b3: BR, options: NY })
+    expect(SEGUNDA_SUGERIDA).toEqual({
+      futures: { startMin: 840, endMin: 900 },
+      binary: { startMin: 540, endMin: 600 },
+      forex: { startMin: 180, endMin: 300 },
+      stocks: { startMin: 900, endMin: 960 },
+      crypto: { startMin: 540, endMin: 660 },
+      b3: { startMin: 840, endMin: 900 },
+      options: { startMin: 900, endMin: 960 },
+    })
+    for (const m of ACCOUNT_MARKETS) expect(MARKET_SPEC[m].windowTzs).toContain(JANELA_SUGERIDA[m].tz)
+    // A market without a window is on its default clock
+    expect(relogioDoMercado(configDepois().settings, 'crypto')).toBe(BR)
+    expect(relogioDoMercado(configDepois().settings, 'stocks')).toBe(NY)
+  })
 })
 
 describe('captions on the other clock', () => {
   it('Sat 17 Oct: today’s offsets only (1 Nov is more than 14 days away)', () => {
     const now = et('2026-10-17 12:00')
-    expect(captionJanela(topOne, now)).toBe('11:00–12:00 em Brasília · seg–sex')
-    expect(captionJanela(ebinex, now)).toBe('19:00–20:00 ET · seg–sex')
+    expect(captionJanela(topOne, now)).toBe(`11:00–12:00 em Brasília${SEP}seg–sex`)
+    expect(captionJanela(ebinex, now)).toBe(`19:00–20:00 ET${SEP}seg–sex`)
   })
 
   it('Sun 18 Oct and Sat 31 Oct: the new time from 1º nov too', () => {
     for (const now of [et('2026-10-18 12:00'), et('2026-10-31 12:00')]) {
-      expect(captionJanela(topOne, now)).toBe('11:00–12:00 em Brasília; a partir de 1º nov: 12:00–13:00 em Brasília · seg–sex')
-      expect(captionJanela(ebinex, now)).toBe('19:00–20:00 ET; a partir de 1º nov: 18:00–19:00 ET · seg–sex')
+      expect(captionJanela(topOne, now)).toBe(`11:00–12:00 em Brasília; a partir de 1º nov: 12:00–13:00 em Brasília${SEP}seg–sex`)
+      expect(captionJanela(ebinex, now)).toBe(`19:00–20:00 ET; a partir de 1º nov: 18:00–19:00 ET${SEP}seg–sex`)
     }
   })
 
   it('Mon 2 Nov: back to one clock, with the winter offsets', () => {
     const now = et('2026-11-02 10:00')
     expect(now.toISOString()).toBe('2026-11-02T15:00:00.000Z')
-    expect(captionJanela(topOne, now)).toBe('12:00–13:00 em Brasília · seg–sex')
-    expect(captionJanela(ebinex, now)).toBe('18:00–19:00 ET · seg–sex')
+    expect(captionJanela(topOne, now)).toBe(`12:00–13:00 em Brasília${SEP}seg–sex`)
+    expect(captionJanela(ebinex, now)).toBe(`18:00–19:00 ET${SEP}seg–sex`)
   })
 
   it('says when the other clock crosses midnight', () => {

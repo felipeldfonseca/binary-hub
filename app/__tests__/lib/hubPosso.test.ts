@@ -256,9 +256,52 @@ describe('plan marks', () => {
 
 describe('money, compact', () => {
   it('drops ,00 and keeps cents otherwise', () => {
-    expect(dinheiroCompacto(0)).toBe('US$ 0');
-    expect(dinheiroCompacto(40000)).toBe('US$ 400');
-    expect(dinheiroCompacto(-1150)).toBe('US$ 11,50');
-    expect(dinheiroCompacto(100000000)).toBe('US$ 1.000.000');
+    expect(dinheiroCompacto(0, 'USD')).toBe('US$ 0');
+    expect(dinheiroCompacto(40000, 'USD')).toBe('US$ 400');
+    expect(dinheiroCompacto(-1150, 'USD')).toBe('US$ 11,50');
+    expect(dinheiroCompacto(100000000, 'USD')).toBe('US$ 1.000.000');
+  });
+
+  it('writes reais for a B3 amount (Fase 2b)', () => {
+    expect(dinheiroCompacto(50000, 'BRL')).toBe('R$ 500');
+    expect(dinheiroCompacto(-75050, 'BRL')).toBe('R$ 750,50');
+  });
+});
+
+describe('the new markets (Fase 2b)', () => {
+  const ftmo = (): Rules => ({
+    market: 'forex',
+    windows: [{ tz: 'America/New_York', startMin: 480, endMin: 600, weekdays: 31 }],
+    windowsFrom: 'market',
+    windowRule: { on: true, outside: 'fora' },
+    block: null,
+    limit: { cents: 100000, mode: 'conta', atLimit: 'encerrar' },
+    states: null,
+    day: { tz: 'America/New_York', startMin: 1020 },
+  });
+  const FX: GateAccount = { market: 'forex', dayClock: { tz: 'America/New_York', startMin: 1020 } };
+
+  it('a forex account without rules, then inside its window with US$ 0 de US$ 1.000', () => {
+    expect(possoTexto(linha('FTMO', et('2026-10-19 08:30'), null, FX))).toBe('Sem janela salva · Definir');
+    const l = linha('FTMO', et('2026-10-19 08:30'), ftmo(), FX);
+    expect(possoTexto(l)).toBe('Liberado · até 10:00 ET');
+    expect(l.limite).toEqual({ usado: 'US$\u00a00', de: 'de US$\u00a01.000', aria: 'FTMO, limite do dia: US$\u00a00 de US$\u00a01.000.', indisponivel: false });
+    // The block and the state rule do not exist in forex
+    expect(evaluateGate(et('2026-10-19 08:30'), FX, version(ftmo()), null).block).toMatchObject({ evaluated: false, reason: 'so_futuros' });
+  });
+
+  it('a B3 limit in reais, and its aria', () => {
+    const clear: Rules = { ...ftmo(), market: 'b3', windows: [{ tz: SP, startMin: 600, endMin: 660, weekdays: 31 }], limit: { cents: 50000, mode: 'conta', atLimit: 'encerrar' }, day: { tz: SP, startMin: 0 } };
+    const l = linha('Clear', brt('2026-10-19 09:30'), clear, { market: 'b3', dayClock: { tz: SP, startMin: 0 } });
+    expect(possoTexto(l)).toBe('Fora da sua janela · abre às 10:00 de Brasília');
+    expect(l.limite).toEqual({ usado: 'R$\u00a00', de: 'de R$\u00a0500', aria: 'Clear, limite do dia: R$\u00a00 de R$\u00a0500.', indisponivel: false });
+  });
+
+  it('a crypto window that opens every day answers on a Saturday', () => {
+    const binance: Rules = { ...ftmo(), market: 'crypto', windows: [{ tz: SP, startMin: 1200, endMin: 1320, weekdays: 127 }], limit: null, day: { tz: SP, startMin: 0 } };
+    expect(possoTexto(linha('Binance', brt('2026-10-24 21:00'), binance, { market: 'crypto', dayClock: { tz: SP, startMin: 0 } }))).toBe(
+      'Liberado · até 22:00 de Brasília',
+    );
+    expect(janelaLinha(binance)).toBe('Janela 20:00–22:00 · Brasília');
   });
 });

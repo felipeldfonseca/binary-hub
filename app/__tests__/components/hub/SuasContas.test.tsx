@@ -9,7 +9,7 @@ import PersonalizarPagina from '@/components/hub/personalizar/PersonalizarPagina
 import type { RulesConfig } from '@/lib/hub/regras'
 import { firmNames } from '@/lib/hub/mesas'
 import { makeAccount, makeBatch, renderHub } from '@/testing/hubHarness'
-import { configAntes, configDepois, idsDono } from '@/testing/regras'
+import { configAntes, configDepois, configMercados, contasMercados, idsDono, idsMercados } from '@/testing/regras'
 
 jest.mock('@/lib/supabase', () => ({ createDataClient: jest.fn(() => ({})) }))
 
@@ -118,7 +118,7 @@ describe('Suas contas', () => {
     expect(screen.getByText('Cada conta é de um mercado só e tem as suas regras.')).toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: 'Como ler: Suas contas' }))
     expect(screen.getByText(/^Uma linha por conta\./)).toBeInTheDocument()
-    expect(screen.getByText('Futuros e binárias nunca são somados.')).toBeInTheDocument()
+    expect(screen.getByText('Contas de mercados diferentes nunca são somadas.')).toBeInTheDocument()
   })
 
   it('groups active accounts by market, never showing example ones', async () => {
@@ -733,7 +733,7 @@ describe('Suas contas · the rules of each account (Phase 2)', () => {
     await waitFor(() => expect(screen.getByRole('heading', { level: 2, name: 'Suas regras' })).toHaveFocus())
   })
 
-  it('offers «Editar regras» only for an account «Suas regras» lists (futures and binary)', async () => {
+  it('offers «Editar regras» only for an account «Suas regras» lists (rules_config’s accounts)', async () => {
     const forex = makeAccount({ label: 'Forex antiga', market: 'forex', platform: null, phase: 'pessoal', sort_order: 5 })
     fetchAccounts.mockResolvedValue([topOneDono, ebinexDono, forex])
     renderHub(
@@ -774,5 +774,202 @@ describe('Suas contas · the rules of each account (Phase 2)', () => {
     renderHub(<SuasContas />)
     const menu = await openMenu('Ebinex')
     expect(within(menu).queryByRole('button', { name: 'Editar regras' })).not.toBeInTheDocument()
+  })
+})
+
+// ------------------------------------------------------------------------------------------------
+// Fase 2b: an account in every market (board Personalizar «Suas contas»: FTMO, IBKR, Binance, Clear)
+// ------------------------------------------------------------------------------------------------
+
+describe('Suas contas · Fase 2b markets', () => {
+  const ids = idsMercados()
+  const NOTA = (de: string) => `Ainda não lemos arquivos ${de}: as operações entram pelo “Registrar operação”, na Fase 3.`
+  const personalizar = () =>
+    renderHub(
+      <HubRoot>
+        <PersonalizarPagina>
+          <h1 tabIndex={-1}>Personalizar</h1>
+        </PersonalizarPagina>
+      </HubRoot>,
+    )
+
+  beforeEach(() => {
+    fetchAccounts.mockResolvedValue(contasMercados())
+    fetchActivity.mockResolvedValue({
+      [ids.topOne]: { total: 312, imported: 309 },
+      [ids.ebinex]: { total: 317, imported: 317 },
+      [ids.ftmo]: { total: 0, imported: 0 },
+      [ids.ibkr]: { total: 0, imported: 0 },
+      [ids.binance]: { total: 0, imported: 0 },
+      [ids.clear]: { total: 0, imported: 0 },
+    })
+    fetchRulesConfig.mockResolvedValue(configMercados())
+    fetchTradesSince.mockResolvedValue({ [ids.topOne]: 3, [ids.ftmo]: 0, [ids.binance]: 0, [ids.clear]: 0 })
+  })
+
+  it('a group per market in the boards’ order; the four without a file reader say so under their heading', async () => {
+    renderHub(<SuasContas />)
+
+    await row('Clear')
+    expect(screen.getAllByRole('heading', { level: 3 }).map((h) => h.textContent)).toEqual(['Futuros', 'Opções binárias', 'Forex', 'Ações', 'Cripto', 'B3'])
+    const notes: [string, string][] = [
+      ['Forex', 'de Forex'],
+      ['Ações', 'de Ações'],
+      ['Cripto', 'de Cripto'],
+      ['B3', 'da B3'],
+    ]
+    for (const [group, de] of notes) {
+      const note = screen.getByRole('heading', { level: 3, name: group }).nextElementSibling as HTMLElement
+      expect(note).toHaveTextContent(NOTA(de))
+      expect(note).toHaveClass('hub-nota', 'hub-sem-leitor')
+      expect(within(screen.getByRole('list', { name: group })).getAllByRole('listitem')).toHaveLength(1)
+    }
+    for (const group of ['Futuros', 'Opções binárias']) {
+      expect(screen.getByRole('heading', { level: 3, name: group }).nextElementSibling?.tagName).toBe('UL')
+    }
+    expect(screen.queryAllByText(/^Ainda não lemos arquivos/)).toHaveLength(4)
+  })
+
+  it('no «Importar» on the accounts of those markets; the Top One and the Ebinex keep theirs', async () => {
+    renderHub(<SuasContas />)
+
+    for (const label of ['FTMO', 'IBKR', 'Binance', 'Clear']) {
+      const li = await row(label)
+      expect(within(li).queryByRole('button', { name: `Importar arquivo para ${label}` })).not.toBeInTheDocument()
+      expect(within(li).getAllByRole('button').map((b) => b.getAttribute('aria-label'))).toEqual([`Mais ações: ${label}`])
+    }
+    for (const label of ['Top One #1', 'Ebinex']) {
+      expect(within(await row(label)).getByRole('button', { name: `Importar arquivo para ${label}` })).toBeInTheDocument()
+    }
+  })
+
+  it('their rows: phase · platform · window · rules · activity, as the board draws them', async () => {
+    renderHub(<SuasContas />)
+
+    await waitFor(async () => expect(parts(await row('FTMO'))).toBe('Avaliação · MetaTrader 5 · 08:00–10:00 ET · regras desde 17 out · 0 op. desde então'))
+    expect(parts(await row('IBKR'))).toBe('Pessoal · Interactive Brokers · sem janela · sem regras salvas · sem operações')
+    expect(parts(await row('Binance'))).toBe('Pessoal · Binance · 20:00–22:00 de Brasília · regras desde 17 out · 0 op. desde então')
+    expect(parts(await row('Clear'))).toBe('Pessoal · Profit (Nelogica) · 10:00–11:00 de Brasília · regras desde 17 out · 0 op. desde então')
+  })
+
+  it('on Personalizar, the ⋯ menu of a no-reader account: «Editar conta», «Editar regras», «Arquivar»', async () => {
+    personalizar()
+    await screen.findByRole('heading', { level: 3, name: 'Como fica hoje' })
+
+    for (const label of ['FTMO', 'IBKR', 'Binance', 'Clear']) {
+      const menu = await openMenu(label)
+      expect(within(menu).getAllByRole('button').map((b) => b.textContent)).toEqual(['Editar conta', 'Editar regras', 'Arquivar'])
+      await userEvent.keyboard('{Escape}')
+    }
+    const top = await openMenu('Top One #1')
+    expect(within(top).getAllByRole('button').map((b) => b.textContent)).toEqual([
+      'Importar arquivo',
+      'Editar conta',
+      'Importações',
+      'Editar regras',
+      'Arquivar',
+    ])
+    await userEvent.keyboard('{Escape}')
+
+    // «Editar regras» hands the account to «Suas regras» (lane B's section) and closes the menu
+    await userEvent.click(within(await openMenu('Clear')).getByRole('button', { name: 'Editar regras' }))
+    expect(screen.queryByRole('group', { name: 'Ações de Clear' })).not.toBeInTheDocument()
+  })
+
+  it('«Importações» stays for an account of such a market that already has imported trades (an old Phase 1 account)', async () => {
+    const antiga = makeAccount({ label: 'Forex antiga', market: 'forex', platform: null, phase: 'pessoal', sort_order: 5 })
+    fetchAccounts.mockResolvedValue([...contasMercados(), antiga])
+    fetchActivity.mockResolvedValue({ [antiga.id]: { total: 40, imported: 40 } })
+    renderHub(<SuasContas />)
+
+    await waitFor(async () => expect(parts(await row('Forex antiga'))).toBe('Pessoal · só histórico importado'))
+    const menu = await openMenu('Forex antiga')
+    expect(within(menu).getByRole('button', { name: 'Importações' })).toBeInTheDocument()
+    expect(within(menu).queryByRole('button', { name: 'Importar arquivo' })).not.toBeInTheDocument()
+    await userEvent.keyboard('{Escape}')
+    expect(within(await openMenu('FTMO')).queryByRole('button', { name: 'Importações' })).not.toBeInTheDocument()
+  })
+
+  it('the ⓘ says what the app reads today, where the other markets’ trades come from, and each account’s money', async () => {
+    renderHub(<SuasContas />)
+    await userEvent.click(screen.getByRole('button', { name: 'Como ler: Suas contas' }))
+    expect(document.getElementById('info-contas')).toHaveTextContent(
+      'Uma linha por conta. Cada conta é de um mercado só, com janela, limite e regras próprias. Arquivar vale na hora, guarda o histórico e pode ser desfeito. O Binary Hub não se conecta à sua corretora: as operações chegam por arquivo ou à mão. Por enquanto, lemos o CSV da Ebinex e o Trade History da Top One. Nas contas de Forex, de Ações, de Cripto e da B3, as operações entram pelo “Registrar operação”, que chega na Fase 3, e logo depois também por um CSV em que você diz o que é cada coluna. O relatório do MetaTrader sai em HTML ou PDF, não em CSV: vai precisar de um leitor próprio, que vem depois. O resultado fica na moeda da conta: R$ na B3; US$ nos outros mercados, com USDT e USDC contados como dólar.',
+    )
+    expect(screen.getByText('Contas de mercados diferentes nunca são somadas.')).toBeInTheDocument()
+  })
+})
+
+describe('Editar conta · Fase 2b markets', () => {
+  beforeEach(() => {
+    fetchAccounts.mockResolvedValue(contasMercados())
+    fetchActivity.mockResolvedValue({})
+  })
+
+  const suggestions = (form: HTMLElement) => {
+    const list = document.getElementById(within(form).getByLabelText(/^Mesa/).getAttribute('list') ?? '') as HTMLDataListElement
+    expect(form).toContainElement(list)
+    return Array.from(list.querySelectorAll('option')).map((o) => o.value)
+  }
+
+  async function editar(label: string) {
+    await userEvent.click(within(await openMenu(label)).getByRole('button', { name: 'Editar conta' }))
+    return screen.getByRole('form', { name: `Editar ${label}` })
+  }
+
+  it('B3: Fase, a free-text «Mesa» with no suggestion, «Tamanho R$», and no «Fuso do arquivo»', async () => {
+    renderHub(<SuasContas />)
+    const form = await editar('Clear')
+
+    expect(within(within(form).getByRole('group', { name: 'Fase' })).getByRole('button', { name: 'Pessoal' })).toHaveAttribute('aria-pressed', 'true')
+    expect(within(form).queryByText('Tipo')).not.toBeInTheDocument()
+    expect(suggestions(form)).toEqual([])
+    expect(within(form).getByLabelText(/^Tamanho R\$/)).toBeInTheDocument()
+    expect(within(form).queryByLabelText(/^Tamanho US\$/)).not.toBeInTheDocument()
+    expect(within(form).queryByLabelText('Fuso do arquivo')).not.toBeInTheDocument()
+
+    await userEvent.click(within(form).getByRole('button', { name: 'Financiada' }))
+    await userEvent.type(within(form).getByLabelText(/^Mesa/), 'Mesa Ômega')
+    await userEvent.type(within(form).getByLabelText(/^Tamanho R\$/), '25.000')
+    await userEvent.click(within(form).getByRole('button', { name: 'Salvar' }))
+
+    expect(await screen.findByText('Clear salva.')).toBeInTheDocument()
+    expect(updateAccount).toHaveBeenCalledWith(expect.anything(), idsMercados().clear, { phase: 'financiada', firm: 'Mesa Ômega', size: '25000' })
+    // An unconfirmed file zone is never asked of a market with no file
+    expect(importFixTz).not.toHaveBeenCalled()
+  })
+
+  it('Forex: the 39 forex firms as suggestions and «Tamanho US$»', async () => {
+    renderHub(<SuasContas />)
+    const form = await editar('FTMO')
+
+    expect(within(form).getByLabelText(/^Mesa/)).toHaveValue('FTMO')
+    expect(suggestions(form)).toEqual(firmNames('forex'))
+    expect(suggestions(form)).toHaveLength(39)
+    expect(within(form).getByLabelText(/^Tamanho US\$/)).toBeInTheDocument()
+    expect(within(form).queryByLabelText('Fuso do arquivo')).not.toBeInTheDocument()
+    expect(within(within(form).getByRole('group', { name: 'Fase' })).getByRole('button', { name: 'Avaliação' })).toHaveAttribute('aria-pressed', 'true')
+  })
+
+  it('Cripto and Ações suggest their own firms; futures and binaries keep «Fuso do arquivo»', async () => {
+    renderHub(<SuasContas />)
+    const binance = await editar('Binance')
+    expect(suggestions(binance)).toEqual(firmNames('crypto'))
+    expect(suggestions(binance)).toContain('Tradeify247')
+    expect(suggestions(binance)).not.toContain('Tradeify 247')
+    await userEvent.click(within(binance).getByRole('button', { name: 'Cancelar' }))
+
+    const ibkr = await editar('IBKR')
+    expect(suggestions(ibkr)).toEqual(['Trade The Pool'])
+    await userEvent.click(within(ibkr).getByRole('button', { name: 'Cancelar' }))
+
+    const top = await editar('Top One #1')
+    expect(within(top).getByLabelText('Fuso do arquivo')).toBeInTheDocument()
+    await userEvent.click(within(top).getByRole('button', { name: 'Cancelar' }))
+
+    const ebinex = await editar('Ebinex')
+    expect(within(ebinex).getByLabelText('Fuso do arquivo')).toBeInTheDocument()
+    expect(within(ebinex).queryByRole('group', { name: 'Fase' })).not.toBeInTheDocument()
+    expect(within(ebinex).queryByLabelText(/^Tamanho/)).not.toBeInTheDocument()
   })
 })

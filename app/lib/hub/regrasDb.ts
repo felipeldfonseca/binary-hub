@@ -1,6 +1,6 @@
 /**
- * The rules API of migration 20261018000003 (rules_config, save_rules, rules_now,
- * merge_preferences), through a Supabase client that carries the user's JWT (useHubDb). Every
+ * The rules API of migration 20261018000003, as 20261019000001 extended it to seven markets
+ * (rules_config, save_rules, rules_now, merge_preferences), through a Supabase client that carries the user's JWT (useHubDb). Every
  * function takes the caller from the JWT; nothing here reads or writes the rule tables directly
  * (they are read-only to the API roles).
  *

@@ -1,7 +1,35 @@
 {
   "rev": "none",
   "builtin": {
+    "b3": {
+      "v": 1,
+      "window_rule": {
+        "on": true,
+        "outside": "fora"
+      }
+    },
+    "forex": {
+      "v": 1,
+      "window_rule": {
+        "on": true,
+        "outside": "fora"
+      }
+    },
     "binary": {
+      "v": 1,
+      "window_rule": {
+        "on": true,
+        "outside": "fora"
+      }
+    },
+    "crypto": {
+      "v": 1,
+      "window_rule": {
+        "on": true,
+        "outside": "fora"
+      }
+    },
+    "stocks": {
       "v": 1,
       "window_rule": {
         "on": true,
@@ -16,6 +44,13 @@
         "before_min": 5
       },
       "states": {},
+      "window_rule": {
+        "on": true,
+        "outside": "fora"
+      }
+    },
+    "options": {
+      "v": 1,
       "window_rule": {
         "on": true,
         "outside": "fora"
@@ -63,7 +98,7 @@
       },
       "settings": null,
       "versions": [],
-      "account_id": "9ed5828e-8f80-442d-aed3-1459aa18613a",
+      "account_id": "e23a08d1-b5ff-4623-824a-4aaf83055d91",
       "is_example": false,
       "archived_at": null
     },
@@ -94,15 +129,20 @@
       },
       "settings": null,
       "versions": [],
-      "account_id": "db040b78-5447-4653-8d4f-5edcd19c027f",
+      "account_id": "c4f3f670-72aa-489a-aca2-bd02fbb4e3a8",
       "is_example": false,
       "archived_at": null
     }
   ],
   "defaults": {
+    "b3": null,
+    "forex": null,
     "binary": null,
-    "futures": null
+    "crypto": null,
+    "stocks": null,
+    "futures": null,
+    "options": null
   },
-  "server_now": "2026-10-17T20:06:02.440861+00:00",
+  "server_now": "2026-10-17T20:06:09.202941+00:00",
   "preferences": {}
 }

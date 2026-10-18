@@ -15,7 +15,7 @@ import { rulesNowFailed } from '@/components/hub/posso/rulesNowRead'
 import { QueryProvider } from '@/lib/providers/QueryProvider'
 import DiarioPage from '@/app/(hub)/diario/page'
 import { makeAccount, renderHub } from '@/testing/hubHarness'
-import { agora, idsDono, regrasJson, type AgoraFixture } from '@/testing/regras'
+import { agora, agoraMercados, idsDono, regrasJson, type AgoraFixture } from '@/testing/regras'
 
 jest.mock('@/lib/supabase', () => ({ createDataClient: jest.fn(() => ({})) }))
 
@@ -437,7 +437,7 @@ describe('PossoOperarHoje (the card, from props)', () => {
     expect(container).toBeEmptyDOMElement()
   })
 
-  it('explains how to read it in the «i» panel (Phase 2 text)', async () => {
+  it('explains how to read it in the «i» panel (Fase 2b text: every market, its currency)', async () => {
     render(<PossoOperarHoje state={ready('agora-seg-0930-et')} onRetry={jest.fn()} />)
 
     const info = screen.getByRole('button', { name: 'Como ler: Posso operar hoje?' })
@@ -446,12 +446,66 @@ describe('PossoOperarHoje (the card, from props)', () => {
     await userEvent.click(info)
     expect(info).toHaveAttribute('aria-expanded', 'true')
     expect(document.getElementById('info-posso')).toHaveTextContent(
-      'Cada conta responde pelas regras dela: janela e limite do dia. O bloqueio de dados fica ativo na Fase 5. ' +
-        'Limite do dia: a maior perda do dia, no pior momento, contra o limite da conta. ' +
-        'Futuros e binárias nunca são somados. Vem das suas regras, nunca da IA.',
+      'Cada conta responde pelas regras dela: janela e limite do dia. O bloqueio de dados fica ativo na Fase 5 e, por enquanto, vale só em Futuros. ' +
+        'Limite do dia: a maior perda do dia, no pior momento, contra o limite da conta, na moeda dela (R$ na B3; US$ nos outros mercados, com USDT e USDC contados como dólar). ' +
+        'Contas de mercados diferentes nunca são somadas. Vem das suas regras, nunca da IA.',
     )
     await userEvent.click(info)
     expect(document.getElementById('info-posso')).toBeNull()
+  })
+})
+
+describe('PossoOperarHoje in six markets (Fase 2b)', () => {
+  /** «R$ 0 de R$ 500» as shown */
+  const brl = (amount: string) => `R$\u00a0${amount}`
+  /** The six-market owner at Mon 19 Oct 2026 08:30 ET (recorded on the markets migration): the Início board's lines */
+  const SEIS: Line[] = [
+    TOP_FORA,
+    { conta: 'Ebinex', texto: 'Sem janela salva · Definir', tom: 'muted', limite: null },
+    { conta: 'FTMO', texto: 'Liberado · até 10:00 ET', tom: 'mint', limite: limite('0', '1.000') },
+    { conta: 'IBKR', texto: 'Sem janela salva · Definir', tom: 'muted', limite: null },
+    { conta: 'Binance', texto: 'Fora da sua janela · abre às 20:00 de Brasília', tom: 'amber', limite: null },
+    { conta: 'Clear', texto: 'Fora da sua janela · abre às 10:00 de Brasília', tom: 'amber', limite: `${brl('0')} de ${brl('500')}` },
+  ]
+
+  it('one line per account of every market, in the board’s words and each account’s money', () => {
+    render(<PossoOperarHoje state={{ status: 'ready', accounts: agoraMercados().accounts }} onRetry={jest.fn()} />)
+
+    expect(lines()).toEqual(SEIS)
+  })
+
+  it('groups the lines in the board’s market order whatever the server’s order, and drops none', () => {
+    const json = regrasJson('agora-mercados-seg-0830-et')
+    json.accounts = [...(json.accounts as Json[])].reverse()
+    render(<PossoOperarHoje state={{ status: 'ready', accounts: parseRulesNow(json).accounts }} onRetry={jest.fn()} />)
+
+    expect(lines().map((l) => l.conta)).toEqual(['Top One #1', 'Ebinex', 'FTMO', 'IBKR', 'Binance', 'Clear'])
+  })
+
+  it('«Definir» for a new-market account goes to Personalizar’s windows, named for it', () => {
+    render(<PossoOperarHoje state={{ status: 'ready', accounts: agoraMercados().accounts }} onRetry={jest.fn()} />)
+
+    const ibkr = items()[3]
+    expect(within(ibkr).getByRole('link', { name: 'Definir a janela da IBKR em Personalizar' })).toHaveAttribute('href', '/personalizar#janelas')
+  })
+
+  it('reads Clear’s limit in R$, as plain text, to a screen reader too', () => {
+    render(<PossoOperarHoje state={{ status: 'ready', accounts: agoraMercados().accounts }} onRetry={jest.fn()} />)
+
+    const clear = items()[5]
+    const limit = clear.querySelector('.hub-posso__limite') as HTMLElement
+    expect(spoken(limit)).toEqual(['Limite do dia', brl('0'), `de ${brl('500')}`])
+    expect(limit.querySelector('[aria-label]')).toBeNull()
+    // The answer and its sub stack as on the board (.empilha)
+    expect(clear.querySelector('.hub-posso__estado')).toHaveClass('hub-posso__estado--empilha')
+  })
+
+  it('PossoOperarHojeDiario: the six lines from rules_now()', async () => {
+    fetchRulesNow.mockReset().mockResolvedValue(agoraMercados())
+    renderHub(<PossoOperarHojeDiario />)
+
+    expect(await screen.findByRole('list', { name: 'Posso operar hoje?' })).toBeInTheDocument()
+    expect(lines()).toEqual(SEIS)
   })
 })
 
@@ -544,7 +598,7 @@ describe('PossoOperarHojeDiario (the card, from rules_now)', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('Não foi possível carregar o “Posso operar hoje?”.')
   })
 
-  it('renders nothing when rules_now has no futures or binary account', async () => {
+  it('renders nothing when rules_now has no active account', async () => {
     fetchRulesNow.mockReset().mockResolvedValue(edited('agora-seg-0930-et', () => []))
     renderHub(<PossoOperarHojeDiario />)
     expect(screen.getByRole('region', { name: 'Posso operar hoje?' })).toBeInTheDocument()

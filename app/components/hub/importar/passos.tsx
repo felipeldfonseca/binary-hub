@@ -2,7 +2,8 @@
 
 import { useMemo, useRef, useState } from 'react'
 import { Upload } from 'lucide-react'
-import type { FailedFile, Market, ParsedFile, RowIssue, RowErrorCode } from '@/lib/domain/import'
+import type { FailedFile, ImportMarket, ParsedFile, RowIssue, RowErrorCode } from '@/lib/domain/import'
+import { CREATABLE_MARKETS, MARKET_SPEC, currencyOf, type AccountMarket } from '@/lib/domain/markets'
 import { entrySpan, totals } from '@/lib/domain/import'
 import {
   FILE_ZONES,
@@ -28,12 +29,12 @@ import {
   platformsFor,
   type PropFirm,
 } from '@/lib/hub/mesas'
-import { formatMoney, formatOffset, formatShift } from '@/lib/hub/formato'
+import { SIMBOLO_MOEDA, formatMoney, formatOffset, formatShift } from '@/lib/hub/formato'
+import { MERCADO } from '@/components/hub/copyMercados'
 import {
   CHOOSE,
   ERRO,
   FIM_FUSO,
-  MARKET_LABEL,
   OPTIONAL,
   PASSO_A,
   PASSO_B,
@@ -246,7 +247,7 @@ export function PassoConta({
   onChoose,
 }: {
   headingRef: HeadingRef
-  market: Market
+  market: ImportMarket
   options: { id: string; label: string }[]
   choice: string | null
   reason: string
@@ -275,8 +276,13 @@ export function PassoConta({
 // ------------------------------------------------------------------------------------------------
 
 export interface AccountForm {
-  market: Market | null
+  market: AccountMarket | null
   platform: string | null
+  /**
+   * The platform was chosen by the app for a one-platform firm (Atmos Funded → MetaTrader 5), not
+   * by the owner: it goes when he swaps to a firm that does not offer it
+   */
+  platformFromFirm: boolean
   firm: string
   search: string
   label: string
@@ -290,6 +296,7 @@ export interface AccountForm {
 export const EMPTY_FORM: AccountForm = {
   market: null,
   platform: null,
+  platformFromFirm: false,
   firm: '',
   search: '',
   label: '',
@@ -311,9 +318,10 @@ export function PassoNovaConta({
   locked = false,
   regras = null,
   firmRemovable = false,
+  moedaDia = null,
 }: {
   headingRef: HeadingRef
-  market: Market
+  market: AccountMarket
   form: AccountForm
   onChange: (patch: Partial<AccountForm>) => void
   roLabel: string
@@ -326,8 +334,15 @@ export function PassoNovaConta({
   regras?: React.ReactNode
   /** The firm came from the file (only a suggestion): «Tirar» next to the read-only row clears it */
   firmRemovable?: boolean
+  /**
+   * «Moeda e virada do dia» and its ⓘ (Fase 2b): only for a market whose files the app cannot read
+   * yet (board choice 6); null hides the row
+   */
+  moedaDia?: { valor: string; info: string } | null
 }) {
-  const futures = market === 'futures'
+  // Fase, Mesa and Tamanho wherever the market has firms (lib/hub/mesas); binaries are «Tipo: Pessoal»
+  const firms = hasFirms(market)
+  const [moedaInfo, toggleMoedaInfo] = useToggle()
   const sizeRef = useRef<HTMLInputElement>(null)
   const refRef = useRef<HTMLInputElement>(null)
   const firm = form.firm.trim()
@@ -356,7 +371,7 @@ export function PassoNovaConta({
           </p>
         )}
       </div>
-      {futures && (
+      {firms && (
         <div className="hub-campo">
           <span id="l-fase" className="hub-rot-campo">
             {PASSO_B.phase}
@@ -401,17 +416,28 @@ export function PassoNovaConta({
           <span className="hub-ro">{roValue}</span>
         )}
       </div>
-      {!futures && (
+      {moedaDia && (
+        <div className="hub-campo">
+          {/* Board: the ⓘ sits right after the label's text */}
+          <span className="hub-rot-campo">
+            {PASSO_B.moedaDia}
+            <InfoButton panelId="info-moeda" label={PASSO_B.moedaDiaAria} open={moedaInfo} onToggle={toggleMoedaInfo} />
+          </span>
+          <span className="hub-ro">{moedaDia.valor}</span>
+          {moedaInfo && <InfoPanel id="info-moeda">{moedaDia.info}</InfoPanel>}
+        </div>
+      )}
+      {!firms && (
         <div className="hub-campo">
           <span className="hub-rot-campo">{PASSO_B.type}</span>
           <span className="hub-ro">{PASSO_B.personal}</span>
         </div>
       )}
       <div className="hub-campos2">
-        {futures && (
+        {firms && (
           <div className="hub-campo">
             <label htmlFor="f-tam" className="hub-rot-campo">
-              {PASSO_B.size} <span className="hub-opc">{OPTIONAL}</span>
+              {PASSO_B.size(SIMBOLO_MOEDA[currencyOf(market)])} <span className="hub-opc">{OPTIONAL}</span>
             </label>
             <input
               ref={sizeRef}
@@ -465,22 +491,37 @@ export function PassoMercado({
   onChoose,
 }: {
   headingRef: HeadingRef
-  market: Market | null
-  onChoose: (market: Market) => void
+  market: AccountMarket | null
+  onChoose: (market: AccountMarket) => void
 }) {
+  // A market whose files the app cannot read yet says so at once (board `I1.nota`); the end screen says it again
+  const semLeitor = !!market && !MARKET_SPEC[market].reader
   return (
     <div className="hub-passo">
       <Heading headingRef={headingRef}>{PASSO_I1.title}</Heading>
-      <div role="group" aria-labelledby="t-passo" aria-describedby="nota-mercado" className="hub-pills">
-        {(['futures', 'binary'] as const).map((m) => (
+      <div
+        role="group"
+        aria-labelledby="t-passo"
+        aria-describedby={semLeitor ? 'nota-mercado nota-leitor' : 'nota-mercado'}
+        className="hub-pills"
+      >
+        {/* The six markets in the boards' order; none disabled */}
+        {CREATABLE_MARKETS.map((m) => (
           <button key={m} type="button" className="hub-pill" aria-pressed={market === m} onClick={() => onChoose(m)}>
-            {MARKET_LABEL[m]}
+            {MERCADO[m].pill}
           </button>
         ))}
       </div>
-      <p id="nota-mercado" className="hub-nota">
-        {PASSO_I1.note}
-      </p>
+      <div aria-live="polite" className="hub-notas-mercado">
+        <p id="nota-mercado" className="hub-nota">
+          {PASSO_I1.note}
+        </p>
+        {semLeitor && market && (
+          <p id="nota-leitor" className="hub-nota">
+            {PASSO_I1.semLeitor(market)}
+          </p>
+        )}
+      </div>
     </div>
   )
 }
@@ -498,7 +539,7 @@ export function PassoPlataforma({
   const platformsRef = useRef<HTMLDivElement>(null)
   const [info, toggleInfo] = useToggle()
   const market = form.market ?? 'futures'
-  // The «Mesa» group, its chip and «Usar “x” como mesa»: futures today (lib/hub/mesas FIRM_MARKETS)
+  // The «Mesa» group, its chip and «Usar “x” como mesa»: every market with firms (lib/hub/mesas FIRM_MARKETS)
   const firms = hasFirms(market)
   const text = form.search.trim()
   const query = foldSearch(text)
@@ -509,12 +550,18 @@ export function PassoPlataforma({
   // With a firm chosen, its chip stands for the group until the owner searches again
   const firmPills = !firms || (form.firm && !query) ? [] : firmsFor(market, text)
   const noMatch = !!query && !list.some(matches) && firmPills.length === 0
+  // The «Mesa» group: its pills; or, before any search in a market with no featured firm (Cripto,
+  // Ações, B3), only the note that the search finds them (board `I2.temGrupoMesa`, `temNotaMesa`)
+  const firmsNote = firms && !query && !form.firm && firmPills.length === 0
+  // The ⓘ stays while the owner searches, and its panel stays open (board `I2.temInfoMesa` ignores the search)
+  const firmsInfo = PASSO_I2.firmsInfo(market, PROP_FIRMS_CHECKED)
+  // Binaries keep the board's one group, named by the step's heading
+  const platformsTitle = PASSO_I2.platformsTitle(market)
 
   const focusSearch = () => setTimeout(() => searchRef.current?.focus(), 0)
 
-  // Binaries keep the board's one group, named by the step's heading
   const platformGroup = (
-    <div ref={platformsRef} role="group" aria-labelledby={firms ? 'l-plataformas' : 't-passo'} className="hub-pills">
+    <div ref={platformsRef} role="group" aria-labelledby={platformsTitle ? 'l-plats' : 't-passo'} className="hub-pills">
       {chips.map((key) => (
         <button
           key={key}
@@ -522,7 +569,7 @@ export function PassoPlataforma({
           className="hub-pill"
           data-plataforma={key}
           aria-pressed={form.platform === key}
-          onClick={() => onChange({ platform: key })}
+          onClick={() => onChange({ platform: key, platformFromFirm: false })}
         >
           {PLATFORM_LABEL[key]}
         </button>
@@ -531,11 +578,15 @@ export function PassoPlataforma({
   )
 
   const chooseFirm = (firm: PropFirm) => {
+    // A platform the app chose for the previous firm goes when this one does not offer it (Atmos
+    // Funded's MetaTrader 5 never stays for Lark Funding); one the owner chose always stays
+    const kept = form.platformFromFirm && form.platform && !firm.platforms.includes(form.platform) ? null : form.platform
     // A firm with one known platform brings it, unless a platform is already chosen
     const only = onlyPlatform(firm)
-    const platform = !form.platform && only ? only : form.platform
-    onChange({ firm: firm.name, search: '', platform })
-    if (platform !== form.platform) {
+    const platform = !kept && only ? only : kept
+    const platformFromFirm = platform === form.platform ? form.platformFromFirm : platform !== null
+    onChange({ firm: firm.name, search: '', platform, platformFromFirm })
+    if (platform && platform !== form.platform) {
       // The pill pressed for the owner takes focus, so a screen reader says what was chosen
       setTimeout(() => platformsRef.current?.querySelector<HTMLButtonElement>(`[data-plataforma="${platform}"]`)?.focus(), 0)
     } else {
@@ -574,47 +625,52 @@ export function PassoPlataforma({
             {PASSO_I2.removeFirm}
           </button>
           {/* Only while no platform is chosen: a one-platform firm (Topstep) brings its own */}
-          {!form.platform && <span className="hub-nota">{PASSO_I2.nowPlatform}</span>}
+          {!form.platform && <span className="hub-nota">{PASSO_I2.nowPlatform(market)}</span>}
         </div>
       )}
-      {firmPills.length > 0 && (
+      {(firmPills.length > 0 || firmsNote) && (
         <div className="hub-campo">
-          {/* 32px: the ⓘ's 44px hit area ends within the 6px gap above the pills, never over them */}
-          <div className="hub-passo__cab" style={{ alignItems: 'center', minHeight: query ? undefined : 32 }}>
+          {/* The ⓘ right after the label (board `.cab-grupo`). 32px: its 44px hit area ends within the
+              6px gap above the pills, never over them */}
+          <div className="hub-cab-grupo" style={{ minHeight: firmsInfo ? 32 : undefined }}>
             <span id="l-mesas" className="hub-rot-campo">
               {PASSO_I2.firmsTitle} <span className="hub-opc">{OPTIONAL}</span>
             </span>
-            {/* The ⓘ explains the featured list, so it goes with it: a search covers every firm */}
-            {!query && <InfoButton panelId="info-mesas" label={PASSO_I2.firmsInfoAria} open={info} onToggle={toggleInfo} />}
+            {firmsInfo && <InfoButton panelId="info-mesas" label={PASSO_I2.firmsInfoAria} open={info} onToggle={toggleInfo} />}
           </div>
-          {!query && info && <InfoPanel id="info-mesas">{PASSO_I2.firmsInfo(PROP_FIRMS_CHECKED)}</InfoPanel>}
-          <div role="group" aria-labelledby="l-mesas" className="hub-pills">
-            {firmPills.map((firm) => (
-              <button key={firm.id} type="button" className="hub-pill" aria-pressed={form.firm === firm.name} onClick={() => chooseFirm(firm)}>
-                {firm.name}
-              </button>
-            ))}
-          </div>
+          {firmsInfo && info && <InfoPanel id="info-mesas">{firmsInfo}</InfoPanel>}
+          {firmPills.length > 0 ? (
+            <div role="group" aria-labelledby="l-mesas" className="hub-pills">
+              {firmPills.map((firm) => (
+                <button key={firm.id} type="button" className="hub-pill" aria-pressed={form.firm === firm.name} onClick={() => chooseFirm(firm)}>
+                  {firm.name}
+                </button>
+              ))}
+            </div>
+          ) : (
+            <p className="hub-nota">{PASSO_I2.firmsNote}</p>
+          )}
         </div>
       )}
-      {firms ? (
+      {platformsTitle ? (
         <div className="hub-campo">
-          <span id="l-plataformas" className="hub-rot-campo">
-            {PASSO_I2.platformsTitle}
+          <span id="l-plats" className="hub-rot-campo">
+            {platformsTitle}
           </span>
           {platformGroup}
         </div>
       ) : (
         platformGroup
       )}
-      {noMatch && <p className="hub-nota">{firms ? PASSO_I2.noMatchFutures : PASSO_I2.noMatchBinary}</p>}
+      {noMatch && <p className="hub-nota">{PASSO_I2.noMatch(market)}</p>}
       {noMatch && firms && (
         <button
           type="button"
           className="hub-pill"
           style={{ alignSelf: 'flex-start', lineHeight: 1.4, paddingTop: 8, paddingBottom: 8 }}
           onClick={() => {
-            onChange({ firm: text, search: '' })
+            // A firm typed freely offers no known platform: the one the app chose for the previous firm goes
+            onChange({ firm: text, search: '', ...(form.platformFromFirm ? { platform: null, platformFromFirm: false } : {}) })
             focusSearch()
           }}
         >
@@ -969,8 +1025,9 @@ export function PassoMercadoErrado({
   onCreate,
 }: {
   headingRef: HeadingRef
-  fileMarket: Market
-  account: { label: string; market: Market }
+  fileMarket: ImportMarket
+  /** The account in context: its real market (a file never reaches an account without a reader) */
+  account: { label: string; market: AccountMarket }
   targets: { id: string; label: string }[]
   /** A request is running: the buttons wait for it */
   busy: boolean

@@ -8,8 +8,8 @@
  * silently revert what another tab saved.
  */
 import { MON_TO_FRI } from '@/lib/domain/tempo';
-import type { AtLimit, CalendarCode, LimitMode, Market, StateChoice, StateName } from '@/lib/domain/gate';
-import { CALENDAR_CODES, STATE_NAMES } from '@/lib/domain/gate';
+import type { AccountMarket, AtLimit, CalendarCode, LimitMode, StateChoice, StateName } from '@/lib/domain/gate';
+import { ACCOUNT_MARKETS, CALENDAR_CODES, MARKET_SPEC, STATE_NAMES } from '@/lib/domain/gate';
 import { SALVAR, ERRO_REGRAS } from '@/components/hub/personalizar/copy';
 import type { RegrasErrorCode } from './regrasDb';
 import { formatDiaMes } from './formato';
@@ -41,15 +41,20 @@ import {
 } from './regras';
 import { JANELA_SUGERIDA, SEGUNDA_SUGERIDA } from './janelas';
 
-/** The «Padrão Futuros» pill: the futures default, edited as a pseudo-account (regras.ts resolveRules) */
+/**
+ * The «Padrão Futuros» pill: the futures default, edited as a pseudo-account (regras.ts
+ * resolveRules). Only futures has a «Padrão» entity (MARKET_SPEC[m].rules.padrao); its day is the
+ * market's, as for an account not created yet.
+ */
 export const PADRAO_FUTUROS = '__padrao_futuros__';
 export const PADRAO_FUTUROS_CONTA: RulesAccount = {
   id: PADRAO_FUTUROS,
   market: 'futures',
-  day: { tz: 'America/New_York', startMin: 1080 },
+  day: { ...MARKET_SPEC.futures.day },
 };
 
-export const MARKETS: readonly Market[] = ['futures', 'binary'];
+/** Every market the draft holds, in group order (ACCOUNT_MARKETS) */
+export const MARKETS: readonly AccountMarket[] = ACCOUNT_MARKETS;
 
 export interface Rascunho {
   /** The rules_config the draft was made against */
@@ -156,7 +161,7 @@ export function aposSalvar(r: Rascunho, enviado: Enviado, rev: string): Rascunho
 // Edits of «Quando você opera»
 // ---------------------------------------------------------------------------------------------
 
-const withMarket = (s: RulesSettings, m: Market, patch: Partial<MarketSettings>): RulesSettings => ({
+const withMarket = (s: RulesSettings, m: AccountMarket, patch: Partial<MarketSettings>): RulesSettings => ({
   ...s,
   markets: { ...s.markets, [m]: { ...s.markets[m], ...patch } },
 });
@@ -167,34 +172,34 @@ const withAccount = (s: RulesSettings, id: string, patch: Partial<AccountSetting
 });
 
 /** One window of a market (index 0 or 1) */
-export function comJanelaDoMercado(s: RulesSettings, m: Market, index: number, patch: Partial<WindowSetting>): RulesSettings {
+export function comJanelaDoMercado(s: RulesSettings, m: AccountMarket, index: number, patch: Partial<WindowSetting>): RulesSettings {
   return withMarket(s, m, { windows: s.markets[m].windows.map((w, i) => (i === index ? { ...w, ...patch } : w)) });
 }
 
 /** A day pill of a market window */
-export function alternarDia(s: RulesSettings, m: Market, index: number, day: number): RulesSettings {
+export function alternarDia(s: RulesSettings, m: AccountMarket, index: number, day: number): RulesSettings {
   const w = s.markets[m].windows[index];
   return w ? comJanelaDoMercado(s, m, index, { weekdays: w.weekdays ^ (1 << day) }) : s;
 }
 
 /** «+ Definir janela»: the market's suggested window */
-export const definirJanela = (s: RulesSettings, m: Market): RulesSettings => withMarket(s, m, { windows: [{ ...JANELA_SUGERIDA[m] }] });
+export const definirJanela = (s: RulesSettings, m: AccountMarket): RulesSettings => withMarket(s, m, { windows: [{ ...JANELA_SUGERIDA[m] }] });
 
 /** «Cancelar esta janela»: the new market window goes, and so do the own windows of its accounts */
-export function cancelarJanela(s: RulesSettings, m: Market, accountIds: readonly string[]): RulesSettings {
+export function cancelarJanela(s: RulesSettings, m: AccountMarket, accountIds: readonly string[]): RulesSettings {
   let out = withMarket(s, m, { windows: [] });
   for (const id of accountIds) if (out.accounts[id]?.window) out = withAccount(out, id, { window: null });
   return out;
 }
 
 /** «+ Segunda janela»: on the market's clock, with the first window's days */
-export function segundaJanela(s: RulesSettings, m: Market): RulesSettings {
+export function segundaJanela(s: RulesSettings, m: AccountMarket): RulesSettings {
   const first = s.markets[m].windows[0];
   if (!first || s.markets[m].windows.length >= 2) return s;
   return withMarket(s, m, { windows: [first, { tz: first.tz, ...SEGUNDA_SUGERIDA[m], weekdays: first.weekdays }] });
 }
 
-export const removerSegunda = (s: RulesSettings, m: Market): RulesSettings => withMarket(s, m, { windows: s.markets[m].windows.slice(0, 1) });
+export const removerSegunda = (s: RulesSettings, m: AccountMarket): RulesSettings => withMarket(s, m, { windows: s.markets[m].windows.slice(0, 1) });
 
 /** «Ajustar só nesta conta»: a copy of the market's first window (its days, or seg–sex) */
 export function ajustarSoNestaConta(s: RulesSettings, account: Pick<RulesAccount, 'id' | 'market'>): RulesSettings {
@@ -211,7 +216,7 @@ export function comJanelaDaConta(s: RulesSettings, id: string, patch: Partial<Wi
 }
 
 // ---------------------------------------------------------------------------------------------
-// Edits of «Suas regras»: entity = «Padrão Futuros» or an account (futures or binary)
+// Edits of «Suas regras»: entity = «Padrão Futuros» or an account (of any market)
 // ---------------------------------------------------------------------------------------------
 
 export type Entidade = { tipo: 'padrao' } | { tipo: 'conta'; conta: AccountConfig };
@@ -308,7 +313,7 @@ export function janelasEfetivas(s: RulesSettings, e: Entidade): { windows: Windo
 }
 
 /** Board `mudouMk`: the market's windows or an own window of one of its active accounts differ */
-export function janelasDoMercadoMudaram(saved: RulesSettings, draft: RulesSettings, m: Market, accountIds: readonly string[]): boolean {
+export function janelasDoMercadoMudaram(saved: RulesSettings, draft: RulesSettings, m: AccountMarket, accountIds: readonly string[]): boolean {
   if (canon(draft.markets[m].windows) !== canon(saved.markets[m].windows)) return true;
   return accountIds.some((id) => canon(draft.accounts[id]?.window ?? null) !== canon(saved.accounts[id]?.window ?? null));
 }

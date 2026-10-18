@@ -5,24 +5,22 @@
  *   NEW      not on any board (screens or states the boards do not draw)
  *   ADAPTED  a board string changed for Phase 1 (the comment says what changed)
  */
+import type { ImportMarket } from '@/lib/domain/import'
+import { MARKET_SPEC, currencyOf } from '@/lib/domain/markets'
 import type { AccountMarket, AccountPhase, ZoneKey } from '@/lib/hub/contas'
-import { ALL_FILE_ZONES, LABEL_MAX } from '@/lib/hub/contas'
+import { ALL_FILE_ZONES, LABEL_MAX, MARKET_ORDER } from '@/lib/hub/contas'
 import type { HubErrorCode } from '@/lib/hub/contasDb'
-import { formatInt } from '@/lib/hub/formato'
+import { SIMBOLO_MOEDA, formatInt } from '@/lib/hub/formato'
+import { MERCADO, USDT_COMO_DOLAR, viraODia } from '@/components/hub/copyMercados'
 
 // ------------------------------------------------------------------------------------------------
 // Shared
 // ------------------------------------------------------------------------------------------------
 
-export const MARKET_LABEL: Record<AccountMarket, string> = {
-  futures: 'Futuros',
-  binary: 'Opções binárias',
-  forex: 'Forex', // NEW (no board shows other markets; only old data can have them)
-  stocks: 'Ações', // NEW
-  crypto: 'Cripto', // NEW
-  b3: 'B3', // NEW
-  options: 'Opções', // NEW
-}
+/** Group headers, chips and the selector (Fase 2b: copyMercados MERCADO[m].nome, values unchanged) */
+export const MARKET_LABEL: Record<AccountMarket, string> = Object.fromEntries(
+  MARKET_ORDER.map((m) => [m, MERCADO[m].nome]),
+) as Record<AccountMarket, string>
 
 export const PHASE_LABEL: Record<AccountPhase, string> = {
   avaliacao: 'Avaliação',
@@ -46,6 +44,32 @@ export const PLATFORM_LABEL: Record<string, string> = {
   iq: 'IQ Option',
   outra: 'Outra',
   topone: 'Top One', // NEW (key the old imports left on the Top One account)
+  // Fase 2b (board ImportarConta `X.PLAT`): Forex
+  mt5: 'MetaTrader 5',
+  mt4: 'MetaTrader 4',
+  ctrader: 'cTrader',
+  matchtrader: 'Match-Trader',
+  tradelocker: 'TradeLocker',
+  dxtrade: 'DXtrade',
+  // Cripto
+  binance: 'Binance',
+  bybit: 'Bybit',
+  okx: 'OKX',
+  coinbase: 'Coinbase',
+  kraken: 'Kraken',
+  bitget: 'Bitget',
+  mercadobitcoin: 'Mercado Bitcoin',
+  // Ações e opções (EUA)
+  ibkr: 'Interactive Brokers',
+  thinkorswim: 'thinkorswim (Schwab)',
+  webull: 'Webull',
+  tastytrade: 'tastytrade',
+  tradier: 'Tradier',
+  avenue: 'Avenue',
+  nomad: 'Nomad',
+  // B3
+  profit: 'Profit (Nelogica)',
+  tryd: 'Tryd',
 }
 
 export const platformLabel = (key: string | null) => (key ? PLATFORM_LABEL[key] ?? key : '')
@@ -64,7 +88,7 @@ export const zoneName = (tz: string) => {
   return key ? ZONE_LABEL[key] : tz
 }
 
-export const NEVER_SUMMED = 'Futuros e binárias nunca são somados.'
+export const NEVER_SUMMED = 'Contas de mercados diferentes nunca são somadas.' // Fase 2b (board ImportarConta l.242, Personalizar l.353)
 export const LOADING = 'Carregando…'
 export const TRY_AGAIN = 'Tentar de novo'
 export const UNDO = 'Desfazer'
@@ -93,10 +117,14 @@ export const CONTAS = {
   title: 'Suas contas',
   sub: 'Cada conta é de um mercado só e tem as suas regras.',
   infoAria: 'Como ler: Suas contas',
-  // ADAPTED: "Duplicar e arquivar valem na hora; arquivar guarda…" → archive only (no duplicate in
-  // Phase 1); the sentences about the Apex examples and copy groups are dropped
+  // ADAPTED (board Personalizar `D.txt.infoContas`, Fase 2b): "Duplicar e arquivar valem na hora;
+  // arquivar guarda…" → archive only (no duplicate yet); the sentences about the Apex examples and
+  // copy groups are dropped, as in Phase 1
   info:
-    'Uma linha por conta. Cada conta é de um mercado só, com janela, limite e regras próprias. Arquivar vale na hora, guarda o histórico e pode ser desfeito. O Binary Hub não se conecta à sua corretora: as operações chegam por arquivo ou à mão.',
+    'Uma linha por conta. Cada conta é de um mercado só, com janela, limite e regras próprias. Arquivar vale na hora, guarda o histórico e pode ser desfeito. O Binary Hub não se conecta à sua corretora: as operações chegam por arquivo ou à mão. Por enquanto, lemos o CSV da Ebinex e o Trade History da Top One. Nas contas de Forex, de Ações, de Cripto e da B3, as operações entram pelo “Registrar operação”, que chega na Fase 3, e logo depois também por um CSV em que você diz o que é cada coluna. O relatório do MetaTrader sai em HTML ou PDF, não em CSV: vai precisar de um leitor próprio, que vem depois. O resultado fica na moeda da conta: R$ na B3; US$ nos outros mercados, com USDT e USDC contados como dólar.',
+  /** Under the group of a market whose files the app cannot read yet (board Personalizar `g.semLeitorTxt`) */
+  semLeitor: (market: AccountMarket) =>
+    `Ainda não lemos arquivos ${MERCADO[market].de}: as operações entram pelo “Registrar operação”, na Fase 3.`,
   empty: 'Traga o histórico da sua corretora.',
   importShort: 'Importar',
   importAria: (label: string) => `Importar arquivo para ${label}`,
@@ -132,7 +160,8 @@ export const EDITAR = {
   personal: 'Pessoal',
   firm: 'Mesa', // NEW (the board only has the chip "Mesa: {x}")
   ref: 'Número na plataforma',
-  size: 'Tamanho US$',
+  /** «Tamanho US$», «Tamanho R$» (NEW for R$: Editar conta follows step b) */
+  size: (simbolo: string) => `Tamanho ${simbolo}`,
   primary: 'Conta principal', // NEW
   primaryNote: 'Abre primeiro quando nenhuma conta foi escolhida.', // NEW
   zone: 'Fuso do arquivo',
@@ -258,22 +287,59 @@ export const ERRO = {
 
 export const PASSO_A = {
   title: 'Para qual conta?',
-  newAccount: (market: 'futures' | 'binary') => (market === 'futures' ? '+ Nova conta de futuros' : '+ Nova conta de binárias'),
+  newAccount: (market: ImportMarket) => (market === 'futures' ? '+ Nova conta de futuros' : '+ Nova conta de binárias'),
   sameFormat: (label: string) => `${label} já recebeu este formato.`,
 }
 
+/**
+ * What a market calls the place an account trades on: step b's read-only row (board `X.MK[*].rot`,
+ * `formNovo`) and i2's platform group (board `X.MK[*].grupo`; binaries have no group name, the
+ * step's heading names it). `options` is never offered: as stocks.
+ */
+const ONDE: Readonly<Record<AccountMarket, { ro: string; grupo: string }>> = {
+  futures: { ro: 'Plataforma', grupo: 'Plataforma' },
+  binary: { ro: 'Corretora', grupo: '' },
+  forex: { ro: 'Plataforma', grupo: 'Plataforma' },
+  stocks: { ro: 'Corretora', grupo: 'Corretora' },
+  crypto: { ro: 'Corretora ou plataforma', grupo: 'Corretora ou plataforma' },
+  b3: { ro: 'Plataforma', grupo: 'Plataforma' },
+  options: { ro: 'Corretora', grupo: 'Corretora' },
+}
+
+/** MetaTrader reports (board `FM` relMT): neither the file readers nor the CSV mapping read them */
+const RELATORIO_MT: Readonly<Record<string, string>> = {
+  mt5: 'O relatório do MetaTrader 5 sai em HTML ou PDF e vai precisar de um leitor próprio, que vem depois.',
+  mt4: 'O relatório do MetaTrader 4 sai em HTML e vai precisar de um leitor próprio, que vem depois.',
+}
+
 export const PASSO_B = {
-  title: (market: 'futures' | 'binary') => (market === 'futures' ? 'Nova conta de futuros' : 'Nova conta de binárias'),
+  title: (market: AccountMarket) => MERCADO[market].titulo,
   label: 'Apelido',
   phase: 'Fase',
   type: 'Tipo',
   personal: 'Pessoal',
-  size: 'Tamanho US$',
+  /** «Tamanho US$», «Tamanho R$» (board: `Tamanho {{ B.moeda }}`) */
+  size: (simbolo: string) => `Tamanho ${simbolo}`,
   ref: 'Número na plataforma',
   roFile: 'Arquivo',
-  roBroker: 'Corretora',
-  roPlatform: 'Plataforma',
+  /** The read-only row's label: «Plataforma», «Corretora», «Corretora ou plataforma» */
+  roLabel: (market: AccountMarket) => ONDE[market].ro,
   roFirmPlatform: 'Mesa e plataforma',
+  // Fase 2b: markets without a file reader (board `B.temMoedaDia`, `B.moedaDia`, `B.infoMoeda`)
+  moedaDia: 'Moeda e virada do dia',
+  moedaDiaAria: 'Como ler: moeda e virada do dia',
+  /**
+   * ADAPTED (board `X.MK[*].dia`): «US$ · o dia vira às 17:00 ET (18:00 em Brasília hoje)»; the
+   * Brasília time is today's (lib/hub/regrasConta viradaEmBrasilia: 19:00 after 1 Nov), and a day
+   * that turns on Brasília's clock has none. «R$ · o dia vira à meia-noite de Brasília».
+   */
+  moedaDiaValor: (market: AccountMarket, emBrasilia: string | null) =>
+    `${SIMBOLO_MOEDA[currencyOf(market)]} · o dia vira ${viraODia(MARKET_SPEC[market].day)}${emBrasilia ? ` (${emBrasilia} em Brasília hoje)` : ''}`,
+  /** The ⓘ: crypto counts USDT and USDC as dollars; with a firm, the firm's own reset */
+  moedaDiaInfo: (market: AccountMarket, comMesa: boolean) =>
+    `${market === 'crypto' ? `${USDT_COMO_DOLAR} ` : ''}A moeda e a virada do dia ficam fixas nesta conta.${
+      comMesa ? ' O limite do dia é a sua regra: a mesa pode zerar o dela em outro horário.' : ''
+    }`,
   roFirmFile: 'Mesa e arquivo', // NEW (a Top One file starts the account with its firm)
   fileTopOne: 'Trade History',
   fileEbinex: 'Ebinex · arquivo CSV',
@@ -291,30 +357,74 @@ export const PASSO_I1 = {
   title: 'Qual mercado?',
   note: 'Cada conta é de um mercado só.',
   hint: 'Escolha o mercado.',
+  /** Under the pills, for a market whose files the app cannot read yet (board `I1.nota`) */
+  semLeitor: (market: AccountMarket) =>
+    `Ainda não lemos arquivos ${MERCADO[market].de}: as operações desta conta entram pelo “Registrar operação”, na Fase 3.`,
+}
+
+const MESES = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro']
+/** '2026-10-18' → «outubro de 2026» */
+const mesDe = (checked: string) => `${MESES[Number(checked.slice(5, 7)) - 1]} de ${checked.slice(0, 4)}`
+
+/**
+ * The rule of a market's featured firms (board `X.MK[*].infoMesa`); only futures and forex feature
+ * firms. `checked` (lib/hub/mesas PROP_FIRMS_CHECKED, YYYY-MM-DD) gives «vistas em outubro de 2026».
+ */
+const REGRA_DAS_MESAS: Partial<Record<AccountMarket, (visto: string) => string>> = {
+  futures: (visto) =>
+    `Mesas de futuros com nota 4 ou mais e pelo menos 50 avaliações verificadas na Prop Firm Match, vistas em ${visto}, mais a Apex Trader Funding, em ordem alfabética.`,
+  forex: (visto) =>
+    `Mesas de forex com nota 4,4 ou mais e pelo menos 100 avaliações verificadas na Prop Firm Match, vistas em ${visto}, em ordem alfabética.`,
+}
+
+/** «Nada com esse nome …» when neither a firm nor a platform answers the search (board `X.MK[*].semAchar`, `I2.vazio`) */
+const SEM_ACHAR: Readonly<Record<AccountMarket, string>> = {
+  futures: 'Nada com esse nome na lista de mesas e plataformas.',
+  binary: 'Nada com esse nome. Escolha “Outra” e siga.',
+  forex: 'Nada com esse nome na lista de mesas e plataformas.',
+  stocks: 'Nada com esse nome na lista de mesas e corretoras.',
+  crypto: 'Nada com esse nome na lista de mesas e corretoras.',
+  b3: 'Nada com esse nome na lista de plataformas.',
+  options: 'Nada com esse nome na lista de mesas e corretoras.',
+}
+
+/** Next to the firm's chip while no platform is chosen (board `X.MK[*].agora`) */
+const AGORA: Readonly<Record<AccountMarket, string>> = {
+  futures: 'Agora escolha a plataforma.',
+  binary: 'Agora escolha a plataforma.',
+  forex: 'Agora escolha a plataforma.',
+  stocks: 'Agora escolha a corretora.',
+  crypto: 'Agora escolha a corretora ou a plataforma.',
+  b3: 'Agora escolha a plataforma.',
+  options: 'Agora escolha a corretora.',
 }
 
 export const PASSO_I2 = {
   title: 'Onde você opera?',
   search: 'Busque mesa, corretora ou plataforma',
-  // ADAPTED: "…na lista de plataformas." → the search covers the firms too
-  noMatchFutures: 'Nada com esse nome na lista de mesas e plataformas.',
-  noMatchBinary: 'Nada com esse nome. Escolha “Outra” e siga.',
+  /** Futures and forex ADAPTED from «…na lista de plataformas.» in Phase 2: the search covers the firms too */
+  noMatch: (market: AccountMarket) => SEM_ACHAR[market],
   firmFromSearch: (text: string) => `Usar “${text}” como mesa`,
   firmChip: (firm: string) => `Mesa: ${firm}`,
   removeFirm: 'Tirar',
   removeFirmAria: (firm: string) => `Tirar a mesa ${firm}`,
-  nowPlatform: 'Agora escolha a plataforma.',
+  nowPlatform: (market: AccountMarket) => AGORA[market],
   iqNote: 'IQ Option não exporta histórico: registre à mão.',
   hint: 'Escolha onde você opera.',
-  firmsTitle: 'Mesa', // NEW (the board has no firm list, only the chip)
-  platformsTitle: 'Plataforma', // NEW (two groups need their own names)
-  firmsInfoAria: 'Como ler: lista de mesas', // NEW
-  /** NEW: the source, the day it was read and the selection rule (`checked` is YYYY-MM-DD); no firm's score */
-  firmsInfo: (checked: string) =>
-    `Mesas de futuros com nota 4 ou mais e pelo menos 50 avaliações verificadas na Prop Firm Match em ${checked
-      .split('-')
-      .reverse()
-      .join('/')}, mais a Apex Trader Funding, que incluímos por escolha. Em ordem alfabética. Não é recomendação nem parceria. A sua não está aqui? Digite o nome.`,
+  firmsTitle: 'Mesa', // board: `l-mesas` «Mesa · opcional»
+  /** The platform group's name; '' for binaries, whose one group the step's heading names */
+  platformsTitle: (market: AccountMarket) => ONDE[market].grupo,
+  /** A market with firms and none featured (crypto, stocks, B3), before any search (board markup l.453) */
+  firmsNote: 'Opera numa mesa? Digite o nome na busca.',
+  firmsInfoAria: 'Como ler: lista de mesas',
+  /**
+   * The ⓘ of the featured firms: the source, when it was read and the rule; never a firm's score.
+   * Null for a market with no featured firm. Board `MESAS()` adds the last two sentences.
+   */
+  firmsInfo: (market: AccountMarket, checked: string): string | null => {
+    const regra = REGRA_DAS_MESAS[market]
+    return regra ? `${regra(mesDe(checked))} Não é recomendação nem parceria. A sua não está aqui? Digite o nome.` : null
+  },
 }
 
 /**
@@ -382,7 +492,7 @@ export const PASSO_D = {
   seeLines: 'Ver linhas',
   line: (line: number, reason: string) => `Linha ${formatInt(line)}: ${reason}`,
   // NEW: the day-change count (not on the board)
-  dayChanges: (count: number, market: 'futures' | 'binary') =>
+  dayChanges: (count: number, market: ImportMarket) =>
     `${count === 1 ? '1 operação fica' : `${formatInt(count)} operações ficam`} em outro dia que o do arquivo: ${
       market === 'futures' ? 'o dia de Futuros vira às 18:00 de Nova York.' : 'o dia de binárias vira à meia-noite de Brasília.'
     }`,
@@ -461,14 +571,24 @@ export const FIM_FUSO = {
 }
 
 export const PASSO_G = {
-  title: (market: 'futures' | 'binary') =>
+  title: (market: ImportMarket) =>
     market === 'binary' ? 'Este arquivo é de binárias (Ebinex).' : 'Este arquivo é de futuros (Top One).', // the second is NEW (symmetric)
   infoAria: 'Como ler: mercado do arquivo',
-  info: (label: string) => `Futuros e binárias nunca são somados: este arquivo não entra em ${label}.`,
-  accountIs: (market: 'futures' | 'binary') =>
-    market === 'futures' ? 'A conta escolhida é de Futuros.' : 'A conta escolhida é de binárias.', // the second is NEW (symmetric)
+  // Fase 2b (board markup l.401)
+  info: (label: string) => `Contas de mercados diferentes nunca são somadas: este arquivo não entra em ${label}.`,
+  /**
+   * Board for futures; binaries NEW in Phase 1 (symmetric); the other markets NEW in Fase 2b («A
+   * conta escolhida é de Forex.», «… da B3.»), though the sheet never brings a file to an account
+   * without a file reader
+   */
+  accountIs: (market: AccountMarket) =>
+    market === 'futures'
+      ? 'A conta escolhida é de Futuros.'
+      : market === 'binary'
+        ? 'A conta escolhida é de binárias.'
+        : `A conta escolhida é ${MERCADO[market].de}.`,
   importInto: (label: string) => `Importar em ${label}`,
-  create: (market: 'futures' | 'binary') => (market === 'binary' ? 'Criar conta de binárias' : 'Criar conta de futuros'), // the second is NEW
+  create: (market: ImportMarket) => (market === 'binary' ? 'Criar conta de binárias' : 'Criar conta de futuros'), // the second is NEW
 }
 
 export const FIM_CONTA = {
@@ -477,6 +597,13 @@ export const FIM_CONTA = {
   text: 'Nada ainda. Importe o histórico ou registre a primeira operação.',
   textIq: 'Nada ainda. Registre a primeira operação.',
   importHistory: 'Importar histórico',
+  // Fase 2b, a market without a file reader (board `FM` linhasNovo): no «Importar histórico»
+  semLeitor: 'Nada ainda: as operações desta conta entram pelo “Registrar operação”, que chega na Fase 3.',
+  /** «Ainda não lemos arquivos de Forex. » and what comes later: MetaTrader's own reader, or the CSV mapping */
+  semLeitorArquivo: (market: AccountMarket, platform: string | null) =>
+    `Ainda não lemos arquivos ${MERCADO[market].de}. ${
+      (platform && RELATORIO_MT[platform]) || 'Depois vem a importação de CSV em que você diz o que é cada coluna.'
+    }`,
 }
 
 /** What a failed request says. NEW (the boards draw no error states). Never the database's text. */

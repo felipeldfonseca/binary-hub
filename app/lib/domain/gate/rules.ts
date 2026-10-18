@@ -32,11 +32,6 @@ import {
 import { assertTimeZone, type DayClock, type TradingWindow } from '../tempo';
 
 export { WINDOW_TZS, type WindowTz } from '../markets';
-/**
- * @deprecated The two markets the Phase 2 rules screens (lib/hub) still handle. The domain takes
- * every AccountMarket; this alias goes when lib/hub moves to AccountMarket (Fase 2b, foundation).
- */
-export type Market = Extract<AccountMarket, 'futures' | 'binary'>;
 /** «Fora da janela, mostrar»: “Fora da sua janela” | “Liberado”, com aviso */
 export type OutsideShows = 'fora' | 'aviso';
 export type StateName = 'alinhadas' | 'so_tecnica' | 'so_fundamentos' | 'em_conflito' | 'sem_direcao';

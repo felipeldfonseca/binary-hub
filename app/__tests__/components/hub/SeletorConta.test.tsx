@@ -39,7 +39,7 @@ describe('SeletorConta', () => {
     expect(current).toHaveTextContent('Financiada')
     expect(current).toHaveFocus()
     expect(within(list).getByRole('button', { name: /Apex A/ })).not.toHaveAttribute('aria-current')
-    expect(within(list).getByText('Futuros e binárias nunca são somados.')).toBeInTheDocument()
+    expect(within(list).getByText('Contas de mercados diferentes nunca são somadas.')).toBeInTheDocument()
     expect(within(list).queryByText(/Todas as contas/)).not.toBeInTheDocument()
   })
 
@@ -124,6 +124,37 @@ describe('SeletorConta', () => {
 
     expect(onAdd).toHaveBeenCalledWith(button)
     expect(document.getElementById('lista-contas')).not.toBeInTheDocument()
+  })
+})
+
+describe('SeletorConta in six markets (Fase 2b)', () => {
+  it('groups every market in the board’s order, with the phase of each account', async () => {
+    const accounts = [
+      makeAccount({ label: 'Clear', market: 'b3', phase: 'pessoal' }),
+      makeAccount({ label: 'Binance', market: 'crypto', phase: 'pessoal' }),
+      makeAccount({ label: 'IBKR', market: 'stocks', phase: 'pessoal' }),
+      makeAccount({ label: 'FTMO', market: 'forex', phase: 'avaliacao' }),
+      ebinex,
+      topOne,
+    ]
+    render(<SeletorConta accounts={accounts} current={accounts[1]} onChoose={jest.fn()} onAdd={jest.fn()} janela="Janela 20:00–22:00 · Brasília" />)
+    const button = screen.getByRole('button', { name: /^Conta: / })
+    expect(button).toHaveAccessibleDescription('Janela 20:00–22:00 · Brasília')
+
+    await userEvent.click(button)
+
+    const list = document.getElementById('lista-contas') as HTMLElement
+    expect(Array.from(list.querySelectorAll('.hub-seletor__grupo')).map((el) => el.textContent)).toEqual([
+      'Futuros',
+      'Opções binárias',
+      'Forex',
+      'Ações',
+      'Cripto',
+      'B3',
+    ])
+    expect(within(list).getByRole('button', { name: /Binance/ })).toHaveAttribute('aria-current', 'true')
+    expect(within(list).getByRole('button', { name: /FTMO/ })).toHaveTextContent('Avaliação')
+    expect(within(list).getByText('Contas de mercados diferentes nunca são somadas.')).toBeInTheDocument()
   })
 })
 

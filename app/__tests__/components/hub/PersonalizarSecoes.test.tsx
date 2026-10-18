@@ -7,14 +7,57 @@ import QuandoVoceOpera from '@/components/hub/personalizar/QuandoVoceOpera'
 import SuasRegras from '@/components/hub/personalizar/SuasRegras'
 import Preferencias from '@/components/hub/personalizar/Preferencias'
 import { BarraSalvar } from '@/components/hub/personalizar/BarraSalvar'
-import { entidadesRegrasDe, type FormLimite } from '@/components/hub/personalizar/PersonalizarProvider'
+import type { FormLimite } from '@/components/hub/personalizar/PersonalizarProvider'
+import { entidadesRegrasDe, lerLimite } from '@/lib/hub/personalizarRegras'
+import { CREATABLE_MARKETS } from '@/lib/domain/markets'
 import { activeAccounts, pendingVersions, type AccountConfig, type RulesConfig, type RulesSettings } from '@/lib/hub/regras'
 import { PADRAO_FUTUROS, ajustarSoNestaConta, comBloqueio, comJanelaDoMercado, comLimite, comModoLimite, comRegraJanela } from '@/lib/hub/rascunho'
-import { configAntes, configDepois, idsDono } from '@/testing/regras'
+import { configAntes, configDepois, configMercados, idsDono, idsMercados } from '@/testing/regras'
 import { et } from '@/testing/gate'
+
+/** « · » with a no-break space on each side (personalizar/copy.ts SEP): it never starts or ends a line */
+const SEP = '\u00a0·\u00a0'
 
 const ids = idsDono()
 const NOW = et('2026-10-22 12:00')
+/** The six-market owner (fixtures recorded on the markets migration): Top One #1, Ebinex, FTMO, IBKR, Binance, Clear */
+const im = idsMercados()
+const FASES_MERCADOS: Record<string, string | null> = {
+  [im.topOne]: 'Financiada',
+  [im.ebinex]: 'Pessoal',
+  [im.ftmo]: 'Avaliação',
+  [im.ibkr]: 'Pessoal',
+  [im.binance]: 'Pessoal',
+  [im.clear]: 'Pessoal',
+}
+
+/** A Phase 1 backfill account in a market no longer offered (options), on Brasília midnight, no version */
+function comOpcoesAntiga(c: RulesConfig): RulesConfig {
+  const ibkr = c.accounts.find((a) => a.id === im.ibkr) as AccountConfig
+  const opc: AccountConfig = { ...ibkr, id: 'acc-opc', label: 'Opções antigas', market: 'options', day: { tz: 'America/Sao_Paulo', startMin: 0 }, versions: [] }
+  return { ...c, accounts: [...c.accounts, opc] }
+}
+
+/** The config with one account's day clock replaced (a Phase 1 backfill account keeps Brasília midnight) */
+function comDia(c: RulesConfig, id: string, day: AccountConfig['day']): RulesConfig {
+  return { ...c, accounts: c.accounts.map((a) => (a.id === id ? { ...a, day } : a)) }
+}
+
+/** The six-market config with a second futures account («Apex A», no version), so «somando» could apply */
+function comApexMercados(c: RulesConfig): RulesConfig {
+  const top = c.accounts.find((a) => a.id === im.topOne) as AccountConfig
+  const apex: AccountConfig = { ...top, id: 'acc-apex', label: 'Apex A', versions: [] }
+  return {
+    ...c,
+    accounts: [...c.accounts, apex],
+    settings: { ...c.settings, accounts: { ...c.settings.accounts, 'acc-apex': { windowRule: {}, block: {}, limit: null, window: null } } },
+  }
+}
+
+/** The config with a market's saved windows removed */
+function semJanela(c: RulesConfig, m: keyof RulesSettings['markets']): RulesConfig {
+  return { ...c, settings: { ...c.settings, markets: { ...c.settings.markets, [m]: { ...c.settings.markets[m], windows: [] } } } }
+}
 
 /** The fixture with a second futures account («Apex A», no versions), as rules_config would list it */
 function comApex(c: RulesConfig): RulesConfig {
@@ -44,7 +87,19 @@ function Janelas({ config, inicial, onAdicionarConta = jest.fn() }: { config: Ru
   )
 }
 
-function Regras({ config, inicial, selecionado, onIrJanelas = jest.fn() }: { config: RulesConfig; inicial?: RulesSettings; selecionado: string; onIrJanelas?: jest.Mock }) {
+function Regras({
+  config,
+  inicial,
+  selecionado,
+  fases = {},
+  onIrJanelas = jest.fn(),
+}: {
+  config: RulesConfig
+  inicial?: RulesSettings
+  selecionado: string
+  fases?: Record<string, string | null>
+  onIrJanelas?: jest.Mock
+}) {
   const [draft, setDraft] = useState(inicial ?? config.settings)
   const [form, setForm] = useState<FormLimite | null>(null)
   const [sel, setSel] = useState(selecionado)
@@ -56,7 +111,7 @@ function Regras({ config, inicial, selecionado, onIrJanelas = jest.fn() }: { con
       config={config}
       draft={draft}
       ativas={activeAccounts(config)}
-      fases={{}}
+      fases={fases}
       pendentes={pendingVersions(config, draft)}
       tradesDesde={undefined}
       selecionado={sel}
@@ -154,7 +209,8 @@ describe('QuandoVoceOpera', () => {
     const onlyFutures = { ...c, accounts: c.accounts.filter((a) => a.market === 'futures') }
     const onAdicionarConta = jest.fn()
     const { unmount } = render(<Janelas config={onlyFutures} onAdicionarConta={onAdicionarConta} />)
-    expect(screen.getByText('Sem conta de opções binárias.')).toBeInTheDocument()
+    expect(screen.getByText('Outros mercados aparecem aqui quando você tiver uma conta neles.')).toBeInTheDocument()
+    expect(screen.queryByText(/Sem conta de/)).not.toBeInTheDocument()
     expect(screen.queryByRole('group', { name: 'Janela de Opções binárias' })).not.toBeInTheDocument()
 
     const add = screen.getByRole('button', { name: '+ Adicionar conta' })
@@ -306,7 +362,7 @@ describe('SuasRegras', () => {
     const soma = render(<Regras config={c} inicial={comModoLimite(c.settings, ids.topOne, 'soma')} selecionado={ids.topOne} />)
     const group = screen.getByRole('group', { name: 'Como o limite de Top One #1 conta' })
     expect(within(group).getByRole('button', { name: 'somando as contas de Futuros' })).toHaveAttribute('aria-pressed', 'true')
-    expect(screen.getByText('Hoje só há uma conta de Futuros. Binárias nunca entram.')).toBeInTheDocument()
+    expect(screen.getByText('Hoje só há uma conta de Futuros. Contas de outros mercados nunca entram.')).toBeInTheDocument()
     expect(within(screen.getByRole('list', { name: 'Como fica hoje' })).getByText(/somando Futuros/)).toBeInTheDocument()
     await userEvent.click(within(group).getByRole('button', { name: 'por conta' }))
     // Back to «por conta» with one account: the pills go (contrato §4.6) and focus stays on the row
@@ -316,7 +372,7 @@ describe('SuasRegras', () => {
 
     const two = comApex(c)
     render(<Regras config={two} inicial={comModoLimite(two.settings, ids.topOne, 'soma')} selecionado={ids.topOne} />)
-    expect(screen.getByText('Soma Top One #1 e Apex A. Binárias nunca entram.')).toBeInTheDocument()
+    expect(screen.getByText('Soma Top One #1 e Apex A. Contas de outros mercados nunca entram.')).toBeInTheDocument()
   })
 
   it('a binary account’s limit has no mode, and «Ficar sem limite» removes it', async () => {
@@ -395,6 +451,406 @@ describe('«Regras de»', () => {
   })
 })
 
+describe('QuandoVoceOpera in six markets (Fase 2b)', () => {
+  const cartao = (nome: string) => screen.getByRole('group', { name: nome })
+
+  it('one card per market with an active account, in the board’s order, with the board’s ids', () => {
+    render(<Janelas config={configMercados()} />)
+
+    const cards = screen.getAllByRole('group', { name: /^Janela d/ })
+    expect(cards.map((c) => c.getAttribute('aria-label'))).toEqual([
+      'Janela de Futuros',
+      'Janela de Opções binárias',
+      'Janela de Forex',
+      'Janela de Ações',
+      'Janela de Cripto',
+      'Janela da B3',
+    ])
+    expect(cards.map((c) => within(c).getByRole('heading', { level: 3 }).textContent)).toEqual(['Futuros', 'Opções binárias', 'Forex', 'Ações', 'Cripto', 'B3'])
+    // Two to a row (board `s6`)
+    for (const c of cards) expect(c).toHaveClass('hub-pz-mcard--metade')
+
+    expect(document.getElementById('j-fx0-de')).toHaveValue('08:00')
+    expect(document.getElementById('j-fx0-ate')).toHaveValue('10:00')
+    expect(document.getElementById('j-cri0-de')).toHaveValue('20:00')
+    expect(document.getElementById('j-cri0-ate')).toHaveValue('22:00')
+    expect(document.getElementById('j-b30-de')).toHaveValue('10:00')
+    expect(document.getElementById('definir-eua')).toHaveTextContent('+ Definir janela')
+    expect(document.getElementById('definir-bin')).toHaveTextContent('+ Definir janela')
+
+    expect(within(cartao('Janela de Forex')).getByText('relógio de Nova York')).toBeInTheDocument()
+    expect(within(cartao('Janela de Cripto')).getByText('relógio de Brasília')).toBeInTheDocument()
+    expect(within(cartao('Janela da B3')).getByText('relógio de Brasília')).toBeInTheDocument()
+    expect(within(cartao('Janela de Ações')).getByText('sem janela')).toBeInTheDocument()
+    expect(within(cartao('Janela de Ações')).getByText('Sem janela: na IBKR, a regra da janela não age.')).toBeInTheDocument()
+    expect(within(cartao('Janela de Cripto')).getByText('Usada por Binance.')).toBeInTheDocument()
+    expect(document.getElementById('j-cri0-cap')).toHaveTextContent('· todos os dias')
+    expect(within(cartao('Janela da B3')).getByLabelText('Início da janela da B3, horário de Brasília')).toHaveValue('10:00')
+
+    // Every creatable market has an account: nothing more to add here
+    expect(screen.queryByText(/Outros mercados aparecem aqui/)).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: '+ Adicionar conta' })).not.toBeInTheDocument()
+  })
+
+  it('«+ Definir janela» on Ações brings 09:30–10:30 ET and focuses its start; «Cancelar esta janela» undoes it', async () => {
+    render(<Janelas config={configMercados()} />)
+
+    await userEvent.click(within(cartao('Janela de Ações')).getByRole('button', { name: '+ Definir janela' }))
+
+    const start = within(cartao('Janela de Ações')).getByLabelText('Início da janela de Ações, horário de Nova York')
+    await waitFor(() => expect(start).toHaveFocus())
+    expect(start).toHaveValue('09:30')
+    expect(within(cartao('Janela de Ações')).getByLabelText('Fim da janela de Ações, horário de Nova York')).toHaveValue('10:30')
+    expect(document.getElementById('j-eua0-cap')).toHaveTextContent('10:30–11:30 em Brasília')
+    expect(document.getElementById('j-eua0-cap')).toHaveTextContent('· seg–sex')
+    expect(within(cartao('Janela de Ações')).getByText('não salvo')).toBeInTheDocument()
+
+    await userEvent.click(within(cartao('Janela de Ações')).getByRole('button', { name: 'Cancelar a janela nova de Ações' }))
+    await waitFor(() => expect(document.getElementById('definir-eua')).toHaveFocus())
+    expect(within(cartao('Janela de Ações')).queryByText('não salvo')).not.toBeInTheDocument()
+  })
+
+  it('Cripto: «+ Definir janela» marks every day, sábado and domingo included; the second window keeps them', async () => {
+    render(<Janelas config={semJanela(configMercados(), 'crypto')} />)
+    expect(within(cartao('Janela de Cripto')).getByText('Sem janela: na Binance, a regra da janela não age.')).toBeInTheDocument()
+
+    await userEvent.click(within(cartao('Janela de Cripto')).getByRole('button', { name: '+ Definir janela' }))
+
+    expect(within(cartao('Janela de Cripto')).getByLabelText('Início da janela de Cripto, horário de Brasília')).toHaveValue('20:00')
+    expect(within(cartao('Janela de Cripto')).getByLabelText('Fim da janela de Cripto, horário de Brasília')).toHaveValue('22:00')
+    expect(document.getElementById('j-cri0-cap')).toHaveTextContent('· todos os dias')
+
+    const mais = within(cartao('Janela de Cripto')).getByRole('button', { name: 'Relógio, dias e segunda janela de Cripto' })
+    expect(mais).toHaveAttribute('aria-controls', 'mais-cri')
+    await userEvent.click(mais)
+    const relogio = within(cartao('Janela de Cripto')).getByRole('group', { name: 'Relógio da janela' })
+    expect(within(relogio).getAllByRole('button').map((b) => [b.textContent, b.getAttribute('aria-pressed')])).toEqual([
+      ['Nova York (ET)', 'false'],
+      ['Brasília', 'true'],
+    ])
+    const dias = within(cartao('Janela de Cripto')).getByRole('group', { name: 'Dias' })
+    expect(within(dias).getAllByRole('button').map((b) => [b.getAttribute('aria-label'), b.getAttribute('aria-pressed')])).toEqual(
+      ['segunda', 'terça', 'quarta', 'quinta', 'sexta', 'sábado', 'domingo'].map((d) => [d, 'true']),
+    )
+
+    await userEvent.click(within(cartao('Janela de Cripto')).getByRole('button', { name: 'Segunda janela de Cripto' }))
+    expect(document.getElementById('j-cri1-de')).toHaveValue('09:00')
+    expect(document.getElementById('j-cri1-ate')).toHaveValue('11:00')
+    const dias2 = within(cartao('Janela de Cripto')).getByRole('group', { name: 'Dias da segunda janela' })
+    expect(within(dias2).getByRole('button', { name: 'domingo' })).toHaveAttribute('aria-pressed', 'true')
+  })
+
+  it('a creatable market without an account: «Outros mercados aparecem aqui …» and «+ Adicionar conta»; a legacy options card never hides it', async () => {
+    const c = configMercados()
+    const semB3 = { ...c, accounts: c.accounts.filter((a) => a.market !== 'b3') }
+    const onAdicionarConta = jest.fn()
+    const { unmount } = render(<Janelas config={semB3} onAdicionarConta={onAdicionarConta} />)
+    expect(screen.queryByRole('group', { name: 'Janela da B3' })).not.toBeInTheDocument()
+    const nota = screen.getByText('Outros mercados aparecem aqui quando você tiver uma conta neles.')
+    const add = screen.getByRole('button', { name: '+ Adicionar conta' })
+    // The link follows the note (board markup l.500), with a 44 px target (.hub-pz-link-btn, CSS test below)
+    expect(nota.nextElementSibling).toBe(add)
+    expect(add).toHaveClass('hub-pz-link-btn')
+    await userEvent.click(add)
+    expect(onAdicionarConta).toHaveBeenCalledWith(add, screen.getByRole('heading', { level: 2, name: 'Quando você opera' }))
+    unmount()
+
+    // Five creatable markets and a Phase 1 options account: its card comes last, the note stays
+    render(<Janelas config={comOpcoesAntiga(semB3)} />)
+    const cards = screen.getAllByRole('group', { name: /^Janela d/ })
+    expect(cards.map((x) => x.getAttribute('aria-label'))).toEqual([
+      'Janela de Futuros',
+      'Janela de Opções binárias',
+      'Janela de Forex',
+      'Janela de Ações',
+      'Janela de Cripto',
+      'Janela de Opções',
+    ])
+    expect(document.getElementById('definir-opc')).toBeInTheDocument()
+    expect(screen.getByText('Outros mercados aparecem aqui quando você tiver uma conta neles.')).toBeInTheDocument()
+  })
+
+  it.each(CREATABLE_MARKETS)('without a %s account, the note and «+ Adicionar conta» show', (m) => {
+    const c = configMercados()
+    const sem = { ...c, accounts: c.accounts.filter((a) => a.market !== m) }
+    expect(activeAccounts(sem)).toHaveLength(5)
+    render(<Janelas config={sem} />)
+    expect(screen.getAllByRole('group', { name: /^Janela d/ })).toHaveLength(5)
+    expect(screen.getByText('Outros mercados aparecem aqui quando você tiver uma conta neles.')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '+ Adicionar conta' })).toBeInTheDocument()
+  })
+
+  it('explains the clocks and the day turn of every market in its ⓘ', async () => {
+    render(<Janelas config={configMercados()} />)
+    await userEvent.click(screen.getByRole('button', { name: 'Como ler: Quando você opera' }))
+    const info = document.getElementById('info-janelas') as HTMLElement
+    expect(info).toHaveTextContent(
+      'Futuros, Forex e Ações seguem o horário de Nova York: a janela fica no relógio de Nova York (ET) e, em Brasília, anda 1 hora quando os EUA mudam o horário. Binárias, Cripto e a B3 ficam no relógio de Brasília, que não muda.',
+    )
+    expect(info).toHaveTextContent('(a próxima é 1º nov)')
+    expect(info).toHaveTextContent(
+      'O dia começa às 18:00 ET em Futuros, às 17:00 ET em Forex, às 20:00 ET em Ações e à meia-noite de Brasília em binárias, em Cripto e na B3. Cripto abre todos os dias, 24 h: a janela pode incluir sábado e domingo.',
+    )
+    expect(info).not.toHaveTextContent('Leituras da IA')
+  })
+})
+
+describe('SuasRegras in six markets (Fase 2b)', () => {
+  const regraNomes = () => Array.from(document.querySelectorAll('.hub-pz-regra__nome > span:first-child')).map((el) => el.textContent)
+  const regrasDe = () => within(screen.getByRole('group', { name: 'Regras de' }))
+  const limiteValor = () => (document.getElementById('r-lim')?.closest('li') as HTMLElement).querySelector('.hub-pz-regra__linha > span')
+  const hojeLinhas = () => within(screen.getByRole('list', { name: 'Como fica hoje' })).getAllByRole('listitem').map((li) => li.textContent)
+
+  it('«Regras de»: «Padrão Futuros», then every active account in the board’s market order', () => {
+    const c = configMercados()
+    render(<Regras config={c} selecionado={im.ftmo} fases={FASES_MERCADOS} />)
+    expect(regrasDe().getAllByRole('button').map((b) => b.textContent)).toEqual(['Padrão Futuros', 'Top One #1', 'Ebinex', 'FTMO', 'IBKR', 'Binance', 'Clear'])
+    expect(regrasDe().getByRole('button', { name: 'FTMO' })).toHaveAttribute('aria-pressed', 'true')
+
+    // Whatever the list order, markets come in ACCOUNT_MARKETS order (list order inside one)
+    const shuffled = [...activeAccounts(c)].reverse()
+    expect(entidadesRegrasDe(shuffled)).toEqual([PADRAO_FUTUROS, im.topOne, im.ebinex, im.ftmo, im.ibkr, im.binance, im.clear])
+    const semFuturos = activeAccounts(c).filter((a) => a.market !== 'futures')
+    expect(entidadesRegrasDe(semFuturos)).toEqual([im.ebinex, im.ftmo, im.ibkr, im.binance, im.clear])
+  })
+
+  it('a B3 account: chip «B3 · Pessoal», the window and the limit only, in R$, with no tag, block, state or «somando»', async () => {
+    render(<Regras config={configMercados()} selecionado={im.clear} fases={FASES_MERCADOS} />)
+
+    expect(screen.getByRole('heading', { level: 3, name: 'Clear' })).toBeInTheDocument()
+    expect(screen.getByText('B3 · Pessoal')).toHaveClass('hub-chip-dado')
+    expect(regraNomes()).toEqual(['Janela', 'Só operar dentro da sua janela', 'Limite do dia'])
+    expect(screen.queryByRole('switch', { name: 'Bloqueio de dados' })).not.toBeInTheDocument()
+    expect(screen.queryByText('Regra por estado')).not.toBeInTheDocument()
+    expect(screen.queryByText('padrão de Futuros')).not.toBeInTheDocument()
+    expect(screen.queryByText('só nesta conta')).not.toBeInTheDocument()
+    expect(screen.queryByRole('group', { name: 'Como o limite de Clear conta' })).not.toBeInTheDocument()
+    expect(screen.queryByText(/somando/)).not.toBeInTheDocument()
+
+    expect((document.getElementById('r-gate')?.closest('ul') as HTMLElement).querySelector('li')).toHaveTextContent('10:00–11:00 de Brasília · seg–sex')
+    expect(limiteValor()?.textContent).toBe('R$\u00a0500')
+    // Thursday 12:00 ET = 13:00 de Brasília, after the window
+    expect(hojeLinhas()).toEqual([
+      `10:00–11:00 Brasília${SEP}sua janelaLiberado`,
+      'No resto do diaFora da sua janela',
+      'Se a perda do dia chegar a R$\u00a0500Encerrado por hoje',
+    ])
+    expect(screen.getByText('no relógio de Brasília')).toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('button', { name: 'Versões (1)' }))
+    // The version note (foundation): window and limit in R$, no block, state or calendar part
+    expect(within(document.getElementById('lista-versoes') as HTMLElement).getAllByRole('listitem')[0].textContent).toBe(
+      `v1${SEP}desde 17 out${SEP}janela 10:00–11:00 de Brasília${SEP}seg–sex${SEP}limite R$\u00a0500`,
+    )
+  })
+
+  it('the B3 limit form: «Limite do dia, em R$», the R$ error, a typed «R$ 1.000,50»', async () => {
+    render(<Regras config={configMercados()} selecionado={im.clear} fases={FASES_MERCADOS} />)
+
+    await userEvent.click(screen.getByRole('button', { name: 'Mudar o limite do dia de Clear' }))
+    const field = screen.getByLabelText('Limite do dia, em R$')
+    await waitFor(() => expect(field).toHaveFocus())
+    expect(field).toHaveValue('500')
+    await userEvent.clear(field)
+    await userEvent.type(field, '2000000')
+    await userEvent.click(screen.getByRole('button', { name: 'OK' }))
+    expect(screen.getByRole('alert')).toHaveTextContent('Use um valor até R$ 1.000.000.')
+
+    await userEvent.clear(screen.getByLabelText('Limite do dia, em R$'))
+    await userEvent.type(screen.getByLabelText('Limite do dia, em R$'), 'R$ 1.000,50')
+    await userEvent.click(screen.getByRole('button', { name: 'OK' }))
+
+    expect(limiteValor()?.textContent).toBe('R$\u00a01.000,50')
+    expect(within(document.getElementById('r-lim')?.closest('li') as HTMLElement).getByText('não salvo')).toBeInTheDocument()
+    expect(hojeLinhas()[2]).toBe('Se a perda do dia chegar a R$\u00a01.000,50Encerrado por hoje')
+    // «Ao chegar no limite» is there; «por conta / somando» is not
+    expect(screen.getByRole('group', { name: 'Ao chegar no limite' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'somando as contas de Futuros' })).not.toBeInTheDocument()
+  })
+
+  it('the limit field refuses the other currency’s symbol instead of swapping it', async () => {
+    const linhaLimite = () => document.getElementById('r-lim')?.closest('li') as HTMLElement
+    // Clear (B3): «US$ 750» is not R$ 750
+    const { unmount } = render(<Regras config={configMercados()} selecionado={im.clear} fases={FASES_MERCADOS} />)
+    await userEvent.click(screen.getByRole('button', { name: 'Mudar o limite do dia de Clear' }))
+    const real = screen.getByLabelText('Limite do dia, em R$')
+    await userEvent.clear(real)
+    await userEvent.type(real, 'US$ 750')
+    await userEvent.click(screen.getByRole('button', { name: 'OK' }))
+    expect(screen.getByRole('alert')).toHaveTextContent('Use só números, como 400 ou 400,50.')
+    expect(real).toHaveValue('US$ 750')
+    expect(real).toHaveAttribute('aria-invalid', 'true')
+    expect(limiteValor()?.textContent).toBe('R$\u00a0500')
+    expect(within(linhaLimite()).queryByText('não salvo')).not.toBeInTheDocument()
+    // Its own symbol, in any case, is taken
+    await userEvent.clear(real)
+    await userEvent.type(real, 'r$ 750')
+    await userEvent.click(screen.getByRole('button', { name: 'OK' }))
+    expect(limiteValor()?.textContent).toBe('R$\u00a0750')
+    unmount()
+
+    // FTMO (Forex): «R$ 500» is not US$ 500
+    render(<Regras config={configMercados()} selecionado={im.ftmo} fases={FASES_MERCADOS} />)
+    await userEvent.click(screen.getByRole('button', { name: 'Mudar o limite do dia de FTMO' }))
+    const dolar = screen.getByLabelText('Limite do dia, em US$')
+    await userEvent.clear(dolar)
+    await userEvent.type(dolar, 'R$ 500')
+    await userEvent.keyboard('{Enter}')
+    expect(screen.getByRole('alert')).toHaveTextContent('Use só números, como 400 ou 400,50.')
+    expect(limiteValor()?.textContent).toBe('US$\u00a01.000')
+    expect(within(linhaLimite()).queryByText('não salvo')).not.toBeInTheDocument()
+  })
+
+  it('lerLimite: the account’s symbol (any case) or none; the other currency’s is «invalid»', () => {
+    expect(lerLimite('R$ 1.000,50', 'BRL')).toEqual({ ok: true, cents: 100050 })
+    expect(lerLimite(' r$750', 'BRL')).toEqual({ ok: true, cents: 75000 })
+    expect(lerLimite('1.000', 'BRL')).toEqual({ ok: true, cents: 100000 })
+    expect(lerLimite('US$ 1.000', 'BRL')).toEqual({ ok: false, reason: 'invalid' })
+    expect(lerLimite('us$1000', 'BRL')).toEqual({ ok: false, reason: 'invalid' })
+    expect(lerLimite('US$ 1.000', 'USD')).toEqual({ ok: true, cents: 100000 })
+    expect(lerLimite('us$ 400,50', 'USD')).toEqual({ ok: true, cents: 40050 })
+    expect(lerLimite('R$ 400', 'USD')).toEqual({ ok: false, reason: 'invalid' })
+    // Otherwise as parseUsdText
+    expect(lerLimite('R$ ', 'BRL')).toEqual({ ok: false, reason: 'empty' })
+    expect(lerLimite('US$ 2000000', 'USD')).toEqual({ ok: false, reason: 'too_large' })
+  })
+
+  it('a Phase 1 options account: last in «Regras de», chip «Opções», window and limit only, and its market ⓘ', async () => {
+    const c = comOpcoesAntiga(configMercados())
+    render(<Regras config={c} selecionado="acc-opc" fases={{ ...FASES_MERCADOS, 'acc-opc': 'Pessoal' }} />)
+
+    expect(regrasDe().getAllByRole('button').map((b) => b.textContent)).toEqual([
+      'Padrão Futuros',
+      'Top One #1',
+      'Ebinex',
+      'FTMO',
+      'IBKR',
+      'Binance',
+      'Clear',
+      'Opções antigas',
+    ])
+    expect(regrasDe().getByRole('button', { name: 'Opções antigas' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('heading', { level: 3, name: 'Opções antigas' })).toBeInTheDocument()
+    expect(screen.getByText('Opções · Pessoal')).toHaveClass('hub-chip-dado')
+    expect(regraNomes()).toEqual(['Janela', 'Só operar dentro da sua janela', 'Limite do dia'])
+    expect(screen.queryByText('só nesta conta')).not.toBeInTheDocument()
+
+    const info = screen.getByRole('button', { name: 'Como ler: regras de Opções' })
+    expect(info.closest('.hub-pz-regras-cab')).not.toBeNull()
+    expect(info).toHaveAttribute('aria-controls', 'info-regras-mk')
+    await userEvent.click(info)
+    // In US$, on the account's own day (Brasília midnight)
+    expect(document.getElementById('info-regras-mk')?.textContent).toBe(
+      'Nas contas de Opções, as regras são a janela e o limite do dia, em US$. Bloqueio de dados e regra por estado valem só para Futuros até a Fase 5. O limite zera quando o dia vira, à meia-noite de Brasília; numa conta de mesa, a mesa pode zerar o limite dela em outro horário.',
+    )
+  })
+
+  it('a forex limit in US$: no «só nesta conta» tag and no mode pills, even beside two futures accounts', () => {
+    const c = comApexMercados(configMercados())
+    const { unmount } = render(<Regras config={c} selecionado={im.topOne} fases={FASES_MERCADOS} />)
+    // The futures account beside Apex A gets the pills; FTMO never does
+    expect(screen.getByRole('group', { name: 'Como o limite de Top One #1 conta' })).toBeInTheDocument()
+    unmount()
+
+    render(<Regras config={c} selecionado={im.ftmo} fases={FASES_MERCADOS} />)
+    expect(screen.getByText('Forex · Avaliação')).toBeInTheDocument()
+    expect(limiteValor()?.textContent).toBe('US$\u00a01.000')
+    expect(screen.queryByText('só nesta conta')).not.toBeInTheDocument()
+    expect(screen.queryByRole('group', { name: 'Como o limite de FTMO conta' })).not.toBeInTheDocument()
+    expect(regraNomes()).toEqual(['Janela', 'Só operar dentro da sua janela', 'Limite do dia'])
+    // Thursday 12:00 ET, after the 08:00–10:00 ET window; no data block line
+    expect(hojeLinhas()).toEqual([
+      `08:00–10:00 ET${SEP}sua janelaLiberado`,
+      'No resto do diaFora da sua janela',
+      'Se a perda do dia chegar a US$\u00a01.000Encerrado por hoje',
+    ])
+  })
+
+  it.each([
+    [
+      'FTMO',
+      'Como ler: regras de Forex',
+      'Nas contas de Forex, as regras são a janela e o limite do dia, em US$. Bloqueio de dados e regra por estado valem só para Futuros até a Fase 5. O limite zera quando o dia vira, às 17:00 ET; numa conta de mesa, a mesa pode zerar o limite dela em outro horário.',
+    ],
+    [
+      'IBKR',
+      'Como ler: regras de Ações',
+      'Nas contas de Ações, as regras são a janela e o limite do dia, em US$. Bloqueio de dados e regra por estado valem só para Futuros até a Fase 5. O limite zera quando o dia vira, às 20:00 ET; numa conta de mesa, a mesa pode zerar o limite dela em outro horário.',
+    ],
+    [
+      'Binance',
+      'Como ler: regras de Cripto',
+      'Nas contas de Cripto, as regras são a janela e o limite do dia, em US$. USDT e USDC contam como dólar. Bloqueio de dados e regra por estado valem só para Futuros até a Fase 5. O limite zera quando o dia vira, à meia-noite de Brasília; numa conta de mesa, a mesa pode zerar o limite dela em outro horário.',
+    ],
+    [
+      'Clear',
+      'Como ler: regras da B3',
+      'Nas contas da B3, as regras são a janela e o limite do dia, em R$. Bloqueio de dados e regra por estado valem só para Futuros até a Fase 5. O limite zera quando o dia vira, à meia-noite de Brasília; numa conta de mesa, a mesa pode zerar o limite dela em outro horário.',
+    ],
+  ])('%s: the market’s ⓘ next to the chip', async (label, aria, texto) => {
+    const c = configMercados()
+    const id = c.accounts.find((a) => a.label === label)!.id
+    render(<Regras config={c} selecionado={id} fases={FASES_MERCADOS} />)
+
+    const info = screen.getByRole('button', { name: aria })
+    expect(info.closest('.hub-pz-regras-cab')).not.toBeNull()
+    expect(info).toHaveAttribute('aria-controls', 'info-regras-mk')
+    expect(info).toHaveAttribute('aria-expanded', 'false')
+    expect(document.getElementById('info-regras-mk')).toBeNull()
+    await userEvent.click(info)
+    expect(info).toHaveAttribute('aria-expanded', 'true')
+    expect(document.getElementById('info-regras-mk')?.textContent).toBe(texto)
+    await userEvent.click(info)
+    expect(document.getElementById('info-regras-mk')).toBeNull()
+  })
+
+  it('no market ⓘ for «Padrão Futuros», Futuros or binárias; an open one follows «Regras de»', async () => {
+    render(<Regras config={configMercados()} selecionado={im.binance} fases={FASES_MERCADOS} />)
+    await userEvent.click(screen.getByRole('button', { name: 'Como ler: regras de Cripto' }))
+
+    await userEvent.click(regrasDe().getByRole('button', { name: 'Clear' }))
+    expect(screen.getByRole('button', { name: 'Como ler: regras da B3' })).toHaveAttribute('aria-expanded', 'true')
+    expect(document.getElementById('info-regras-mk')).toHaveTextContent('Nas contas da B3')
+
+    for (const label of ['Padrão Futuros', 'Top One #1', 'Ebinex']) {
+      await userEvent.click(regrasDe().getByRole('button', { name: label }))
+      expect(screen.queryByRole('button', { name: /^Como ler: regras / })).not.toBeInTheDocument()
+      expect(document.getElementById('info-regras-mk')).toBeNull()
+    }
+  })
+
+  it('the ⓘ says when the limit resets on the account’s own clock: a Phase 1 forex account on Brasília midnight', async () => {
+    const c = comDia(configMercados(), im.ftmo, { tz: 'America/Sao_Paulo', startMin: 0 })
+    render(<Regras config={c} selecionado={im.ftmo} fases={FASES_MERCADOS} />)
+    await userEvent.click(screen.getByRole('button', { name: 'Como ler: regras de Forex' }))
+    expect(document.getElementById('info-regras-mk')).toHaveTextContent('O limite zera quando o dia vira, à meia-noite de Brasília;')
+    expect(document.getElementById('info-regras-mk')).not.toHaveTextContent('17:00')
+  })
+
+  it('IBKR, without a version: no window, «Nenhuma versão salva» with its approved text, and «Começar as regras hoje»', () => {
+    render(<Regras config={configMercados()} selecionado={im.ibkr} fases={FASES_MERCADOS} />)
+    expect(screen.getByText('Ações · Pessoal')).toBeInTheDocument()
+    expect(screen.getByText('Sem janela', { selector: '.hub-pz-fraco' })).toBeInTheDocument()
+    expect(screen.getByText(/Sem janela: esta regra não age\./)).toBeInTheDocument()
+    expect(limiteValor()).toHaveTextContent('Sem limite')
+    expect(hojeLinhas()).toEqual(['O dia todoSem janela salva'])
+    expect(screen.getByText('Nenhuma versão salva')).toBeInTheDocument()
+    expect(screen.getByText('Até salvar, as operações ficam em “Histórico importado · só resultado”.')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Começar as regras hoje' })).toBeInTheDocument()
+  })
+
+  it('the rules ⓘ says the other markets have the window and the limit, in their currency', async () => {
+    render(<Regras config={configMercados()} selecionado={im.clear} fases={FASES_MERCADOS} />)
+    await userEvent.click(screen.getByRole('button', { name: 'Como ler: Suas regras' }))
+    const info = document.getElementById('info-regras') as HTMLElement
+    expect(info).toHaveTextContent(
+      'Bloqueio de dados e regra por estado valem só para Futuros até a Fase 5; a regra por estado é uma só para o mercado. Nos outros mercados, as regras são a janela e o limite do dia.',
+    )
+    expect(info).toHaveTextContent('O limite do dia fica na moeda da conta, R$ na B3 e US$ nos outros mercados, e nunca soma contas de mercados diferentes.')
+    expect(info).not.toHaveTextContent('Futuros com binárias')
+  })
+})
+
 describe('Preferencias and the bar', () => {
   it('Tema is instant and «Horários na tela» waits for the rules', async () => {
     const onTema = jest.fn()
@@ -456,6 +912,13 @@ describe('hub-personalizar.css', () => {
     expect(media('max-width: 980px')).toContain('.hub-pz-grade')
     expect(media('max-width: 540px')).toMatch(/\.hub-pz-barra \{\n {4}border-radius: 24px;/)
     expect(media('prefers-reduced-motion: reduce')).toContain('transition: none')
+  })
+
+  it('gives «+ Adicionar conta» under the market cards a 44px target (board `link-44`)', () => {
+    const rule = css.slice(css.indexOf('.hub .hub-pz-link-btn {'), css.indexOf('}', css.indexOf('.hub .hub-pz-link-btn {')))
+    expect(rule).toContain('display: inline-flex;')
+    expect(rule).toContain('align-items: center;')
+    expect(rule).toContain('min-height: 44px;')
   })
 
   it('underlines the links to «Quando você opera»; the one inside a warning stays inline with a 44px hit area', () => {

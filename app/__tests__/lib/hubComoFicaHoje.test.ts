@@ -9,6 +9,9 @@ import { pendingVersions, resolveRules, type ConfigVersion, type RulesConfig, ty
 import { PADRAO_FUTUROS_CONTA, comLimite, comRegraJanela } from '@/lib/hub/rascunho'
 import { aoSalvarConta, aoSalvarPadrao, comoFicaHoje, notaVersao, partesVersao, quandoVersao, type ComoFicaHoje } from '@/lib/hub/comoFicaHoje'
 
+/** « · » with a no-break space on each side (personalizar/copy.ts SEP): it never starts or ends a line */
+const SEP = '\u00a0·\u00a0'
+
 const ids = idsDono()
 
 /** Each line as «left → state · sub», with the tone */
@@ -24,7 +27,7 @@ describe('«Como fica hoje» (contrato §4.7)', () => {
     const r = topOneRules()
     const h = comoFicaHoje(r, et('2026-10-22 12:00'), win(r))
     expect(linhas(h)).toEqual([
-      '10:00–11:00 ET · sua janela → Liberado [mint]',
+      `10:00–11:00 ET${SEP}sua janela → Liberado [mint]`,
       'No resto do dia → Fora da sua janela [amber]',
       'Se a perda do dia chegar a US$\u00a0400 → Encerrado por hoje [red]',
       'Bloqueio de dados → ativo na Fase 5 [muted, leve]',
@@ -38,13 +41,13 @@ describe('«Como fica hoje» (contrato §4.7)', () => {
   it('the owner’s Ebinex', () => {
     const r = ebinexRules()
     const h = comoFicaHoje(r, brt('2026-10-22 12:00'), win(r))
-    expect(linhas(h)).toEqual(['20:00–21:00 Brasília · sua janela → Liberado [mint]', 'No resto do dia → Fora da sua janela [amber]'])
+    expect(linhas(h)).toEqual([`20:00–21:00 Brasília${SEP}sua janela → Liberado [mint]`, 'No resto do dia → Fora da sua janela [amber]'])
     expect(h.sub).toBe('no relógio de Brasília')
   })
 
   it('after 18:00 ET the futures day is already the next one (Friday’s window)', () => {
     const r = topOneRules()
-    expect(linhas(comoFicaHoje(r, et('2026-10-22 19:30'), win(r)))[0]).toBe('10:00–11:00 ET · sua janela → Liberado [mint]')
+    expect(linhas(comoFicaHoje(r, et('2026-10-22 19:30'), win(r)))[0]).toBe(`10:00–11:00 ET${SEP}sua janela → Liberado [mint]`)
     // Friday after 18:00 is Saturday's day: no window
     expect(linhas(comoFicaHoje(r, et('2026-10-23 18:30'), win(r)))[0]).toBe('O dia todo → Fora da sua janela · hoje não é dia da janela [amber]')
   })
@@ -65,7 +68,7 @@ describe('«Como fica hoje» (contrato §4.7)', () => {
   it('rule off with a limit: the window still shows, the rest is «Liberado»', () => {
     const r: Rules = { ...topOneRules(), windowRule: { on: false, outside: 'fora' } }
     expect(linhas(comoFicaHoje(r, et('2026-10-22 12:00'), win(r))).slice(0, 3)).toEqual([
-      '10:00–11:00 ET · sua janela → Liberado [mint]',
+      `10:00–11:00 ET${SEP}sua janela → Liberado [mint]`,
       'No resto do dia → Liberado [mint]',
       'Se a perda do dia chegar a US$\u00a0400 → Encerrado por hoje [red]',
     ])
@@ -102,8 +105,8 @@ describe('«Como fica hoje» (contrato §4.7)', () => {
   it('two windows, from the start of the day', () => {
     const r: Rules = { ...topOneRules(), windows: [ny(840, 900), ny(600, 660)] }
     expect(linhas(comoFicaHoje(r, et('2026-10-22 12:00'), win(r))).slice(0, 3)).toEqual([
-      '10:00–11:00 ET · uma das suas janelas → Liberado [mint]',
-      '14:00–15:00 ET · uma das suas janelas → Liberado [mint]',
+      `10:00–11:00 ET${SEP}uma das suas janelas → Liberado [mint]`,
+      `14:00–15:00 ET${SEP}uma das suas janelas → Liberado [mint]`,
       'No resto do dia → Fora da sua janela [amber]',
     ])
   })
@@ -125,7 +128,7 @@ describe('«Como fica hoje» (contrato §4.7)', () => {
     const c = configDepois()
     const r = resolveRules(PADRAO_FUTUROS_CONTA, c.settings)
     expect(linhas(comoFicaHoje(r, et('2026-10-22 12:00'), c.settings.markets.futures.windows))).toEqual([
-      '10:00–11:00 ET · sua janela → Liberado [mint]',
+      `10:00–11:00 ET${SEP}sua janela → Liberado [mint]`,
       'No resto do dia → Fora da sua janela [amber]',
       'Bloqueio de dados → ativo na Fase 5 [muted, leve]',
     ])
@@ -135,7 +138,7 @@ describe('«Como fica hoje» (contrato §4.7)', () => {
     // Opens on segunda only: at 01:00 on terça the day is still segunda's
     const r: Rules = { ...ebinexRules(), windows: [sp(1320, 120, 0b0000001)] }
     expect(linhas(comoFicaHoje(r, brt('2026-10-20 01:00'), win(r)))).toEqual([
-      '22:00–02:00 Brasília · sua janela → Liberado [mint]',
+      `22:00–02:00 Brasília${SEP}sua janela → Liberado [mint]`,
       'No resto do dia → Fora da sua janela [amber]',
     ])
     expect(r.day).toEqual(BIN_CLOCK)
@@ -162,7 +165,7 @@ const labelOf = (id: string) => (id === ids.topOne ? 'Top One #1' : null)
 describe('version notes (board partesSig, contrato §4.8)', () => {
   it('writes every part of the owner’s rules', () => {
     expect(partesVersao(topOneRules())).toEqual({
-      janela: 'janela 10:00–11:00 ET · seg–sex',
+      janela: `janela 10:00–11:00 ET${SEP}seg–sex`,
       gate: 'só dentro da janela',
       fora: 'fora da janela: “Fora da sua janela”',
       bloq: 'bloqueio 5 min antes e 10 depois',
@@ -171,7 +174,7 @@ describe('version notes (board partesSig, contrato §4.8)', () => {
       cal: 'calendários: EUA',
     })
     expect(partesVersao(ebinexRules())).toEqual({
-      janela: 'janela 20:00–21:00 de Brasília · seg–sex',
+      janela: `janela 20:00–21:00 de Brasília${SEP}seg–sex`,
       gate: 'só dentro da janela',
       fora: 'fora da janela: “Fora da sua janela”',
       lim: 'sem limite',
@@ -179,17 +182,17 @@ describe('version notes (board partesSig, contrato §4.8)', () => {
   })
 
   it('v1: «{janela} · {limite}», or «copiadas de …»', () => {
-    expect(notaVersao([versao(topOneRules(), '2026-10-17')], 0, labelOf)).toBe('janela 10:00–11:00 ET · seg–sex · limite US$\u00a0400 por conta')
-    expect(notaVersao([versao(ebinexRules(), '2026-10-17')], 0, labelOf)).toBe('janela 20:00–21:00 de Brasília · seg–sex · sem limite')
+    expect(notaVersao([versao(topOneRules(), '2026-10-17')], 0, labelOf)).toBe(`janela 10:00–11:00 ET${SEP}seg–sex${SEP}limite US$\u00a0400 por conta`)
+    expect(notaVersao([versao(ebinexRules(), '2026-10-17')], 0, labelOf)).toBe(`janela 20:00–21:00 de Brasília${SEP}seg–sex${SEP}sem limite`)
     expect(notaVersao([versao(topOneRules(), '2026-10-17', { origin: 'copiar', copiedFrom: ids.topOne })], 0, labelOf)).toBe('copiadas de Top One #1')
   })
 
   it('later versions list only what changed', () => {
     const v1 = topOneRules()
     const note = (r: Rules) => notaVersao([versao(v1, '2026-10-17'), versao(r, '2026-10-20')], 1, labelOf)
-    expect(note({ ...v1, windows: [ny(570, 660)] })).toBe('janela 09:30–11:00 ET · seg–sex')
-    expect(note({ ...v1, windows: [ny(570, 660)], windowsFrom: 'account' })).toBe('janela 09:30–11:00 ET · seg–sex (só nesta conta)')
-    expect(note({ ...v1, windows: [ny(600, 660), ny(840, 900)] })).toBe('janela 10:00–11:00 ET · seg–sex; 14:00–15:00 ET · seg–sex')
+    expect(note({ ...v1, windows: [ny(570, 660)] })).toBe(`janela 09:30–11:00 ET${SEP}seg–sex`)
+    expect(note({ ...v1, windows: [ny(570, 660)], windowsFrom: 'account' })).toBe(`janela 09:30–11:00 ET${SEP}seg–sex (só nesta conta)`)
+    expect(note({ ...v1, windows: [ny(600, 660), ny(840, 900)] })).toBe(`janela 10:00–11:00 ET${SEP}seg–sex; 14:00–15:00 ET${SEP}seg–sex`)
     expect(note({ ...v1, windows: [], windowsFrom: null })).toBe('sem janela')
     // The «fora da janela» part exists only while the rule is on
     expect(note({ ...v1, windowRule: { on: false, outside: 'fora' } })).toBe('pode operar fora da janela')
@@ -199,7 +202,7 @@ describe('version notes (board partesSig, contrato §4.8)', () => {
     expect(note({ ...v1, limit: { cents: 40000, mode: 'soma', atLimit: 'avisar' } })).toBe('limite US$\u00a0400 somando as contas de Futuros, só avisa')
     expect(note({ ...v1, limit: null })).toBe('sem limite')
     expect(note({ ...v1, states: { ...v1.states!, alinhadas: 'so_a_favor', em_conflito: 'opero' } })).toBe(
-      'regra por estado: Alinhadas: Só a favor · Em conflito: Opero',
+      `regra por estado: Alinhadas: Só a favor${SEP}Em conflito: Opero`,
     )
     expect(note({ ...v1, block: { ...v1.block!, calendars: ['us', 'eu'] } })).toBe('calendários: EUA e Zona do euro')
     expect(note({ ...v1, block: { ...v1.block!, calendars: [] } })).toBe('calendários: nenhum')
@@ -267,6 +270,53 @@ describe('«Ao salvar …» from pendingVersions', () => {
     expect(aoSalvarConta(pendingVersions(c, c.settings), ids.ebinex, brt('2026-10-22 12:00'))).toBeNull()
     expect(aoSalvarConta(pendingVersions(c, c.settings, { force: [ids.ebinex] }), ids.ebinex, brt('2026-10-22 12:00'))).toBe(
       'Ao salvar: Regras v1 desde 22 out.',
+    )
+  })
+})
+
+describe('the new markets (Fase 2b)', () => {
+  const clear = (): Rules => ({
+    market: 'b3',
+    windows: [sp(600, 660)],
+    windowsFrom: 'market',
+    windowRule: { on: true, outside: 'fora' },
+    block: null,
+    limit: { cents: 50000, mode: 'conta', atLimit: 'encerrar' },
+    states: null,
+    day: { tz: 'America/Sao_Paulo', startMin: 0 },
+  })
+  const ftmo = (): Rules => ({ ...clear(), market: 'forex', windows: [ny(480, 600)], limit: { cents: 100000, mode: 'conta', atLimit: 'avisar' }, day: { tz: 'America/New_York', startMin: 1020 } })
+
+  it('«Se a perda do dia chegar a R$ 500» on B3; no block line, no «somando»', () => {
+    const r = clear()
+    const h = comoFicaHoje(r, brt('2026-10-22 12:00'), win(r))
+    expect(linhas(h)).toEqual([
+      `10:00–11:00 Brasília${SEP}sua janela → Liberado [mint]`,
+      'No resto do dia → Fora da sua janela [amber]',
+      'Se a perda do dia chegar a R$\u00a0500 → Encerrado por hoje [red]',
+    ])
+    expect(h.sub).toBe('no relógio de Brasília')
+    // «somando» is futures only, even on a value the database would refuse
+    const soma = comoFicaHoje({ ...r, limit: { ...r.limit!, mode: 'soma' } }, brt('2026-10-22 12:00'), win(r))
+    expect(soma.linhas[2].esquerda.map((t) => t.t)).toEqual(['Se a perda do dia chegar a ', 'R$\u00a0500'])
+  })
+
+  it('writes the notes of a forex or B3 version: window and limit only, money in the market’s currency', () => {
+    expect(partesVersao(clear())).toEqual({
+      janela: `janela 10:00–11:00 de Brasília${SEP}seg–sex`,
+      gate: 'só dentro da janela',
+      fora: 'fora da janela: “Fora da sua janela”',
+      lim: 'limite R$\u00a0500',
+    })
+    expect(partesVersao(ftmo())).toEqual({
+      janela: `janela 08:00–10:00 ET${SEP}seg–sex`,
+      gate: 'só dentro da janela',
+      fora: 'fora da janela: “Fora da sua janela”',
+      lim: 'limite US$\u00a01.000, só avisa',
+    })
+    expect(notaVersao([versao(clear(), '2026-10-17')], 0, labelOf)).toBe(`janela 10:00–11:00 de Brasília${SEP}seg–sex${SEP}limite R$\u00a0500`)
+    expect(notaVersao([versao(clear(), '2026-10-17'), versao({ ...clear(), limit: { cents: 75050, mode: 'conta', atLimit: 'encerrar' } }, '2026-10-18')], 1, labelOf)).toBe(
+      'limite R$\u00a0750,50',
     )
   })
 })

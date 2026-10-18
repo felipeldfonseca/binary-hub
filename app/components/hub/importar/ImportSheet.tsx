@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { FileText } from 'lucide-react'
 import { buildImportArgs, previewArgs, readImportFile, type ReadImportFileResult } from '@/lib/domain/import'
+import { MARKET_SPEC, currencyOf } from '@/lib/domain/markets'
 import { FIRM_MAX, LABEL_MAX, PLATFORM_UNKNOWN, labelTaken, parseSize, zoneKeyOf, type TradingAccount } from '@/lib/hub/contas'
 import {
   HubDataError,
@@ -26,6 +27,7 @@ import {
   desdeDaNovaConta,
   linhaAntesDasRegras,
   linhaImportadas,
+  moedaEViradaDoDia,
   novaContaNaConfig,
   outrasContasComVersao,
   regrasDaNovaConta,
@@ -232,6 +234,15 @@ export default function ImportSheet({ mode, accountId, onClose }: { mode: SheetM
   const parsed = parsedOf(flow.file)
   const account = view(flow.accountId)
   const label = account?.label ?? ''
+  /**
+   * The account a file goes to: the one in context, unless its market has no file reader (Fase 2b,
+   * Forex, Ações, Cripto, B3), whose files the sheet never takes: it then opens as «Escolha o
+   * arquivo» and asks for the account after reading the file
+   */
+  const fileTarget = (id: string | null): TradingAccount | null => {
+    const a = view(id)
+    return a && MARKET_SPEC[a.market].reader ? a : null
+  }
 
   /** Moves to a step; `push` keeps the current one for "Voltar". */
   const move = useCallback((passo: Passo, patch: Partial<Flow> = {}, push = true) => {
@@ -309,7 +320,7 @@ export default function ImportSheet({ mode, accountId, onClose }: { mode: SheetM
       move('erro', { file: result })
       return
     }
-    const context = view(flow.accountId)
+    const context = fileTarget(flow.accountId)
     if (context && context.market === p.market) {
       await afterAccount(context, result, { file: result })
       return
@@ -377,16 +388,17 @@ export default function ImportSheet({ mode, accountId, onClose }: { mode: SheetM
     // What the rules block shows as «Criar» is pressed: the locked form keeps showing it
     const rulesAtCreation = config && rules ? { regras: rules, desde: desdeDaNovaConta(config, rules, now) } : null
     try {
-      const futures = formMarket === 'futures'
+      // Fase, Mesa and Tamanho wherever the market has firms; binaries are «Pessoal»
+      const firms = hasFirms(formMarket)
       const created = await createAccount(db, userId, {
         market: formMarket,
         label: form.label.trim().slice(0, LABEL_MAX),
         platform: parsed ? parsed.platform : form.platform === PLATFORM_UNKNOWN ? null : form.platform,
         // Chosen in i2, or the file's firm unless the owner took it out in step b
-        firm: hasFirms(formMarket) ? form.firm.trim().slice(0, FIRM_MAX) || null : null,
+        firm: firms ? form.firm.trim().slice(0, FIRM_MAX) || null : null,
         external_ref: form.ref.trim() || null,
-        phase: futures ? form.phase : 'pessoal',
-        size: futures && sizeValue !== 'invalid' ? sizeValue : null,
+        phase: firms ? form.phase : 'pessoal',
+        size: firms && sizeValue !== 'invalid' ? sizeValue : null,
         is_primary: active.length === 0,
       })
       refresh()
@@ -593,7 +605,8 @@ export default function ImportSheet({ mode, accountId, onClose }: { mode: SheetM
 
   switch (flow.passo) {
     case 'solte': {
-      const title = flow.fileAgain ? SOLTE.titleAgain : account ? SOLTE.titleFor(account.label) : SOLTE.titleNone
+      const target = fileTarget(flow.accountId)
+      const title = flow.fileAgain ? SOLTE.titleAgain : target ? SOLTE.titleFor(target.label) : SOLTE.titleNone
       body = <PassoSolte headingRef={headingRef} title={title} reading={reading} onFile={(file) => void onFile(file)} />
       break
     }
@@ -643,23 +656,29 @@ export default function ImportSheet({ mode, accountId, onClose }: { mode: SheetM
       primary = { label: FOLHA.next, run: () => move('b'), blocked: form.platform ? undefined : PASSO_I2.hint }
       break
     case 'b': {
-      const futures = formMarket === 'futures'
-      const firm = hasFirms(formMarket) ? form.firm.trim() : ''
-      let roLabel: string = futures ? PASSO_B.roPlatform : PASSO_B.roBroker
+      // Fase (required), Mesa and Tamanho wherever the market has firms (lib/hub/mesas)
+      const firms = hasFirms(formMarket)
+      const firm = firms ? form.firm.trim() : ''
+      let roLabel: string = PASSO_B.roLabel(formMarket)
       let roValue = ''
       if (parsed) {
         if (parsed.platform === 'topone') {
           roLabel = firm ? PASSO_B.roFirmFile : PASSO_B.roFile
           roValue = firm ? firmAndPlatform(firm, 'topone') : PASSO_B.fileTopOne
         } else {
-          roLabel = PASSO_B.roBroker
+          roLabel = PASSO_B.roLabel(parsed.market)
           roValue = PASSO_B.fileEbinex
         }
       } else {
         if (firm) roLabel = PASSO_B.roFirmPlatform
         roValue = form.platform ? firmAndPlatform(firm, form.platform) : [firm, PASSO_B.platformTbd].filter(Boolean).join(' · ')
       }
-      const sizeInvalid = futures && sizeValue === 'invalid'
+      // A market without a file reader shows its money and day turn, fixed in the account (Fase 2b)
+      const moedaDia =
+        !parsed && !MARKET_SPEC[formMarket].reader
+          ? { valor: moedaEViradaDoDia(formMarket, now), info: PASSO_B.moedaDiaInfo(formMarket, !!firm) }
+          : null
+      const sizeInvalid = firms && sizeValue === 'invalid'
       const locked = flow.createdFromForm && !!flow.created
       // Locked, the block shows what it showed at creation; «desde» is v1's own day once saved (none
       // when it could not be saved), and the prediction while it saves
@@ -678,13 +697,13 @@ export default function ImportSheet({ mode, accountId, onClose }: { mode: SheetM
           : null
       const outras = !locked && config && rules ? outrasContasComVersao(config, rules, now) : null
       const name = form.label.trim()
-      // What «Criar» waits for first: a nickname and, for futures, the phase
-      const basics = !name ? PASSO_B.needLabel : futures && !form.phase ? PASSO_B.needPhase : undefined
+      // What «Criar» waits for first: a nickname and, wherever the market has firms, the phase
+      const basics = !name ? PASSO_B.needLabel : firms && !form.phase ? PASSO_B.needPhase : undefined
       // Then the rules block: the saved rules, and a limit or a window that can be saved
       let rulesBlocked: string | undefined
       let rulesBlockedBy: string | undefined
       if (rulesLoad === 'carregando') rulesBlockedBy = 'regras-carga'
-      else if (rules?.limiteErro) rulesBlocked = REGRAS.limiteErro[rules.limiteErro]
+      else if (rules?.limiteErro) rulesBlocked = REGRAS.limiteErro(rules.limiteErro, currencyOf(formMarket))
       else if (rules?.janelaErro) {
         if (form.rules.aberto) rulesBlockedBy = 'j-erro'
         else rulesBlocked = ERRO_JANELA[rules.janelaErro]
@@ -701,6 +720,7 @@ export default function ImportSheet({ mode, accountId, onClose }: { mode: SheetM
           sizeInvalid={sizeInvalid}
           locked={locked}
           firmRemovable={!!parsed}
+          moedaDia={moedaDia}
           regras={
             <RegrasDaConta
               carga={blockLoad}
@@ -798,7 +818,7 @@ export default function ImportSheet({ mode, accountId, onClose }: { mode: SheetM
         <PassoMercadoErrado
           headingRef={headingRef}
           fileMarket={parsed.market}
-          account={{ label: from.label, market: from.market === 'futures' ? 'futures' : 'binary' }}
+          account={{ label: from.label, market: from.market }}
           targets={targets}
           busy={busy}
           onImportInto={(id) => {
@@ -848,8 +868,21 @@ export default function ImportSheet({ mode, accountId, onClose }: { mode: SheetM
       break
     case 'fimConta': {
       const created = flow.created
+      const title = FIM_CONTA.title(created?.label ?? label)
+      if (created && !MARKET_SPEC[created.market].reader) {
+        // No file reader for this market yet: no «Importar histórico»; where its trades will come from
+        body = (
+          <PassoFim
+            headingRef={headingRef}
+            title={title}
+            lines={[FIM_CONTA.semLeitor, FIM_CONTA.semLeitorArquivo(created.market, created.platform)]}
+          />
+        )
+        primary = closeAction
+        break
+      }
       const iq = created?.platform === 'iq'
-      body = <PassoFim headingRef={headingRef} title={FIM_CONTA.title(created?.label ?? label)} lines={[iq ? FIM_CONTA.textIq : FIM_CONTA.text]} />
+      body = <PassoFim headingRef={headingRef} title={title} lines={[iq ? FIM_CONTA.textIq : FIM_CONTA.text]} />
       primary = iq ? closeAction : { label: FIM_CONTA.importHistory, run: () => move('solte', { accountId: created?.id ?? flow.accountId }) }
       break
     }

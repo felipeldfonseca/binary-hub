@@ -5,20 +5,20 @@
  * count of the file's rows before the account's rules started. Pure: time is an input, the words
  * come from components/hub/contas/copyRegras.ts.
  */
-import { MON_TO_FRI, formatHhMm } from '@/lib/domain/tempo'
+import { MON_TO_FRI, formatHhMm, localToUtc, utcToLocal, type DayClock } from '@/lib/domain/tempo'
 import { previewInstant, type ImportRow } from '@/lib/domain/import'
-import type { LimitMode, Market, Rules } from '@/lib/domain/gate'
+import { MARKET_SPEC, currencyOf, type AccountMarket, type LimitMode, type Rules } from '@/lib/domain/gate'
 import { ANTES_DAS_REGRAS, LINHA_CONTA, REGRAS_CONTA, RELOGIO_NOME } from '@/components/hub/contas/copyRegras'
-import { MARKET_DAY } from './contas'
-import { formatDiaMes } from './formato'
+import { PASSO_B } from '@/components/hub/contas/copy'
+import { SIMBOLO_MOEDA, formatDiaMes } from './formato'
 import { JANELA_SUGERIDA, faixaJanela } from './janelas'
 import { dinheiroCompacto, sufixoRelogio } from './posso'
+import { lerLimite } from './personalizarRegras'
 import {
   activeAccounts,
   copyAccountSettings,
   effectiveDayAt,
   emptyAccountSettings,
-  parseUsdText,
   pendingVersions,
   resolveRules,
   windowError,
@@ -53,9 +53,9 @@ export interface RegrasForm {
   propria?: WindowSetting
   /** The market has no window: whether the form sets one («+ Definir janela») */
   definir?: boolean
-  /** «Limite do dia, US$» as typed */
+  /** «Limite do dia, US$» (R$ on B3) as typed */
   limite?: string
-  /** «por conta» | «somando as contas de Futuros» */
+  /** «por conta» | «somando as contas de Futuros» (only where MARKET_SPEC[m].rules.soma) */
   modo?: LimitMode
   /** «Mudar» is open */
   aberto: boolean
@@ -83,7 +83,7 @@ export function textoLimite(cents: number): string {
 }
 
 /** The accounts a new account of `market` can copy its rules from: active ones of the same market, in list order */
-export function opcoesCopiar(config: Pick<RulesConfig, 'accounts'>, market: Market): { id: string; label: string }[] {
+export function opcoesCopiar(config: Pick<RulesConfig, 'accounts'>, market: AccountMarket): { id: string; label: string }[] {
   return activeAccounts(config)
     .filter((a) => a.market === market)
     .map((a) => ({ id: a.id, label: a.label }))
@@ -91,7 +91,7 @@ export function opcoesCopiar(config: Pick<RulesConfig, 'accounts'>, market: Mark
 
 /** What the rules block of step b resolves to */
 export interface RegrasDaNovaConta {
-  market: Market
+  market: AccountMarket
   /** «Copiar regras de» options (without «Não copiar») */
   opcoes: { id: string; label: string }[]
   /** The source account; null = «Não copiar» (or nothing to copy) */
@@ -108,7 +108,7 @@ export interface RegrasDaNovaConta {
   /** A typed limit that cannot be saved (empty is no limit, not an error) */
   limiteErro: Exclude<Extract<UsdTextResult, { ok: false }>['reason'], 'empty'> | null
   modo: LimitMode
-  /** The mode pills: futures, with a second futures account once this one exists */
+  /** The mode pills: a market that sums (futures), with a second account of it once this one exists */
   temModo: boolean
   /** The new account's settings, for v1 (buildNewAccountPayload) */
   settings: AccountSettings
@@ -119,7 +119,7 @@ export interface RegrasDaNovaConta {
 }
 
 /** The form against the saved rules (rules_config): defaults from the copy source, then the owner's changes */
-export function regrasDaNovaConta(config: Pick<RulesConfig, 'accounts' | 'settings'>, market: Market, form: RegrasForm): RegrasDaNovaConta {
+export function regrasDaNovaConta(config: Pick<RulesConfig, 'accounts' | 'settings'>, market: AccountMarket, form: RegrasForm): RegrasDaNovaConta {
   const opcoes = opcoesCopiar(config, market)
   const copiar =
     form.copiar === NAO_COPIAR ? null : form.copiar && opcoes.some((o) => o.id === form.copiar) ? form.copiar : (opcoes[0]?.id ?? null)
@@ -140,10 +140,13 @@ export function regrasDaNovaConta(config: Pick<RulesConfig, 'accounts' | 'settin
   }
 
   const limiteTexto = form.limite ?? (fonte.limit ? textoLimite(fonte.limit.cents) : '')
-  const limite = parseUsdText(limiteTexto)
+  // In the market's money, as Personalizar reads it: «US$ 400» typed on a B3 account (or «R$ 400»
+  // on a dollar one) is refused, never saved as R$ 400 (US$ 400)
+  const limite = lerLimite(limiteTexto, currencyOf(market))
   const limiteErro = limite.ok || limite.reason === 'empty' ? null : limite.reason
-  const fut = market === 'futures'
-  const modo: LimitMode = fut ? (form.modo ?? fonte.limit?.mode ?? 'conta') : 'conta'
+  // «por conta / somando» only where the market sums its accounts (Futuros)
+  const soma = MARKET_SPEC[market].rules.soma
+  const modo: LimitMode = soma ? (form.modo ?? fonte.limit?.mode ?? 'conta') : 'conta'
 
   const settings: AccountSettings = {
     ...fonte,
@@ -164,7 +167,7 @@ export function regrasDaNovaConta(config: Pick<RulesConfig, 'accounts' | 'settin
     limite,
     limiteErro,
     modo,
-    temModo: fut && opcoes.length > 0,
+    temModo: soma && opcoes.length > 0,
     settings,
     marketWindows: !temJanelaMercado && janela ? [janela] : undefined,
     bloqueado: !!janelaErro || !!limiteErro,
@@ -179,14 +182,15 @@ export function faixaResumo(w: WindowSetting): string {
     : faixaJanela(w.startMin, w.endMin)
 }
 
-/** The limit part of the summary line */
+/** The limit part of the summary line, in the market's currency («US$ 400 por conta», «R$ 400») */
 function limiteResumo(r: RegrasDaNovaConta, form: RegrasForm): string {
-  const sufixo = r.market === 'futures' ? (r.modo === 'soma' ? REGRAS_CONTA.somando : REGRAS_CONTA.porConta) : ''
-  if (r.limite.ok) return dinheiroCompacto(r.limite.cents) + sufixo
+  const sufixo = MARKET_SPEC[r.market].rules.soma ? (r.modo === 'soma' ? REGRAS_CONTA.somando : REGRAS_CONTA.porConta) : ''
+  const moeda = currencyOf(r.market)
+  if (r.limite.ok) return dinheiroCompacto(r.limite.cents, moeda) + sufixo
   const texto = r.limiteTexto.trim()
   // Board: what was typed, even before it is valid (the creation button says what is wrong); the
-  // non-breaking space keeps «US$» with the amount, as dinheiroCompacto does
-  if (texto) return `US$ ${texto}${sufixo}`
+  // non-breaking space keeps the symbol with the amount, as dinheiroCompacto does
+  if (texto) return `${SIMBOLO_MOEDA[moeda]}\u00a0${texto}${sufixo}`
   return r.copiar && form.limite === undefined ? REGRAS_CONTA.semLimite : REGRAS_CONTA.definir
 }
 
@@ -252,8 +256,9 @@ export function regrasResolvidas(config: Pick<RulesConfig, 'settings'>, r: Regra
       : config.settings.markets,
     accounts: { ...config.settings.accounts, [NOVA]: r.settings },
   }
-  const day = MARKET_DAY[r.market]
-  return resolveRules({ id: NOVA, market: r.market, day: { tz: day.day_tz, startMin: day.day_start_min } }, s)
+  // An account not created yet: the market's day clock (the database's insert trigger sets the same)
+  const day = MARKET_SPEC[r.market].day
+  return resolveRules({ id: NOVA, market: r.market, day: { tz: day.tz, startMin: day.startMin } }, s)
 }
 
 /**
@@ -286,6 +291,36 @@ export function outrasContasComVersao(config: RulesConfig, r: RegrasDaNovaConta,
     formatDiaMes(effectiveDayAt(now, outras[0].rules)),
     outras.map((p) => ativas.get(p.accountId) as string),
   )
+}
+
+// ---------------------------------------------------------------------------------------------
+// Step b: «Moeda e virada do dia» of a market without a file reader (Fase 2b)
+// ---------------------------------------------------------------------------------------------
+
+const BRASILIA = 'America/Sao_Paulo'
+
+/**
+ * When a day clock's turn falls in Brasília today, at today's offsets: 17:00 ET → '18:00' in
+ * October, '19:00' after the US clocks change on 1 Nov. «Today» is the date on the day clock at
+ * `now`. Null when the day already turns on Brasília's clock.
+ */
+export function viradaEmBrasilia(day: DayClock, now: Date): string | null {
+  if (day.tz === BRASILIA) return null
+  const hoje = utcToLocal(now, day.tz)
+  const virada = localToUtc(
+    { year: hoje.year, month: hoje.month, day: hoje.day, hour: Math.floor(day.startMin / 60), minute: day.startMin % 60 },
+    day.tz,
+  )
+  return formatHhMm(utcToLocal(virada, BRASILIA).minuteOfDay)
+}
+
+/**
+ * The «Moeda e virada do dia» row of a new account (board `B.moedaDia`): «US$ · o dia vira às 17:00
+ * ET (18:00 em Brasília hoje)», «R$ · o dia vira à meia-noite de Brasília». An account not created
+ * yet, so the market's day clock (the database's insert trigger sets the same).
+ */
+export function moedaEViradaDoDia(market: AccountMarket, now: Date): string {
+  return PASSO_B.moedaDiaValor(market, viradaEmBrasilia(MARKET_SPEC[market].day, now))
 }
 
 // ---------------------------------------------------------------------------------------------

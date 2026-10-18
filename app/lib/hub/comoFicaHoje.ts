@@ -8,14 +8,17 @@
  * occurrence it is the day the occurrence opened. Windows open «today» when their opening falls on
  * that trading day (as gate_eval counts them). Nothing checked is never «Liberado»: «Sem janela
  * salva» / «Sem regra ativa», as the «Posso operar hoje?» card says.
+ *
+ * Money is in the currency of the rules' market (R$ on B3, US$ elsewhere); the data block, the
+ * state rule, the calendars and «somando» appear only where the market has them (MARKET_SPEC).
  */
 import { tradingDayOn, windowOccurrences, addDays } from '@/lib/domain/tempo';
-import { STATE_NAMES, type Rules, type CalendarCode } from '@/lib/domain/gate';
+import { MARKET_SPEC, STATE_NAMES, currencyOf, type Rules, type CalendarCode } from '@/lib/domain/gate';
 import { dinheiroCompacto, type Tom } from './posso';
 import { formatDiaMes } from './formato';
 import { effectiveDayAt, type ConfigVersion, type PendingVersion, type WindowSetting } from './regras';
 import { faixaJanela, resumoDias } from './janelas';
-import { ATIVO_NA_FASE_5, CALENDARIO_NOME, ESCOLHA_NOME, ESTADO_NOME, HOJE, NOTA, RELOGIO, VERSAO } from '@/components/hub/personalizar/copy';
+import { ATIVO_NA_FASE_5, CALENDARIO_NOME, ESCOLHA_NOME, ESTADO_NOME, HOJE, NOTA, RELOGIO, SEP, VERSAO } from '@/components/hub/personalizar/copy';
 
 export interface Trecho {
   t: string;
@@ -93,8 +96,8 @@ export function comoFicaHoje(rules: Rules, now: Date, edited: readonly WindowSet
     linhas.push({
       esquerda: [
         { t: HOJE.sePerda },
-        { t: dinheiroCompacto(rules.limit.cents), mono: true },
-        ...(rules.limit.mode === 'soma' && rules.market === 'futures' ? [{ t: HOJE.somandoFuturos }] : []),
+        { t: dinheiroCompacto(rules.limit.cents, currencyOf(rules.market)), mono: true },
+        ...(rules.limit.mode === 'soma' && MARKET_SPEC[rules.market].rules.soma ? [{ t: HOJE.somandoFuturos }] : []),
       ],
       estado: avisar ? HOJE.liberado : HOJE.encerrado,
       tom: avisar ? 'neutral' : 'red',
@@ -114,43 +117,42 @@ export function comoFicaHoje(rules: Rules, now: Date, edited: readonly WindowSet
 // Version notes (board partesSig), computed from consecutive rules
 // ---------------------------------------------------------------------------------------------
 
-/** «Alinhadas: Só a favor · Em conflito: Opero», or '' with no choice */
+/** «Alinhadas: Só a favor · Em conflito: Opero» (« · » is SEP, here and in the notes below), or '' with no choice */
 export function resumoEstados(states: Partial<Record<string, string | null>> | null): string {
   if (!states) return '';
   return STATE_NAMES.filter((k) => states[k])
     .map((k) => `${ESTADO_NOME[k]}: ${ESCOLHA_NOME[states[k] as keyof typeof ESCOLHA_NOME]}`)
-    .join(' · ');
+    .join(SEP);
 }
 
 /** «10:00–11:00 ET · seg–sex; 14:00–15:00 ET · seg–sex» */
 export function descricaoJanelas(windows: readonly WindowSetting[]): string {
-  return windows.map((w) => `${faixaJanela(w.startMin, w.endMin)} ${RELOGIO[w.tz].de} · ${resumoDias(w.weekdays)}`).join('; ');
+  return windows.map((w) => `${faixaJanela(w.startMin, w.endMin)} ${RELOGIO[w.tz].de}${SEP}${resumoDias(w.weekdays)}`).join('; ');
 }
 
 type Parte = 'janela' | 'gate' | 'fora' | 'bloq' | 'lim' | 'est' | 'cal';
 
 /** Each part of the rules as the version list writes it; keys missing when they do not apply */
 export function partesVersao(r: Rules): Partial<Record<Parte, string>> {
-  const fut = r.market === 'futures';
+  const caps = MARKET_SPEC[r.market].rules;
   const o: Partial<Record<Parte, string>> = {};
   o.janela = r.windows.length
     ? NOTA.janela(descricaoJanelas(r.windows as WindowSetting[]) + (r.windowsFrom === 'account' ? NOTA.soNestaConta : ''))
     : NOTA.semJanela;
   o.gate = r.windowRule.on ? NOTA.soDentro : NOTA.podeFora;
   if (r.windowRule.on) o.fora = r.windowRule.outside === 'aviso' ? NOTA.foraAviso : NOTA.foraFora;
-  if (fut) {
+  if (caps.block) {
     const b = r.block;
     o.bloq = b && b.on && b.beforeMin + b.afterMin > 0 ? NOTA.bloqueio(b.beforeMin, b.afterMin) : NOTA.semBloqueio;
   }
   o.lim = r.limit
-    ? NOTA.limite(dinheiroCompacto(r.limit.cents)) +
-      (fut ? (r.limit.mode === 'soma' ? NOTA.somando : NOTA.porConta) : '') +
+    ? NOTA.limite(dinheiroCompacto(r.limit.cents, currencyOf(r.market))) +
+      (caps.soma ? (r.limit.mode === 'soma' ? NOTA.somando : NOTA.porConta) : '') +
       (r.limit.atLimit === 'avisar' ? NOTA.soAvisa : '')
     : NOTA.semLimite;
-  if (fut) {
-    o.est = NOTA.estado(resumoEstados(r.states) || NOTA.nenhumaEscolha);
-    o.cal = NOTA.calendarios((r.block?.calendars ?? []).map((c: CalendarCode) => CALENDARIO_NOME[c]));
-  }
+  if (caps.states) o.est = NOTA.estado(resumoEstados(r.states) || NOTA.nenhumaEscolha);
+  // The calendars live in the data block
+  if (caps.block) o.cal = NOTA.calendarios((r.block?.calendars ?? []).map((c: CalendarCode) => CALENDARIO_NOME[c]));
   return o;
 }
 
@@ -164,11 +166,11 @@ export function notaVersao(versions: readonly ConfigVersion[], i: number, labelO
     const from = v.origin === 'copiar' && v.copiedFrom ? labelOf(v.copiedFrom) : null;
     if (from) return NOTA.copiadas(from);
     const p = partesVersao(v.rules);
-    return [p.janela, p.lim].filter(Boolean).join(' · ');
+    return [p.janela, p.lim].filter(Boolean).join(SEP);
   }
   const a = partesVersao(versions[i - 1].rules);
   const b = partesVersao(v.rules);
-  return (Object.keys(b) as Parte[]).filter((k) => a[k] !== b[k]).map((k) => b[k] as string).join(' · ');
+  return (Object.keys(b) as Parte[]).filter((k) => a[k] !== b[k]).map((k) => b[k] as string).join(SEP);
 }
 
 /** '14' or '1º' (the day of a range's start, the month comes at its end) */

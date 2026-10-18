@@ -1,9 +1,10 @@
 'use client'
 
 import { formatHhMm, parseHhMm } from '@/lib/domain/tempo'
-import type { LimitMode, WindowTz } from '@/lib/domain/gate'
+import { currencyOf, type LimitMode, type WindowTz } from '@/lib/domain/gate'
+import { SIMBOLO_MOEDA } from '@/lib/hub/formato'
 import { windowError, type WindowSetting } from '@/lib/hub/regras'
-import { WINDOW_CLOCKS, captionJanela, viraODia } from '@/lib/hub/janelas'
+import { WINDOW_CLOCKS, legendaJanela, viraODia } from '@/lib/hub/janelas'
 import {
   NAO_COPIAR,
   comCopiar,
@@ -74,6 +75,10 @@ export default function RegrasDaConta({ carga, regras: r, form, onForm, label, n
   const nota = notaCopiar(r)
   // The limit's error is said by the sheet's hint, or here when the hint says something else first
   const limiteErroAqui = !!r.limiteErro && !limiteErroId
+  // The limit is in the market's money: «Limite do dia, R$» on B3 (Fase 2b)
+  const moeda = currencyOf(r.market)
+  // The market's suggested window, while the form sets it: crypto says its weekend is already marked
+  const diasNota = !pergunta && r.janela ? (REGRAS_CONTA.diasNota[r.market] ?? null) : null
 
   return (
     <div className="hub-rc">
@@ -155,6 +160,7 @@ export default function RegrasDaConta({ carga, regras: r, form, onForm, label, n
               relogioFixo={daConta}
               rotuloInicio={daConta ? REGRAS_CONTA.inicioAria(label.trim(), r.janela.tz) : REGRAS_CONTA.inicioMercadoAria(r.market, r.janela.tz)}
               rotuloFim={daConta ? REGRAS_CONTA.fimAria(label.trim(), r.janela.tz) : REGRAS_CONTA.fimMercadoAria(r.market, r.janela.tz)}
+              diasNota={diasNota}
               onChange={mudarJanela}
             />
           )}
@@ -176,7 +182,7 @@ export default function RegrasDaConta({ carga, regras: r, form, onForm, label, n
 
           <div className="hub-campo hub-rc-limite">
             <label htmlFor="f-lim" className="hub-rot-campo">
-              {REGRAS_CONTA.limite}
+              {REGRAS_CONTA.limite(SIMBOLO_MOEDA[moeda])}
             </label>
             <input
               id="f-lim"
@@ -191,7 +197,7 @@ export default function RegrasDaConta({ carga, regras: r, form, onForm, label, n
             />
             {limiteErroAqui && r.limiteErro && (
               <p id="f-lim-erro" className="hub-erro">
-                {REGRAS.limiteErro[r.limiteErro]}
+                {REGRAS.limiteErro(r.limiteErro, moeda)}
               </p>
             )}
           </div>
@@ -225,13 +231,19 @@ export default function RegrasDaConta({ carga, regras: r, form, onForm, label, n
   )
 }
 
-/** `das [HH:MM] às [HH:MM] ET` (or the clock select), the caption on the other clock, the days and the error */
+/**
+ * `das [HH:MM] às [HH:MM] ET` (or the clock select), the caption on the other clock, the days, their
+ * note and the error. The caption is the board's (`B.janCap`): the hours on the other clock only, and
+ * in the 14 days before a clock change the new ones too («; a partir de 1º nov: …»); the days are
+ * the pills right under it. Personalizar's caption (captionJanela) also names the days.
+ */
 function CamposJanela({
   w,
   now,
   relogioFixo,
   rotuloInicio,
   rotuloFim,
+  diasNota = null,
   onChange,
 }: {
   w: WindowSetting
@@ -240,10 +252,15 @@ function CamposJanela({
   relogioFixo: boolean
   rotuloInicio: string
   rotuloFim: string
+  /** Under the days (board `B.diasNota`): «Cripto abre todos os dias: …» */
+  diasNota?: string | null
   onChange: (patch: Partial<WindowSetting>) => void
 }) {
   const erro = windowError(w)
-  const desc = erro ? 'j-cap j-erro' : 'j-cap'
+  // Empty when start = end: the error says what to do
+  const legenda = legendaJanela(w, now)
+  const desc = [legenda ? 'j-cap' : '', erro ? 'j-erro' : ''].filter(Boolean).join(' ') || undefined
+  const diasDesc = [diasNota ? 'j-dias-nota' : '', erro === 'no_days' ? 'j-erro' : ''].filter(Boolean).join(' ')
   // An unparsable value is ignored: the field keeps the last valid one (as in Personalizar)
   const ler = (key: 'startMin' | 'endMin') => (event: React.ChangeEvent<HTMLInputElement>) => {
     const v = parseHhMm(event.target.value)
@@ -305,10 +322,12 @@ function CamposJanela({
         )}
         {viraODia(w) && <span className="hub-nota">{JANELAS.doDiaSeguinte}</span>}
       </div>
-      <p id="j-cap" className="hub-nota">
-        {captionJanela(w, now)}
-      </p>
-      <div role="group" aria-label={REGRAS_CONTA.diasAria} aria-describedby={erro === 'no_days' ? 'j-erro' : undefined} className="hub-pills">
+      {legenda && (
+        <p id="j-cap" className="hub-nota">
+          {legenda}
+        </p>
+      )}
+      <div role="group" aria-label={REGRAS_CONTA.diasAria} aria-describedby={diasDesc || undefined} className="hub-pills">
         {DIAS_CURTOS.map((d, i) => (
           <button
             key={d}
@@ -322,6 +341,11 @@ function CamposJanela({
           </button>
         ))}
       </div>
+      {diasNota && (
+        <p id="j-dias-nota" className="hub-nota">
+          {diasNota}
+        </p>
+      )}
       {erro && (
         <p id="j-erro" className="hub-erro" role="alert">
           {ERRO_JANELA[erro]}

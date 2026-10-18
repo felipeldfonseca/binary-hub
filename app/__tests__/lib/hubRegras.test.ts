@@ -2,13 +2,15 @@
  * @jest-environment node
  */
 import { MON_TO_FRI } from '@/lib/domain';
-import { toResolvedJson } from '@/lib/domain/gate';
+import { ACCOUNT_MARKETS, MARKET_SPEC, toResolvedJson } from '@/lib/domain/gate';
 import { formatDiaMes } from '@/lib/hub/formato';
 import { possoLinha, possoTexto } from '@/lib/hub/posso';
 import {
   InvalidSettingsError,
   RulesAnswerError,
   accountRulesJson,
+  accountSettingsFromJson,
+  limitJson,
   activeAccounts,
   buildNewAccountPayload,
   buildSavePayload,
@@ -34,7 +36,8 @@ import {
   withAccountRule,
   type RulesSettings,
 } from '@/lib/hub/regras';
-import { agora, configAntes, configDepois, idsDono, regrasJson, saveDono } from '@/testing/regras';
+import { agora, agoraMercados, configAntes, configDepois, configMercados, idsDono, idsMercados, regrasJson, saveDono } from '@/testing/regras';
+import { rascunhoSujo, iniciarRascunho } from '@/lib/hub/rascunho';
 
 const clone = <T,>(x: T): T => JSON.parse(JSON.stringify(x));
 
@@ -52,16 +55,23 @@ describe('parseRulesConfig', () => {
     const c = configAntes();
     const { topOne, ebinex } = idsDono();
     expect(c.rev).toBe('none');
-    expect(c.savedMarkets).toEqual({ futures: false, binary: false });
+    // Fase 2b: every market of ACCOUNT_MARKETS, none saved yet
+    expect(c.savedMarkets).toEqual({ futures: false, binary: false, forex: false, stocks: false, crypto: false, b3: false, options: false });
     expect(c.accounts.map((a) => [a.label, a.market, a.versions.length, a.archivedAt, a.isExample])).toEqual([
       ['Top One #1', 'futures', 0, null, false],
       ['Ebinex', 'binary', 0, null, false],
     ]);
     expect(c.accounts[0].day).toEqual({ tz: 'America/New_York', startMin: 1080 });
+    const onlyWindowAndLimit = { windowRule: { on: true, outside: 'fora' }, block: null, states: {}, windows: [] };
     expect(c.settings).toEqual({
       markets: {
         futures: { windowRule: { on: true, outside: 'fora' }, block: { on: true, beforeMin: 5, afterMin: 10 }, states: {}, windows: [] },
-        binary: { windowRule: { on: true, outside: 'fora' }, block: null, states: {}, windows: [] },
+        binary: onlyWindowAndLimit,
+        forex: onlyWindowAndLimit,
+        stocks: onlyWindowAndLimit,
+        crypto: onlyWindowAndLimit,
+        b3: onlyWindowAndLimit,
+        options: onlyWindowAndLimit,
       },
       accounts: { [topOne]: emptyAccountSettings(), [ebinex]: emptyAccountSettings() },
       displayTz: 'et',
@@ -74,7 +84,7 @@ describe('parseRulesConfig', () => {
     const c = configDepois();
     const { topOne, ebinex } = idsDono();
     expect(c.rev).toMatch(/^2026-10-17T/);
-    expect(c.savedMarkets).toEqual({ futures: true, binary: true });
+    expect(c.savedMarkets).toEqual({ futures: true, binary: true, forex: false, stocks: false, crypto: false, b3: false, options: false });
     expect(c.settings.markets.futures.windows).toEqual([{ tz: 'America/New_York', startMin: 600, endMin: 660, weekdays: 31 }]);
     expect(c.settings.accounts[topOne].limit).toEqual({ cents: 40000, mode: 'conta', atLimit: 'encerrar' });
     expect(c.settings.accounts[ebinex]).toEqual(emptyAccountSettings());
@@ -408,14 +418,22 @@ describe('parseRulesNow', () => {
     expect(nextChangeAt({ serverNow: new Date(), accounts: [] })).toBeNull();
   });
 
-  it('leaves out accounts of markets without rules instead of failing the whole answer', () => {
+  it('keeps the accounts of every market: «Posso operar hoje?» never drops one (Fase 2b)', () => {
     // rules_now lists every active account; a Phase 1 backfill can hold a forex account
     const json = regrasJson('agora-antes-seg-0930-et');
     const list = json.accounts as Record<string, unknown>[];
     list.splice(1, 0, { ...clone(list[0]), account_id: '00000000-0000-4000-8000-0000000000f1', label: 'Forex', market: 'forex' });
     const now = parseRulesNow(json);
-    expect(now.accounts.map((a) => a.label)).toEqual(['Top One #1', 'Ebinex']);
-    // Anything else of another shape still fails
+    expect(now.accounts.map((a) => [a.label, a.market])).toEqual([
+      ['Top One #1', 'futures'],
+      ['Forex', 'forex'],
+      ['Ebinex', 'binary'],
+    ]);
+    expect(possoTexto(possoLinha('Forex', now.accounts[1].gate, now.accounts[1].rules))).toBe('Sem janela salva · Definir');
+    // A market outside the seven, or anything else of another shape, still fails
+    list[1].market = 'xyz';
+    expect(() => parseRulesNow(json)).toThrow(RulesAnswerError);
+    list[1].market = 'forex';
     list.push(42 as unknown as Record<string, unknown>);
     expect(() => parseRulesNow(json)).toThrow(RulesAnswerError);
   });
@@ -468,5 +486,143 @@ describe('small pieces', () => {
     expect(formatDiaMes('2026-10-17')).toBe('17 out');
     expect(formatDiaMes('2026-11-01')).toBe('1º nov');
     expect(formatDiaMes('2027-01-01', true)).toBe('1º jan 2027');
+  });
+});
+
+describe('seven markets (Fase 2b)', () => {
+  const NBSP = '\u00a0';
+
+  it('reads the six-market owner’s configuration, and resolves every account as the database did', () => {
+    const c = configMercados();
+    const ids = idsMercados();
+    expect(c.accounts.map((a) => [a.label, a.market])).toEqual([
+      ['Top One #1', 'futures'],
+      ['Ebinex', 'binary'],
+      ['FTMO', 'forex'],
+      ['IBKR', 'stocks'],
+      ['Binance', 'crypto'],
+      ['Clear', 'b3'],
+    ]);
+    expect(c.savedMarkets).toEqual({ futures: true, binary: false, forex: true, stocks: false, crypto: true, b3: true, options: false });
+    for (const a of c.accounts) {
+      expect(a.day).toEqual(MARKET_SPEC[a.market].day);
+      expect(canon(toResolvedJson(resolveRules(a, c.settings)))).toBe(canon(toResolvedJson(a.current)));
+    }
+    expect(c.settings.accounts[ids.clear].limit).toEqual({ cents: 50000, mode: 'conta', atLimit: 'encerrar' });
+    expect(c.settings.accounts[ids.ftmo].limit).toEqual({ cents: 100000, mode: 'conta', atLimit: 'encerrar' });
+    expect(c.settings.markets.crypto.windows).toEqual([{ tz: 'America/Sao_Paulo', startMin: 1200, endMin: 1320, weekdays: 127 }]);
+    // Nothing to save: no spurious default for a market never saved (C13)
+    expect(buildSavePayload(c, c.settings)).toBeNull();
+    expect(rascunhoSujo(iniciarRascunho(c))).toBe(false);
+  });
+
+  it('keeps the limit in the market’s currency: `brl` on B3, `usd` elsewhere, the other key refused', () => {
+    const lim = { mode: 'conta', at_limit: 'encerrar' };
+    expect(accountSettingsFromJson('b3', { v: 1, limit: { brl: 500.5, ...lim } }, null).limit).toEqual({ cents: 50050, mode: 'conta', atLimit: 'encerrar' });
+    expect(accountSettingsFromJson('forex', { v: 1, limit: { usd: 1000, ...lim } }, null).limit).toEqual({ cents: 100000, mode: 'conta', atLimit: 'encerrar' });
+    expect(() => accountSettingsFromJson('b3', { v: 1, limit: { usd: 500, ...lim } }, null)).toThrow(RulesAnswerError);
+    expect(() => accountSettingsFromJson('futures', { v: 1, limit: { brl: 500, ...lim } }, null)).toThrow(RulesAnswerError);
+    expect(() => accountSettingsFromJson('b3', { v: 1, limit: { usd: 500, brl: 500, ...lim } }, null)).toThrow(RulesAnswerError);
+
+    const s = { ...emptyAccountSettings(), limit: { cents: 50050, mode: 'conta' as const, atLimit: 'avisar' as const } };
+    expect(accountRulesJson('b3', s)).toEqual({ v: 1, limit: { brl: 500.5, mode: 'conta', at_limit: 'avisar' } });
+    expect(accountRulesJson('crypto', s)).toEqual({ v: 1, limit: { usd: 500.5, mode: 'conta', at_limit: 'avisar' } });
+    expect(limitJson('futures', s.limit)).toEqual({ usd: 500.5, mode: 'conta', at_limit: 'avisar' });
+    // A block set by mistake on another market is never written
+    expect(accountRulesJson('forex', { ...s, block: { on: false } })).not.toHaveProperty('block');
+  });
+
+  it('resolves the window and the limit everywhere, the block and the states only in futures', () => {
+    const c = configMercados();
+    for (const m of ACCOUNT_MARKETS) {
+      const r = resolveRules({ id: 'nova', market: m, day: { ...MARKET_SPEC[m].day } }, c.settings);
+      expect(r.block === null).toBe(!MARKET_SPEC[m].rules.block);
+      expect(r.states === null).toBe(!MARKET_SPEC[m].rules.states);
+      expect(marketRulesJson(m, c.settings.markets[m])).toEqual(
+        m === 'futures' ? expect.objectContaining({ block: expect.any(Object), states: expect.any(Object) }) : { v: 1, window_rule: { on: true, outside: 'fora' } },
+      );
+    }
+  });
+
+  it('refuses a configuration without a builtin for every market', () => {
+    const json = regrasJson('config-mercados');
+    delete (json.builtin as Record<string, unknown>).b3;
+    expect(() => parseRulesConfig(json)).toThrow(RulesAnswerError);
+    const json2 = regrasJson('config-mercados');
+    (json2.accounts as Record<string, unknown>[])[0].market = 'xyz';
+    expect(() => parseRulesConfig(json2)).toThrow(RulesAnswerError);
+  });
+
+  it('builds a save of any market: its default, its accounts, nothing of the others', () => {
+    const c = configMercados();
+    const ids = idsMercados();
+    const d = clone(c.settings);
+    d.markets.b3.windows = [{ tz: 'America/Sao_Paulo', startMin: 600, endMin: 720, weekdays: MON_TO_FRI }];
+    d.accounts[ids.clear].limit = { cents: 80000, mode: 'conta', atLimit: 'encerrar' };
+    d.markets.stocks.windows = [{ tz: 'America/New_York', startMin: 570, endMin: 630, weekdays: MON_TO_FRI }];
+    const payload = buildSavePayload(c, d)!;
+    expect(Object.keys(payload.defaults!).sort()).toEqual(['b3', 'stocks']);
+    expect(payload.accounts).toEqual({ [ids.clear]: { rules: { v: 1, limit: { brl: 800, mode: 'conta', at_limit: 'encerrar' } }, window: null } });
+    expect(pendingVersions(c, d).map((p) => [p.accountId, p.versionNo]).sort()).toEqual(
+      [
+        [ids.clear, 2],
+        [ids.ibkr, 1],
+      ].sort(),
+    );
+    expect(rascunhoSujo({ ...iniciarRascunho(c), draft: d })).toBe(true);
+
+    // A window error in any market blocks the save
+    const bad = clone(d);
+    bad.markets.crypto.windows[0].weekdays = 0;
+    expect(settingsIssues(bad, [])).toEqual([{ place: { market: 'crypto', index: 0 }, error: 'no_days' }]);
+    expect(() => buildSavePayload(c, bad)).toThrow(InvalidSettingsError);
+
+    // Carried over a newer base, market by market
+    const rebased = rebaseSettings(c.accounts, c.settings, c.settings, d);
+    for (const m of ACCOUNT_MARKETS) expect(sameMarket(m, rebased.markets[m], d.markets[m])).toBe(true);
+  });
+
+  it('gives a new B3 account v1 with its limit in reais and the market’s first window', () => {
+    const c = configMercados();
+    const payload = buildNewAccountPayload(c, {
+      accountId: 'nova',
+      market: 'b3',
+      settings: { ...emptyAccountSettings(), limit: { cents: 40000, mode: 'conta', atLimit: 'encerrar' } },
+      marketWindows: [{ tz: 'America/Sao_Paulo', startMin: 600, endMin: 660, weekdays: MON_TO_FRI }],
+    });
+    expect(payload.accounts!.nova).toEqual({ rules: { v: 1, limit: { brl: 400, mode: 'conta', at_limit: 'encerrar' } }, window: null, version: 'force' });
+    expect(payload.defaults).toEqual({
+      b3: { rules: { v: 1, window_rule: { on: true, outside: 'fora' } }, windows: [{ tz: 'America/Sao_Paulo', start_min: 600, end_min: 660, weekdays: 31 }] },
+    });
+  });
+
+  it('answers «Posso operar hoje?» for all six at Mon 19 Oct 08:30 ET, as the Início board draws it', () => {
+    const now = agoraMercados();
+    const linhas = now.accounts.map((a) => {
+      const l = possoLinha(a.label, a.gate, a.rules);
+      return [a.label, possoTexto(l), l.limite && `${l.limite.usado} ${l.limite.de}`];
+    });
+    expect(linhas).toEqual([
+      ['Top One #1', 'Fora da sua janela · abre às 10:00 ET', `US$${NBSP}0 de US$${NBSP}400`],
+      ['Ebinex', 'Sem janela salva · Definir', null],
+      ['FTMO', 'Liberado · até 10:00 ET', `US$${NBSP}0 de US$${NBSP}1.000`],
+      ['IBKR', 'Sem janela salva · Definir', null],
+      ['Binance', 'Fora da sua janela · abre às 20:00 de Brasília', null],
+      ['Clear', 'Fora da sua janela · abre às 10:00 de Brasília', `R$${NBSP}0 de R$${NBSP}500`],
+    ]);
+    const clear = now.accounts[5];
+    expect(possoLinha('Clear', clear.gate, clear.rules).limite!.aria).toBe(`Clear, limite do dia: R$${NBSP}0 de R$${NBSP}500.`);
+    expect(possoLinha('IBKR', now.accounts[3].gate, null).acao).toEqual({
+      texto: 'Definir',
+      href: '/personalizar#janelas',
+      aria: 'Definir a janela da IBKR em Personalizar',
+    });
+  });
+
+  it('reads a limit typed with R$ as with US$', () => {
+    expect(parseUsdText('R$ 1.000,50')).toEqual({ ok: true, cents: 100050 });
+    expect(parseUsdText('r$500')).toEqual({ ok: true, cents: 50000 });
+    expect(parseUsdText('US$ 400')).toEqual({ ok: true, cents: 40000 });
+    expect(parseUsdText('€ 400')).toEqual({ ok: false, reason: 'invalid' });
   });
 });
