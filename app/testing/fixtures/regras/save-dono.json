@@ -1,0 +1,22 @@
+{
+  "rev": "2026-10-17T20:06:09.241766Z",
+  "dry_run": false,
+  "saved_at": "2026-10-17T20:06:09.241766+00:00",
+  "versions": [
+    {
+      "origin": "salvar",
+      "account_id": "e23a08d1-b5ff-4623-824a-4aaf83055d91",
+      "version_no": 1,
+      "effective_day": "2026-10-17",
+      "effective_from": "2026-10-17T20:06:09.241766+00:00"
+    },
+    {
+      "origin": "salvar",
+      "account_id": "c4f3f670-72aa-489a-aca2-bd02fbb4e3a8",
+      "version_no": 1,
+      "effective_day": "2026-10-17",
+      "effective_from": "2026-10-17T20:06:09.241766+00:00"
+    }
+  ],
+  "unchanged": []
+}

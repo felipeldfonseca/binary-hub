@@ -1,8 +1,3 @@
-# Firebase Functions compiled artifacts
-functions/lib/
-functions/lib/**/*
-functions/.firebase/
-
 # Node modules
 node_modules/
 */node_modules/
@@ -14,6 +9,8 @@ node_modules/
 .env.development
 .env.test
 *.env*
+# The template has names only, never values
+!.env.example
 
 # Build outputs
 .next/
@@ -54,7 +51,7 @@ Thumbs.db
 # Vercel
 .vercel
 
-# Firebase
+# Local leftovers from the old Firebase setup
 .firebase/
 firebase-debug.log
 firestore-debug.log
@@ -74,6 +71,25 @@ ui-debug.log
 # Local development
 .local/
 
-# Service account files
+# Security - CRITICAL
 service-account.json
 *.json.key
+*.pem
+*.key
+*.p12
+*.pfx
+secrets.json
+.env.production.local
+
+# Testing
+coverage/
+.nyc_output/
+jest-coverage/
+
+# Local development
+.local/
+tmp/
+temp/
+
+# Real trade exports: never commit (the repo is public)
+docs/csv/

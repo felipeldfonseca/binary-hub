@@ -3,8 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { sendPasswordResetEmail } from 'firebase/auth'
-import { auth } from '../../../lib/firebase'
+import { useAuth } from '@/lib/contexts/AuthContext'
 import PublicRoute from '@/components/auth/PublicRoute'
 import { useLanguage } from '@/lib/contexts/LanguageContext'
 
@@ -15,6 +14,7 @@ export default function ForgotPasswordPage() {
   const [error, setError] = useState('')
   const router = useRouter()
   const { isPortuguese } = useLanguage()
+  const { sendPasswordReset } = useAuth()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -23,40 +23,21 @@ export default function ForgotPasswordPage() {
     setMessage('')
 
     try {
-      await sendPasswordResetEmail(auth, email)
-      setMessage(isPortuguese 
-        ? 'Email de redefinição de senha enviado! Verifique sua caixa de entrada e siga as instruções para redefinir sua senha.'
-        : 'Password reset email sent! Check your inbox and follow the instructions to reset your password.'
-      )
-    } catch (error: any) {
-      console.error('Password reset error:', error)
-      
-      // Handle specific Firebase errors
-      switch (error.code) {
-        case 'auth/user-not-found':
-          setError(isPortuguese 
-            ? 'Nenhuma conta encontrada com este endereço de email.'
-            : 'No account found with this email address.'
-          )
-          break
-        case 'auth/invalid-email':
-          setError(isPortuguese 
-            ? 'Por favor, insira um endereço de email válido.'
-            : 'Please enter a valid email address.'
-          )
-          break
-        case 'auth/too-many-requests':
-          setError(isPortuguese 
-            ? 'Muitas solicitações de redefinição. Tente novamente mais tarde.'
-            : 'Too many reset requests. Please try again later.'
-          )
-          break
-        default:
-          setError(isPortuguese 
-            ? 'Falha ao enviar email de redefinição. Tente novamente.'
-            : 'Failed to send reset email. Please try again.'
-          )
+      const result = await sendPasswordReset(email)
+      if (result.error) {
+        setError(result.error)
+      } else {
+        setMessage(isPortuguese
+          ? 'Email de redefinição de senha enviado! Verifique sua caixa de entrada e siga as instruções para redefinir sua senha.'
+          : 'Password reset email sent! Check your inbox and follow the instructions to reset your password.'
+        )
       }
+    } catch (error: unknown) {
+      console.error('Password reset error:', error)
+      setError(isPortuguese
+        ? 'Falha ao enviar email de redefinição. Tente novamente.'
+        : 'Failed to send reset email. Please try again.'
+      )
     } finally {
       setIsLoading(false)
     }

@@ -3,14 +3,15 @@
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/hooks/useAuth'
+import { AuthUser, formatUser } from '@/lib/auth'
 
 export default function HeroSection() {
   const router = useRouter()
   const { user } = useAuth()
 
   // Get user's display name or email
-  const getUserName = (user: any) => {
-    let name = user?.displayName || user?.email?.split('@')[0] || 'Trader'
+  const getUserName = (user: AuthUser | null) => {
+    let name = user?.displayName?.trim() || user?.email?.split('@')[0] || 'Trader'
     
     // Get only the first name (before any space)
     const firstName = name.split(' ')[0]
@@ -19,10 +20,10 @@ export default function HeroSection() {
     return firstName.charAt(0).toUpperCase() + firstName.slice(1).toLowerCase()
   }
 
-  const userName = getUserName(user)
+  const userName = getUserName(formatUser(user))
 
   return (
-    <section className="w-full min-h-[40vh] flex items-center pt-24 sm:pt-28 lg:pt-32 pb-4 sm:pb-8 lg:pb-12">
+    <section className="w-full flex items-center pt-4 sm:pt-6 pb-4 sm:pb-8">
       <div className="container mx-auto px-4 flex flex-col items-center text-center">
         {/* Hero Title - Personalized welcome message */}
         <h1 className="hero-title font-poly font-normal mb-6 sm:mb-8 lg:mb-10 leading-tight">
@@ -40,7 +41,7 @@ export default function HeroSection() {
         
         {/* CTA Button - Add new trades */}
         <button 
-          onClick={() => router.push('/trades/new')}
+          onClick={() => router.push('/trades')}
           className="btn-primary font-comfortaa font-bold transition-all duration-300 hover:scale-105 text-lg px-8 py-4 max-xl:text-base max-xl:px-6 max-xl:py-3 max-md:text-sm max-md:px-4 max-md:py-2"
         >
           Add new trades

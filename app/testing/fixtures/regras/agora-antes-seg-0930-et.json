@@ -1,0 +1,77 @@
+{
+  "accounts": [
+    {
+      "at": "2026-10-19T13:30:00+00:00",
+      "block": {
+        "state": "nao_avaliado",
+        "reason": "sem_versao"
+      },
+      "desde": null,
+      "label": "Top One #1",
+      "limit": {
+        "state": "nao_avaliado",
+        "reason": "sem_versao"
+      },
+      "rules": null,
+      "today": {
+        "trades": 0,
+        "net_usd": 0,
+        "worst_usd": 0
+      },
+      "market": "futures",
+      "status": null,
+      "window": {
+        "state": "nao_avaliado",
+        "reason": "sem_versao"
+      },
+      "version": null,
+      "warnings": [],
+      "desde_day": null,
+      "account_id": "e23a08d1-b5ff-4623-824a-4aaf83055d91",
+      "changes_at": "2026-10-19T22:00:00+00:00",
+      "state_rule": {
+        "state": "nao_avaliado",
+        "reason": "sem_versao"
+      },
+      "trading_day": "2026-10-19",
+      "checks_evaluated": []
+    },
+    {
+      "at": "2026-10-19T13:30:00+00:00",
+      "block": {
+        "state": "nao_avaliado",
+        "reason": "sem_versao"
+      },
+      "desde": null,
+      "label": "Ebinex",
+      "limit": {
+        "state": "nao_avaliado",
+        "reason": "sem_versao"
+      },
+      "rules": null,
+      "today": {
+        "trades": 0,
+        "net_usd": 0,
+        "worst_usd": 0
+      },
+      "market": "binary",
+      "status": null,
+      "window": {
+        "state": "nao_avaliado",
+        "reason": "sem_versao"
+      },
+      "version": null,
+      "warnings": [],
+      "desde_day": null,
+      "account_id": "c4f3f670-72aa-489a-aca2-bd02fbb4e3a8",
+      "changes_at": "2026-10-20T03:00:00+00:00",
+      "state_rule": {
+        "state": "nao_avaliado",
+        "reason": "sem_versao"
+      },
+      "trading_day": "2026-10-19",
+      "checks_evaluated": []
+    }
+  ],
+  "server_now": "2026-10-19T13:30:00+00:00"
+}

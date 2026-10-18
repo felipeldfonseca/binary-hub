@@ -44,9 +44,10 @@ export default function Navbar() {
     { href: isPortuguese ? '/dashboard?lang=pt' : '/dashboard', label: isPortuguese ? 'Início' : 'Home' },
     { href: '/trades', label: isPortuguese ? 'Operações' : 'Trades' },
     { href: '/analytics', label: isPortuguese ? 'Análises' : 'Analytics' },
-    { href: '/events', label: isPortuguese ? 'Eventos' : 'Events' },
+    { href: '/market', label: isPortuguese ? 'Mercado' : 'Market' },
+    { href: '/social', label: isPortuguese ? 'Social' : 'Social' },
     { href: '/ai', label: 'AI' },
-    { href: isPortuguese ? '/dashboard/plans?lang=pt' : '/dashboard/plans', label: isPortuguese ? 'Planos' : 'Plans' },
+    { href: '/accomplishments', label: isPortuguese ? 'Conquistas' : 'Accomplishments' },
   ]
 
   const dashboardNavItems = getDashboardNavItems()
@@ -354,11 +355,11 @@ export default function Navbar() {
                       <p className="text-sm font-medium text-white truncate">{user?.email}</p>
                     </div>
                     <Link
-                      href="/profile"
+                      href="/profile/edit"
                       onClick={() => setIsProfileOpen(false)}
                       className="block px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 hover:text-white transition-colors"
                     >
-                      Your Profile
+                      Edit Profile
                     </Link>
                     <Link
                       href="/settings"
@@ -366,6 +367,13 @@ export default function Navbar() {
                       className="block px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 hover:text-white transition-colors"
                     >
                       Settings
+                    </Link>
+                    <Link
+                      href={isPortuguese ? '/plans?lang=pt' : '/plans'}
+                      onClick={() => setIsProfileOpen(false)}
+                      className="block px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 hover:text-white transition-colors"
+                    >
+                      {isPortuguese ? 'Planos' : 'Plans'}
                     </Link>
                     <div className="border-t border-gray-700 mt-2">
                       <button
@@ -500,11 +508,11 @@ export default function Navbar() {
                   <p className="text-sm font-medium text-green-400 truncate">{user?.email}</p>
                 </div>
                 <Link
-                  href="/profile"
+                  href="/profile/edit"
                   onClick={() => setIsMobileMenuOpen(false)}
                   className="nav-link block px-4 py-3 rounded-lg text-base transition-all duration-300 text-green-400 hover:bg-primary/10 font-comfortaa font-bold"
                 >
-                  Your Profile
+                  Edit Profile
                 </Link>
                 <Link
                   href="/settings"
@@ -512,6 +520,13 @@ export default function Navbar() {
                   className="nav-link block px-4 py-3 rounded-lg text-base transition-all duration-300 text-green-400 hover:bg-primary/10 font-comfortaa font-bold"
                 >
                   Settings
+                </Link>
+                <Link
+                  href={isPortuguese ? '/plans?lang=pt' : '/plans'}
+                  onClick={() => setIsMobileMenuOpen(false)}
+                  className="nav-link block px-4 py-3 rounded-lg text-base transition-all duration-300 text-green-400 hover:bg-primary/10 font-comfortaa font-bold"
+                >
+                  {isPortuguese ? 'Planos' : 'Plans'}
                 </Link>
                 <button
                   onClick={handleLogout}

@@ -1,0 +1,96 @@
+/**
+ * Arguments for the `import_preview` and `import_commit` RPCs. Only builds them: the call
+ * itself (PostgREST `/rest/v1/rpc/...` with the user's JWT) belongs to the caller.
+ */
+import { assertTimeZone } from '../tempo';
+import {
+  IMPORT_ROW_KEYS,
+  type ImportRow,
+  type ParsedFile,
+  type Platform,
+  type RowErrorCode,
+  type RowIssue,
+} from './types';
+
+/** What the server keeps of a browser-side row error: the line and the code, never a value. */
+export interface RpcRowError {
+  line: number;
+  code: RowErrorCode;
+}
+
+export interface ImportPreviewArgs {
+  p_account: string;
+  p_platform: Platform;
+  /** Over the raw bytes */
+  p_sha256: string;
+  /** The account's file zone, for rows with no stated offset */
+  p_file_tz: string;
+  /** The same payload for preview and commit */
+  p_rows: ImportRow[];
+  p_errors: RpcRowError[];
+  /** Non-blank data records in the file: rows + errors */
+  p_rows_total: number;
+}
+
+export interface ImportCommitArgs extends ImportPreviewArgs {
+  p_file_name: string;
+}
+
+/** The commit's arguments; previewArgs() drops what the preview does not take. */
+export type ImportRpcArgs = ImportCommitArgs;
+
+const SHA256 = /^[0-9a-f]{64}$/;
+const MAX_FILE_NAME = 255;
+
+export function toRpcErrors(errors: RowIssue<RowErrorCode>[]): RpcRowError[] {
+  return errors.map((e) => ({ line: e.line, code: e.code }));
+}
+
+/** Exactly the ImportRow keys, in order, so nothing else ever reaches the server. */
+export function toRpcRow(row: ImportRow): ImportRow {
+  const out = {} as Record<string, unknown>;
+  for (const key of IMPORT_ROW_KEYS) out[key] = row[key];
+  return out as unknown as ImportRow;
+}
+
+/**
+ * Builds the RPC arguments for a parsed file. Throws RangeError (with no file content in the
+ * message) when the account is missing, the platform differs from the file's, the hash is not
+ * a SHA-256, or the zone is not 'UTC' or an IANA Area/Location name.
+ */
+export function buildImportArgs(i: {
+  accountId: string;
+  platform: Platform;
+  fileName: string;
+  sha256: string;
+  fileTz: string;
+  outcome: ParsedFile;
+}): ImportRpcArgs {
+  if (!i.accountId) throw new RangeError('Missing account');
+  if (i.platform !== i.outcome.platform) throw new RangeError('Platform does not match the file');
+  if (!SHA256.test(i.sha256)) throw new RangeError('Invalid file hash');
+  assertTimeZone(i.fileTz);
+  return {
+    p_account: i.accountId,
+    p_platform: i.platform,
+    p_file_name: Array.from(i.fileName).slice(0, MAX_FILE_NAME).join(''),
+    p_sha256: i.sha256,
+    p_file_tz: i.fileTz,
+    p_rows: i.outcome.rows.map(toRpcRow),
+    p_errors: toRpcErrors(i.outcome.errors),
+    p_rows_total: i.outcome.records,
+  };
+}
+
+/** `import_preview` takes no file name; PostgREST matches functions by argument names. */
+export function previewArgs(args: ImportRpcArgs): ImportPreviewArgs {
+  return {
+    p_account: args.p_account,
+    p_platform: args.p_platform,
+    p_sha256: args.p_sha256,
+    p_file_tz: args.p_file_tz,
+    p_rows: args.p_rows,
+    p_errors: args.p_errors,
+    p_rows_total: args.p_rows_total,
+  };
+}

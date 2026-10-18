@@ -1,0 +1,579 @@
+{
+  "rev": "2026-10-17T20:06:01.697070Z",
+  "builtin": {
+    "b3": {
+      "v": 1,
+      "window_rule": {
+        "on": true,
+        "outside": "fora"
+      }
+    },
+    "forex": {
+      "v": 1,
+      "window_rule": {
+        "on": true,
+        "outside": "fora"
+      }
+    },
+    "binary": {
+      "v": 1,
+      "window_rule": {
+        "on": true,
+        "outside": "fora"
+      }
+    },
+    "crypto": {
+      "v": 1,
+      "window_rule": {
+        "on": true,
+        "outside": "fora"
+      }
+    },
+    "stocks": {
+      "v": 1,
+      "window_rule": {
+        "on": true,
+        "outside": "fora"
+      }
+    },
+    "futures": {
+      "v": 1,
+      "block": {
+        "on": true,
+        "after_min": 10,
+        "before_min": 5
+      },
+      "states": {},
+      "window_rule": {
+        "on": true,
+        "outside": "fora"
+      }
+    },
+    "options": {
+      "v": 1,
+      "window_rule": {
+        "on": true,
+        "outside": "fora"
+      }
+    }
+  },
+  "accounts": [
+    {
+      "day": {
+        "tz": "America/New_York",
+        "start_min": 1080
+      },
+      "label": "Top One #1",
+      "market": "futures",
+      "window": null,
+      "current": {
+        "v": 1,
+        "day": {
+          "tz": "America/New_York",
+          "start_min": 1080
+        },
+        "block": {
+          "on": true,
+          "after_min": 10,
+          "calendars": [
+            "us"
+          ],
+          "before_min": 5
+        },
+        "limit": {
+          "usd": 400,
+          "mode": "conta",
+          "at_limit": "encerrar"
+        },
+        "market": "futures",
+        "states": {
+          "alinhadas": null,
+          "so_tecnica": null,
+          "em_conflito": null,
+          "sem_direcao": null,
+          "so_fundamentos": null
+        },
+        "windows": [
+          {
+            "tz": "America/New_York",
+            "end_min": 660,
+            "weekdays": 31,
+            "start_min": 600
+          }
+        ],
+        "window_rule": {
+          "on": true,
+          "outside": "fora"
+        },
+        "windows_from": "market"
+      },
+      "settings": {
+        "rules": {
+          "v": 1,
+          "limit": {
+            "usd": 400,
+            "mode": "conta",
+            "at_limit": "encerrar"
+          }
+        },
+        "updated_at": "2026-10-17T20:06:01.441762+00:00"
+      },
+      "versions": [
+        {
+          "id": "ee53d7c3-5790-4d3e-bb44-097fbf81384f",
+          "origin": "salvar",
+          "resolved": {
+            "v": 1,
+            "day": {
+              "tz": "America/New_York",
+              "start_min": 1080
+            },
+            "block": {
+              "on": true,
+              "after_min": 10,
+              "calendars": [
+                "us"
+              ],
+              "before_min": 5
+            },
+            "limit": {
+              "usd": 400,
+              "mode": "conta",
+              "at_limit": "encerrar"
+            },
+            "market": "futures",
+            "states": {
+              "alinhadas": null,
+              "so_tecnica": null,
+              "em_conflito": null,
+              "sem_direcao": null,
+              "so_fundamentos": null
+            },
+            "windows": [
+              {
+                "tz": "America/New_York",
+                "end_min": 660,
+                "weekdays": 31,
+                "start_min": 600
+              }
+            ],
+            "window_rule": {
+              "on": true,
+              "outside": "fora"
+            },
+            "windows_from": "market"
+          },
+          "version_no": 1,
+          "copied_from": null,
+          "effective_day": "2026-10-17",
+          "effective_from": "2026-10-17T20:06:01.441762+00:00"
+        }
+      ],
+      "account_id": "3f029c25-cb37-435b-86e1-07f393b6385f",
+      "is_example": false,
+      "archived_at": null
+    },
+    {
+      "day": {
+        "tz": "America/Sao_Paulo",
+        "start_min": 0
+      },
+      "label": "Ebinex",
+      "market": "binary",
+      "window": null,
+      "current": {
+        "v": 1,
+        "day": {
+          "tz": "America/Sao_Paulo",
+          "start_min": 0
+        },
+        "block": null,
+        "limit": null,
+        "market": "binary",
+        "states": null,
+        "windows": [],
+        "window_rule": {
+          "on": true,
+          "outside": "fora"
+        },
+        "windows_from": null
+      },
+      "settings": null,
+      "versions": [],
+      "account_id": "264add60-c117-482a-a2e2-45ad11a46071",
+      "is_example": false,
+      "archived_at": null
+    },
+    {
+      "day": {
+        "tz": "America/New_York",
+        "start_min": 1020
+      },
+      "label": "FTMO",
+      "market": "forex",
+      "window": null,
+      "current": {
+        "v": 1,
+        "day": {
+          "tz": "America/New_York",
+          "start_min": 1020
+        },
+        "block": null,
+        "limit": {
+          "usd": 1000,
+          "mode": "conta",
+          "at_limit": "encerrar"
+        },
+        "market": "forex",
+        "states": null,
+        "windows": [
+          {
+            "tz": "America/New_York",
+            "end_min": 600,
+            "weekdays": 31,
+            "start_min": 480
+          }
+        ],
+        "window_rule": {
+          "on": true,
+          "outside": "fora"
+        },
+        "windows_from": "market"
+      },
+      "settings": {
+        "rules": {
+          "v": 1,
+          "limit": {
+            "usd": 1000,
+            "mode": "conta",
+            "at_limit": "encerrar"
+          }
+        },
+        "updated_at": "2026-10-17T20:06:01.517209+00:00"
+      },
+      "versions": [
+        {
+          "id": "d4462805-be7e-4c6e-9a4e-9d6dc44e5936",
+          "origin": "criar",
+          "resolved": {
+            "v": 1,
+            "day": {
+              "tz": "America/New_York",
+              "start_min": 1020
+            },
+            "block": null,
+            "limit": {
+              "usd": 1000,
+              "mode": "conta",
+              "at_limit": "encerrar"
+            },
+            "market": "forex",
+            "states": null,
+            "windows": [
+              {
+                "tz": "America/New_York",
+                "end_min": 600,
+                "weekdays": 31,
+                "start_min": 480
+              }
+            ],
+            "window_rule": {
+              "on": true,
+              "outside": "fora"
+            },
+            "windows_from": "market"
+          },
+          "version_no": 1,
+          "copied_from": null,
+          "effective_day": "2026-10-17",
+          "effective_from": "2026-10-17T20:06:01.517209+00:00"
+        }
+      ],
+      "account_id": "6469eb85-58c3-46a7-894c-e34bd932211c",
+      "is_example": false,
+      "archived_at": null
+    },
+    {
+      "day": {
+        "tz": "America/New_York",
+        "start_min": 1200
+      },
+      "label": "IBKR",
+      "market": "stocks",
+      "window": null,
+      "current": {
+        "v": 1,
+        "day": {
+          "tz": "America/New_York",
+          "start_min": 1200
+        },
+        "block": null,
+        "limit": null,
+        "market": "stocks",
+        "states": null,
+        "windows": [],
+        "window_rule": {
+          "on": true,
+          "outside": "fora"
+        },
+        "windows_from": null
+      },
+      "settings": null,
+      "versions": [],
+      "account_id": "b8df237c-ace3-4976-a9c7-380b1dc190fb",
+      "is_example": false,
+      "archived_at": null
+    },
+    {
+      "day": {
+        "tz": "America/Sao_Paulo",
+        "start_min": 0
+      },
+      "label": "Binance",
+      "market": "crypto",
+      "window": null,
+      "current": {
+        "v": 1,
+        "day": {
+          "tz": "America/Sao_Paulo",
+          "start_min": 0
+        },
+        "block": null,
+        "limit": null,
+        "market": "crypto",
+        "states": null,
+        "windows": [
+          {
+            "tz": "America/Sao_Paulo",
+            "end_min": 1320,
+            "weekdays": 127,
+            "start_min": 1200
+          }
+        ],
+        "window_rule": {
+          "on": true,
+          "outside": "fora"
+        },
+        "windows_from": "market"
+      },
+      "settings": {
+        "rules": {
+          "v": 1,
+          "limit": null
+        },
+        "updated_at": "2026-10-17T20:06:01.625066+00:00"
+      },
+      "versions": [
+        {
+          "id": "2c758f57-b3a3-4d5e-ba8a-2c5b072b748b",
+          "origin": "criar",
+          "resolved": {
+            "v": 1,
+            "day": {
+              "tz": "America/Sao_Paulo",
+              "start_min": 0
+            },
+            "block": null,
+            "limit": null,
+            "market": "crypto",
+            "states": null,
+            "windows": [
+              {
+                "tz": "America/Sao_Paulo",
+                "end_min": 1320,
+                "weekdays": 127,
+                "start_min": 1200
+              }
+            ],
+            "window_rule": {
+              "on": true,
+              "outside": "fora"
+            },
+            "windows_from": "market"
+          },
+          "version_no": 1,
+          "copied_from": null,
+          "effective_day": "2026-10-17",
+          "effective_from": "2026-10-17T20:06:01.625066+00:00"
+        }
+      ],
+      "account_id": "438acc58-3dc0-47a9-8c46-c7cbcbb8d424",
+      "is_example": false,
+      "archived_at": null
+    },
+    {
+      "day": {
+        "tz": "America/Sao_Paulo",
+        "start_min": 0
+      },
+      "label": "Clear",
+      "market": "b3",
+      "window": null,
+      "current": {
+        "v": 1,
+        "day": {
+          "tz": "America/Sao_Paulo",
+          "start_min": 0
+        },
+        "block": null,
+        "limit": {
+          "brl": 500,
+          "mode": "conta",
+          "at_limit": "encerrar"
+        },
+        "market": "b3",
+        "states": null,
+        "windows": [
+          {
+            "tz": "America/Sao_Paulo",
+            "end_min": 660,
+            "weekdays": 31,
+            "start_min": 600
+          }
+        ],
+        "window_rule": {
+          "on": true,
+          "outside": "fora"
+        },
+        "windows_from": "market"
+      },
+      "settings": {
+        "rules": {
+          "v": 1,
+          "limit": {
+            "brl": 500,
+            "mode": "conta",
+            "at_limit": "encerrar"
+          }
+        },
+        "updated_at": "2026-10-17T20:06:01.69707+00:00"
+      },
+      "versions": [
+        {
+          "id": "d75f4969-5cf6-4ac9-9ee6-0fddfbad6b41",
+          "origin": "criar",
+          "resolved": {
+            "v": 1,
+            "day": {
+              "tz": "America/Sao_Paulo",
+              "start_min": 0
+            },
+            "block": null,
+            "limit": {
+              "brl": 500,
+              "mode": "conta",
+              "at_limit": "encerrar"
+            },
+            "market": "b3",
+            "states": null,
+            "windows": [
+              {
+                "tz": "America/Sao_Paulo",
+                "end_min": 660,
+                "weekdays": 31,
+                "start_min": 600
+              }
+            ],
+            "window_rule": {
+              "on": true,
+              "outside": "fora"
+            },
+            "windows_from": "market"
+          },
+          "version_no": 1,
+          "copied_from": null,
+          "effective_day": "2026-10-17",
+          "effective_from": "2026-10-17T20:06:01.69707+00:00"
+        }
+      ],
+      "account_id": "2e7a7010-c095-4aac-93be-d972c4115b3a",
+      "is_example": false,
+      "archived_at": null
+    }
+  ],
+  "defaults": {
+    "b3": {
+      "rules": {
+        "v": 1,
+        "window_rule": {
+          "on": true,
+          "outside": "fora"
+        }
+      },
+      "windows": [
+        {
+          "tz": "America/Sao_Paulo",
+          "end_min": 660,
+          "weekdays": 31,
+          "start_min": 600
+        }
+      ],
+      "updated_at": "2026-10-17T20:06:01.69707+00:00"
+    },
+    "forex": {
+      "rules": {
+        "v": 1,
+        "window_rule": {
+          "on": true,
+          "outside": "fora"
+        }
+      },
+      "windows": [
+        {
+          "tz": "America/New_York",
+          "end_min": 600,
+          "weekdays": 31,
+          "start_min": 480
+        }
+      ],
+      "updated_at": "2026-10-17T20:06:01.517209+00:00"
+    },
+    "binary": null,
+    "crypto": {
+      "rules": {
+        "v": 1,
+        "window_rule": {
+          "on": true,
+          "outside": "fora"
+        }
+      },
+      "windows": [
+        {
+          "tz": "America/Sao_Paulo",
+          "end_min": 1320,
+          "weekdays": 127,
+          "start_min": 1200
+        }
+      ],
+      "updated_at": "2026-10-17T20:06:01.625066+00:00"
+    },
+    "stocks": null,
+    "futures": {
+      "rules": {
+        "v": 1,
+        "block": {
+          "on": true,
+          "after_min": 10,
+          "before_min": 5
+        },
+        "states": {},
+        "window_rule": {
+          "on": true,
+          "outside": "fora"
+        }
+      },
+      "windows": [
+        {
+          "tz": "America/New_York",
+          "end_min": 660,
+          "weekdays": 31,
+          "start_min": 600
+        }
+      ],
+      "updated_at": "2026-10-17T20:06:01.441762+00:00"
+    },
+    "options": null
+  },
+  "server_now": "2026-10-17T20:06:01.727048+00:00",
+  "preferences": {}
+}

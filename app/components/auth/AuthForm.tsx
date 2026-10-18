@@ -20,9 +20,11 @@ interface AuthFormProps {
   onClose: () => void
   mode: 'signin' | 'signup'
   onModeChange: (mode: 'signin' | 'signup') => void
+  onSuccess?: (data: any) => void
+  isEmbedded?: boolean
 }
 
-export default function AuthForm({ isOpen, onClose, mode, onModeChange }: AuthFormProps) {
+export default function AuthForm({ isOpen, onClose, mode, onModeChange, onSuccess, isEmbedded = false }: AuthFormProps) {
   const { register, login, error, loading, clearError } = useAuth()
   const router = useRouter()
   const { isPortuguese } = useLanguage()
@@ -165,7 +167,18 @@ export default function AuthForm({ isOpen, onClose, mode, onModeChange }: AuthFo
         setFormData({ name: '', email: '', password: '', confirmPassword: '' })
         setFormErrors({})
         setLocalError(null)
-        onClose()
+        
+        // Call success callback for multi-step registration
+        if (onSuccess && mode === 'signup') {
+          onSuccess({
+            email: formData.email,
+            password: formData.password,
+            displayName: formData.name,
+            acceptedTerms: true
+          })
+        } else {
+          onClose()
+        }
       } else {
         console.log('Auth failed - showing error')
         // Set local error and keep form open
@@ -226,12 +239,20 @@ export default function AuthForm({ isOpen, onClose, mode, onModeChange }: AuthFo
 
   if (!isOpen) return null
 
+  const containerClass = isEmbedded 
+    ? "w-full" 
+    : "fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50"
+  
+  const cardClass = isEmbedded
+    ? "bg-transparent"
+    : "bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-md mx-4 overflow-hidden"
+
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-      <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-md mx-4 overflow-hidden">
+    <div className={containerClass}>
+      <div className={cardClass}>
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700">
-          <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
+          <h2 className="text-2xl font-comfortaa font-bold text-gray-900 dark:text-white">
             {mode === 'signup' 
               ? (isPortuguese ? 'Criar Conta' : 'Create Account') 
               : (isPortuguese ? 'Bem-vindo de Volta' : 'Welcome Back')
@@ -257,7 +278,7 @@ export default function AuthForm({ isOpen, onClose, mode, onModeChange }: AuthFo
           {/* Name Field (Signup only) */}
           {mode === 'signup' && (
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              <label className="block text-sm font-comfortaa font-medium text-gray-700 dark:text-gray-300 mb-1">
                 {isPortuguese ? 'Nome Completo' : 'Full Name'}
               </label>
               <div className="relative">
@@ -283,7 +304,7 @@ export default function AuthForm({ isOpen, onClose, mode, onModeChange }: AuthFo
 
           {/* Email Field */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            <label className="block text-sm font-comfortaa font-medium text-gray-700 dark:text-gray-300 mb-1">
               {isPortuguese ? 'Endereço de Email' : 'Email Address'}
             </label>
                          <div className="relative">
@@ -308,7 +329,7 @@ export default function AuthForm({ isOpen, onClose, mode, onModeChange }: AuthFo
 
           {/* Password Field */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            <label className="block text-sm font-comfortaa font-medium text-gray-700 dark:text-gray-300 mb-1">
               {isPortuguese ? 'Senha' : 'Password'}
             </label>
                          <div className="relative">
@@ -341,7 +362,7 @@ export default function AuthForm({ isOpen, onClose, mode, onModeChange }: AuthFo
           {/* Confirm Password Field (Signup only) */}
           {mode === 'signup' && (
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              <label className="block text-sm font-comfortaa font-medium text-gray-700 dark:text-gray-300 mb-1">
                 {isPortuguese ? 'Confirmar Senha' : 'Confirm Password'}
               </label>
                              <div className="relative">
@@ -389,7 +410,7 @@ export default function AuthForm({ isOpen, onClose, mode, onModeChange }: AuthFo
             type="button"
             onClick={handleSubmit}
             disabled={loading}
-            className="w-full bg-primary hover:bg-primary/90 disabled:bg-primary/50 text-gray-900 font-medium py-3 px-4 rounded-lg transition-colors flex items-center justify-center gap-2"
+                            className="w-full bg-primary hover:bg-primary/90 disabled:bg-primary/50 text-gray-900 font-comfortaa font-medium py-3 px-4 rounded-lg transition-colors flex items-center justify-center gap-2"
           >
             {loading ? (
              <div className="w-5 h-5 border-2 border-gray-900 border-t-transparent rounded-full animate-spin"></div>
@@ -414,7 +435,7 @@ export default function AuthForm({ isOpen, onClose, mode, onModeChange }: AuthFo
               <button
                 type="button"
                 onClick={() => handleModeChange(mode === 'signup' ? 'signin' : 'signup')}
-                className="ml-1 text-primary hover:text-primary/80 font-medium transition-colors"
+                className="ml-1 text-primary hover:text-primary/80 font-comfortaa font-medium transition-colors"
               >
                 {mode === 'signup' 
                   ? (isPortuguese ? 'Entrar' : 'Sign In')

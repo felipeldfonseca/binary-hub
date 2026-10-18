@@ -1,56 +1,68 @@
-# Binary Hub
+# Binary Hub
 
-> *Discipline. Data. Domination.*  – journaling & performance insights for binary‑options traders
+Diário de operações e central de mercado para quem opera opções binárias (Ebinex) e futuros (Top One). O app está sendo reconstruído tela a tela a partir de um protótipo aprovado, em fases.
 
-![Build](https://img.shields.io/github/actions/workflow/status/binaryhub/binaryhub/ci.yml?branch=main)
-![License](https://img.shields.io/github/license/binaryhub/binaryhub)
+## Stack
 
-Binary Hub é uma aplicação **SaaS** que ajuda traders de opções binárias a registrar operações, rastrear KPIs e receber insights gerados por IA para corrigir maus hábitos. O projeto é construído para escalar a partir de um fundador solo até uma plataforma multi‑asset.
+| Camada | Tecnologia |
+|---|---|
+| App | Next.js 14 (app router), TypeScript, Tailwind |
+| Dados e login | Supabase (Postgres com RLS, Auth) |
+| Publicação | Vercel, pelo GitHub Actions a cada push na `main` |
+| Análise de mercado | API da Anthropic |
+| Testes | Jest e Testing Library |
 
-> **MVP meta:** lançar em 10 semanas e validar 50 WAU / 10 assinantes Pro.
-> Para o escopo detalhado consulte [`docs/MVP_SCOPE.md`](docs/MVP_SCOPE.md).
+## Rodar localmente
 
----
+Requer Node 22.
 
-## ✨ Funcionalidades Principais (MVP)
-
-| Feature                              | Estado |
-| ------------------------------------ | ------ |
-| Autenticação (Email, Google)         | ✅      |
-| Log manual / CSV upload de trades    | ✅      |
-| Dashboard com Win Rate, P\&L, streak | ✅      |
-| Calendário de performance (heat‑map) | ✅      |
-| Regras pessoais & aderência          | 🟡 (β) |
-| Insight semanal do LLM               | ⬜      |
-| Exportação PDF                       | ⬜      |
-
----
-
-## 🏗️ Stack Técnica
-
-| Camada       | Tech                               | Notas               |
-| ------------ | ---------------------------------- | ------------------- |
-| Front‑end    | **Next.js 14**, Tailwind CSS       | Deploy Vercel       |
-| Back‑end     | **Firebase** (Auth, Firestore, CF) | NoSQL, serverless   |
-| API Insights | **FastAPI** + OpenAI GPT‑4o        | Cloud Run           |
-| CI / CD      | GitHub Actions                     | Lint, test, preview |
-| Testes       | Jest, Pytest, Playwright           | Cobertura ≥ 80 %    |
-
----
-
-## 📂 Estrutura do Repositório
-
-```
-.
-├─ apps/
-│  └─ web/         # Next.js front‑end
-├─ functions/      # Firebase Cloud Functions (TypeScript)
-├─ api/            # FastAPI service (Python)
-├─ docs/           # PRD, arquitetura, data‑model, etc.
-├─ design/         # Figma exports, Style Guide UI
-├─ tests/          # Estratégia e suites E2E
-└─ infra/          # IaC (Terraform opciona...
-
+```bash
+npm run setup
+cp -n app/.env.example app/.env.local   # só cria se não existir; preencha os valores
+npm run dev                          # http://localhost:3000
 ```
 
-> _Changelog 2025-07-12_: variáveis de ambiente configuradas no Vercel para todos os ambientes.
+Para ver as telas novas (`/diario`), coloque o e-mail da sua conta em `HUB_USERS` no `app/.env.local`.
+
+Outros comandos, todos a partir da raiz:
+
+```bash
+npm test             # testes
+npm run type-check   # tipos
+npm run lint         # lint
+npm run build        # build de produção
+```
+
+## Estrutura
+
+```
+app/                 # o aplicativo (Next.js)
+├── app/(hub)/       # telas novas, com a moldura das pranchas
+├── app/api/         # rotas de API (todas exigem login)
+├── components/hub/  # moldura: cabeçalho, tema, acesso
+├── lib/             # autenticação, Supabase, fusos, leitores de CSV
+├── styles/hub.css   # tokens de cor das telas novas
+└── __tests__/       # testes
+supabase/            # configuração e migrações SQL
+design/              # logos e fontes
+docs/arquivo/        # documentos de antes da reconstrução, só para consulta
+```
+
+## Fases
+
+| Fase | Conteúdo |
+|---|---|
+| 0 | Base segura e moldura (concluída) |
+| 1 | Contas e importação |
+| 2 | Regras e janelas |
+| 3 | Registrar operação |
+| 4 | Diário |
+| 5 | Estado do mercado |
+| 6 | Análises |
+| 7 | Padrões |
+| 8 | Mercado, página do ativo, Início e IA |
+| 9 | Troca e limpeza |
+
+## Repositório público
+
+Nunca envie para o Git exportações reais das corretoras nem arquivos `.env`. A pasta `docs/csv/` é ignorada pelo Git justamente para guardar os arquivos reais.
