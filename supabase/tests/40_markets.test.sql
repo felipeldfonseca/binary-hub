@@ -132,6 +132,14 @@ select tests.raises(format($$update public.trading_accounts set currency = 'BRL'
                     'permission denied for table trading_accounts', 'the currency is not writable through the API');
 select tests.raises(format($$update public.trading_accounts set day_start_min = 0 where id = %L$$, :'fx'),
                     'permission denied for table trading_accounts', 'nor the day clock');
+-- legacy_market_type marks the accounts the Phase 1 backfill created; a client that sends it too
+-- still gets the market's values (the trigger skips no row)
+savepoint legacy_insert;
+insert into public.trading_accounts (user_id, market, label, platform, phase, legacy_market_type, day_tz, day_start_min, currency, sort_order)
+values (:M, 'forex', 'FTMO antiga', 'mt5', 'avaliacao', 'forex', 'America/Sao_Paulo', 0, 'BRL', 9);
+select tests.eq((select day_tz || ' ' || day_start_min || ' ' || currency from public.trading_accounts where user_id = :M and label = 'FTMO antiga'),
+                'America/New_York 1020 USD', 'an insert that sends legacy_market_type gets the market''s clock and currency too');
+rollback to savepoint legacy_insert;
 commit;
 
 -- =============================================================================================
@@ -171,6 +179,33 @@ select tests.eq(tests.limit_code('b3', '{"brl": 400.001, "mode": "conta", "at_li
 select tests.eq(tests.limit_code('b3', '{"brl": 1000000.01, "mode": "conta", "at_limit": "encerrar"}'), 'bad_limit', 'over a million reais');
 select tests.eq(tests.limit_code('b3', '{"brl": "500", "mode": "conta", "at_limit": "encerrar"}'), 'bad_limit', 'an amount written as text');
 select tests.eq(tests.limit_code('b3', '{"brl": 1000000, "mode": "conta", "at_limit": "avisar"}'), null, 'R$ 1.000.000 that warns');
+-- The order of the checks (contract §3.3; checkLimit in TypeScript must give the same code): unknown
+-- keys first, then the other currency's key, the amount, mode and at_limit (bad_limit), and «somando»
+-- outside Futuros last, so a limit with a fault besides «somando» is bad_limit, not not_for_market
+select tests.eq((select string_agg(m || ' ' || l::text || ' → ' || coalesce(tests.limit_code(m, l), 'ok'), '; ')
+                 from (values
+                   ('forex', '{"usd": 100, "mode": "soma", "at_limit": "encerrar", "x": 1}'::jsonb, 'unknown_key'),
+                   ('b3', '{"usd": 100, "x": 1, "mode": "conta", "at_limit": "encerrar"}', 'unknown_key'),
+                   ('b3', '{"usd": 100, "mode": "soma", "at_limit": "encerrar"}', 'bad_limit'),
+                   ('b3', '{"brl": 100, "usd": 100, "mode": "soma", "at_limit": "encerrar"}', 'bad_limit'),
+                   ('forex', '{"brl": 100, "mode": "soma", "at_limit": "encerrar"}', 'bad_limit'),
+                   ('forex', '{"usd": "x", "mode": "soma", "at_limit": "encerrar"}', 'bad_limit'),
+                   ('forex', '{"mode": "soma", "at_limit": "encerrar"}', 'bad_limit'),
+                   ('forex', '{"usd": 0, "mode": "soma", "at_limit": "encerrar"}', 'bad_limit'),
+                   ('crypto', '{"usd": 100.005, "mode": "soma", "at_limit": "avisar"}', 'bad_limit'),
+                   ('stocks', '{"usd": 100, "mode": "soma", "at_limit": "x"}', 'bad_limit'),
+                   ('binary', '{"usd": 100, "mode": "soma"}', 'bad_limit'),
+                   ('forex', '[]', 'bad_limit'),
+                   ('forex', '"soma"', 'bad_limit'),
+                   ('forex', '{"usd": 100, "mode": "soma", "at_limit": "encerrar"}', 'not_for_market'),
+                   ('b3', '{"brl": 100, "mode": "soma", "at_limit": "encerrar"}', 'not_for_market'),
+                   ('futures', '{"usd": "x", "mode": "soma", "at_limit": "encerrar"}', 'bad_limit'),
+                   ('futures', '{"usd": 100, "mode": "soma", "at_limit": "encerrar"}', null)
+                 ) as c(m, l, expected)
+                 where tests.limit_code(m, l) is distinct from expected), null,
+                'the limit''s checks run in the contract''s order: unknown_key, then bad_limit, then not_for_market');
+select tests.eq(tests.limit_code('futures', '{"brl": 400, "mode": "conta", "at_limit": "encerrar"}'), 'bad_limit',
+                'brl alone on a dollar market (unknown_key before M5d, like both keys; no stored row and no Phase 2 path writes brl)');
 select tests.ok(public.rules_check_market('xyz', '{"v": 1, "window_rule": {"on": true, "outside": "fora"}}') = 'unsupported_market'
                 and public.rules_check_account('xyz', '{"v": 1}') = 'unsupported_market'
                 and public.rules_check_market(null, '{"v": 1, "window_rule": {"on": true, "outside": "fora"}}') = 'unsupported_market',
@@ -223,6 +258,9 @@ from (values
      "day": {"tz": "America/New_York", "start_min": 1200}}'),
   ('forex soma', 'not_for_market', '{"v": 1, "market": "forex", "windows": [], "windows_from": null,
      "window_rule": {"on": true, "outside": "fora"}, "block": null, "limit": {"usd": 500, "mode": "soma", "at_limit": "encerrar"},
+     "states": null, "day": {"tz": "America/New_York", "start_min": 1020}}'),
+  ('forex soma with an amount in text', 'bad_limit', '{"v": 1, "market": "forex", "windows": [], "windows_from": null,
+     "window_rule": {"on": true, "outside": "fora"}, "block": null, "limit": {"usd": "500", "mode": "soma", "at_limit": "encerrar"},
      "states": null, "day": {"tz": "America/New_York", "start_min": 1020}}'),
   ('a futures-shaped version with market b3', 'not_for_market', jsonb_set(tests.topone_v1(), '{market}', '"b3"')),
   ('market xyz', 'unsupported_market', jsonb_set(tests.binary_v1(), '{market}', '"xyz"')),
@@ -516,6 +554,21 @@ select tests.ok((select bool_and(x->'current' = x->'versions'->-1->'resolved') f
                  where jsonb_array_length(x->'versions') > 0), 'current is what a save now would freeze');
 commit;
 
+-- Archived and example accounts are listed too: the Phase 2 app reads every account rules_config
+-- returns (contract §4.9; the conferência's contas_em_mercados_novos counts them, C15)
+begin;
+select set_config('request.jwt.claim.sub', :M, true);
+set local role authenticated;
+update public.trading_accounts set archived_at = '2026-10-10 12:00:00+00' where id = :'cr';
+insert into public.trading_accounts (user_id, market, label, platform, phase, is_example, sort_order)
+values (:M, 'stocks', 'Exemplo IBKR', 'ibkr', 'pessoal', true, 6);
+select tests.eq((select jsonb_object_agg(x->>'label', jsonb_build_array(x->>'archived_at', x->'is_example'))
+                 from jsonb_array_elements(public.rules_config()->'accounts') x),
+                '{"Top One M": [null, false], "FTMO": [null, false], "IBKR": [null, false],
+                  "Binance": ["2026-10-10T12:00:00+00:00", false], "Clear": [null, false], "Exemplo IBKR": [null, true]}'::jsonb,
+                'rules_config lists archived and example accounts, each marked');
+rollback;
+
 -- =============================================================================================
 -- 7. «Posso operar hoje?» in the new markets
 -- =============================================================================================
@@ -658,6 +711,17 @@ values (:L, 'EURUSD', 'forex', 'long', '2026-10-19 12:00:00+00', 1, 'win', 5, 'f
 select tests.ok((select account_id = :'l_fx' and trading_day = '2026-10-19' from public.trades where user_id = :L),
                 'an old-page Forex trade lands on the backfilled account, on its own day');
 select tests.eq(public.gate_at(:'l_opt', now())->'status', 'null'::jsonb, 'an options account is answered (no version yet)');
+-- Editar conta on both (the market trigger runs on insert only: a rename or an archive keeps the
+-- clock and the currency, and an «options» account, which can no longer be created, can be edited)
+update public.trading_accounts set label = 'Forex antigo' where id = :'l_fx';
+update public.trading_accounts set label = 'Opções antigas', archived_at = '2026-10-18 12:00:00+00' where id = :'l_opt';
+select tests.eq((select string_agg(label || ' ' || day_tz || ' ' || day_start_min || ' ' || currency || ' ' || (archived_at is not null), ', '
+                                   order by sort_order)
+                 from public.trading_accounts where user_id = :L),
+                'Forex antigo America/Sao_Paulo 0 BRL false, Opções antigas America/Sao_Paulo 0 USD true',
+                'renaming and archiving them changes neither clock nor currency');
+select tests.ok((select account_id = :'l_fx' and trading_day = '2026-10-19' from public.trades where user_id = :L),
+                'and their trades keep their day');
 commit;
 select tests.eq((select string_agg(day_tz || ' ' || day_start_min || ' ' || currency, ', ' order by sort_order)
                  from public.trading_accounts where user_id = :L),
@@ -716,6 +780,28 @@ values (:C, 'futures', 'deposit', 100, '2026-10-19');
 select tests.eq((select account_id from public.account_transactions where user_id = :C and transaction_date = '2026-10-19'),
                 :'c_legacy_fut'::uuid, 'and so does an old-page futures transaction');
 commit;
+
+-- A (legacy seed) has the accounts created from the old data (Top One #1, Ebinex) and hub accounts
+-- in the same markets (Top One #2, the example account, Ebinex 3–5). The old quick-add writers send
+-- no market_type and no account; their trades go to the accounts created from the old data, never
+-- to a hub account of the same market (contract §4.8; before M5d the missing market_type matched
+-- every hub account's empty legacy_market_type instead)
+begin;
+select set_config('request.jwt.claim.sub', :A, true);
+set local role authenticated;
+select tests.ok((select count(*) from public.trading_accounts where user_id = :A and archived_at is null and legacy_market_type is null
+                 and market in ('futures', 'binary')) >= 2, 'A has hub accounts next to the ones created from the old data');
+insert into public.trades (user_id, symbol, asset_type, direction, entry_time, quantity, result, pnl)
+values (:A, 'NQ', 'futures', 'long', '2026-10-19 14:00:00+00', 1, 'win', 20);
+insert into public.trades (user_id, symbol, asset_type, direction, entry_time, exit_time, stake_amount, payout_percent, result, pnl)
+values (:A, 'EUR/USD', 'binary_option', 'call', '2026-10-19 23:30:00+00', '2026-10-19 23:31:00+00', 10, 90, 'win', 9);
+select tests.eq((select string_agg(t.market_type || ' > ' || a.label || ' (' || coalesce(a.legacy_market_type, 'hub') || ')', ', '
+                                   order by t.market_type)
+                 from public.trades t join public.trading_accounts a on a.id = t.account_id
+                 where t.user_id = :A and t.entry_time in ('2026-10-19 14:00:00+00', '2026-10-19 23:30:00+00')),
+                'binary > Ebinex (binary), futures > Top One #1 (futures)',
+                'old-page trades without a market land on the accounts created from the old data');
+rollback;
 
 -- =============================================================================================
 -- 12. Nothing that existed before moved

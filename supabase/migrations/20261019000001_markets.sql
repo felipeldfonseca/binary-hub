@@ -47,12 +47,17 @@
 --   - The validators (rules_check_limit, _market, _account, _resolved), rules_builtin,
 --     rules_resolve, rules_check_payload, save_rules, gate_eval, gate_at and rules_config read the
 --     market from market_caps instead of naming futures and binary. For a futures or binary input
---     each gives exactly what it gave before (the one exception: a limit carrying both "usd" and
---     "brl" was unknown_key and is now bad_limit; no stored row has "brl").
+--     each gives exactly what it gave before, with one exception: a limit carrying "brl" and no
+--     other unknown key, alone or beside "usd", was unknown_key and is now bad_limit (no stored row
+--     has "brl", and the Phase 2 app never sends it).
 --   - The three two-market checks of operating_windows, market_rule_defaults and
 --     account_rule_settings become named checks with the seven markets (*_market_ok).
 --   - A BEFORE INSERT trigger on trading_accounts sets day_tz, day_start_min and currency from
 --     market_caps, whatever the client sent, and refuses a market that is not creatable.
+--   - trades_bridge (Phase 1): a trade an old page writes with no account and no market_type goes
+--     to the account created from the old data, as its ordering always meant to (it went to a hub
+--     account of the same market). Trades written with an account or a market_type are placed as
+--     before, and no stored trade moves.
 --
 -- What never changes
 --
@@ -1078,7 +1083,81 @@ create trigger trading_accounts_by_market
   for each row execute function public.trading_accounts_by_market();
 
 -- =============================================================================================
--- 7. Privileges (Supabase grants EXECUTE on every new function to anon and authenticated)
+-- 7. The old pages' trades go to the account created from the old data
+-- =============================================================================================
+-- For a writer that names no account (the old pages), trades_bridge picks one by market and puts
+-- first the account the Phase 1 backfill created from the old data (legacy_market_type). It
+-- compared legacy_market_type with the trade's market_type, which the old quick-add writers
+-- (binárias and futuros) leave empty: an empty market_type matched every hub account's empty
+-- legacy_market_type and never the backfilled one, so their trades went to a hub account of the
+-- same market (even an archived or example one). The comparison now uses the market the trade
+-- resolves to. A trade with market_type compares exactly as before, a trade with an account skips
+-- the choice, and no stored trade moves. The rest is 20261018000002's body, unchanged.
+
+create or replace function public.trades_bridge()
+returns trigger
+language plpgsql
+set search_path = ''
+as $$
+declare
+  acc public.trading_accounts%rowtype;
+  mkt text;
+begin
+  if new.account_id is null then
+    -- An old writer: pick the account by market, preferring the one created from the old data
+    mkt := coalesce(new.market_type,
+                    case new.asset_type when 'binary_option' then 'binary' when 'futures' then 'futures' end);
+    select a.* into acc
+    from public.trading_accounts a
+    where a.user_id = new.user_id
+      and a.market = mkt
+    order by (a.legacy_market_type is not distinct from mkt) desc,
+             (a.archived_at is null) desc, a.is_primary desc, a.sort_order, a.created_at
+    limit 1;
+    if not found then
+      raise exception 'no_account_for_trade' using errcode = '23514';
+    end if;
+    new.account_id := acc.id;
+  else
+    select a.* into acc from public.trading_accounts a where a.id = new.account_id and a.user_id = new.user_id;
+    if not found then
+      raise exception 'unknown_account' using errcode = '23503';
+    end if;
+  end if;
+
+  -- The old pages filter by market_type
+  if new.market_type is null
+     or (tg_op = 'UPDATE' and new.account_id is distinct from old.account_id) then
+    new.market_type := acc.market;
+  end if;
+
+  if tg_op = 'INSERT' and new.source is null then
+    if new.notes ~ '^(ebinex|topone):.' then
+      -- The old import path: it wrote the file's wall clock as UTC. Keep that clock, and once
+      -- the account's zone has been confirmed, place the trade at the right instant.
+      new.source := 'import';
+      new.source_platform := split_part(new.notes, ':', 1);
+      new.external_id := substr(new.notes, position(':' in new.notes) + 1);
+      if new.entry_time = date_trunc('second', new.entry_time) then
+        new.source_local_entry := new.entry_time at time zone 'UTC';
+        new.source_local_exit := new.exit_time at time zone 'UTC';
+        if acc.tz_applied_at is not null and acc.file_tz <> 'UTC' then
+          new.entry_time := new.source_local_entry at time zone acc.file_tz;
+          new.exit_time := new.source_local_exit at time zone acc.file_tz;
+        end if;
+      end if;
+    else
+      new.source := 'after';
+    end if;
+  end if;
+
+  new.trading_day := public.compute_trading_day(acc.id, new.entry_time);
+  return new;
+end;
+$$;
+
+-- =============================================================================================
+-- 8. Privileges (Supabase grants EXECUTE on every new function to anon and authenticated)
 -- =============================================================================================
 
 -- The descriptor and the amount: called as the caller by the invoker functions (rules_resolve,
@@ -1112,7 +1191,7 @@ grant execute on function public.gate_at(uuid, timestamptz) to authenticated;
 grant execute on function public.rules_config() to authenticated;
 
 -- =============================================================================================
--- 8. Nothing that existed moved (any failure stops the migration; codes carry counts, never values)
+-- 9. Nothing that existed moved (any failure stops the migration; codes carry counts, never values)
 -- =============================================================================================
 
 do $$
