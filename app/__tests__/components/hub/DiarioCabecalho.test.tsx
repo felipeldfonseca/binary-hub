@@ -8,7 +8,7 @@ import DiarioCabecalho from '@/components/hub/contas/DiarioCabecalho'
 import ImportSheetProvider from '@/components/hub/importar/ImportSheetProvider'
 import { QueryProvider } from '@/lib/providers/QueryProvider'
 import { makeAccount, renderHub } from '@/testing/hubHarness'
-import { agora, idsDono } from '@/testing/regras'
+import { agora, agoraMercados, contasMercados, idsDono, idsMercados } from '@/testing/regras'
 import { regrasKeys } from '@/hooks/useRegras'
 import { hubKeys } from '@/hooks/useContas'
 import type { TradingAccount } from '@/lib/hub/contas'
@@ -23,6 +23,32 @@ jest.mock('next/navigation', () => ({
 }))
 
 jest.mock('@/lib/supabase', () => ({ createDataClient: jest.fn(() => ({})) }))
+
+// The import sheet is lane A's. These tests check what the header asks of it, through the frozen
+// useImportSheet().open({mode, accountId, opener}), never the sheet's steps or headings (contract C4).
+// The real sheet still opens: only the call is recorded.
+const mockOpen = jest.fn()
+jest.mock('@/components/hub/importar/ImportSheetProvider', () => {
+  const { useMemo } = jest.requireActual('react')
+  const actual = jest.requireActual('@/components/hub/importar/ImportSheetProvider')
+  return {
+    __esModule: true,
+    ...actual,
+    useImportSheet: () => {
+      const sheet = actual.useImportSheet()
+      return useMemo(
+        () => ({
+          ...sheet,
+          open: (options: unknown) => {
+            mockOpen(options)
+            sheet.open(options)
+          },
+        }),
+        [sheet],
+      )
+    },
+  }
+})
 
 jest.mock('@/hooks/useAuth', () => ({
   useAuth: () => ({ user: { id: 'user-1' }, session: { access_token: 'user-jwt' } }),
@@ -60,6 +86,7 @@ const selectorButton = () => screen.findByRole('button', { name: /^Conta: / })
 beforeEach(() => {
   mockSearch = ''
   mockReplace.mockReset()
+  mockOpen.mockReset()
   fetchAccounts.mockReset().mockResolvedValue([topOne, ebinex, apex, example, closed])
   fetchPreferences.mockReset().mockResolvedValue({ tema: 'escuro' })
   mergePreferences.mockReset().mockImplementation(async (_db, patch) => ({ tema: 'escuro', ...patch }) as data.HubPreferences)
@@ -161,33 +188,30 @@ describe('Diário header', () => {
 
     expect(await screen.findByText('Traga o histórico da sua corretora.')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /^Conta: / })).not.toBeInTheDocument()
-    await userEvent.click(screen.getByRole('button', { name: '+ Adicionar conta' }))
-    expect(screen.getByRole('dialog', { name: 'Adicionar conta' })).toBeInTheDocument()
+    const add = screen.getByRole('button', { name: '+ Adicionar conta' })
+    await userEvent.click(add)
+    expect(mockOpen).toHaveBeenCalledWith({ mode: 'adicionar', opener: add })
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
   })
 
   it('gives focus to the H1 when the empty state that opened the sheet is gone', async () => {
     fetchAccounts.mockResolvedValue([example])
     const created = makeAccount({ label: 'Ebx', market: 'binary', platform: 'pocket', phase: 'pessoal', is_primary: true })
-    createAccount.mockImplementation(async () => {
-      fetchAccounts.mockResolvedValue([example, created])
-      return created
-    })
-    renderHub(<DiarioCabecalho />)
+    const { queryClient } = renderHub(<DiarioCabecalho />)
 
     await userEvent.click(await screen.findByRole('button', { name: '+ Adicionar conta' }))
-    const dialog = screen.getByRole('dialog', { name: 'Adicionar conta' })
-    await userEvent.click(within(dialog).getByRole('button', { name: 'Opções binárias' }))
-    await userEvent.click(within(dialog).getByRole('button', { name: 'Continuar' }))
-    await userEvent.click(within(dialog).getByRole('button', { name: 'Pocket Option' }))
-    await userEvent.click(within(dialog).getByRole('button', { name: 'Continuar' }))
-    await userEvent.type(within(dialog).getByLabelText('Apelido'), 'Ebx')
-    await userEvent.click(within(dialog).getByRole('button', { name: 'Criar Ebx' }))
-    await within(dialog).findByRole('heading', { name: 'Ebx criada.' })
-    // The selector replaces the empty state
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
+    // An account is created while the sheet is open (the sheet's steps are lane A's tests): the
+    // accounts are read again and the selector replaces the empty state
+    fetchAccounts.mockResolvedValue([example, created])
+    await act(async () => {
+      await queryClient.invalidateQueries({ queryKey: hubKeys.contas('user-1') })
+    })
     expect(await screen.findByRole('button', { name: /^Conta: /, hidden: true })).toHaveTextContent('Conta: Ebx')
 
     await userEvent.keyboard('{Escape}')
 
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
     expect(screen.getByRole('heading', { level: 1, name: 'Diário' })).toHaveFocus()
   })
 
@@ -195,20 +219,26 @@ describe('Diário header', () => {
     renderHub(<DiarioCabecalho />)
     await selectorButton()
 
-    await userEvent.click(screen.getByRole('button', { name: 'Importar arquivo' }))
+    const importFile = screen.getByRole('button', { name: 'Importar arquivo' })
+    await userEvent.click(importFile)
 
-    const dialog = screen.getByRole('dialog', { name: 'Importar arquivo' })
-    expect(within(dialog).getByRole('heading', { name: 'Importar histórico de Ebinex' })).toHaveFocus()
+    expect(mockOpen).toHaveBeenCalledWith({ mode: 'importar', accountId: ebinex.id, opener: importFile })
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
     await userEvent.keyboard('{Escape}')
-    expect(screen.getByRole('button', { name: 'Importar arquivo' })).toHaveFocus()
+    expect(importFile).toHaveFocus()
   })
 
   it('opens the sheet straight away with ?importar=1, and drops it from the URL', async () => {
     mockSearch = `importar=1&conta=${topOne.id}`
     renderHub(<DiarioCabecalho />)
 
-    const dialog = await screen.findByRole('dialog', { name: 'Importar arquivo' })
-    expect(within(dialog).getByRole('heading', { name: 'Importar histórico de Top One' })).toBeInTheDocument()
+    expect(await screen.findByRole('dialog')).toBeInTheDocument()
+    expect(mockOpen).toHaveBeenCalledTimes(1)
+    expect(mockOpen).toHaveBeenCalledWith({
+      mode: 'importar',
+      accountId: topOne.id,
+      opener: screen.getByRole('button', { name: 'Importar arquivo', hidden: true }),
+    })
     await waitFor(() => expect(mockReplace).toHaveBeenCalledWith(`/diario?conta=${topOne.id}`))
   })
 
@@ -500,5 +530,94 @@ describe('Diário header window line', () => {
     await waitFor(() => expect(queryClient.getQueryState(regrasKeys.agora('user-1'))?.status).toBe('success'))
     await act(async () => {})
     expect(line()).toBeNull()
+  })
+})
+
+describe('Diário header in six markets (Fase 2b)', () => {
+  // The six-market owner (recorded on the markets migration) and rules_now() at Mon 19 Oct 08:30 ET
+  const im = idsMercados()
+  const line = () => document.getElementById('janela-conta')
+
+  beforeEach(() => {
+    fetchAccounts.mockResolvedValue(contasMercados())
+    fetchRulesNow.mockResolvedValue(agoraMercados())
+  })
+
+  it.each([
+    ['FTMO', 'ftmo', 'Janela 08:00–10:00 ET'],
+    ['IBKR', 'ibkr', 'Sem janela salva'],
+    ['Binance', 'binance', 'Janela 20:00–22:00 · Brasília'],
+    ['Clear', 'clear', 'Janela 10:00–11:00 · Brasília'],
+  ] as const)('the window line of %s under the selector', async (label, key, texto) => {
+    mockSearch = `conta=${im[key]}`
+    renderHub(<DiarioCabecalho />)
+
+    const button = await selectorButton()
+    expect(button).toHaveTextContent(`Conta: ${label}`)
+    await waitFor(() => expect(line()).toHaveTextContent(texto))
+    expect(button).toHaveAccessibleDescription(texto)
+  })
+
+  it('lists every market in the selector, in the board’s order, never summed', async () => {
+    renderHub(<DiarioCabecalho />)
+
+    await userEvent.click(await selectorButton())
+
+    const list = document.getElementById('lista-contas') as HTMLElement
+    expect(Array.from(list.querySelectorAll('.hub-seletor__grupo')).map((el) => el.textContent)).toEqual([
+      'Futuros',
+      'Opções binárias',
+      'Forex',
+      'Ações',
+      'Cripto',
+      'B3',
+    ])
+    expect(within(list).getByText('Contas de mercados diferentes nunca são somadas.')).toBeInTheDocument()
+  })
+
+  it('«Importar arquivo» with a Cripto account opens the sheet without an account (no file of that market is read yet)', async () => {
+    mockSearch = `conta=${im.binance}`
+    renderHub(<DiarioCabecalho />)
+    expect(await selectorButton()).toHaveTextContent('Conta: Binance')
+
+    const importFile = screen.getByRole('button', { name: 'Importar arquivo' })
+    await userEvent.click(importFile)
+
+    expect(mockOpen).toHaveBeenCalledWith({ mode: 'importar', accountId: null, opener: importFile })
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
+    await userEvent.keyboard('{Escape}')
+    expect(importFile).toHaveFocus()
+  })
+
+  it.each(['ftmo', 'ibkr', 'clear'] as const)('?importar=1 with a %s account in context opens the sheet without it', async (key) => {
+    mockSearch = `importar=1&conta=${im[key]}`
+    renderHub(<DiarioCabecalho />)
+
+    expect(await screen.findByRole('dialog')).toBeInTheDocument()
+    expect(mockOpen).toHaveBeenCalledTimes(1)
+    expect(mockOpen).toHaveBeenCalledWith({
+      mode: 'importar',
+      accountId: null,
+      opener: screen.getByRole('button', { name: 'Importar arquivo', hidden: true }),
+    })
+    await waitFor(() => expect(mockReplace).toHaveBeenCalledWith(`/diario?conta=${im[key]}`))
+  })
+
+  it.each(['topOne', 'ebinex'] as const)('a Futuros or binárias account (%s) still opens the sheet on itself, also with ?importar=1', async (key) => {
+    mockSearch = `conta=${im[key]}`
+    const { unmount } = renderHub(<DiarioCabecalho />)
+    await selectorButton()
+
+    const importFile = screen.getByRole('button', { name: 'Importar arquivo' })
+    await userEvent.click(importFile)
+
+    expect(mockOpen).toHaveBeenCalledWith({ mode: 'importar', accountId: im[key], opener: importFile })
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
+    unmount()
+
+    mockOpen.mockReset()
+    mockSearch = `importar=1&conta=${im[key]}`
+    renderHub(<DiarioCabecalho />)
+    await waitFor(() => expect(mockOpen).toHaveBeenCalledWith(expect.objectContaining({ mode: 'importar', accountId: im[key] })))
   })
 })

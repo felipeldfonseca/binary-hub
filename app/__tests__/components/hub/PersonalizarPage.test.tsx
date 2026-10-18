@@ -13,7 +13,7 @@ import { ERRO_REGRAS } from '@/components/hub/personalizar/copy'
 import { buildSavePayload, type ConfigVersion, type RulesConfig, type RulesSettings, type SaveRulesResult } from '@/lib/hub/regras'
 import { comLimite } from '@/lib/hub/rascunho'
 import { makeAccount, renderHub } from '@/testing/hubHarness'
-import { configAntes, configDepois, idsDono } from '@/testing/regras'
+import { configAntes, configDepois, configMercados, contasMercados, idsDono, idsMercados } from '@/testing/regras'
 import { et, topOneRules } from '@/testing/gate'
 
 jest.mock('@/lib/supabase', () => ({ createDataClient: jest.fn(() => ({})) }))
@@ -529,6 +529,99 @@ describe('«Suas regras»', () => {
 
     expect(screen.getAllByText('Nenhum calendário marcado: nada vai bloquear o dia.')).toHaveLength(2)
     expect(statusTopo()).toHaveTextContent('Alterações não salvas')
+  })
+})
+
+describe('six markets (Fase 2b)', () => {
+  // The six-market owner as recorded on the markets migration (invented data): Top One #1, Ebinex,
+  // FTMO (Forex, Avaliação), IBKR (Ações, no version), Binance (Cripto), Clear (B3, R$ 500)
+  const im = idsMercados()
+
+  beforeEach(() => {
+    fetchAccounts.mockResolvedValue(contasMercados())
+    fetchRulesConfig.mockResolvedValue(configMercados())
+    fetchTradesSince.mockResolvedValue({})
+  })
+
+  it('a card per market with an account, «Regras de» in the same order, the chips with each account’s phase', async () => {
+    renderPage()
+    await ready()
+
+    expect(within(janelas()).getAllByRole('group', { name: /^Janela d/ }).map((g) => g.getAttribute('aria-label'))).toEqual([
+      'Janela de Futuros',
+      'Janela de Opções binárias',
+      'Janela de Forex',
+      'Janela de Ações',
+      'Janela de Cripto',
+      'Janela da B3',
+    ])
+    expect(within(janelas()).queryByRole('button', { name: '+ Adicionar conta' })).not.toBeInTheDocument()
+    expect(within(screen.getByRole('group', { name: 'Regras de' })).getAllByRole('button').map((b) => b.textContent)).toEqual([
+      'Padrão Futuros',
+      'Top One #1',
+      'Ebinex',
+      'FTMO',
+      'IBKR',
+      'Binance',
+      'Clear',
+    ])
+
+    await escolher('Clear')
+    expect(within(regras()).getByText('B3 · Pessoal')).toBeInTheDocument()
+    expect(valorLimite()?.textContent).toBe('R$\u00a0500')
+    await escolher('FTMO')
+    expect(within(regras()).getByText('Forex · Avaliação')).toBeInTheDocument()
+    expect(within(regras()).getByRole('button', { name: 'Como ler: regras de Forex' })).toBeInTheDocument()
+  })
+
+  it('saves a B3 limit with the brl key, and nothing else', async () => {
+    const base = configMercados()
+    const saved = comLimite(base.settings, im.clear, 75000)
+    saveRules.mockResolvedValue(
+      resultado('rev-2', [{ accountId: im.clear, versionNo: 2, effectiveFrom: new Date('2026-10-22T16:00:00Z'), effectiveDay: '2026-10-22', origin: 'salvar' }]),
+    )
+    renderPage()
+    await ready()
+    await escolher('Clear')
+
+    await userEvent.click(screen.getByRole('button', { name: 'Mudar o limite do dia de Clear' }))
+    const field = screen.getByLabelText('Limite do dia, em R$')
+    await userEvent.clear(field)
+    await userEvent.type(field, '750')
+    await userEvent.click(screen.getByRole('button', { name: 'OK' }))
+    expect(valorLimite()?.textContent).toBe('R$\u00a0750')
+    // Clear's day turns at midnight in Brasília: Thursday 12:00 ET is still 22 out
+    expect(screen.getByText('Ao salvar: Regras v2 desde 22 out.')).toBeInTheDocument()
+
+    await userEvent.click(salvarTopo())
+
+    await waitFor(() => expect(saveRules).toHaveBeenCalled())
+    const payload = saveRules.mock.calls[0][1]
+    expect(payload).toEqual(buildSavePayload(base, saved))
+    expect(Object.keys(payload.accounts ?? {})).toEqual([im.clear])
+    expect(payload.accounts?.[im.clear].rules.limit).toEqual({ brl: 750, mode: 'conta', at_limit: 'encerrar' })
+    // No market default rides along (the 2b app never writes defaults it did not change)
+    expect(payload.defaults).toBeUndefined()
+    await waitFor(() => expect(statusTopo()).toHaveTextContent('Salvo. Regras novas desde 22 out: Clear v2.'))
+  })
+
+  it('«+ Definir janela» in Ações saves the stocks default (09:30–10:30 ET), and IBKR gets its first version', async () => {
+    saveRules.mockResolvedValue(resultado('rev-2'))
+    renderPage()
+    await ready()
+    const acoes = within(janelas()).getByRole('group', { name: 'Janela de Ações' })
+
+    await userEvent.click(within(acoes).getByRole('button', { name: '+ Definir janela' }))
+    await escolher('IBKR')
+    expect(screen.getByText('Ao salvar: Regras v1 desde 22 out.')).toBeInTheDocument()
+    await userEvent.click(salvarTopo())
+
+    await waitFor(() => expect(saveRules).toHaveBeenCalled())
+    const payload = saveRules.mock.calls[0][1]
+    expect(Object.keys(payload.defaults ?? {})).toEqual(['stocks'])
+    expect(payload.defaults?.stocks?.windows).toEqual([{ tz: 'America/New_York', start_min: 570, end_min: 630, weekdays: 31 }])
+    expect(payload.defaults?.stocks?.rules).not.toHaveProperty('block')
+    expect(payload.defaults?.stocks?.rules).not.toHaveProperty('states')
   })
 })
 

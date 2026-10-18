@@ -8,12 +8,15 @@
  *   ADAPTED  a board string changed for Phase 2 (the comment says what changed)
  *
  * Lane A2 reuses the window strings, the day names and ERRO_REGRAS (read-only).
+ *
+ * Fase 2b (lane B): the boards of version 53 (Personalizar with six markets). The new markets have
+ * the window and the daily limit only; their money is the market's (R$ on B3, US$ elsewhere).
  */
 import { ACCOUNT_MARKETS, type AccountMarket, type CalendarCode, type Currency, type StateChoice, type StateName, type WindowTz } from '@/lib/domain/gate'
 import { REGRAS_ERROR_CODES, type RegrasErrorCode } from '@/lib/hub/regrasDb'
 import type { DisplayTz, UsdTextResult, WindowError } from '@/lib/hub/regras'
 import { SIMBOLO_MOEDA, formatInt } from '@/lib/hub/formato'
-import { MERCADO } from '@/components/hub/copyMercados'
+import { MERCADO, USDT_COMO_DOLAR } from '@/components/hub/copyMercados'
 
 /** «a, b e c» (board `lista`) */
 export const lista = (xs: readonly string[]): string =>
@@ -145,9 +148,10 @@ export const JANELAS = {
   titulo: 'Quando você opera',
   infoAria: 'Como ler: Quando você opera',
   sub: 'Cada mercado tem a sua janela padrão; uma conta pode ter a própria.',
-  // ADAPTED: drops «e para as Leituras da IA» (Phase 8); the next clock change is computed
+  // ADAPTED (board v53 `txt.infoJanelas`): drops «e para as Leituras da IA» (Phase 8); the next
+  // clock change is computed
   info: (proximaMudanca: string) =>
-    `Elas valem para “Só operar dentro da sua janela”, em Suas regras. Futuros seguem o pregão de Nova York: a janela fica no relógio de Nova York (ET) e, em Brasília, anda 1 hora quando os EUA mudam o horário. Binárias abrem 24 h: a janela fica no relógio de Brasília, que não muda. Em cinza, a mesma janela no outro relógio; nos 14 dias antes de uma mudança (a próxima é ${proximaMudanca}), aparece também a hora nova. Fim antes do início: a janela termina no dia seguinte, e as operações contam no dia em que ela abre. O dia de Futuros começa às 18:00 ET; o de binárias, à meia-noite de Brasília. Os campos de hora usam sempre o relógio da janela, qualquer que seja “Horários na tela”. Com uma segunda conta no mercado, dá para ajustar a janela só nela. Ao salvar, cada conta cuja janela mudou ganha uma versão nova das regras, com a data do dia.`,
+    `Elas valem para “Só operar dentro da sua janela”, em Suas regras. Futuros, Forex e Ações seguem o horário de Nova York: a janela fica no relógio de Nova York (ET) e, em Brasília, anda 1 hora quando os EUA mudam o horário. Binárias, Cripto e a B3 ficam no relógio de Brasília, que não muda. Em cinza, a mesma janela no outro relógio; nos 14 dias antes de uma mudança (a próxima é ${proximaMudanca}), aparece também a hora nova. Fim antes do início: a janela termina no dia seguinte, e as operações contam no dia em que ela abre. O dia começa às 18:00 ET em Futuros, às 17:00 ET em Forex, às 20:00 ET em Ações e à meia-noite de Brasília em binárias, em Cripto e na B3. Cripto abre todos os dias, 24 h: a janela pode incluir sábado e domingo. Os campos de hora usam sempre o relógio da janela, qualquer que seja “Horários na tela”. Com uma segunda conta no mercado, dá para ajustar a janela só nela. Ao salvar, cada conta cuja janela mudou ganha uma versão nova das regras, com a data do dia.`,
   // Fase 2b: the market's «de» form («Janela de Futuros», «Janela da B3»)
   grupoAria: (market: AccountMarket) => `Janela ${MERCADO[market].de}`,
   semJanelaChip: 'sem janela',
@@ -186,9 +190,9 @@ export const JANELAS = {
   ajustarAria: (label: string) => `Ajustar só nesta conta: ${label}`,
   voltar: 'Voltar ao padrão',
   voltarAria: (label: string) => `Voltar ao padrão: ${label}`,
-  semContaBinarias: 'Sem conta de opções binárias.',
-  semContaFuturos: 'Sem conta de Futuros.',
   semContas: 'Sem contas ativas: as janelas aparecem com a primeira.',
+  // Fase 2b (board `faltaMk`): while one of the six creatable markets has no active account
+  outrosMercados: 'Outros mercados aparecem aqui quando você tiver uma conta neles.',
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -199,8 +203,18 @@ export const REGRAS = {
   titulo: 'Suas regras',
   infoAria: 'Como ler: Suas regras',
   sub: 'Cada conta tem as suas; elas decidem o “Posso operar hoje?” dela.',
-  // ADAPTED: drops the example-accounts sentence; the last sentence is NEW (Phase 5)
-  info: 'Elas decidem o “Posso operar hoje?” de cada conta: Liberado, Aguardar até HH:MM, Fora da sua janela ou Encerrado por hoje. Nunca há uma resposta só para várias contas: cada conta tem a sua linha. Durante um bloqueio de dados, a tela mostra “Aguardar até”, mesmo fora da janela; no limite, “Encerrado por hoje” vale o resto do dia. “Padrão Futuros” vale para toda conta de Futuros, menos no que for “só nesta conta”. Bloqueio de dados e regra por estado valem só para Futuros; a regra por estado é uma só para o mercado. Em cada estado, escolha o que você faz: o diário confere a escolha sozinho, operação por operação. “Só a favor” é operar só na direção do estado. O texto é seu, aparece em “Seu plano”, na página do ativo, e o diário não tenta conferi-lo. O limite do dia nunca soma Futuros com binárias. Cada operação é conferida pela versão que valia na entrada: salvar uma mudança cria uma versão nova, com a data do dia, e não reescreve o passado. Antes da primeira versão, as operações ficam em “Histórico importado · só resultado”. Operações fora da janela ficam marcadas no diário, para as Análises compararem o plano com o que você fez. O Binary Hub não envia ordens nem se conecta à sua corretora: bloquear é mostrar o aviso na tela e marcar no diário. A IA nunca muda uma regra. O bloqueio de dados e a regra por estado passam a valer na Fase 5, quando o app tiver a agenda econômica e o estado do mercado; você já pode deixá-los prontos.',
+  // ADAPTED (board v53 `txt.infoRegras`): drops the example-accounts sentence; the last sentence is
+  // NEW (Phase 5)
+  info: 'Elas decidem o “Posso operar hoje?” de cada conta: Liberado, Aguardar até HH:MM, Fora da sua janela ou Encerrado por hoje. Nunca há uma resposta só para várias contas: cada conta tem a sua linha. Durante um bloqueio de dados, a tela mostra “Aguardar até”, mesmo fora da janela; no limite, “Encerrado por hoje” vale o resto do dia. “Padrão Futuros” vale para toda conta de Futuros, menos no que for “só nesta conta”. Bloqueio de dados e regra por estado valem só para Futuros até a Fase 5; a regra por estado é uma só para o mercado. Nos outros mercados, as regras são a janela e o limite do dia. Em cada estado, escolha o que você faz: o diário confere a escolha sozinho, operação por operação. “Só a favor” é operar só na direção do estado. O texto é seu, aparece em “Seu plano”, na página do ativo, e o diário não tenta conferi-lo. O limite do dia fica na moeda da conta, R$ na B3 e US$ nos outros mercados, e nunca soma contas de mercados diferentes. Cada operação é conferida pela versão que valia na entrada: salvar uma mudança cria uma versão nova, com a data do dia, e não reescreve o passado. Antes da primeira versão, as operações ficam em “Histórico importado · só resultado”. Operações fora da janela ficam marcadas no diário, para as Análises compararem o plano com o que você fez. O Binary Hub não envia ordens nem se conecta à sua corretora: bloquear é mostrar o aviso na tela e marcar no diário. A IA nunca muda uma regra. O bloqueio de dados e a regra por estado passam a valer na Fase 5, quando o app tiver a agenda econômica e o estado do mercado; você já pode deixá-los prontos.',
+  /**
+   * The ⓘ next to the chip of an account in a market opened in Fase 2b (board `infoMk`): `vira`
+   * is viraODia of the account's own day clock («à meia-noite de Brasília», «às 17:00 ET»)
+   */
+  infoMk: (market: AccountMarket, simbolo: string, vira: string) =>
+    `${MERCADO[market].nas}, as regras são a janela e o limite do dia, em ${simbolo}.` +
+    (market === 'crypto' ? ` ${USDT_COMO_DOLAR}` : '') +
+    ` Bloqueio de dados e regra por estado valem só para Futuros até a Fase 5. O limite zera quando o dia vira, ${vira}; numa conta de mesa, a mesa pode zerar o limite dela em outro horário.`,
+  infoMkAria: (market: AccountMarket) => `Como ler: regras ${MERCADO[market].de}`,
   semConta: 'As regras aparecem quando você tiver uma conta.',
   regrasDe: 'Regras de',
   padraoFuturos: 'Padrão Futuros',
@@ -248,7 +262,8 @@ export const REGRAS = {
   mudarLimite: 'Mudar',
   definirLimiteAria: (label: string) => `Definir o limite do dia de ${label}`,
   mudarLimiteAria: (label: string) => `Mudar o limite do dia de ${label}`,
-  limiteCampo: 'Limite do dia, em US$',
+  // Fase 2b (board `campoRot`): the account's currency, «US$» or «R$»
+  limiteCampo: (simbolo: string) => `Limite do dia, em ${simbolo}`,
   ok: 'OK',
   cancelar: 'Cancelar',
   ficarSemLimite: 'Ficar sem limite',
@@ -265,8 +280,9 @@ export const REGRAS = {
     { valor: 'conta', texto: 'por conta' },
     { valor: 'soma', texto: 'somando as contas de Futuros' },
   ] as const,
-  soma: (contas: readonly string[]) => `Soma ${lista(contas)}. Binárias nunca entram.`,
-  somaUma: 'Hoje só há uma conta de Futuros. Binárias nunca entram.',
+  // Fase 2b (board `somaTxt`): «Contas de outros mercados nunca entram»
+  soma: (contas: readonly string[]) => `Soma ${lista(contas)}. Contas de outros mercados nunca entram.`,
+  somaUma: 'Hoje só há uma conta de Futuros. Contas de outros mercados nunca entram.',
   aoChegar: 'Ao chegar no limite',
   aoChegarOpcoes: [
     { valor: 'encerrar', texto: 'Encerrar o dia no app' },

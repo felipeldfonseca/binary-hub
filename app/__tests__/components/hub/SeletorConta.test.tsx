@@ -127,6 +127,37 @@ describe('SeletorConta', () => {
   })
 })
 
+describe('SeletorConta in six markets (Fase 2b)', () => {
+  it('groups every market in the board’s order, with the phase of each account', async () => {
+    const accounts = [
+      makeAccount({ label: 'Clear', market: 'b3', phase: 'pessoal' }),
+      makeAccount({ label: 'Binance', market: 'crypto', phase: 'pessoal' }),
+      makeAccount({ label: 'IBKR', market: 'stocks', phase: 'pessoal' }),
+      makeAccount({ label: 'FTMO', market: 'forex', phase: 'avaliacao' }),
+      ebinex,
+      topOne,
+    ]
+    render(<SeletorConta accounts={accounts} current={accounts[1]} onChoose={jest.fn()} onAdd={jest.fn()} janela="Janela 20:00–22:00 · Brasília" />)
+    const button = screen.getByRole('button', { name: /^Conta: / })
+    expect(button).toHaveAccessibleDescription('Janela 20:00–22:00 · Brasília')
+
+    await userEvent.click(button)
+
+    const list = document.getElementById('lista-contas') as HTMLElement
+    expect(Array.from(list.querySelectorAll('.hub-seletor__grupo')).map((el) => el.textContent)).toEqual([
+      'Futuros',
+      'Opções binárias',
+      'Forex',
+      'Ações',
+      'Cripto',
+      'B3',
+    ])
+    expect(within(list).getByRole('button', { name: /Binance/ })).toHaveAttribute('aria-current', 'true')
+    expect(within(list).getByRole('button', { name: /FTMO/ })).toHaveTextContent('Avaliação')
+    expect(within(list).getByText('Contas de mercados diferentes nunca são somadas.')).toBeInTheDocument()
+  })
+})
+
 describe('SeletorConta window line', () => {
   it('shows the current account’s window under its button, which it describes', () => {
     const { button } = renderSelector(topOne, 'Janela 10:00–11:00 ET')

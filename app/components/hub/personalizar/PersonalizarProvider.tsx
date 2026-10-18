@@ -6,6 +6,7 @@ import { useAgora } from '@/hooks/useAgora'
 import { useAccounts } from '@/hooks/useContas'
 import { changedOnlyHere, useRulesConfig, useSaveRules, useTradesSinceRules } from '@/hooks/useRegras'
 import { PHASE_LABEL } from '@/components/hub/contas/copy'
+import { entidadesRegrasDe } from '@/lib/hub/personalizarRegras'
 import {
   activeAccounts,
   buildSavePayload,
@@ -19,7 +20,6 @@ import {
 } from '@/lib/hub/regras'
 import { toRegrasError } from '@/lib/hub/regrasDb'
 import {
-  PADRAO_FUTUROS,
   aposSalvar,
   iniciarRascunho,
   problemasDoRascunho,
@@ -97,13 +97,6 @@ export function usePersonalizar(): PersonalizarValue {
  */
 export function useEditarRegras(): ((accountId: string) => void) | null {
   return useContext(EditarRegrasContext)
-}
-
-/** «Regras de» pills: «Padrão Futuros» (with an active futures account), futures accounts, binary accounts */
-export function entidadesRegrasDe(ativas: readonly AccountConfig[]): string[] {
-  const fut = ativas.filter((a) => a.market === 'futures').map((a) => a.id)
-  const bin = ativas.filter((a) => a.market === 'binary').map((a) => a.id)
-  return [...(fut.length ? [PADRAO_FUTUROS] : []), ...fut, ...bin]
 }
 
 function focarSecao(secao: Secao) {

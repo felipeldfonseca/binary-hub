@@ -1,7 +1,7 @@
 'use client'
 
 import { formatHhMm, parseHhMm } from '@/lib/domain/tempo'
-import type { AccountMarket, WindowTz } from '@/lib/domain/gate'
+import { CREATABLE_MARKETS, type AccountMarket, type WindowTz } from '@/lib/domain/gate'
 import { windowError, type AccountConfig, type RulesSettings, type WindowSetting } from '@/lib/hub/regras'
 import {
   WINDOW_CLOCKS,
@@ -47,13 +47,18 @@ export interface QuandoVoceOperaProps {
   onAdicionarConta: (opener: HTMLElement, fallback: HTMLElement | null) => void
 }
 
-/** «Quando você opera» (board #janelas): one card per market with an active account */
+/**
+ * «Quando você opera» (board #janelas): one card per market with an active account, in
+ * ACCOUNT_MARKETS order (Futuros, binárias, Forex, Ações, Cripto, B3; a legacy options account
+ * last). Under the cards, «+ Adicionar conta» while one of the six creatable markets has no active
+ * account (board `faltaMk`): a legacy options card never hides it.
+ */
 export default function QuandoVoceOpera({ carga, onTentar, now, salvo, draft, ativas, onEditar, onAdicionarConta }: QuandoVoceOperaProps) {
   const [info, toggleInfo] = useToggle()
   const pedirFoco = useFocoPendente()
   const mercados = MARKETS.filter((m) => ativas.some((a) => a.market === m))
   const falta =
-    mercados.length === 0 ? JANELAS.semContas : mercados.length === 1 ? (mercados[0] === 'futures' ? JANELAS.semContaBinarias : JANELAS.semContaFuturos) : null
+    mercados.length === 0 ? JANELAS.semContas : CREATABLE_MARKETS.some((m) => !mercados.includes(m)) ? JANELAS.outrosMercados : null
 
   return (
     <section id="janelas" aria-labelledby="t-janelas" className="hub-card">

@@ -1,9 +1,13 @@
 'use client'
 
 import { useMemo } from 'react'
+import { MARKET_SPEC, currencyOf } from '@/lib/domain/gate'
 import { resolveRules, type AccountConfig, type PendingVersion, type RulesConfig, type RulesSettings } from '@/lib/hub/regras'
 import { comCalendario, janelasEfetivas, mudancasDaEntidade, PADRAO_FUTUROS, PADRAO_FUTUROS_CONTA, type Entidade } from '@/lib/hub/rascunho'
 import { comoFicaHoje } from '@/lib/hub/comoFicaHoje'
+import { SIMBOLO_MOEDA } from '@/lib/hub/formato'
+import { entidadesRegrasDe, temInfoDoMercado } from '@/lib/hub/personalizarRegras'
+import { viraODia } from '@/components/hub/copyMercados'
 import { InfoButton, InfoPanel, useToggle } from '@/components/hub/contas/ui'
 import BlocoVersao from './BlocoVersao'
 import Calendarios from './Calendarios'
@@ -37,7 +41,12 @@ export interface SuasRegrasProps {
   onIrJanelas: () => void
 }
 
-/** «Suas regras» (board #regras): the rules of «Padrão Futuros» or one account, today under them, the versions, the calendars */
+/**
+ * «Suas regras» (board #regras): the rules of «Padrão Futuros» or one account, today under them, the
+ * versions, the calendars. The rows follow the market (MARKET_SPEC[m].rules): the data block and
+ * the state rule only where it has them (Futuros until Phase 5), the window and the daily limit
+ * everywhere, the limit in the account's currency.
+ */
 export default function SuasRegras(props: SuasRegrasProps) {
   const { carga, onTentar, config, draft, ativas } = props
   const [info, toggleInfo] = useToggle()
@@ -84,21 +93,27 @@ function Regras({
   onIrJanelas,
 }: SuasRegrasProps & { config: RulesConfig; draft: RulesSettings }) {
   const pedirFoco = useFocoPendente()
+  // One toggle for the market ⓘ, kept across «Regras de» (board `infAb.regrasMk`)
+  const [infoMk, toggleInfoMk] = useToggle()
   const futuros = useMemo(() => ativas.filter((a) => a.market === 'futures'), [ativas])
-  const binarias = useMemo(() => ativas.filter((a) => a.market === 'binary'), [ativas])
   const conta = ativas.find((a) => a.id === selecionado) ?? null
   const entidade: Entidade = conta ? { tipo: 'conta', conta } : { tipo: 'padrao' }
-  const market = conta ? conta.market : 'futures'
+  // «Padrão Futuros» is the futures default (PADRAO_FUTUROS_CONTA)
+  const market = (conta ?? PADRAO_FUTUROS_CONTA).market
+  const caps = MARKET_SPEC[market].rules
   const salvo = config.settings
   const mud = mudancasDaEntidade(salvo, draft, entidade)
   const rules = resolveRules(conta ?? PADRAO_FUTUROS_CONTA, draft)
   const hoje = comoFicaHoje(rules, now, janelasEfetivas(draft, entidade).windows)
 
-  const opcoes = [
-    ...(futuros.length ? [{ id: PADRAO_FUTUROS, texto: REGRAS.padraoFuturos }] : []),
-    ...futuros.map((a) => ({ id: a.id, texto: a.label })),
-    ...binarias.map((a) => ({ id: a.id, texto: a.label })),
-  ]
+  const opcoes = entidadesRegrasDe(ativas).map((id) => ({
+    id,
+    texto: id === PADRAO_FUTUROS ? REGRAS.padraoFuturos : (ativas.find((a) => a.id === id)?.label ?? ''),
+  }))
+  // The account's own day clock (rules_config), which a Phase 1 backfill account may hold apart
+  // from its market's: the limit resets when that day turns
+  const infoMercado =
+    conta && temInfoDoMercado(conta.market) ? REGRAS.infoMk(conta.market, SIMBOLO_MOEDA[currencyOf(conta.market)], viraODia(conta.day)) : null
 
   return (
     <>
@@ -120,12 +135,16 @@ function Regras({
         <span className="hub-chip-dado">
           {conta ? REGRAS.chipConta(MERCADO_NOME[conta.market], fases[conta.id] ?? null) : REGRAS.valePara(futuros.length)}
         </span>
+        {conta && infoMercado && (
+          <InfoButton panelId="info-regras-mk" label={REGRAS.infoMkAria(conta.market)} open={infoMk} onToggle={toggleInfoMk} />
+        )}
       </div>
+      {infoMercado && infoMk && <InfoPanel id="info-regras-mk">{infoMercado}</InfoPanel>}
 
       <ul className="hub-pz-regras">
         <RegraJanela entidade={entidade} draft={draft} mudou={mud.janela} onIrJanelas={onIrJanelas} />
         <RegraSoDentro entidade={entidade} draft={draft} mudou={mud.regraJanela} onEditar={onEditar} onIrJanelas={onIrJanelas} />
-        {market === 'futures' && <RegraBloqueio entidade={entidade} draft={draft} salvo={salvo} mudou={mud.bloqueio} onEditar={onEditar} />}
+        {caps.block && <RegraBloqueio entidade={entidade} draft={draft} salvo={salvo} mudou={mud.bloqueio} onEditar={onEditar} />}
         <RegraLimite
           entidade={entidade}
           draft={draft}
@@ -136,7 +155,7 @@ function Regras({
           onEditar={onEditar}
           pedirFoco={pedirFoco}
         />
-        {market === 'futures' && <RegraEstado draft={draft} mudou={mud.estados} onEditar={onEditar} />}
+        {caps.states && <RegraEstado draft={draft} mudou={mud.estados} onEditar={onEditar} />}
       </ul>
 
       <ComoFicaHoje dados={hoje} />

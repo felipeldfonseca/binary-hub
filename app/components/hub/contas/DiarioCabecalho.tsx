@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
+import { MARKET_SPEC } from '@/lib/domain/markets'
 import { useContaAtual } from '@/hooks/useContas'
 import { useRulesNow } from '@/hooks/useRegras'
 import { janelaLinha } from '@/lib/hub/posso'
@@ -25,6 +26,9 @@ export function DiarioTitulo() {
  * The Diário header of the boards: H1, "Importar arquivo" and the account selector, with the
  * current account's window under it (from the rules in force, rules_now). Opening
  * /diario?importar=1 opens the import sheet for the current account.
+ *
+ * Fase 2b: no file of the new markets is read yet (MARKET_SPEC[m].reader), so with such an account
+ * in context the sheet opens without an account («Escolha o arquivo»), never on that account.
  */
 export default function DiarioCabecalho() {
   const conta = useContaAtual()
@@ -38,6 +42,8 @@ export default function DiarioCabecalho() {
   const handled = useRef(false)
   const wantsImport = searchParams?.get('importar') === '1'
   const currentId = conta.current?.id ?? null
+  // The account the import starts on: the current one, when a reader exists for its market
+  const importId = conta.current && MARKET_SPEC[conta.current.market].reader ? conta.current.id : null
   const rulesNow = useRulesNow()
   const rulesFailed = rulesNowFailed(rulesNow)
 
@@ -53,13 +59,13 @@ export default function DiarioCabecalho() {
   useEffect(() => {
     if (!wantsImport || handled.current || conta.isLoading) return
     handled.current = true
-    sheet.open({ mode: 'importar', accountId: currentId, opener: importRef.current })
+    sheet.open({ mode: 'importar', accountId: importId, opener: importRef.current })
     // A reload must not open it again
     const params = new URLSearchParams(searchParams?.toString() ?? '')
     params.delete('importar')
     const query = params.toString()
     router.replace(query ? `/diario?${query}` : '/diario')
-  }, [wantsImport, conta.isLoading, currentId, sheet, router, searchParams])
+  }, [wantsImport, conta.isLoading, importId, sheet, router, searchParams])
 
   // «Tentar de novo» stays, with its focus, while its read runs. When the accounts replace it, focus
   // would fall to the page's start; it goes to the account selector that took its place (the H1
@@ -73,7 +79,7 @@ export default function DiarioCabecalho() {
     if (!active || active === document.body) (selectorRef.current ?? titleRef.current)?.focus()
   })
 
-  const openImport = (opener: HTMLElement | null) => sheet.open({ mode: 'importar', accountId: currentId, opener })
+  const openImport = (opener: HTMLElement | null) => sheet.open({ mode: 'importar', accountId: importId, opener })
   const openAdd = (opener: HTMLElement | null) => sheet.open({ mode: 'adicionar', opener })
 
   let selector: React.ReactNode
