@@ -805,3 +805,195 @@ describe('parseServerGate', () => {
 it('refuses an invalid instant', () => {
   expect(() => evaluateGate(new Date('x'), TOP_ONE, null, null)).toThrow(RangeError);
 });
+
+// ---------------------------------------------------------------------------------------------
+// Phase 2b: Forex, Ações, Cripto and B3 have the window and the daily limit only; the day turns
+// at 17:00 New York for Forex and 20:00 for Ações; crypto opens on weekends; B3 counts reais
+// ---------------------------------------------------------------------------------------------
+
+const FX_CLOCK = { tz: NY, startMin: 1020 };
+const FTMO: GateAccount = { market: 'forex', dayClock: FX_CLOCK };
+const IBKR: GateAccount = { market: 'stocks', dayClock: { tz: NY, startMin: 1200 } };
+const BINANCE: GateAccount = { market: 'crypto', dayClock: BIN_CLOCK };
+const CLEAR: GateAccount = { market: 'b3', dayClock: BIN_CLOCK };
+
+const windowOnly = (market: Rules['market'], day: Rules['day'], windows: Rules['windows'], limit: Rules['limit'] = null): Rules => ({
+  market,
+  windows,
+  windowsFrom: windows.length ? 'market' : null,
+  windowRule: { on: true, outside: 'fora' },
+  block: null,
+  limit,
+  states: null,
+  day,
+});
+/** FTMO (invented): 08:00–10:00 ET Mon–Fri, US$ 1.000 */
+const ftmoRules = () =>
+  windowOnly('forex', FX_CLOCK, [{ tz: NY, startMin: 480, endMin: 600, weekdays: MON_TO_FRI }], {
+    cents: 100000,
+    mode: 'conta',
+    atLimit: 'encerrar',
+  });
+/** Binance (invented): 20:00–22:00 Brasília every day, no limit */
+const binanceRules = () => windowOnly('crypto', BIN_CLOCK, [{ tz: SP, startMin: 1200, endMin: 1320, weekdays: 127 }]);
+/** Clear (invented): 10:00–11:00 Brasília Mon–Fri, R$ 500 */
+const clearRules = () =>
+  windowOnly('b3', BIN_CLOCK, [{ tz: SP, startMin: 600, endMin: 660, weekdays: MON_TO_FRI }], {
+    cents: 50000,
+    mode: 'conta',
+    atLimit: 'encerrar',
+  });
+
+let seq2b = 0;
+/** A closed trade on an account's clock; amounts in the account's currency */
+function tradeOn(clock: { tz: string; startMin: number }, entryAt: Date, exitAt: Date | null, amount: number): DayTrade {
+  seq2b += 1;
+  return {
+    id: `2b000000-0000-4000-8000-${String(seq2b).padStart(12, '0')}`,
+    tradingDay: computeTradingDay(entryAt, { market: 'forex', dayClock: clock }, []),
+    entryAt,
+    exitAt,
+    pnlCents: Math.round(amount * 100),
+    commissionCents: null,
+    result: amount < 0 ? 'loss' : 'win',
+  };
+}
+
+describe('Forex: window and limit only; the day turns at 17:00 New York', () => {
+  it('inside its window: Liberado; the data block and the state rule are «so_futuros», even with Phase 5 inputs', () => {
+    const p = evaluatePlan({
+      tradeId: null,
+      entryAt: et('2026-10-19 09:00'),
+      account: FTMO,
+      version: version(ftmoRules()),
+      trades: [],
+      direction: 1,
+      events: { available: true, value: [{ at: et('2026-10-19 08:30'), label: 'CPI', calendar: 'us' }] },
+      state: state('em_conflito', 0),
+    });
+    expect(p.gate.status).toBe('liberado');
+    expect(p.gate.block).toEqual({ evaluated: false, state: 'nao_avaliado', reason: 'so_futuros' });
+    expect(p.gate.stateRule).toEqual({ evaluated: false, state: 'nao_avaliado', reason: 'so_futuros' });
+    expect(p.stateRule).toEqual({ evaluated: false, state: 'nao_avaliado', reason: 'so_futuros' });
+    expect([p.checksEvaluated, p.breaks, p.verdict]).toEqual([['janela', 'limite'], [], 'no_plano']);
+    expect(answerOf(p.gate)).toMatchObject({ kind: 'liberado', until: et('2026-10-19 10:00') });
+  });
+
+  it.each([
+    ['Mon 16:59 ET', '2026-10-19 16:59', '2026-10-19'],
+    ['Mon 17:00 ET', '2026-10-19 17:00', '2026-10-20'],
+    ['Fri 17:30 ET (Saturday)', '2026-10-23 17:30', '2026-10-24'],
+    ['Sun 25 Oct 17:30 ET (EDT)', '2026-10-25 17:30', '2026-10-26'],
+    ['Sun 1 Nov 17:30 ET (EST)', '2026-11-01 17:30', '2026-11-02'],
+  ])('%s is the trading day %s, before version 1 and after', (_label, time, day) => {
+    expect(gateTradingDay(et(time), FTMO, null)).toBe(day);
+    expect(gate(et(time), ftmoRules(), [], null, FTMO).tradingDay).toBe(day);
+  });
+
+  it('a Sunday-evening loss counts on Monday, and US$ 1.000 closes the day until the 17:00 turn', () => {
+    const trades = [
+      tradeOn(FX_CLOCK, et('2026-10-25 17:30'), et('2026-10-25 17:40'), -600),
+      tradeOn(FX_CLOCK, et('2026-10-26 08:10'), et('2026-10-26 08:20'), -400),
+    ];
+    expect(trades.map((t) => t.tradingDay)).toEqual(['2026-10-26', '2026-10-26']);
+    const g = gate(et('2026-10-26 08:30'), ftmoRules(), trades, null, FTMO);
+    expect(answerOf(g)).toEqual({ kind: 'encerrado', hitAt: et('2026-10-26 08:20'), limitCents: 100000, worstCents: -100000, warnings: [] });
+    expect(g.changesAt).toEqual(et('2026-10-26 10:00'));
+    expect(gate(et('2026-10-26 16:59'), ftmoRules(), trades, null, FTMO).status).toBe('encerrado');
+    const next = gate(et('2026-10-26 17:00'), ftmoRules(), trades, null, FTMO);
+    expect([next.tradingDay, next.status, next.limit.evaluated && next.limit.worstCents]).toEqual(['2026-10-27', 'fora_janela', 0]);
+  });
+
+  it('with nothing evaluated, the answer changes at the 17:00 turn', () => {
+    expect(gate(et('2026-10-19 12:00'), null, [], null, FTMO).changesAt).toEqual(et('2026-10-19 17:00'));
+  });
+});
+
+describe('Ações (EUA): the day turns at 20:00 New York', () => {
+  it('a limit with no window: «somando» never applies, the day ends at 20:00 ET', () => {
+    const rules = windowOnly('stocks', IBKR.dayClock, [], { cents: 30000, mode: 'conta', atLimit: 'encerrar' });
+    const clock = IBKR.dayClock;
+    const loss = tradeOn(clock, et('2026-10-19 10:00'), et('2026-10-19 10:30'), -300);
+    const g = gate(et('2026-10-19 19:59'), rules, [loss], null, IBKR);
+    expect([g.tradingDay, g.status, g.checksEvaluated]).toEqual(['2026-10-19', 'encerrado', ['limite']]);
+    expect(g.changesAt).toEqual(et('2026-10-19 20:00'));
+    expect(gate(et('2026-10-19 20:00'), rules, [loss], null, IBKR)).toMatchObject({ tradingDay: '2026-10-20', status: 'liberado' });
+  });
+});
+
+describe('Cripto: windows on weekends', () => {
+  it.each([
+    ['Sat 24 Oct 21:00', '2026-10-24 21:00', 'liberado', '2026-10-24'],
+    ['Sun 25 Oct 20:00', '2026-10-25 20:00', 'liberado', '2026-10-25'],
+    ['Sun 25 Oct 22:00', '2026-10-25 22:00', 'fora_janela', '2026-10-25'],
+  ])('every day: %s Brasília is %s', (_label, time, status, day) => {
+    const g = gate(brt(time), binanceRules(), [], null, BINANCE);
+    expect([g.status, g.tradingDay, g.checksEvaluated]).toEqual([status, day, ['janela']]);
+    expect(g.block).toEqual({ evaluated: false, state: 'nao_avaliado', reason: 'so_futuros' });
+  });
+
+  it('Monday to Friday only: Saturday is «nao_e_dia»', () => {
+    const r = { ...binanceRules(), windows: [{ ...binanceRules().windows[0], weekdays: MON_TO_FRI }] };
+    const g = gate(brt('2026-10-24 21:00'), r, [], null, BINANCE);
+    expect([g.status, g.window.evaluated && g.window.position]).toEqual(['fora_janela', 'nao_e_dia']);
+  });
+
+  it('22:00–02:00 every day: Sunday 01:00 is Saturday night', () => {
+    const r = { ...binanceRules(), windows: [{ tz: SP, startMin: 1320, endMin: 120, weekdays: 127 }] };
+    const g = gate(brt('2026-10-25 01:00'), r, [], null, BINANCE);
+    expect([g.status, g.tradingDay]).toEqual(['liberado', '2026-10-24']);
+  });
+});
+
+describe('B3: the limit in reais', () => {
+  const losses = () => [
+    tradeOn(BIN_CLOCK, brt('2026-10-19 10:05'), brt('2026-10-19 10:10'), -350),
+    tradeOn(BIN_CLOCK, brt('2026-10-19 10:12'), brt('2026-10-19 10:20'), -250),
+  ];
+
+  it('R$ 500 reached at 10:20: «Encerrado por hoje», the amounts in cents of reais', () => {
+    const g = gate(brt('2026-10-19 10:30'), clearRules(), losses(), null, CLEAR);
+    expect(g.limit).toMatchObject({ evaluated: true, state: 'atingido', cents: 50000, worstCents: -60000, used: 1.2, near: true });
+    expect(answerOf(g)).toEqual({ kind: 'encerrado', hitAt: brt('2026-10-19 10:20'), limitCents: 50000, worstCents: -60000, warnings: [] });
+    expect(g.changesAt).toEqual(brt('2026-10-19 11:00'));
+  });
+
+  it('a trade after the limit is «● depois do limite»', () => {
+    const p = evaluatePlan({
+      tradeId: null,
+      entryAt: brt('2026-10-19 10:40'),
+      account: CLEAR,
+      version: version(clearRules()),
+      trades: losses(),
+      direction: -1,
+      state: state('alinhadas', 1),
+    });
+    expect([p.breaks, p.stateRule.evaluated, p.verdict]).toEqual([['depois_do_limite'], false, 'fora_do_plano']);
+    expect(toEntryContext(p)).toMatchObject({ after_limit: true, in_block: null, state_choice: null, rule_ok: null });
+  });
+
+  it('reads the server\'s answer for a R$ limit (gate_at keeps the key `usd`)', () => {
+    const g = parseServerGate({
+      at: '2026-10-19T13:30:00+00:00',
+      trading_day: '2026-10-19',
+      status: 'encerrado',
+      warnings: [],
+      checks_evaluated: ['janela', 'limite'],
+      window: {
+        state: 'dentro',
+        reason: null,
+        position: 'dentro',
+        current: { opens_at: '2026-10-19T13:00:00+00:00', closes_at: '2026-10-19T14:00:00+00:00' },
+        next: { opens_at: '2026-10-20T13:00:00+00:00', closes_at: '2026-10-20T14:00:00+00:00', trading_day: '2026-10-20' },
+      },
+      limit: {
+        state: 'atingido', reason: null, usd: 500, mode: 'conta', at_limit: 'encerrar', trades: 2,
+        net_usd: -600, worst_usd: -600, hit_at: '2026-10-19T13:20:00+00:00', used: 1.2, near: true,
+      },
+      block: { state: 'nao_avaliado', reason: 'so_futuros' },
+      state_rule: { state: 'nao_avaliado', reason: 'so_futuros' },
+      changes_at: '2026-10-19T14:00:00+00:00',
+    });
+    expect(g).toEqual(gate(brt('2026-10-19 10:30'), clearRules(), losses(), null, CLEAR));
+  });
+});

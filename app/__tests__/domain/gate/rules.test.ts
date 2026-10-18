@@ -134,3 +134,70 @@ describe('parseRuleVersion', () => {
     expect(() => parseRuleVersion({ version_no: 1, effective_from: 'hoje', resolved: TOP_ONE_V1 })).toThrow(RulesError);
   });
 });
+
+// Phase 2b (M5d): window and limit only outside futures; the limit's key is the market's currency's.
+// The database's codes for every shape are in cases.json (group "resolved").
+const NEW_MARKET = {
+  v: 1,
+  windows: [{ tz: 'America/New_York', start_min: 480, end_min: 600, weekdays: 31 }],
+  windows_from: 'market',
+  window_rule: { on: true, outside: 'fora' },
+  block: null,
+  states: null,
+};
+const FTMO_V1 = { ...NEW_MARKET, market: 'forex', limit: { usd: 1000, mode: 'conta', at_limit: 'encerrar' }, day: { tz: 'America/New_York', start_min: 1020 } };
+const CLEAR_V1 = {
+  ...NEW_MARKET,
+  market: 'b3',
+  windows: [{ tz: 'America/Sao_Paulo', start_min: 600, end_min: 660, weekdays: 31 }],
+  limit: { brl: 500, mode: 'conta', at_limit: 'encerrar' },
+  day: { tz: 'America/Sao_Paulo', start_min: 0 },
+};
+const BINANCE_V1 = {
+  ...NEW_MARKET,
+  market: 'crypto',
+  windows: [{ tz: 'America/Sao_Paulo', start_min: 1200, end_min: 1320, weekdays: 127 }],
+  limit: null,
+  day: { tz: 'America/Sao_Paulo', start_min: 0 },
+};
+
+describe('rules in the new markets', () => {
+  it('reads a B3 limit in reais as cents, and writes it back under `brl`', () => {
+    const rules = parseRules(CLEAR_V1);
+    expect(rules).toMatchObject({ market: 'b3', block: null, states: null, limit: { cents: 50000, mode: 'conta', atLimit: 'encerrar' } });
+    const json = toResolvedJson(rules);
+    expect(json).toEqual(CLEAR_V1);
+    expect(json.limit).not.toHaveProperty('usd');
+  });
+
+  it('keeps `usd` for the dollar markets (Forex, crypto with USDT)', () => {
+    expect(parseRules(FTMO_V1).limit?.cents).toBe(100000);
+    expect(toResolvedJson(parseRules(FTMO_V1))).toEqual(FTMO_V1);
+    const withLimit = { ...BINANCE_V1, limit: { usd: 250.5, mode: 'conta', at_limit: 'avisar' } };
+    expect(toResolvedJson(parseRules(withLimit))).toEqual(withLimit);
+  });
+
+  it('reads a crypto window on every day of the week', () => {
+    expect(parseRules(BINANCE_V1).windows).toEqual([{ tz: 'America/Sao_Paulo', startMin: 1200, endMin: 1320, weekdays: 127 }]);
+  });
+
+  it('writes the key of the rules\' own market: the same cents are R$ on B3 and US$ on Forex', () => {
+    const b3: Rules = parseRules(CLEAR_V1);
+    expect(toResolvedJson({ ...b3, market: 'forex' }).limit).toEqual({ usd: 500, mode: 'conta', at_limit: 'encerrar' });
+    expect(toResolvedJson(b3).limit).toEqual({ brl: 500, mode: 'conta', at_limit: 'encerrar' });
+  });
+
+  it.each([
+    ['B3 with `usd`', { ...CLEAR_V1, limit: { usd: 500, mode: 'conta', at_limit: 'encerrar' } }, 'bad_limit'],
+    ['Forex with `brl`', { ...FTMO_V1, limit: { brl: 1000, mode: 'conta', at_limit: 'encerrar' } }, 'bad_limit'],
+    ['the owner\'s Top One with `brl`', { ...TOP_ONE_V1, limit: { brl: 400, mode: 'conta', at_limit: 'encerrar' } }, 'bad_limit'],
+    ['both keys (was unknown_key in Phase 2)', { ...TOP_ONE_V1, limit: { usd: 400, brl: 400, mode: 'conta', at_limit: 'encerrar' } }, 'bad_limit'],
+    ['B3 `brl` and an unknown key', { ...CLEAR_V1, limit: { brl: 500, mode: 'conta', at_limit: 'encerrar', x: 1 } }, 'unknown_key'],
+    ['B3 «somando»', { ...CLEAR_V1, limit: { brl: 500, mode: 'soma', at_limit: 'encerrar' } }, 'not_for_market'],
+    ['crypto with a data block', { ...BINANCE_V1, block: TOP_ONE_V1.block }, 'not_for_market'],
+    ['Forex with a state rule', { ...FTMO_V1, states: TOP_ONE_V1.states }, 'not_for_market'],
+    ['a market that does not exist', { ...FTMO_V1, market: 'xyz' }, 'unsupported_market'],
+  ])('refuses %s with the database\'s code', (_label, json, code) => {
+    expect(() => parseRules(json)).toThrow(expect.objectContaining({ code }));
+  });
+});
