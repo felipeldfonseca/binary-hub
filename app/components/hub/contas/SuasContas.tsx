@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { MARKET_SPEC } from '@/lib/domain/markets'
 import { groupByMarket, type TradingAccount } from '@/lib/hub/contas'
 import { toHubError, updateAccount, type AccountActivity, type HubErrorCode } from '@/lib/hub/contasDb'
 import { formatDay } from '@/lib/hub/formato'
@@ -60,7 +61,8 @@ function Parte({ trechos }: { trechos: Trecho[] }) {
  * "Suas contas" (Personalizar #contas): one row per active account grouped by market, import,
  * edit, the account's imports, archive with undo, and the closed accounts. Actions apply at once.
  * Phase 2: each row also says its window, since when its rules count and what it traded since,
- * and the menu opens its rules in «Suas regras».
+ * and the menu opens its rules in «Suas regras». Fase 2b: a market whose files the app cannot read
+ * yet says so under its heading, and its accounts have no «Importar».
  */
 export default function SuasContas() {
   const { all, active, archived, isLoading, isError, refetch } = useAccounts()
@@ -210,131 +212,144 @@ export default function SuasContas() {
   } else {
     list = (
       <>
-        {groupByMarket(active).map((group) => (
-          <div key={group.market} className="hub-grupo">
-            <h3 id={`g-${group.market}`}>{MARKET_LABEL[group.market]}</h3>
-            <ul className="hub-lista" aria-labelledby={`g-${group.market}`}>
-              {group.accounts.map((account) => {
-                // Board: phase · platform · window · rules · activity (the mesa is in Editar conta). Until
-                // the rules and the counts are here, the Phase 1 parts: phase · platform · activity
-                const atividade = activityText(activity.data?.[account.id])
-                const regras = config?.accounts.find((a) => a.id === account.id)
-                const regraPartes = regras ? partesRegras(regras, counts?.[account.id], atividade) : null
-                const parts: Trecho[][] = [
-                  account.phase ? PHASE_LABEL[account.phase] : '',
-                  platformLabel(account.platform),
-                  ...(regraPartes ? [] : [atividade]),
-                ]
-                  .filter(Boolean)
-                  .map((t): Trecho[] => [{ t }])
-                  .concat(regraPartes ?? [])
-                const menuId = `menu-${account.id}`
-                const menuOpen = menuFor === account.id
-                return (
-                  <li key={account.id} className="hub-conta">
-                    <div style={{ minWidth: 0 }}>
-                      <div className="hub-conta__cab">
-                        <strong>{account.label}</strong>
-                      </div>
-                      {parts.length > 0 && (
-                        <div className="hub-partes">
-                          {parts.map((p, i) => (
-                            <Parte key={i} trechos={p} />
-                          ))}
+        {groupByMarket(active).map((group) => {
+          // No file reader for this market yet (Forex, Ações, Cripto, B3): no «Importar», and the note says why
+          const reader = MARKET_SPEC[group.market].reader
+          return (
+            <div key={group.market} className="hub-grupo">
+              <h3 id={`g-${group.market}`}>{MARKET_LABEL[group.market]}</h3>
+              {!reader && <p className="hub-nota hub-sem-leitor">{CONTAS.semLeitor(group.market)}</p>}
+              <ul className="hub-lista" aria-labelledby={`g-${group.market}`}>
+                {group.accounts.map((account) => {
+                  // Board: phase · platform · window · rules · activity (the mesa is in Editar conta). Until
+                  // the rules and the counts are here, the Phase 1 parts: phase · platform · activity
+                  const atividade = activityText(activity.data?.[account.id])
+                  const regras = config?.accounts.find((a) => a.id === account.id)
+                  const regraPartes = regras ? partesRegras(regras, counts?.[account.id], atividade) : null
+                  const parts: Trecho[][] = [
+                    account.phase ? PHASE_LABEL[account.phase] : '',
+                    platformLabel(account.platform),
+                    ...(regraPartes ? [] : [atividade]),
+                  ]
+                    .filter(Boolean)
+                    .map((t): Trecho[] => [{ t }])
+                    .concat(regraPartes ?? [])
+                  const menuId = `menu-${account.id}`
+                  const menuOpen = menuFor === account.id
+                  // «Importações» (NEW in Phase 1): where a file can come in, or where one already did
+                  const batches = reader || (activity.data?.[account.id]?.imported ?? 0) > 0
+                  return (
+                    <li key={account.id} className="hub-conta">
+                      <div style={{ minWidth: 0 }}>
+                        <div className="hub-conta__cab">
+                          <strong>{account.label}</strong>
                         </div>
-                      )}
-                    </div>
-                    <div className="hub-conta__acoes">
-                      <button
-                        type="button"
-                        className="hub-btn"
-                        aria-label={CONTAS.importAria(account.label)}
-                        onClick={(event) => sheet.open({ mode: 'importar', accountId: account.id, opener: event.currentTarget })}
-                      >
-                        {CONTAS.importShort}
-                      </button>
-                      <button
-                        ref={(el) => {
-                          moreRefs.current[account.id] = el
-                        }}
-                        type="button"
-                        className="hub-btn hub-btn--icone"
-                        aria-label={CONTAS.moreAria(account.label)}
-                        aria-expanded={menuOpen}
-                        aria-controls={menuId}
-                        onClick={() => setMenuFor(menuOpen ? null : account.id)}
-                      >
-                        <span aria-hidden="true">⋯</span>
-                      </button>
-                    </div>
-                    {menuOpen && (
-                      <div
-                        id={menuId}
-                        className="hub-menu-inline hub-cheia"
-                        role="group"
-                        aria-label={CONTAS.menuAria(account.label)}
-                        onKeyDown={(event) => {
-                          if (event.key === 'Escape') {
-                            setMenuFor(null)
-                            focusMore(account.id)
-                          }
-                        }}
-                      >
-                        <button
-                          type="button"
-                          className="hub-btn"
-                          onClick={() => {
-                            setMenuFor(null)
-                            sheet.open({ mode: 'importar', accountId: account.id, opener: moreRefs.current[account.id] })
-                          }}
-                        >
-                          {CONTAS.menuImport}
-                        </button>
-                        <button type="button" className="hub-btn" onClick={() => openPanel(account.id, 'editar')}>
-                          {CONTAS.menuEdit}
-                        </button>
-                        <button type="button" className="hub-btn" onClick={() => openPanel(account.id, 'importacoes')}>
-                          {CONTAS.menuBatches}
-                        </button>
-                        {/* Only for an account «Suas regras» lists (futures and binary, as rules_config reads them) */}
-                        {editarRegras && ativasRegras?.some((a) => a.id === account.id) && (
+                        {parts.length > 0 && (
+                          <div className="hub-partes">
+                            {parts.map((p, i) => (
+                              <Parte key={i} trechos={p} />
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                      <div className="hub-conta__acoes">
+                        {reader && (
                           <button
                             type="button"
                             className="hub-btn"
-                            onClick={() => {
-                              setMenuFor(null)
-                              editarRegras(account.id)
-                            }}
+                            aria-label={CONTAS.importAria(account.label)}
+                            onClick={(event) => sheet.open({ mode: 'importar', accountId: account.id, opener: event.currentTarget })}
                           >
-                            {LINHA_CONTA.editarRegras}
+                            {CONTAS.importShort}
                           </button>
                         )}
-                        <button type="button" className="hub-btn" onClick={() => void archive(account)}>
-                          {CONTAS.menuArchive}
+                        <button
+                          ref={(el) => {
+                            moreRefs.current[account.id] = el
+                          }}
+                          type="button"
+                          className="hub-btn hub-btn--icone"
+                          aria-label={CONTAS.moreAria(account.label)}
+                          aria-expanded={menuOpen}
+                          aria-controls={menuId}
+                          onClick={() => setMenuFor(menuOpen ? null : account.id)}
+                        >
+                          <span aria-hidden="true">⋯</span>
                         </button>
                       </div>
-                    )}
-                    {panel?.id === account.id && panel.kind === 'editar' && (
-                      <EditarConta
-                        account={account}
-                        accounts={all}
-                        primaryId={primaryId}
-                        onCancel={() => closePanel(account.id)}
-                        onSaved={(text) => {
-                          setToast({ text })
-                          closePanel(account.id)
-                        }}
-                      />
-                    )}
-                    {panel?.id === account.id && panel.kind === 'importacoes' && (
-                      <Importacoes account={account} onClose={() => closePanel(account.id)} />
-                    )}
-                  </li>
-                )
-              })}
-            </ul>
-          </div>
-        ))}
+                      {menuOpen && (
+                        <div
+                          id={menuId}
+                          className="hub-menu-inline hub-cheia"
+                          role="group"
+                          aria-label={CONTAS.menuAria(account.label)}
+                          onKeyDown={(event) => {
+                            if (event.key === 'Escape') {
+                              setMenuFor(null)
+                              focusMore(account.id)
+                            }
+                          }}
+                        >
+                          {reader && (
+                            <button
+                              type="button"
+                              className="hub-btn"
+                              onClick={() => {
+                                setMenuFor(null)
+                                sheet.open({ mode: 'importar', accountId: account.id, opener: moreRefs.current[account.id] })
+                              }}
+                            >
+                              {CONTAS.menuImport}
+                            </button>
+                          )}
+                          <button type="button" className="hub-btn" onClick={() => openPanel(account.id, 'editar')}>
+                            {CONTAS.menuEdit}
+                          </button>
+                          {batches && (
+                            <button type="button" className="hub-btn" onClick={() => openPanel(account.id, 'importacoes')}>
+                              {CONTAS.menuBatches}
+                            </button>
+                          )}
+                          {/* Only for an account «Suas regras» lists (rules_config: active accounts of every market) */}
+                          {editarRegras && ativasRegras?.some((a) => a.id === account.id) && (
+                            <button
+                              type="button"
+                              className="hub-btn"
+                              onClick={() => {
+                                setMenuFor(null)
+                                editarRegras(account.id)
+                              }}
+                            >
+                              {LINHA_CONTA.editarRegras}
+                            </button>
+                          )}
+                          <button type="button" className="hub-btn" onClick={() => void archive(account)}>
+                            {CONTAS.menuArchive}
+                          </button>
+                        </div>
+                      )}
+                      {panel?.id === account.id && panel.kind === 'editar' && (
+                        <EditarConta
+                          account={account}
+                          accounts={all}
+                          primaryId={primaryId}
+                          onCancel={() => closePanel(account.id)}
+                          onSaved={(text) => {
+                            setToast({ text })
+                            closePanel(account.id)
+                          }}
+                        />
+                      )}
+                      {panel?.id === account.id && panel.kind === 'importacoes' && (
+                        <Importacoes account={account} onClose={() => closePanel(account.id)} />
+                      )}
+                    </li>
+                  )
+                })}
+              </ul>
+            </div>
+          )
+        })}
         <div className="hub-acoes">
           <button type="button" className="hub-btn hub-btn--pri" onClick={(event) => sheet.open({ mode: 'adicionar', opener: event.currentTarget })}>
             {ADD_ACCOUNT}

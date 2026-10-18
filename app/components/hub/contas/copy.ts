@@ -117,10 +117,14 @@ export const CONTAS = {
   title: 'Suas contas',
   sub: 'Cada conta é de um mercado só e tem as suas regras.',
   infoAria: 'Como ler: Suas contas',
-  // ADAPTED: "Duplicar e arquivar valem na hora; arquivar guarda…" → archive only (no duplicate in
-  // Phase 1); the sentences about the Apex examples and copy groups are dropped
+  // ADAPTED (board Personalizar `D.txt.infoContas`, Fase 2b): "Duplicar e arquivar valem na hora;
+  // arquivar guarda…" → archive only (no duplicate yet); the sentences about the Apex examples and
+  // copy groups are dropped, as in Phase 1
   info:
-    'Uma linha por conta. Cada conta é de um mercado só, com janela, limite e regras próprias. Arquivar vale na hora, guarda o histórico e pode ser desfeito. O Binary Hub não se conecta à sua corretora: as operações chegam por arquivo ou à mão.',
+    'Uma linha por conta. Cada conta é de um mercado só, com janela, limite e regras próprias. Arquivar vale na hora, guarda o histórico e pode ser desfeito. O Binary Hub não se conecta à sua corretora: as operações chegam por arquivo ou à mão. Por enquanto, lemos o CSV da Ebinex e o Trade History da Top One. Nas contas de Forex, de Ações, de Cripto e da B3, as operações entram pelo “Registrar operação”, que chega na Fase 3, e logo depois também por um CSV em que você diz o que é cada coluna. O relatório do MetaTrader sai em HTML ou PDF, não em CSV: vai precisar de um leitor próprio, que vem depois. O resultado fica na moeda da conta: R$ na B3; US$ nos outros mercados, com USDT e USDC contados como dólar.',
+  /** Under the group of a market whose files the app cannot read yet (board Personalizar `g.semLeitorTxt`) */
+  semLeitor: (market: AccountMarket) =>
+    `Ainda não lemos arquivos ${MERCADO[market].de}: as operações entram pelo “Registrar operação”, na Fase 3.`,
   empty: 'Traga o histórico da sua corretora.',
   importShort: 'Importar',
   importAria: (label: string) => `Importar arquivo para ${label}`,
@@ -156,7 +160,8 @@ export const EDITAR = {
   personal: 'Pessoal',
   firm: 'Mesa', // NEW (the board only has the chip "Mesa: {x}")
   ref: 'Número na plataforma',
-  size: 'Tamanho US$',
+  /** «Tamanho US$», «Tamanho R$» (NEW for R$: Editar conta follows step b) */
+  size: (simbolo: string) => `Tamanho ${simbolo}`,
   primary: 'Conta principal', // NEW
   primaryNote: 'Abre primeiro quando nenhuma conta foi escolhida.', // NEW
   zone: 'Fuso do arquivo',

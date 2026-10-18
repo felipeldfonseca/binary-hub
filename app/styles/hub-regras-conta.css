@@ -119,6 +119,12 @@
   gap: 4px;
 }
 
+/* Fase 2b · Suas contas: the note under the heading of a market without a file reader (board
+   `.grupo-mk .sem-leitor`); `.hub .hub-nota` sets margin 0, so this needs the group in front */
+.hub .hub-grupo .hub-sem-leitor {
+  margin-top: -4px;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .hub-rc *,
   .hub-rc *::before,
