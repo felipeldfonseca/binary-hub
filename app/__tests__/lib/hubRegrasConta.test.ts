@@ -4,9 +4,11 @@
 import { MON_TO_FRI } from '@/lib/domain/tempo'
 import type { ImportRow } from '@/lib/domain/import'
 import { brt, et, topOneRules } from '@/testing/gate'
-import { configAntes, configDepois, idsDono } from '@/testing/regras'
+import { configAntes, configDepois, configMercados, idsDono, idsMercados } from '@/testing/regras'
+import { MARKET_SPEC, type AccountMarket } from '@/lib/domain/markets'
 import { resolveRules, type AccountSettings, type RulesConfig, type WindowSetting } from '@/lib/hub/regras'
 import { REGRAS_CONTA } from '@/components/hub/contas/copyRegras'
+import { FIM_CONTA, PASSO_B } from '@/components/hub/contas/copy'
 import {
   NAO_COPIAR,
   REGRAS_FORM_VAZIO,
@@ -17,6 +19,7 @@ import {
   linhaAntesDasRegras,
   linhaImportadas,
   linhaResumo,
+  moedaEViradaDoDia,
   notaCopiar,
   mesmaJanela,
   novaContaNaConfig,
@@ -28,6 +31,7 @@ import {
   regrasEditadas,
   regrasResolvidas,
   textoLimite,
+  viradaEmBrasilia,
   type RegrasForm,
 } from '@/lib/hub/regrasConta'
 
@@ -44,7 +48,7 @@ function comConta(base: RulesConfig, id: string, patch: Partial<AccountSettings>
 }
 
 const form = (f: Partial<RegrasForm> = {}): RegrasForm => ({ ...REGRAS_FORM_VAZIO, ...f })
-const resumo = (config: RulesConfig, market: 'futures' | 'binary', f: RegrasForm = form()) => linhaResumo(regrasDaNovaConta(config, market, f), f)
+const resumo = (config: RulesConfig, market: AccountMarket, f: RegrasForm = form()) => linhaResumo(regrasDaNovaConta(config, market, f), f)
 
 describe('«Copiar regras de»', () => {
   it('offers the active accounts of the same market only, never across markets', () => {
@@ -229,6 +233,160 @@ describe('the market’s name in the creation form', () => {
   it('passes the market to Personalizar’s window labels', () => {
     expect(REGRAS_CONTA.inicioMercadoAria('binary', 'America/Sao_Paulo')).toBe('Início da janela de Opções binárias, horário de Brasília')
     expect(REGRAS_CONTA.cancelarJanelaAria('futures')).toBe('Cancelar a janela nova de Futuros')
+  })
+})
+
+// Fase 2b: Forex, Ações e opções (EUA), Cripto and B3 in the creation form (board ImportarConta
+// scenarios 11–14): window and daily limit only, in the market's money, on the market's day clock
+describe('the Fase 2b markets in the creation form', () => {
+  const NOVOS = ['forex', 'stocks', 'crypto', 'b3'] as const
+
+  it('a market’s first account: nothing to copy, «sem janela» and «definir» until the form sets them', () => {
+    const c = configAntes()
+    for (const m of NOVOS) {
+      const r = regrasDaNovaConta(c, m, form())
+      expect(r.opcoes).toEqual([])
+      expect(r.copiar).toBeNull()
+      expect(notaCopiar(r)).toBe('Começa com o padrão do mercado.')
+      expect(perguntaJanela(r)).toBeNull()
+      expect(r.janela).toBeNull()
+      expect(linhaResumo(r, form())).toBe('Janela: sem janela · limite do dia: definir')
+    }
+  })
+
+  it('«+ Definir janela» brings the market’s suggested window, which becomes the market’s (board `X.MK[*].sug`)', () => {
+    const c = configAntes()
+    const def = form({ definir: true, limite: '500' })
+    const forex = regrasDaNovaConta(c, 'forex', def)
+    expect(forex.janela).toEqual(w(NY, 480, 600))
+    expect(forex.marketWindows).toEqual([w(NY, 480, 600)])
+    expect(linhaResumo(forex, def)).toBe(`Janela 08:00–10:00 (Nova York) · padrão de Forex · limite do dia: US$${NBSP}500`)
+    expect(resumo(c, 'stocks', def)).toBe(`Janela 09:30–10:30 (Nova York) · padrão de Ações · limite do dia: US$${NBSP}500`)
+    // Crypto opens every day: Saturday and Sunday come marked
+    const cripto = regrasDaNovaConta(c, 'crypto', def)
+    expect(cripto.janela).toEqual(w(SP, 1200, 1320, 127))
+    expect(linhaResumo(cripto, def)).toBe(`Janela 20:00–22:00 (Brasília) · padrão de Cripto · limite do dia: US$${NBSP}500`)
+    // B3 is in reais
+    const b3form = form({ definir: true, limite: '400' })
+    const b3 = regrasDaNovaConta(c, 'b3', b3form)
+    expect(b3.janela).toEqual(w(SP, 600, 660))
+    expect(linhaResumo(b3, b3form)).toBe(`Janela 10:00–11:00 (Brasília) · padrão da B3 · limite do dia: R$${NBSP}400`)
+    // «Cancelar esta janela» goes back to none
+    expect(regrasDaNovaConta(c, 'b3', form({ definir: false })).janela).toBeNull()
+  })
+
+  it('the crypto note goes under the days of the crypto window only', () => {
+    expect(REGRAS_CONTA.diasNota.crypto).toBe('Cripto abre todos os dias: sábado e domingo já vêm marcados.')
+    for (const m of ['futures', 'binary', 'forex', 'stocks', 'b3'] as const) expect(REGRAS_CONTA.diasNota[m]).toBeUndefined()
+  })
+
+  it('the limit in the market’s money, and what was typed when it is not a number: «R$ abc» on B3', () => {
+    const c = configAntes()
+    expect(REGRAS_CONTA.limite('US$')).toBe('Limite do dia, US$')
+    expect(REGRAS_CONTA.limite('R$')).toBe('Limite do dia, R$')
+    const letras = form({ limite: 'abc' })
+    const r = regrasDaNovaConta(c, 'b3', letras)
+    expect(r.limiteErro).toBe('invalid')
+    expect(r.bloqueado).toBe(true)
+    expect(linhaResumo(r, letras)).toBe(`Janela: sem janela · limite do dia: R$${NBSP}abc`)
+    // «R$» typed in front is read, as «US$» is
+    expect(regrasDaNovaConta(c, 'b3', form({ limite: 'R$ 1.000,50' })).settings.limit).toEqual({ cents: 100050, mode: 'conta', atLimit: 'encerrar' })
+    expect(resumo(c, 'b3', form({ limite: '1.000,50' }))).toBe(`Janela: sem janela · limite do dia: R$${NBSP}1.000,50`)
+  })
+
+  it('never «por conta / somando» outside Futuros, even with another account of the market', () => {
+    const c = configMercados()
+    const ids = idsMercados()
+    for (const m of NOVOS) {
+      const r = regrasDaNovaConta(c, m, form({ modo: 'soma', limite: '300' }))
+      expect(r.temModo).toBe(false)
+      expect(r.modo).toBe('conta')
+      expect(r.settings.limit?.mode).toBe('conta')
+      expect(linhaResumo(r, form({ limite: '300' }))).not.toMatch(/por conta|somando/)
+    }
+    // A second forex account: FTMO to copy from, its window to answer «Usar a janela de Forex …?»
+    const forex = regrasDaNovaConta(c, 'forex', form())
+    expect(forex.opcoes).toEqual([{ id: ids.ftmo, label: 'FTMO' }])
+    expect(notaCopiar(forex)).toBe('Copia janela e limite do dia.')
+    expect(perguntaJanela(forex)).toBe('Usar a janela de Forex (08:00–10:00 ET)?')
+    expect(linhaResumo(forex, form())).toBe(`Janela 08:00–10:00 (Nova York) · padrão de Forex · limite do dia: US$${NBSP}1.000`)
+    const b3 = regrasDaNovaConta(c, 'b3', form())
+    expect(perguntaJanela(b3)).toBe('Usar a janela da B3 (10:00–11:00 de Brasília)?')
+    expect(linhaResumo(b3, form())).toBe(`Janela 10:00–11:00 (Brasília) · padrão da B3 · limite do dia: R$${NBSP}500`)
+    // IBKR has no version and no window: a second stocks account starts with none to answer
+    expect(perguntaJanela(regrasDaNovaConta(c, 'stocks', form()))).toBeNull()
+  })
+
+  it('v1 on the market’s day clock: Forex turns at 17:00 ET, Ações at 20:00 ET, Cripto and B3 at Brasília midnight', () => {
+    const c = configAntes()
+    const day = (m: AccountMarket) => regrasResolvidas(c, regrasDaNovaConta(c, m, form({ definir: true }))).day
+    expect(day('forex')).toEqual({ tz: NY, startMin: 1020 })
+    expect(day('stocks')).toEqual({ tz: NY, startMin: 1200 })
+    expect(day('crypto')).toEqual({ tz: SP, startMin: 0 })
+    expect(day('b3')).toEqual({ tz: SP, startMin: 0 })
+    const forex = regrasDaNovaConta(c, 'forex', form())
+    expect(desdeDaNovaConta(c, forex, et('2026-10-19 16:59'))).toBe('19 out')
+    expect(desdeDaNovaConta(c, forex, et('2026-10-19 17:00'))).toBe('20 out')
+    const stocks = regrasDaNovaConta(c, 'stocks', form())
+    expect(desdeDaNovaConta(c, stocks, et('2026-10-19 19:59'))).toBe('19 out')
+    expect(desdeDaNovaConta(c, stocks, et('2026-10-19 20:00'))).toBe('20 out')
+    // Crypto on a Saturday stays on Saturday
+    expect(desdeDaNovaConta(c, regrasDaNovaConta(c, 'crypto', form()), brt('2026-10-24 23:59'))).toBe('24 out')
+    // No block or state rule outside Futuros
+    const rules = regrasResolvidas(c, regrasDaNovaConta(c, 'b3', form({ definir: true, limite: '500' })))
+    expect(rules.block).toBeNull()
+    expect(rules.states).toBeNull()
+    expect(rules.limit).toEqual({ cents: 50000, mode: 'conta', atLimit: 'encerrar' })
+  })
+})
+
+describe('«Moeda e virada do dia» (board `B.moedaDia`, `B.infoMoeda`)', () => {
+  it('Forex and Ações: the turn on New York’s clock and, in Brasília, today’s time', () => {
+    const seg = et('2026-10-19 12:00')
+    expect(moedaEViradaDoDia('forex', seg)).toBe('US$ · o dia vira às 17:00 ET (18:00 em Brasília hoje)')
+    expect(moedaEViradaDoDia('stocks', seg)).toBe('US$ · o dia vira às 20:00 ET (21:00 em Brasília hoje)')
+    // The US clocks go back on Sun 1 Nov: one hour later in Brasília from that day on
+    const segNov = et('2026-11-02 12:00')
+    expect(moedaEViradaDoDia('forex', segNov)).toBe('US$ · o dia vira às 17:00 ET (19:00 em Brasília hoje)')
+    expect(moedaEViradaDoDia('stocks', segNov)).toBe('US$ · o dia vira às 20:00 ET (22:00 em Brasília hoje)')
+    expect(viradaEmBrasilia(MARKET_SPEC.forex.day, et('2026-10-31 23:30'))).toBe('18:00')
+    expect(viradaEmBrasilia(MARKET_SPEC.forex.day, et('2026-11-01 00:30'))).toBe('19:00')
+    // «Today» is the date on the day's clock: 22:30 in Brasília on 25 Oct is still the 25th in New York
+    expect(viradaEmBrasilia(MARKET_SPEC.stocks.day, brt('2026-10-25 22:30'))).toBe('21:00')
+  })
+
+  it('Cripto and B3: Brasília midnight, with no second clock; B3 in reais', () => {
+    const seg = et('2026-10-19 12:00')
+    expect(moedaEViradaDoDia('crypto', seg)).toBe('US$ · o dia vira à meia-noite de Brasília')
+    expect(moedaEViradaDoDia('b3', seg)).toBe('R$ · o dia vira à meia-noite de Brasília')
+    expect(viradaEmBrasilia(MARKET_SPEC.b3.day, seg)).toBeNull()
+  })
+
+  it('the ⓘ: USDT only for crypto; the firm’s own reset only with a firm', () => {
+    expect(PASSO_B.moedaDiaInfo('crypto', false)).toBe('USDT e USDC contam como dólar. A moeda e a virada do dia ficam fixas nesta conta.')
+    expect(PASSO_B.moedaDiaInfo('forex', true)).toBe(
+      'A moeda e a virada do dia ficam fixas nesta conta. O limite do dia é a sua regra: a mesa pode zerar o dela em outro horário.',
+    )
+    expect(PASSO_B.moedaDiaInfo('forex', false)).toBe('A moeda e a virada do dia ficam fixas nesta conta.')
+    expect(PASSO_B.moedaDiaInfo('crypto', true)).toBe(
+      'USDT e USDC contam como dólar. A moeda e a virada do dia ficam fixas nesta conta. O limite do dia é a sua regra: a mesa pode zerar o dela em outro horário.',
+    )
+    for (const m of ['forex', 'stocks', 'b3'] as const) expect(PASSO_B.moedaDiaInfo(m, true)).not.toContain('USDT')
+  })
+
+  it('«Tamanho» and the end screen in each market’s words', () => {
+    expect(PASSO_B.size('US$')).toBe('Tamanho US$')
+    expect(PASSO_B.size('R$')).toBe('Tamanho R$')
+    expect(FIM_CONTA.semLeitorArquivo('forex', 'mt5')).toBe(
+      'Ainda não lemos arquivos de Forex. O relatório do MetaTrader 5 sai em HTML ou PDF e vai precisar de um leitor próprio, que vem depois.',
+    )
+    expect(FIM_CONTA.semLeitorArquivo('forex', 'mt4')).toBe(
+      'Ainda não lemos arquivos de Forex. O relatório do MetaTrader 4 sai em HTML e vai precisar de um leitor próprio, que vem depois.',
+    )
+    expect(FIM_CONTA.semLeitorArquivo('crypto', 'binance')).toBe(
+      'Ainda não lemos arquivos de Cripto. Depois vem a importação de CSV em que você diz o que é cada coluna.',
+    )
+    expect(FIM_CONTA.semLeitorArquivo('b3', null)).toBe('Ainda não lemos arquivos da B3. Depois vem a importação de CSV em que você diz o que é cada coluna.')
   })
 })
 

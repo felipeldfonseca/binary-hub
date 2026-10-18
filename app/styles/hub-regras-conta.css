@@ -1,7 +1,9 @@
 /*
  * Rules in account creation (the import sheet's step b), «Editar regras» and the rule parts of a
- * «Suas contas» row, and the import preview's «Antes de …» line (Phase 2, lane A2). Scoped to .hub
- * like styles/hub.css. Imported by app/(hub)/layout.tsx. Only lane A2 edits this file.
+ * «Suas contas» row, and the import preview's «Antes de …» line (Phase 2, lane A2); the Fase 2b
+ * markets in account creation and Suas contas (lane A). Scoped to .hub like styles/hub.css.
+ * Imported by app/(hub)/layout.tsx, after hub.css, so a rule here can override one there. Only
+ * lane A edits this file.
  *
  * The sheet (.hub-folha) is on --bg, so the summary line on --surface keeps every text above 4.5:1
  * in both themes (contrato §2.5); nothing here stacks --surface on --surface.
@@ -107,6 +109,29 @@
   font-family: var(--mono);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
+}
+
+/* Fase 2b · «Qual mercado?» (i1): «Cada conta é de um mercado só.» and the no-reader note, in one
+   live region (board: a flex column, gap 4px) */
+.hub-notas-mercado {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+/* Fase 2b · «Onde você opera?» (i2): the «Mesa · opcional» label with its ⓘ right after it (board
+   `.cab-grupo`), not pushed to the row's far end as `.hub-passo__cab` does */
+.hub-cab-grupo {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* Fase 2b · Suas contas: the note under the heading of a market without a file reader (board
+   `.grupo-mk .sem-leitor`); `.hub .hub-nota` sets margin 0, so this needs the group in front */
+.hub .hub-grupo .hub-sem-leitor {
+  margin-top: -4px;
 }
 
 @media (prefers-reduced-motion: reduce) {

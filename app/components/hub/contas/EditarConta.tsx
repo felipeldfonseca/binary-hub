@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import { MARKET_SPEC, currencyOf } from '@/lib/domain/markets'
 import {
   ALL_FILE_ZONES,
   FIRM_MAX,
@@ -15,7 +16,7 @@ import {
   type TradingAccount,
 } from '@/lib/hub/contas'
 import { importFixTz, setPrimary, toHubError, updateAccount, type AccountPatch, type FixTzResult, type HubErrorCode } from '@/lib/hub/contasDb'
-import { formatShift } from '@/lib/hub/formato'
+import { SIMBOLO_MOEDA, formatShift } from '@/lib/hub/formato'
 import { firmNames, hasFirms } from '@/lib/hub/mesas'
 import { useHubDb, useRefreshAfterWrite } from '@/hooks/useContas'
 import { BUSY, CANCEL, CHOOSE, EDITAR, ERROR_TEXT, OPTIONAL, PASSO_B, PHASE_LABEL, fixTzLine, fixTzUntouched, zoneName } from './copy'
@@ -31,16 +32,18 @@ interface Props {
 }
 
 /**
- * "Editar conta" (no board; follows the inline forms of Suas contas). Changing or confirming
- * the file zone of an account with trades shows what moves first (import_fix_tz dry run) and
- * waits for an explicit "Confirmar fuso".
+ * "Editar conta" (no board; follows the inline forms of Suas contas and step b). Fase, Mesa and
+ * «Tamanho» (in the market's money) wherever the market has firms; «Tipo: Pessoal» for binaries.
+ * «Fuso do arquivo» only for a market with a file reader (Fase 2b: no file reaches the others).
+ * Changing or confirming the file zone of an account with trades shows what moves first
+ * (import_fix_tz dry run) and waits for an explicit "Confirmar fuso".
  */
 export default function EditarConta({ account, accounts, primaryId, onSaved, onCancel }: Props) {
   const { db } = useHubDb()
   const refresh = useRefreshAfterWrite()
-  const futures = account.market === 'futures'
-  // «Mesa»: free text, with the firms of the account's market as suggestions (lib/hub/mesas)
+  // Fase, «Mesa» (free text, with the firms of the account's market as suggestions) and «Tamanho»
   const firms = hasFirms(account.market)
+  const reader = MARKET_SPEC[account.market].reader
   const confirmed = tzConfirmed(account)
   const id = account.id
   const [label, setLabel] = useState(account.label)
@@ -73,13 +76,13 @@ export default function EditarConta({ account, accounts, primaryId, onSaved, onC
   // changed, and a change must fit (never cut on save)
   const labelChanged = trimmed !== account.label
   const tooLong = labelChanged && trimmed.length > LABEL_MAX
-  const sizeValue = futures ? parseSize(size) : null
+  const sizeValue = firms ? parseSize(size) : null
   const labelError = taken ? PASSO_B.labelTaken : tried && !trimmed ? EDITAR.needLabel : tooLong ? EDITAR.labelTooLong : ''
   const sizeError = tried && sizeValue === 'invalid' ? PASSO_B.badSize : ''
   const zoneOptions = ALL_FILE_ZONES.some((z) => z.tz === account.file_tz) || !confirmed
     ? ALL_FILE_ZONES.map((z) => z.tz)
     : [...ALL_FILE_ZONES.map((z) => z.tz), account.file_tz]
-  const zoneChanged = zone !== '' && (zone !== account.file_tz || !confirmed)
+  const zoneChanged = reader && zone !== '' && (zone !== account.file_tz || !confirmed)
 
   const finish = (zoneDone: string | null) => {
     refresh()
@@ -101,11 +104,11 @@ export default function EditarConta({ account, accounts, primaryId, onSaved, onC
     try {
       const patch: AccountPatch = {}
       if (labelChanged) patch.label = trimmed
-      const nextPhase = futures ? phase : account.phase ?? 'pessoal'
+      const nextPhase = firms ? phase : account.phase ?? 'pessoal'
       if (nextPhase !== account.phase) patch.phase = nextPhase
       if (firms && (firm.trim() || null) !== account.firm) patch.firm = firm.trim() || null
       if ((ref.trim() || null) !== account.external_ref) patch.external_ref = ref.trim() || null
-      if (futures && sizeValue !== 'invalid' && sizeValue !== (account.size === null ? null : String(account.size))) patch.size = sizeValue
+      if (firms && sizeValue !== 'invalid' && sizeValue !== (account.size === null ? null : String(account.size))) patch.size = sizeValue
       if (!primary && account.is_primary) patch.is_primary = false
       if (Object.keys(patch).length > 0) await updateAccount(db, id, patch)
       if (primary && !account.is_primary) await setPrimary(db, id, primaryId)
@@ -190,7 +193,7 @@ export default function EditarConta({ account, accounts, primaryId, onSaved, onC
         )}
       </div>
 
-      {futures ? (
+      {firms ? (
         <div className="hub-campo">
           <span id={fieldId('fase')} className="hub-rot-campo">
             {EDITAR.phase}
@@ -242,10 +245,10 @@ export default function EditarConta({ account, accounts, primaryId, onSaved, onC
       )}
 
       <div className="hub-campos2" style={{ maxWidth: 480 }}>
-        {futures && (
+        {firms && (
           <div className="hub-campo">
             <label htmlFor={fieldId('tam')} className="hub-rot-campo">
-              {EDITAR.size} <span className="hub-opc">{OPTIONAL}</span>
+              {EDITAR.size(SIMBOLO_MOEDA[currencyOf(account.market)])} <span className="hub-opc">{OPTIONAL}</span>
             </label>
             <input
               ref={sizeRef}
@@ -294,32 +297,34 @@ export default function EditarConta({ account, accounts, primaryId, onSaved, onC
         </p>
       </div>
 
-      <div className="hub-campo">
-        <label htmlFor={fieldId('fuso')} className="hub-rot-campo">
-          {EDITAR.zone}
-        </label>
-        <select
-          id={fieldId('fuso')}
-          className="hub-sel"
-          style={{ alignSelf: 'flex-start' }}
-          value={zone}
-          disabled={!!dry}
-          aria-describedby={confirmed ? undefined : fieldId('fuso-nota')}
-          onChange={(event) => setZone(event.target.value)}
-        >
-          {!confirmed && <option value="">{CHOOSE}</option>}
-          {zoneOptions.map((tz) => (
-            <option key={tz} value={tz}>
-              {zoneName(tz)}
-            </option>
-          ))}
-        </select>
-        {!confirmed && (
-          <p id={fieldId('fuso-nota')} className="hub-nota">
-            {EDITAR.zoneUnconfirmed}
-          </p>
-        )}
-      </div>
+      {reader && (
+        <div className="hub-campo">
+          <label htmlFor={fieldId('fuso')} className="hub-rot-campo">
+            {EDITAR.zone}
+          </label>
+          <select
+            id={fieldId('fuso')}
+            className="hub-sel"
+            style={{ alignSelf: 'flex-start' }}
+            value={zone}
+            disabled={!!dry}
+            aria-describedby={confirmed ? undefined : fieldId('fuso-nota')}
+            onChange={(event) => setZone(event.target.value)}
+          >
+            {!confirmed && <option value="">{CHOOSE}</option>}
+            {zoneOptions.map((tz) => (
+              <option key={tz} value={tz}>
+                {zoneName(tz)}
+              </option>
+            ))}
+          </select>
+          {!confirmed && (
+            <p id={fieldId('fuso-nota')} className="hub-nota">
+              {EDITAR.zoneUnconfirmed}
+            </p>
+          )}
+        </div>
+      )}
 
       {dry && (
         <div className="hub-bloco hub-bloco--atencao" role="group" aria-labelledby={fieldId('fuso-efeito')}>

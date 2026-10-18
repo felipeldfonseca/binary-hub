@@ -170,9 +170,19 @@ describe('firmsFor', () => {
     expect(hasFirms('binary')).toBe(false);
     expect(hasFirms('futures')).toBe(true);
     expect(hasFirms(null)).toBe(false);
-    expect(FIRM_MARKETS).toEqual(['futures']);
     expect(firmsFor('binary', '')).toEqual([]);
     expect(firmsFor('binary', 'top')).toEqual([]);
+  });
+
+  it('gives a «Mesa», a «Fase» and a «Tamanho» to futures and the four Fase 2b markets; B3 by free text only', () => {
+    expect(FIRM_MARKETS).toEqual(['futures', 'forex', 'crypto', 'stocks', 'b3']);
+    for (const m of ['forex', 'crypto', 'stocks', 'b3'] as const) expect(hasFirms(m)).toBe(true);
+    // Never offered: an old options account keeps «Tipo: Pessoal»
+    expect(hasFirms('options')).toBe(false);
+    // B3 has firms but no list: nothing featured, nothing found, no suggestion
+    expect(firmsFor('b3', '')).toEqual([]);
+    expect(firmsFor('b3', 'xp')).toEqual([]);
+    expect(firmNames('b3')).toEqual([]);
   });
 });
 
@@ -237,12 +247,26 @@ describe('firm copy', () => {
     expect(firmAndPlatform(null, null)).toBe('');
   });
 
-  it('the ⓘ names the source, the day and the rule, mentions Apex, and gives no score', () => {
-    const text = PASSO_I2.firmsInfo(PROP_FIRMS_CHECKED);
-    expect(text).toContain('Prop Firm Match em 18/10/2026');
-    expect(text).toContain('nota 4 ou mais e pelo menos 50 avaliações verificadas');
-    expect(text).toContain('Apex Trader Funding, que incluímos por escolha');
-    expect(text).not.toMatch(/\d[.,]\d/);
+  it('the ⓘ names the source, the month and the rule, mentions Apex, and gives no score (board `X.MK.fut.infoMesa`)', () => {
+    expect(PASSO_I2.firmsInfo('futures', PROP_FIRMS_CHECKED)).toBe(
+      'Mesas de futuros com nota 4 ou mais e pelo menos 50 avaliações verificadas na Prop Firm Match, vistas em outubro de 2026, mais a Apex Trader Funding, em ordem alfabética. Não é recomendação nem parceria. A sua não está aqui? Digite o nome.',
+    );
+    // The month follows the list's date when it is refreshed
+    expect(PASSO_I2.firmsInfo('futures', '2027-01-09')).toContain('vistas em janeiro de 2027');
+  });
+
+  it('forex has its own rule; crypto, stocks and B3, with no featured firm, have no ⓘ (board `X.MK.fx.infoMesa`)', () => {
+    const forex = PASSO_I2.firmsInfo('forex', PROP_FIRMS_CHECKED);
+    expect(forex).toBe(
+      'Mesas de forex com nota 4,4 ou mais e pelo menos 100 avaliações verificadas na Prop Firm Match, vistas em outubro de 2026, em ordem alfabética. Não é recomendação nem parceria. A sua não está aqui? Digite o nome.',
+    );
+    // The rule's threshold is the only number with a decimal: no firm's score
+    expect(forex!.replace('4,4', '')).not.toMatch(/\d[.,]\d/);
+    for (const m of ['crypto', 'stocks', 'b3', 'binary'] as const) expect(PASSO_I2.firmsInfo(m, PROP_FIRMS_CHECKED)).toBeNull();
+    // Only the markets that feature firms explain a featured list
+    for (const m of ['futures', 'forex', 'crypto', 'stocks', 'b3'] as const) {
+      expect(firmsFor(m, '').length > 0).toBe(PASSO_I2.firmsInfo(m, PROP_FIRMS_CHECKED) !== null);
+    }
   });
 });
 

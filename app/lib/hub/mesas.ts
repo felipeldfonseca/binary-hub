@@ -69,11 +69,11 @@ export const PROP_FIRMS_CHECKED = '2026-10-18';
 export const FIRM_MATCHES_MAX = 8;
 
 /**
- * Markets whose accounts have a «Mesa»: futures today. The Fase 2b account screens (lane A) add
- * forex, crypto, stocks and b3 (b3 with an empty list: the firm is free text) together with the
- * required «Fase»; the lists below are already in place.
+ * Markets whose accounts have a «Mesa», a «Fase» and a «Tamanho» (board ImportarConta `X.MK[*].firmas`):
+ * futures and the four Fase 2b markets. B3 has no listed firm (firmsFor('b3', …) and firmNames('b3')
+ * give []): its «Mesa» is free text. Binaries have none (and «Tipo: Pessoal»).
  */
-export const FIRM_MARKETS: readonly AccountMarket[] = ['futures'];
+export const FIRM_MARKETS: readonly AccountMarket[] = ['futures', 'forex', 'crypto', 'stocks', 'b3'];
 
 export const hasFirms = (market: AccountMarket | null | undefined): boolean => !!market && FIRM_MARKETS.includes(market);
 

@@ -4,7 +4,8 @@ import userEvent from '@testing-library/user-event'
 import RegrasDaConta from '@/components/hub/importar/RegrasDaConta'
 import type { RulesConfig } from '@/lib/hub/regras'
 import { NAO_COPIAR, REGRAS_FORM_VAZIO, desdeDaNovaConta, regrasDaNovaConta, type RegrasForm } from '@/lib/hub/regrasConta'
-import { configAntes, configDepois } from '@/testing/regras'
+import type { AccountMarket } from '@/lib/domain/markets'
+import { configAntes, configDepois, configMercados } from '@/testing/regras'
 import { brt, et } from '@/testing/gate'
 
 const NBSP = ' '
@@ -22,7 +23,7 @@ function Bloco({
   outras = null,
 }: {
   config: RulesConfig
-  market?: 'futures' | 'binary'
+  market?: AccountMarket
   now?: Date
   label?: string
   inicial?: RegrasForm
@@ -313,5 +314,97 @@ describe('RegrasDaConta · an account already created', () => {
     expect(screen.getByLabelText('Copiar regras de')).toBeDisabled()
     expect(screen.queryByRole('button', { name: 'Mudar' })).not.toBeInTheDocument()
     expect(document.getElementById('ed-regras')).toBeNull()
+  })
+})
+
+// Fase 2b: the limit in the market's money and the crypto days (board ImportarConta scenarios 12 and 14)
+describe('RegrasDaConta · the Fase 2b markets', () => {
+  it('B3: «Limite do dia, R$», the summary in R$ and the errors in R$', async () => {
+    render(<Bloco config={configAntes()} market="b3" inicial={{ aberto: true }} limiteErroId={null} />)
+    const limite = screen.getByLabelText('Limite do dia, R$')
+    expect(screen.queryByLabelText('Limite do dia, US$')).not.toBeInTheDocument()
+    await userEvent.type(limite, '400')
+    expect(linha().textContent).toBe(`Janela: sem janela · limite do dia: R$${NBSP}400`)
+
+    await userEvent.clear(limite)
+    await userEvent.type(limite, '2.000.000')
+    expect(limite).toHaveAccessibleDescription('Use um valor até R$ 1.000.000.')
+    expect(screen.getByText('Use um valor até R$ 1.000.000.', { selector: '#f-lim-erro' })).toBeInTheDocument()
+    await userEvent.clear(limite)
+    await userEvent.type(limite, '0')
+    expect(limite).toHaveAccessibleDescription('Digite um valor maior que zero.')
+  })
+
+  it('the dollar markets keep «Limite do dia, US$» and say US$ in their errors', async () => {
+    for (const market of ['forex', 'stocks', 'crypto'] as const) {
+      const { unmount } = render(<Bloco config={configAntes()} market={market} inicial={{ aberto: true }} limiteErroId={null} />)
+      await userEvent.type(screen.getByLabelText('Limite do dia, US$'), '1.000.001')
+      expect(screen.getByLabelText('Limite do dia, US$')).toHaveAccessibleDescription('Use um valor até US$ 1.000.000.')
+      unmount()
+    }
+  })
+
+  it('no mode and no block or state rows outside Futuros, even with another account of the market', () => {
+    for (const market of ['forex', 'stocks', 'crypto', 'b3'] as const) {
+      const { unmount } = render(<Bloco config={configMercados()} market={market} inicial={{ aberto: true }} />)
+      expect(screen.queryByRole('group', { name: 'Como o limite conta' })).not.toBeInTheDocument()
+      expect(screen.queryByText(/bloqueio de dados|regra do estado/)).not.toBeInTheDocument()
+      unmount()
+    }
+  })
+
+  it('crypto: «+ Definir janela» marks every day and says so under the days', async () => {
+    render(<Bloco config={configAntes()} market="crypto" inicial={{ aberto: true }} />)
+    expect(screen.queryByText('Cripto abre todos os dias: sábado e domingo já vêm marcados.')).not.toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('button', { name: '+ Definir janela' }))
+
+    const dias = screen.getByRole('group', { name: 'Dias da janela' })
+    expect(within(dias).getAllByRole('button').map((b) => [b.getAttribute('aria-label'), b.getAttribute('aria-pressed')])).toEqual([
+      ['segunda', 'true'],
+      ['terça', 'true'],
+      ['quarta', 'true'],
+      ['quinta', 'true'],
+      ['sexta', 'true'],
+      ['sábado', 'true'],
+      ['domingo', 'true'],
+    ])
+    expect(screen.getByText('Cripto abre todos os dias: sábado e domingo já vêm marcados.')).toHaveAttribute('id', 'j-dias-nota')
+    expect(dias).toHaveAccessibleDescription('Cripto abre todos os dias: sábado e domingo já vêm marcados.')
+    // With no day left the error describes the days too
+    for (const d of within(dias).getAllByRole('button')) await userEvent.click(d)
+    expect(dias).toHaveAttribute('aria-describedby', 'j-dias-nota j-erro')
+
+    await userEvent.click(screen.getByRole('button', { name: 'Cancelar a janela nova de Cripto' }))
+    expect(screen.queryByText('Cripto abre todos os dias: sábado e domingo já vêm marcados.')).not.toBeInTheDocument()
+  })
+
+  it('a second crypto account: the question and its own window, with no days note (it is no suggested window)', async () => {
+    // config-mercados: Binance already gave Cripto its window (20:00–22:00 de Brasília, every day)
+    render(<Bloco config={configMercados()} market="crypto" label="Bybit" inicial={{ aberto: true, copiar: NAO_COPIAR }} />)
+    const nota = 'Cripto abre todos os dias: sábado e domingo já vêm marcados.'
+    const pergunta = screen.getByRole('group', { name: /^Usar a janela de Cripto/ })
+    expect(screen.queryByText(nota)).not.toBeInTheDocument()
+
+    await userEvent.click(within(pergunta).getByRole('button', { name: 'Outra' }))
+
+    // The account's own window is open to edit, every day still marked, and nothing says why
+    const dias = screen.getByRole('group', { name: 'Dias da janela' })
+    expect(within(dias).getAllByRole('button').every((b) => b.getAttribute('aria-pressed') === 'true')).toBe(true)
+    expect(screen.getByLabelText(/^Início da janela só de Bybit/)).toBeInTheDocument()
+    expect(screen.queryByText(nota)).not.toBeInTheDocument()
+    expect(document.getElementById('j-dias-nota')).toBeNull()
+    expect(dias).not.toHaveAttribute('aria-describedby')
+    expect(screen.queryByRole('button', { name: '+ Definir janela' })).not.toBeInTheDocument()
+  })
+
+  it('the other markets’ suggested windows have no days note', async () => {
+    for (const market of ['forex', 'stocks', 'b3'] as const) {
+      const { unmount } = render(<Bloco config={configAntes()} market={market} inicial={{ aberto: true }} />)
+      await userEvent.click(screen.getByRole('button', { name: '+ Definir janela' }))
+      expect(screen.getByRole('group', { name: 'Dias da janela' })).not.toHaveAttribute('aria-describedby')
+      expect(document.getElementById('j-dias-nota')).toBeNull()
+      unmount()
+    }
   })
 })
