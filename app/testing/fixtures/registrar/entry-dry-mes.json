@@ -1,0 +1,120 @@
+{
+  "gate": {
+    "at": "2026-10-18T23:39:49.470339+00:00",
+    "block": {
+      "state": "nao_avaliado",
+      "reason": "fase5"
+    },
+    "desde": "2026-09-18T23:39:49.393721+00:00",
+    "label": "Registrar futures",
+    "limit": {
+      "usd": 400,
+      "mode": "conta",
+      "near": false,
+      "used": 0,
+      "state": "ok",
+      "hit_at": null,
+      "reason": null,
+      "trades": 0,
+      "net_usd": 0,
+      "at_limit": "encerrar",
+      "worst_usd": 0
+    },
+    "today": {
+      "trades": 0,
+      "net_usd": 0,
+      "worst_usd": 0
+    },
+    "market": "futures",
+    "status": "liberado",
+    "window": {
+      "next": {
+        "opens_at": "2026-10-19T22:09:00+00:00",
+        "closes_at": "2026-10-20T01:09:00+00:00",
+        "trading_day": "2026-10-20"
+      },
+      "state": "dentro",
+      "reason": null,
+      "current": {
+        "opens_at": "2026-10-18T22:09:00+00:00",
+        "closes_at": "2026-10-19T01:09:00+00:00"
+      },
+      "position": "dentro"
+    },
+    "version": {
+      "id": "92201534-a94c-4fd6-9dfb-27a1a77295ea",
+      "origin": "criar",
+      "version_no": 1,
+      "effective_from": "2026-09-18T23:39:49.393721+00:00"
+    },
+    "warnings": [],
+    "desde_day": "2026-09-19",
+    "account_id": "156bfa4d-cd78-42a2-a5fc-014347f22c68",
+    "changes_at": "2026-10-19T01:09:00+00:00",
+    "state_rule": {
+      "state": "nao_avaliado",
+      "reason": "fase5"
+    },
+    "trading_day": "2026-10-19",
+    "checks_evaluated": [
+      "janela",
+      "limite"
+    ]
+  },
+  "plan": {
+    "breaks": [],
+    "verdict": "no_plano",
+    "checks_evaluated": [
+      "janela",
+      "limite"
+    ]
+  },
+  "context": {
+    "rule_ok": null,
+    "in_block": null,
+    "warnings": [],
+    "in_window": true,
+    "after_limit": false,
+    "gate_status": "liberado",
+    "state_choice": null,
+    "checks_evaluated": [
+      "janela",
+      "limite"
+    ],
+    "day_pnl_at_entry": 0,
+    "day_worst_at_entry": 0
+  },
+  "dry_run": true,
+  "preview": {
+    "risk": 110,
+    "reward": 220,
+    "stop_points": 11,
+    "target_points": 22
+  },
+  "similar": [],
+  "version": {
+    "id": "92201534-a94c-4fd6-9dfb-27a1a77295ea",
+    "version_no": 1
+  },
+  "entry_at": "2026-10-18T23:39:49.470339+00:00",
+  "repeated": false,
+  "expires_at": null,
+  "instrument": {
+    "key": "MES",
+    "pip": null,
+    "pnl": "prices",
+    "mult": "5",
+    "tick": "0.25",
+    "costs": false,
+    "known": true,
+    "stops": "pts",
+    "qty_dp": 0,
+    "correct": false,
+    "price_dp": 8,
+    "asset_type": "futures"
+  },
+  "server_now": "2026-10-18T23:39:49.470339+00:00",
+  "stop_price": 7885.25,
+  "trading_day": "2026-10-19",
+  "target_price": 7918.25
+}

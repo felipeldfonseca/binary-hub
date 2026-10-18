@@ -1,0 +1,19 @@
+{
+  "slots": [
+    {
+      "id": "73bc9450-911d-43d8-bb2c-b8b6f5c3c243",
+      "mime": "image/webp",
+      "name": "MGC_entrada.webp",
+      "path": "429ba370-b51c-45fa-bf32-0d402da33ccf/99e32de3-10d5-4040-9b07-6435f49f4506/73bc9450-911d-43d8-bb2c-b8b6f5c3c243.webp"
+    },
+    {
+      "id": "50715b6b-b74c-4a6f-843b-1a6f0dc1fda4",
+      "mime": "image/png",
+      "name": "MGC_saida.png",
+      "path": "429ba370-b51c-45fa-bf32-0d402da33ccf/99e32de3-10d5-4040-9b07-6435f49f4506/50715b6b-b74c-4a6f-843b-1a6f0dc1fda4.png"
+    }
+  ],
+  "trash": [],
+  "bucket": "trade-images",
+  "server_now": "2026-10-18T23:39:50.275428+00:00"
+}
