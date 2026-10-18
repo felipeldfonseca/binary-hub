@@ -28,6 +28,46 @@ describe('the prop-firm list', () => {
     expect(new Set(PROP_FIRMS.map((f) => `${f.market}:${foldSearch(f.name)}`)).size).toBe(PROP_FIRMS.length);
   });
 
+  it('pins every firm: the name an account stores, its platform keys, aliases and the featured flag (mesas_futuros.md, 2026-10-18)', () => {
+    // Written out by hand from the research's table (App keys, plus BlackArrow/BlackArrow Pro and
+    // WealthCharts where the firm's «Platform:» line lists them): a typo in a name would be stored
+    // in trading_accounts.firm, so every value is pinned here, not derived from PROP_FIRMS
+    const F = true;
+    const expected: [name: string, platforms: string[], aliases: string[], featured: boolean][] = [
+      ['Apex Trader Funding', ['tradovate', 'rithmic', 'ninja', 'quantower', 'tradingview', 'wealthcharts'], ['Apex'], F],
+      ['AquaFunded Futures', ['tradovate'], [], !F],
+      ['Blue Guardian Futures', ['tradovate', 'ninja', 'tradingview'], [], F],
+      ['Blueberry Futures', ['blackarrow'], [], !F],
+      ['DayTraders', ['rithmic', 'quantower'], [], !F],
+      ['E8 Futures', ['tradovate', 'tradingview'], [], !F],
+      ['Earn2Trade', ['tradovate', 'rithmic', 'ninja', 'quantower', 'tradingview', 'blackarrow'], ['E2T'], !F],
+      ['Finotive Futures', ['tradovate', 'ninja', 'quantower', 'tradingview'], [], !F],
+      ['FTMO Futures', ['tradovate', 'ninja', 'tradingview'], [], !F],
+      ['Funded Futures Family', ['tradovate', 'ninja', 'tradingview', 'wealthcharts'], ['FFF'], !F],
+      ['FundedNext Futures', ['tradovate', 'ninja', 'tradingview'], [], F],
+      ['FuturesElite', ['tradovate', 'ninja', 'quantower', 'wealthcharts'], [], !F],
+      ['Goat Funded Futures', ['tradovate', 'ninja', 'quantower', 'tradingview'], [], !F],
+      ['Hola Prime Futures', ['tradovate', 'ninja', 'tradingview', 'wealthcharts'], [], !F],
+      ['Lucid Trading', ['tradovate', 'rithmic', 'ninja', 'quantower', 'tradingview'], [], F],
+      ['My Funded Futures', ['tradovate', 'ninja', 'quantower', 'tradingview'], ['MFF'], F],
+      ['Take Profit Trader', ['tradovate', 'rithmic', 'ninja', 'quantower', 'tradingview'], ['TPT'], !F],
+      ['The Trading Pit Futures', ['tradovate', 'rithmic', 'ninja', 'quantower', 'tradingview'], [], !F],
+      ['The5ers Futures', ['blackarrow'], [], !F],
+      ['Top One Futures', ['tradovate', 'ninja', 'tradingview', 'blackarrow', 'wealthcharts'], [], F],
+      ['Topstep', ['topstepx'], [], F],
+      ['TradeDay', ['tradovate', 'rithmic', 'ninja', 'quantower', 'tradingview', 'wealthcharts'], [], !F],
+      ['Tradeify', ['tradovate', 'rithmic', 'ninja', 'quantower', 'tradingview', 'wealthcharts'], [], F],
+      ['Traders Launch', ['quantower', 'tradingview'], [], F],
+      ['Ylos Trading', ['blackarrow'], [], !F],
+    ];
+    const actual = PROP_FIRMS.filter((f) => f.market === 'futures')
+      .map((f): [string, string[], string[], boolean] => [f.name, [...f.platforms], [...(f.aliases ?? [])], !!f.featured])
+      .sort((a, b) => a[0].localeCompare(b[0], 'pt-BR'));
+    expect(actual).toEqual(expected);
+    // Trade The Pool (stocks only) stays out
+    expect(firmByName('futures', 'Trade The Pool')).toBeNull();
+  });
+
   it('keeps every name within the firm column (60) and without the site’s «NEW» badge', () => {
     for (const firm of PROP_FIRMS) {
       expect(firm.name.length).toBeLessThanOrEqual(FIRM_MAX);
@@ -112,6 +152,12 @@ describe('firmsFor', () => {
       'DayTraders',
       'Earn2Trade',
     ]);
+  });
+
+  it('ranks a match that ignores the spaces with those where the text starts a word', () => {
+    // "trade r": no name holds it as typed; «Traders Launch» starts with it once the spaces go, so it
+    // comes before the firms that only hold "trader" inside
+    expect(names(firmsFor('futures', 'trade r'))).toEqual(['Traders Launch', 'Apex Trader Funding', 'DayTraders', 'Take Profit Trader']);
   });
 
   it('finds nothing for a firm outside the list, or for punctuation alone', () => {
