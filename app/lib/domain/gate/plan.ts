@@ -5,8 +5,10 @@
  * limite · contra a regra. «Só avisar» and “Liberado”, com aviso change only what the screen
  * said: the trade is still marked outside the plan.
  *
- * Before version 1 nothing is evaluated («Histórico importado · só resultado»).
+ * Before version 1 nothing is evaluated («Histórico importado · só resultado»). The state rule
+ * exists only where MARKET_SPEC says so (futures).
  */
+import { MARKET_SPEC } from '../markets';
 import {
   evaluateGate,
   gateTradingDay,
@@ -45,7 +47,8 @@ export interface PlanInput {
   version: RuleVersion | null;
   /**
    * The trades of the limit's scope on the entry's trading day: this account's, or with «somando»
-   * those of the owner's active futures accounts (not archived, not examples; never binaries).
+   * (futures only) those of the owner's active futures accounts (not archived, not examples; never
+   * another market's).
    * Only those realized at or before the entry count, and never the trade itself (`tradeId`).
    * null = not loaded.
    */
@@ -97,7 +100,7 @@ export function evaluatePlan(input: PlanInput): PlanResult {
   const state = input.state ?? NOT_YET;
   let stateRule: StateRuleCheck;
   if (!rules) stateRule = notEvaluated('sem_versao');
-  else if (rules.market !== 'futures' || !rules.states) stateRule = notEvaluated('so_futuros');
+  else if (!MARKET_SPEC[rules.market].rules.states || !rules.states) stateRule = notEvaluated('so_futuros');
   else if (!state.available) stateRule = notEvaluated('fase5');
   else if (!state.value) stateRule = notEvaluated('sem_estado');
   else if (state.value.suspended) stateRule = notEvaluated('comparacao_suspensa');

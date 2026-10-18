@@ -8,9 +8,19 @@
  *
  * Nothing here ever carries a cell value in an issue, a notice or an exception message.
  */
+import type { AccountMarket } from '../markets';
 
 export type Platform = 'ebinex' | 'topone';
-export type Market = 'binary' | 'futures';
+/**
+ * The market of a file format (Ebinex: binaries, Top One: futures): only these two have a reader.
+ * Built from AccountMarket, so a file's market is always one an account can be in.
+ */
+export type ImportMarket = Extract<AccountMarket, 'binary' | 'futures'>;
+/**
+ * @deprecated The old name of ImportMarket, still imported by lib/hub and the import sheet; it goes
+ * when they move to ImportMarket / AccountMarket (Fase 2b, foundation).
+ */
+export type Market = ImportMarket;
 
 /**
  * - `ebinex_br`: current Ebinex export, `DD/MM/YYYY HH:MM:SS` on the Brasília clock, no offset.
@@ -201,7 +211,7 @@ export interface ParsedFile {
   ok: true;
   platform: Platform;
   variant: FileVariant;
-  market: Market;
+  market: ImportMarket;
   /** Non-blank data records (header excluded): rows + errors */
   records: number;
   rows: ImportRow[];
@@ -227,7 +237,7 @@ export interface FailedFile {
 
 export type ParseOutcome = FailedFile | ParsedFile;
 
-export const PLATFORM_MARKET: Readonly<Record<Platform, Market>> = { ebinex: 'binary', topone: 'futures' };
+export const PLATFORM_MARKET: Readonly<Record<Platform, ImportMarket>> = { ebinex: 'binary', topone: 'futures' };
 
 /** Backed by the real exports: Ebinex writes the Brasília clock, Top One writes UTC. */
 export const PLATFORM_FILE_TZ_HINT: Readonly<Record<Platform, string>> = {
