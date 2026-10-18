@@ -8,7 +8,7 @@ import DiarioCabecalho from '@/components/hub/contas/DiarioCabecalho'
 import ImportSheetProvider from '@/components/hub/importar/ImportSheetProvider'
 import { QueryProvider } from '@/lib/providers/QueryProvider'
 import { makeAccount, renderHub } from '@/testing/hubHarness'
-import { agora, idsDono } from '@/testing/regras'
+import { agora, agoraMercados, contasMercados, idsDono, idsMercados } from '@/testing/regras'
 import { regrasKeys } from '@/hooks/useRegras'
 import { hubKeys } from '@/hooks/useContas'
 import type { TradingAccount } from '@/lib/hub/contas'
@@ -500,5 +500,81 @@ describe('Diário header window line', () => {
     await waitFor(() => expect(queryClient.getQueryState(regrasKeys.agora('user-1'))?.status).toBe('success'))
     await act(async () => {})
     expect(line()).toBeNull()
+  })
+})
+
+describe('Diário header in six markets (Fase 2b)', () => {
+  // The six-market owner (recorded on the markets migration) and rules_now() at Mon 19 Oct 08:30 ET
+  const im = idsMercados()
+  const line = () => document.getElementById('janela-conta')
+
+  beforeEach(() => {
+    fetchAccounts.mockResolvedValue(contasMercados())
+    fetchRulesNow.mockResolvedValue(agoraMercados())
+  })
+
+  it.each([
+    ['FTMO', 'ftmo', 'Janela 08:00–10:00 ET'],
+    ['IBKR', 'ibkr', 'Sem janela salva'],
+    ['Binance', 'binance', 'Janela 20:00–22:00 · Brasília'],
+    ['Clear', 'clear', 'Janela 10:00–11:00 · Brasília'],
+  ] as const)('the window line of %s under the selector', async (label, key, texto) => {
+    mockSearch = `conta=${im[key]}`
+    renderHub(<DiarioCabecalho />)
+
+    const button = await selectorButton()
+    expect(button).toHaveTextContent(`Conta: ${label}`)
+    await waitFor(() => expect(line()).toHaveTextContent(texto))
+    expect(button).toHaveAccessibleDescription(texto)
+  })
+
+  it('lists every market in the selector, in the board’s order, never summed', async () => {
+    renderHub(<DiarioCabecalho />)
+
+    await userEvent.click(await selectorButton())
+
+    const list = document.getElementById('lista-contas') as HTMLElement
+    expect(Array.from(list.querySelectorAll('.hub-seletor__grupo')).map((el) => el.textContent)).toEqual([
+      'Futuros',
+      'Opções binárias',
+      'Forex',
+      'Ações',
+      'Cripto',
+      'B3',
+    ])
+    expect(within(list).getByText('Contas de mercados diferentes nunca são somadas.')).toBeInTheDocument()
+  })
+
+  it('«Importar arquivo» with a Cripto account opens the sheet without an account (no file of that market is read yet)', async () => {
+    mockSearch = `conta=${im.binance}`
+    renderHub(<DiarioCabecalho />)
+    expect(await selectorButton()).toHaveTextContent('Conta: Binance')
+
+    await userEvent.click(screen.getByRole('button', { name: 'Importar arquivo' }))
+
+    const dialog = screen.getByRole('dialog', { name: 'Importar arquivo' })
+    expect(within(dialog).getByRole('heading', { name: 'Escolha o arquivo' })).toHaveFocus()
+    expect(within(dialog).queryByRole('heading', { name: /Binance/ })).not.toBeInTheDocument()
+    await userEvent.keyboard('{Escape}')
+    expect(screen.getByRole('button', { name: 'Importar arquivo' })).toHaveFocus()
+  })
+
+  it.each(['ftmo', 'ibkr', 'clear'] as const)('?importar=1 with a %s account in context opens the sheet without it', async (key) => {
+    mockSearch = `importar=1&conta=${im[key]}`
+    renderHub(<DiarioCabecalho />)
+
+    const dialog = await screen.findByRole('dialog', { name: 'Importar arquivo' })
+    expect(within(dialog).getByRole('heading', { name: 'Escolha o arquivo' })).toBeInTheDocument()
+    await waitFor(() => expect(mockReplace).toHaveBeenCalledWith(`/diario?conta=${im[key]}`))
+  })
+
+  it('a Futuros or binárias account still opens the sheet on itself', async () => {
+    mockSearch = `conta=${im.topOne}`
+    renderHub(<DiarioCabecalho />)
+    expect(await selectorButton()).toHaveTextContent('Conta: Top One #1')
+
+    await userEvent.click(screen.getByRole('button', { name: 'Importar arquivo' }))
+
+    expect(within(screen.getByRole('dialog', { name: 'Importar arquivo' })).getByRole('heading', { name: 'Importar histórico de Top One #1' })).toBeInTheDocument()
   })
 })
