@@ -133,7 +133,8 @@ describe('RegrasDaConta · «Mudar»', () => {
     // An account window is on the market's clock: the clock is text, not a choice
     expect(within(editor).queryByLabelText('Relógio da janela')).not.toBeInTheDocument()
     expect(within(editor).getByText('ET')).toBeInTheDocument()
-    expect(inicio).toHaveAccessibleDescription(`11:00–12:00 em Brasília${SEP}seg–sex`)
+    // The board's caption: the hours on the other clock; the days are the pills under it
+    expect(inicio).toHaveAccessibleDescription('11:00–12:00 em Brasília')
     const dias = within(editor).getByRole('group', { name: 'Dias da janela' })
     expect(within(dias).getAllByRole('button').map((b) => b.getAttribute('aria-label'))).toEqual([
       'segunda',
@@ -175,7 +176,9 @@ describe('RegrasDaConta · «Mudar»', () => {
 
     expect(screen.getByRole('alert')).toHaveTextContent('Início e fim iguais: mude um dos dois.')
     expect(inicio).toHaveAttribute('aria-invalid', 'true')
-    expect(inicio).toHaveAccessibleDescription('seg–sex Início e fim iguais: mude um dos dois.')
+    // No caption for a window with no length: the error says what to do
+    expect(document.getElementById('j-cap')).toBeNull()
+    expect(inicio).toHaveAccessibleDescription('Início e fim iguais: mude um dos dois.')
     expect(linha()).toHaveTextContent(/^Janela a definir \(Nova York\)/)
 
     fireEvent.change(inicio, { target: { value: '09:00' } })
@@ -358,6 +361,27 @@ describe('RegrasDaConta · the Fase 2b markets', () => {
       expect(document.getElementById('f-lim-erro')).toBeNull()
       unmount()
     }
+  })
+
+  it('a new market’s first window: the caption is the board’s, the hours on the other clock and no days (Personalizar names them)', async () => {
+    // Mon 19 Oct: the US clocks change on 1 Nov, inside the 14 days, so the new hours come too
+    const { unmount } = render(<Bloco config={configAntes()} market="b3" now={brt('2026-10-19 13:00')} inicial={{ aberto: true }} />)
+    await userEvent.click(screen.getByRole('button', { name: '+ Definir janela' }))
+    const inicio = screen.getByLabelText('Início da janela da B3, horário de Brasília')
+    const legenda = document.getElementById('j-cap') as HTMLElement
+    expect(legenda.textContent).toBe('09:00–10:00 ET; a partir de 1º nov: 08:00–09:00 ET')
+    expect(legenda).toHaveClass('hub-nota')
+    expect(inicio).toHaveAccessibleDescription('09:00–10:00 ET; a partir de 1º nov: 08:00–09:00 ET')
+    expect(screen.getByLabelText('Fim da janela da B3, horário de Brasília')).toHaveAccessibleDescription('09:00–10:00 ET; a partir de 1º nov: 08:00–09:00 ET')
+    // The days are the pills right under it
+    const dias = screen.getByRole('group', { name: 'Dias da janela' })
+    expect(legenda.compareDocumentPosition(dias) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    unmount()
+
+    // Wed 14 Oct: 1 Nov is 18 days away, today's hours only
+    render(<Bloco config={configAntes()} market="forex" now={et('2026-10-14 12:00')} inicial={{ aberto: true, definir: true }} />)
+    expect(document.getElementById('j-cap')?.textContent).toBe('09:00–11:00 em Brasília')
+    expect(screen.getByLabelText('Início da janela de Forex, horário de Nova York')).toHaveAccessibleDescription('09:00–11:00 em Brasília')
   })
 
   it('the dollar markets keep «Limite do dia, US$» and say US$ in their errors', async () => {

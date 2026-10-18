@@ -4,7 +4,7 @@ import { formatHhMm, parseHhMm } from '@/lib/domain/tempo'
 import { currencyOf, type LimitMode, type WindowTz } from '@/lib/domain/gate'
 import { SIMBOLO_MOEDA } from '@/lib/hub/formato'
 import { windowError, type WindowSetting } from '@/lib/hub/regras'
-import { WINDOW_CLOCKS, captionJanela, viraODia } from '@/lib/hub/janelas'
+import { WINDOW_CLOCKS, legendaJanela, viraODia } from '@/lib/hub/janelas'
 import {
   NAO_COPIAR,
   comCopiar,
@@ -231,7 +231,12 @@ export default function RegrasDaConta({ carga, regras: r, form, onForm, label, n
   )
 }
 
-/** `das [HH:MM] às [HH:MM] ET` (or the clock select), the caption on the other clock, the days, their note and the error */
+/**
+ * `das [HH:MM] às [HH:MM] ET` (or the clock select), the caption on the other clock, the days, their
+ * note and the error. The caption is the board's (`B.janCap`): the hours on the other clock only, and
+ * in the 14 days before a clock change the new ones too («; a partir de 1º nov: …»); the days are
+ * the pills right under it. Personalizar's caption (captionJanela) also names the days.
+ */
 function CamposJanela({
   w,
   now,
@@ -252,7 +257,9 @@ function CamposJanela({
   onChange: (patch: Partial<WindowSetting>) => void
 }) {
   const erro = windowError(w)
-  const desc = erro ? 'j-cap j-erro' : 'j-cap'
+  // Empty when start = end: the error says what to do
+  const legenda = legendaJanela(w, now)
+  const desc = [legenda ? 'j-cap' : '', erro ? 'j-erro' : ''].filter(Boolean).join(' ') || undefined
   const diasDesc = [diasNota ? 'j-dias-nota' : '', erro === 'no_days' ? 'j-erro' : ''].filter(Boolean).join(' ')
   // An unparsable value is ignored: the field keeps the last valid one (as in Personalizar)
   const ler = (key: 'startMin' | 'endMin') => (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -315,9 +322,11 @@ function CamposJanela({
         )}
         {viraODia(w) && <span className="hub-nota">{JANELAS.doDiaSeguinte}</span>}
       </div>
-      <p id="j-cap" className="hub-nota">
-        {captionJanela(w, now)}
-      </p>
+      {legenda && (
+        <p id="j-cap" className="hub-nota">
+          {legenda}
+        </p>
+      )}
       <div role="group" aria-label={REGRAS_CONTA.diasAria} aria-describedby={diasDesc || undefined} className="hub-pills">
         {DIAS_CURTOS.map((d, i) => (
           <button
