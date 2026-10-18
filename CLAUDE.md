@@ -44,7 +44,8 @@ Inside `app/`, `npx jest --ci <path>` runs one suite. Use Node 22 (`.nvmrc`). Be
 - The Supabase session lives in the browser. API routes get the user from the bearer token with `requireUser(request)` and must call it first.
 - Paid AI endpoints also call `denyPaidAi(user)` (env `AI_ALLOWED_USERS`). Hub endpoints call `denyHubAccess(user)` (env `HUB_USERS`). Sign-up is open, so with a list unset nobody is allowed.
 - `__tests__/api/routesRequireAuth.test.ts` discovers every route handler on disk; add new handlers to `EXPECTED_HANDLERS`.
-- Rules are written only by the `save_rules` function (windows, defaults, account settings and the append-only versions); the API may update `trading_accounts` only on the columns the hub edits (label, firm, external_ref, phase, size, is_primary, archived_at). `profiles.preferences.calendars` feeds the futures versions, so a trigger keeps it (and `profiles.preferences_saved_at`) unchanged on every write except `save_rules`'s own.
+- Rules are written only by the `save_rules` function (windows, defaults, account settings and the append-only versions); the API may update `trading_accounts` only on the columns the hub edits (label, firm, external_ref, phase, size, is_primary, archived_at). `profiles.preferences.calendars` feeds the futures versions, so a trigger keeps it (and `profiles.preferences_saved_at`) unchanged on every write except `save_rules`'s own. New accounts get `day_tz`, `day_start_min` and `currency` from `market_caps(market)` (insert trigger); the hub creates accounts in Futuros, binárias, Forex, Ações e opções (EUA), Cripto and B3.
+- Money is in the market's currency: B3 in reais (`brl` in stored limits), everything else in dollars (`usd`; USDT and USDC count as dollars). Accounts in different markets are never summed.
 - The server cannot tell who requests a page. Anything a hub page renders on the server reaches every visitor; `ProtectedRoute` and `HubGate` only hide it. Private data is read in the browser with the user's session, where row-level security limits it to the owner, or through API routes that check the session. Anything that costs money or reaches a third party (market data, AI) goes through API routes that also check HUB_USERS.
 
 ## Time zones and trading days
@@ -55,7 +56,7 @@ Inside `app/`, `npx jest --ci <path>` runs one suite. Use Node 22 (`.nvmrc`). Be
   - Top One exports are in UTC; `PnL` is gross, `Commissions` is a positive cost, `Gain` is a percentage of the account.
 - Only offset-less wall-clock values go through `AT TIME ZONE`; casting a string with an offset to `timestamp` would drop the offset.
 - Postgres (`timestamp AT TIME ZONE tz`) is the canonical conversion. `localToUtc` in `lib/domain/tempo.ts` follows the same rules (skipped times use the offset from before the change; repeated times take the later occurrence) and only accepts `UTC` or Area/Location zone names.
-- A trading day is `compute_trading_day(account, instant)` in the database: the date on the account's day clock (`day_tz`, turning at `day_start_min`: 18:00 New York for futures, midnight in Brasília for binaries), except that an entry inside an occurrence of a window of the rule version in force counts on the day that occurrence opened (so an overnight window counts on the day it opened). Before an account's first rule version only the day clock applies. Never derive a day from `toISOString()` or the browser's zone.
+- A trading day is `compute_trading_day(account, instant)` in the database: the date on the account's day clock (`day_tz`, turning at `day_start_min`: 18:00 New York for futures, 17:00 New York for Forex, 20:00 New York for Ações e opções (EUA), midnight in Brasília for binaries, Cripto and B3), except that an entry inside an occurrence of a window of the rule version in force counts on the day that occurrence opened (so an overnight window counts on the day it opened). Before an account's first rule version only the day clock applies. Never derive a day from `toISOString()` or the browser's zone.
 
 ## Hub UI
 
@@ -81,6 +82,7 @@ The approved plan has ten phases, each ending with a screen the owner tests and 
 0. Safe base and frame (done): CI, cleanup, time helpers, hub frame, `/diario` placeholder.
 1. Accounts and import: real accounts, an import that can be undone, per-broker fields (Top One stop, target, commission; Ebinex exit and payout), correct time zones.
 2. Rules and windows: operating windows per account or market, versioned rules, "Posso operar hoje?".
+2b. Mercados: Forex, Cripto, Ações e opções (EUA) e B3 com janela e limite do dia.
 3. Log a trade: setup, marks with server time, window and limit warnings, images and a note.
 4. Diário: calendar, the day, the week.
 5. Market state, computed by rules.
