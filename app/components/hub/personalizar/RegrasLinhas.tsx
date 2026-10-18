@@ -31,7 +31,7 @@ import {
 } from '@/lib/hub/rascunho'
 import { resumoEstados } from '@/lib/hub/comoFicaHoje'
 import { Disclosure, useToggle } from '@/components/hub/contas/ui'
-import { ATIVO_NA_FASE_5, ESCOLHA_NOME, ESTADO_NOME, PADRAO_DE_FUTUROS, REGRAS, RELOGIO, SO_NESTA_CONTA } from './copy'
+import { ATIVO_NA_FASE_5, ESCOLHA_NOME, ESTADO_NOME, PADRAO_DE_FUTUROS, REGRAS, RELOGIO, SEP, SO_NESTA_CONTA } from './copy'
 import type { FormLimite } from './PersonalizarProvider'
 import { Interruptor, Pilulas, TagNaoSalvo } from './ui'
 
@@ -98,7 +98,7 @@ export function RegraJanela({ entidade, draft, mudou, onIrJanelas }: { entidade:
               <span key={k}>
                 {k > 0 && '; '}
                 <span className="hub-pz-num">{faixaJanela(w.startMin, w.endMin)}</span>
-                {` ${RELOGIO[w.tz].de} · ${resumoDias(w.weekdays)}`}
+                {` ${RELOGIO[w.tz].de}${SEP}${resumoDias(w.weekdays)}`}
               </span>
             ))
           ) : (

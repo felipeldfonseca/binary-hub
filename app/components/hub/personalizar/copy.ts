@@ -22,6 +22,12 @@ import { MERCADO, USDT_COMO_DOLAR } from '@/components/hub/copyMercados'
 export const lista = (xs: readonly string[]): string =>
   xs.length <= 1 ? xs.join('') : `${xs.slice(0, -1).join(', ')} e ${xs[xs.length - 1]}`
 
+/**
+ * « · » between two parts of a text: a no-break space on each side, so the separator never starts
+ * or ends a line; the line breaks at another space instead
+ */
+export const SEP = '\u00a0·\u00a0'
+
 export const NAO_SALVO = 'não salvo'
 export const SO_NESTA_CONTA = 'só nesta conta'
 export const PADRAO_DE_FUTUROS = 'padrão de Futuros'
@@ -272,7 +278,7 @@ export const REGRAS = {
     ({
       empty: 'Digite um valor maior que zero.',
       not_positive: 'Digite um valor maior que zero.',
-      too_large: `Use um valor até ${SIMBOLO_MOEDA[currency]} 1.000.000.`, // NEW (the database's maximum)
+      too_large: `Use um valor até ${SIMBOLO_MOEDA[currency]}\u00a01.000.000.`, // NEW (the database's maximum; the symbol stays with the amount)
       invalid: 'Use só números, como 400 ou 400,50.', // NEW (the board's number field could not get letters)
     })[reason],
   modoAria: (label: string) => `Como o limite de ${label} conta`,
@@ -320,8 +326,8 @@ export const ESCOLHA_NOME: Record<StateChoice, string> = {
 export const HOJE = {
   titulo: 'Como fica hoje',
   noRelogio: (relogio: string) => `no ${relogio}`,
-  suaJanela: ' · sua janela',
-  umaDasJanelas: ' · uma das suas janelas',
+  suaJanela: `${SEP}sua janela`,
+  umaDasJanelas: `${SEP}uma das suas janelas`,
   liberado: 'Liberado',
   foraDaJanela: 'Fora da sua janela',
   encerrado: 'Encerrado por hoje',
@@ -353,10 +359,10 @@ export const VERSAO = {
   operacoesDesde: (n: number, d: string) => `${formatInt(n)} ${n === 1 ? 'operação' : 'operações'} do diário desde ${d}.`,
   aoSalvar: (n: number, d: string) => `Ao salvar: Regras v${n} desde ${d}.`,
   versoes: (n: number) => `Versões (${formatInt(n)})`,
-  antes: (d: string) => `Antes de ${d}: Histórico importado · só resultado.`,
+  antes: (d: string) => `Antes de ${d}: Histórico importado${SEP}só resultado.`,
   analises: 'As Análises contam a partir daqui.',
   nenhuma: 'Nenhuma versão salva',
-  ateSalvar: 'Até salvar, as operações ficam em “Histórico importado · só resultado”.',
+  ateSalvar: `Até salvar, as operações ficam em “Histórico importado${SEP}só resultado”.`,
   comecar: 'Começar as regras hoje', // NEW (personalizar.md P12)
   desde: (d: string) => `desde ${d}`,
   hoje: ' (hoje)',

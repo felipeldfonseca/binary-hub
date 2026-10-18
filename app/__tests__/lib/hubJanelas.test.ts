@@ -23,6 +23,9 @@ import {
   viraODia,
 } from '@/lib/hub/janelas'
 
+/** « · » with a no-break space on each side (personalizar/copy.ts SEP): it never starts or ends a line */
+const SEP = '\u00a0·\u00a0'
+
 const topOne: WindowSetting = { tz: NY, startMin: 600, endMin: 660, weekdays: MON_TO_FRI }
 const ebinex: WindowSetting = { tz: BR, startMin: 1200, endMin: 1260, weekdays: MON_TO_FRI }
 const w = (tz: WindowSetting['tz'], start: number, end: number, weekdays = MON_TO_FRI): WindowSetting => ({ tz, startMin: start, endMin: end, weekdays })
@@ -80,22 +83,22 @@ describe('faixaJanela and the days', () => {
 describe('captions on the other clock', () => {
   it('Sat 17 Oct: today’s offsets only (1 Nov is more than 14 days away)', () => {
     const now = et('2026-10-17 12:00')
-    expect(captionJanela(topOne, now)).toBe('11:00–12:00 em Brasília · seg–sex')
-    expect(captionJanela(ebinex, now)).toBe('19:00–20:00 ET · seg–sex')
+    expect(captionJanela(topOne, now)).toBe(`11:00–12:00 em Brasília${SEP}seg–sex`)
+    expect(captionJanela(ebinex, now)).toBe(`19:00–20:00 ET${SEP}seg–sex`)
   })
 
   it('Sun 18 Oct and Sat 31 Oct: the new time from 1º nov too', () => {
     for (const now of [et('2026-10-18 12:00'), et('2026-10-31 12:00')]) {
-      expect(captionJanela(topOne, now)).toBe('11:00–12:00 em Brasília; a partir de 1º nov: 12:00–13:00 em Brasília · seg–sex')
-      expect(captionJanela(ebinex, now)).toBe('19:00–20:00 ET; a partir de 1º nov: 18:00–19:00 ET · seg–sex')
+      expect(captionJanela(topOne, now)).toBe(`11:00–12:00 em Brasília; a partir de 1º nov: 12:00–13:00 em Brasília${SEP}seg–sex`)
+      expect(captionJanela(ebinex, now)).toBe(`19:00–20:00 ET; a partir de 1º nov: 18:00–19:00 ET${SEP}seg–sex`)
     }
   })
 
   it('Mon 2 Nov: back to one clock, with the winter offsets', () => {
     const now = et('2026-11-02 10:00')
     expect(now.toISOString()).toBe('2026-11-02T15:00:00.000Z')
-    expect(captionJanela(topOne, now)).toBe('12:00–13:00 em Brasília · seg–sex')
-    expect(captionJanela(ebinex, now)).toBe('18:00–19:00 ET · seg–sex')
+    expect(captionJanela(topOne, now)).toBe(`12:00–13:00 em Brasília${SEP}seg–sex`)
+    expect(captionJanela(ebinex, now)).toBe(`18:00–19:00 ET${SEP}seg–sex`)
   })
 
   it('says when the other clock crosses midnight', () => {

@@ -16,6 +16,9 @@ import { makeAccount, renderHub } from '@/testing/hubHarness'
 import { configAntes, configDepois, configMercados, contasMercados, idsDono, idsMercados } from '@/testing/regras'
 import { et, topOneRules } from '@/testing/gate'
 
+/** « · » with a no-break space on each side (personalizar/copy.ts SEP): it never starts or ends a line */
+const SEP = '\u00a0·\u00a0'
+
 jest.mock('@/lib/supabase', () => ({ createDataClient: jest.fn(() => ({})) }))
 jest.mock('@/hooks/useAuth', () => ({
   useAuth: () => ({ user: { id: 'user-1' }, session: { access_token: 'user-jwt' } }),
@@ -397,7 +400,7 @@ describe('«Suas regras»', () => {
     expect(valorLimite()).toHaveTextContent('US$ 400')
     const hoje = screen.getByRole('list', { name: 'Como fica hoje' })
     expect(within(hoje).getAllByRole('listitem').map((li) => li.textContent)).toEqual([
-      '10:00–11:00 ET · sua janelaLiberado',
+      `10:00–11:00 ET${SEP}sua janelaLiberado`,
       'No resto do diaFora da sua janela',
       'Se a perda do dia chegar a US$\u00a0400Encerrado por hoje',
       'Bloqueio de dadosativo na Fase 5',
@@ -407,8 +410,8 @@ describe('«Suas regras»', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Versões (1)' }))
     const lista = document.getElementById('lista-versoes') as HTMLElement
     expect(within(lista).getAllByRole('listitem').map((li) => li.textContent)).toEqual([
-      'v1 · desde 17 out · janela 10:00–11:00 ET · seg–sex · limite US$\u00a0400 por conta',
-      'Antes de 17 out: Histórico importado · só resultado.',
+      `v1${SEP}desde 17 out${SEP}janela 10:00–11:00 ET${SEP}seg–sex${SEP}limite US$\u00a0400 por conta`,
+      `Antes de 17 out: Histórico importado${SEP}só resultado.`,
     ])
     expect(screen.getByText('As Análises contam a partir daqui.')).toBeInTheDocument()
   })

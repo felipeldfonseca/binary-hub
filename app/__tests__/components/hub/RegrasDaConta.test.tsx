@@ -8,6 +8,9 @@ import type { AccountMarket } from '@/lib/domain/markets'
 import { configAntes, configDepois, configMercados } from '@/testing/regras'
 import { brt, et } from '@/testing/gate'
 
+/** « · » with a no-break space on each side (personalizar/copy.ts SEP): it never starts or ends a line */
+const SEP = '\u00a0·\u00a0'
+
 const NBSP = ' '
 
 /** The sheet's side of the block: it holds the form and resolves it against the saved rules */
@@ -84,7 +87,7 @@ describe('RegrasDaConta · «Copiar regras de»', () => {
     expect(within(select).getAllByRole('option').map((o) => o.textContent)).toEqual(['Top One #1', 'Não copiar'])
     expect(select).toHaveDisplayValue('Top One #1')
     expect(select).toHaveAccessibleDescription('Copia janela, limite do dia, bloqueio de dados e regra do estado.')
-    expect(linha().textContent).toBe(`Janela 10:00–11:00 (Nova York) · padrão de Futuros · limite do dia: US$${NBSP}400 por conta`)
+    expect(linha().textContent).toBe(`Janela 10:00–11:00 (Nova York)${SEP}padrão de Futuros${SEP}limite do dia: US$${NBSP}400 por conta`)
 
     await userEvent.selectOptions(select, 'Não copiar')
 
@@ -130,7 +133,7 @@ describe('RegrasDaConta · «Mudar»', () => {
     // An account window is on the market's clock: the clock is text, not a choice
     expect(within(editor).queryByLabelText('Relógio da janela')).not.toBeInTheDocument()
     expect(within(editor).getByText('ET')).toBeInTheDocument()
-    expect(inicio).toHaveAccessibleDescription('11:00–12:00 em Brasília · seg–sex')
+    expect(inicio).toHaveAccessibleDescription(`11:00–12:00 em Brasília${SEP}seg–sex`)
     const dias = within(editor).getByRole('group', { name: 'Dias da janela' })
     expect(within(dias).getAllByRole('button').map((b) => b.getAttribute('aria-label'))).toEqual([
       'segunda',
@@ -141,7 +144,7 @@ describe('RegrasDaConta · «Mudar»', () => {
       'sábado',
       'domingo',
     ])
-    expect(linha().textContent).toBe(`Janela 10:00–11:00 (Nova York) · só nesta conta · limite do dia: US$${NBSP}400 por conta`)
+    expect(linha().textContent).toBe(`Janela 10:00–11:00 (Nova York)${SEP}só nesta conta${SEP}limite do dia: US$${NBSP}400 por conta`)
 
     fireEvent.change(inicio, { target: { value: '09:30' } })
     expect(linha()).toHaveTextContent(/^Janela 09:30–11:00 \(Nova York\) · só nesta conta/)
@@ -324,11 +327,11 @@ describe('RegrasDaConta · the Fase 2b markets', () => {
     const limite = screen.getByLabelText('Limite do dia, R$')
     expect(screen.queryByLabelText('Limite do dia, US$')).not.toBeInTheDocument()
     await userEvent.type(limite, '400')
-    expect(linha().textContent).toBe(`Janela: sem janela · limite do dia: R$${NBSP}400`)
+    expect(linha().textContent).toBe(`Janela: sem janela${SEP}limite do dia: R$${NBSP}400`)
 
     await userEvent.clear(limite)
     await userEvent.type(limite, '2.000.000')
-    expect(limite).toHaveAccessibleDescription('Use um valor até R$ 1.000.000.')
+    expect(limite).toHaveAccessibleDescription(`Use um valor até R$${NBSP}1.000.000.`)
     expect(screen.getByText('Use um valor até R$ 1.000.000.', { selector: '#f-lim-erro' })).toBeInTheDocument()
     await userEvent.clear(limite)
     await userEvent.type(limite, '0')
@@ -361,7 +364,7 @@ describe('RegrasDaConta · the Fase 2b markets', () => {
     for (const market of ['forex', 'stocks', 'crypto'] as const) {
       const { unmount } = render(<Bloco config={configAntes()} market={market} inicial={{ aberto: true }} limiteErroId={null} />)
       await userEvent.type(screen.getByLabelText('Limite do dia, US$'), '1.000.001')
-      expect(screen.getByLabelText('Limite do dia, US$')).toHaveAccessibleDescription('Use um valor até US$ 1.000.000.')
+      expect(screen.getByLabelText('Limite do dia, US$')).toHaveAccessibleDescription(`Use um valor até US$${NBSP}1.000.000.`)
       unmount()
     }
   })

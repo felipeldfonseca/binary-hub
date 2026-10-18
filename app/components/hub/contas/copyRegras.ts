@@ -11,7 +11,7 @@
  */
 import { MARKET_SPEC, type AccountMarket, type WindowTz } from '@/lib/domain/gate'
 import { formatInt } from '@/lib/hub/formato'
-import { JANELAS, RELOGIO, lista } from '@/components/hub/personalizar/copy'
+import { JANELAS, RELOGIO, SEP, lista } from '@/components/hub/personalizar/copy'
 import { MERCADO } from '@/components/hub/copyMercados'
 
 // ------------------------------------------------------------------------------------------------
@@ -36,11 +36,14 @@ export const REGRAS_CONTA = {
     MARKET_SPEC[market].rules.block ? 'Copia janela, limite do dia, bloqueio de dados e regra do estado.' : 'Copia janela e limite do dia.',
 
   mudar: 'Mudar',
-  /** «Janela 10:00–11:00 (Nova York) · padrão de Futuros · limite do dia: US$ 400 por conta» */
+  /**
+   * «Janela 10:00–11:00 (Nova York) · padrão de Futuros · limite do dia: US$ 400 por conta»; each
+   * « · » is SEP (no-break spaces), so none starts or ends a line
+   */
   linha: (faixa: string, relogio: string, origem: string, limite: string) =>
-    `Janela ${faixa} (${relogio}) · ${origem} · limite do dia: ${limite}`,
+    `Janela ${faixa} (${relogio})${SEP}${origem}${SEP}limite do dia: ${limite}`,
   // NEW (personalizar.md §11.1): no market window and no window set in the form
-  linhaSemJanela: (limite: string) => `Janela: sem janela · limite do dia: ${limite}`,
+  linhaSemJanela: (limite: string) => `Janela: sem janela${SEP}limite do dia: ${limite}`,
   /** «20:00 → 02:00 do dia seguinte» */
   faixaNoite: (inicio: string, fim: string) => `${inicio} → ${fim} do dia seguinte`,
   aDefinir: 'a definir',

@@ -13,6 +13,9 @@ import { csvFile, fixtureFile, makeAccount, makePreview, renderHub } from '@/tes
 import { configAntes, configDepois, configMercados, contasMercados, idsDono, idsMercados } from '@/testing/regras'
 import { brt, et } from '@/testing/gate'
 
+/** « · » with a no-break space on each side (personalizar/copy.ts SEP): it never starts or ends a line */
+const SEP = '\u00a0·\u00a0'
+
 jest.mock('@/lib/supabase', () => ({ createDataClient: jest.fn(() => ({})) }))
 
 jest.mock('@/hooks/useAuth', () => ({
@@ -1460,7 +1463,7 @@ describe('ImportSheet · the rules of a new account (step b)', () => {
     const select = within(dialog).getByLabelText('Copiar regras de')
     expect(select).toHaveDisplayValue('Top One #1')
     expect(select).toHaveAccessibleDescription('Copia janela, limite do dia, bloqueio de dados e regra do estado.')
-    expect(linhaRegra(dialog)).toBe(`Janela 10:00–11:00 (Nova York) · padrão de Futuros · limite do dia: US$${NBSP}400 por conta`)
+    expect(linhaRegra(dialog)).toBe(`Janela 10:00–11:00 (Nova York)${SEP}padrão de Futuros${SEP}limite do dia: US$${NBSP}400 por conta`)
     expect(within(dialog).getByRole('button', { name: 'Mudar' })).toHaveAttribute('aria-expanded', 'false')
     expect(within(dialog).getByText('Regras valem desde hoje, 19 out')).toBeInTheDocument()
     // Board order: after «Número na plataforma», before the creation button
@@ -1494,7 +1497,7 @@ describe('ImportSheet · the rules of a new account (step b)', () => {
     fireEvent.change(within(dialog).getByLabelText('Fim da janela só de Pocket, horário de Brasília'), { target: { value: '02:00' } })
 
     expect(within(dialog).getByText('Regras valem desde hoje, 19 out')).toBeInTheDocument()
-    expect(linhaRegra(dialog)).toBe('Janela 22:00 → 02:00 do dia seguinte (Brasília) · só nesta conta · limite do dia: sem limite')
+    expect(linhaRegra(dialog)).toBe(`Janela 22:00 → 02:00 do dia seguinte (Brasília)${SEP}só nesta conta${SEP}limite do dia: sem limite`)
   })
 
   it('creates the account, then its v1 through useSaveRules, then goes on: «Sim» keeps the market’s window', async () => {
@@ -1535,7 +1538,7 @@ describe('ImportSheet · the rules of a new account (step b)', () => {
     fireEvent.change(within(dialog).getByLabelText('Início da janela só de Apex B, horário de Nova York'), { target: { value: '09:30' } })
     await userEvent.type(within(dialog).getByLabelText('Limite do dia, US$'), '250,50')
     await userEvent.click(within(dialog).getByRole('button', { name: 'somando as contas de Futuros' }))
-    expect(linhaRegra(dialog)).toBe(`Janela 09:30–11:00 (Nova York) · só nesta conta · limite do dia: US$${NBSP}250,50 somando as contas de Futuros`)
+    expect(linhaRegra(dialog)).toBe(`Janela 09:30–11:00 (Nova York)${SEP}só nesta conta${SEP}limite do dia: US$${NBSP}250,50 somando as contas de Futuros`)
 
     await userEvent.click(within(dialog).getByRole('button', { name: 'Criar Apex B' }))
 
@@ -1557,10 +1560,10 @@ describe('ImportSheet · the rules of a new account (step b)', () => {
     fetchRulesConfig.mockResolvedValue(configAntes())
     const { dialog } = await openRules({ mode: 'adicionar' })
     await fillNewFuturesAccount(dialog, 'Apex B')
-    expect(linhaRegra(dialog)).toBe('Janela: sem janela · limite do dia: sem limite')
+    expect(linhaRegra(dialog)).toBe(`Janela: sem janela${SEP}limite do dia: sem limite`)
     await userEvent.click(within(dialog).getByRole('button', { name: 'Mudar' }))
     await userEvent.click(within(dialog).getByRole('button', { name: '+ Definir janela' }))
-    expect(linhaRegra(dialog)).toBe('Janela 10:00–11:00 (Nova York) · padrão de Futuros · limite do dia: sem limite')
+    expect(linhaRegra(dialog)).toBe(`Janela 10:00–11:00 (Nova York)${SEP}padrão de Futuros${SEP}limite do dia: sem limite`)
 
     await userEvent.click(within(dialog).getByRole('button', { name: 'Criar Apex B' }))
 
@@ -1765,7 +1768,7 @@ describe('ImportSheet · the rules of a new account (step b)', () => {
     await userEvent.click(within(dialog).getByRole('button', { name: 'Continuar' }))
 
     expect(within(dialog).getByLabelText('Copiar regras de')).toHaveDisplayValue('Ebinex')
-    expect(linhaRegra(dialog)).toBe('Janela 20:00–21:00 (Brasília) · padrão de Binárias · limite do dia: sem limite')
+    expect(linhaRegra(dialog)).toBe(`Janela 20:00–21:00 (Brasília)${SEP}padrão de Binárias${SEP}limite do dia: sem limite`)
     expect(within(dialog).getByRole('button', { name: 'Mudar' })).toHaveAttribute('aria-expanded', 'false')
   })
 
@@ -2301,7 +2304,7 @@ describe('ImportSheet · Fase 2b · «Nova conta de …» (step b) and «{conta}
     // First account of the market: no «Copiar regras de», only the note
     expect(within(dialog).queryByLabelText('Copiar regras de')).not.toBeInTheDocument()
     expect(within(dialog).getByText('Começa com o padrão do mercado.')).toBeInTheDocument()
-    expect(linhaRegra(dialog)).toBe('Janela: sem janela · limite do dia: definir')
+    expect(linhaRegra(dialog)).toBe(`Janela: sem janela${SEP}limite do dia: definir`)
 
     await userEvent.click(within(dialog).getByRole('button', { name: 'Mudar' }))
     await userEvent.click(within(dialog).getByRole('button', { name: '+ Definir janela' }))
@@ -2311,14 +2314,14 @@ describe('ImportSheet · Fase 2b · «Nova conta de …» (step b) and «{conta}
     expect(within(dias).getAllByRole('button').map((b) => b.getAttribute('aria-pressed'))).toEqual(['true', 'true', 'true', 'true', 'true', 'false', 'false'])
     expect(within(dialog).queryByText('Cripto abre todos os dias: sábado e domingo já vêm marcados.')).not.toBeInTheDocument()
     await userEvent.type(within(dialog).getByLabelText('Limite do dia, US$'), '500')
-    expect(linhaRegra(dialog)).toBe(`Janela 08:00–10:00 (Nova York) · padrão de Forex · limite do dia: US$${NBSP}500`)
+    expect(linhaRegra(dialog)).toBe(`Janela 08:00–10:00 (Nova York)${SEP}padrão de Forex${SEP}limite do dia: US$${NBSP}500`)
     // No «por conta / somando», no second window, no «Mais regras da mesa» (as drawn)
     expect(within(dialog).queryByRole('group', { name: 'Como o limite conta' })).not.toBeInTheDocument()
     expect(within(dialog).queryByRole('button', { name: /Segunda janela/ })).not.toBeInTheDocument()
     expect(within(dialog).queryByText(/Mais regras da mesa/)).not.toBeInTheDocument()
     // «Cancelar esta janela» undoes it
     await userEvent.click(within(dialog).getByRole('button', { name: 'Cancelar a janela nova de Forex' }))
-    expect(linhaRegra(dialog)).toBe(`Janela: sem janela · limite do dia: US$${NBSP}500`)
+    expect(linhaRegra(dialog)).toBe(`Janela: sem janela${SEP}limite do dia: US$${NBSP}500`)
     await userEvent.click(within(dialog).getByRole('button', { name: '+ Definir janela' }))
 
     await userEvent.click(within(dialog).getByRole('button', { name: 'Avaliação' }))
@@ -2408,7 +2411,7 @@ describe('ImportSheet · Fase 2b · «Nova conta de …» (step b) and «{conta}
     expect(dias.compareDocumentPosition(nota) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
     expect(nota.compareDocumentPosition(cancelar) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
     await userEvent.type(within(dialog).getByLabelText('Limite do dia, US$'), '200')
-    expect(linhaRegra(dialog)).toBe(`Janela 20:00–22:00 (Brasília) · padrão de Cripto · limite do dia: US$${NBSP}200`)
+    expect(linhaRegra(dialog)).toBe(`Janela 20:00–22:00 (Brasília)${SEP}padrão de Cripto${SEP}limite do dia: US$${NBSP}200`)
 
     await userEvent.click(within(dialog).getByRole('button', { name: 'Pessoal' }))
     await userEvent.click(within(dialog).getByRole('button', { name: 'Criar Binance' }))
@@ -2455,12 +2458,12 @@ describe('ImportSheet · Fase 2b · «Nova conta de …» (step b) and «{conta}
     await userEvent.type(limite, '2.000.000')
     const create = within(dialog).getByRole('button', { name: 'Criar Mini-índice' })
     expect(create).toHaveAttribute('aria-disabled', 'true')
-    expect(create).toHaveAccessibleDescription('Use um valor até R$ 1.000.000.')
+    expect(create).toHaveAccessibleDescription(`Use um valor até R$${NBSP}1.000.000.`)
     await userEvent.clear(limite)
     await userEvent.type(limite, '400')
-    expect(linhaRegra(dialog)).toBe(`Janela: sem janela · limite do dia: R$${NBSP}400`)
+    expect(linhaRegra(dialog)).toBe(`Janela: sem janela${SEP}limite do dia: R$${NBSP}400`)
     await userEvent.click(within(dialog).getByRole('button', { name: '+ Definir janela' }))
-    expect(linhaRegra(dialog)).toBe(`Janela 10:00–11:00 (Brasília) · padrão da B3 · limite do dia: R$${NBSP}400`)
+    expect(linhaRegra(dialog)).toBe(`Janela 10:00–11:00 (Brasília)${SEP}padrão da B3${SEP}limite do dia: R$${NBSP}400`)
     await userEvent.type(within(dialog).getByLabelText(/^Tamanho R\$/), '25.000')
 
     await userEvent.click(create)
@@ -2521,7 +2524,7 @@ describe('ImportSheet · Fase 2b · «Nova conta de …» (step b) and «{conta}
     const select = within(dialog).getByLabelText('Copiar regras de')
     expect(select).toHaveDisplayValue('Clear')
     expect(select).toHaveAccessibleDescription('Copia janela e limite do dia.')
-    expect(linhaRegra(dialog)).toBe(`Janela 10:00–11:00 (Brasília) · padrão da B3 · limite do dia: R$${NBSP}500`)
+    expect(linhaRegra(dialog)).toBe(`Janela 10:00–11:00 (Brasília)${SEP}padrão da B3${SEP}limite do dia: R$${NBSP}500`)
     await userEvent.click(within(dialog).getByRole('button', { name: 'Mudar' }))
     expect(within(dialog).getByText('Usar a janela da B3 (10:00–11:00 de Brasília)?')).toBeInTheDocument()
     expect(within(dialog).queryByRole('group', { name: 'Como o limite conta' })).not.toBeInTheDocument()

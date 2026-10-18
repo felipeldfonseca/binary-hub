@@ -10,7 +10,7 @@
  */
 import { formatHhMm, nextOffsetChange, utcOffsetMinutes, utcToLocal } from '@/lib/domain/tempo';
 import { ACCOUNT_MARKETS, MARKET_SPEC, type AccountMarket, type WindowTz } from '@/lib/domain/gate';
-import { DIAS_CURTOS, DIAS_NENHUM, DIAS_TODOS, LEGENDA, RELOGIO } from '@/components/hub/personalizar/copy';
+import { DIAS_CURTOS, DIAS_NENHUM, DIAS_TODOS, LEGENDA, RELOGIO, SEP } from '@/components/hub/personalizar/copy';
 import { formatDiaMes } from './formato';
 import type { RulesSettings, WindowSetting } from './regras';
 
@@ -111,11 +111,14 @@ export function legendaJanela(w: WindowSetting, now: Date): string {
   return t;
 }
 
-/** The whole caption under a window line: «11:00–12:00 em Brasília · seg–sex»; start = end: the days only */
+/**
+ * The whole caption under a window line: «11:00–12:00 em Brasília · seg–sex» (no-break spaces
+ * around the « · »: SEP); start = end: the days only
+ */
 export function captionJanela(w: WindowSetting, now: Date): string {
   const l = legendaJanela(w, now);
   const d = resumoDias(w.weekdays);
-  return l ? `${l} · ${d}` : d;
+  return l ? `${l}${SEP}${d}` : d;
 }
 
 /** «a próxima é {d}» in the info panel: New York's next change, on its own calendar ('1º nov') */

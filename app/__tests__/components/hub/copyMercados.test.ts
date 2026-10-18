@@ -7,7 +7,11 @@
 import { ACCOUNT_MARKETS, CREATABLE_MARKETS, MARKET_SPEC } from '@/lib/domain/markets'
 import { MERCADO, USDT_COMO_DOLAR, viraODia } from '@/components/hub/copyMercados'
 import { MARKET_LABEL, NEVER_SUMMED, PASSO_B } from '@/components/hub/contas/copy'
-import { JANELAS, MERCADO_NOME, REGRAS } from '@/components/hub/personalizar/copy'
+import { HOJE, JANELAS, MERCADO_NOME, REGRAS, SEP, VERSAO } from '@/components/hub/personalizar/copy'
+import { captionJanela } from '@/lib/hub/janelas'
+import { descricaoJanelas, resumoEstados } from '@/lib/hub/comoFicaHoje'
+
+const NBSP = '\u00a0'
 
 describe('MERCADO', () => {
   it('names the six creatable markets as the boards do, in their order', () => {
@@ -103,10 +107,40 @@ describe('the frozen exports set from it', () => {
   // tested in __tests__/lib/hubRegrasConta.test.ts, which lane A owns.
 
   it('says the limit’s maximum in the account’s currency', () => {
-    expect(REGRAS.limiteErro('too_large', 'USD')).toBe('Use um valor até US$ 1.000.000.')
-    expect(REGRAS.limiteErro('too_large', 'BRL')).toBe('Use um valor até R$ 1.000.000.')
+    expect(REGRAS.limiteErro('too_large', 'USD')).toBe(`Use um valor até US$${NBSP}1.000.000.`)
+    expect(REGRAS.limiteErro('too_large', 'BRL')).toBe(`Use um valor até R$${NBSP}1.000.000.`)
     expect(REGRAS.limiteErro('empty', 'BRL')).toBe('Digite um valor maior que zero.')
     expect(REGRAS.limiteErro('not_positive', 'USD')).toBe('Digite um valor maior que zero.')
     expect(REGRAS.limiteErro('invalid', 'USD')).toBe('Use só números, como 400 ou 400,50.')
+  })
+})
+
+describe('« · » never starts or ends a line', () => {
+  /** Every « · » has a no-break space on each side: the line breaks at another space */
+  const colado = (texto: string) => {
+    expect(texto).toContain('·')
+    expect(texto).not.toMatch(/(^|[^\u00a0])·|·([^\u00a0]|$)/)
+  }
+  const segSex = { tz: 'America/New_York', startMin: 600, endMin: 660, weekdays: 31 } as const
+
+  it('SEP is « · » between two no-break spaces', () => {
+    expect(SEP).toBe('\u00a0·\u00a0')
+  })
+
+  it('in the frozen captions and texts: window captions, version notes, «Histórico importado · só resultado», «Como fica hoje»', () => {
+    // «11:00–12:00 em Brasília · seg–sex», and with the new time from 1º nov
+    colado(captionJanela(segSex, new Date('2026-10-14T16:00:00Z')))
+    colado(captionJanela(segSex, new Date('2026-10-19T16:00:00Z')))
+    colado(descricaoJanelas([segSex, { ...segSex, startMin: 840, endMin: 900 }]))
+    colado(resumoEstados({ alinhadas: 'so_a_favor', em_conflito: 'opero' }))
+    colado(VERSAO.antes('17 out'))
+    colado(VERSAO.ateSalvar)
+    colado(HOJE.suaJanela)
+    colado(HOJE.umaDasJanelas)
+  })
+
+  it('keeps the money symbol with the amount in the limit’s maximum', () => {
+    expect(REGRAS.limiteErro('too_large', 'USD')).toContain('US$\u00a01.000.000')
+    expect(REGRAS.limiteErro('too_large', 'BRL')).toContain('R$\u00a01.000.000')
   })
 })

@@ -35,6 +35,9 @@ import {
   type RegrasForm,
 } from '@/lib/hub/regrasConta'
 
+/** « · » with a no-break space on each side (personalizar/copy.ts SEP): it never starts or ends a line */
+const SEP = '\u00a0·\u00a0'
+
 const NBSP = ' '
 const NY = 'America/New_York'
 const SP = 'America/Sao_Paulo'
@@ -115,13 +118,13 @@ describe('«Copiar regras de»', () => {
 
 describe('the summary line', () => {
   it('copying the Top One: the market window and its limit per account', () => {
-    expect(resumo(configDepois(), 'futures')).toBe(`Janela 10:00–11:00 (Nova York) · padrão de Futuros · limite do dia: US$${NBSP}400 por conta`)
+    expect(resumo(configDepois(), 'futures')).toBe(`Janela 10:00–11:00 (Nova York)${SEP}padrão de Futuros${SEP}limite do dia: US$${NBSP}400 por conta`)
   })
 
   it('copying the Ebinex, which has no limit: «sem limite»; «Não copiar» and empty: «definir»', () => {
-    expect(resumo(configDepois(), 'binary')).toBe('Janela 20:00–21:00 (Brasília) · padrão de Binárias · limite do dia: sem limite')
+    expect(resumo(configDepois(), 'binary')).toBe(`Janela 20:00–21:00 (Brasília)${SEP}padrão de Binárias${SEP}limite do dia: sem limite`)
     expect(resumo(configDepois(), 'binary', form({ copiar: NAO_COPIAR }))).toBe(
-      'Janela 20:00–21:00 (Brasília) · padrão de Binárias · limite do dia: definir',
+      `Janela 20:00–21:00 (Brasília)${SEP}padrão de Binárias${SEP}limite do dia: definir`,
     )
     // Typed and cleared again: «definir», as on the board
     expect(resumo(configDepois(), 'binary', form({ limite: '' }))).toMatch(/limite do dia: definir$/)
@@ -133,17 +136,17 @@ describe('the summary line', () => {
     expect(r.usarPadrao).toBe(false)
     expect(r.janela).toEqual(w(NY, 600, 660))
     expect(r.settings.window).toEqual(w(NY, 600, 660))
-    expect(linhaResumo(r, f)).toBe(`Janela 10:00–11:00 (Nova York) · só nesta conta · limite do dia: US$${NBSP}400 por conta`)
+    expect(linhaResumo(r, f)).toBe(`Janela 10:00–11:00 (Nova York)${SEP}só nesta conta${SEP}limite do dia: US$${NBSP}400 por conta`)
   })
 
   it('a window that ends the next day, and one that cannot be saved', () => {
     const noite = form({ janela: 'propria', propria: w(SP, 1320, 120) })
     expect(resumo(configDepois(), 'binary', noite)).toBe(
-      'Janela 22:00 → 02:00 do dia seguinte (Brasília) · só nesta conta · limite do dia: sem limite',
+      `Janela 22:00 → 02:00 do dia seguinte (Brasília)${SEP}só nesta conta${SEP}limite do dia: sem limite`,
     )
     const igual = form({ janela: 'propria', propria: w(NY, 600, 600) })
     const r = regrasDaNovaConta(configDepois(), 'futures', igual)
-    expect(linhaResumo(r, igual)).toBe(`Janela a definir (Nova York) · só nesta conta · limite do dia: US$${NBSP}400 por conta`)
+    expect(linhaResumo(r, igual)).toBe(`Janela a definir (Nova York)${SEP}só nesta conta${SEP}limite do dia: US$${NBSP}400 por conta`)
     expect(r.janelaErro).toBe('same_start_end')
     expect(r.bloqueado).toBe(true)
     expect(regrasDaNovaConta(configDepois(), 'futures', form({ janela: 'propria', propria: w(NY, 600, 660, 0) })).janelaErro).toBe('no_days')
@@ -155,21 +158,21 @@ describe('the summary line', () => {
     const r = regrasDaNovaConta(c, 'futures', form())
     expect(r.usarPadrao).toBe(false)
     expect(r.janela).toEqual(w(NY, 570, 690))
-    expect(linhaResumo(r, form())).toMatch(/^Janela 09:30–11:30 \(Nova York\) · só nesta conta · /)
+    expect(linhaResumo(r, form())).toMatch(/^Janela 09:30–11:30 \(Nova York\)\u00a0·\u00a0só nesta conta\u00a0·\u00a0limite/)
     // «Sim» goes back to the market's window
     expect(regrasDaNovaConta(c, 'futures', form({ janela: 'padrao' })).settings.window).toBeNull()
   })
 
   it('no market window: «sem janela» until the form sets one, which becomes the market’s', () => {
     const c = configAntes()
-    expect(resumo(c, 'futures', form({ copiar: NAO_COPIAR }))).toBe('Janela: sem janela · limite do dia: definir')
-    expect(resumo(c, 'futures')).toBe('Janela: sem janela · limite do dia: sem limite')
+    expect(resumo(c, 'futures', form({ copiar: NAO_COPIAR }))).toBe(`Janela: sem janela${SEP}limite do dia: definir`)
+    expect(resumo(c, 'futures')).toBe(`Janela: sem janela${SEP}limite do dia: sem limite`)
     const f = form({ definir: true })
     const r = regrasDaNovaConta(c, 'futures', f)
     expect(r.janela).toEqual(w(NY, 600, 660))
     expect(r.marketWindows).toEqual([w(NY, 600, 660)])
     expect(r.settings.window).toBeNull()
-    expect(linhaResumo(r, f)).toBe('Janela 10:00–11:00 (Nova York) · padrão de Futuros · limite do dia: sem limite')
+    expect(linhaResumo(r, f)).toBe(`Janela 10:00–11:00 (Nova York)${SEP}padrão de Futuros${SEP}limite do dia: sem limite`)
     expect(regrasDaNovaConta(c, 'binary', f).marketWindows).toEqual([w(SP, 1200, 1260)])
     expect(perguntaJanela(r)).toBeNull()
   })
@@ -205,6 +208,21 @@ describe('the summary line', () => {
   })
 })
 
+describe('the summary line never starts or ends a line with « · »', () => {
+  it('writes each « · » between no-break spaces, with or without a window', () => {
+    const c = configAntes()
+    for (const r of [regrasDaNovaConta(c, 'b3', form({ definir: true, limite: '400' })), regrasDaNovaConta(c, 'forex', form())]) {
+      const texto = linhaResumo(r, form())
+      expect(texto.match(/·/g)?.length).toBeGreaterThan(0)
+      expect(texto).not.toMatch(/(^|[^\u00a0])·|·([^\u00a0]|$)/)
+    }
+    expect(REGRAS_CONTA.linha('10:00–11:00', 'Brasília', 'padrão da B3', 'R$\u00a0400')).toBe(
+      'Janela 10:00–11:00 (Brasília)\u00a0·\u00a0padrão da B3\u00a0·\u00a0limite do dia: R$\u00a0400',
+    )
+    expect(REGRAS_CONTA.linhaSemJanela('definir')).toBe('Janela: sem janela\u00a0·\u00a0limite do dia: definir')
+  })
+})
+
 describe('the «Usar a janela» question', () => {
   it('names the market’s window on its clock', () => {
     expect(perguntaJanela(regrasDaNovaConta(configDepois(), 'futures', form()))).toBe('Usar a janela de Futuros (10:00–11:00 ET)?')
@@ -212,7 +230,7 @@ describe('the «Usar a janela» question', () => {
     const c = configDepois()
     c.settings.markets.futures.windows = [w(NY, 600, 660), w(NY, 840, 900)]
     expect(perguntaJanela(regrasDaNovaConta(c, 'futures', form()))).toBe('Usar a janela de Futuros (10:00–11:00 e 14:00–15:00 ET)?')
-    expect(resumo(c, 'futures')).toMatch(/^Janela 10:00–11:00 e 14:00–15:00 \(Nova York\) · padrão de Futuros · /)
+    expect(resumo(c, 'futures')).toMatch(/^Janela 10:00–11:00 e 14:00–15:00 \(Nova York\)\u00a0·\u00a0padrão de Futuros\u00a0·\u00a0limite/)
   })
 })
 
@@ -250,7 +268,7 @@ describe('the Fase 2b markets in the creation form', () => {
       expect(notaCopiar(r)).toBe('Começa com o padrão do mercado.')
       expect(perguntaJanela(r)).toBeNull()
       expect(r.janela).toBeNull()
-      expect(linhaResumo(r, form())).toBe('Janela: sem janela · limite do dia: definir')
+      expect(linhaResumo(r, form())).toBe(`Janela: sem janela${SEP}limite do dia: definir`)
     }
   })
 
@@ -260,17 +278,17 @@ describe('the Fase 2b markets in the creation form', () => {
     const forex = regrasDaNovaConta(c, 'forex', def)
     expect(forex.janela).toEqual(w(NY, 480, 600))
     expect(forex.marketWindows).toEqual([w(NY, 480, 600)])
-    expect(linhaResumo(forex, def)).toBe(`Janela 08:00–10:00 (Nova York) · padrão de Forex · limite do dia: US$${NBSP}500`)
-    expect(resumo(c, 'stocks', def)).toBe(`Janela 09:30–10:30 (Nova York) · padrão de Ações · limite do dia: US$${NBSP}500`)
+    expect(linhaResumo(forex, def)).toBe(`Janela 08:00–10:00 (Nova York)${SEP}padrão de Forex${SEP}limite do dia: US$${NBSP}500`)
+    expect(resumo(c, 'stocks', def)).toBe(`Janela 09:30–10:30 (Nova York)${SEP}padrão de Ações${SEP}limite do dia: US$${NBSP}500`)
     // Crypto opens every day: Saturday and Sunday come marked
     const cripto = regrasDaNovaConta(c, 'crypto', def)
     expect(cripto.janela).toEqual(w(SP, 1200, 1320, 127))
-    expect(linhaResumo(cripto, def)).toBe(`Janela 20:00–22:00 (Brasília) · padrão de Cripto · limite do dia: US$${NBSP}500`)
+    expect(linhaResumo(cripto, def)).toBe(`Janela 20:00–22:00 (Brasília)${SEP}padrão de Cripto${SEP}limite do dia: US$${NBSP}500`)
     // B3 is in reais
     const b3form = form({ definir: true, limite: '400' })
     const b3 = regrasDaNovaConta(c, 'b3', b3form)
     expect(b3.janela).toEqual(w(SP, 600, 660))
-    expect(linhaResumo(b3, b3form)).toBe(`Janela 10:00–11:00 (Brasília) · padrão da B3 · limite do dia: R$${NBSP}400`)
+    expect(linhaResumo(b3, b3form)).toBe(`Janela 10:00–11:00 (Brasília)${SEP}padrão da B3${SEP}limite do dia: R$${NBSP}400`)
     // «Cancelar esta janela» goes back to none
     expect(regrasDaNovaConta(c, 'b3', form({ definir: false })).janela).toBeNull()
   })
@@ -288,10 +306,10 @@ describe('the Fase 2b markets in the creation form', () => {
     const r = regrasDaNovaConta(c, 'b3', letras)
     expect(r.limiteErro).toBe('invalid')
     expect(r.bloqueado).toBe(true)
-    expect(linhaResumo(r, letras)).toBe(`Janela: sem janela · limite do dia: R$${NBSP}abc`)
+    expect(linhaResumo(r, letras)).toBe(`Janela: sem janela${SEP}limite do dia: R$${NBSP}abc`)
     // «R$» typed in front is read, as «US$» is
     expect(regrasDaNovaConta(c, 'b3', form({ limite: 'R$ 1.000,50' })).settings.limit).toEqual({ cents: 100050, mode: 'conta', atLimit: 'encerrar' })
-    expect(resumo(c, 'b3', form({ limite: '1.000,50' }))).toBe(`Janela: sem janela · limite do dia: R$${NBSP}1.000,50`)
+    expect(resumo(c, 'b3', form({ limite: '1.000,50' }))).toBe(`Janela: sem janela${SEP}limite do dia: R$${NBSP}1.000,50`)
   })
 
   it('reads the limit in the market’s money, as Personalizar does: the other currency’s symbol is refused', () => {
@@ -316,8 +334,8 @@ describe('the Fase 2b markets in the creation form', () => {
     // A plain number is the market's money
     aceito('b3', '400', 40000)
     aceito('forex', '400', 40000)
-    expect(resumo(c, 'b3', form({ definir: true, limite: '400' }))).toBe(`Janela 10:00–11:00 (Brasília) · padrão da B3 · limite do dia: R$${NBSP}400`)
-    expect(resumo(c, 'forex', form({ definir: true, limite: '400' }))).toBe(`Janela 08:00–10:00 (Nova York) · padrão de Forex · limite do dia: US$${NBSP}400`)
+    expect(resumo(c, 'b3', form({ definir: true, limite: '400' }))).toBe(`Janela 10:00–11:00 (Brasília)${SEP}padrão da B3${SEP}limite do dia: R$${NBSP}400`)
+    expect(resumo(c, 'forex', form({ definir: true, limite: '400' }))).toBe(`Janela 08:00–10:00 (Nova York)${SEP}padrão de Forex${SEP}limite do dia: US$${NBSP}400`)
     // Futures, in dollars too
     recusado('futures', 'R$ 400')
   })
@@ -337,10 +355,10 @@ describe('the Fase 2b markets in the creation form', () => {
     expect(forex.opcoes).toEqual([{ id: ids.ftmo, label: 'FTMO' }])
     expect(notaCopiar(forex)).toBe('Copia janela e limite do dia.')
     expect(perguntaJanela(forex)).toBe('Usar a janela de Forex (08:00–10:00 ET)?')
-    expect(linhaResumo(forex, form())).toBe(`Janela 08:00–10:00 (Nova York) · padrão de Forex · limite do dia: US$${NBSP}1.000`)
+    expect(linhaResumo(forex, form())).toBe(`Janela 08:00–10:00 (Nova York)${SEP}padrão de Forex${SEP}limite do dia: US$${NBSP}1.000`)
     const b3 = regrasDaNovaConta(c, 'b3', form())
     expect(perguntaJanela(b3)).toBe('Usar a janela da B3 (10:00–11:00 de Brasília)?')
-    expect(linhaResumo(b3, form())).toBe(`Janela 10:00–11:00 (Brasília) · padrão da B3 · limite do dia: R$${NBSP}500`)
+    expect(linhaResumo(b3, form())).toBe(`Janela 10:00–11:00 (Brasília)${SEP}padrão da B3${SEP}limite do dia: R$${NBSP}500`)
     // IBKR has no version and no window: a second stocks account starts with none to answer
     expect(perguntaJanela(regrasDaNovaConta(c, 'stocks', form()))).toBeNull()
   })

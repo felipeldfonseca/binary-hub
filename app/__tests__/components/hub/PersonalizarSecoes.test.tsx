@@ -15,6 +15,9 @@ import { PADRAO_FUTUROS, ajustarSoNestaConta, comBloqueio, comJanelaDoMercado, c
 import { configAntes, configDepois, configMercados, idsDono, idsMercados } from '@/testing/regras'
 import { et } from '@/testing/gate'
 
+/** « · » with a no-break space on each side (personalizar/copy.ts SEP): it never starts or ends a line */
+const SEP = '\u00a0·\u00a0'
+
 const ids = idsDono()
 const NOW = et('2026-10-22 12:00')
 /** The six-market owner (fixtures recorded on the markets migration): Top One #1, Ebinex, FTMO, IBKR, Binance, Clear */
@@ -628,7 +631,7 @@ describe('SuasRegras in six markets (Fase 2b)', () => {
     expect(limiteValor()?.textContent).toBe('R$\u00a0500')
     // Thursday 12:00 ET = 13:00 de Brasília, after the window
     expect(hojeLinhas()).toEqual([
-      '10:00–11:00 Brasília · sua janelaLiberado',
+      `10:00–11:00 Brasília${SEP}sua janelaLiberado`,
       'No resto do diaFora da sua janela',
       'Se a perda do dia chegar a R$\u00a0500Encerrado por hoje',
     ])
@@ -637,7 +640,7 @@ describe('SuasRegras in six markets (Fase 2b)', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Versões (1)' }))
     // The version note (foundation): window and limit in R$, no block, state or calendar part
     expect(within(document.getElementById('lista-versoes') as HTMLElement).getAllByRole('listitem')[0].textContent).toBe(
-      'v1 · desde 17 out · janela 10:00–11:00 de Brasília · seg–sex · limite R$\u00a0500',
+      `v1${SEP}desde 17 out${SEP}janela 10:00–11:00 de Brasília${SEP}seg–sex${SEP}limite R$\u00a0500`,
     )
   })
 
@@ -757,7 +760,7 @@ describe('SuasRegras in six markets (Fase 2b)', () => {
     expect(regraNomes()).toEqual(['Janela', 'Só operar dentro da sua janela', 'Limite do dia'])
     // Thursday 12:00 ET, after the 08:00–10:00 ET window; no data block line
     expect(hojeLinhas()).toEqual([
-      '08:00–10:00 ET · sua janelaLiberado',
+      `08:00–10:00 ET${SEP}sua janelaLiberado`,
       'No resto do diaFora da sua janela',
       'Se a perda do dia chegar a US$\u00a01.000Encerrado por hoje',
     ])

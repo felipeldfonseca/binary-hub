@@ -18,7 +18,7 @@ import { dinheiroCompacto, type Tom } from './posso';
 import { formatDiaMes } from './formato';
 import { effectiveDayAt, type ConfigVersion, type PendingVersion, type WindowSetting } from './regras';
 import { faixaJanela, resumoDias } from './janelas';
-import { ATIVO_NA_FASE_5, CALENDARIO_NOME, ESCOLHA_NOME, ESTADO_NOME, HOJE, NOTA, RELOGIO, VERSAO } from '@/components/hub/personalizar/copy';
+import { ATIVO_NA_FASE_5, CALENDARIO_NOME, ESCOLHA_NOME, ESTADO_NOME, HOJE, NOTA, RELOGIO, SEP, VERSAO } from '@/components/hub/personalizar/copy';
 
 export interface Trecho {
   t: string;
@@ -117,17 +117,17 @@ export function comoFicaHoje(rules: Rules, now: Date, edited: readonly WindowSet
 // Version notes (board partesSig), computed from consecutive rules
 // ---------------------------------------------------------------------------------------------
 
-/** «Alinhadas: Só a favor · Em conflito: Opero», or '' with no choice */
+/** «Alinhadas: Só a favor · Em conflito: Opero» (« · » is SEP, here and in the notes below), or '' with no choice */
 export function resumoEstados(states: Partial<Record<string, string | null>> | null): string {
   if (!states) return '';
   return STATE_NAMES.filter((k) => states[k])
     .map((k) => `${ESTADO_NOME[k]}: ${ESCOLHA_NOME[states[k] as keyof typeof ESCOLHA_NOME]}`)
-    .join(' · ');
+    .join(SEP);
 }
 
 /** «10:00–11:00 ET · seg–sex; 14:00–15:00 ET · seg–sex» */
 export function descricaoJanelas(windows: readonly WindowSetting[]): string {
-  return windows.map((w) => `${faixaJanela(w.startMin, w.endMin)} ${RELOGIO[w.tz].de} · ${resumoDias(w.weekdays)}`).join('; ');
+  return windows.map((w) => `${faixaJanela(w.startMin, w.endMin)} ${RELOGIO[w.tz].de}${SEP}${resumoDias(w.weekdays)}`).join('; ');
 }
 
 type Parte = 'janela' | 'gate' | 'fora' | 'bloq' | 'lim' | 'est' | 'cal';
@@ -166,11 +166,11 @@ export function notaVersao(versions: readonly ConfigVersion[], i: number, labelO
     const from = v.origin === 'copiar' && v.copiedFrom ? labelOf(v.copiedFrom) : null;
     if (from) return NOTA.copiadas(from);
     const p = partesVersao(v.rules);
-    return [p.janela, p.lim].filter(Boolean).join(' · ');
+    return [p.janela, p.lim].filter(Boolean).join(SEP);
   }
   const a = partesVersao(versions[i - 1].rules);
   const b = partesVersao(v.rules);
-  return (Object.keys(b) as Parte[]).filter((k) => a[k] !== b[k]).map((k) => b[k] as string).join(' · ');
+  return (Object.keys(b) as Parte[]).filter((k) => a[k] !== b[k]).map((k) => b[k] as string).join(SEP);
 }
 
 /** '14' or '1º' (the day of a range's start, the month comes at its end) */
