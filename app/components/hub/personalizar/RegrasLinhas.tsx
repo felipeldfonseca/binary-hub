@@ -1,9 +1,19 @@
 'use client'
 
 import { useState } from 'react'
-import { STATE_NAMES, type AtLimit, type LimitMode, type OutsideShows, type StateChoice, type StateName } from '@/lib/domain/gate'
+import {
+  MARKET_SPEC,
+  STATE_NAMES,
+  currencyOf,
+  type AtLimit,
+  type LimitMode,
+  type OutsideShows,
+  type StateChoice,
+  type StateName,
+} from '@/lib/domain/gate'
 import { allowsSoAFavor, parseUsdText, windowError, type AccountConfig, type BlockSetting, type RulesSettings } from '@/lib/hub/regras'
 import { dinheiroCompacto } from '@/lib/hub/posso'
+import { SIMBOLO_MOEDA } from '@/lib/hub/formato'
 import { faixaJanela, resumoDias } from '@/lib/hub/janelas'
 import {
   comAoChegar,
@@ -26,7 +36,10 @@ import { Interruptor, Pilulas, TagNaoSalvo } from './ui'
 
 type Editar = (fn: (draft: RulesSettings) => RulesSettings) => void
 
-/** «padrão de Futuros» / «só nesta conta»: futures accounts only (board `tagDe`, `janTag`) */
+/**
+ * «padrão de Futuros» / «só nesta conta» (board `tagDe`, `janTag`): only on an account whose market
+ * has a visible default («Padrão Futuros»: MARKET_SPEC[m].rules.padrao, futures only)
+ */
 function TagOrigem({ propria }: { propria: boolean }) {
   return propria ? (
     <span className="hub-tag hub-tag--propria">{SO_NESTA_CONTA}</span>
@@ -35,7 +48,7 @@ function TagOrigem({ propria }: { propria: boolean }) {
   )
 }
 
-const ehContaFuturos = (e: Entidade) => e.tipo === 'conta' && e.conta.market === 'futures'
+const temPadrao = (e: Entidade) => e.tipo === 'conta' && MARKET_SPEC[e.conta.market].rules.padrao
 
 function Regra({ nome, children }: { nome: React.ReactNode; children: React.ReactNode }) {
   return (
@@ -72,7 +85,7 @@ export function RegraJanela({ entidade, draft, mudou, onIrJanelas }: { entidade:
       nome={
         <>
           <span>{REGRAS.janela}</span>
-          {ehContaFuturos(entidade) && tem && <TagOrigem propria={propria} />}
+          {temPadrao(entidade) && tem && <TagOrigem propria={propria} />}
           {mudou && <TagNaoSalvo />}
         </>
       }
@@ -111,6 +124,7 @@ export function RegraSoDentro({
   onEditar: Editar
   onIrJanelas: () => void
 }) {
+  // «Padrão Futuros» is the futures default
   const market = entidade.tipo === 'padrao' ? 'futures' : entidade.conta.market
   const padrao = draft.markets[market].windowRule
   const own = entidade.tipo === 'conta' ? draft.accounts[entidade.conta.id]?.windowRule : undefined
@@ -123,7 +137,7 @@ export function RegraSoDentro({
       nome={
         <>
           <span id="r-gate">{REGRAS.soDentro}</span>
-          {ehContaFuturos(entidade) && <TagOrigem propria={entidade.tipo === 'conta' && temProprio(draft, entidade.conta.id, 'windowRule')} />}
+          {temPadrao(entidade) && <TagOrigem propria={entidade.tipo === 'conta' && temProprio(draft, entidade.conta.id, 'windowRule')} />}
           {mudou && <TagNaoSalvo />}
         </>
       }
@@ -204,7 +218,7 @@ function CampoMinutos({
   )
 }
 
-/** «Bloqueio de dados» (futures): saved and versioned, «ativo na Fase 5» */
+/** «Bloqueio de dados» (where MARKET_SPEC has a block: futures): saved and versioned, «ativo na Fase 5» */
 export function RegraBloqueio({
   entidade,
   draft,
@@ -233,7 +247,7 @@ export function RegraBloqueio({
       nome={
         <>
           <span id="r-bloq">{REGRAS.bloqueio}</span>
-          {ehContaFuturos(entidade) && <TagOrigem propria={entidade.tipo === 'conta' && temProprio(draft, entidade.conta.id, 'block')} />}
+          {temPadrao(entidade) && <TagOrigem propria={entidade.tipo === 'conta' && temProprio(draft, entidade.conta.id, 'block')} />}
           {mudou && <TagNaoSalvo />}
         </>
       }
@@ -284,7 +298,11 @@ function textoDoValor(cents: number): string {
   return resto ? `${inteiro},${String(resto).padStart(2, '0')}` : String(inteiro)
 }
 
-/** «Limite do dia»: per account (never inherited); «Padrão Futuros» only says so */
+/**
+ * «Limite do dia»: per account (never inherited), in the account's currency (R$ on B3, US$
+ * elsewhere); «por conta / somando» only where the market sums (MARKET_SPEC[m].rules.soma:
+ * futures); «Padrão Futuros» only says so
+ */
 export function RegraLimite({
   entidade,
   draft,
@@ -314,7 +332,8 @@ export function RegraLimite({
   }
   const conta = entidade.conta
   const lim = draft.accounts[conta.id]?.limit ?? null
-  const fut = conta.market === 'futures'
+  const caps = MARKET_SPEC[conta.market].rules
+  const moeda = currencyOf(conta.market)
   const verbo = lim ? REGRAS.mudarLimite : REGRAS.definirLimite
   const aria = lim ? REGRAS.mudarLimiteAria(conta.label) : REGRAS.definirLimiteAria(conta.label)
 
@@ -334,19 +353,19 @@ export function RegraLimite({
     fechar()
   }
 
-  const mostrarModo = !!lim && fut && (futuros.length >= 2 || lim.mode === 'soma')
+  const mostrarModo = !!lim && caps.soma && (futuros.length >= 2 || lim.mode === 'soma')
   return (
     <Regra
       nome={
         <>
           <span id="r-lim">{REGRAS.limite}</span>
-          {lim && fut && <span className="hub-tag hub-tag--propria">{SO_NESTA_CONTA}</span>}
+          {lim && caps.padrao && <span className="hub-tag hub-tag--propria">{SO_NESTA_CONTA}</span>}
           {mudou && <TagNaoSalvo />}
         </>
       }
     >
       <div className="hub-pz-regra__linha">
-        <span className={lim ? 'hub-pz-num' : 'hub-pz-fraco'}>{lim ? dinheiroCompacto(lim.cents, 'USD' /* lane B: currency */) : REGRAS.semLimite}</span>
+        <span className={lim ? 'hub-pz-num' : 'hub-pz-fraco'}>{lim ? dinheiroCompacto(lim.cents, moeda) : REGRAS.semLimite}</span>
         <button
           id="lim-def"
           type="button"
@@ -371,7 +390,7 @@ export function RegraLimite({
           <div className="hub-pz-form-linha">
             <div className="hub-campo hub-pz-campo-lim">
               <label htmlFor="lim-valor" className="hub-rot-campo">
-                {REGRAS.limiteCampo}
+                {REGRAS.limiteCampo(SIMBOLO_MOEDA[moeda])}
               </label>
               <input
                 id="lim-valor"
@@ -403,7 +422,7 @@ export function RegraLimite({
           </div>
           {form.erro && (
             <p id="lim-erro" className="hub-erro" role="alert">
-              {REGRAS.limiteErro(form.erro, 'USD' /* lane B: currency */)}
+              {REGRAS.limiteErro(form.erro, moeda)}
             </p>
           )}
           {lim && (
@@ -464,7 +483,10 @@ const CHIP_ESTADO: Record<StateName, string> = {
   sem_direcao: 'hub-pz-est-chip--sem',
 }
 
-/** «Regra por estado» (futures, one for the market): saved; choices version, texts never; «ativo na Fase 5» */
+/**
+ * «Regra por estado» (where MARKET_SPEC has states: futures, one for the market): saved; choices
+ * version, texts never; «ativo na Fase 5»
+ */
 export function RegraEstado({ draft, mudou, onEditar }: { draft: RulesSettings; mudou: boolean; onEditar: Editar }) {
   const [aberto, alternar] = useToggle()
   const states = draft.markets.futures.states
