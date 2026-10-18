@@ -7,6 +7,8 @@
  */
 import {
   centsToUsd,
+  checkRules,
+  MAX_LIMIT_CENTS,
   parseRuleVersion,
   parseRules,
   RulesError,
@@ -190,8 +192,10 @@ describe('rules in the new markets', () => {
   it.each([
     ['B3 with `usd`', { ...CLEAR_V1, limit: { usd: 500, mode: 'conta', at_limit: 'encerrar' } }, 'bad_limit'],
     ['Forex with `brl`', { ...FTMO_V1, limit: { brl: 1000, mode: 'conta', at_limit: 'encerrar' } }, 'bad_limit'],
-    ['the owner\'s Top One with `brl`', { ...TOP_ONE_V1, limit: { brl: 400, mode: 'conta', at_limit: 'encerrar' } }, 'bad_limit'],
+    ['the owner\'s Top One with `brl` (was unknown_key in Phase 2)', { ...TOP_ONE_V1, limit: { brl: 400, mode: 'conta', at_limit: 'encerrar' } }, 'bad_limit'],
+    ['the owner\'s Ebinex with `brl` (was unknown_key in Phase 2)', { ...EBINEX_V1, limit: { brl: 100, mode: 'conta', at_limit: 'encerrar' } }, 'bad_limit'],
     ['both keys (was unknown_key in Phase 2)', { ...TOP_ONE_V1, limit: { usd: 400, brl: 400, mode: 'conta', at_limit: 'encerrar' } }, 'bad_limit'],
+    ['Top One `brl` and an unknown key (as in Phase 2)', { ...TOP_ONE_V1, limit: { brl: 400, mode: 'conta', at_limit: 'encerrar', x: 1 } }, 'unknown_key'],
     ['B3 `brl` and an unknown key', { ...CLEAR_V1, limit: { brl: 500, mode: 'conta', at_limit: 'encerrar', x: 1 } }, 'unknown_key'],
     ['B3 «somando»', { ...CLEAR_V1, limit: { brl: 500, mode: 'soma', at_limit: 'encerrar' } }, 'not_for_market'],
     ['crypto with a data block', { ...BINANCE_V1, block: TOP_ONE_V1.block }, 'not_for_market'],
@@ -199,5 +203,63 @@ describe('rules in the new markets', () => {
     ['a market that does not exist', { ...FTMO_V1, market: 'xyz' }, 'unsupported_market'],
   ])('refuses %s with the database\'s code', (_label, json, code) => {
     expect(() => parseRules(json)).toThrow(expect.objectContaining({ code }));
+  });
+});
+
+// rules_check_limit as Phase 2 left it (20261018000001 and checkLimit at 7c07ac9), frozen here
+function phase2LimitCode(market: string, l: unknown): string | null {
+  if (l === null) return null;
+  if (typeof l !== 'object' || Array.isArray(l)) return 'bad_limit';
+  const o = l as Record<string, unknown>;
+  if (!Object.keys(o).every((k) => ['usd', 'mode', 'at_limit'].includes(k))) return 'unknown_key';
+  const cents = usdToCents(o.usd);
+  if (cents === null || cents <= 0 || cents > MAX_LIMIT_CENTS) return 'bad_limit';
+  if (o.mode !== 'conta' && o.mode !== 'soma') return 'bad_limit';
+  if (o.at_limit !== 'encerrar' && o.at_limit !== 'avisar') return 'bad_limit';
+  if (o.mode === 'soma' && market !== 'futures') return 'not_for_market';
+  return null;
+}
+
+describe('the limit codes Phase 2b changed for futures and binaries (40_markets.test.sql does the same)', () => {
+  const limits: unknown[] = [null, 400, [], 'brl'];
+  for (const usd of [false, true]) {
+    for (const brl of [false, true]) {
+      for (const x of [false, true]) {
+        for (const amount of [400, 0, '400', 400.001, 1000000.01, null]) {
+          for (const mode of ['conta', 'soma', 'x', undefined]) {
+            for (const atLimit of ['encerrar', 'avisar', undefined]) {
+              limits.push({
+                ...(usd ? { usd: amount } : {}),
+                ...(brl ? { brl: amount } : {}),
+                ...(x ? { x: 1 } : {}),
+                ...(mode === undefined ? {} : { mode }),
+                ...(atLimit === undefined ? {} : { at_limit: atLimit }),
+              });
+            }
+          }
+        }
+      }
+    }
+  }
+  const carriesBrl = (l: unknown) =>
+    typeof l === 'object' && l !== null && !Array.isArray(l) && 'brl' in l && !('x' in l);
+
+  it.each([
+    ['futures', TOP_ONE_V1, ['bad_limit', 'ok', 'unknown_key']],
+    ['binary', EBINEX_V1, ['bad_limit', 'not_for_market', 'ok', 'unknown_key']],
+  ])('%s: only a limit with `brl` and no other unknown key changed, unknown_key → bad_limit', (market, base, codes) => {
+    const changed = new Map<string, number>();
+    const before = new Set<string>();
+    for (const limit of limits) {
+      const was = phase2LimitCode(market, limit) ?? 'ok';
+      const now = checkRules({ ...base, limit }) ?? 'ok';
+      if (!carriesBrl(limit)) before.add(was);
+      if (carriesBrl(limit) || was !== now) {
+        const key = `${carriesBrl(limit) ? 'brl' : 'other'}: ${was} → ${now}`;
+        changed.set(key, (changed.get(key) ?? 0) + 1);
+      }
+    }
+    expect(Object.fromEntries(changed)).toEqual({ 'brl: unknown_key → bad_limit': 144 });
+    expect(Array.from(before).sort()).toEqual(codes);
   });
 });

@@ -165,6 +165,71 @@ select tests.eq((select string_agg(m || ':' || coalesce(tests.limit_code(m, '{"u
 select tests.eq(tests.limit_code('b3', '{"brl": 400, "usd": 400, "mode": "conta", "at_limit": "encerrar"}'), 'bad_limit', 'both keys');
 select tests.eq(tests.limit_code('futures', '{"usd": 400, "brl": 400, "mode": "conta", "at_limit": "encerrar"}'), 'bad_limit',
                 'both keys on futures (unknown_key before M5d; no stored row has brl)');
+
+-- What M5d changed for futures and binaries, against rules_check_limit as 20261018000001 left it
+-- (copied here, frozen): over every mix of amount keys, an unknown key, amount, mode and at_limit,
+-- the two disagree only on a limit carrying "brl" and no other unknown key, alone or beside "usd"
+-- (unknown_key then, bad_limit now)
+create or replace function tests.phase2_check_limit(p_market text, p jsonb)
+returns text
+language plpgsql
+immutable
+set search_path = ''
+as $$
+begin
+  if p is null or jsonb_typeof(p) = 'null' then
+    return null;
+  end if;
+  if jsonb_typeof(p) <> 'object' then
+    return 'bad_limit';
+  end if;
+  if not public.rules_keys_ok(p, array['usd', 'mode', 'at_limit']) then
+    return 'unknown_key';
+  end if;
+  if not public.rules_is_money(p->'usd') then
+    return 'bad_limit';
+  end if;
+  if jsonb_typeof(p->'mode') is distinct from 'string' or (p->>'mode') not in ('conta', 'soma') then
+    return 'bad_limit';
+  end if;
+  if jsonb_typeof(p->'at_limit') is distinct from 'string' or (p->>'at_limit') not in ('encerrar', 'avisar') then
+    return 'bad_limit';
+  end if;
+  if (p->>'mode') = 'soma' and p_market is distinct from 'futures' then
+    return 'not_for_market';
+  end if;
+  return null;
+exception when others then
+  return 'bad_limit';
+end;
+$$;
+
+create temp table m5d_limit_codes as
+select m, l, coalesce(jsonb_typeof(l) = 'object' and l ? 'brl' and not l ? 'x', false) as brl,
+       tests.phase2_check_limit(m, l) as before, public.rules_check_limit(m, l) as now
+from unnest(array['futures', 'binary']) m,
+     (select (case when ku then jsonb_build_object('usd', a) else '{}' end)
+             || (case when kb then jsonb_build_object('brl', a) else '{}' end)
+             || (case when kx then '{"x": 1}' else '{}' end)::jsonb
+             || (case when mo is null then '{}' else jsonb_build_object('mode', mo) end)
+             || (case when al is null then '{}' else jsonb_build_object('at_limit', al) end) as l
+      from unnest(array[false, true]) ku, unnest(array[false, true]) kb, unnest(array[false, true]) kx,
+           unnest(array['400', '0', '"400"', '400.001', '1000000.01', 'null']::jsonb[]) a,
+           unnest(array['conta', 'soma', 'x', null]) mo, unnest(array['encerrar', 'avisar', null]) al
+      union all
+      select unnest(array[null, 'null', '400', '[]', '"brl"']::jsonb[])) s;
+
+select tests.eq((select string_agg(format('%s %s: %s → %s (%s)', m, case when brl then 'brl' else 'other' end,
+                                          coalesce(before, 'ok'), coalesce(now, 'ok'), n), ', ' order by m, brl, before, now)
+                 from (select m, brl, before, now, count(*) n from m5d_limit_codes
+                       where brl or before is distinct from now group by 1, 2, 3, 4) g),
+                'binary brl: unknown_key → bad_limit (144), futures brl: unknown_key → bad_limit (144)',
+                'futures and binaries: the only limits whose code changed carry brl (alone or beside usd), unknown_key → bad_limit');
+select tests.eq((select string_agg(m || ': ' || codes, '; ' order by m)
+                 from (select m, string_agg(distinct coalesce(before, 'ok'), ',' order by coalesce(before, 'ok')) codes from m5d_limit_codes
+                       where not brl group by m) g),
+                'binary: bad_limit,not_for_market,ok,unknown_key; futures: bad_limit,ok,unknown_key',
+                'the other limits reach every Phase 2 code of their market');
 select tests.eq(tests.limit_code('b3', '{"brl": 400, "eur": 1, "mode": "conta", "at_limit": "encerrar"}'), 'unknown_key', 'an unknown key');
 select tests.eq(tests.limit_code('b3', '{"mode": "conta", "at_limit": "encerrar"}'), 'bad_limit', 'no amount');
 select tests.eq(tests.limit_code('b3', '{"brl": 400.001, "mode": "conta", "at_limit": "encerrar"}'), 'bad_limit', 'fractions of a centavo');

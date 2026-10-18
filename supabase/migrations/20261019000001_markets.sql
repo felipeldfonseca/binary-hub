@@ -47,8 +47,9 @@
 --   - The validators (rules_check_limit, _market, _account, _resolved), rules_builtin,
 --     rules_resolve, rules_check_payload, save_rules, gate_eval, gate_at and rules_config read the
 --     market from market_caps instead of naming futures and binary. For a futures or binary input
---     each gives exactly what it gave before (the one exception: a limit carrying both "usd" and
---     "brl" was unknown_key and is now bad_limit; no stored row has "brl").
+--     each gives exactly what it gave before, with one exception: a limit carrying "brl" and no
+--     other unknown key, alone or beside "usd", was unknown_key and is now bad_limit (no stored row
+--     has "brl", and the Phase 2 app never sends it).
 --   - The three two-market checks of operating_windows, market_rule_defaults and
 --     account_rule_settings become named checks with the seven markets (*_market_ok).
 --   - A BEFORE INSERT trigger on trading_accounts sets day_tz, day_start_min and currency from
