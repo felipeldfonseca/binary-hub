@@ -10,6 +10,7 @@ import { QueryProvider } from '@/lib/providers/QueryProvider'
 import { makeAccount, renderHub } from '@/testing/hubHarness'
 import { agora, idsDono } from '@/testing/regras'
 import { regrasKeys } from '@/hooks/useRegras'
+import { hubKeys } from '@/hooks/useContas'
 import type { TradingAccount } from '@/lib/hub/contas'
 
 let mockSearch = ''
@@ -272,6 +273,28 @@ describe('Diário header', () => {
       await waitFor(() => expect(screen.getByRole('alert')).toBe(accountsError()))
       expect(retry).toBeInTheDocument()
       expect(retry).toHaveFocus()
+    })
+
+    it('keeps the selector during a later background read, once the accounts came after an error', async () => {
+      fetchAccounts.mockReset().mockRejectedValueOnce(new data.HubDataError('network')).mockResolvedValueOnce([topOne])
+      const { queryClient } = renderHub(<DiarioCabecalho />)
+      await screen.findByRole('alert')
+      screen.getByRole('button', { name: 'Tentar de novo' }).focus()
+      await userEvent.keyboard('{Enter}')
+      const selector = await selectorButton()
+
+      let answer!: (accounts: TradingAccount[]) => void
+      fetchAccounts.mockImplementation(() => new Promise((resolve) => (answer = resolve)))
+      await act(async () => {
+        void queryClient.invalidateQueries({ queryKey: hubKeys.contas('user-1') })
+      })
+      await waitFor(() => expect(fetchAccounts).toHaveBeenCalledTimes(3))
+
+      // The accounts on screen stay: no «Carregando…», no «Tentar de novo»
+      expect(selector).toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'Tentar de novo' })).not.toBeInTheDocument()
+      expect(screen.queryByText('Carregando…')).not.toBeInTheDocument()
+      await act(async () => answer([topOne]))
     })
 
     it('leaves focus alone when it moved on before the accounts came', async () => {
