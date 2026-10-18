@@ -2481,6 +2481,37 @@ describe('ImportSheet · Fase 2b · «Nova conta de …» (step b) and «{conta}
     expect(within(dialog).getByText('Ainda não lemos arquivos da B3. Depois vem a importação de CSV em que você diz o que é cada coluna.')).toBeInTheDocument()
   })
 
+  it('a limit in dollars keeps a B3 account’s «Criar» blocked; «R$ 400» is taken', async () => {
+    const b3 = await toNewAccountStep('B3', 'Profit (Nelogica)', 'Mini-índice')
+    await userEvent.click(within(b3).getByRole('button', { name: 'Pessoal' }))
+    await userEvent.click(within(b3).getByRole('button', { name: 'Mudar' }))
+    const reais = within(b3).getByLabelText('Limite do dia, R$')
+    await userEvent.type(reais, 'US$ 400')
+    const criarB3 = within(b3).getByRole('button', { name: 'Criar Mini-índice' })
+    expect(criarB3).toHaveAttribute('aria-disabled', 'true')
+    expect(criarB3).toHaveAccessibleDescription('Use só números, como 400 ou 400,50.')
+    expect(reais).toHaveAccessibleDescription('Use só números, como 400 ou 400,50.')
+    await userEvent.click(criarB3)
+    expect(createAccount).not.toHaveBeenCalled()
+    await userEvent.clear(reais)
+    await userEvent.type(reais, 'R$ 400')
+    expect(criarB3).not.toHaveAttribute('aria-disabled')
+  })
+
+  it('a limit in reais keeps a Forex account’s «Criar» blocked; a plain number is in dollars', async () => {
+    const forex = await toNewAccountStep('Forex e CFDs', 'MetaTrader 5', 'FTMO 100k', 'FTMO')
+    await userEvent.click(within(forex).getByRole('button', { name: 'Avaliação' }))
+    await userEvent.click(within(forex).getByRole('button', { name: 'Mudar' }))
+    const dolares = within(forex).getByLabelText('Limite do dia, US$')
+    await userEvent.type(dolares, 'R$ 400')
+    const criarForex = within(forex).getByRole('button', { name: 'Criar FTMO 100k' })
+    expect(criarForex).toHaveAttribute('aria-disabled', 'true')
+    expect(criarForex).toHaveAccessibleDescription('Use só números, como 400 ou 400,50.')
+    await userEvent.clear(dolares)
+    await userEvent.type(dolares, '400')
+    expect(criarForex).not.toHaveAttribute('aria-disabled')
+  })
+
   it('a second account in a Fase 2b market copies the first one’s rules: window and limit only', async () => {
     fetchAccounts.mockResolvedValue(contasMercados())
     fetchRulesConfig.mockResolvedValue(configMercados())

@@ -335,6 +335,28 @@ describe('RegrasDaConta · the Fase 2b markets', () => {
     expect(limite).toHaveAccessibleDescription('Digite um valor maior que zero.')
   })
 
+  it('the other currency’s symbol is an error under the field: «US$ 400» on B3, «R$ 400» on Forex', async () => {
+    for (const [market, rotulo, outro, proprio] of [
+      ['b3', 'Limite do dia, R$', 'US$ 400', 'R$ 400'],
+      ['forex', 'Limite do dia, US$', 'R$ 400', 'US$ 400'],
+    ] as const) {
+      const { unmount } = render(<Bloco config={configAntes()} market={market} inicial={{ aberto: true }} limiteErroId={null} />)
+      const limite = screen.getByLabelText(rotulo)
+      await userEvent.type(limite, outro)
+      expect(limite).toHaveAttribute('aria-invalid', 'true')
+      expect(screen.getByText('Use só números, como 400 ou 400,50.', { selector: '#f-lim-erro' })).toHaveClass('hub-erro')
+      expect(limite).toHaveAccessibleDescription('Use só números, como 400 ou 400,50.')
+      await userEvent.clear(limite)
+      await userEvent.type(limite, proprio)
+      expect(limite).not.toHaveAttribute('aria-invalid')
+      expect(document.getElementById('f-lim-erro')).toBeNull()
+      await userEvent.clear(limite)
+      await userEvent.type(limite, '400')
+      expect(document.getElementById('f-lim-erro')).toBeNull()
+      unmount()
+    }
+  })
+
   it('the dollar markets keep «Limite do dia, US$» and say US$ in their errors', async () => {
     for (const market of ['forex', 'stocks', 'crypto'] as const) {
       const { unmount } = render(<Bloco config={configAntes()} market={market} inicial={{ aberto: true }} limiteErroId={null} />)

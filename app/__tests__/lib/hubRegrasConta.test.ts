@@ -294,6 +294,34 @@ describe('the Fase 2b markets in the creation form', () => {
     expect(resumo(c, 'b3', form({ limite: '1.000,50' }))).toBe(`Janela: sem janela · limite do dia: R$${NBSP}1.000,50`)
   })
 
+  it('reads the limit in the market’s money, as Personalizar does: the other currency’s symbol is refused', () => {
+    const c = configAntes()
+    const recusado = (m: AccountMarket, limite: string) => {
+      const r = regrasDaNovaConta(c, m, form({ definir: true, limite }))
+      expect([limite, r.limiteErro, r.bloqueado, r.settings.limit]).toEqual([limite, 'invalid', true, null])
+    }
+    const aceito = (m: AccountMarket, limite: string, cents: number) => {
+      const r = regrasDaNovaConta(c, m, form({ definir: true, limite }))
+      expect([limite, r.limiteErro, r.bloqueado, r.settings.limit]).toEqual([limite, null, false, { cents, mode: 'conta', atLimit: 'encerrar' }])
+    }
+    // B3 is in reais: «US$ 400» is never saved as R$ 400
+    recusado('b3', 'US$ 400')
+    recusado('b3', 'us$400')
+    aceito('b3', 'R$ 400', 40000)
+    aceito('b3', 'r$ 400,50', 40050)
+    // Forex is in dollars: «R$ 400» is never saved as US$ 400
+    recusado('forex', 'R$ 400')
+    recusado('forex', 'R$400')
+    aceito('forex', 'US$ 400', 40000)
+    // A plain number is the market's money
+    aceito('b3', '400', 40000)
+    aceito('forex', '400', 40000)
+    expect(resumo(c, 'b3', form({ definir: true, limite: '400' }))).toBe(`Janela 10:00–11:00 (Brasília) · padrão da B3 · limite do dia: R$${NBSP}400`)
+    expect(resumo(c, 'forex', form({ definir: true, limite: '400' }))).toBe(`Janela 08:00–10:00 (Nova York) · padrão de Forex · limite do dia: US$${NBSP}400`)
+    // Futures, in dollars too
+    recusado('futures', 'R$ 400')
+  })
+
   it('never «por conta / somando» outside Futuros, even with another account of the market', () => {
     const c = configMercados()
     const ids = idsMercados()

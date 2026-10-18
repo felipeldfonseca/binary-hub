@@ -13,12 +13,12 @@ import { PASSO_B } from '@/components/hub/contas/copy'
 import { SIMBOLO_MOEDA, formatDiaMes } from './formato'
 import { JANELA_SUGERIDA, faixaJanela } from './janelas'
 import { dinheiroCompacto, sufixoRelogio } from './posso'
+import { lerLimite } from './personalizarRegras'
 import {
   activeAccounts,
   copyAccountSettings,
   effectiveDayAt,
   emptyAccountSettings,
-  parseUsdText,
   pendingVersions,
   resolveRules,
   windowError,
@@ -140,7 +140,9 @@ export function regrasDaNovaConta(config: Pick<RulesConfig, 'accounts' | 'settin
   }
 
   const limiteTexto = form.limite ?? (fonte.limit ? textoLimite(fonte.limit.cents) : '')
-  const limite = parseUsdText(limiteTexto)
+  // In the market's money, as Personalizar reads it: «US$ 400» typed on a B3 account (or «R$ 400»
+  // on a dollar one) is refused, never saved as R$ 400 (US$ 400)
+  const limite = lerLimite(limiteTexto, currencyOf(market))
   const limiteErro = limite.ok || limite.reason === 'empty' ? null : limite.reason
   // «por conta / somando» only where the market sums its accounts (Futuros)
   const soma = MARKET_SPEC[market].rules.soma
