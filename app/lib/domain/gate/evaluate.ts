@@ -1,12 +1,19 @@
 /**
  * "Posso operar hoje?" for one account at one instant, from the rules in force and the day's
- * result. The same truth table as SQL gate_eval (20261018000003_rules_api.sql), so a preview in
- * the browser (unsaved edits, «Como fica hoje») says what the server would say.
+ * result. The same truth table as SQL gate_eval (20261018000003_rules_api.sql, as
+ * 20261019000001_markets.sql replaced it), so a preview in the browser (unsaved edits, «Como fica
+ * hoje») says what the server would say.
  *
  * Precedence: Encerrado por hoje > Aguardar até HH:MM (data block, Phase 5) > Fora da sua janela >
  * Liberado; nothing evaluated → no status («Sem janela salva»), never «Liberado». A check that was
  * not evaluated says why ("não avaliado") and is never folded into a pass or a false.
+ *
+ * Every market has the window and the daily limit. The data block and the state rule exist only
+ * where MARKET_SPEC says so (futures); elsewhere they are "não avaliado: so_futuros" («this market
+ * has no such rule»). Money is in cents of the market's currency (currencyOf(rules.market)); the
+ * server's answer keeps its key names (`usd`, `net_usd`, `worst_usd`) whatever the currency.
  */
+import { MARKET_SPEC, type AccountMarket } from '../markets';
 import {
   tradingDayBounds,
   tradingDayFor,
@@ -14,7 +21,7 @@ import {
   windowOccurrences,
   type DayClock,
 } from '../tempo';
-import { usdToCents, versionAt, type AtLimit, type CalendarCode, type LimitMode, type Market, type RuleVersion } from './rules';
+import { usdToCents, versionAt, type AtLimit, type CalendarCode, type LimitMode, type RuleVersion } from './rules';
 import type { DayResult } from './usage';
 
 export type CheckKey = 'janela' | 'bloqueio' | 'limite' | 'estado';
@@ -28,6 +35,7 @@ export type SkipReason =
   | 'sem_limite'
   | 'sem_dados'
   | 'sem_calendario'
+  /** The market has no such rule (the data block and the state rule are futures only) */
   | 'so_futuros'
   | 'fase5'
   | 'sem_estado'
@@ -67,7 +75,7 @@ export type WindowCheck = WindowEvaluated | NotEvaluated<'sem_versao' | 'regra_d
 export interface LimitEvaluated {
   evaluated: true;
   state: 'ok' | 'atingido';
-  /** The limit */
+  /** The limit. This and every amount below are cents of the market's currency (currencyOf(market)). */
   cents: number;
   mode: LimitMode;
   atLimit: AtLimit;
@@ -135,7 +143,7 @@ export interface EconomicEvent {
 }
 
 export interface GateAccount {
-  market: Market;
+  market: AccountMarket;
   /** trading_accounts.day_tz / day_start_min: the day clock before version 1 (a version carries its own) */
   dayClock: DayClock;
 }
@@ -237,7 +245,7 @@ export function evaluateGate(
   let blocks: BlockInterval[] = [];
   let block: BlockCheck;
   if (!rules) block = notEvaluated('sem_versao');
-  else if (rules.market !== 'futures') block = notEvaluated('so_futuros');
+  else if (!MARKET_SPEC[rules.market].rules.block) block = notEvaluated('so_futuros');
   else if (!rules.block || !rules.block.on || rules.block.beforeMin + rules.block.afterMin === 0) {
     block = notEvaluated('regra_desligada');
   } else if (!events.available) block = notEvaluated('fase5');
@@ -283,7 +291,7 @@ export function evaluateGate(
   }
 
   // State rule (Phase 5; never part of the account's answer)
-  const stateRule = notEvaluated(!rules ? 'sem_versao' : rules.market !== 'futures' ? 'so_futuros' : 'fase5');
+  const stateRule = notEvaluated(!rules ? 'sem_versao' : !MARKET_SPEC[rules.market].rules.states ? 'so_futuros' : 'fase5');
 
   const checksEvaluated: CheckKey[] = [];
   if (window.evaluated) checksEvaluated.push('janela');
@@ -456,6 +464,7 @@ export function parseServerGate(json: unknown): GateResult {
     limit = {
       evaluated: true,
       state: l.state,
+      // `usd`, `net_usd` and `worst_usd` hold the account's money whatever its currency (R$ on B3)
       cents: cents(l.usd),
       mode: l.mode,
       atLimit: l.at_limit,
