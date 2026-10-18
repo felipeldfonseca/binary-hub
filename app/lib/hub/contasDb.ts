@@ -144,8 +144,12 @@ export async function createAccount(db: SupabaseClient, userId: string, input: N
   return row;
 }
 
+/**
+ * The columns the API may update (column privileges, migration 20261018000001). The file zone
+ * changes only through importFixTz; the market and the day clock never change after creation.
+ */
 export type AccountPatch = Partial<
-  Pick<TradingAccount, 'label' | 'firm' | 'external_ref' | 'phase' | 'is_primary' | 'archived_at' | 'file_tz'>
+  Pick<TradingAccount, 'label' | 'firm' | 'external_ref' | 'phase' | 'is_primary' | 'archived_at'>
 > & { size?: string | null };
 
 export async function updateAccount(db: SupabaseClient, id: string, patch: AccountPatch): Promise<void> {
