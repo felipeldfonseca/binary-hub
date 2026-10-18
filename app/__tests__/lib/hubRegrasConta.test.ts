@@ -6,6 +6,7 @@ import type { ImportRow } from '@/lib/domain/import'
 import { brt, et, topOneRules } from '@/testing/gate'
 import { configAntes, configDepois, idsDono } from '@/testing/regras'
 import { resolveRules, type AccountSettings, type RulesConfig, type WindowSetting } from '@/lib/hub/regras'
+import { REGRAS_CONTA } from '@/components/hub/contas/copyRegras'
 import {
   NAO_COPIAR,
   REGRAS_FORM_VAZIO,
@@ -208,6 +209,26 @@ describe('the «Usar a janela» question', () => {
     c.settings.markets.futures.windows = [w(NY, 600, 660), w(NY, 840, 900)]
     expect(perguntaJanela(regrasDaNovaConta(c, 'futures', form()))).toBe('Usar a janela de Futuros (10:00–11:00 e 14:00–15:00 ET)?')
     expect(resumo(c, 'futures')).toMatch(/^Janela 10:00–11:00 e 14:00–15:00 \(Nova York\) · padrão de Futuros · /)
+  })
+})
+
+// Fase 2b foundation: the creation form names the market with copyMercados' short form
+// (MERCADO[m].deCurto). Moved here from copyMercados.test.ts: these keys are lane A's.
+describe('the market’s name in the creation form', () => {
+  it('names the creation form’s market with its short form', () => {
+    expect(REGRAS_CONTA.padraoDe('futures')).toBe('padrão de Futuros')
+    expect(REGRAS_CONTA.padraoDe('binary')).toBe('padrão de Binárias')
+    expect(REGRAS_CONTA.padraoDe('b3')).toBe('padrão da B3')
+    expect(REGRAS_CONTA.pergunta('futures', ['10:00–11:00'], 'America/New_York')).toBe('Usar a janela de Futuros (10:00–11:00 ET)?')
+    expect(REGRAS_CONTA.pergunta('b3', ['10:00–11:00'], 'America/Sao_Paulo')).toBe('Usar a janela da B3 (10:00–11:00 de Brasília)?')
+    expect(REGRAS_CONTA.outrasContas('binary', '17 out', ['Pocket'])).toBe(
+      'Ao criar, esta janela passa a ser a de Binárias: Pocket também ganha versão nova das regras desde 17 out.',
+    )
+  })
+
+  it('passes the market to Personalizar’s window labels', () => {
+    expect(REGRAS_CONTA.inicioMercadoAria('binary', 'America/Sao_Paulo')).toBe('Início da janela de Opções binárias, horário de Brasília')
+    expect(REGRAS_CONTA.cancelarJanelaAria('futures')).toBe('Cancelar a janela nova de Futuros')
   })
 })
 

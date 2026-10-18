@@ -7,7 +7,6 @@
 import { ACCOUNT_MARKETS, CREATABLE_MARKETS, MARKET_SPEC } from '@/lib/domain/markets'
 import { MERCADO, USDT_COMO_DOLAR, viraODia } from '@/components/hub/copyMercados'
 import { MARKET_LABEL, NEVER_SUMMED, PASSO_B } from '@/components/hub/contas/copy'
-import { REGRAS_CONTA } from '@/components/hub/contas/copyRegras'
 import { JANELAS, MERCADO_NOME, REGRAS } from '@/components/hub/personalizar/copy'
 
 describe('MERCADO', () => {
@@ -98,20 +97,10 @@ describe('the frozen exports set from it', () => {
     expect(JANELAS.segundaAria('stocks')).toBe('Segunda janela de Ações')
     expect(JANELAS.removerAria('b3')).toBe('Remover a segunda janela da B3')
     expect(JANELAS.contasAria('b3')).toBe('Contas da B3')
-    expect(REGRAS_CONTA.inicioMercadoAria('binary', 'America/Sao_Paulo')).toBe('Início da janela de Opções binárias, horário de Brasília')
-    expect(REGRAS_CONTA.cancelarJanelaAria('futures')).toBe('Cancelar a janela nova de Futuros')
   })
 
-  it('names the creation form’s market with its short form', () => {
-    expect(REGRAS_CONTA.padraoDe('futures')).toBe('padrão de Futuros')
-    expect(REGRAS_CONTA.padraoDe('binary')).toBe('padrão de Binárias')
-    expect(REGRAS_CONTA.padraoDe('b3')).toBe('padrão da B3')
-    expect(REGRAS_CONTA.pergunta('futures', ['10:00–11:00'], 'America/New_York')).toBe('Usar a janela de Futuros (10:00–11:00 ET)?')
-    expect(REGRAS_CONTA.pergunta('b3', ['10:00–11:00'], 'America/Sao_Paulo')).toBe('Usar a janela da B3 (10:00–11:00 de Brasília)?')
-    expect(REGRAS_CONTA.outrasContas('binary', '17 out', ['Pocket'])).toBe(
-      'Ao criar, esta janela passa a ser a de Binárias: Pocket também ganha versão nova das regras desde 17 out.',
-    )
-  })
+  // The creation form's words (REGRAS_CONTA, copyRegras.ts) are lane A's, not frozen: they are
+  // tested in __tests__/lib/hubRegrasConta.test.ts, which lane A owns.
 
   it('says the limit’s maximum in the account’s currency', () => {
     expect(REGRAS.limiteErro('too_large', 'USD')).toBe('Use um valor até US$ 1.000.000.')
