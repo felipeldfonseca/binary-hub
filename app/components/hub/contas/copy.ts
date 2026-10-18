@@ -38,6 +38,8 @@ export const PLATFORM_LABEL: Record<string, string> = {
   topstepx: 'TopstepX',
   quantower: 'Quantower',
   tradingview: 'TradingView',
+  blackarrow: 'BlackArrow', // NEW (owner's default, 2026-10-18: Top One Futures and three other firms offer it)
+  wealthcharts: 'WealthCharts', // NEW (same decision)
   naosei: 'Não sei',
   ebinex: 'Ebinex',
   pocket: 'Pocket Option',
@@ -272,6 +274,7 @@ export const PASSO_B = {
   roBroker: 'Corretora',
   roPlatform: 'Plataforma',
   roFirmPlatform: 'Mesa e plataforma',
+  roFirmFile: 'Mesa e arquivo', // NEW (a Top One file starts the account with its firm)
   fileTopOne: 'Trade History',
   fileEbinex: 'Ebinex · arquivo CSV',
   platformTbd: 'plataforma a escolher',
@@ -293,7 +296,8 @@ export const PASSO_I1 = {
 export const PASSO_I2 = {
   title: 'Onde você opera?',
   search: 'Busque mesa, corretora ou plataforma',
-  noMatchFutures: 'Nada com esse nome na lista de plataformas.',
+  // ADAPTED: "…na lista de plataformas." → the search covers the firms too
+  noMatchFutures: 'Nada com esse nome na lista de mesas e plataformas.',
   noMatchBinary: 'Nada com esse nome. Escolha “Outra” e siga.',
   firmFromSearch: (text: string) => `Usar “${text}” como mesa`,
   firmChip: (firm: string) => `Mesa: ${firm}`,
@@ -302,6 +306,26 @@ export const PASSO_I2 = {
   nowPlatform: 'Agora escolha a plataforma.',
   iqNote: 'IQ Option não exporta histórico: registre à mão.',
   hint: 'Escolha onde você opera.',
+  firmsTitle: 'Mesa', // NEW (the board has no firm list, only the chip)
+  platformsTitle: 'Plataforma', // NEW (two groups need their own names)
+  firmsInfoAria: 'Como ler: lista de mesas', // NEW
+  /** NEW: the source, the day it was read and the selection rule (`checked` is YYYY-MM-DD); no firm's score */
+  firmsInfo: (checked: string) =>
+    `Mesas de futuros com nota 4 ou mais e pelo menos 50 avaliações verificadas na Prop Firm Match em ${checked
+      .split('-')
+      .reverse()
+      .join('/')}, mais a Apex Trader Funding, que incluímos por escolha. Em ordem alfabética. Não é recomendação nem parceria. A sua não está aqui? Digite o nome.`,
+}
+
+/**
+ * «Mesa · plataforma» of an account (step b's read-only row). Next to a firm, the key `topone`
+ * (the Top One file, «Top One» alone) reads «Trade History», so an account of «Top One Futures»
+ * never reads «Top One Futures · Top One». NEW
+ */
+export function firmAndPlatform(firm: string | null, platform: string | null): string {
+  const name = (firm ?? '').trim()
+  const where = name && platform === 'topone' ? PASSO_B.fileTopOne : platformLabel(platform)
+  return [name, where].filter(Boolean).join(' · ')
 }
 
 export const PASSO_C = {

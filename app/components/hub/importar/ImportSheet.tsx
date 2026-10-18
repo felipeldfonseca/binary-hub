@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { FileText } from 'lucide-react'
 import { buildImportArgs, previewArgs, readImportFile, type ReadImportFileResult } from '@/lib/domain/import'
-import { LABEL_MAX, PLATFORM_UNKNOWN, labelTaken, parseSize, zoneKeyOf, type TradingAccount } from '@/lib/hub/contas'
+import { FIRM_MAX, LABEL_MAX, PLATFORM_UNKNOWN, labelTaken, parseSize, zoneKeyOf, type TradingAccount } from '@/lib/hub/contas'
 import {
   HubDataError,
   createAccount,
@@ -33,6 +33,7 @@ import {
   type RegrasDaNovaConta,
 } from '@/lib/hub/regrasConta'
 import { formatDiaMes } from '@/lib/hub/formato'
+import { firmOfFile, hasFirms } from '@/lib/hub/mesas'
 import {
   ARQUIVO,
   BUSY,
@@ -52,7 +53,7 @@ import {
   PASSO_I2,
   SOLTE,
   UNDO,
-  platformLabel,
+  firmAndPlatform,
   undoAria,
   zoneName,
 } from '@/components/hub/contas/copy'
@@ -329,6 +330,11 @@ export default function ImportSheet({ mode, accountId, onClose }: { mode: SheetM
   const form = flow.form
   const setForm = (patch: Partial<AccountForm>) => setFlow((f) => ({ ...f, form: { ...f.form, ...patch } }))
   const formMarket = parsed?.market ?? form.market ?? 'futures'
+  // A file's own firm (Top One file → «Top One Futures»): step b starts with it, removable, since
+  // the file's format is not proof of the firm (lib/hub/mesas firmOfFile)
+  const firmFromFile = parsed && hasFirms(parsed.market) ? firmOfFile(parsed.platform) ?? '' : ''
+  /** Step b's empty form for the file's market */
+  const newFormForFile = (market: AccountForm['market']): AccountForm => ({ ...EMPTY_FORM, market, firm: firmFromFile })
   const sizeValue = parseSize(form.size)
   // Once the form created its account, that account's nickname is not "taken"
   const taken = labelTaken(form.label, all, flow.createdFromForm ? flow.created?.id : undefined)
@@ -376,7 +382,8 @@ export default function ImportSheet({ mode, accountId, onClose }: { mode: SheetM
         market: formMarket,
         label: form.label.trim().slice(0, LABEL_MAX),
         platform: parsed ? parsed.platform : form.platform === PLATFORM_UNKNOWN ? null : form.platform,
-        firm: parsed || !futures ? null : form.firm.trim() || null,
+        // Chosen in i2, or the file's firm unless the owner took it out in step b
+        firm: hasFirms(formMarket) ? form.firm.trim().slice(0, FIRM_MAX) || null : null,
         external_ref: form.ref.trim() || null,
         phase: futures ? form.phase : 'pessoal',
         size: futures && sizeValue !== 'invalid' ? sizeValue : null,
@@ -532,7 +539,9 @@ export default function ImportSheet({ mode, accountId, onClose }: { mode: SheetM
   }
 
   const typed =
-    !!(form.label.trim() || form.size.trim() || form.ref.trim() || form.firm.trim() || form.search.trim() || form.phase || form.platform) ||
+    // The file's firm, left as it came, is not something the owner typed
+    form.firm.trim() !== firmFromFile ||
+    !!(form.label.trim() || form.size.trim() || form.ref.trim() || form.search.trim() || form.phase || form.platform) ||
     regrasEditadas(form.rules) ||
     (mode === 'adicionar' && !!form.market)
   const dirty = !flow.createdFromForm && ['i1', 'i2', 'b'].includes(flow.passo) && typed
@@ -612,7 +621,7 @@ export default function ImportSheet({ mode, accountId, onClose }: { mode: SheetM
       primary = {
         label: FOLHA.next,
         run: () => {
-          if (flow.choice === 'nova') move('b', { form: { ...EMPTY_FORM, market: parsed.market }, createdFromForm: false })
+          if (flow.choice === 'nova') move('b', { form: newFormForFile(parsed.market), createdFromForm: false })
           else if (chosen && flow.file) void afterAccount(chosen, flow.file, { accountId: chosen.id })
         },
       }
@@ -635,15 +644,20 @@ export default function ImportSheet({ mode, accountId, onClose }: { mode: SheetM
       break
     case 'b': {
       const futures = formMarket === 'futures'
+      const firm = hasFirms(formMarket) ? form.firm.trim() : ''
       let roLabel: string = futures ? PASSO_B.roPlatform : PASSO_B.roBroker
       let roValue = ''
       if (parsed) {
-        roLabel = parsed.platform === 'topone' ? PASSO_B.roFile : PASSO_B.roBroker
-        roValue = parsed.platform === 'topone' ? PASSO_B.fileTopOne : PASSO_B.fileEbinex
+        if (parsed.platform === 'topone') {
+          roLabel = firm ? PASSO_B.roFirmFile : PASSO_B.roFile
+          roValue = firm ? firmAndPlatform(firm, 'topone') : PASSO_B.fileTopOne
+        } else {
+          roLabel = PASSO_B.roBroker
+          roValue = PASSO_B.fileEbinex
+        }
       } else {
-        if (futures && form.firm.trim()) roLabel = PASSO_B.roFirmPlatform
-        const platform = form.platform ? platformLabel(form.platform) : PASSO_B.platformTbd
-        roValue = [futures ? form.firm.trim() : '', platform].filter(Boolean).join(' · ')
+        if (firm) roLabel = PASSO_B.roFirmPlatform
+        roValue = form.platform ? firmAndPlatform(firm, form.platform) : [firm, PASSO_B.platformTbd].filter(Boolean).join(' · ')
       }
       const sizeInvalid = futures && sizeValue === 'invalid'
       const locked = flow.createdFromForm && !!flow.created
@@ -686,6 +700,7 @@ export default function ImportSheet({ mode, accountId, onClose }: { mode: SheetM
           labelTaken={taken}
           sizeInvalid={sizeInvalid}
           locked={locked}
+          firmRemovable={!!parsed}
           regras={
             <RegrasDaConta
               carga={blockLoad}
@@ -792,7 +807,7 @@ export default function ImportSheet({ mode, accountId, onClose }: { mode: SheetM
             if (target && flow.file) void afterAccount(target, flow.file, { accountId: id })
           }}
           onCreate={() => {
-            if (!busyRef.current) move('b', { form: { ...EMPTY_FORM, market: parsed.market }, createdFromForm: false })
+            if (!busyRef.current) move('b', { form: newFormForFile(parsed.market), createdFromForm: false })
           }}
         />
       )

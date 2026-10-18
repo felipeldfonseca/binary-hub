@@ -16,6 +16,7 @@ import {
 } from '@/lib/hub/contas'
 import { importFixTz, setPrimary, toHubError, updateAccount, type AccountPatch, type FixTzResult, type HubErrorCode } from '@/lib/hub/contasDb'
 import { formatShift } from '@/lib/hub/formato'
+import { firmNames, hasFirms } from '@/lib/hub/mesas'
 import { useHubDb, useRefreshAfterWrite } from '@/hooks/useContas'
 import { BUSY, CANCEL, CHOOSE, EDITAR, ERROR_TEXT, OPTIONAL, PASSO_B, PHASE_LABEL, fixTzLine, fixTzUntouched, zoneName } from './copy'
 
@@ -38,6 +39,8 @@ export default function EditarConta({ account, accounts, primaryId, onSaved, onC
   const { db } = useHubDb()
   const refresh = useRefreshAfterWrite()
   const futures = account.market === 'futures'
+  // «Mesa»: free text, with the firms of the account's market as suggestions (lib/hub/mesas)
+  const firms = hasFirms(account.market)
   const confirmed = tzConfirmed(account)
   const id = account.id
   const [label, setLabel] = useState(account.label)
@@ -100,7 +103,7 @@ export default function EditarConta({ account, accounts, primaryId, onSaved, onC
       if (labelChanged) patch.label = trimmed
       const nextPhase = futures ? phase : account.phase ?? 'pessoal'
       if (nextPhase !== account.phase) patch.phase = nextPhase
-      if (futures && (firm.trim() || null) !== account.firm) patch.firm = firm.trim() || null
+      if (firms && (firm.trim() || null) !== account.firm) patch.firm = firm.trim() || null
       if ((ref.trim() || null) !== account.external_ref) patch.external_ref = ref.trim() || null
       if (futures && sizeValue !== 'invalid' && sizeValue !== (account.size === null ? null : String(account.size))) patch.size = sizeValue
       if (!primary && account.is_primary) patch.is_primary = false
@@ -214,7 +217,7 @@ export default function EditarConta({ account, accounts, primaryId, onSaved, onC
         </div>
       )}
 
-      {futures && (
+      {firms && (
         <div className="hub-campo">
           <label htmlFor={fieldId('mesa')} className="hub-rot-campo">
             {EDITAR.firm} <span className="hub-opc">{OPTIONAL}</span>
@@ -225,10 +228,16 @@ export default function EditarConta({ account, accounts, primaryId, onSaved, onC
             type="text"
             autoComplete="off"
             maxLength={FIRM_MAX}
+            list={fieldId('mesas')}
             value={firm}
             disabled={!!dry}
             onChange={(event) => setFirm(event.target.value)}
           />
+          <datalist id={fieldId('mesas')}>
+            {firmNames(account.market).map((name) => (
+              <option key={name} value={name} />
+            ))}
+          </datalist>
         </div>
       )}
 

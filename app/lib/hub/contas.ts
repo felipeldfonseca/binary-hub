@@ -38,9 +38,14 @@ export const CREATABLE_MARKETS: readonly Market[] = ['futures', 'binary'];
 
 export const PHASES_FUTURES: readonly AccountPhase[] = ['avaliacao', 'financiada', 'pessoal'];
 
-/** Platform keys offered in "Onde você opera?", in the boards' order. The last one always stays. */
+/**
+ * Platform keys offered in "Onde você opera?", in the boards' order. The last one always stays.
+ * BlackArrow and WealthCharts are not on the board: the owner accepted them on 2026-10-18 (Top
+ * One Futures offers both, and three firms of lib/hub/mesas.ts offer only BlackArrow). They are
+ * labels only: no reader of their files is implied.
+ */
 export const PLATFORMS: Readonly<Record<Market, readonly string[]>> = {
-  futures: ['tradovate', 'rithmic', 'ninja', 'topstepx', 'quantower', 'tradingview', 'naosei'],
+  futures: ['tradovate', 'rithmic', 'ninja', 'topstepx', 'quantower', 'tradingview', 'blackarrow', 'wealthcharts', 'naosei'],
   binary: ['ebinex', 'pocket', 'iq', 'outra'],
 };
 

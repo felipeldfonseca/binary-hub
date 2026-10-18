@@ -6,10 +6,10 @@ import type { FailedFile, Market, ParsedFile, RowIssue, RowErrorCode } from '@/l
 import { entrySpan, totals } from '@/lib/domain/import'
 import {
   FILE_ZONES,
+  FIRM_MAX,
   LABEL_MAX,
   OTHER_FILE_ZONES,
   PHASES_FUTURES,
-  PLATFORMS,
   REF_MAX,
   REFERENCE_TZ,
   displaySpan,
@@ -18,6 +18,16 @@ import {
   type ZoneKey,
 } from '@/lib/hub/contas'
 import type { FixTzResult, ImportPreviewResult, RowError } from '@/lib/hub/contasDb'
+import {
+  PROP_FIRMS_CHECKED,
+  firmByName,
+  firmsFor,
+  foldSearch,
+  hasFirms,
+  onlyPlatform,
+  platformsFor,
+  type PropFirm,
+} from '@/lib/hub/mesas'
 import { formatMoney, formatOffset, formatShift } from '@/lib/hub/formato'
 import {
   CHOOSE,
@@ -300,6 +310,7 @@ export function PassoNovaConta({
   sizeInvalid,
   locked = false,
   regras = null,
+  firmRemovable = false,
 }: {
   headingRef: HeadingRef
   market: Market
@@ -313,8 +324,13 @@ export function PassoNovaConta({
   locked?: boolean
   /** The rules block (RegrasDaConta), after «Tamanho US$ / Número na plataforma» (board) */
   regras?: React.ReactNode
+  /** The firm came from the file (only a suggestion): «Tirar» next to the read-only row clears it */
+  firmRemovable?: boolean
 }) {
   const futures = market === 'futures'
+  const sizeRef = useRef<HTMLInputElement>(null)
+  const refRef = useRef<HTMLInputElement>(null)
+  const firm = form.firm.trim()
   return (
     <div className="hub-passo">
       <Heading headingRef={headingRef}>{PASSO_B.title(market)}</Heading>
@@ -363,7 +379,27 @@ export function PassoNovaConta({
       )}
       <div className="hub-campo">
         <span className="hub-rot-campo">{roLabel}</span>
-        <span className="hub-ro">{roValue}</span>
+        {firmRemovable && firm && !locked ? (
+          <div className="hub-linha" style={{ gap: 8, flexWrap: 'nowrap' }}>
+            <span className="hub-ro" style={{ flex: '1 1 auto', minWidth: 0 }}>
+              {roValue}
+            </span>
+            <button
+              type="button"
+              className="hub-btn"
+              aria-label={PASSO_I2.removeFirmAria(firm)}
+              onClick={() => {
+                onChange({ firm: '' })
+                // The button goes away with the firm: focus moves on to the next field
+                setTimeout(() => (sizeRef.current ?? refRef.current)?.focus(), 0)
+              }}
+            >
+              {PASSO_I2.removeFirm}
+            </button>
+          </div>
+        ) : (
+          <span className="hub-ro">{roValue}</span>
+        )}
       </div>
       {!futures && (
         <div className="hub-campo">
@@ -378,6 +414,7 @@ export function PassoNovaConta({
               {PASSO_B.size} <span className="hub-opc">{OPTIONAL}</span>
             </label>
             <input
+              ref={sizeRef}
               id="f-tam"
               className="hub-entrada hub-entrada--mono"
               type="text"
@@ -401,6 +438,7 @@ export function PassoNovaConta({
             {PASSO_B.ref} <span className="hub-opc">{OPTIONAL}</span>
           </label>
           <input
+            ref={refRef}
             id="f-num"
             className="hub-entrada hub-entrada--mono"
             type="text"
@@ -457,16 +495,53 @@ export function PassoPlataforma({
   onChange: (patch: Partial<AccountForm>) => void
 }) {
   const searchRef = useRef<HTMLInputElement>(null)
+  const platformsRef = useRef<HTMLDivElement>(null)
+  const [info, toggleInfo] = useToggle()
   const market = form.market ?? 'futures'
-  const futures = market === 'futures'
-  const list = PLATFORMS[market]
+  // The «Mesa» group, its chip and «Usar “x” como mesa»: futures today (lib/hub/mesas FIRM_MARKETS)
+  const firms = hasFirms(market)
   const text = form.search.trim()
-  const query = text.toLocaleLowerCase('pt-BR')
-  const matches = (key: string) => PLATFORM_LABEL[key].toLocaleLowerCase('pt-BR').includes(query)
+  const query = foldSearch(text)
+  // A firm from the list puts its platforms first; a firm typed freely changes nothing
+  const list = platformsFor(market, firms ? firmByName(market, form.firm) : null)
+  const matches = (key: string) => foldSearch(PLATFORM_LABEL[key]).includes(query)
   const chips = list.filter((key, i) => !query || matches(key) || key === form.platform || i === list.length - 1)
-  const noMatch = !!query && !list.some(matches)
+  // With a firm chosen, its chip stands for the group until the owner searches again
+  const firmPills = !firms || (form.firm && !query) ? [] : firmsFor(market, text)
+  const noMatch = !!query && !list.some(matches) && firmPills.length === 0
 
   const focusSearch = () => setTimeout(() => searchRef.current?.focus(), 0)
+
+  // Binaries keep the board's one group, named by the step's heading
+  const platformGroup = (
+    <div ref={platformsRef} role="group" aria-labelledby={firms ? 'l-plataformas' : 't-passo'} className="hub-pills">
+      {chips.map((key) => (
+        <button
+          key={key}
+          type="button"
+          className="hub-pill"
+          data-plataforma={key}
+          aria-pressed={form.platform === key}
+          onClick={() => onChange({ platform: key })}
+        >
+          {PLATFORM_LABEL[key]}
+        </button>
+      ))}
+    </div>
+  )
+
+  const chooseFirm = (firm: PropFirm) => {
+    // A firm with one known platform brings it, unless a platform is already chosen
+    const only = onlyPlatform(firm)
+    const platform = !form.platform && only ? only : form.platform
+    onChange({ firm: firm.name, search: '', platform })
+    if (platform !== form.platform) {
+      // The pill pressed for the owner takes focus, so a screen reader says what was chosen
+      setTimeout(() => platformsRef.current?.querySelector<HTMLButtonElement>(`[data-plataforma="${platform}"]`)?.focus(), 0)
+    } else {
+      focusSearch()
+    }
+  }
 
   return (
     <div className="hub-passo">
@@ -478,10 +553,12 @@ export function PassoPlataforma({
         autoComplete="off"
         aria-label={PASSO_I2.search}
         placeholder={PASSO_I2.search}
+        // «Usar “x” como mesa» stores the text as the firm, and trading_accounts.firm takes FIRM_MAX
+        maxLength={FIRM_MAX}
         value={form.search}
         onChange={(event) => onChange({ search: event.target.value })}
       />
-      {futures && form.firm && (
+      {firms && form.firm && (
         <div className="hub-linha" style={{ gap: 8 }}>
           <span className="hub-chip-dado">{PASSO_I2.firmChip(form.firm)}</span>
           <button
@@ -489,24 +566,49 @@ export function PassoPlataforma({
             className="hub-btn"
             aria-label={PASSO_I2.removeFirmAria(form.firm)}
             onClick={() => {
+              // Only the firm: the platform chosen stays
               onChange({ firm: '' })
               focusSearch()
             }}
           >
             {PASSO_I2.removeFirm}
           </button>
-          <span className="hub-nota">{PASSO_I2.nowPlatform}</span>
+          {/* Only while no platform is chosen: a one-platform firm (Topstep) brings its own */}
+          {!form.platform && <span className="hub-nota">{PASSO_I2.nowPlatform}</span>}
         </div>
       )}
-      <div role="group" aria-labelledby="t-passo" className="hub-pills">
-        {chips.map((key) => (
-          <button key={key} type="button" className="hub-pill" aria-pressed={form.platform === key} onClick={() => onChange({ platform: key })}>
-            {PLATFORM_LABEL[key]}
-          </button>
-        ))}
-      </div>
-      {noMatch && <p className="hub-nota">{futures ? PASSO_I2.noMatchFutures : PASSO_I2.noMatchBinary}</p>}
-      {noMatch && futures && (
+      {firmPills.length > 0 && (
+        <div className="hub-campo">
+          {/* 32px: the ⓘ's 44px hit area ends within the 6px gap above the pills, never over them */}
+          <div className="hub-passo__cab" style={{ alignItems: 'center', minHeight: query ? undefined : 32 }}>
+            <span id="l-mesas" className="hub-rot-campo">
+              {PASSO_I2.firmsTitle} <span className="hub-opc">{OPTIONAL}</span>
+            </span>
+            {/* The ⓘ explains the featured list, so it goes with it: a search covers every firm */}
+            {!query && <InfoButton panelId="info-mesas" label={PASSO_I2.firmsInfoAria} open={info} onToggle={toggleInfo} />}
+          </div>
+          {!query && info && <InfoPanel id="info-mesas">{PASSO_I2.firmsInfo(PROP_FIRMS_CHECKED)}</InfoPanel>}
+          <div role="group" aria-labelledby="l-mesas" className="hub-pills">
+            {firmPills.map((firm) => (
+              <button key={firm.id} type="button" className="hub-pill" aria-pressed={form.firm === firm.name} onClick={() => chooseFirm(firm)}>
+                {firm.name}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+      {firms ? (
+        <div className="hub-campo">
+          <span id="l-plataformas" className="hub-rot-campo">
+            {PASSO_I2.platformsTitle}
+          </span>
+          {platformGroup}
+        </div>
+      ) : (
+        platformGroup
+      )}
+      {noMatch && <p className="hub-nota">{firms ? PASSO_I2.noMatchFutures : PASSO_I2.noMatchBinary}</p>}
+      {noMatch && firms && (
         <button
           type="button"
           className="hub-pill"

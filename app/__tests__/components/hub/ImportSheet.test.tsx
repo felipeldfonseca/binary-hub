@@ -1,10 +1,11 @@
 import React from 'react'
-import { act, fireEvent, screen, waitFor, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import * as data from '@/lib/hub/contasDb'
 import * as regrasDb from '@/lib/hub/regrasDb'
 import { readImportFile } from '@/lib/domain/import'
 import { useImportSheet, type SheetMode } from '@/components/hub/importar/ImportSheetProvider'
+import { EMPTY_FORM, PassoNovaConta } from '@/components/hub/importar/passos'
 import { changedOnlyHere } from '@/hooks/useRegras'
 import type { AccountConfig, RulesConfig, SaveRulesResult } from '@/lib/hub/regras'
 import { csvFile, fixtureFile, makeAccount, makePreview, renderHub } from '@/testing/hubHarness'
@@ -681,8 +682,10 @@ describe('ImportSheet · accounts', () => {
     await userEvent.click(within(dialog).getByRole('button', { name: 'Continuar' }))
 
     expect(await within(dialog).findByRole('heading', { name: 'Nova conta de futuros' })).toHaveFocus()
-    expect(within(dialog).getByText('Arquivo')).toBeInTheDocument()
-    expect(within(dialog).getByText('Trade History')).toBeInTheDocument()
+    // The file's firm comes filled in, and can be taken out (the format is not proof of the firm)
+    expect(within(dialog).getByText('Mesa e arquivo')).toBeInTheDocument()
+    expect(within(dialog).getByText('Top One Futures · Trade History')).toBeInTheDocument()
+    expect(within(dialog).getByRole('button', { name: 'Tirar a mesa Top One Futures' })).toBeInTheDocument()
     const create = within(dialog).getByRole('button', { name: 'Criar conta' })
     expect(create).toHaveAccessibleDescription('Dê um apelido à conta.')
 
@@ -697,7 +700,7 @@ describe('ImportSheet · accounts', () => {
       market: 'futures',
       label: 'Apex B',
       platform: 'topone',
-      firm: null,
+      firm: 'Top One Futures',
       external_ref: null,
       phase: 'financiada',
       size: '50000',
@@ -721,7 +724,7 @@ describe('ImportSheet · accounts', () => {
 
 describe('ImportSheet · add an account', () => {
   it('goes market → platform → account, then offers to import its history', async () => {
-    const created = makeAccount({ label: 'Apex A', market: 'futures', platform: 'rithmic', firm: 'Apex', phase: 'avaliacao' })
+    const created = makeAccount({ label: 'Apex A', market: 'futures', platform: 'rithmic', firm: 'Mesa Alfa', phase: 'avaliacao' })
     createAccount.mockResolvedValue(created)
 
     const dialog = await openSheet({ mode: 'adicionar' })
@@ -735,19 +738,21 @@ describe('ImportSheet · add an account', () => {
 
     expect(within(dialog).getByRole('heading', { name: 'Onde você opera?' })).toHaveFocus()
     const search = within(dialog).getByRole('searchbox', { name: 'Busque mesa, corretora ou plataforma' })
-    await userEvent.type(search, 'Apex')
-    expect(within(dialog).getByText('Nada com esse nome na lista de plataformas.')).toBeInTheDocument()
+    // A firm outside the list: neither a firm nor a platform answers, so the text becomes the firm
+    await userEvent.type(search, 'Mesa Alfa')
+    expect(within(dialog).getByText('Nada com esse nome na lista de mesas e plataformas.')).toBeInTheDocument()
+    expect(within(dialog).queryByRole('group', { name: /^Mesa/ })).not.toBeInTheDocument()
     // "Não sei" always stays
     expect(within(dialog).getByRole('button', { name: 'Não sei' })).toBeInTheDocument()
-    await userEvent.click(within(dialog).getByRole('button', { name: 'Usar “Apex” como mesa' }))
-    expect(within(dialog).getByText('Mesa: Apex')).toBeInTheDocument()
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Usar “Mesa Alfa” como mesa' }))
+    expect(within(dialog).getByText('Mesa: Mesa Alfa')).toBeInTheDocument()
     await waitFor(() => expect(search).toHaveFocus())
     await userEvent.click(within(dialog).getByRole('button', { name: 'Rithmic' }))
     await userEvent.click(within(dialog).getByRole('button', { name: 'Continuar' }))
 
     expect(within(dialog).getByRole('heading', { name: 'Nova conta de futuros' })).toHaveFocus()
     expect(within(dialog).getByText('Mesa e plataforma')).toBeInTheDocument()
-    expect(within(dialog).getByText('Apex · Rithmic')).toBeInTheDocument()
+    expect(within(dialog).getByText('Mesa Alfa · Rithmic')).toBeInTheDocument()
     await userEvent.type(within(dialog).getByLabelText('Apelido'), 'Apex A')
     await userEvent.click(within(dialog).getByRole('button', { name: 'Avaliação' }))
     await userEvent.click(within(dialog).getByRole('button', { name: 'Criar Apex A' }))
@@ -756,7 +761,7 @@ describe('ImportSheet · add an account', () => {
     expect(createAccount).toHaveBeenCalledWith(
       expect.anything(),
       'user-1',
-      expect.objectContaining({ market: 'futures', platform: 'rithmic', firm: 'Apex', phase: 'avaliacao', is_primary: false }),
+      expect.objectContaining({ market: 'futures', platform: 'rithmic', firm: 'Mesa Alfa', phase: 'avaliacao', is_primary: false }),
     )
     expect(within(dialog).getByText('Nada ainda. Importe o histórico ou registre a primeira operação.')).toBeInTheDocument()
 
@@ -798,6 +803,368 @@ describe('ImportSheet · add an account', () => {
     expect(create).toHaveAttribute('aria-disabled', 'true')
     await userEvent.click(create)
     expect(createAccount).not.toHaveBeenCalled()
+  })
+})
+
+describe('ImportSheet · the prop-firm list (i2)', () => {
+  const FEATURED = [
+    'Apex Trader Funding',
+    'Blue Guardian Futures',
+    'FundedNext Futures',
+    'Lucid Trading',
+    'My Funded Futures',
+    'Top One Futures',
+    'Topstep',
+    'Tradeify',
+    'Traders Launch',
+  ]
+  const FUTURES_PLATFORMS = ['Tradovate', 'Rithmic', 'NinjaTrader', 'TopstepX', 'Quantower', 'TradingView', 'BlackArrow', 'WealthCharts', 'Não sei']
+
+  const names = (group: HTMLElement) => within(group).getAllByRole('button').map((b) => b.textContent)
+  const firmGroup = (dialog: HTMLElement) => within(dialog).getByRole('group', { name: 'Mesa · opcional' })
+  const platformGroup = (dialog: HTMLElement) => within(dialog).getByRole('group', { name: 'Plataforma' })
+
+  async function toI2(market: 'Futuros' | 'Opções binárias' = 'Futuros') {
+    const dialog = await openSheet({ mode: 'adicionar' })
+    await waitFor(() => expect(fetchAccounts).toHaveBeenCalled())
+    await userEvent.click(within(dialog).getByRole('button', { name: market }))
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Continuar' }))
+    expect(within(dialog).getByRole('heading', { name: 'Onde você opera?' })).toHaveFocus()
+    return { dialog, search: within(dialog).getByRole('searchbox', { name: 'Busque mesa, corretora ou plataforma' }) }
+  }
+
+  it('shows the featured firms in alphabetical order under «Mesa», above the platforms, and its ⓘ states the rule', async () => {
+    const { dialog } = await toI2()
+
+    expect(names(firmGroup(dialog))).toEqual(FEATURED)
+    expect(names(platformGroup(dialog))).toEqual(FUTURES_PLATFORMS)
+    // «Mesa» comes before «Plataforma»
+    expect(firmGroup(dialog).compareDocumentPosition(platformGroup(dialog)) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    for (const pill of within(firmGroup(dialog)).getAllByRole('button')) expect(pill).toHaveAttribute('aria-pressed', 'false')
+
+    const info = within(dialog).getByRole('button', { name: 'Como ler: lista de mesas' })
+    expect(info).toHaveAttribute('aria-controls', 'info-mesas')
+    await userEvent.click(info)
+    expect(info).toHaveAttribute('aria-expanded', 'true')
+    expect(dialog.querySelector('#info-mesas')).toHaveTextContent(
+      'Mesas de futuros com nota 4 ou mais e pelo menos 50 avaliações verificadas na Prop Firm Match em 18/10/2026, mais a Apex Trader Funding, que incluímos por escolha. Em ordem alfabética. Não é recomendação nem parceria. A sua não está aqui? Digite o nome.',
+    )
+    // No firm's score anywhere on the step
+    expect(dialog).not.toHaveTextContent(/\d[.,]\d/)
+  })
+
+  it('searches firms and platforms together: "top" shows two firms and TopstepX, each under its own group', async () => {
+    const { dialog, search } = await toI2()
+
+    await userEvent.type(search, 'top')
+
+    expect(names(firmGroup(dialog))).toEqual(['Top One Futures', 'Topstep'])
+    // «Não sei» always stays
+    expect(names(platformGroup(dialog))).toEqual(['TopstepX', 'Não sei'])
+    // The ⓘ explains the featured list, not a search
+    expect(within(dialog).queryByRole('button', { name: 'Como ler: lista de mesas' })).not.toBeInTheDocument()
+    expect(within(dialog).queryByText('Nada com esse nome na lista de mesas e plataformas.')).not.toBeInTheDocument()
+    expect(within(dialog).queryByRole('button', { name: /como mesa$/ })).not.toBeInTheDocument()
+  })
+
+  it('finds a firm by its alias, with any case and accents, and searches every firm, not only the featured ones', async () => {
+    const { dialog, search } = await toI2()
+
+    await userEvent.type(search, 'mff')
+    expect(names(firmGroup(dialog))).toEqual(['My Funded Futures'])
+    // No platform holds "mff", but a firm answers: no «Nada com esse nome» and no free-text firm
+    expect(within(dialog).queryByText('Nada com esse nome na lista de mesas e plataformas.')).not.toBeInTheDocument()
+    expect(within(dialog).queryByRole('button', { name: /como mesa$/ })).not.toBeInTheDocument()
+
+    await userEvent.clear(search)
+    await userEvent.type(search, 'TÓPSTEP')
+    expect(names(firmGroup(dialog))).toEqual(['Topstep'])
+
+    await userEvent.clear(search)
+    await userEvent.type(search, 'earn2')
+    expect(names(firmGroup(dialog))).toEqual(['Earn2Trade'])
+
+    // A word many firms share: at most 8
+    await userEvent.clear(search)
+    await userEvent.type(search, 'futures')
+    expect(names(firmGroup(dialog))).toHaveLength(8)
+  })
+
+  it('picking Topstep sets the chip, selects TopstepX and gives it focus', async () => {
+    const { dialog, search } = await toI2()
+
+    await userEvent.click(within(firmGroup(dialog)).getByRole('button', { name: 'Topstep' }))
+
+    expect(within(dialog).getByText('Mesa: Topstep')).toBeInTheDocument()
+    // TopstepX came with the firm: nothing asks for a platform any more
+    expect(within(dialog).queryByText('Agora escolha a plataforma.')).not.toBeInTheDocument()
+    // The chip stands for the group
+    expect(within(dialog).queryByRole('group', { name: 'Mesa · opcional' })).not.toBeInTheDocument()
+    expect(search).toHaveValue('')
+    const topstepx = within(platformGroup(dialog)).getByRole('button', { name: 'TopstepX' })
+    expect(topstepx).toHaveAttribute('aria-pressed', 'true')
+    await waitFor(() => expect(topstepx).toHaveFocus())
+    expect(names(platformGroup(dialog))[0]).toBe('TopstepX')
+
+    const next = within(dialog).getByRole('button', { name: 'Continuar' })
+    expect(next).not.toHaveAttribute('aria-disabled')
+    await userEvent.click(next)
+    expect(within(dialog).getByText('Mesa e plataforma')).toBeInTheDocument()
+    expect(within(dialog).getByText('Topstep · TopstepX')).toBeInTheDocument()
+  })
+
+  it('picking a firm keeps a platform already chosen', async () => {
+    const { dialog, search } = await toI2()
+    await userEvent.click(within(platformGroup(dialog)).getByRole('button', { name: 'Rithmic' }))
+
+    await userEvent.click(within(firmGroup(dialog)).getByRole('button', { name: 'Topstep' }))
+
+    expect(within(platformGroup(dialog)).getByRole('button', { name: 'Rithmic' })).toHaveAttribute('aria-pressed', 'true')
+    expect(within(platformGroup(dialog)).getByRole('button', { name: 'TopstepX' })).toHaveAttribute('aria-pressed', 'false')
+    expect(within(dialog).getByText('Mesa: Topstep')).toBeInTheDocument()
+    expect(within(dialog).queryByText('Agora escolha a plataforma.')).not.toBeInTheDocument()
+    await waitFor(() => expect(search).toHaveFocus())
+  })
+
+  it('picking Top One Futures puts its platforms first; «Tirar» takes out only the firm', async () => {
+    const { dialog, search } = await toI2()
+
+    await userEvent.click(within(firmGroup(dialog)).getByRole('button', { name: 'Top One Futures' }))
+
+    expect(within(dialog).getByText('Mesa: Top One Futures')).toBeInTheDocument()
+    expect(names(platformGroup(dialog))).toEqual([
+      'Tradovate',
+      'NinjaTrader',
+      'TradingView',
+      'BlackArrow',
+      'WealthCharts',
+      'Rithmic',
+      'TopstepX',
+      'Quantower',
+      'Não sei',
+    ])
+    // Several platforms: none is chosen for the owner, the chip asks for one, and the search takes focus back
+    for (const pill of within(platformGroup(dialog)).getAllByRole('button')) expect(pill).toHaveAttribute('aria-pressed', 'false')
+    expect(within(dialog).getByText('Agora escolha a plataforma.')).toBeInTheDocument()
+    await waitFor(() => expect(search).toHaveFocus())
+
+    await userEvent.click(within(platformGroup(dialog)).getByRole('button', { name: 'NinjaTrader' }))
+    expect(within(dialog).queryByText('Agora escolha a plataforma.')).not.toBeInTheDocument()
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Tirar a mesa Top One Futures' }))
+
+    expect(within(dialog).queryByText('Mesa: Top One Futures')).not.toBeInTheDocument()
+    expect(names(firmGroup(dialog))).toEqual(FEATURED)
+    expect(names(platformGroup(dialog))).toEqual(FUTURES_PLATFORMS)
+    expect(within(platformGroup(dialog)).getByRole('button', { name: 'NinjaTrader' })).toHaveAttribute('aria-pressed', 'true')
+    await waitFor(() => expect(search).toHaveFocus())
+  })
+
+  it('a firm that offers only BlackArrow (Ylos Trading) selects BlackArrow', async () => {
+    const { dialog, search } = await toI2()
+
+    await userEvent.type(search, 'ylos')
+    await userEvent.click(within(firmGroup(dialog)).getByRole('button', { name: 'Ylos Trading' }))
+
+    expect(within(dialog).getByText('Mesa: Ylos Trading')).toBeInTheDocument()
+    // The search that found the firm is emptied, so every platform pill is back
+    expect(search).toHaveValue('')
+    expect(names(platformGroup(dialog))).toHaveLength(FUTURES_PLATFORMS.length)
+    expect(within(platformGroup(dialog)).getByRole('button', { name: 'BlackArrow' })).toHaveAttribute('aria-pressed', 'true')
+    expect(within(dialog).queryByText('Agora escolha a plataforma.')).not.toBeInTheDocument()
+  })
+
+  it('with a firm chosen, a new search can replace it', async () => {
+    const { dialog, search } = await toI2()
+    await userEvent.click(within(firmGroup(dialog)).getByRole('button', { name: 'Topstep' }))
+
+    // A search that shows the chosen firm again marks it as pressed
+    await userEvent.type(search, 'top')
+    expect(within(firmGroup(dialog)).getByRole('button', { name: 'Topstep' })).toHaveAttribute('aria-pressed', 'true')
+    expect(within(firmGroup(dialog)).getByRole('button', { name: 'Top One Futures' })).toHaveAttribute('aria-pressed', 'false')
+
+    await userEvent.clear(search)
+    await userEvent.type(search, 'luc')
+    expect(names(firmGroup(dialog))).toEqual(['Lucid Trading'])
+    await userEvent.click(within(firmGroup(dialog)).getByRole('button', { name: 'Lucid Trading' }))
+
+    expect(within(dialog).getByText('Mesa: Lucid Trading')).toBeInTheDocument()
+    expect(search).toHaveValue('')
+    expect(within(dialog).queryByText('Mesa: Topstep')).not.toBeInTheDocument()
+    // TopstepX came with Topstep and stays: picking a firm never takes a platform away
+    expect(within(platformGroup(dialog)).getByRole('button', { name: 'TopstepX' })).toHaveAttribute('aria-pressed', 'true')
+  })
+
+  it('creates the account with the firm picked from the list', async () => {
+    createAccount.mockResolvedValue(makeAccount({ label: 'TOF 1', market: 'futures', platform: 'tradovate', firm: 'Top One Futures', phase: 'avaliacao' }))
+    const { dialog } = await toI2()
+
+    await userEvent.click(within(firmGroup(dialog)).getByRole('button', { name: 'Top One Futures' }))
+    await userEvent.click(within(platformGroup(dialog)).getByRole('button', { name: 'Tradovate' }))
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Continuar' }))
+    expect(within(dialog).getByText('Top One Futures · Tradovate')).toBeInTheDocument()
+    // Chosen by the owner in i2 (Voltar changes it): «Tirar» is only for a firm that came from a file
+    expect(within(dialog).queryByRole('button', { name: /^Tirar a mesa/ })).not.toBeInTheDocument()
+    await userEvent.type(within(dialog).getByLabelText('Apelido'), 'TOF 1')
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Avaliação' }))
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Criar TOF 1' }))
+
+    await within(dialog).findByRole('heading', { name: 'TOF 1 criada.' })
+    expect(createAccount).toHaveBeenCalledWith(
+      expect.anything(),
+      'user-1',
+      expect.objectContaining({ market: 'futures', platform: 'tradovate', firm: 'Top One Futures' }),
+    )
+  })
+
+  it('searches the platforms with accents ignored: "nao" finds «Não sei», so nothing says there is no match', async () => {
+    const { dialog, search } = await toI2()
+
+    await userEvent.type(search, 'nao')
+
+    expect(names(platformGroup(dialog))).toEqual(['Não sei'])
+    expect(within(dialog).queryByText('Nada com esse nome na lista de mesas e plataformas.')).not.toBeInTheDocument()
+    expect(within(dialog).queryByRole('button', { name: /como mesa$/ })).not.toBeInTheDocument()
+  })
+
+  it('takes at most 60 characters, so a firm typed freely always fits the account', async () => {
+    createAccount.mockResolvedValue(makeAccount({ label: 'Longa', market: 'futures', platform: 'rithmic', phase: 'avaliacao' }))
+    const { dialog, search } = await toI2()
+    const long = 'Mesa Alfa Beta Gama Delta Epsilon Zeta Eta Teta Iota Capa Lambda Mi'
+    expect(long.length).toBeGreaterThan(60)
+
+    await userEvent.click(search)
+    await userEvent.paste(long)
+
+    expect(search).toHaveValue(long.slice(0, 60))
+    await userEvent.click(within(dialog).getByRole('button', { name: `Usar “${long.slice(0, 60).trim()}” como mesa` }))
+    await userEvent.click(within(platformGroup(dialog)).getByRole('button', { name: 'Rithmic' }))
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Continuar' }))
+    await userEvent.type(within(dialog).getByLabelText('Apelido'), 'Longa')
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Avaliação' }))
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Criar Longa' }))
+
+    await within(dialog).findByRole('heading', { name: 'Longa criada.' })
+    const sent = createAccount.mock.calls[0][2].firm
+    expect(sent).toBe(long.slice(0, 60).trim())
+    expect(sent!.length).toBeLessThanOrEqual(60)
+  })
+
+  it('binaries have no «Mesa»: one group named by the step, and their own no-match copy', async () => {
+    const { dialog, search } = await toI2('Opções binárias')
+
+    expect(within(dialog).queryByRole('group', { name: /^Mesa/ })).not.toBeInTheDocument()
+    expect(within(dialog).queryByText('Plataforma')).not.toBeInTheDocument()
+    expect(names(within(dialog).getByRole('group', { name: 'Onde você opera?' }))).toEqual(['Ebinex', 'Pocket Option', 'IQ Option', 'Outra'])
+
+    await userEvent.type(search, 'top')
+    expect(within(dialog).queryByRole('button', { name: 'Topstep' })).not.toBeInTheDocument()
+    expect(within(dialog).getByText('Nada com esse nome. Escolha “Outra” e siga.')).toBeInTheDocument()
+    expect(within(dialog).queryByRole('button', { name: /como mesa$/ })).not.toBeInTheDocument()
+  })
+})
+
+describe('ImportSheet · the firm of a Top One file (step b)', () => {
+  async function toStepB() {
+    readFile.mockResolvedValue(fixtureFile('topone_ok'))
+    fetchAccounts.mockResolvedValue([ebinex])
+    const dialog = await openSheet()
+    await chooseFile(dialog)
+    await within(dialog).findByRole('heading', { name: 'Para qual conta?' })
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Continuar' }))
+    expect(await within(dialog).findByRole('heading', { name: 'Nova conta de futuros' })).toHaveFocus()
+    return dialog
+  }
+
+  it('«Tirar» takes the suggested firm out: the row reads «Arquivo · Trade History» and the account has no firm', async () => {
+    createAccount.mockResolvedValue(makeAccount({ label: 'Conta TH', market: 'futures', platform: 'topone', phase: 'pessoal' }))
+    importPreview.mockResolvedValue(makePreview({ new: 7, rows_total: 7 }))
+    const dialog = await toStepB()
+
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Tirar a mesa Top One Futures' }))
+
+    expect(within(dialog).getByText('Arquivo')).toBeInTheDocument()
+    expect(within(dialog).getByText('Trade History')).toBeInTheDocument()
+    expect(within(dialog).queryByText('Mesa e arquivo')).not.toBeInTheDocument()
+    expect(within(dialog).queryByRole('button', { name: /^Tirar a mesa/ })).not.toBeInTheDocument()
+    // The button went away with the firm: focus moves on to the next field
+    await waitFor(() => expect(within(dialog).getByLabelText(/Tamanho US\$/)).toHaveFocus())
+
+    await userEvent.type(within(dialog).getByLabelText('Apelido'), 'Conta TH')
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Pessoal' }))
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Criar Conta TH e continuar' }))
+
+    await within(dialog).findByRole('heading', { name: 'Em que fuso estão os horários deste arquivo?' })
+    expect(createAccount).toHaveBeenCalledWith(expect.anything(), 'user-1', expect.objectContaining({ platform: 'topone', firm: null }))
+  })
+
+  it('the suggested firm left as it came is not something typed: closing does not ask', async () => {
+    await toStepB()
+
+    await userEvent.keyboard('{Escape}')
+
+    expect(screen.queryByText('Fechar sem salvar?')).not.toBeInTheDocument()
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
+
+  it('taking the suggested firm out counts as typed: closing asks first', async () => {
+    const dialog = await toStepB()
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Tirar a mesa Top One Futures' }))
+
+    await userEvent.keyboard('{Escape}')
+
+    expect(within(dialog).getByText('Fechar sem salvar?')).toBeInTheDocument()
+  })
+
+  it('a Top One file brought into a binary account: «Criar conta de futuros» starts with the firm too', async () => {
+    readFile.mockResolvedValue(fixtureFile('topone_ok'))
+    fetchAccounts.mockResolvedValue([ebinex])
+    const dialog = await openSheet({ accountId: ebinex.id })
+    await chooseFile(dialog)
+
+    expect(await within(dialog).findByRole('heading', { name: 'Este arquivo é de futuros (Top One).' })).toHaveFocus()
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Criar conta de futuros' }))
+
+    expect(await within(dialog).findByRole('heading', { name: 'Nova conta de futuros' })).toHaveFocus()
+    expect(within(dialog).getByText('Mesa e arquivo')).toBeInTheDocument()
+    expect(within(dialog).getByText('Top One Futures · Trade History')).toBeInTheDocument()
+    expect(within(dialog).getByRole('button', { name: 'Tirar a mesa Top One Futures' })).toBeInTheDocument()
+  })
+
+  it('a locked form (its account exists) shows the firm without «Tirar»', () => {
+    const onChange = jest.fn()
+    const props = {
+      headingRef: React.createRef<HTMLHeadingElement>(),
+      market: 'futures' as const,
+      form: { ...EMPTY_FORM, market: 'futures' as const, firm: 'Top One Futures', label: 'Conta TH' },
+      onChange,
+      roLabel: 'Mesa e arquivo',
+      roValue: 'Top One Futures · Trade History',
+      labelTaken: false,
+      sizeInvalid: false,
+      firmRemovable: true,
+    }
+    const { rerender } = render(<PassoNovaConta {...props} />)
+    // The same form before «Criar»: the file's firm can still be taken out
+    expect(screen.getByRole('button', { name: 'Tirar a mesa Top One Futures' })).toBeInTheDocument()
+
+    rerender(<PassoNovaConta {...props} locked />)
+
+    expect(screen.getByText('Top One Futures · Trade History')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /^Tirar a mesa/ })).not.toBeInTheDocument()
+    expect(onChange).not.toHaveBeenCalled()
+  })
+
+  it('an Ebinex file suggests no firm', async () => {
+    readFile.mockResolvedValue(fixtureFile('ebinex_atual_ok'))
+    fetchAccounts.mockResolvedValue([topOne])
+    const dialog = await openSheet()
+    await chooseFile(dialog)
+    await within(dialog).findByRole('heading', { name: 'Para qual conta?' })
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Continuar' }))
+
+    expect(await within(dialog).findByRole('heading', { name: 'Nova conta de binárias' })).toHaveFocus()
+    expect(within(dialog).getByText('Ebinex · arquivo CSV')).toBeInTheDocument()
+    expect(within(dialog).queryByRole('button', { name: /^Tirar a mesa/ })).not.toBeInTheDocument()
   })
 })
 
