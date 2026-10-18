@@ -575,7 +575,8 @@ export function PassoPlataforma({
       )}
       {firmPills.length > 0 && (
         <div className="hub-campo">
-          <div className="hub-passo__cab" style={{ alignItems: 'center', minHeight: 44 }}>
+          {/* 32px: the ⓘ's 44px hit area ends within the 6px gap above the pills, never over them */}
+          <div className="hub-passo__cab" style={{ alignItems: 'center', minHeight: query ? undefined : 32 }}>
             <span id="l-mesas" className="hub-rot-campo">
               {PASSO_I2.firmsTitle} <span className="hub-opc">{OPTIONAL}</span>
             </span>
