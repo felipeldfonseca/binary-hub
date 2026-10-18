@@ -1016,7 +1016,9 @@ begin
   where tr.id = t.id;
 
   return public.trade_state(t.id) || jsonb_build_object(
-    'dry_run', false, 'repeated', false, 'points', x->'points', 'r', v_r,
+    'dry_run', false, 'repeated', false, 'exit_at', exit_at, 'exit_registered_at', now(), 'exit_price', x->'exit_price',
+    'pnl', x->'pnl', 'result', x->'result', 'pnl_basis', x->'pnl_basis', 'commission', x->'commission',
+    'points', x->'points', 'r', v_r,
     -- What the day looks like now (the limit warnings after an exit)
     'gate_now', public.gate_at(acc.id, now()) - 'rules');
 end;
@@ -1499,6 +1501,7 @@ begin
 
   return public.trade_state(t.id) || jsonb_build_object(
     'saved_at', now(),
+    'note_saved_at', (select tr.note_saved_at from public.trades tr where tr.id = t.id),
     'trash', (select coalesce(jsonb_agg(x.path order by x.queued_at, x.path), '[]'::jsonb)
               from public.trade_image_trash x where x.user_id = uid));
 end;

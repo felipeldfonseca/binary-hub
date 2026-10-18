@@ -575,8 +575,10 @@ select tests.ok((select status = 'closed' and pnl = 75 and result = 'win' and pn
                         and exit_time = now() and exit_registered_at = now() and commission is null
                  from public.trades where id = (select v from tests.p3 where k = 'mes1')::uuid),
                 'MES: (7903.75 − 7896.25) × US$ 5 × 2 = US$ 75, computed by the server; commission still unknown');
-select tests.ok((:'x'::jsonb)->'gate_now' is not null and (:'x'::jsonb)->>'points' = '7.50000000',
-                'the exit answer carries the points and the day as it is now');
+select tests.ok((:'x'::jsonb)->'gate_now' is not null and (:'x'::jsonb)->>'points' = '7.50000000'
+                and ((:'x'::jsonb)->>'exit_at')::timestamptz = now() and ((:'x'::jsonb)->>'exit_registered_at')::timestamptz = now()
+                and (:'x'::jsonb)->>'pnl' = '75.00' and (:'x'::jsonb)->>'result' = 'win',
+                'the exit answer carries the instants, the result, the points and the day as it is now');
 select tests.eq((select (public.limit_usage(:'top', t.trading_day, false, 400, now())->>'trades')::int
                  from public.trades t where t.id = (select v from tests.p3 where k = 'mes1')::uuid), 3,
                 'the closed trade now counts in the day''s limit (open ones never do)');
@@ -1104,6 +1106,7 @@ select tests.ok((select count(*) = 4 and bool_and(status = 'ok' and bytes = 8400
                 and (select note = 'Entrei antes do rompimento confirmar.' and note_saved_at = now() from public.trades where id = :'mes1'),
                 '«Salvar imagens e nota»: four saved with the bytes Storage recorded, one time for the save, and the note');
 select tests.ok(jsonb_array_length((:'e'::jsonb)->'images') = 4 and (:'e'::jsonb)->>'saved_at' is not null
+                and ((:'e'::jsonb)->>'note_saved_at')::timestamptz = now()
                 and (:'e'::jsonb)->'trash' = '[]'::jsonb, 'the answer lists the images and an empty trash');
 select tests.fails(format($$select public.save_extras(%L, %L::jsonb)$$, :'mes1',
                           jsonb_build_object('v', 1, 'images', (select jsonb_agg(id order by ord) from tests.slot) || to_jsonb(gen_random_uuid()))),
