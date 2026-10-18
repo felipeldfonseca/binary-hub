@@ -33,6 +33,7 @@ import {
   type RegrasDaNovaConta,
 } from '@/lib/hub/regrasConta'
 import { formatDiaMes } from '@/lib/hub/formato'
+import { hasFirms } from '@/lib/hub/mesas'
 import {
   ARQUIVO,
   BUSY,
@@ -52,7 +53,7 @@ import {
   PASSO_I2,
   SOLTE,
   UNDO,
-  platformLabel,
+  firmAndPlatform,
   undoAria,
   zoneName,
 } from '@/components/hub/contas/copy'
@@ -376,7 +377,7 @@ export default function ImportSheet({ mode, accountId, onClose }: { mode: SheetM
         market: formMarket,
         label: form.label.trim().slice(0, LABEL_MAX),
         platform: parsed ? parsed.platform : form.platform === PLATFORM_UNKNOWN ? null : form.platform,
-        firm: parsed || !futures ? null : form.firm.trim() || null,
+        firm: parsed || !hasFirms(formMarket) ? null : form.firm.trim() || null,
         external_ref: form.ref.trim() || null,
         phase: futures ? form.phase : 'pessoal',
         size: futures && sizeValue !== 'invalid' ? sizeValue : null,
@@ -635,15 +636,20 @@ export default function ImportSheet({ mode, accountId, onClose }: { mode: SheetM
       break
     case 'b': {
       const futures = formMarket === 'futures'
+      const firm = hasFirms(formMarket) ? form.firm.trim() : ''
       let roLabel: string = futures ? PASSO_B.roPlatform : PASSO_B.roBroker
       let roValue = ''
       if (parsed) {
-        roLabel = parsed.platform === 'topone' ? PASSO_B.roFile : PASSO_B.roBroker
-        roValue = parsed.platform === 'topone' ? PASSO_B.fileTopOne : PASSO_B.fileEbinex
+        if (parsed.platform === 'topone') {
+          roLabel = firm ? PASSO_B.roFirmFile : PASSO_B.roFile
+          roValue = firm ? firmAndPlatform(firm, 'topone') : PASSO_B.fileTopOne
+        } else {
+          roLabel = PASSO_B.roBroker
+          roValue = PASSO_B.fileEbinex
+        }
       } else {
-        if (futures && form.firm.trim()) roLabel = PASSO_B.roFirmPlatform
-        const platform = form.platform ? platformLabel(form.platform) : PASSO_B.platformTbd
-        roValue = [futures ? form.firm.trim() : '', platform].filter(Boolean).join(' · ')
+        if (firm) roLabel = PASSO_B.roFirmPlatform
+        roValue = form.platform ? firmAndPlatform(firm, form.platform) : [firm, PASSO_B.platformTbd].filter(Boolean).join(' · ')
       }
       const sizeInvalid = futures && sizeValue === 'invalid'
       const locked = flow.createdFromForm && !!flow.created

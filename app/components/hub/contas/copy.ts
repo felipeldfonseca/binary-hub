@@ -296,7 +296,8 @@ export const PASSO_I1 = {
 export const PASSO_I2 = {
   title: 'Onde você opera?',
   search: 'Busque mesa, corretora ou plataforma',
-  noMatchFutures: 'Nada com esse nome na lista de plataformas.',
+  // ADAPTED: "…na lista de plataformas." → the search covers the firms too
+  noMatchFutures: 'Nada com esse nome na lista de mesas e plataformas.',
   noMatchBinary: 'Nada com esse nome. Escolha “Outra” e siga.',
   firmFromSearch: (text: string) => `Usar “${text}” como mesa`,
   firmChip: (firm: string) => `Mesa: ${firm}`,
