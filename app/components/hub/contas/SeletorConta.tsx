@@ -11,15 +11,21 @@ interface Props {
   onChoose: (id: string) => void
   /** "+ Adicionar conta": the button gets focus back when the sheet closes */
   onAdd: (opener: HTMLElement | null) => void
+  /** The line under the button: «Janela 10:00–11:00 ET», «Sem janela salva»; nothing when absent */
+  janela?: string | null
+  /** The «Conta: …» button, for a parent that gives it focus (the Diário header after «Tentar de novo») */
+  buttonRef?: React.RefObject<HTMLButtonElement>
 }
 
 /**
  * "Conta: {label} ▾" and its list (Diário version of the boards): one account at a time, grouped
  * by market, never summed. Escape or a choice closes it and gives focus back to the button.
+ * Under the button, the current account's window (`janela`), which also describes the button.
  */
-export default function SeletorConta({ accounts, current, onChoose, onAdd }: Props) {
+export default function SeletorConta({ accounts, current, onChoose, onAdd, janela, buttonRef: outerRef }: Props) {
   const [open, setOpen] = useState(false)
-  const buttonRef = useRef<HTMLButtonElement>(null)
+  const ownRef = useRef<HTMLButtonElement>(null)
+  const buttonRef = outerRef ?? ownRef
   const wrapRef = useRef<HTMLDivElement>(null)
   const listRef = useRef<HTMLDivElement>(null)
 
@@ -64,6 +70,7 @@ export default function SeletorConta({ accounts, current, onChoose, onAdd }: Pro
         className="hub-btn hub-seletor__botao"
         aria-expanded={open}
         aria-controls="lista-contas"
+        aria-describedby={janela ? 'janela-conta' : undefined}
         onClick={() => setOpen((v) => !v)}
       >
         <span>
@@ -74,6 +81,11 @@ export default function SeletorConta({ accounts, current, onChoose, onAdd }: Pro
           ▾
         </span>
       </button>
+      {janela && (
+        <span id="janela-conta" className="hub-seletor__janela">
+          {janela}
+        </span>
+      )}
       {open && (
         <>
           <div className="hub-seletor__fundo" aria-hidden="true" onClick={close} />

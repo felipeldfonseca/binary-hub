@@ -230,8 +230,20 @@ export async function fetchBatches(db: SupabaseClient, accountId: string): Promi
   return rows ?? [];
 }
 
+/**
+ * profiles.preferences. Written only by merge_preferences (theme, conta_atual) and save_rules
+ * (display_tz, calendars); see lib/hub/regrasDb.ts. Never written whole: a stale copy would erase
+ * what another tab saved.
+ */
 export interface HubPreferences {
   conta_atual?: string;
+  theme?: 'claro' | 'escuro';
+  /** «Horários na tela» */
+  display_tz?: 'et' | 'br' | 'both';
+  /** «Calendários econômicos»; copied into every futures version by save_rules */
+  calendars?: ('us' | 'eu' | 'br')[];
+  language?: 'pt' | 'en';
+  alerts?: Partial<Record<'state_change' | 'before_block' | 'limit_80', boolean>>;
   [key: string]: unknown;
 }
 
@@ -241,11 +253,6 @@ export async function fetchPreferences(db: SupabaseClient, userId: string): Prom
   );
   const prefs = row?.preferences;
   return prefs && typeof prefs === 'object' && !Array.isArray(prefs) ? prefs : {};
-}
-
-/** Writes the whole preferences object (jsonb), so pass the current one with the change merged in. */
-export async function savePreferences(db: SupabaseClient, userId: string, preferences: HubPreferences): Promise<void> {
-  await run(db.from('profiles').update({ preferences }).eq('id', userId));
 }
 
 // ---------------------------------------------------------------------------------------------

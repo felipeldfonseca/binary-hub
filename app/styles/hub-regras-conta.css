@@ -1,0 +1,118 @@
+/*
+ * Rules in account creation (the import sheet's step b), «Editar regras» and the rule parts of a
+ * «Suas contas» row, and the import preview's «Antes de …» line (Phase 2, lane A2). Scoped to .hub
+ * like styles/hub.css. Imported by app/(hub)/layout.tsx. Only lane A2 edits this file.
+ *
+ * The sheet (.hub-folha) is on --bg, so the summary line on --surface keeps every text above 4.5:1
+ * in both themes (contrato §2.5); nothing here stacks --surface on --surface.
+ */
+
+/* Step b: the rules block (ImportarConta board .campo, .linha-regra, .editor, .horas, .dias) */
+.hub-rc {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+}
+.hub-rc-linha {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  padding: 8px 8px 8px 14px;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  font-size: 13px;
+}
+.hub-rc-linha > span {
+  flex: 1 1 220px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  text-wrap: pretty;
+}
+.hub-rc-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px 14px 14px;
+  border-radius: 14px;
+  border: 1px dashed var(--neutral-border);
+}
+.hub-rc-grupo {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+.hub-rc-pergunta {
+  font-size: 13px;
+  font-weight: 700;
+  text-wrap: pretty;
+}
+.hub-rc-horas {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 13px;
+}
+.hub-rc-hgrupo {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+}
+.hub .hub-rc-hora {
+  width: 96px;
+  min-height: 44px;
+  padding: 0 6px 0 10px;
+  border-radius: 10px;
+  border: 1px solid var(--field-border);
+  background: var(--inset);
+  color: var(--text);
+  /* The browser's clock icon stays visible on the dark fields of both themes */
+  color-scheme: dark;
+  font-family: var(--mono);
+  font-size: 14px;
+  box-sizing: border-box;
+}
+.hub .hub-rc-hora[aria-invalid='true'] {
+  border-color: var(--amber);
+}
+.hub-rc-forte {
+  font-weight: 700;
+}
+.hub .hub-rc-dia {
+  min-width: 44px;
+  padding: 0 8px;
+  text-align: center;
+}
+.hub-rc-limite {
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+.hub .hub-rc-lim {
+  max-width: 160px;
+}
+.hub-rc-desde {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* Suas contas: times in the row's window part (board .partes .num) */
+.hub-rc-num {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hub-rc *,
+  .hub-rc *::before,
+  .hub-rc *::after {
+    transition: none !important;
+  }
+}

@@ -1,6 +1,7 @@
 import React from 'react'
 import { act, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import AppShell from '@/components/hub/AppShell'
 import HubRoot from '@/components/hub/HubRoot'
 
@@ -15,6 +16,16 @@ jest.mock('next/navigation', () => ({
 // The import sheet the shell holds reaches the data client only once it opens
 jest.mock('@/lib/supabase', () => ({ createDataClient: jest.fn(() => ({})) }))
 
+// The shell syncs the theme with the profile (TemaDoPerfil): nothing saved, merges succeed
+jest.mock('@/lib/hub/contasDb', () => ({
+  ...jest.requireActual('@/lib/hub/contasDb'),
+  fetchPreferences: jest.fn(async () => ({})),
+}))
+jest.mock('@/lib/hub/regrasDb', () => ({
+  ...jest.requireActual('@/lib/hub/regrasDb'),
+  mergePreferences: jest.fn(async () => ({})),
+}))
+
 jest.mock('@/hooks/useAuth', () => ({
   useAuth: () => ({
     user: { id: 'user-1', email: 'felipe@example.com' },
@@ -23,13 +34,18 @@ jest.mock('@/hooks/useAuth', () => ({
   }),
 }))
 
+const queryWrapper = ({ children }: { children: React.ReactNode }) => (
+  <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>{children}</QueryClientProvider>
+)
+
 const renderShell = () =>
   render(
     <HubRoot>
       <AppShell>
         <p>Conteúdo da página</p>
       </AppShell>
-    </HubRoot>
+    </HubRoot>,
+    { wrapper: queryWrapper }
   )
 
 describe('AppShell', () => {
@@ -142,7 +158,8 @@ describe('AppShell', () => {
         <AppShell>
           <button type="button">Ação da página</button>
         </AppShell>
-      </HubRoot>
+      </HubRoot>,
+      { wrapper: queryWrapper }
     )
 
     await userEvent.click(screen.getByRole('button', { name: 'Menu' }))

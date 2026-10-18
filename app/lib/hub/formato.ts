@@ -67,6 +67,16 @@ export function formatDayMonth(date: string, withYear = false): string {
 }
 
 /**
+ * A trading day as the rules screens write it: '17 out', and '1º nov' for the first of a month
+ * (boards: «a partir de 1º nov», «Regras v1 desde 17 out»). With `withYear`, '1º nov 2027'.
+ */
+export function formatDiaMes(date: string, withYear = false): string {
+  const d = parseIsoDate(date);
+  if (!d) return date;
+  return `${d.day === 1 ? '1º' : d.day} ${MONTHS[d.month - 1]}${withYear ? ` ${d.year}` : ''}`;
+}
+
+/**
  * The days a file covers, as on the boards: '4 ago–13 out', '4–29 ago', and the year only when
  * it is not `currentYear` ('4–29 ago 2025', '4 dez 2025–13 jan 2026').
  */

@@ -1,5 +1,9 @@
 import type { Metadata } from 'next'
 import '@/styles/hub.css'
+// Phase 2: one file per lane, so the screens never edit the same stylesheet
+import '@/styles/hub-personalizar.css'
+import '@/styles/hub-posso.css'
+import '@/styles/hub-regras-conta.css'
 import ProtectedRoute from '@/components/auth/ProtectedRoute'
 import AppShell from '@/components/hub/AppShell'
 import HubGate, { HubLoading } from '@/components/hub/HubGate'
