@@ -7,6 +7,7 @@ import SuasContas from '@/components/hub/contas/SuasContas'
 import HubRoot from '@/components/hub/HubRoot'
 import PersonalizarPagina from '@/components/hub/personalizar/PersonalizarPagina'
 import type { RulesConfig } from '@/lib/hub/regras'
+import { firmNames } from '@/lib/hub/mesas'
 import { makeAccount, makeBatch, renderHub } from '@/testing/hubHarness'
 import { configAntes, configDepois, idsDono } from '@/testing/regras'
 
@@ -377,6 +378,55 @@ describe('Editar conta', () => {
     await userEvent.click(within(form).getByRole('button', { name: 'Salvar' }))
 
     expect(updateAccount).toHaveBeenCalledWith(expect.anything(), long.id, { phase: 'financiada' })
+  })
+
+  it('suggests the firms of the account’s market for «Mesa», alphabetically, and saves the one chosen', async () => {
+    renderHub(<SuasContas />)
+
+    await userEvent.click(within(await openMenu('Top One #1')).getByRole('button', { name: 'Editar conta' }))
+    const form = screen.getByRole('form', { name: 'Editar Top One #1' })
+    const firm = within(form).getByLabelText(/^Mesa/)
+    expect(firm).toHaveValue('')
+    const datalist = document.getElementById(firm.getAttribute('list') ?? '') as HTMLDataListElement
+    expect(form).toContainElement(datalist)
+    const options = Array.from(datalist.querySelectorAll('option')).map((o) => o.value)
+    expect(options).toEqual(firmNames('futures'))
+    expect(options).toHaveLength(25)
+    expect(options).toEqual(expect.arrayContaining(['Apex Trader Funding', 'Top One Futures', 'Ylos Trading']))
+
+    await userEvent.type(firm, 'Top One Futures')
+    await userEvent.click(within(form).getByRole('button', { name: 'Salvar' }))
+
+    expect(updateAccount).toHaveBeenCalledWith(expect.anything(), topOne.id, { firm: 'Top One Futures' })
+  })
+
+  it('saves a firm outside the list as typed, and an empty «Mesa» as none', async () => {
+    renderHub(<SuasContas />)
+
+    await userEvent.click(within(await openMenu('Apex A')).getByRole('button', { name: 'Editar conta' }))
+    let form = screen.getByRole('form', { name: 'Editar Apex A' })
+    const firm = within(form).getByLabelText(/^Mesa/)
+    expect(firm).toHaveValue('Apex')
+    await userEvent.clear(firm)
+    await userEvent.type(firm, 'Mesa Alfa')
+    await userEvent.click(within(form).getByRole('button', { name: 'Salvar' }))
+    expect(updateAccount).toHaveBeenLastCalledWith(expect.anything(), apex.id, { firm: 'Mesa Alfa' })
+
+    await screen.findByText('Apex A salva.')
+    await userEvent.click(within(await openMenu('Apex A')).getByRole('button', { name: 'Editar conta' }))
+    form = screen.getByRole('form', { name: 'Editar Apex A' })
+    await userEvent.clear(within(form).getByLabelText(/^Mesa/))
+    await userEvent.click(within(form).getByRole('button', { name: 'Salvar' }))
+    expect(updateAccount).toHaveBeenLastCalledWith(expect.anything(), apex.id, { firm: null })
+  })
+
+  it('has no «Mesa» on a binary account', async () => {
+    renderHub(<SuasContas />)
+
+    await userEvent.click(within(await openMenu('Ebinex')).getByRole('button', { name: 'Editar conta' }))
+    const form = screen.getByRole('form', { name: 'Editar Ebinex' })
+    expect(within(form).queryByLabelText(/^Mesa/)).not.toBeInTheDocument()
+    expect(form.querySelector('datalist')).toBeNull()
   })
 
   it('makes an account the primary one, clearing the old primary', async () => {
