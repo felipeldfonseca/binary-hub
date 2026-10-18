@@ -8,7 +8,8 @@ import SuasRegras from '@/components/hub/personalizar/SuasRegras'
 import Preferencias from '@/components/hub/personalizar/Preferencias'
 import { BarraSalvar } from '@/components/hub/personalizar/BarraSalvar'
 import type { FormLimite } from '@/components/hub/personalizar/PersonalizarProvider'
-import { entidadesRegrasDe } from '@/lib/hub/personalizarRegras'
+import { entidadesRegrasDe, lerLimite } from '@/lib/hub/personalizarRegras'
+import { CREATABLE_MARKETS } from '@/lib/domain/markets'
 import { activeAccounts, pendingVersions, type AccountConfig, type RulesConfig, type RulesSettings } from '@/lib/hub/regras'
 import { PADRAO_FUTUROS, ajustarSoNestaConta, comBloqueio, comJanelaDoMercado, comLimite, comModoLimite, comRegraJanela } from '@/lib/hub/rascunho'
 import { configAntes, configDepois, configMercados, idsDono, idsMercados } from '@/testing/regras'
@@ -566,6 +567,16 @@ describe('QuandoVoceOpera in six markets (Fase 2b)', () => {
     expect(screen.getByText('Outros mercados aparecem aqui quando você tiver uma conta neles.')).toBeInTheDocument()
   })
 
+  it.each(CREATABLE_MARKETS)('without a %s account, the note and «+ Adicionar conta» show', (m) => {
+    const c = configMercados()
+    const sem = { ...c, accounts: c.accounts.filter((a) => a.market !== m) }
+    expect(activeAccounts(sem)).toHaveLength(5)
+    render(<Janelas config={sem} />)
+    expect(screen.getAllByRole('group', { name: /^Janela d/ })).toHaveLength(5)
+    expect(screen.getByText('Outros mercados aparecem aqui quando você tiver uma conta neles.')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '+ Adicionar conta' })).toBeInTheDocument()
+  })
+
   it('explains the clocks and the day turn of every market in its ⓘ', async () => {
     render(<Janelas config={configMercados()} />)
     await userEvent.click(screen.getByRole('button', { name: 'Como ler: Quando você opera' }))
@@ -652,6 +663,83 @@ describe('SuasRegras in six markets (Fase 2b)', () => {
     // «Ao chegar no limite» is there; «por conta / somando» is not
     expect(screen.getByRole('group', { name: 'Ao chegar no limite' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'somando as contas de Futuros' })).not.toBeInTheDocument()
+  })
+
+  it('the limit field refuses the other currency’s symbol instead of swapping it', async () => {
+    const linhaLimite = () => document.getElementById('r-lim')?.closest('li') as HTMLElement
+    // Clear (B3): «US$ 750» is not R$ 750
+    const { unmount } = render(<Regras config={configMercados()} selecionado={im.clear} fases={FASES_MERCADOS} />)
+    await userEvent.click(screen.getByRole('button', { name: 'Mudar o limite do dia de Clear' }))
+    const real = screen.getByLabelText('Limite do dia, em R$')
+    await userEvent.clear(real)
+    await userEvent.type(real, 'US$ 750')
+    await userEvent.click(screen.getByRole('button', { name: 'OK' }))
+    expect(screen.getByRole('alert')).toHaveTextContent('Use só números, como 400 ou 400,50.')
+    expect(real).toHaveValue('US$ 750')
+    expect(real).toHaveAttribute('aria-invalid', 'true')
+    expect(limiteValor()?.textContent).toBe('R$\u00a0500')
+    expect(within(linhaLimite()).queryByText('não salvo')).not.toBeInTheDocument()
+    // Its own symbol, in any case, is taken
+    await userEvent.clear(real)
+    await userEvent.type(real, 'r$ 750')
+    await userEvent.click(screen.getByRole('button', { name: 'OK' }))
+    expect(limiteValor()?.textContent).toBe('R$\u00a0750')
+    unmount()
+
+    // FTMO (Forex): «R$ 500» is not US$ 500
+    render(<Regras config={configMercados()} selecionado={im.ftmo} fases={FASES_MERCADOS} />)
+    await userEvent.click(screen.getByRole('button', { name: 'Mudar o limite do dia de FTMO' }))
+    const dolar = screen.getByLabelText('Limite do dia, em US$')
+    await userEvent.clear(dolar)
+    await userEvent.type(dolar, 'R$ 500')
+    await userEvent.keyboard('{Enter}')
+    expect(screen.getByRole('alert')).toHaveTextContent('Use só números, como 400 ou 400,50.')
+    expect(limiteValor()?.textContent).toBe('US$\u00a01.000')
+    expect(within(linhaLimite()).queryByText('não salvo')).not.toBeInTheDocument()
+  })
+
+  it('lerLimite: the account’s symbol (any case) or none; the other currency’s is «invalid»', () => {
+    expect(lerLimite('R$ 1.000,50', 'BRL')).toEqual({ ok: true, cents: 100050 })
+    expect(lerLimite(' r$750', 'BRL')).toEqual({ ok: true, cents: 75000 })
+    expect(lerLimite('1.000', 'BRL')).toEqual({ ok: true, cents: 100000 })
+    expect(lerLimite('US$ 1.000', 'BRL')).toEqual({ ok: false, reason: 'invalid' })
+    expect(lerLimite('us$1000', 'BRL')).toEqual({ ok: false, reason: 'invalid' })
+    expect(lerLimite('US$ 1.000', 'USD')).toEqual({ ok: true, cents: 100000 })
+    expect(lerLimite('us$ 400,50', 'USD')).toEqual({ ok: true, cents: 40050 })
+    expect(lerLimite('R$ 400', 'USD')).toEqual({ ok: false, reason: 'invalid' })
+    // Otherwise as parseUsdText
+    expect(lerLimite('R$ ', 'BRL')).toEqual({ ok: false, reason: 'empty' })
+    expect(lerLimite('US$ 2000000', 'USD')).toEqual({ ok: false, reason: 'too_large' })
+  })
+
+  it('a Phase 1 options account: last in «Regras de», chip «Opções», window and limit only, and its market ⓘ', async () => {
+    const c = comOpcoesAntiga(configMercados())
+    render(<Regras config={c} selecionado="acc-opc" fases={{ ...FASES_MERCADOS, 'acc-opc': 'Pessoal' }} />)
+
+    expect(regrasDe().getAllByRole('button').map((b) => b.textContent)).toEqual([
+      'Padrão Futuros',
+      'Top One #1',
+      'Ebinex',
+      'FTMO',
+      'IBKR',
+      'Binance',
+      'Clear',
+      'Opções antigas',
+    ])
+    expect(regrasDe().getByRole('button', { name: 'Opções antigas' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('heading', { level: 3, name: 'Opções antigas' })).toBeInTheDocument()
+    expect(screen.getByText('Opções · Pessoal')).toHaveClass('hub-chip-dado')
+    expect(regraNomes()).toEqual(['Janela', 'Só operar dentro da sua janela', 'Limite do dia'])
+    expect(screen.queryByText('só nesta conta')).not.toBeInTheDocument()
+
+    const info = screen.getByRole('button', { name: 'Como ler: regras de Opções' })
+    expect(info.closest('.hub-pz-regras-cab')).not.toBeNull()
+    expect(info).toHaveAttribute('aria-controls', 'info-regras-mk')
+    await userEvent.click(info)
+    // In US$, on the account's own day (Brasília midnight)
+    expect(document.getElementById('info-regras-mk')?.textContent).toBe(
+      'Nas contas de Opções, as regras são a janela e o limite do dia, em US$. Bloqueio de dados e regra por estado valem só para Futuros até a Fase 5. O limite zera quando o dia vira, à meia-noite de Brasília; numa conta de mesa, a mesa pode zerar o limite dela em outro horário.',
+    )
   })
 
   it('a forex limit in US$: no «só nesta conta» tag and no mode pills, even beside two futures accounts', () => {

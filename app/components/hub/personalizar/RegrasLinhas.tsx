@@ -11,10 +11,11 @@ import {
   type StateChoice,
   type StateName,
 } from '@/lib/domain/gate'
-import { allowsSoAFavor, parseUsdText, windowError, type AccountConfig, type BlockSetting, type RulesSettings } from '@/lib/hub/regras'
+import { allowsSoAFavor, windowError, type AccountConfig, type BlockSetting, type RulesSettings } from '@/lib/hub/regras'
 import { dinheiroCompacto } from '@/lib/hub/posso'
 import { SIMBOLO_MOEDA } from '@/lib/hub/formato'
 import { faixaJanela, resumoDias } from '@/lib/hub/janelas'
+import { lerLimite } from '@/lib/hub/personalizarRegras'
 import {
   comAoChegar,
   comBloqueio,
@@ -343,7 +344,8 @@ export function RegraLimite({
   }
   const ok = () => {
     if (!form) return
-    const r = parseUsdText(form.texto)
+    // In the account's currency: the other currency's symbol is refused, never swapped
+    const r = lerLimite(form.texto, moeda)
     if (!r.ok) {
       onForm({ ...form, erro: r.reason })
       pedirFoco('lim-valor')

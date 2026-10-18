@@ -4,9 +4,10 @@
  * components/hub/personalizar/copy.ts; what each market has (block, states, soma, «Padrão») is
  * MARKET_SPEC in lib/domain/markets.
  */
-import type { AccountMarket } from '@/lib/domain/markets';
+import type { AccountMarket, Currency } from '@/lib/domain/markets';
 import { groupByMarket } from './contas';
-import type { AccountConfig } from './regras';
+import { SIMBOLO_MOEDA } from './formato';
+import { parseUsdText, type AccountConfig, type UsdTextResult } from './regras';
 import { PADRAO_FUTUROS } from './rascunho';
 
 /**
@@ -26,3 +27,17 @@ export function entidadesRegrasDe(ativas: readonly AccountConfig[]): string[] {
  * money and day. Futures and binaries keep the Phase 2 board, which has no such ⓘ.
  */
 export const temInfoDoMercado = (m: AccountMarket): boolean => m !== 'futures' && m !== 'binary';
+
+/** A money symbol typed at the start of an amount, as parseUsdText drops it: «US$» or «R$», any case */
+const SIMBOLO_DIGITADO = /^\s*(US|R)\$/i;
+
+/**
+ * The «Limite do dia» field of an account: parseUsdText, except that a symbol of the other currency
+ * is refused («Use só números…»). parseUsdText drops «US$» and «R$» alike, so «US$ 500» typed on a B3
+ * account would otherwise be saved as R$ 500 without a word.
+ */
+export function lerLimite(texto: string, moeda: Currency): UsdTextResult {
+  const m = SIMBOLO_DIGITADO.exec(texto ?? '');
+  if (m && `${m[1].toUpperCase()}$` !== SIMBOLO_MOEDA[moeda]) return { ok: false, reason: 'invalid' };
+  return parseUsdText(texto);
+}
