@@ -278,6 +278,11 @@ export function PassoConta({
 export interface AccountForm {
   market: AccountMarket | null
   platform: string | null
+  /**
+   * The platform was chosen by the app for a one-platform firm (Atmos Funded → MetaTrader 5), not
+   * by the owner: it goes when he swaps to a firm that does not offer it
+   */
+  platformFromFirm: boolean
   firm: string
   search: string
   label: string
@@ -291,6 +296,7 @@ export interface AccountForm {
 export const EMPTY_FORM: AccountForm = {
   market: null,
   platform: null,
+  platformFromFirm: false,
   firm: '',
   search: '',
   label: '',
@@ -547,7 +553,8 @@ export function PassoPlataforma({
   // The «Mesa» group: its pills; or, before any search in a market with no featured firm (Cripto,
   // Ações, B3), only the note that the search finds them (board `I2.temGrupoMesa`, `temNotaMesa`)
   const firmsNote = firms && !query && !form.firm && firmPills.length === 0
-  const firmsInfo = query ? null : PASSO_I2.firmsInfo(market, PROP_FIRMS_CHECKED)
+  // The ⓘ stays while the owner searches, and its panel stays open (board `I2.temInfoMesa` ignores the search)
+  const firmsInfo = PASSO_I2.firmsInfo(market, PROP_FIRMS_CHECKED)
   // Binaries keep the board's one group, named by the step's heading
   const platformsTitle = PASSO_I2.platformsTitle(market)
 
@@ -562,7 +569,7 @@ export function PassoPlataforma({
           className="hub-pill"
           data-plataforma={key}
           aria-pressed={form.platform === key}
-          onClick={() => onChange({ platform: key })}
+          onClick={() => onChange({ platform: key, platformFromFirm: false })}
         >
           {PLATFORM_LABEL[key]}
         </button>
@@ -571,11 +578,15 @@ export function PassoPlataforma({
   )
 
   const chooseFirm = (firm: PropFirm) => {
+    // A platform the app chose for the previous firm goes when this one does not offer it (Atmos
+    // Funded's MetaTrader 5 never stays for Lark Funding); one the owner chose always stays
+    const kept = form.platformFromFirm && form.platform && !firm.platforms.includes(form.platform) ? null : form.platform
     // A firm with one known platform brings it, unless a platform is already chosen
     const only = onlyPlatform(firm)
-    const platform = !form.platform && only ? only : form.platform
-    onChange({ firm: firm.name, search: '', platform })
-    if (platform !== form.platform) {
+    const platform = !kept && only ? only : kept
+    const platformFromFirm = platform === form.platform ? form.platformFromFirm : platform !== null
+    onChange({ firm: firm.name, search: '', platform, platformFromFirm })
+    if (platform && platform !== form.platform) {
       // The pill pressed for the owner takes focus, so a screen reader says what was chosen
       setTimeout(() => platformsRef.current?.querySelector<HTMLButtonElement>(`[data-plataforma="${platform}"]`)?.focus(), 0)
     } else {
@@ -619,12 +630,12 @@ export function PassoPlataforma({
       )}
       {(firmPills.length > 0 || firmsNote) && (
         <div className="hub-campo">
-          {/* 32px: the ⓘ's 44px hit area ends within the 6px gap above the pills, never over them */}
-          <div className="hub-passo__cab" style={{ alignItems: 'center', minHeight: firmsInfo ? 32 : undefined }}>
+          {/* The ⓘ right after the label (board `.cab-grupo`). 32px: its 44px hit area ends within the
+              6px gap above the pills, never over them */}
+          <div className="hub-cab-grupo" style={{ minHeight: firmsInfo ? 32 : undefined }}>
             <span id="l-mesas" className="hub-rot-campo">
               {PASSO_I2.firmsTitle} <span className="hub-opc">{OPTIONAL}</span>
             </span>
-            {/* The ⓘ explains the featured list, so it goes with it: a search covers every firm */}
             {firmsInfo && <InfoButton panelId="info-mesas" label={PASSO_I2.firmsInfoAria} open={info} onToggle={toggleInfo} />}
           </div>
           {firmsInfo && info && <InfoPanel id="info-mesas">{firmsInfo}</InfoPanel>}
@@ -658,7 +669,8 @@ export function PassoPlataforma({
           className="hub-pill"
           style={{ alignSelf: 'flex-start', lineHeight: 1.4, paddingTop: 8, paddingBottom: 8 }}
           onClick={() => {
-            onChange({ firm: text, search: '' })
+            // A firm typed freely offers no known platform: the one the app chose for the previous firm goes
+            onChange({ firm: text, search: '', ...(form.platformFromFirm ? { platform: null, platformFromFirm: false } : {}) })
             focusSearch()
           }}
         >

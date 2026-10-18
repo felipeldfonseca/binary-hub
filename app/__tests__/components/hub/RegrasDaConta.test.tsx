@@ -379,6 +379,25 @@ describe('RegrasDaConta · the Fase 2b markets', () => {
     expect(screen.queryByText('Cripto abre todos os dias: sábado e domingo já vêm marcados.')).not.toBeInTheDocument()
   })
 
+  it('a second crypto account: the question and its own window, with no days note (it is no suggested window)', async () => {
+    // config-mercados: Binance already gave Cripto its window (20:00–22:00 de Brasília, every day)
+    render(<Bloco config={configMercados()} market="crypto" label="Bybit" inicial={{ aberto: true, copiar: NAO_COPIAR }} />)
+    const nota = 'Cripto abre todos os dias: sábado e domingo já vêm marcados.'
+    const pergunta = screen.getByRole('group', { name: /^Usar a janela de Cripto/ })
+    expect(screen.queryByText(nota)).not.toBeInTheDocument()
+
+    await userEvent.click(within(pergunta).getByRole('button', { name: 'Outra' }))
+
+    // The account's own window is open to edit, every day still marked, and nothing says why
+    const dias = screen.getByRole('group', { name: 'Dias da janela' })
+    expect(within(dias).getAllByRole('button').every((b) => b.getAttribute('aria-pressed') === 'true')).toBe(true)
+    expect(screen.getByLabelText(/^Início da janela só de Bybit/)).toBeInTheDocument()
+    expect(screen.queryByText(nota)).not.toBeInTheDocument()
+    expect(document.getElementById('j-dias-nota')).toBeNull()
+    expect(dias).not.toHaveAttribute('aria-describedby')
+    expect(screen.queryByRole('button', { name: '+ Definir janela' })).not.toBeInTheDocument()
+  })
+
   it('the other markets’ suggested windows have no days note', async () => {
     for (const market of ['forex', 'stocks', 'b3'] as const) {
       const { unmount } = render(<Bloco config={configAntes()} market={market} inicial={{ aberto: true }} />)

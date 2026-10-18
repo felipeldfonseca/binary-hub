@@ -856,14 +856,21 @@ describe('ImportSheet · the prop-firm list (i2)', () => {
 
   it('searches firms and platforms together: "top" shows two firms and TopstepX, each under its own group', async () => {
     const { dialog, search } = await toI2()
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Como ler: lista de mesas' }))
 
     await userEvent.type(search, 'top')
 
     expect(names(firmGroup(dialog))).toEqual(['Top One Futures', 'Topstep'])
     // «Não sei» always stays
     expect(names(platformGroup(dialog))).toEqual(['TopstepX', 'Não sei'])
-    // The ⓘ explains the featured list, not a search
-    expect(within(dialog).queryByRole('button', { name: 'Como ler: lista de mesas' })).not.toBeInTheDocument()
+    // The ⓘ stays with «Mesa · opcional» while the owner searches, right after the label, and its panel stays open
+    // (board `I2.temInfoMesa` ignores the search; `.cab-grupo`)
+    const info = within(dialog).getByRole('button', { name: 'Como ler: lista de mesas' })
+    expect(info).toHaveAttribute('aria-expanded', 'true')
+    expect(dialog.querySelector('#info-mesas')).toHaveTextContent(/^Mesas de futuros com nota 4 ou mais/)
+    expect(info.previousElementSibling).toHaveAttribute('id', 'l-mesas')
+    expect(info.parentElement).toHaveClass('hub-cab-grupo')
+    expect(info.parentElement).not.toHaveClass('hub-passo__cab')
     expect(within(dialog).queryByText('Nada com esse nome na lista de mesas e plataformas.')).not.toBeInTheDocument()
     expect(within(dialog).queryByRole('button', { name: /como mesa$/ })).not.toBeInTheDocument()
   })
@@ -991,8 +998,24 @@ describe('ImportSheet · the prop-firm list (i2)', () => {
     expect(within(dialog).getByText('Mesa: Lucid Trading')).toBeInTheDocument()
     expect(search).toHaveValue('')
     expect(within(dialog).queryByText('Mesa: Topstep')).not.toBeInTheDocument()
-    // TopstepX came with Topstep and stays: picking a firm never takes a platform away
+    // TopstepX came with Topstep, and Lucid Trading does not offer it: it goes, and the step asks for a platform
+    expect(within(platformGroup(dialog)).getByRole('button', { name: 'TopstepX' })).toHaveAttribute('aria-pressed', 'false')
+    expect(within(dialog).getByText('Agora escolha a plataforma.')).toBeInTheDocument()
+    expect(search).toHaveFocus()
+  })
+
+  it('a platform the owner pressed himself stays when he swaps the firm', async () => {
+    const { dialog, search } = await toI2()
+    await userEvent.click(within(firmGroup(dialog)).getByRole('button', { name: 'Topstep' }))
+    // The owner presses TopstepX himself: from now on it is his choice, not the firm's
+    await userEvent.click(within(platformGroup(dialog)).getByRole('button', { name: 'TopstepX' }))
+
+    await userEvent.type(search, 'luc')
+    await userEvent.click(within(firmGroup(dialog)).getByRole('button', { name: 'Lucid Trading' }))
+
+    expect(within(dialog).getByText('Mesa: Lucid Trading')).toBeInTheDocument()
     expect(within(platformGroup(dialog)).getByRole('button', { name: 'TopstepX' })).toHaveAttribute('aria-pressed', 'true')
+    expect(within(dialog).queryByText('Agora escolha a plataforma.')).not.toBeInTheDocument()
   })
 
   it('creates the account with the firm picked from the list', async () => {
@@ -2105,17 +2128,66 @@ describe('ImportSheet · Fase 2b · «Onde você opera?» (i2)', () => {
     expect(within(dialog).queryByText('Agora escolha a plataforma.')).not.toBeInTheDocument()
   })
 
+  it('Forex: the MetaTrader 5 that came with Atmos Funded goes when the owner swaps to a firm without it', async () => {
+    const { dialog, search } = await toPlatformStep('Forex e CFDs')
+    const mt5 = () => within(dialog).getByRole('button', { name: 'MetaTrader 5' })
+    const pickFirm = async (text: string, name: string) => {
+      await userEvent.type(search, text)
+      await userEvent.click(within(firmGroup(dialog)).getByRole('button', { name }))
+      expect(within(dialog).getByText(`Mesa: ${name}`)).toBeInTheDocument()
+    }
+
+    await pickFirm('atmos', 'Atmos Funded')
+    expect(mt5()).toHaveAttribute('aria-pressed', 'true')
+
+    // Lark Funding: cTrader, Match-Trader and DXtrade, no MetaTrader 5
+    await pickFirm('lark', 'Lark Funding')
+    expect(mt5()).toHaveAttribute('aria-pressed', 'false')
+    expect(within(dialog).getByText('Agora escolha a plataforma.')).toBeInTheDocument()
+    // Nothing is chosen for the owner, so «Continuar» waits for a platform
+    expect(within(dialog).getByRole('button', { name: 'Continuar' })).toHaveAttribute('aria-disabled', 'true')
+    expect(within(dialog).getByRole('button', { name: 'Continuar' })).toHaveAccessibleDescription('Escolha onde você opera.')
+
+    // Tradeify FX brings its MetaTrader 5 again; ThinkCapital lists no platform, so it goes again
+    await pickFirm('tradeify fx', 'Tradeify FX')
+    expect(mt5()).toHaveAttribute('aria-pressed', 'true')
+    await pickFirm('think', 'ThinkCapital')
+    expect(mt5()).toHaveAttribute('aria-pressed', 'false')
+    expect(within(dialog).getByText('Agora escolha a plataforma.')).toBeInTheDocument()
+
+    // A firm that also offers it keeps it (FTMO has MetaTrader 5)
+    await pickFirm('atmos', 'Atmos Funded')
+    await pickFirm('ftmo', 'FTMO')
+    expect(mt5()).toHaveAttribute('aria-pressed', 'true')
+    expect(within(dialog).queryByText('Agora escolha a plataforma.')).not.toBeInTheDocument()
+
+    // A firm typed by name offers no known platform: the one that came with the firm before goes
+    await pickFirm('atmos', 'Atmos Funded')
+    await userEvent.type(search, 'Mesa Zeta')
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Usar “Mesa Zeta” como mesa' }))
+    expect(within(dialog).getByText('Mesa: Mesa Zeta')).toBeInTheDocument()
+    expect(mt5()).toHaveAttribute('aria-pressed', 'false')
+    expect(within(dialog).getByText('Agora escolha a plataforma.')).toBeInTheDocument()
+
+    // The owner's own choice then reaches step b
+    await userEvent.click(within(dialog).getByRole('button', { name: 'cTrader' }))
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Continuar' }))
+    expect(within(dialog).getByText('Mesa Zeta · cTrader')).toBeInTheDocument()
+  })
+
   it('Forex: «top one» finds Top One Trader only; no match says the market’s text and offers the firm by name', async () => {
     const { dialog, search } = await toPlatformStep('Forex e CFDs')
 
     await userEvent.type(search, 'top one')
     expect(pillNames(firmGroup(dialog))).toEqual(['Top One Trader'])
-    // The ⓘ goes with the featured list, not with a search
-    expect(within(dialog).queryByRole('button', { name: 'Como ler: lista de mesas' })).not.toBeInTheDocument()
+    // The ⓘ stays with the group while a search shows firms (board `I2.temInfoMesa`)
+    expect(within(dialog).getByRole('button', { name: 'Como ler: lista de mesas' })).toHaveAttribute('aria-controls', 'info-mesas')
 
     await userEvent.clear(search)
     await userEvent.type(search, 'Mesa Zeta')
+    // No firm answers: the group goes, and its ⓘ with it
     expect(within(dialog).queryByRole('group', { name: 'Mesa · opcional' })).not.toBeInTheDocument()
+    expect(within(dialog).queryByRole('button', { name: 'Como ler: lista de mesas' })).not.toBeInTheDocument()
     expect(within(dialog).getByText('Nada com esse nome na lista de mesas e plataformas.')).toBeInTheDocument()
     await userEvent.click(within(dialog).getByRole('button', { name: 'Usar “Mesa Zeta” como mesa' }))
     expect(within(dialog).getByText('Mesa: Mesa Zeta')).toBeInTheDocument()

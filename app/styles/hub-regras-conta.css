@@ -119,6 +119,15 @@
   gap: 4px;
 }
 
+/* Fase 2b · «Onde você opera?» (i2): the «Mesa · opcional» label with its ⓘ right after it (board
+   `.cab-grupo`), not pushed to the row's far end as `.hub-passo__cab` does */
+.hub-cab-grupo {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
 /* Fase 2b · Suas contas: the note under the heading of a market without a file reader (board
    `.grupo-mk .sem-leitor`); `.hub .hub-nota` sets margin 0, so this needs the group in front */
 .hub .hub-grupo .hub-sem-leitor {
