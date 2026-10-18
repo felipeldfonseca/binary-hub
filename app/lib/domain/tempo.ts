@@ -258,8 +258,9 @@ export function tradingDay(instant: Date, clock: TradingWindow | string, options
 
 /**
  * The clock an account's trading day runs on: trading_accounts.day_tz and day_start_min (frozen
- * in each rule version as `day`). Futures: New York, turning at 18:00 (1080). Binaries:
- * Brasília, turning at midnight (0).
+ * in each rule version as `day`). A new account gets its market's (MARKET_SPEC[m].day): futures
+ * New York at 18:00 (1080), Forex New York at 17:00 (1020), Ações e opções New York at 20:00
+ * (1200), binaries, crypto and B3 Brasília at midnight (0).
  */
 export interface DayClock {
   tz: string;

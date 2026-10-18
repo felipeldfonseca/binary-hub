@@ -1,16 +1,28 @@
 /**
  * "Posso operar hoje?" and the plan of a trade, from an account's rules: the same truth table as
  * the database (gate_eval, limit_usage, trading_day_for), for previews of unsaved rules and for
- * the plan marks. Pure: depends only on ../tempo and the standard library; time is an input.
- * The pt-BR words live outside lib/domain (lib/hub/posso).
+ * the plan marks. Pure: depends only on ../tempo, ../markets and the standard library; time is an
+ * input. The pt-BR words live outside lib/domain (lib/hub/posso).
  */
+export {
+  ACCOUNT_MARKETS,
+  CREATABLE_MARKETS,
+  MARKET_SPEC,
+  WINDOW_TZS,
+  currencyOf,
+  isAccountMarket,
+  limitKey,
+  type AccountMarket,
+  type Currency,
+  type MarketSpec,
+  type WindowTz,
+} from '../markets';
 export {
   CALENDAR_CODES,
   MAX_LIMIT_CENTS,
   RulesError,
   STATE_NAMES,
   STATES_WITHOUT_DIRECTION,
-  WINDOW_TZS,
   centsToUsd,
   checkRules,
   parseRuleVersion,
@@ -28,7 +40,6 @@ export {
   type RulesErrorCode,
   type StateChoice,
   type StateName,
-  type WindowTz,
 } from './rules';
 export { dayResultFromServer, dayUsage, type DayResult, type DayTrade } from './usage';
 export {

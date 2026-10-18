@@ -1,6 +1,7 @@
 /**
  * Broker CSV import (Ebinex, Top One): reads an export in the browser into rows for the
- * `import_preview` / `import_commit` RPCs. Depends only on ../tempo and the standard library.
+ * `import_preview` / `import_commit` RPCs. Depends only on ../tempo, a type from ../markets and the
+ * standard library.
  */
 export * from './types';
 export { decodeCsvBytes, normalizeHeader } from './text';

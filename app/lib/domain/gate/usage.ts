@@ -7,12 +7,14 @@
  * computation for one day's trades in the browser (the plan of a trade, previews), never floats.
  *
  * The scope is the caller's, and dayUsage sums whatever it is given: one account's trades, or,
- * with «somando as contas de Futuros», the trades of the owner's active futures accounts (not
- * archived, not examples; gate.md §4.3), never binaries.
+ * with «somando as contas de Futuros» (futures only), the trades of the owner's active futures
+ * accounts (not archived, not examples; gate.md §4.3), never another market's. Amounts are cents of
+ * the account's currency (currencyOf(market): R$ on B3, US$ elsewhere); accounts in different
+ * markets are never summed, so a scope never mixes currencies.
  */
 import { usdToCents } from './rules';
 
-/** One trade as the limit sees it. Cents are integers. */
+/** One trade as the limit sees it. Cents are integers, in the account's currency. */
 export interface DayTrade {
   /** trades.id: the last tie-breaker of the exit order */
   id?: string;
@@ -113,7 +115,8 @@ export function dayUsage(
 /**
  * A day result from the server: gate_at's `limit` ({trades, net_usd, worst_usd, hit_at, usd} when
  * it was evaluated) or `today` ({trades, net_usd, worst_usd}), with the answer's trading day and
- * instant. Null when the object does not hold one.
+ * instant. Null when the object does not hold one. The `*usd` keys hold the account's money
+ * whatever its currency (reais on B3): the server kept the names.
  */
 export function dayResultFromServer(
   json: unknown,

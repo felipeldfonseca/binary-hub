@@ -4,21 +4,39 @@
  * accepts and refuses the rest with the same bare code, so a bad row never reads as "no rule".
  *
  * Stored shape (every key always present):
- *   {"v": 1, "market": "futures" | "binary",
+ *   {"v": 1, "market": "futures" | "binary" | "forex" | "stocks" | "crypto" | "b3" | "options",
  *    "windows": [{"tz": "America/New_York" | "America/Sao_Paulo", "start_min": 0..1439,
  *                 "end_min": 0..1439 (≠ start_min; lower = ends the next day), "weekdays": 1..127}] (0..2, one clock),
  *    "windows_from": "market" | "account" | null (null exactly when windows = []),
  *    "window_rule": {"on": bool, "outside": "fora" | "aviso"},
- *    "block": null (binary) | {"on", "before_min": 0..60, "after_min": 0..120, "calendars": ["us" | "eu" | "br"]},
- *    "limit": null | {"usd": > 0, ≤ 1 000 000, whole cents, "mode": "conta" | "soma" (futures), "at_limit": "encerrar" | "avisar"},
- *    "states": null (binary) | {"alinhadas" | "so_tecnica" | "so_fundamentos" | "em_conflito" | "sem_direcao": choice | null},
+ *    "block": null (every market but futures) | {"on", "before_min": 0..60, "after_min": 0..120, "calendars": ["us" | "eu" | "br"]},
+ *    "limit": null | {"usd" (US$ markets) | "brl" (B3): > 0, ≤ 1 000 000, whole cents,
+ *                     "mode": "conta" | "soma" (futures), "at_limit": "encerrar" | "avisar"},
+ *    "states": null (every market but futures) | {"alinhadas" | "so_tecnica" | "so_fundamentos" | "em_conflito" | "sem_direcao": choice | null},
  *    "day": {"tz", "start_min"}}
+ *
+ * Which of block, states and «soma» a market has, and its currency, come from MARKET_SPEC
+ * (../markets, the database's market_caps). The amount's key is the market's currency's: `brl` on
+ * B3, `usd` everywhere else. The domain form keeps cents only; their currency is
+ * currencyOf(rules.market).
  */
+import {
+  MARKET_SPEC,
+  WINDOW_TZS,
+  currencyOf,
+  isAccountMarket,
+  limitKey,
+  type AccountMarket,
+  type WindowTz,
+} from '../markets';
 import { assertTimeZone, type DayClock, type TradingWindow } from '../tempo';
 
-export type Market = 'futures' | 'binary';
-/** The two clocks a window can be on: «Nova York (ET)» and «Brasília» */
-export type WindowTz = 'America/New_York' | 'America/Sao_Paulo';
+export { WINDOW_TZS, type WindowTz } from '../markets';
+/**
+ * @deprecated The two markets the Phase 2 rules screens (lib/hub) still handle. The domain takes
+ * every AccountMarket; this alias goes when lib/hub moves to AccountMarket (Fase 2b, foundation).
+ */
+export type Market = Extract<AccountMarket, 'futures' | 'binary'>;
 /** «Fora da janela, mostrar»: “Fora da sua janela” | “Liberado”, com aviso */
 export type OutsideShows = 'fora' | 'aviso';
 export type StateName = 'alinhadas' | 'so_tecnica' | 'so_fundamentos' | 'em_conflito' | 'sem_direcao';
@@ -33,24 +51,29 @@ export type AtLimit = 'encerrar' | 'avisar';
 export const STATE_NAMES: readonly StateName[] = ['alinhadas', 'so_tecnica', 'so_fundamentos', 'em_conflito', 'sem_direcao'];
 /** States without a direction: «Só a favor» makes no sense there and is refused */
 export const STATES_WITHOUT_DIRECTION: readonly StateName[] = ['em_conflito', 'sem_direcao'];
-export const WINDOW_TZS: readonly WindowTz[] = ['America/New_York', 'America/Sao_Paulo'];
 export const CALENDAR_CODES: readonly CalendarCode[] = ['us', 'eu', 'br'];
-/** «Limite do dia»: at most US$ 1.000.000 */
+/** «Limite do dia»: at most 1.000.000 in the account's currency (US$ or R$) */
 export const MAX_LIMIT_CENTS = 100_000_000;
 
 /** The parsed form of account_rule_versions.resolved (or of an unsaved draft). Money in integer cents. */
 export interface Rules {
-  market: Market;
+  market: AccountMarket;
   /** 0–2 windows on one clock; [] = «Sem janela salva» */
   windows: TradingWindow[];
   windowsFrom: 'market' | 'account' | null;
   /** «Só operar dentro da sua janela» and «Fora da janela, mostrar» */
   windowRule: { on: boolean; outside: OutsideShows };
-  /** «Bloqueio de dados» with the economic calendars marked when it was saved; null for binaries */
+  /**
+   * «Bloqueio de dados» with the economic calendars marked when it was saved; null where the market
+   * has none (every market but futures)
+   */
   block: { on: boolean; beforeMin: number; afterMin: number; calendars: CalendarCode[] } | null;
-  /** «Limite do dia»; null = «Sem limite» */
+  /** «Limite do dia», in cents of the market's currency (currencyOf(market)); null = «Sem limite» */
   limit: { cents: number; mode: LimitMode; atLimit: AtLimit } | null;
-  /** «Regra por estado»: the choice for each state (null = none); null for binaries. Texts never enter a version. */
+  /**
+   * «Regra por estado»: the choice for each state (null = none); null where the market has none
+   * (every market but futures). Texts never enter a version.
+   */
   states: Record<StateName, StateChoice | null> | null;
   /** The account's day clock when the version was saved */
   day: DayClock;
@@ -94,7 +117,8 @@ export class RulesError extends Error {
 }
 
 // ---------------------------------------------------------------------------------------------
-// Checks (the order and codes of 20261018000001_rules_tables.sql)
+// Checks (the order and codes of 20261018000001_rules_tables.sql, with the limit, market and
+// resolved checks as 20261019000001_markets.sql replaced them)
 // ---------------------------------------------------------------------------------------------
 
 type Json = unknown;
@@ -109,6 +133,7 @@ const isInt = (x: Json, min: number, max: number): x is number =>
 /**
  * A JSON number of dollars → integer cents, exactly (through its shortest decimal form, so
  * 400.1 is 40010, never 40009.999…). Null when it is not a number with at most two decimals.
+ * Despite the name, any decimal amount converts the same way (a B3 limit in reais too).
  */
 export function usdToCents(usd: unknown): number | null {
   if (typeof usd !== 'number' || !Number.isFinite(usd)) return null;
@@ -119,7 +144,7 @@ export function usdToCents(usd: unknown): number | null {
   return m[1] === '-' && cents !== 0 ? -cents : cents;
 }
 
-/** Integer cents → a JSON number of dollars (40010 → 400.1), for the stored shape. */
+/** Integer cents → a JSON number of dollars (40010 → 400.1), for the stored shape; reais the same way. */
 export function centsToUsd(cents: number): number {
   if (!Number.isSafeInteger(cents)) throw new RangeError('Invalid cents');
   return Number(`${cents < 0 ? '-' : ''}${Math.floor(Math.abs(cents) / 100)}.${String(Math.abs(cents) % 100).padStart(2, '0')}`);
@@ -181,15 +206,24 @@ function stateChoiceOk(state: string, choice: Json): boolean {
     : choice === 'opero' || choice === 'so_a_favor' || choice === 'nao_opero';
 }
 
+/**
+ * «Limite do dia» (rules_check_limit): null, or one amount under the market's currency key (`usd`,
+ * or `brl` on B3) with `mode` and `at_limit`. An unknown market reads as USD (its callers have
+ * already answered unsupported_market).
+ */
 function checkLimit(market: string, l: Json): RulesErrorCode | null {
   if (l === null) return null;
   if (!isObj(l)) return 'bad_limit';
-  if (!keysOk(l, ['usd', 'mode', 'at_limit'])) return 'unknown_key';
-  const cents = usdToCents(l.usd);
+  if (!keysOk(l, ['usd', 'brl', 'mode', 'at_limit'])) return 'unknown_key';
+  const spec = isAccountMarket(market) ? MARKET_SPEC[market] : null;
+  const key = limitKey(spec?.currency ?? 'USD');
+  // The other currency's key, alone or beside the market's
+  if (has(l, key === 'brl' ? 'usd' : 'brl')) return 'bad_limit';
+  const cents = usdToCents(l[key]);
   if (cents === null || cents <= 0 || cents > MAX_LIMIT_CENTS) return 'bad_limit';
   if (l.mode !== 'conta' && l.mode !== 'soma') return 'bad_limit';
   if (l.at_limit !== 'encerrar' && l.at_limit !== 'avisar') return 'bad_limit';
-  if (l.mode === 'soma' && market !== 'futures') return 'not_for_market';
+  if (l.mode === 'soma' && !spec?.rules.soma) return 'not_for_market';
   return null;
 }
 
@@ -204,8 +238,8 @@ export function checkRules(p: unknown): RulesErrorCode | null {
   if (!isObj(p)) return 'bad_rules';
   if (p.v !== 1) return 'bad_rules_version';
   if (!keysOk(p, RESOLVED_KEYS) || Object.keys(p).length !== RESOLVED_KEYS.length) return 'bad_rules';
-  if (p.market !== 'futures' && p.market !== 'binary') return 'unsupported_market';
-  const fut = p.market === 'futures';
+  if (!isAccountMarket(p.market)) return 'unsupported_market';
+  const caps = MARKET_SPEC[p.market].rules;
   if (!Array.isArray(p.windows)) return 'bad_window';
   const wcode = checkWindows(p.windows, 2);
   if (wcode) return wcode;
@@ -219,15 +253,20 @@ export function checkRules(p: unknown): RulesErrorCode | null {
   }
   const rcode = checkWindowRule(p.window_rule);
   if (rcode) return rcode;
-  if (fut) {
+  // The data block and the state rule, only where the market has them (futures)
+  if (caps.block) {
     if (!isObj(p.block) || !has(p.block, 'calendars') || !checkCalendars(p.block.calendars)) return 'bad_block';
     const rest: Obj = { ...p.block };
     delete rest.calendars;
     const bcode = checkBlock(rest);
     if (bcode) return bcode;
+  } else if (p.block !== null) {
+    return 'not_for_market';
+  }
+  if (caps.states) {
     if (!isObj(p.states) || Object.keys(p.states).length !== 5 || !keysOk(p.states, STATE_NAMES)) return 'bad_state_rule';
     for (const [k, choice] of Object.entries(p.states)) if (!stateChoiceOk(k, choice)) return 'bad_state_choice';
-  } else if (p.block !== null || p.states !== null) {
+  } else if (p.states !== null) {
     return 'not_for_market';
   }
   const lcode = checkLimit(p.market, p.limit);
@@ -259,8 +298,9 @@ export function parseRules(json: unknown): Rules {
   const l = p.limit as Obj | null;
   const s = p.states as Obj | null;
   const day = p.day as Obj;
+  const market = p.market as AccountMarket;
   return {
-    market: p.market as Market,
+    market,
     windows,
     windowsFrom: p.windows_from as Rules['windowsFrom'],
     windowRule: { on: wr.on as boolean, outside: wr.outside as OutsideShows },
@@ -270,13 +310,20 @@ export function parseRules(json: unknown): Rules {
       afterMin: b.after_min as number,
       calendars: [...(b.calendars as CalendarCode[])],
     },
-    limit: l && { cents: usdToCents(l.usd) as number, mode: l.mode as LimitMode, atLimit: l.at_limit as AtLimit },
+    limit: l && {
+      cents: usdToCents(l[limitKey(currencyOf(market))]) as number,
+      mode: l.mode as LimitMode,
+      atLimit: l.at_limit as AtLimit,
+    },
     states: s && (Object.fromEntries(STATE_NAMES.map((k) => [k, s[k] as StateChoice | null])) as Record<StateName, StateChoice | null>),
     day: { tz: day.tz as string, startMin: day.start_min as number },
   };
 }
 
-/** The stored shape of parsed rules (snake_case, dollars), equal to the jsonb the database keeps. */
+/**
+ * The stored shape of parsed rules (snake_case; the limit in units of the market's currency, under
+ * its key), equal to the jsonb the database keeps.
+ */
 export function toResolvedJson(r: Rules): Record<string, unknown> {
   return {
     v: 1,
@@ -290,7 +337,11 @@ export function toResolvedJson(r: Rules): Record<string, unknown> {
       after_min: r.block.afterMin,
       calendars: [...r.block.calendars],
     },
-    limit: r.limit && { usd: centsToUsd(r.limit.cents), mode: r.limit.mode, at_limit: r.limit.atLimit },
+    limit: r.limit && {
+      [limitKey(currencyOf(r.market))]: centsToUsd(r.limit.cents),
+      mode: r.limit.mode,
+      at_limit: r.limit.atLimit,
+    },
     states: r.states && Object.fromEntries(STATE_NAMES.map((k) => [k, r.states![k]])),
     day: { tz: r.day.tz, start_min: r.day.startMin },
   };

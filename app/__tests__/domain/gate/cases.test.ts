@@ -1,9 +1,12 @@
 /**
  * @jest-environment node
  *
- * The shared cases: every "expected" in cases.json was computed by the Phase 2 SQL (gate_eval,
- * limit_usage, trading_day_on, trading_day_for, rules_check_resolved). The TypeScript domain must
- * give the same answer for the same inputs. The rows marked "sql" are the inputs that
+ * The shared cases: every "expected" in cases.json was computed by the SQL (gate_eval,
+ * limit_usage, trading_day_on, trading_day_for, rules_check_resolved) of the Phase 2 migrations
+ * and M5d (20261019000001_markets.sql: seven markets, the limit in reais on B3), with the
+ * generator kept outside the repo. The TypeScript domain must give the same answer for the same
+ * inputs. The Phase 2b rows (Forex, Ações, Cripto, B3, Opções) follow the Phase 2 rows in each
+ * group. The rows marked "sql" are the inputs that
  * supabase/tests/30_phase2.test.sql asserts (§12 tests.gate_cases and tests.owner_cases; §13 for
  * the limit, with dates relative to now() there).
  */
