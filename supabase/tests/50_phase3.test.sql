@@ -258,6 +258,33 @@ select tests.eq(public.trade_expiry('Ebinex', '2026-10-15 23:10:05+00', 300), '2
                 'Ebinex M5: the next 5-minute candle + 5');
 select tests.eq(public.trade_expiry('pocketoption', '2026-10-15 23:10:05+00', 60), '2026-10-15 23:11:05+00'::timestamptz,
                 'other platforms: entry + duration');
+-- The owner's Ebinex model (2026-10-19): the order waits for the next candle of its timeframe and runs that
+-- whole candle; Brasília is UTC−3, so the grid of the hour is the same on both clocks
+select tests.eq(public.trade_expiry('ebinex', '2026-10-15 23:10:30+00', 60), '2026-10-15 23:12:00+00'::timestamptz,
+                'Ebinex M1 at 20:10:30 → runs 20:11–20:12');
+select tests.eq(public.trade_expiry('ebinex', '2026-10-15 23:13:00+00', 300), '2026-10-15 23:20:00+00'::timestamptz,
+                'Ebinex M5 at 20:13 → runs 20:15–20:20');
+select tests.eq(public.trade_expiry('ebinex', '2026-10-15 23:14:30+00', 300), '2026-10-15 23:20:00+00'::timestamptz,
+                'Ebinex M5 at 20:14:30 → still the 20:15 candle, ends 20:20');
+select tests.eq(public.trade_expiry('ebinex', '2026-10-15 23:15:00+00', 300), '2026-10-15 23:25:00+00'::timestamptz,
+                'Ebinex M5 at 20:15:00 (the candle just opened) → waits for 20:20, ends 20:25');
+select tests.eq(public.trade_expiry('ebinex', '2026-10-15 23:13:00+00', 900), '2026-10-15 23:30:00+00'::timestamptz,
+                'Ebinex M15 at 20:13 → runs 20:15–20:30');
+select tests.eq(public.trade_expiry('ebinex', '2026-10-15 23:59:50+00', 900), '2026-10-16 00:15:00+00'::timestamptz,
+                'Ebinex M15 at 20:59:50 → runs 21:00–21:15 (across the hour and the UTC day)');
+select tests.eq(public.trade_expiry('pocketoption', '2026-10-15 23:13:20+00', 120), '2026-10-15 23:15:20+00'::timestamptz,
+                'a traditional platform, 2 min at 20:13:20 → 20:15:20 (from the click)');
+select tests.eq(public.trade_caps('binary') #> '{durations_by_platform,ebinex}', '[60, 300, 900]'::jsonb,
+                'Ebinex offers 1, 5 and 15 min');
+select tests.eq(public.trade_caps('binary') -> 'durations', '[60, 120, 300, 900]'::jsonb,
+                'every other binary platform keeps 1, 2, 5 and 15 min');
+select tests.ok(not public.trade_instrument('binary', 'EUR/USD', null) ?| array['durations', 'durations_by_platform', 'expiry_by_platform'],
+                'the instrument spec carries no binary-only list');
+select tests.eq(public.trade_check_payload('entry', 'binary', '{"v": 1, "symbol": "EUR/USD", "direction": "call", "stake": "20", "payout": "88", "duration_s": 120}',
+                                           true, ' Ebinex '),
+                '{"code": "bad_duration", "field": "duration_s"}'::jsonb, 'the platform is read as trade_expiry reads it (case and spaces)');
+select tests.ok(public.trade_check_payload('entry', 'binary', '{"v": 1, "symbol": "EUR/USD", "direction": "call", "stake": "20", "payout": "88", "duration_s": 120}',
+                                           true, null) is null, 'an account with no platform keeps the market''s list');
 select tests.eq(public.trade_hm_resolve('23:58', 'America/Sao_Paulo', '2026-10-21 03:03:00+00'), '2026-10-21 02:58:00+00'::timestamptz,
                 '23:58 typed at 00:03 in Brasília is yesterday''s');
 select tests.eq(public.trade_hm_resolve('01:30', 'America/New_York', '2026-11-01 07:10:00+00'), '2026-11-01 06:30:00+00'::timestamptz,
@@ -457,6 +484,16 @@ select tests.fails(format($$select public.register_entry(%L, '{"v": 1, "symbol":
                    'bad_payout', 'payout', '«O payout vai de 1 a 100%.»', '101');
 select tests.fails(format($$select public.register_entry(%L, '{"v": 1, "symbol": "EUR/USD", "direction": "call", "stake": "20", "payout": "88", "duration_s": 90}', true)$$, :'ebx'),
                    'bad_duration', 'duration_s', '«Escolha a expiração.» (90 s is not offered)');
+select tests.fails(format($$select public.register_entry(%L, '{"v": 1, "symbol": "EUR/USD", "direction": "call", "stake": "20", "payout": "88", "duration_s": 120}', true)$$, :'ebx'),
+                   'bad_duration', 'duration_s', 'Ebinex has no 2 min expiration');
+select tests.fails(format($$select public.register_entry(%L, '{"v": 1, "symbol": "EUR/USD", "direction": "call", "stake": "20", "payout": "88", "duration_s": "120"}', true)$$, :'ebx'),
+                   'bad_duration', 'duration_s', 'nor as a string');
+select tests.ok((select bool_and(public.register_entry(:'ebx', jsonb_build_object('v', 1, 'symbol', 'EUR/USD', 'direction', 'call',
+                   'stake', '20', 'payout', '88', 'duration_s', d), true)->>'expires_at' is not null) from unnest(array[60, 300, 900]) d),
+                'Ebinex takes 1, 5 and 15 min');
+select public.register_entry(:'pok', '{"v": 1, "symbol": "EUR/USD", "direction": "call", "stake": "20", "payout": "88", "duration_s": 120}', true) as d \gset
+select tests.eq(((:'d'::jsonb)->>'expires_at')::timestamptz, ((:'d'::jsonb)->>'entry_at')::timestamptz + interval '2 minutes',
+                'a traditional platform takes 2 min, from the entry');
 select tests.fails(format($$select public.register_entry(%L, '{"v": 1, "symbol": "EUR/USD", "direction": "call", "stake": "0", "payout": "88", "duration_s": 60}', true)$$, :'ebx'),
                    'bad_stake', 'stake', '«Use um valor maior que zero.»');
 select tests.fails(format($$select public.register_entry(%L, '{"v": 1, "symbol": "EUR/USD", "direction": "long", "stake": "20", "payout": "88", "duration_s": 60}', true)$$, :'ebx'),
@@ -2013,6 +2050,67 @@ select tests.eq(public.trade_entry_plan('{"in_window": null, "after_limit": null
                 'plan: nothing evaluated is «—», never «No plano»');
 select tests.eq(public.trade_entry_plan('{"in_window": true, "after_limit": null, "checks_evaluated": ["janela"]}')->>'verdict', 'no_plano',
                 'plan: the window checked and kept');
+
+-- =============================================================================================
+-- 16. Ebinex's expirations (the owner's answers of 2026-10-19)
+-- =============================================================================================
+--
+-- Ebinex is an order book: an order placed during a candle of its timeframe (1, 5 or 15 min only) waits
+-- for the next candle and runs that whole candle. «Já fechada» on a fixed past day pins his examples
+-- through the API, and a file whose rows end at «Vela» + «Tempo» (the reader's exit) finds the trades by
+-- their expiry even with another stake (a binary of another stake pairs only when its expiry is the
+-- file's exit).
+select ((now() at time zone 'America/Sao_Paulo')::date - 2)::text as dv \gset
+begin;
+select set_config('request.jwt.claim.sub', :P, true);
+set local role authenticated;
+select tests.eq((select jsonb_agg(((public.register_after(:'lebx', jsonb_build_object('v', 1, 'symbol', 'EUR/USD', 'direction', 'call',
+                   'stake', '20', 'payout', '88', 'duration_s', x.d, 'clock', 'America/Sao_Paulo', 'day', :'dv', 'entry', x.hm,
+                   'outcome', 'ganho'), true)->>'expires_at')::timestamptz at time zone 'America/Sao_Paulo')::time order by x.n)
+                 from (values (1, 60, '20:10'), (2, 300, '20:13'), (3, 300, '20:14'), (4, 900, '20:13'), (5, 900, '20:59')) x(n, d, hm)),
+                '["20:12:00", "20:20:00", "20:20:00", "20:30:00", "21:15:00"]'::jsonb,
+                'Ebinex «Já fechada»: M1 20:10 → 20:12; M5 20:13 and 20:14 → 20:20; M15 20:13 → 20:30; M15 20:59 → 21:15');
+select tests.fails(format($$select public.register_after(%L, %L::jsonb, true)$$, :'lebx',
+                          jsonb_build_object('v', 1, 'symbol', 'EUR/USD', 'direction', 'call', 'stake', '20', 'payout', '88',
+                                             'duration_s', 120, 'clock', 'America/Sao_Paulo', 'day', :'dv', 'entry', '20:10',
+                                             'outcome', 'ganho')),
+                   'bad_duration', 'duration_s', '«Já fechada» on Ebinex: no 2 min either');
+select tests.eq(((public.register_after(:'pok', jsonb_build_object('v', 1, 'symbol', 'EUR/USD', 'direction', 'call', 'stake', '20',
+                   'payout', '88', 'duration_s', 120, 'clock', 'America/Sao_Paulo', 'day', :'dv', 'entry', '20:13',
+                   'outcome', 'ganho'), true)->>'expires_at')::timestamptz at time zone 'America/Sao_Paulo')::time,
+                '20:15'::time, 'a traditional platform, 2 min at 20:13 → 20:15 (from the click)');
+insert into tests.p3 select 'V_' || x.k, public.register_after(:'lebx', jsonb_build_object('v', 1, 'client_key', tests.ck(),
+  'symbol', x.sym, 'direction', x.dir, 'stake', '10', 'payout', '85', 'duration_s', x.d, 'clock', 'America/Sao_Paulo',
+  'day', :'dv', 'entry', '20:13', 'outcome', 'ganho'))->>'trade_id'
+from (values ('m5', 'USD/JPY', 'call', 300), ('m15', 'EUR/GBP', 'put', 900)) x(k, sym, dir, d);
+commit;
+select max(v) filter (where k = 'V_m5') as v_m5, max(v) filter (where k = 'V_m15') as v_m15 from tests.p3 \gset
+insert into tests.p3 select 'fileV', jsonb_build_array(
+  tests.row(2, 'WV1', 'USD/JPY', 'binary_option', 'call', null, null, '151.20', '151.30', '1', '15.00', '85', 'win', '12.75', '0.00')
+    || jsonb_build_object('local_entry', :'dv' || 'T20:13:20', 'local_exit', :'dv' || 'T20:20:00', 'utc_offset', null,
+                          'duration_seconds', 300, 'timeframe', 'M5'),
+  tests.row(3, 'WV2', 'EUR/GBP', 'binary_option', 'put', null, null, '0.8650', '0.8640', '1', '15.00', '85', 'win', '12.75', '0.00')
+    || jsonb_build_object('local_entry', :'dv' || 'T20:13:40', 'local_exit', :'dv' || 'T20:30:00', 'utc_offset', null,
+                          'duration_seconds', 900, 'timeframe', 'M15'))::text;
+begin;
+select set_config('request.jwt.claim.sub', :P, true);
+set local role authenticated;
+select public.import_commit(:'lebx', 'ebinex', 'operacoes_5.csv', null, 'America/Sao_Paulo', (select v from tests.p3 where k = 'fileV')::jsonb) as cv \gset
+select tests.eq((:'cv'::jsonb) - 'batch_id' - 'errors', '{"inserted": 0, "duplicate": 0, "completed": 0, "other_account": 0, "linked": 2}'::jsonb,
+                'an M5 and an M15 row (exit = «Vela» + «Tempo») each find the trade registered at 20:13');
+select tests.ok((select external_id = 'WV1' and stake_amount = 15 and pnl = 12.75 and duration_seconds = 300 and timeframe = 'M5'
+                        and exit_time = expires_at
+                        and expires_at = (:'dv'::date + time '20:20') at time zone 'America/Sao_Paulo'
+                 from public.trades where id = :'v_m5')
+                and (select external_id = 'WV2' and stake_amount = 15 and duration_seconds = 900 and timeframe = 'M15'
+                        and exit_time = expires_at
+                        and expires_at = (:'dv'::date + time '20:30') at time zone 'America/Sao_Paulo'
+                     from public.trades where id = :'v_m15'),
+                'stake typed 10, the file says 15 at the same expiry: one trade each, the file''s stake');
+select tests.eq(public.import_undo(((:'cv'::jsonb)->>'batch_id')::uuid), '{"deleted": 0}'::jsonb, 'undo the M5/M15 file');
+select tests.ok((select bool_and(stake_amount = 10 and external_id is null) from public.trades where id in (:'v_m5', :'v_m15')),
+                'the stakes typed come back');
+commit;
 
 -- =============================================================================================
 -- Nothing that existed moved, and no registered trade carries an import's traces

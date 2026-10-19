@@ -14,7 +14,8 @@
 --        price markets: "quantity", "entry_price", optional "stop_pts"|"stop_pips"|"stop_price" and
 --                       "target_*" in the instrument's unit, "option" {"right", "strike",
 --                       "expires_on", "multiplier"} on Ações e opções,
---        binary: "stake", "payout", "duration_s",
+--        binary: "stake", "payout", "duration_s" (one the account's platform offers:
+--                trade_caps durations_by_platform, else durations; Ebinex 60, 300, 900),
 --        "clock": "America/New_York" | "America/Sao_Paulo", "entry": "HH:MM" (absent = now),
 --        "marks": {"setup" | "execucao" | "emocao" | "seguiu_texto": value | null},
 --        "allow_similar": bool}
@@ -186,9 +187,11 @@ as $$
                ((((p_entry at time zone p_tz)::date) + 1) + p_hm::time) at time zone p_tz as c1) x
 $$;
 
--- When a binary option registered in the app ends: by the account platform's rule in trade_caps
--- ("next_candle" for Ebinex: the candle after the order's minute, on the candle's own grid of the
--- hour, + its length; M1 at 20:10:05 → 20:12:00), else "entry" (entry + duration)
+-- When a binary option registered in the app ends: by the account platform's rule in trade_caps.
+-- "next_candle" (Ebinex, an order book): the order waits for the next candle of its timeframe, on
+-- that timeframe's own grid of the hour, and runs that whole candle (M1 at 20:10:30 → 20:11–20:12;
+-- M5 at 20:13 or 20:14:30 → 20:15–20:20; M15 at 20:13 → 20:15–20:30). Else "entry": the time runs
+-- from the click (entry + duration), whatever the moment in the candle.
 create or replace function public.trade_expiry(p_platform text, p_entry timestamptz, p_duration int)
 returns timestamptz
 language plpgsql
@@ -287,9 +290,11 @@ exception when others then
 end;
 $$;
 
--- The shape of a register_* payload (p_mode 'entry' | 'after' | 'exit') for a market. What
--- depends on the instrument (decimals, tick, stop unit, typed result) is checked by the caller.
-create or replace function public.trade_check_payload(p_mode text, p_market text, p jsonb, p_dry boolean)
+-- The shape of a register_* payload (p_mode 'entry' | 'after' | 'exit') for a market and the
+-- account's platform (a binary's durations). What depends on the instrument (decimals, tick, stop
+-- unit, typed result) is checked by the caller.
+create or replace function public.trade_check_payload(p_mode text, p_market text, p jsonb, p_dry boolean,
+                                                      p_platform text)
 returns jsonb
 language plpgsql
 stable
@@ -298,6 +303,9 @@ as $$
 declare
   caps jsonb := public.trade_caps(p_market);
   bin boolean := p_market = 'binary';
+  -- The durations the platform offers (Ebinex: 1, 5 and 15 min), else the market's
+  durations jsonb := coalesce(caps #> array['durations_by_platform', lower(btrim(coalesce(p_platform, '')))],
+                              caps -> 'durations');
   entry_keys constant text[] := array['v', 'client_key', 'symbol', 'direction', 'quantity', 'entry_price', 'stake',
     'payout', 'duration_s', 'stop_pts', 'target_pts', 'stop_pips', 'target_pips', 'stop_price', 'target_price',
     'option', 'clock', 'entry', 'marks', 'allow_similar'];
@@ -368,7 +376,7 @@ begin
       end if;
       d := case jsonb_typeof(p->'duration_s') when 'number' then (p->'duration_s')::text
                                               when 'string' then p->>'duration_s' end;
-      if d is null or d !~ '^[0-9]{1,6}$' or not (caps->'durations') @> to_jsonb(d::int) then
+      if d is null or d !~ '^[0-9]{1,6}$' or not coalesce(durations @> to_jsonb(d::int), false) then
         return public.trade_err('bad_duration', 'duration_s');
       end if;
     else
@@ -803,7 +811,7 @@ begin
   if not exists (select 1 from public.account_rule_versions v where v.account_id = acc.id) then
     perform public.trade_fail('no_rules');
   end if;
-  err := public.trade_check_payload('entry', acc.market, p_entry, dry);
+  err := public.trade_check_payload('entry', acc.market, p_entry, dry, acc.platform);
   if err is not null then
     perform public.trade_fail(err->>'code', err->>'field');
   end if;
@@ -958,7 +966,7 @@ begin
     perform public.trade_fail('not_open');
   end if;
   select a.* into acc from public.trading_accounts a where a.id = t.account_id;
-  err := public.trade_check_payload('exit', acc.market, p_exit, dry);
+  err := public.trade_check_payload('exit', acc.market, p_exit, dry, acc.platform);
   if err is not null then
     perform public.trade_fail(err->>'code', err->>'field');
   end if;
@@ -1078,7 +1086,7 @@ begin
   if not exists (select 1 from public.account_rule_versions v where v.account_id = acc.id) then
     perform public.trade_fail('no_rules');
   end if;
-  err := public.trade_check_payload('after', acc.market, p_trade, dry);
+  err := public.trade_check_payload('after', acc.market, p_trade, dry, acc.platform);
   if err is not null then
     perform public.trade_fail(err->>'code', err->>'field');
   end if;
@@ -1594,7 +1602,7 @@ revoke all on function public.trade_pnl(jsonb, int, numeric, numeric, numeric) f
 revoke all on function public.trade_binary_result(numeric, numeric, text) from public, anon, authenticated;
 revoke all on function public.trade_option_of(public.trades) from public, anon, authenticated;
 revoke all on function public.trade_check_marks(jsonb) from public, anon, authenticated;
-revoke all on function public.trade_check_payload(text, text, jsonb, boolean) from public, anon, authenticated;
+revoke all on function public.trade_check_payload(text, text, jsonb, boolean, text) from public, anon, authenticated;
 revoke all on function public.trade_parse_entry(text, jsonb) from public, anon, authenticated;
 revoke all on function public.trade_parse_exit(jsonb, jsonb, int, numeric, numeric, numeric) from public, anon, authenticated;
 revoke all on function public.trade_context_from_gate(jsonb) from public, anon, authenticated;

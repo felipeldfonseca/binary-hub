@@ -86,10 +86,17 @@ union all select 'profiles', p.id::text, md5(to_jsonb(p)::text) from public.prof
 --   option            "no" | "allowed" | "required": a listed option's contract on the form
 --   option_spec       what an option changes (premium in US$ per share, contracts, × multiplier)
 --   dollar_quotes     crypto: pairs quoted in these count as US$ (others take a typed result)
---   durations, expiry, expiry_by_platform   binary: «Expiração» in seconds, and when it ends:
---                     "entry" = entry + duration (the board's «Vence às»); "next_candle" = the
---                     candle after the order on the candle's own grid + duration (Ebinex: the file's
---                     «Vela» + «Tempo»; M1 proven on every row of the owner's files)
+--   durations, durations_by_platform   binary: «Expiração» in seconds, the ones the account's
+--                     platform offers (a platform not listed offers "durations"; Ebinex: 1, 5 and
+--                     15 min only)
+--   expiry, expiry_by_platform   binary: when it ends. "entry" = entry + duration, whatever the
+--                     moment in the candle (every platform but Ebinex: the time runs from the
+--                     click); "next_candle" = Ebinex's order book: an order placed during a candle
+--                     of the chosen timeframe (until 5 s before it closes) waits for the next
+--                     candle on that timeframe's own grid of the hour, runs that whole candle and
+--                     ends when it closes (M1 20:10:30 → 20:11–20:12; M5 20:13 → 20:15–20:20; M15
+--                     20:13 → 20:15–20:30; the file's «Vela» + «Tempo», M1 proven on every row of
+--                     the owner's files)
 --
 -- instrument_specs(): the instruments of a market whose spec differs from the market's, keyed by
 -- trade_match_key() (MESM6 → MES, WINZ26 → WIN, EUR/USD → EURUSD). Each key overrides the market's
@@ -109,7 +116,8 @@ as $$
               "stops": "pts", "pnl": "typed", "mult": null, "correct": false, "costs": false, "option": "no"},
   "binary":  {"asset_type": "binary_option", "directions": ["call", "put"], "qty_dp": null, "price_dp": null,
               "stops": null, "pnl": "outcome", "mult": null, "correct": false, "costs": false, "option": "no",
-              "durations": [60, 120, 300, 900], "expiry": "entry", "expiry_by_platform": {"ebinex": "next_candle"}},
+              "durations": [60, 120, 300, 900], "durations_by_platform": {"ebinex": [60, 300, 900]},
+              "expiry": "entry", "expiry_by_platform": {"ebinex": "next_candle"}},
   "forex":   {"asset_type": "forex", "directions": ["long", "short"], "qty_dp": 2, "price_dp": 5,
               "stops": "price", "pnl": "typed", "mult": null, "correct": true, "costs": true, "option": "no"},
   "stocks":  {"asset_type": "stock", "directions": ["long", "short"], "qty_dp": 6, "price_dp": 4,
@@ -231,7 +239,8 @@ begin
   end if;
   row := public.instrument_specs() -> p_market -> k;
   spec := jsonb_build_object('tick', null, 'pip', null)
-          || (caps - array['directions', 'durations', 'expiry', 'expiry_by_platform', 'dollar_quotes', 'option', 'option_spec'])
+          || (caps - array['directions', 'durations', 'durations_by_platform', 'expiry', 'expiry_by_platform', 'dollar_quotes',
+                           'option', 'option_spec'])
           || coalesce(row, '{}'::jsonb)
           || jsonb_build_object('key', k, 'known', row is not null);
   -- A crypto pair is in dollars only when it is quoted in a dollar coin
