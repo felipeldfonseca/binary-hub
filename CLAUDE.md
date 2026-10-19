@@ -37,7 +37,7 @@ Inside `app/`, `npx jest --ci <path>` runs one suite. Use Node 22 (`.nvmrc`). Be
   - `app/styles/hub.css`: the boards' design tokens, scoped to `.hub`.
 - `supabase/`: local config and SQL migrations. There is a single Supabase project (no separate test project); migrations run on it.
 - `design/`: logos and fonts.
-- Deploy: the GitHub workflow `deploy_frontend.yml` builds and deploys to Vercel on push to `main`. Day-to-day work merges into `feature/rebuild-lean`; `main` still holds the pre-rebuild app until the rebuild is promoted.
+- Deploy: the GitHub workflow `deploy_frontend.yml` builds and deploys to Vercel on push to `main` (`vercel build` + `vercel deploy --prebuilt`). The Vercel project's own framework preset is «Other», so `app/vercel.json` pins `"framework": "nextjs"`; without it the build ships only `public/` and every page is a 404. Day-to-day work merges into `feature/rebuild-lean`, which is promoted to `main` on the owner's request.
 
 ## Auth and access
 
