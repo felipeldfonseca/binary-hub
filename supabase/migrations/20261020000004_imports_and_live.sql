@@ -15,12 +15,14 @@
 --        minutes before and 16 minutes after the file's (a live entry is typed to the minute and may
 --        be registered up to 15 minutes late; a «Já fechada» entry, typed from memory, within 16
 --        minutes either way). Candidate pairs are taken greedily, each trade and each row at most
---        once, in this order: a binary whose expiry equals the file's exit first, then the same size
---        (quantity; binary: stake) before a different one (decision 2: the file corrects a typed
---        «Contratos» or stake, so a size typo never duplicates the trade; a binary of another stake
---        pairs only when its expiry is the file's exit), then the smallest entry gap, then the
---        file's entry, the trade's entry, its id and the line. No row is ever left out: a row with
---        no partner is inserted (4), an app trade with no row stays as registered.
+--        once, in this order: a binary whose expiry equals the file's exit first (a row with no
+--        exit, an Ebinex refund, is not: it never takes the trade from the row that ended at its
+--        expiry), then the same size (quantity; binary: stake) before a different one, even one a
+--        few minutes nearer (decision 2: the file corrects a typed «Contratos» or stake, so a size
+--        typo never duplicates the trade; a binary of another stake pairs only when its expiry is
+--        the file's exit), then the smallest entry gap, then the file's entry, the trade's entry,
+--        its id and the line. No row is ever left out: a row with no partner is inserted (4), an
+--        app trade with no row stays as registered.
 --     4. otherwise: inserted, as before.
 --   The link path (decision 2: the broker file wins on money): the app trade gets the file's key
 --   (source_platform, external_id and the old notes key), the commission, and every price, quantity,
@@ -240,7 +242,9 @@ begin
            null::jsonb as patch
     from public.import_checked_rows(p_account, p_platform, p_file_tz, p_rows) r;
 
-  -- One-to-one: the best remaining pair first (a binary's expiry, then the same size, then the gap)
+  -- One-to-one: the best remaining pair first (a binary's expiry, then the same size, then the gap).
+  -- Each key is true or false, never null: a null would sort first under desc (a refunded row, with
+  -- no exit, ahead of the row that ended at the trade's expiry)
   for c in
     select r.rn, t.id as tid
     from pg_temp.import_rows r
@@ -256,7 +260,7 @@ begin
       -- several orders a few minutes apart; the expiry pins the order's minute)
       and (p_account.market <> 'binary' or t.stake_amount = r.stake_amount
            or (t.expires_at is not null and t.expires_at = r.exit_time))
-    order by (t.expires_at is not null and t.expires_at = r.exit_time) desc,
+    order by (t.expires_at = r.exit_time) is true desc,
              (case when p_account.market = 'binary' then t.stake_amount = r.stake_amount
                    else t.quantity = r.quantity end) is true desc,
              abs(extract(epoch from (t.entry_time - r.entry_time))), r.entry_time, t.entry_time, t.id, r.line, r.rn

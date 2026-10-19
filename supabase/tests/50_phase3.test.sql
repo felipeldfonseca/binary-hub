@@ -1831,6 +1831,73 @@ select tests.ok((select stake_amount = 10 and status = 'open' and external_id is
                 'the stake typed comes back');
 commit;
 
+-- The matching order, pinned (each case a pair or instrument and side of its own):
+--   AUD/USD call  a refunded row (no exit) nearer the registered entry than the row that ended at the
+--                 trade's expiry → the expiry row is the trade; the refund is inserted on its own and
+--                 the trade is never inserted a second time
+--   NZD/USD call  two rows ending at the trade's expiry, the nearer one of another stake → the same
+--                 stake (decision 2)
+--   NQ long       «Contratos» 2: a 3-lot row in the trade's minute and a 2-lot row 2 minutes before it
+--                 → the 2-lot row (the same size before a smaller gap); the 3-lot row is inserted
+begin;
+select set_config('request.jwt.claim.sub', :P, true);
+set local role authenticated;
+insert into tests.p3 select 'O_' || x.k, public.register_entry(:'lebx', jsonb_build_object('v', 1, 'client_key', tests.ck(),
+  'symbol', x.sym, 'direction', 'call', 'stake', '10', 'payout', '85', 'duration_s', 60, 'clock', 'America/Sao_Paulo',
+  'entry', tests.hm('America/Sao_Paulo', -x.back)))->>'trade_id'
+from (values ('aud', 'AUD/USD', 6), ('nzd', 'NZD/USD', 7)) x(k, sym, back);
+insert into tests.p3 select 'O_nq', public.register_entry(:'liga', jsonb_build_object('v', 1, 'client_key', tests.ck(),
+  'symbol', 'NQ', 'direction', 'long', 'quantity', '2', 'entry_price', '21000.25', 'clock', 'America/New_York',
+  'entry', tests.hm('America/New_York', -6)))->>'trade_id';
+commit;
+select max(v) filter (where k = 'O_aud') as o_aud, max(v) filter (where k = 'O_nzd') as o_nzd,
+       max(v) filter (where k = 'O_nq') as o_nq
+from tests.p3 \gset
+insert into tests.p3 select 'fileO', jsonb_build_array(
+  tests.wall(tests.row(2, 'WO1', 'AUD/USD', 'binary_option', 'call', null, null, '0.6550', null, '1', '10.00', '85', 'breakeven', '0.00', '0.00'),
+             'America/Sao_Paulo', a.entry_time + interval '5 seconds', null),
+  tests.wall(tests.row(3, 'WO2', 'AUD/USD', 'binary_option', 'call', null, null, '0.6550', '0.6560', '1', '10.00', '85', 'win', '8.50', '0.00'),
+             'America/Sao_Paulo', a.entry_time + interval '40 seconds', a.expires_at),
+  tests.wall(tests.row(4, 'WO3', 'NZD/USD', 'binary_option', 'call', null, null, '0.5950', '0.5940', '1', '20.00', '85', 'loss', '-20.00', '0.00'),
+             'America/Sao_Paulo', n.entry_time + interval '5 seconds', n.expires_at),
+  tests.wall(tests.row(5, 'WO4', 'NZD/USD', 'binary_option', 'call', null, null, '0.5950', '0.5960', '1', '10.00', '85', 'win', '8.50', '0.00'),
+             'America/Sao_Paulo', n.entry_time + interval '50 seconds', n.expires_at))::text
+from public.trades a, public.trades n
+where a.id = :'o_aud' and n.id = :'o_nzd';
+insert into tests.p3 select 'fileO2', jsonb_build_array(
+  tests.row(2, 'PO1', 'NQZ6', 'futures', 'long', q.entry_time + interval '10 seconds', q.entry_time + interval '3 minutes',
+            '21000.25', '21002.25', '3', null, null, 'win', '120.00', '4.02'),
+  tests.row(3, 'PO2', 'NQZ6', 'futures', 'long', q.entry_time - interval '2 minutes', q.entry_time + interval '1 minute',
+            '21000.00', '21001.00', '2', null, null, 'win', '40.00', '2.68'))::text
+from public.trades q where q.id = :'o_nq';
+begin;
+select set_config('request.jwt.claim.sub', :P, true);
+set local role authenticated;
+select public.import_commit(:'lebx', 'ebinex', 'operacoes_3.csv', null, 'America/Sao_Paulo', (select v from tests.p3 where k = 'fileO')::jsonb) as co \gset
+select tests.eq((:'co'::jsonb) - 'batch_id' - 'errors', '{"inserted": 2, "duplicate": 0, "completed": 0, "other_account": 0, "linked": 2}'::jsonb,
+                'a refund and two stakes at one expiry: two linked, two inserted');
+select tests.ok((select external_id = 'WO2' and status = 'closed' and result = 'win' and pnl = 8.50 and exit_time = expires_at
+                 from public.trades where id = :'o_aud')
+                and (select count(*) = 1 from public.trades where account_id = :'lebx' and external_id = 'WO2')
+                and (select source = 'import' and exit_time is null and result = 'breakeven'
+                     from public.trades where account_id = :'lebx' and external_id = 'WO1')
+                and (select count(*) = 2 from public.trades where account_id = :'lebx' and symbol = 'AUD/USD' and direction = 'call'),
+                'a refunded row (no exit) never takes the trade from the row that ended at its expiry: the trade once, the refund apart');
+select tests.ok((select external_id = 'WO4' and stake_amount = 10 and pnl = 8.50 from public.trades where id = :'o_nzd')
+                and (select source = 'import' and stake_amount = 20 from public.trades where account_id = :'lebx' and external_id = 'WO3'),
+                'two rows ending at the expiry: the same stake before a nearer one of another stake');
+select tests.eq(public.import_undo(((:'co'::jsonb)->>'batch_id')::uuid), '{"deleted": 2}'::jsonb, 'undo the refund file');
+select public.import_commit(:'liga', 'topone', 'liga3.csv', null, 'UTC', (select v from tests.p3 where k = 'fileO2')::jsonb) as cq \gset
+select tests.eq((:'cq'::jsonb) - 'batch_id' - 'errors', '{"inserted": 1, "duplicate": 0, "completed": 0, "other_account": 0, "linked": 1}'::jsonb,
+                'two rows for one NQ trade: one linked, one inserted');
+select tests.ok((select external_id = 'PO2' and quantity = 2 and status = 'closed' and pnl = 40 from public.trades where id = :'o_nq')
+                and (select source = 'import' and quantity = 3 from public.trades where account_id = :'liga' and external_id = 'PO1'),
+                '«Contratos» 2: the 2-lot row 2 minutes before, not the 3-lot row in the same minute (the same size before the gap)');
+select tests.eq(public.import_undo(((:'cq'::jsonb)->>'batch_id')::uuid), '{"deleted": 1}'::jsonb, 'undo the NQ file');
+select tests.ok((select bool_and(status = 'open' and external_id is null) from public.trades where id in (:'o_aud', :'o_nzd', :'o_nq')),
+                'the three registered trades are as registered');
+commit;
+
 -- =============================================================================================
 -- 14. Deleting a registered trade: «Desfazer entrada» and the old page (decision 3)
 -- =============================================================================================
