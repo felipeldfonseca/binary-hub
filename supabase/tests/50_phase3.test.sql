@@ -1839,19 +1839,22 @@ commit;
 --                 stake (decision 2)
 --   NQ long       «Contratos» 2: a 3-lot row in the trade's minute and a 2-lot row 2 minutes before it
 --                 → the 2-lot row (the same size before a smaller gap); the 3-lot row is inserted
+--   USD/CAD call  a row ending at the trade's expiry, of another stake, and a nearer row of the same
+--                 stake (first in the file) ending a minute later → the expiry row (the expiry before
+--                 the same stake); the same-stake row is inserted on its own
 begin;
 select set_config('request.jwt.claim.sub', :P, true);
 set local role authenticated;
 insert into tests.p3 select 'O_' || x.k, public.register_entry(:'lebx', jsonb_build_object('v', 1, 'client_key', tests.ck(),
   'symbol', x.sym, 'direction', 'call', 'stake', '10', 'payout', '85', 'duration_s', 60, 'clock', 'America/Sao_Paulo',
   'entry', tests.hm('America/Sao_Paulo', -x.back)))->>'trade_id'
-from (values ('aud', 'AUD/USD', 6), ('nzd', 'NZD/USD', 7)) x(k, sym, back);
+from (values ('aud', 'AUD/USD', 6), ('nzd', 'NZD/USD', 7), ('cad', 'USD/CAD', 9)) x(k, sym, back);
 insert into tests.p3 select 'O_nq', public.register_entry(:'liga', jsonb_build_object('v', 1, 'client_key', tests.ck(),
   'symbol', 'NQ', 'direction', 'long', 'quantity', '2', 'entry_price', '21000.25', 'clock', 'America/New_York',
   'entry', tests.hm('America/New_York', -6)))->>'trade_id';
 commit;
 select max(v) filter (where k = 'O_aud') as o_aud, max(v) filter (where k = 'O_nzd') as o_nzd,
-       max(v) filter (where k = 'O_nq') as o_nq
+       max(v) filter (where k = 'O_nq') as o_nq, max(v) filter (where k = 'O_cad') as o_cad
 from tests.p3 \gset
 insert into tests.p3 select 'fileO', jsonb_build_array(
   tests.wall(tests.row(2, 'WO1', 'AUD/USD', 'binary_option', 'call', null, null, '0.6550', null, '1', '10.00', '85', 'breakeven', '0.00', '0.00'),
@@ -1870,6 +1873,12 @@ insert into tests.p3 select 'fileO2', jsonb_build_array(
   tests.row(3, 'PO2', 'NQZ6', 'futures', 'long', q.entry_time - interval '2 minutes', q.entry_time + interval '1 minute',
             '21000.00', '21001.00', '2', null, null, 'win', '40.00', '2.68'))::text
 from public.trades q where q.id = :'o_nq';
+insert into tests.p3 select 'fileO3', jsonb_build_array(
+  tests.wall(tests.row(2, 'WO5', 'USD/CAD', 'binary_option', 'call', null, null, '1.3800', '1.3810', '1', '10.00', '85', 'win', '8.50', '0.00'),
+             'America/Sao_Paulo', c.entry_time + interval '5 seconds', c.expires_at + interval '1 minute'),
+  tests.wall(tests.row(3, 'WO6', 'USD/CAD', 'binary_option', 'call', null, null, '1.3800', '1.3790', '1', '20.00', '85', 'loss', '-20.00', '0.00'),
+             'America/Sao_Paulo', c.entry_time + interval '40 seconds', c.expires_at))::text
+from public.trades c where c.id = :'o_cad';
 begin;
 select set_config('request.jwt.claim.sub', :P, true);
 set local role authenticated;
@@ -1894,8 +1903,18 @@ select tests.ok((select external_id = 'PO2' and quantity = 2 and status = 'close
                 and (select source = 'import' and quantity = 3 from public.trades where account_id = :'liga' and external_id = 'PO1'),
                 '«Contratos» 2: the 2-lot row 2 minutes before, not the 3-lot row in the same minute (the same size before the gap)');
 select tests.eq(public.import_undo(((:'cq'::jsonb)->>'batch_id')::uuid), '{"deleted": 1}'::jsonb, 'undo the NQ file');
-select tests.ok((select bool_and(status = 'open' and external_id is null) from public.trades where id in (:'o_aud', :'o_nzd', :'o_nq')),
-                'the three registered trades are as registered');
+select public.import_commit(:'lebx', 'ebinex', 'operacoes_4.csv', null, 'America/Sao_Paulo', (select v from tests.p3 where k = 'fileO3')::jsonb) as cc \gset
+select tests.eq((:'cc'::jsonb) - 'batch_id' - 'errors', '{"inserted": 1, "duplicate": 0, "completed": 0, "other_account": 0, "linked": 1}'::jsonb,
+                'two rows for one USD/CAD trade: one linked, one inserted');
+select tests.ok((select external_id = 'WO6' and stake_amount = 20 and status = 'closed' and pnl = -20 and exit_time = expires_at
+                 from public.trades where id = :'o_cad')
+                and (select source = 'import' and stake_amount = 10 and pnl = 8.50
+                     from public.trades where account_id = :'lebx' and external_id = 'WO5'),
+                'the expiry before the same stake: the row of another stake ending at the expiry, not a nearer one of the same stake');
+select tests.eq(public.import_undo(((:'cc'::jsonb)->>'batch_id')::uuid), '{"deleted": 1}'::jsonb, 'undo the USD/CAD file');
+select tests.ok((select bool_and(status = 'open' and external_id is null) from public.trades where id in (:'o_aud', :'o_nzd', :'o_nq', :'o_cad'))
+                and (select stake_amount = 10 from public.trades where id = :'o_cad'),
+                'the four registered trades are as registered');
 commit;
 
 -- =============================================================================================
