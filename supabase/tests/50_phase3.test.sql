@@ -274,6 +274,15 @@ select tests.eq(public.trade_expiry('ebinex', '2026-10-15 23:59:50+00', 900), '2
                 'Ebinex M15 at 20:59:50 → runs 21:00–21:15 (across the hour and the UTC day)');
 select tests.eq(public.trade_expiry('pocketoption', '2026-10-15 23:13:20+00', 120), '2026-10-15 23:15:20+00'::timestamptz,
                 'a traditional platform, 2 min at 20:13:20 → 20:15:20 (from the click)');
+-- The last 5 s of a candle are blocked on Ebinex, so an order is placed before them; one registered in
+-- them (the click came first) still belongs to that candle and runs the next one, never a later one
+select tests.eq((select jsonb_agg(public.trade_expiry('ebinex', x.at, x.d) at time zone 'UTC' order by x.n)
+                 from (values (1, '2026-10-15 23:10:55+00'::timestamptz, 60), (2, '2026-10-15 23:10:59.999+00', 60),
+                              (3, '2026-10-15 23:14:55+00', 300), (4, '2026-10-15 23:14:59.999+00', 300),
+                              (5, '2026-10-15 23:14:57+00', 900), (6, '2026-10-15 23:59:59.999+00', 900),
+                              (7, '2026-12-31 23:59:59+00', 60)) x(n, at, d)),
+                '["2026-10-15T23:12:00", "2026-10-15T23:12:00", "2026-10-15T23:20:00", "2026-10-15T23:20:00", "2026-10-15T23:30:00", "2026-10-16T00:15:00", "2027-01-01T00:01:00"]'::jsonb,
+                'Ebinex at second 55 to 59.999 of the candle: M1 → +2, M5 20:14:55 → 20:20, M15 20:14:57 → 20:30, across the day and the year');
 select tests.eq(public.trade_caps('binary') #> '{durations_by_platform,ebinex}', '[60, 300, 900]'::jsonb,
                 'Ebinex offers 1, 5 and 15 min');
 select tests.eq(public.trade_caps('binary') -> 'durations', '[60, 120, 300, 900]'::jsonb,
@@ -2214,6 +2223,71 @@ select tests.eq(public.register_entry(:'risco', jsonb_build_object('v', 1, 'symb
                   'entry_price', '7896.25', 'stop_pts', '24', 'clock', 'America/New_York', 'entry', tests.hm('America/New_York', -10)), true)->'limit_room',
                 '{"usd": 400, "net_usd": -300, "reached": false, "left": 100, "risk": 120, "above": true}'::jsonb,
                 'an entry typed 10 minutes back: the day as it was then');
+commit;
+
+-- A US$ 200 win a minute ago: the net recovers to −250, but the running net reached −400, so the
+-- limit stays reached («Encerrado por hoje», left 0, never above), whatever usd + net would say. A
+-- «Já fechada» typed 10 minutes back is judged at its entry, before the loss and the win.
+begin;
+select set_config('request.jwt.claim.sub', :P, true);
+set local role authenticated;
+insert into public.trades (user_id, account_id, symbol, asset_type, direction, entry_time, exit_time, quantity, result, pnl, commission)
+values (:P, :'risco', 'MESZ6', 'futures', 'long', now() - interval '3 minutes', now() - interval '1 minute', 1, 'win', 200, 0);
+commit;
+begin;
+select set_config('request.jwt.claim.sub', :P, true);
+set local role authenticated;
+select public.register_entry(:'risco', '{"v": 1, "symbol": "MES", "direction": "long", "quantity": "1", "entry_price": "7896.25", "stop_pts": "40"}', true) as d \gset
+select tests.ok((:'d'::jsonb)#>>'{gate,status}' = 'encerrado' and (:'d'::jsonb)#>>'{gate,limit,state}' = 'atingido'
+                and (:'d'::jsonb)->'limit_room' = '{"usd": 400, "net_usd": -250, "reached": true, "left": 0, "risk": 200, "above": false}'::jsonb,
+                'reached, then recovered to −250: still reached, left 0, a US$ 200 stop is not "above" the 150 a sum would leave');
+select public.register_after(:'risco', jsonb_build_object('v', 1, 'symbol', 'MES', 'direction', 'long', 'quantity', '1',
+         'entry_price', '7896.25', 'stop_pts', '24', 'exit_price', '7890.00', 'clock', 'America/New_York',
+         'day', public.compute_trading_day(:'risco', now())::text, 'entry', tests.hm('America/New_York', -10),
+         'exit', tests.hm('America/New_York', -1)), true) as d \gset
+select tests.ok((:'d'::jsonb)#>>'{gate,status}' = 'liberado'
+                and (:'d'::jsonb)->'limit_room' = '{"usd": 400, "net_usd": -300, "reached": false, "left": 100, "risk": 120, "above": true}'::jsonb,
+                '«Já fechada» typed 10 minutes back, after a later loss and win: the room at its entry, not now');
+commit;
+
+-- A «soma» limit: the net is the sum of the owner's futures accounts, not the account's own day. Q's
+-- «Soma Q» has a US$ 400 limit on the sum and no trade today; «Soma Q2» lost US$ 300.
+begin;
+select set_config('request.jwt.claim.sub', :Q, true);
+set local role authenticated;
+insert into public.trading_accounts (user_id, market, label, platform) values
+  (:Q, 'futures', 'Soma Q', 'topone'), (:Q, 'futures', 'Soma Q2', 'topone');
+commit;
+select id as somaq from public.trading_accounts where user_id = :Q and label = 'Soma Q' \gset
+select id as somaq2 from public.trading_accounts where user_id = :Q and label = 'Soma Q2' \gset
+begin;
+select set_config('request.jwt.claim.sub', :Q, true);
+set local role authenticated;
+select tests.eq(jsonb_array_length(public.save_rules(jsonb_build_object('v', 1, 'base_rev', public.rules_config()->>'rev', 'accounts', jsonb_build_object(
+  :'somaq', jsonb_build_object('rules', '{"v": 1, "limit": {"usd": 400, "mode": "soma", "at_limit": "encerrar"}}'::jsonb,
+                               'window', tests.win('America/New_York', -90, 90), 'version', 'force'),
+  :'somaq2', jsonb_build_object('rules', '{"v": 1}'::jsonb, 'window', tests.win('America/New_York', -90, 90), 'version', 'force'))))->'versions'),
+  2, 'Q: a «soma» limit on one futures account, none on the other');
+commit;
+alter table public.account_rule_versions disable trigger account_rule_versions_guard;
+update public.account_rule_versions v set effective_from = v.effective_from - interval '30 days'
+where v.account_id in (:'somaq', :'somaq2');
+alter table public.account_rule_versions enable trigger account_rule_versions_guard;
+-- Q never registered a trade, which is what creates the profile a trade row points to
+insert into public.profiles (id) values (:Q) on conflict (id) do nothing;
+begin;
+select set_config('request.jwt.claim.sub', :Q, true);
+set local role authenticated;
+insert into public.trades (user_id, account_id, symbol, asset_type, direction, entry_time, exit_time, quantity, result, pnl, commission)
+values (:Q, :'somaq2', 'MESZ6', 'futures', 'long', now() - interval '40 minutes', now() - interval '20 minutes', 2, 'loss', -298, 2);
+commit;
+begin;
+select set_config('request.jwt.claim.sub', :Q, true);
+set local role authenticated;
+select public.register_entry(:'somaq', '{"v": 1, "symbol": "MES", "direction": "long", "quantity": "1", "entry_price": "7896.25", "stop_pts": "24"}', true) as d \gset
+select tests.ok(((:'d'::jsonb)#>>'{gate,today,net_usd}')::numeric = 0 and ((:'d'::jsonb)#>>'{gate,limit,net_usd}')::numeric = -300
+                and (:'d'::jsonb)->'limit_room' = '{"usd": 400, "net_usd": -300, "reached": false, "left": 100, "risk": 120, "above": true}'::jsonb,
+                '«soma»: the account''s own day is 0, the sum lost US$ 300; US$ 120 is above the US$ 100 the sum leaves');
 commit;
 
 -- =============================================================================================
