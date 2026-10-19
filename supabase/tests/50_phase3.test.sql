@@ -127,7 +127,8 @@ insert into public.trading_accounts (user_id, market, label, platform) values
   (:P, 'futures', 'Aviso P', 'topone'), (:P, 'futures', 'Sem regras P', 'topone'), (:P, 'futures', 'Novo P', 'topone'),
   (:P, 'futures', 'Arquivada P', 'topone'), (:P, 'binary', 'Ebinex P', 'ebinex'), (:P, 'binary', 'Pocket P', 'pocketoption'),
   (:P, 'binary', 'Noite P', 'ebinex'), (:P, 'forex', 'Forex P', 'mt5'), (:P, 'stocks', 'Ações P', 'ibkr'),
-  (:P, 'crypto', 'Cripto P', 'binance'), (:P, 'b3', 'B3 P', 'profit'), (:P, 'futures', 'Dia P', 'topone');
+  (:P, 'crypto', 'Cripto P', 'binance'), (:P, 'b3', 'B3 P', 'profit'), (:P, 'futures', 'Dia P', 'topone'),
+  (:P, 'futures', 'Liga P', 'topone'), (:P, 'binary', 'Liga Ebinex P', 'ebinex');
 commit;
 
 select id as top from public.trading_accounts where user_id = :P and label = 'Top One P' \gset
@@ -145,6 +146,8 @@ select id as stk from public.trading_accounts where user_id = :P and label = 'A�
 select id as cry from public.trading_accounts where user_id = :P and label = 'Cripto P' \gset
 select id as b3 from public.trading_accounts where user_id = :P and label = 'B3 P' \gset
 select id as dia from public.trading_accounts where user_id = :P and label = 'Dia P' \gset
+select id as liga from public.trading_accounts where user_id = :P and label = 'Liga P' \gset
+select id as lebx from public.trading_accounts where user_id = :P and label = 'Liga Ebinex P' \gset
 
 begin;
 select set_config('request.jwt.claim.sub', :P, true);
@@ -170,8 +173,10 @@ select tests.eq(jsonb_array_length(public.save_rules(jsonb_build_object('v', 1, 
                             'window', tests.win('America/Sao_Paulo', -90, 90), 'version', 'force'),
   :'dia', jsonb_build_object('rules', '{"v": 1}'::jsonb,
                              'window', '{"tz": "America/New_York", "start_min": 600, "end_min": 660, "weekdays": 31}'::jsonb,
-                             'version', 'force'))))->'versions'),
-  14, 'P''s rules: fourteen versions');
+                             'version', 'force'),
+  :'liga', jsonb_build_object('rules', '{"v": 1}'::jsonb, 'window', tests.win('America/New_York', -90, 90), 'version', 'force'),
+  :'lebx', jsonb_build_object('rules', '{"v": 1}'::jsonb, 'window', tests.win('America/Sao_Paulo', -90, 90), 'version', 'force'))))->'versions'),
+  16, 'P''s rules: sixteen versions');
 commit;
 
 -- «desde» a month ago for every P account but «Novo P» (whose v1 starts now)
@@ -259,6 +264,10 @@ select tests.eq(public.trade_hm_resolve('01:30', 'America/New_York', '2026-11-01
                 'New York fall-back: 01:30 is the later (EST) occurrence');
 select tests.eq(public.trade_hm_resolve('10:15', 'America/New_York', '2026-10-14 14:07:00+00'), '2026-10-14 14:15:00+00'::timestamptz,
                 'a time later today stays today (the caller says "não pode ser depois de agora")');
+select tests.eq(public.trade_hm_resolve('21:59', 'America/New_York', '2026-10-14 14:00:00+00'), '2026-10-15 01:59:00+00'::timestamptz,
+                '11 h 59 ahead is still today''s (refused as the future)');
+select tests.eq(public.trade_hm_resolve('22:01', 'America/New_York', '2026-10-14 14:00:00+00'), '2026-10-14 02:01:00+00'::timestamptz,
+                '12 h 01 ahead is yesterday''s');
 
 -- =============================================================================================
 -- 7. register_entry: the gate at entry (the owner test «Às 11:05 aparece "Fora da sua janela"»)
@@ -618,8 +627,10 @@ select tests.ok((select pnl = 57.50 and commission = 3.50 and pnl_basis = 'price
                  where id = (select v from tests.p3 where k = 'fx_eurusd')::uuid),
                 'EUR/USD 1,08520 → 1,08635, 0,50 lote: US$ 57,50; «Custos» in commission');
 select public.register_exit((select v from tests.p3 where k = 'fx_usdjpy')::uuid, '{"v": 1, "exit_price": "150.980"}') as x \gset
-select tests.eq((select pnl from public.trades where id = (select v from tests.p3 where k = 'fx_usdjpy')::uuid), 51.66::numeric,
-                'USD/JPY: ≈ US$ 51,66 (¥ 7.800 ÷ 150,98)');
+select tests.ok((select pnl = 51.66 and pnl_basis = 'estimate' from public.trades
+                 where id = (select v from tests.p3 where k = 'fx_usdjpy')::uuid)
+                and (:'x'::jsonb)->>'pnl_basis' = 'estimate',
+                'USD/JPY: ≈ US$ 51,66 (¥ 7.800 ÷ 150,98), stored as an estimate, never as an exact result');
 select tests.fails(format($$select public.register_exit(%L, '{"v": 1, "exit_price": "0.86090"}')$$, (select v from tests.p3 where k = 'fx_eurgbp')),
                    'pnl_required', 'pnl', 'EUR/GBP: the result must be typed');
 select public.register_exit((select v from tests.p3 where k = 'fx_eurgbp')::uuid, '{"v": 1, "exit_price": "0.86090", "pnl": "105.10"}') as x \gset
@@ -649,6 +660,29 @@ select public.register_exit((select v from tests.p3 where k = 'b3_wdo')::uuid, '
 select tests.eq((select pnl from public.trades where id = (select v from tests.p3 where k = 'b3_wdo')::uuid), 110.00::numeric,
                 'WDO, Compra 2 ct, 5.432,0 → 5.437,5: R$ 110,00');
 commit;
+
+-- The exit hour: never after now; in the entry's own minute it is the entry (the entry may carry
+-- seconds). The entry is moved to :30 of a minute two minutes back (guard off); all rolled back.
+begin;
+select set_config('request.jwt.claim.sub', :P, true);
+set local role authenticated;
+select public.register_entry(:'fora', jsonb_build_object('v', 1, 'client_key', tests.ck(), 'symbol', 'MES', 'direction', 'long',
+                             'quantity', '1', 'entry_price', '7896.25'))->>'trade_id' as clamp \gset
+reset role;
+alter table public.trades disable trigger trades_guard;
+update public.trades set entry_time = date_trunc('minute', now()) - interval '2 minutes' + interval '30 seconds' where id = :'clamp';
+alter table public.trades enable trigger trades_guard;
+set local role authenticated;
+select tests.fails(format($$select public.register_exit(%L, %L::jsonb, true)$$, :'clamp',
+                          jsonb_build_object('v', 1, 'exit_price', '7897.00', 'clock', 'America/New_York', 'exit', tests.hm('America/New_York', 5))),
+                   case when tests.hm('America/New_York', 5) < tests.hm('America/New_York', 0) then 'exit_before_entry' else 'exit_in_future' end,
+                   'exit', '«A saída não pode ser depois de agora»');
+select public.register_exit(:'clamp', jsonb_build_object('v', 1, 'exit_price', '7897.00', 'clock', 'America/New_York',
+         'exit', to_char((date_trunc('minute', now()) - interval '2 minutes') at time zone 'America/New_York', 'HH24:MI'))) is not null;
+select tests.ok((select exit_time = entry_time and entry_time = date_trunc('minute', now()) - interval '90 seconds' and status = 'closed'
+                 from public.trades where id = :'clamp'),
+                'an exit typed in the entry''s own minute is the entry, not «antes da entrada»');
+rollback;
 
 -- =============================================================================================
 -- 2b. Server times (even the table owner gets the server's clock)
@@ -710,6 +744,27 @@ select tests.fails($$update public.trades set registered_at = now() where notes 
                    'registered_at of a row from before Phase 3 stays null');
 select tests.fails($$update public.trades set registered_at = registered_at - interval '1 hour' where registered_at is not null and source = 'import' and id = (select id from public.trades where registered_at is not null and source = 'import' limit 1)$$,
                    'frozen', null, 'registered_at of an imported row');
+select tests.fails(format($$update public.trades set target_price = 7999 where id = %L$$, :'lim'), 'frozen', null, 'target_price');
+select tests.fails(format($$update public.trades set expires_at = now() where id = %L$$, :'lim'), 'frozen', null, 'expires_at');
+select tests.fails(format($$update public.trades set asset_type = 'stock' where id = %L$$, :'lim'), 'frozen', null, 'asset_type');
+select tests.fails(format($$update public.trades set strike = 601 where id = %L$$, (select v from tests.p3 where k = 'stk_spy')), 'frozen', null,
+                   'the option contract');
+select tests.fails(format($$update public.trades set import_batch_id = gen_random_uuid() where id = %L$$, :'lim'), 'frozen', null,
+                   'an app trade never joins an import batch (undoing it would delete the trade)');
+select tests.fails(format($$insert into public.trades (user_id, account_id, symbol, asset_type, direction, entry_time, rule_version_id)
+                            values (%L, %L, 'MES', 'futures', 'long', now(), %L)$$,
+                          :P, :'top2', (select id from public.account_rule_versions where account_id = :'top' order by version_no limit 1)),
+                   'frozen', null, 'a rule version of another account');
+select tests.ok(tests.err(format($$insert into public.trades (user_id, account_id, symbol, asset_type, direction, entry_time, source, status, result)
+                                   values (%L, %L, 'MES', 'futures', 'long', now(), 'after', 'open', 'pending')$$, :P, :'top2'))->>'message'
+                like '%trades_open_shape%', 'only a live trade is ever open');
+-- Registering the exit stamps the server's time, whatever the writer says (rolled back)
+begin;
+update public.trades set status = 'closed', exit_time = now(), exit_price = 7880, pnl = -1, result = 'loss',
+                         exit_registered_at = '2000-01-01'
+where id = :'lim';
+select tests.eq((select exit_registered_at from public.trades where id = :'lim'), now(), 'exit_registered_at is the server''s');
+rollback;
 begin;
 update public.trades set note = 'nota', note_saved_at = '2000-01-01' where id = :'mes1';
 select tests.ok((select note_saved_at = now() from public.trades where id = :'mes1'), 'note_saved_at follows the note, on the server clock');
@@ -1036,6 +1091,11 @@ select tests.ok((select exit_time = date_trunc('minute', now()) - interval '5 mi
 select tests.eq((select count(*) from (select public.add_marks(:'mk', '{"v": 1, "marks": {"setup": "B"}}') from generate_series(1, 97)) x),
                 97::bigint, 'up to 100 marks on a trade');
 select tests.fails(format($$select public.add_marks(%L, '{"v": 1, "marks": {"setup": "A"}}')$$, :'mk'), 'too_many_marks', null, '101st mark');
+-- A «Já fechada» trade never had a «limpa» mark: a new one is not «trocada»
+select public.add_marks((select v from tests.p3 where k = 'after1')::uuid, '{"v": 1, "marks": {"setup": "B"}}') is not null;
+select tests.ok((select current_value = 'B' and clean_value is null and not current_limpa and not changed_after
+                 from public.trade_marks_now_v where trade_id = (select v from tests.p3 where k = 'after1')::uuid and kind = 'setup'),
+                'changed_after needs a «limpa» mark to differ from');
 commit;
 
 -- =============================================================================================
@@ -1205,6 +1265,91 @@ select tests.fails(format($$select public.image_slots(%L, '{"v": 1, "new": [{"mi
 commit;
 delete from public.trade_attachments where name = 'q.png';
 delete from public.trade_image_trash where path in (select path from public.trade_image_trash where user_id = :P and path not in (select path from tests.slot));
+
+-- The quota counts the files Storage holds: a replaced one still waiting in the trash counts until
+-- the browser removes it
+\set big '''50505050-0000-0000-0000-000000000050/00000000-0000-4000-8000-000000000501/00000000-0000-4000-8000-000000000502.png'''
+insert into storage.objects (bucket_id, name, owner_id, metadata)
+values ('trade-images', :big, :P, '{"size": 524288000, "mimetype": "image/png"}');
+insert into public.trade_image_trash (path, user_id, reason) values (:big, :P, 'substituida');
+begin;
+select set_config('request.jwt.claim.sub', :P, true);
+set local role authenticated;
+select tests.fails(format($$select public.image_slots(%L, '{"v": 1, "new": [{"mime": "image/png", "bytes": 1000, "name": "z.png"}]}')$$, :'lim'),
+                   'storage_quota', 'new', 'a file in the trash still counts in the 500 MB');
+select set_config('storage.allow_delete_query', 'true', true);
+delete from storage.objects where name = :big;
+select set_config('storage.allow_delete_query', '', true);
+select tests.eq(public.image_trash_done(array[:big])->>'cleared', '1', 'removed through Storage, it leaves the trash');
+select tests.ok(public.image_slots(:'lim', '{"v": 1, "new": [{"mime": "image/png", "bytes": 1000, "name": "z.png"}]}') is not null,
+                'and no longer counts');
+commit;
+
+-- Reservations of the user's other trades expire after 30 minutes (reserva_vencida)
+begin;
+select set_config('request.jwt.claim.sub', :P, true);
+set local role authenticated;
+select public.image_slots(:'mk', '{"v": 1, "new": [{"mime": "image/png", "bytes": 1000, "name": "v.png"}]}')#>>'{slots,0,path}' as vpath \gset
+commit;
+alter table public.trade_attachments disable trigger trade_attachments_guard;
+update public.trade_attachments set reserved_at = reserved_at - interval '31 minutes' where path = :'vpath';
+alter table public.trade_attachments enable trigger trade_attachments_guard;
+begin;
+select set_config('request.jwt.claim.sub', :P, true);
+set local role authenticated;
+select public.image_slots(:'lim', '{"v": 1, "new": []}') is not null;
+select tests.ok((select reason = 'reserva_vencida' from public.trade_image_trash where path = :'vpath')
+                and not exists (select 1 from public.trade_attachments where path = :'vpath'),
+                'another trade''s reservation older than 30 minutes expires to the trash');
+commit;
+
+-- The save checks who uploaded the file and that the user is still a hub member
+begin;
+select set_config('request.jwt.claim.sub', :P, true);
+set local role authenticated;
+select public.image_slots(:'mk', '{"v": 1, "new": [{"mime": "image/png", "bytes": 1000, "name": "o.png"}]}')->'slots'->0 as oslot \gset
+commit;
+insert into storage.objects (bucket_id, name, owner_id, metadata)
+values ('trade-images', (:'oslot'::jsonb)->>'path', :Q, '{"size": 1000, "mimetype": "image/png"}');
+begin;
+select set_config('request.jwt.claim.sub', :P, true);
+set local role authenticated;
+select tests.fails(format($$select public.save_extras(%L, %L::jsonb)$$, :'mk',
+                          jsonb_build_object('v', 1, 'images', jsonb_build_array((:'oslot'::jsonb)->'id'))),
+                   'upload_mismatch', 'images', 'a file another user put at the path');
+commit;
+update storage.objects set owner_id = :P where name = (:'oslot'::jsonb)->>'path';
+delete from public.hub_members where user_id = :P;
+begin;
+select set_config('request.jwt.claim.sub', :P, true);
+set local role authenticated;
+select tests.fails(format($$select public.save_extras(%L, %L::jsonb)$$, :'mk',
+                          jsonb_build_object('v', 1, 'images', jsonb_build_array((:'oslot'::jsonb)->'id'))),
+                   'not_hub_member', null, 'a login taken out of hub_members saves no new image');
+commit;
+insert into public.hub_members (user_id) values (:P);
+begin;
+select set_config('request.jwt.claim.sub', :P, true);
+set local role authenticated;
+select tests.eq(public.save_extras(:'mk', jsonb_build_object('v', 1, 'images', jsonb_build_array((:'oslot'::jsonb)->'id')))#>>'{images,0,name}',
+                'o.png', 'back in the hub, the image is saved');
+-- A reservation's file can be removed through Storage (the browser's cleanup after a failed save)
+select public.image_slots(:'mk', jsonb_build_object('v', 1, 'keep', jsonb_build_array((:'oslot'::jsonb)->'id'),
+                                                    'new', '[{"mime": "image/png", "bytes": 1000, "name": "d.png"}]'::jsonb))#>>'{slots,0,path}' as dpath \gset
+insert into storage.objects (bucket_id, name, owner_id, metadata) values ('trade-images', :'dpath', :P, '{"size": 1000, "mimetype": "image/png"}');
+select set_config('storage.allow_delete_query', 'true', true);
+with d as (delete from storage.objects where name = :'dpath' returning 1) select tests.eq((select count(*) from d), 1::bigint,
+  'a reserved path''s file can be deleted');
+select set_config('storage.allow_delete_query', '', true);
+-- A save reorders the images (unique positions are checked at commit)
+select public.save_extras(:'mes1', jsonb_build_object('v', 1, 'images', (select jsonb_agg(id order by case ord when 1 then 2 when 2 then 1 else ord end)
+                                                                         from tests.slot where ord <> 4))) is not null;
+select tests.eq((select string_agg(a.name || '@' || a.position, ',' order by a.position) from public.trade_attachments a where a.trade_id = :'mes1'),
+                'image.png@1,MES_10-04_entrada.png@2,image (2).png@3,nova.png@4', 'the first two swapped');
+commit;
+select tests.fails(format($$update public.trade_attachments set status = 'pendente', position = null where trade_id = %L and position = 1$$, :'mes1'),
+                   'frozen', null, 'a saved image never goes back to reserved');
+delete from public.trade_image_trash where user_id = :P and path not in (select path from tests.slot);
 
 -- =============================================================================================
 -- 13. Imports and registered trades: one trade, the file wins on money, undo gives it back
@@ -1392,7 +1537,7 @@ commit;
 insert into tests.p3 select 'file4', jsonb_build_array(
   tests.row(2, 'P3SIM', 'MESM6', 'futures', 'long', date_trunc('minute', now()) - interval '3 hours',
             date_trunc('minute', now()) - interval '3 hours' + interval '5 minutes', '7900.00', '7901.00', '1', null, null, 'win', '5.00', '0.62'),
-  tests.row(3, 'P3SIM2', 'MNQZ6', 'futures', 'short', now() - interval '12 minutes', now() - interval '11 minutes',
+  tests.row(3, 'P3SIM2', 'NQZ6', 'futures', 'short', now() - interval '12 minutes', now() - interval '11 minutes',
             '21000.00', '20999.00', '3', null, null, 'win', '6.00', '1.86'))::text;
 begin;
 select set_config('request.jwt.claim.sub', :P, true);
@@ -1422,9 +1567,268 @@ select tests.ok(public.register_after(:'top2', jsonb_build_object('v', 1, 'clien
                   'exit', to_char((date_trunc('minute', now()) - interval '176 minutes') at time zone 'America/New_York', 'HH24:MI'),
                   'exit_price', '7901.00', 'allow_similar', true))->>'repeated' = 'false', '… and registers once confirmed');
 select tests.fails(format($$select public.register_entry(%L, %L::jsonb)$$, :'top2',
-                          jsonb_build_object('v', 1, 'client_key', tests.ck(), 'symbol', 'MNQ', 'direction', 'short', 'quantity', '3',
+                          jsonb_build_object('v', 1, 'client_key', tests.ck(), 'symbol', 'NQ', 'direction', 'short', 'quantity', '3',
                                              'entry_price', '21000.00', 'clock', 'America/New_York', 'entry', tests.hm('America/New_York', -10))),
                    'similar_trade', null, 'a live entry typed back like an imported trade');
+-- The window is the import's, seen from the other side: a «Já fechada» hour typed from memory may
+-- be a few minutes off either way; a live entry is never before the broker's fill by more than 2
+-- minutes; the size does not matter (the import pairs a different size too); the side does
+select tests.eq(public.register_after(:'top2', jsonb_build_object('v', 1, 'symbol', 'MES', 'direction', 'long', 'quantity', '1',
+                  'entry_price', '7900.00', 'clock', 'America/New_York',
+                  'day', public.compute_trading_day(:'top2', date_trunc('minute', now()) - interval '3 hours')::text,
+                  'entry', to_char((date_trunc('minute', now()) - interval '183 minutes') at time zone 'America/New_York', 'HH24:MI'),
+                  'exit', to_char((date_trunc('minute', now()) - interval '176 minutes') at time zone 'America/New_York', 'HH24:MI'),
+                  'exit_price', '7901.00'), true)->'similar',
+                (select jsonb_build_array(id) from public.trades where external_id = 'P3SIM' and account_id = :'top2'),
+                '«Já fechada» typed 3 minutes before the broker''s fill');
+select tests.eq(public.register_after(:'top2', jsonb_build_object('v', 1, 'symbol', 'MES', 'direction', 'long', 'quantity', '2',
+                  'entry_price', '7900.00', 'clock', 'America/New_York',
+                  'day', public.compute_trading_day(:'top2', date_trunc('minute', now()) - interval '3 hours')::text,
+                  'entry', to_char((date_trunc('minute', now()) - interval '179 minutes') at time zone 'America/New_York', 'HH24:MI'),
+                  'exit', to_char((date_trunc('minute', now()) - interval '176 minutes') at time zone 'America/New_York', 'HH24:MI'),
+                  'exit_price', '7901.00'), true)->'similar',
+                (select jsonb_build_array(id) from public.trades where external_id = 'P3SIM' and account_id = :'top2'),
+                'another size («Contratos» typed wrong) still looks like it');
+select tests.eq(public.register_after(:'top2', jsonb_build_object('v', 1, 'symbol', 'MES', 'direction', 'short', 'quantity', '1',
+                  'entry_price', '7900.00', 'clock', 'America/New_York',
+                  'day', public.compute_trading_day(:'top2', date_trunc('minute', now()) - interval '3 hours')::text,
+                  'entry', to_char((date_trunc('minute', now()) - interval '179 minutes') at time zone 'America/New_York', 'HH24:MI'),
+                  'exit', to_char((date_trunc('minute', now()) - interval '176 minutes') at time zone 'America/New_York', 'HH24:MI'),
+                  'exit_price', '7899.00'), true)->'similar', '[]'::jsonb, 'the other side does not');
+select tests.eq(public.register_entry(:'top2', jsonb_build_object('v', 1, 'symbol', 'NQ', 'direction', 'short', 'quantity', '3',
+                  'entry_price', '21000.00', 'clock', 'America/New_York', 'entry', tests.hm('America/New_York', -15)), true)->'similar',
+                '[]'::jsonb, 'an imported trade 3 minutes after a live entry is another trade');
+commit;
+
+-- Matching, case by case (account «Liga P», one instrument and side per case, so the cases never meet)
+--   MES long   «Contratos» typed 2, the file says 3                 → linked, the file's 3 (decision 2)
+--   MNQ long   registered 15 minutes after the broker's fill         → linked
+--   MGC short  registered 3 minutes before the file's fill           → another trade: inserted
+--   ES short   decoys at the same minute: ES long (other side), NQ short (other instrument), and an
+--              ES short written by the old page (not registered in the app) → inserted, no decoy touched
+--   GC long    «Aberta» registered after the trade had ended (the hour left at now) → closed at its entry
+--   CL long    an exit after now (a file read on the wrong clock)    → linked, still open
+--   MCL short  closed in the app with a loss, the file says win      → the file's result
+--   MES short  «Já fechada» typed 3 minutes before the fill          → linked
+--   ZN long    a trade the app never saw                             → inserted
+begin;
+select set_config('request.jwt.claim.sub', :P, true);
+set local role authenticated;
+insert into tests.p3 select 'L_' || x.k, public.register_entry(:'liga', jsonb_build_object('v', 1, 'client_key', tests.ck(),
+  'symbol', x.sym, 'direction', x.dir, 'quantity', x.qty, 'entry_price', x.px, 'marks', '{"setup": "A"}'::jsonb)
+  || case when x.back > 0 then jsonb_build_object('clock', 'America/New_York', 'entry', tests.hm('America/New_York', -x.back))
+          else '{}'::jsonb end)->>'trade_id'
+from (values ('typo', 'MES', 'long', '2', '7896.25', 4), ('late', 'MNQ', 'long', '1', '21000.25', 0),
+             ('early', 'MGC', 'short', '1', '2401.30', 5), ('dside', 'ES', 'long', '1', '7896.25', 9),
+             ('dsym', 'NQ', 'short', '1', '21000.25', 9), ('ended', 'GC', 'long', '1', '2401.30', 0),
+             ('future', 'CL', 'long', '1', '70.00', 3), ('result', 'MCL', 'short', '1', '70.00', 6),
+             ('only', 'MGC', 'long', '1', '2401.30', 7)) x(k, sym, dir, qty, px, back);
+insert into tests.p3 select 'L_after', public.register_after(:'liga', jsonb_build_object('v', 1, 'client_key', tests.ck(),
+  'symbol', 'MES', 'direction', 'short', 'quantity', '1', 'entry_price', '7896.25', 'clock', 'America/New_York',
+  'day', public.compute_trading_day(:'liga', date_trunc('minute', now()) - interval '53 minutes')::text,
+  'entry', tests.hm('America/New_York', -53), 'exit', tests.hm('America/New_York', -45), 'exit_price', '7890.00'))->>'trade_id';
+insert into public.trades (user_id, account_id, symbol, asset_type, direction, entry_time, quantity, result, pnl)
+values (:P, :'liga', 'ES', 'futures', 'short', date_trunc('minute', now()) - interval '9 minutes', 1, 'win', 5);
+commit;
+begin;
+select set_config('request.jwt.claim.sub', :P, true);
+set local role authenticated;
+select tests.eq(public.register_exit((select v from tests.p3 where k = 'L_result')::uuid, '{"v": 1, "exit_price": "70.10"}')->>'result',
+                'loss', 'MCL short closed in the app: −US$ 10');
+commit;
+select max(v) filter (where k = 'L_typo') as l_typo, max(v) filter (where k = 'L_late') as l_late,
+       max(v) filter (where k = 'L_early') as l_early, max(v) filter (where k = 'L_dside') as l_dside,
+       max(v) filter (where k = 'L_dsym') as l_dsym, max(v) filter (where k = 'L_ended') as l_ended,
+       max(v) filter (where k = 'L_future') as l_future, max(v) filter (where k = 'L_result') as l_result,
+       max(v) filter (where k = 'L_only') as l_only, max(v) filter (where k = 'L_after') as l_after
+from tests.p3 \gset
+
+insert into tests.p3 select 'fileL', jsonb_build_array(
+  tests.row(2, 'PL1', 'MESZ6', 'futures', 'long', a.entry_time - interval '30 seconds', a.entry_time + interval '3 minutes',
+            '7896.50', '7900.00', '3', null, null, 'win', '52.50', '2.01'),
+  tests.row(3, 'PL2', 'MNQZ6', 'futures', 'long', b.entry_time - interval '15 minutes', b.entry_time - interval '14 minutes',
+            '21000.25', '21001.25', '1', null, null, 'win', '2.00', '0.62'),
+  tests.row(4, 'PL3', 'MGCZ6', 'futures', 'short', c.entry_time + interval '3 minutes', c.entry_time + interval '4 minutes',
+            '2401.30', '2401.10', '1', null, null, 'win', '2.00', '0.62'),
+  tests.row(5, 'PL4', 'ESZ6', 'futures', 'short', d.entry_time + interval '10 seconds', d.entry_time + interval '2 minutes',
+            '7896.25', '7895.25', '1', null, null, 'win', '50.00', '2.68'),
+  tests.row(6, 'PL5', 'GCZ6', 'futures', 'long', e.entry_time - interval '10 minutes', e.entry_time - interval '8 minutes',
+            '2401.30', '2402.30', '1', null, null, 'win', '100.00', '1.50'),
+  tests.row(7, 'PL6', 'CLZ6', 'futures', 'long', f.entry_time - interval '20 seconds', now() + interval '30 days',
+            '70.00', '70.50', '1', null, null, 'win', '500.00', '1.50'),
+  tests.row(8, 'PL7', 'MCLZ6', 'futures', 'short', g.entry_time - interval '10 seconds', g.exit_time,
+            '70.00', '69.95', '1', null, null, 'win', '5.00', '1.04'),
+  tests.row(9, 'PL8', 'MESZ6', 'futures', 'short', h.entry_time + interval '3 minutes', h.entry_time + interval '8 minutes',
+            '7896.25', '7890.00', '1', null, null, 'win', '31.25', '0.62'),
+  tests.row(10, 'PL9', 'ZNZ6', 'futures', 'long', date_trunc('minute', now()) - interval '30 minutes',
+            date_trunc('minute', now()) - interval '25 minutes', '112.50', '112.60', '1', null, null, 'win', '100.00', '1.00'))::text
+from public.trades a, public.trades b, public.trades c, public.trades d, public.trades e, public.trades f, public.trades g,
+     public.trades h
+where a.id = :'l_typo' and b.id = :'l_late' and c.id = :'l_early' and d.id = :'l_dside' and e.id = :'l_ended'
+  and f.id = :'l_future' and g.id = :'l_result' and h.id = :'l_after';
+
+begin;
+select set_config('request.jwt.claim.sub', :P, true);
+set local role authenticated;
+select tests.eq(public.import_preview(:'liga', 'topone', null, 'UTC', (select v from tests.p3 where k = 'fileL')::jsonb)
+                - array['errors', 'first_day', 'last_day', 'account_tz', 'tz_confirmed', 'already_imported'],
+                '{"new": 3, "linked": 6, "linked_differs": 2, "duplicate": 0, "completable": 0, "other_account": 0,
+                  "day_changes": 0, "tz_status": "ok", "rows_total": 9}'::jsonb,
+                'preview: six registered, two of them with other money, three new');
+select public.import_commit(:'liga', 'topone', 'liga.csv', null, 'UTC', (select v from tests.p3 where k = 'fileL')::jsonb) as c \gset
+select tests.eq((:'c'::jsonb) - 'batch_id' - 'errors', '{"inserted": 3, "duplicate": 0, "completed": 0, "other_account": 0, "linked": 6}'::jsonb,
+                'commit: six linked, three inserted');
+select (:'c'::jsonb)->>'batch_id' as batch_l \gset
+select tests.ok((select quantity = 3 and entry_price = 7896.50 and external_id = 'PL1' and status = 'closed' and pnl = 52.50
+                 from public.trades where id = :'l_typo')
+                and (select l.differs @> array['quantity', 'entry_price'] and (l.before->>'quantity')::numeric = 2
+                     from public.trade_import_links l where l.trade_id = :'l_typo')
+                and (select count(*) = 1 from public.trades where account_id = :'liga' and direction = 'long'
+                       and public.trade_match_key('futures', symbol) = 'MES'),
+                '«Contratos» typed 2, the file says 3: one trade, with the file''s 3 (decision 2)');
+select tests.eq((select external_id from public.trades where id = :'l_late'), 'PL2', 'registered 15 minutes after the fill: linked');
+select tests.ok((select external_id is null and status = 'open' from public.trades where id = :'l_early')
+                and (select source = 'import' from public.trades where account_id = :'liga' and external_id = 'PL3'),
+                'registered 3 minutes before the file''s fill: another trade, the row is inserted');
+select tests.ok((select bool_and(external_id is null) from public.trades
+                 where account_id = :'liga' and symbol in ('ES', 'NQ') and source in ('live', 'after'))
+                and (select count(*) = 2 from public.trades where account_id = :'liga' and direction = 'short'
+                       and public.trade_match_key('futures', symbol) = 'ES')
+                and (select source = 'import' from public.trades where account_id = :'liga' and external_id = 'PL4'),
+                'decoys (the other side, another instrument, a trade the app did not register) are never linked');
+select tests.ok((select t.status = 'closed' and t.exit_time = t.entry_time and t.exit_registered_at is null and t.pnl = 100
+                        and l.closed and l.file_exit_at = date_trunc('second', t.entry_time - interval '8 minutes')
+                 from public.trades t join public.trade_import_links l on l.trade_id = t.id where t.id = :'l_ended')
+                and (select not limpa from public.trade_marks_v where trade_id = :'l_ended'),
+                'an «Aberta» registered after the file''s exit: closed at its entry, the file''s exit on the link, its mark not «limpa»');
+select tests.ok((select status = 'open' and exit_time is null and pnl is null and external_id = 'PL6' and commission = 1.50
+                 from public.trades where id = :'l_future')
+                and (select not closed from public.trade_import_links where trade_id = :'l_future'),
+                'an exit after now never closes a registered trade');
+select tests.eq(public.register_exit(:'l_future', '{"v": 1, "exit_price": "70.50"}', true)->>'pnl', '500.00',
+                '… which still takes the app''s exit');
+select tests.ok((select result = 'win' and pnl = 5 and exit_price = 69.95 and commission = 1.04 and pnl_basis = 'file'
+                        and exit_registered_at is not null
+                 from public.trades where id = :'l_result')
+                and (select differs @> array['result', 'pnl', 'exit_price'] from public.trade_import_links where trade_id = :'l_result'),
+                'closed with a loss in the app, a win in the file: the file''s result');
+select tests.ok((select external_id = 'PL8' from public.trades where id = :'l_after')
+                and (select count(*) = 1 from public.trades where account_id = :'liga' and direction = 'short'
+                       and public.trade_match_key('futures', symbol) = 'MES'),
+                '«Já fechada» typed 3 minutes before the fill: one trade');
+select tests.eq((select source from public.trades where account_id = :'liga' and external_id = 'PL9'), 'import', 'the unknown trade is inserted');
+commit;
+
+-- A file whose every row is a registered trade: nothing inserted, the batch is kept and can be undone
+insert into tests.p3 select 'fileL1', jsonb_build_array(
+  tests.row(2, 'PL10', 'MGCZ6', 'futures', 'long', t.entry_time - interval '10 seconds', t.entry_time + interval '1 minute',
+            '2401.30', '2401.80', '1', null, null, 'win', '5.00', '0.62'))::text
+from public.trades t where t.id = :'l_only';
+begin;
+select set_config('request.jwt.claim.sub', :P, true);
+set local role authenticated;
+select public.import_commit(:'liga', 'topone', 'one.csv', null, 'UTC', (select v from tests.p3 where k = 'fileL1')::jsonb) as c \gset
+select tests.ok((:'c'::jsonb)->>'batch_id' is not null and (:'c'::jsonb)->>'inserted' = '0' and (:'c'::jsonb)->>'linked' = '1'
+                and (select rows_inserted = 0 and rows_linked = 1 and status = 'done' from public.import_batches
+                     where id = ((:'c'::jsonb)->>'batch_id')::uuid),
+                'every row linked: the batch is kept');
+select tests.eq(public.import_undo(((:'c'::jsonb)->>'batch_id')::uuid), '{"deleted": 0}'::jsonb, '… and undone');
+select tests.ok((select status = 'open' and external_id is null and exit_time is null from public.trades where id = :'l_only'),
+                'the trade is as registered again');
+commit;
+
+-- The same trade in a corrected file: the link completes it again (a later batch); undoing the
+-- first batch keeps what the later one wrote, and undoing both gives back the registered values
+insert into tests.p3 select 'fileL2', jsonb_build_array(
+  tests.row(2, 'PL1', 'MESZ6', 'futures', 'long', a.entry_time - interval '30 seconds', a.entry_time + interval '3 minutes',
+            '7896.50', '7900.00', '3', null, null, 'win', '55.00', '3.10'))::text
+from public.trades a where a.id = :'l_typo';
+begin;
+select set_config('request.jwt.claim.sub', :P, true);
+set local role authenticated;
+select public.import_commit(:'liga', 'topone', 'liga2.csv', null, 'UTC', (select v from tests.p3 where k = 'fileL2')::jsonb) as c2 \gset
+select tests.eq((:'c2'::jsonb) - 'batch_id' - 'errors', '{"inserted": 0, "duplicate": 1, "completed": 1, "other_account": 0, "linked": 0}'::jsonb,
+                'a trade linked by an earlier file is completed by the next one');
+select (:'c2'::jsonb)->>'batch_id' as batch_l2 \gset
+select tests.ok((select commission = 3.10 and pnl = 55 from public.trades where id = :'l_typo'), 'the later file''s commission and result');
+select tests.eq(public.import_undo(:'batch_l'), '{"deleted": 3}'::jsonb, 'undo the first file: its three inserted trades go');
+select tests.ok((select status = 'open' and quantity = 2 and entry_price = 7896.25 and external_id is null and commission = 3.10
+                 from public.trades where id = :'l_typo'),
+                'the first file''s values are given back, except the commission the later file changed');
+select tests.ok((select result = 'loss' and pnl = -10 and exit_price = 70.10 and commission is null and pnl_basis = 'prices'
+                 from public.trades where id = :'l_result')
+                and (select status = 'open' and exit_time is null from public.trades where id = :'l_ended')
+                and (select status = 'open' and external_id is null from public.trades where id = :'l_future')
+                and (select external_id is null from public.trades where id = :'l_after'),
+                'every registered trade is as registered');
+select tests.eq(public.import_undo(:'batch_l2'), '{"deleted": 0}'::jsonb, 'undo the later file');
+select tests.ok((select status = 'open' and commission is null and pnl is null and result = 'pending' and quantity = 2
+                 from public.trades where id = :'l_typo')
+                and not exists (select 1 from public.trade_import_links where trade_id = :'l_typo'),
+                'undone in any order, the registered values come back');
+commit;
+
+-- Ebinex, the current export (Brasília wall clock, no offset), on «Liga Ebinex P»:
+--   EUR/USD call   registered → linked; the trade never takes the broker's wall clock
+--   GBP/USD call   stake typed 10, the file says 20, same expiry → linked, the file's 20
+--   BTC/USDT call  two registered a minute apart; the row's expiry is the first one's although its
+--                  entry is nearer the second → the first (the expiry decides)
+--   EUR/USD put    and ETH/USDT put (no exit: refunded) never registered → inserted
+create or replace function tests.wall(p_row jsonb, p_tz text, p_entry timestamptz, p_exit timestamptz)
+returns jsonb language sql stable
+as $$ select p_row || jsonb_build_object('local_entry', to_char(p_entry at time zone p_tz, 'YYYY-MM-DD"T"HH24:MI:SS'),
+                                         'local_exit', to_char(p_exit at time zone p_tz, 'YYYY-MM-DD"T"HH24:MI:SS'),
+                                         'utc_offset', null) $$;
+grant execute on function tests.wall(jsonb, text, timestamptz, timestamptz) to authenticated;
+begin;
+select set_config('request.jwt.claim.sub', :P, true);
+set local role authenticated;
+insert into tests.p3 select 'W_' || x.k, public.register_entry(:'lebx', jsonb_build_object('v', 1, 'client_key', tests.ck(),
+  'symbol', x.sym, 'direction', 'call', 'stake', '10', 'payout', '85', 'duration_s', 60, 'clock', 'America/Sao_Paulo',
+  'entry', tests.hm('America/Sao_Paulo', -x.back)))->>'trade_id'
+from (values ('eur', 'EUR/USD', 4), ('gbp', 'GBP/USD', 8), ('btc_a', 'BTC/USDT', 12), ('btc_b', 'BTC/USDT', 11)) x(k, sym, back);
+commit;
+select max(v) filter (where k = 'W_eur') as w_eur, max(v) filter (where k = 'W_gbp') as w_gbp,
+       max(v) filter (where k = 'W_btc_a') as w_btc_a, max(v) filter (where k = 'W_btc_b') as w_btc_b
+from tests.p3 \gset
+insert into tests.p3 select 'fileW', jsonb_build_array(
+  tests.wall(tests.row(2, 'WL1', 'EUR/USD', 'binary_option', 'call', null, null, '1.0850', '1.0860', '1', '10.00', '85', 'win', '8.50', '0.00'),
+             'America/Sao_Paulo', e.entry_time + interval '5 seconds', e.expires_at),
+  tests.wall(tests.row(3, 'WL2', 'GBP/USD', 'binary_option', 'call', null, null, '1.2700', '1.2690', '1', '20.00', '85', 'loss', '-20.00', '0.00'),
+             'America/Sao_Paulo', g.entry_time + interval '5 seconds', g.expires_at),
+  tests.wall(tests.row(4, 'WL3', 'BTC/USDT', 'binary_option', 'call', null, null, '112400', '112450', '1', '10.00', '85', 'win', '8.50', '0.00'),
+             'America/Sao_Paulo', ba.entry_time + interval '59 seconds', ba.expires_at),
+  tests.wall(tests.row(5, 'WL4', 'EUR/USD', 'binary_option', 'put', null, null, '1.0850', '1.0860', '1', '10.00', '85', 'loss', '-10.00', '0.00'),
+             'America/Sao_Paulo', date_trunc('minute', now()) - interval '3 minutes' + interval '5 seconds',
+             date_trunc('minute', now()) - interval '1 minute'),
+  tests.wall(tests.row(6, 'WL5', 'ETH/USDT', 'binary_option', 'put', null, null, '4000', null, '1', '10.00', '85', 'breakeven', '0.00', '0.00'),
+             'America/Sao_Paulo', date_trunc('minute', now()) - interval '20 minutes', null))::text
+from public.trades e, public.trades g, public.trades ba
+where e.id = :'w_eur' and g.id = :'w_gbp' and ba.id = :'w_btc_a';
+begin;
+select set_config('request.jwt.claim.sub', :P, true);
+set local role authenticated;
+select public.import_commit(:'lebx', 'ebinex', 'operacoes_2.csv', null, 'America/Sao_Paulo', (select v from tests.p3 where k = 'fileW')::jsonb) as cw \gset
+select tests.eq((:'cw'::jsonb) - 'batch_id' - 'errors', '{"inserted": 2, "duplicate": 0, "completed": 0, "other_account": 0, "linked": 3}'::jsonb,
+                'a wall-clock Ebinex file: three linked, two inserted');
+select tests.ok((select external_id = 'WL1' and status = 'closed' and exit_time = expires_at and source_local_entry is null
+                        and source_local_exit is null and import_batch_id is null
+                 from public.trades where id = :'w_eur')
+                and (select source_local_entry = (date_trunc('minute', now()) - interval '3 minutes' + interval '5 seconds') at time zone 'America/Sao_Paulo'
+                     from public.trades where account_id = :'lebx' and external_id = 'WL4'),
+                'linked from a wall-clock row, the registered trade keeps no wall clock; the inserted one does');
+select tests.ok((select stake_amount = 20 and pnl = -20 and result = 'loss' and external_id = 'WL2' from public.trades where id = :'w_gbp')
+                and (select differs @> array['stake_amount'] from public.trade_import_links where trade_id = :'w_gbp'),
+                'stake typed 10, the file says 20 at the same expiry: one trade, the file''s stake');
+select tests.ok((select external_id = 'WL3' from public.trades where id = :'w_btc_a')
+                and (select external_id is null and status = 'open' from public.trades where id = :'w_btc_b'),
+                'the expiry decides before the entry gap');
+select public.add_marks((select id from public.trades where account_id = :'lebx' and external_id = 'WL5'), '{"v": 1, "marks": {"setup": "A"}}') is not null;
+select tests.eq((select limpa from public.trade_marks_v where trade_id = (select id from public.trades where account_id = :'lebx' and external_id = 'WL5')),
+                false, 'an imported trade with no exit (refunded) never takes a «limpa» mark');
+select tests.eq(public.import_undo(((:'cw'::jsonb)->>'batch_id')::uuid), '{"deleted": 2}'::jsonb, 'undo');
+select tests.ok((select stake_amount = 10 and status = 'open' and external_id is null from public.trades where id = :'w_gbp'),
+                'the stake typed comes back');
 commit;
 
 -- =============================================================================================
@@ -1438,9 +1842,12 @@ select public.register_entry(:'top2', jsonb_build_object('v', 1, 'client_key', t
          'quantity', '1', 'entry_price', '7896.25', 'marks', '{"setup": "C"}'::jsonb))->>'trade_id' as u1 \gset
 select public.register_entry(:'top2', jsonb_build_object('v', 1, 'client_key', tests.ck(), 'symbol', 'MES', 'direction', 'short',
          'quantity', '1', 'entry_price', '7896.25'))->>'trade_id' as u2 \gset
+select public.register_entry(:'top2', jsonb_build_object('v', 1, 'client_key', tests.ck(), 'symbol', 'MGC', 'direction', 'short',
+         'quantity', '1', 'entry_price', '2401.30'))->>'trade_id' as u3 \gset
 commit;
 alter table public.trades disable trigger trades_guard;
 update public.trades set registered_at = registered_at - interval '16 minutes' where id = :'u2';
+update public.trades set registered_at = registered_at - interval '14 minutes' where id = :'u3';
 alter table public.trades enable trigger trades_guard;
 
 begin;
@@ -1458,6 +1865,7 @@ select tests.eq((select jsonb_agg(k order by k) from public.trade_deletions d, j
                 '["account_id", "deleted_at", "entry_time", "id", "origin", "registered_at", "source", "trade_id", "trading_day", "user_id", "via"]'::jsonb,
                 'the log keeps times and ids only, never a value');
 select tests.fails(format($$select public.undo_entry(%L)$$, :'u2'), 'undo_too_late', null, 'more than 15 minutes after the registration');
+select tests.eq(public.undo_entry(:'u3')->>'deleted', 'true', '14 minutes after the registration: still undone');
 select tests.fails(format($$select public.undo_entry(%L)$$, :'mk'), 'not_open', null, 'a closed trade');
 select tests.fails(format($$select public.undo_entry(%L)$$, (select v from tests.p3 where k = 'after1')), 'not_app_trade', null,
                    'a «Já fechada» trade');
@@ -1474,7 +1882,7 @@ select tests.eq((select count(*) from public.trade_image_trash where reason = 'o
                    and path in (select a.path from tests.slot a where a.ord in (1, 2, 3, 5))), 4::bigint,
                 'the deleted trade''s four images are queued for removal');
 delete from public.trades where external_id = 'P3SIM' and account_id = :'top2';
-select tests.eq((select count(*) from public.trade_deletions where user_id = :P), 3::bigint, 'deleting an imported trade logs nothing');
+select tests.eq((select count(*) from public.trade_deletions where user_id = :P), 4::bigint, 'deleting an imported trade logs nothing');
 commit;
 
 -- =============================================================================================

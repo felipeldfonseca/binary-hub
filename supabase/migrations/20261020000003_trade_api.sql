@@ -20,8 +20,9 @@
 --        "allow_similar": bool}
 --   register_exit(p_trade uuid, p_exit jsonb, p_dry_run boolean default false) returns jsonb
 --     «Registrar saída» / «Registrar resultado». The server computes the result from the prices
---     (instrument_specs) or the binary outcome; a typed "pnl" is required where it cannot, and
---     corrects a computed one only in the new markets. «Custos» ("costs") where the market has them.
+--     (instrument_specs; pnl_basis 'prices', or 'estimate' for a forex pair with the dollar as base,
+--     converted at the exit price) or the binary outcome; a typed "pnl" is required where it cannot,
+--     and corrects a computed one only in the new markets. «Custos» ("costs") where the market has them.
 --       {"v": 1, "exit_price", "exit": "HH:MM", "clock", "pnl", "costs"} | {"v": 1, "outcome":
 --        "ganho" | "perda" | "devolvida"}
 --   register_after(p_account uuid, p_trade jsonb, p_dry_run boolean default false) returns jsonb
@@ -38,7 +39,8 @@
 --
 -- Answers carry "server_now" and the trade's whole state (trade_state); register_* also "dry_run",
 -- "repeated" (the client_key was used: nothing written) and "similar" (imported trades this one
--- looks like; the call is refused with similar_trade unless "allow_similar").
+-- looks like: the import's match seen from the other side; the call is refused with similar_trade
+-- unless "allow_similar").
 --
 -- Error codes: not_authenticated, unknown_account, archived_account, unknown_trade, not_app_trade,
 -- not_for_market, no_rules, before_rules, bad_payload, payload_too_large, unknown_key,
@@ -552,8 +554,9 @@ begin
 end;
 $$;
 
--- The exit of a price-market trade (raises a code): exit price on its tick, the result computed or
--- typed, «Custos». Returns exit_price, pnl, result, pnl_basis, commission, points.
+-- The exit of a price-market trade (raises a code): exit price on its tick, the result computed
+-- (exact: 'prices'; converted at the exit price: 'estimate') or typed, «Custos». Returns
+-- exit_price, pnl, result, pnl_basis, commission, points.
 create or replace function public.trade_parse_exit(p_spec jsonb, p jsonb, p_sgn int, p_qty numeric, p_entry numeric,
                                                    p_commission numeric)
 returns jsonb
@@ -582,7 +585,8 @@ begin
     basis := 'typed';
   elsif p_spec->>'pnl' in ('prices', 'prices_div_exit') then
     v_pnl := public.trade_pnl(p_spec, p_sgn, p_qty, p_entry, px);
-    basis := 'prices';
+    -- A pair with the dollar as base: the broker converts at its own closing rate (an estimate)
+    basis := case when p_spec->>'pnl' = 'prices_div_exit' then 'estimate' else 'prices' end;
   else
     perform public.trade_fail('pnl_required', 'pnl');
   end if;
@@ -695,10 +699,12 @@ as $$
 $$;
 
 -- Imported trades of the account that this one looks like (D30: «Esta operação parece já ter vindo
--- do arquivo»): same instrument key, side and size, the file's entry within 16 minutes before and 2
--- after (the import's matching window, seen from the other side)
+-- do arquivo»): the import's match (20261020000004, import_stage) seen from the other side. Same
+-- instrument key and side, any size (the import pairs a different size too: a typed «Contratos» or
+-- stake the file corrects), and the file's entry within 16 minutes before and 2 after a live entry,
+-- or within 16 minutes either way of a reconstructed one («Já fechada»: the hour is typed from memory)
 create or replace function public.trade_similar(p_account uuid, p_market text, p_key text, p_direction text,
-                                                p_qty numeric, p_stake numeric, p_entry timestamptz)
+                                                p_entry timestamptz, p_reconstructed boolean)
 returns jsonb
 language sql
 stable
@@ -710,8 +716,8 @@ as $$
     and t.source = 'import'
     and t.direction = p_direction
     and public.trade_match_key(p_market, t.symbol) = p_key
-    and case when p_market = 'binary' then t.stake_amount = p_stake else t.quantity = p_qty end
-    and t.entry_time between p_entry - interval '16 minutes' and p_entry + interval '2 minutes'
+    and t.entry_time between p_entry - interval '16 minutes'
+                         and p_entry + case when p_reconstructed then interval '16 minutes' else interval '2 minutes' end
 $$;
 
 -- Marks of a checked payload, one row per kind present, in a fixed order
@@ -854,8 +860,7 @@ begin
   if bin then
     exp_at := public.trade_expiry(acc.platform, entry_at, (f->>'duration')::int);
   end if;
-  v_similar := public.trade_similar(acc.id, acc.market, spec->>'key', f->>'direction',
-                                    (f->>'quantity')::numeric, (f->>'stake')::numeric, entry_at);
+  v_similar := public.trade_similar(acc.id, acc.market, spec->>'key', f->>'direction', entry_at, false);
 
   if dry then
     return jsonb_build_object(
@@ -1135,8 +1140,7 @@ begin
   -- «Posso operar hoje? Na entrada:», reconstructed with the trades realized by then
   v_gate := public.gate_at(acc.id, entry_at) - 'rules';
   ctx := public.trade_context_from_gate(v_gate);
-  v_similar := public.trade_similar(acc.id, acc.market, spec->>'key', f->>'direction',
-                                    (f->>'quantity')::numeric, (f->>'stake')::numeric, entry_at);
+  v_similar := public.trade_similar(acc.id, acc.market, spec->>'key', f->>'direction', entry_at, true);
 
   if dry then
     return jsonb_build_object(
@@ -1369,8 +1373,15 @@ begin
   where a.user_id = uid and a.status = 'pendente' and a.reserved_at <= now() - interval '30 minutes';
   perform pg_catalog.set_config('binary_hub.trash_reason', '', true);
 
-  -- 500 MB per member (what the browser declares until a file is saved: a guard, not the gate)
-  if (select coalesce(sum(coalesce(a.bytes, a.claimed_bytes)), 0) from public.trade_attachments a where a.user_id = uid)
+  -- 500 MB per member: every file Storage holds in the member's folder (saved, or replaced, removed
+  -- or expired and still waiting in the trash), plus what pending reservations declared for files
+  -- not uploaded yet, plus this request (a guard against mistakes; hub_members is the gate)
+  if (select coalesce(sum(case when jsonb_typeof(o.metadata->'size') = 'number' then (o.metadata->>'size')::numeric end), 0)
+      from storage.objects o
+      where o.bucket_id = 'trade-images' and o.name like uid::text || '/%')
+     + (select coalesce(sum(a.claimed_bytes), 0) from public.trade_attachments a
+        where a.user_id = uid and a.status = 'pendente'
+          and not exists (select 1 from storage.objects o where o.bucket_id = 'trade-images' and o.name = a.path))
      + claimed > 524288000 then
     perform public.trade_fail('storage_quota', 'new');
   end if;
@@ -1589,7 +1600,7 @@ revoke all on function public.trade_parse_exit(jsonb, jsonb, int, numeric, numer
 revoke all on function public.trade_context_from_gate(jsonb) from public, anon, authenticated;
 revoke all on function public.trade_entry_plan(jsonb) from public, anon, authenticated;
 revoke all on function public.trade_state(uuid) from public, anon, authenticated;
-revoke all on function public.trade_similar(uuid, text, text, text, numeric, numeric, timestamptz) from public, anon, authenticated;
+revoke all on function public.trade_similar(uuid, text, text, text, timestamptz, boolean) from public, anon, authenticated;
 revoke all on function public.trade_insert_marks(uuid, uuid, jsonb) from public, anon, authenticated;
 revoke all on function public.trade_preview(jsonb) from public, anon, authenticated;
 

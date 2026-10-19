@@ -11,25 +11,33 @@
 --        fields it was missing, as before; an app trade linked earlier gets the link path (below).
 --     2. its ID is in another of the user's accounts: left out, as before.
 --     3. otherwise, matched one-to-one to an app-registered trade of the same account without an ID:
---        same instrument key (trade_match_key: MESM6 = MES), side, quantity (binary: stake), and the
---        app entry between 2 minutes before and 16 minutes after the file's (a live entry is typed to
---        the minute and may be registered up to 15 minutes late). Candidate pairs are taken greedily,
---        each trade and each row at most once, in this order: a binary whose expiry equals the file's
---        exit first, then the smallest entry gap, then the file's entry, the trade's entry, its id and
---        the line. No row is ever left out: a row with no partner is inserted (4), an app trade with no
---        row stays as registered.
+--        same instrument key (trade_match_key: MESM6 = MES) and side, and the app entry between 2
+--        minutes before and 16 minutes after the file's (a live entry is typed to the minute and may
+--        be registered up to 15 minutes late; a «Já fechada» entry, typed from memory, within 16
+--        minutes either way). Candidate pairs are taken greedily, each trade and each row at most
+--        once, in this order: a binary whose expiry equals the file's exit first, then the same size
+--        (quantity; binary: stake) before a different one (decision 2: the file corrects a typed
+--        «Contratos» or stake, so a size typo never duplicates the trade; a binary of another stake
+--        pairs only when its expiry is the file's exit), then the smallest entry gap, then the
+--        file's entry, the trade's entry, its id and the line. No row is ever left out: a row with
+--        no partner is inserted (4), an app trade with no row stays as registered.
 --     4. otherwise: inserted, as before.
 --   The link path (decision 2: the broker file wins on money): the app trade gets the file's key
 --   (source_platform, external_id and the old notes key), the commission, and every price, quantity,
 --   stake, payout, pnl and result the file states and the app had otherwise; an open trade is closed
---   by the file when the file's exit is at or after its entry (exit_registered_at stays null: the app
---   did not register it). Never written on an app trade: entry_time, registered_at, source, account,
+--   by the file when the file's exit has already happened (never an exit after now: a file read on
+--   the wrong clock would otherwise make later marks «limpas»), at the file's exit or, when the file
+--   exited before the typed entry (a trade registered after it ended), at the entry
+--   (exit_registered_at stays null: the app did not register it; trade_import_links keeps the file's
+--   own exit). Never written on an app trade: entry_time, registered_at, source, account,
 --   rule version, stop and target, the broker's wall clock (source_local_*: import_fix_tz can never
 --   move it), its marks, its entry context, its note, its images. trade_import_links keeps, per batch
 --   and trade, every column's value before and after, the file's own entry and exit instants (the gap
 --   to the typed hour stays visible), and which money the file disagreed on.
 --   import_batches.rows_linked counts the batch's link rows; a batch that only linked is kept, so it
---   can be undone. import_undo reverts every column whose value is still what the batch wrote,
+--   can be undone. import_undo reverts every column whose value is still what the batch wrote (a
+--   column a later batch changed keeps the later value, and that batch, when undone, gives back what
+--   this one found: in any order, undoing every batch ends on the registered values),
 --   reopens a trade the file closed, clears the key it set, and never deletes an app trade; the
 --   batch's own trades are deleted as before (their marks and images with them). Its answer is
 --   unchanged: {"deleted": n}.
@@ -40,7 +48,9 @@
 --
 --   No row that exists is written (the end of this file proves it, and then checks Phase 3 as a
 --   whole: no trading day drifts, the new tables are empty, the bucket and the Storage policies are as
---   specified, and no API role holds a privilege it should not).
+--   specified (each policy's command, roles and expressions, and no other policy that would open
+--   trade-images), the functions that read storage.objects see every row, and no API role holds a
+--   privilege it should not).
 
 create temp table m6a_4_before as
 select 'trades' as tbl, t.id::text as k,
@@ -125,8 +135,9 @@ $$;
 
 -- What a file row changes on the app trade it is linked to (decision 2: the file wins on money;
 -- times, stop and target, marks and the entry context stay). {"set": {column: value}, "differs":
--- [money columns where the app had another value], "closes": the file closes an open trade,
--- "set_key": the trade gets the file's ID}
+-- [money columns where the app had another value], "closes": the file closes an open trade (an
+-- exit that already happened; never before the trade's entry), "set_key": the trade gets the
+-- file's ID}
 create or replace function public.import_link_patch(p_trade public.trades, p_row jsonb, p_platform text)
 returns jsonb
 language plpgsql
@@ -154,10 +165,11 @@ begin
     end if;
   end loop;
   closes := p_trade.status = 'open' and p_row->>'exit_time' is not null
-            and (p_row->>'exit_time')::timestamptz >= p_trade.entry_time
+            and (p_row->>'exit_time')::timestamptz <= now()
             and p_row->>'pnl' is not null and p_row->>'result' is not null;
   if closes then
-    s := s || jsonb_build_object('exit_time', p_row->'exit_time', 'exit_price', p_row->'exit_price', 'pnl', p_row->'pnl',
+    s := s || jsonb_build_object('exit_time', greatest((p_row->>'exit_time')::timestamptz, p_trade.entry_time),
+                                 'exit_price', p_row->'exit_price', 'pnl', p_row->'pnl',
                                  'result', p_row->'result', 'status', 'closed', 'pnl_basis', 'file');
   elsif p_trade.status = 'closed' then
     foreach k in array array['exit_price', 'pnl'] loop
@@ -228,18 +240,25 @@ begin
            null::jsonb as patch
     from public.import_checked_rows(p_account, p_platform, p_file_tz, p_rows) r;
 
-  -- One-to-one: the best remaining pair first
+  -- One-to-one: the best remaining pair first (a binary's expiry, then the same size, then the gap)
   for c in
     select r.rn, t.id as tid
     from pg_temp.import_rows r
     join public.trades t on t.account_id = p_account.id and t.user_id = p_account.user_id
                          and t.external_id is null and t.direction = r.direction
-                         and t.entry_time between r.entry_time - interval '2 minutes' and r.entry_time + interval '16 minutes'
+    join public.trade_entry_context x on x.trade_id = t.id
     where r.code is null and not r.elsewhere and r.existing_id is null
-      and exists (select 1 from public.trade_entry_context x where x.trade_id = t.id)
+      and t.entry_time between r.entry_time - case when x.origin = 'reconstructed' then interval '16 minutes'
+                                                   else interval '2 minutes' end
+                           and r.entry_time + interval '16 minutes'
       and public.trade_match_key(p_account.market, t.symbol) = public.trade_match_key(p_account.market, r.symbol)
-      and case when p_account.market = 'binary' then t.stake_amount = r.stake_amount else t.quantity = r.quantity end
+      -- A binary of another stake only when its expiry is the file's exit (a burst of one pair has
+      -- several orders a few minutes apart; the expiry pins the order's minute)
+      and (p_account.market <> 'binary' or t.stake_amount = r.stake_amount
+           or (t.expires_at is not null and t.expires_at = r.exit_time))
     order by (t.expires_at is not null and t.expires_at = r.exit_time) desc,
+             (case when p_account.market = 'binary' then t.stake_amount = r.stake_amount
+                   else t.quantity = r.quantity end) is true desc,
              abs(extract(epoch from (t.entry_time - r.entry_time))), r.entry_time, t.entry_time, t.id, r.line, r.rn
   loop
     update pg_temp.import_rows u set link_id = c.tid
@@ -569,6 +588,15 @@ begin
       rev := rev || jsonb_build_object('status', 'open', 'exit_time', null, 'exit_price', null, 'pnl', null,
                                        'result', 'pending', 'pnl_basis', coalesce(l.before->'pnl_basis', 'null'::jsonb));
     end if;
+    -- A later batch that wrote over this batch's value gives back, when it is undone, what this
+    -- batch found (or what this undo set): undone in any order, the registered values come back
+    update public.trade_import_links x
+    set before = x.before || (select jsonb_object_agg(k2, case when rev ? k2 then rev->k2 else l.before->k2 end)
+                              from jsonb_object_keys(x.before) k2
+                              where l.after ? k2 and public.import_col_equal(k2, x.before, l.after))
+    where x.trade_id = tr.id and x.batch_id <> b.id
+      and exists (select 1 from jsonb_object_keys(x.before) k2
+                  where l.after ? k2 and public.import_col_equal(k2, x.before, l.after));
     continue when rev = '{}'::jsonb;
     nr := jsonb_populate_record(tr, rev);
     update public.trades t
@@ -738,12 +766,73 @@ begin
         and bk.allowed_mime_types::text[] <@ array['image/png', 'image/jpeg', 'image/webp']) <> 1 then
     raise exception 'm6a_bucket';
   end if;
-  if (select count(*) from pg_catalog.pg_policies pp
-      where pp.schemaname = 'storage' and pp.tablename = 'objects'
-        and pp.policyname in ('trade-images insert reserved', 'trade-images select own', 'trade-images delete trashed')) <> 3 then
-    raise exception 'm6a_storage_policies';
+  -- The three policies exactly as 20261020000002 wrote them (command, roles, permissive, both
+  -- expressions): the same statements on a scratch table with the same columns deparse to the same
+  -- text in this session
+  create temporary table m6a_policy_ref (bucket_id text, name text);
+  create policy "trade-images insert reserved" on pg_temp.m6a_policy_ref for insert to authenticated
+    with check (bucket_id = 'trade-images'
+                and (storage.foldername(name))[1] = (select auth.uid())::text
+                and public.trade_image_upload_ok(name));
+  create policy "trade-images select own" on pg_temp.m6a_policy_ref for select to authenticated
+    using (bucket_id = 'trade-images'
+           and (storage.foldername(name))[1] = (select auth.uid())::text);
+  create policy "trade-images delete trashed" on pg_temp.m6a_policy_ref for delete to authenticated
+    using (bucket_id = 'trade-images'
+           and (storage.foldername(name))[1] = (select auth.uid())::text
+           and public.trade_image_delete_ok(name));
+  with pol as (
+    select p.polrelid, p.polname::text as pname, p.polcmd, p.polpermissive,
+           array(select pg_catalog.pg_get_userbyid(r) from unnest(p.polroles) r order by 1) as roles,
+           pg_catalog.pg_get_expr(p.polqual, p.polrelid) as q, pg_catalog.pg_get_expr(p.polwithcheck, p.polrelid) as w
+    from pg_catalog.pg_policy p
+    where p.polrelid in ('storage.objects'::regclass, 'pg_temp.m6a_policy_ref'::regclass)
+  )
+  select count(*) into n from (
+    (select pname, polcmd, polpermissive, roles, q, w from pol
+     where polrelid = 'storage.objects'::regclass and pname like 'trade-images%'
+     except
+     select pname, polcmd, polpermissive, roles, q, w from pol where polrelid = 'pg_temp.m6a_policy_ref'::regclass)
+    union all
+    (select pname, polcmd, polpermissive, roles, q, w from pol where polrelid = 'pg_temp.m6a_policy_ref'::regclass
+     except
+     select pname, polcmd, polpermissive, roles, q, w from pol
+     where polrelid = 'storage.objects'::regclass and pname like 'trade-images%')) d;
+  drop table pg_temp.m6a_policy_ref;
+  if n > 0 then
+    raise exception 'm6a_storage_policies: %', n;
+  end if;
+  -- No other permissive policy lets the API roles into storage.objects without naming a bucket, or
+  -- names trade-images (policies are OR-ed: it would open the bucket to every signed-up user)
+  select count(*) into n
+  from pg_catalog.pg_policy p
+  where p.polrelid = 'storage.objects'::regclass and p.polpermissive and p.polname !~ '^trade-images '
+    and exists (select 1 from unnest(p.polroles) r where r = 0 or pg_catalog.pg_get_userbyid(r) in ('anon', 'authenticated'))
+    and (coalesce(pg_catalog.pg_get_expr(p.polqual, p.polrelid), '') || ' ' || coalesce(pg_catalog.pg_get_expr(p.polwithcheck, p.polrelid), '')
+           !~ 'bucket_id = '
+         or coalesce(pg_catalog.pg_get_expr(p.polqual, p.polrelid), '') || ' ' || coalesce(pg_catalog.pg_get_expr(p.polwithcheck, p.polrelid), '')
+           ~ 'trade-images');
+  if n > 0 then
+    raise exception 'm6a_storage_open_policies: %', n;
   end if;
   -- storage-check:end
+
+  -- image_slots, save_extras and image_trash_done read storage.objects as their owner (SECURITY
+  -- DEFINER): it must see every row, or every upload would read as missing, the quota would miss
+  -- files, and the trash would forget files that still exist
+  select count(*) into n
+  from pg_catalog.pg_proc p
+  join pg_catalog.pg_roles r on r.oid = p.proowner
+  cross join pg_catalog.pg_class c
+  where p.oid in ('public.image_slots(uuid, jsonb)'::regprocedure, 'public.save_extras(uuid, jsonb)'::regprocedure,
+                  'public.image_trash_done(text[])'::regprocedure)
+    and c.oid = 'storage.objects'::regclass
+    and not (has_table_privilege(p.proowner, c.oid, 'SELECT')
+             and (r.rolsuper or r.rolbypassrls
+                  or (pg_catalog.pg_has_role(p.proowner, c.relowner, 'USAGE') and not c.relforcerowsecurity)));
+  if n > 0 then
+    raise exception 'm6a_storage_objects_hidden: %', n;
+  end if;
 
   -- The API roles: SELECT only on the new tables and views (hub_members: nothing); anon nothing
   select count(*) into n

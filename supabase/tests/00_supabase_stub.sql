@@ -132,6 +132,11 @@ begin
 end
 $$;
 
+-- Supabase Storage migration 0055-prevent-direct-deletes puts it on both tables
+drop trigger if exists protect_buckets_delete on storage.buckets;
+create trigger protect_buckets_delete
+  before delete on storage.buckets
+  for each statement execute function storage.protect_delete();
 drop trigger if exists protect_objects_delete on storage.objects;
 create trigger protect_objects_delete
   before delete on storage.objects

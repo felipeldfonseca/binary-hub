@@ -13,9 +13,11 @@
 --     rule_version_id     the rule version in force at entry_time (app trades only); never changes.
 --     client_key          the form's idempotency key (app trades only); never changes.
 --     expires_at          a binary option's expiry, fixed at registration; never changes.
---     pnl_basis           where pnl came from: 'prices' (computed by the server from the prices),
---                         'typed' (typed or corrected by the trader), 'outcome' (binary: stake ×
---                         payout), 'file' (the broker file); null on the old rows.
+--     pnl_basis           where pnl came from: 'prices' (computed by the server from the prices,
+--                         exact), 'estimate' (computed by the server, approximate: a forex pair with
+--                         the dollar as base, converted at the exit price), 'typed' (typed or
+--                         corrected by the trader), 'outcome' (binary: stake × payout), 'file' (the
+--                         broker file); null on the old rows.
 --     option_right, strike, expires_on, multiplier   a listed option's contract (asset_type
 --                         'option' only; all four or none).
 --   trade_entry_context   one row per app trade: the «Posso operar hoje?» answer at its entry,
@@ -92,8 +94,9 @@ union all select 'profiles', p.id::text, md5(to_jsonb(p)::text) from public.prof
 -- instrument_specs(): the instruments of a market whose spec differs from the market's, keyed by
 -- trade_match_key() (MESM6 → MES, WINZ26 → WIN, EUR/USD → EURUSD). Each key overrides the market's
 -- caps: tick (the price must be a multiple), mult, pip (forex), stops, pnl ("prices_div_exit": a
--- pair with the dollar as base, Δ × mult × lots ÷ exit price, an estimate), asset_type, price_dp,
--- qty_dp. An instrument that is not listed takes the market's caps (futures: typed result).
+-- pair with the dollar as base, Δ × mult × lots ÷ exit price, an estimate: stored with pnl_basis
+-- 'estimate', never as an exact 'prices'), asset_type, price_dp, qty_dp. An instrument that is not
+-- listed takes the market's caps (futures: typed result).
 
 create or replace function public.trade_caps_all()
 returns jsonb
@@ -270,7 +273,7 @@ alter table public.trades
 
 alter table public.trades
   add constraint trades_status_ok check (status in ('open', 'closed')),
-  add constraint trades_pnl_basis_ok check (pnl_basis is null or pnl_basis in ('prices', 'typed', 'outcome', 'file')),
+  add constraint trades_pnl_basis_ok check (pnl_basis is null or pnl_basis in ('prices', 'estimate', 'typed', 'outcome', 'file')),
   -- Only a live app trade is ever open, and while open it has no exit and no result yet
   add constraint trades_open_shape
     check (status = 'closed'
@@ -299,7 +302,7 @@ comment on column public.trades.client_key is
 comment on column public.trades.expires_at is
   'A binary option''s expiry, fixed when it was registered in the app.';
 comment on column public.trades.pnl_basis is
-  'Where pnl came from: prices (computed by the server), typed (typed or corrected), outcome (binary), file (broker file). Null before Phase 3.';
+  'Where pnl came from: prices (computed by the server, exact), estimate (computed by the server, approximate), typed (typed or corrected), outcome (binary), file (broker file). Null before Phase 3.';
 
 -- =============================================================================================
 -- 3. The entry context and the marks

@@ -22,6 +22,12 @@
 --   the upload policy (only reserved paths), and the save (save_extras, a list of at most four, with
 --   unique positions 1–4).
 --
+--   The app uploads with the Storage API's plain upload (as the signed-in user, no upsert), never
+--   with a signed upload URL: Storage checks the insert policy only when such a URL is created, and
+--   the upload itself then runs above these policies for up to two hours, upsert included (it could
+--   write a path after its 30 minutes, after it was trashed, or over a saved image). A Jest test
+--   (storageUploads) keeps createSignedUploadUrl and uploadToSignedUrl out of the app.
+--
 -- What never changes
 --
 --   No row that exists is written (the end of this file proves it). Images and notes never reach any
