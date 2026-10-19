@@ -2,12 +2,12 @@
   "r": null,
   "pnl": 17.6,
   "gate": {
-    "at": "2026-10-18T23:39:50.193024+00:00",
+    "at": "2026-10-19T01:25:29.627116+00:00",
     "block": {
       "state": "nao_avaliado",
       "reason": "so_futuros"
     },
-    "desde": "2026-09-18T23:39:49.393721+00:00",
+    "desde": "2026-09-19T01:25:28.796512+00:00",
     "label": "Registrar binary",
     "limit": {
       "state": "nao_avaliado",
@@ -22,28 +22,28 @@
     "status": "liberado",
     "window": {
       "next": {
-        "opens_at": "2026-10-19T22:09:00+00:00",
-        "closes_at": "2026-10-20T01:09:00+00:00",
+        "opens_at": "2026-10-19T23:55:00+00:00",
+        "closes_at": "2026-10-20T02:55:00+00:00",
         "trading_day": "2026-10-19"
       },
       "state": "dentro",
       "reason": null,
       "current": {
-        "opens_at": "2026-10-18T22:09:00+00:00",
-        "closes_at": "2026-10-19T01:09:00+00:00"
+        "opens_at": "2026-10-18T23:55:00+00:00",
+        "closes_at": "2026-10-19T02:55:00+00:00"
       },
       "position": "dentro"
     },
     "version": {
-      "id": "78eebe8f-73c3-4e08-a4a4-92cf792d91a0",
+      "id": "f920ae6f-bec8-4b98-8587-c5fc5b53c77d",
       "origin": "criar",
       "version_no": 1,
-      "effective_from": "2026-09-18T23:39:49.393721+00:00"
+      "effective_from": "2026-09-19T01:25:28.796512+00:00"
     },
     "warnings": [],
     "desde_day": "2026-09-18",
-    "account_id": "e98ecbb8-03bc-4d34-a5b3-d434f5a6b502",
-    "changes_at": "2026-10-19T01:09:00+00:00",
+    "account_id": "c00490bd-2e05-4ab6-b251-22823136bfa6",
+    "changes_at": "2026-10-19T02:55:00+00:00",
     "state_rule": {
       "state": "nao_avaliado",
       "reason": "so_futuros"
@@ -62,7 +62,7 @@
   },
   "marks": [],
   "trade": {
-    "id": "9717489b-c855-4208-ad04-f5faf7518107",
+    "id": "29a3527d-7d82-41de-9596-9ece4341fe54",
     "pnl": 17.6,
     "note": null,
     "option": null,
@@ -72,25 +72,25 @@
     "symbol": "EUR/USD",
     "quantity": 1,
     "direction": "call",
-    "exit_time": "2026-10-18T23:38:00+00:00",
+    "exit_time": "2026-10-19T01:24:00+00:00",
     "pnl_basis": "outcome",
     "timeframe": "M1",
-    "account_id": "e98ecbb8-03bc-4d34-a5b3-d434f5a6b502",
+    "account_id": "c00490bd-2e05-4ab6-b251-22823136bfa6",
     "asset_type": "binary_option",
     "commission": 0,
-    "entry_time": "2026-10-18T23:36:50.193024+00:00",
+    "entry_time": "2026-10-19T01:22:29.627116+00:00",
     "exit_price": null,
-    "expires_at": "2026-10-18T23:38:00+00:00",
+    "expires_at": "2026-10-19T01:24:00+00:00",
     "stop_price": null,
     "entry_price": null,
     "trading_day": "2026-10-18",
     "stake_amount": 20,
     "target_price": null,
     "note_saved_at": null,
-    "registered_at": "2026-10-18T23:39:50.193024+00:00",
+    "registered_at": "2026-10-19T01:25:29.627116+00:00",
     "payout_percent": 88,
     "duration_seconds": 60,
-    "exit_registered_at": "2026-10-18T23:39:50.238409+00:00"
+    "exit_registered_at": "2026-10-19T01:25:29.672819+00:00"
   },
   "images": [],
   "points": null,
@@ -102,9 +102,9 @@
     "warnings": [],
     "in_window": true,
     "after_limit": null,
-    "captured_at": "2026-10-18T23:39:50.193024+00:00",
+    "captured_at": "2026-10-19T01:25:29.627116+00:00",
     "gate_status": "liberado",
-    "evaluated_at": "2026-10-18T23:39:50.193024+00:00",
+    "evaluated_at": "2026-10-19T01:25:29.627116+00:00",
     "state_choice": null,
     "checks_evaluated": [
       "janela"
@@ -113,19 +113,19 @@
     "day_worst_at_entry": null
   },
   "dry_run": false,
-  "exit_at": "2026-10-18T23:38:00+00:00",
+  "exit_at": "2026-10-19T01:24:00+00:00",
   "version": {
-    "id": "78eebe8f-73c3-4e08-a4a4-92cf792d91a0",
+    "id": "f920ae6f-bec8-4b98-8587-c5fc5b53c77d",
     "version_no": 1
   },
-  "entry_at": "2026-10-18T23:36:50.193024+00:00",
+  "entry_at": "2026-10-19T01:22:29.627116+00:00",
   "gate_now": {
-    "at": "2026-10-18T23:39:50.238409+00:00",
+    "at": "2026-10-19T01:25:29.672819+00:00",
     "block": {
       "state": "nao_avaliado",
       "reason": "so_futuros"
     },
-    "desde": "2026-09-18T23:39:49.393721+00:00",
+    "desde": "2026-09-19T01:25:28.796512+00:00",
     "label": "Registrar binary",
     "limit": {
       "state": "nao_avaliado",
@@ -140,28 +140,28 @@
     "status": "liberado",
     "window": {
       "next": {
-        "opens_at": "2026-10-19T22:09:00+00:00",
-        "closes_at": "2026-10-20T01:09:00+00:00",
+        "opens_at": "2026-10-19T23:55:00+00:00",
+        "closes_at": "2026-10-20T02:55:00+00:00",
         "trading_day": "2026-10-19"
       },
       "state": "dentro",
       "reason": null,
       "current": {
-        "opens_at": "2026-10-18T22:09:00+00:00",
-        "closes_at": "2026-10-19T01:09:00+00:00"
+        "opens_at": "2026-10-18T23:55:00+00:00",
+        "closes_at": "2026-10-19T02:55:00+00:00"
       },
       "position": "dentro"
     },
     "version": {
-      "id": "78eebe8f-73c3-4e08-a4a4-92cf792d91a0",
+      "id": "f920ae6f-bec8-4b98-8587-c5fc5b53c77d",
       "origin": "criar",
       "version_no": 1,
-      "effective_from": "2026-09-18T23:39:49.393721+00:00"
+      "effective_from": "2026-09-19T01:25:28.796512+00:00"
     },
     "warnings": [],
     "desde_day": "2026-09-18",
-    "account_id": "e98ecbb8-03bc-4d34-a5b3-d434f5a6b502",
-    "changes_at": "2026-10-19T01:09:00+00:00",
+    "account_id": "c00490bd-2e05-4ab6-b251-22823136bfa6",
+    "changes_at": "2026-10-19T02:55:00+00:00",
     "state_rule": {
       "state": "nao_avaliado",
       "reason": "so_futuros"
@@ -172,13 +172,13 @@
     ]
   },
   "repeated": false,
-  "trade_id": "9717489b-c855-4208-ad04-f5faf7518107",
+  "trade_id": "29a3527d-7d82-41de-9596-9ece4341fe54",
   "marks_now": [],
   "pnl_basis": "outcome",
   "commission": 0,
   "exit_price": null,
-  "server_now": "2026-10-18T23:39:50.238409+00:00",
+  "server_now": "2026-10-19T01:25:29.672819+00:00",
   "trading_day": "2026-10-18",
-  "registered_at": "2026-10-18T23:39:50.193024+00:00",
-  "exit_registered_at": "2026-10-18T23:39:50.238409+00:00"
+  "registered_at": "2026-10-19T01:25:29.627116+00:00",
+  "exit_registered_at": "2026-10-19T01:25:29.672819+00:00"
 }

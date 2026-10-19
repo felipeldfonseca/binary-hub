@@ -4,11 +4,11 @@
   "points": 7.5,
   "result": "win",
   "dry_run": true,
-  "exit_at": "2026-10-18T23:39:49.915387+00:00",
+  "exit_at": "2026-10-19T01:25:29.308463+00:00",
   "repeated": false,
-  "trade_id": "9d40aa2c-8759-4c71-9be1-1924bb5b28f4",
+  "trade_id": "dfe6c70f-77c3-4ff5-ba1f-8e2eebf91094",
   "pnl_basis": "prices",
   "commission": null,
   "exit_price": 7903.75,
-  "server_now": "2026-10-18T23:39:49.915387+00:00"
+  "server_now": "2026-10-19T01:25:29.308463+00:00"
 }

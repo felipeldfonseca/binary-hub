@@ -6,14 +6,18 @@
  * registering (trade_preview). Amounts are decimal strings in Postgres' text; the arithmetic is
  * the database's, so the preview is the value stored, to the cent.
  *
- * Where pnl came from (trades.pnl_basis): 'prices' computed by the server, 'typed' typed or
+ * Where pnl came from (trades.pnl_basis): 'prices' computed by the server from the prices
+ * (exact), 'estimate' computed by the server but approximate (a forex pair with the dollar as base,
+ * converted at the exit price: the broker converts at its own closing rate), 'typed' typed or
  * corrected by the trader, 'outcome' a binary's stake × payout, 'file' a broker file.
  */
 import type { InstrumentSpec } from './caps';
 import { abs, cmp, div, fromInt, isMultipleOf, mul, neg, numeric, numericText, round, sign, sub, tradeNum, type Numeric } from './numeric';
 import type { ExitPayload, Outcome, ParsedEntry, RegistroCode } from './payload';
 
-export type PnlBasis = 'prices' | 'typed' | 'outcome' | 'file';
+/** Every value trades.pnl_basis takes (its check constraint, trades_pnl_basis_ok), null aside */
+export const PNL_BASES = ['prices', 'estimate', 'typed', 'outcome', 'file'] as const;
+export type PnlBasis = (typeof PNL_BASES)[number];
 export type TradeResult = 'win' | 'loss' | 'breakeven';
 
 const n = (x: string | Numeric): Numeric => (typeof x === 'string' ? numeric(x) : x);
@@ -62,7 +66,8 @@ const MAX_PNL = numeric('10000000000000000');
  * trade_parse_exit: the exit of a price-market trade. The exit price must be above zero (an
  * option may expire worthless at 0) and on the tick; a typed "pnl" is taken where the result is
  * typed, or corrects a computed one where the market allows it («Corrigir»); otherwise the result
- * comes from the prices, and a typed-result instrument without "pnl" is pnl_required. «Custos»
+ * comes from the prices ('prices', or 'estimate' when divided by the exit price), and a
+ * typed-result instrument without "pnl" is pnl_required. «Custos»
  * replace the commission. `commission` is the trade's stored one (futures: null).
  */
 export function parseExit(
@@ -87,7 +92,8 @@ export function parseExit(
   } else if (spec.pnl === 'prices' || spec.pnl === 'prices_div_exit') {
     const computed = pnlFromPrices(spec, sgn, quantity, entryPrice, numericText(px));
     pnl = computed === null ? null : numeric(computed);
-    basis = 'prices';
+    // A pair with the dollar as base: the broker converts at its own closing rate (an estimate)
+    basis = spec.pnl === 'prices_div_exit' ? 'estimate' : 'prices';
   } else {
     return { ok: false, code: 'pnl_required', field: 'pnl' };
   }
@@ -125,8 +131,8 @@ export interface PnlInput {
 
 /**
  * The result of an exit in any market, and where it came from (pnl_basis): a binary's outcome
- * ('outcome'), the prices ('prices', also divided by the exit price on a pair with the dollar as
- * base), or what the trader typed ('typed'), with the refusals of trade_parse_exit.
+ * ('outcome'), the prices ('prices'; 'estimate' when divided by the exit price, on a pair with the
+ * dollar as base), or what the trader typed ('typed'), with the refusals of trade_parse_exit.
  */
 export function pnlFor(spec: InstrumentSpec, x: PnlInput): ({ ok: true } & ExitResult) | { ok: false; code: RegistroCode; field: string } {
   const sgn: 1 | -1 = x.direction === 'long' || x.direction === 'call' ? 1 : -1;

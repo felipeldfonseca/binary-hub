@@ -17,6 +17,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { parseServerGate, type CheckKey, type GateResult, type GateStatus, type GateWarning, type PlanBreak, type PlanVerdict } from '@/lib/domain/gate';
 import {
   MARK_KINDS,
+  PNL_BASES,
   REGISTRO_CODES,
   decimalFromJson,
   entryPlanOf,
@@ -338,7 +339,7 @@ function parseTrade(x: unknown): RegisteredTrade {
     pnl: decOrNull(t.pnl, MONEY),
     result: oneOfOrNull(t.result, ['win', 'loss', 'breakeven', 'pending'] as const),
     commission: decOrNull(t.commission, MONEY),
-    pnlBasis: oneOfOrNull(t.pnl_basis, ['prices', 'typed', 'outcome', 'file'] as const),
+    pnlBasis: oneOfOrNull(t.pnl_basis, PNL_BASES),
     note: strOrNull(t.note),
     noteSavedAt: dateOrNull(t.note_saved_at),
   };
@@ -539,7 +540,7 @@ function parseExit(s: Obj): ExitAnswer {
     exitPrice: decOrNull(s.exit_price, PRICE),
     pnl: dec(s.pnl, MONEY),
     result: oneOf(s.result, ['win', 'loss', 'breakeven'] as const),
-    pnlBasis: oneOf(s.pnl_basis, ['prices', 'typed', 'outcome', 'file'] as const),
+    pnlBasis: oneOf(s.pnl_basis, PNL_BASES),
     commission: decOrNull(s.commission, MONEY),
     points: decOrNull(s.points, PRICE),
     r: decOrNull(s.r, 4),

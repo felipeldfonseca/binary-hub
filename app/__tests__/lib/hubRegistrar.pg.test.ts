@@ -23,6 +23,7 @@ import {
   INSTRUMENT_SPEC,
   TRADE_CAPS,
   afterPayload,
+  assignImportLinks,
   binaryExpiry,
   entryPayload,
   entryPreview,
@@ -32,14 +33,19 @@ import {
   instrumentJson,
   instrumentSpecsJson,
   isClean,
+  linkPatch,
   marksNow,
   marksPayload,
+  similarImports,
   tradeCapsJson,
   undoRefusal,
   validateAfter,
   validateEntry,
   validateExit,
   type EntryFields,
+  type LinkRow,
+  type MatchRow,
+  type MatchTrade,
   type OpenTrade,
 } from '@/lib/domain/registro';
 import { ACCOUNT_MARKETS, MARKET_SPEC, formatHhMm, tradingDayFor, utcToLocal, type AccountMarket } from '@/lib/domain';
@@ -59,9 +65,10 @@ import {
   saveExtras,
   undoEntry,
   RegistrarDataError,
+  type RegisteredTrade,
   type TradeState,
 } from '@/lib/hub/registrarDb';
-import { PG_URL, asUser, asUserExec, createAccountAsUser, lit, psql } from '@/testing/pg';
+import { PG_URL, asUser, asUserExec, createAccountAsUser, lastLine, lit, psql } from '@/testing/pg';
 
 const PSQL = process.env.BH_PSQL || '/opt/homebrew/opt/postgresql@15/bin/psql';
 const RECORD = process.env.BH_PG_RECORD;
@@ -519,6 +526,215 @@ alter table public.trades enable trigger trades_guard;`);
     expect(await imageTrashDone(db, kept.trash)).toEqual({ cleared: 1, remaining: 0 });
     write('trash-done', lastAnswer());
   });
+
+  it('a pair with the dollar as base: the result is an estimate (pnl_basis), as the domain computes it', async () => {
+    const reg = await registerEntry(
+      db,
+      acc.forex,
+      entryPayload('forex', { clientKey: newClientKey(), symbol: 'USD/JPY', direction: 'short', quantity: '1', entryPrice: '151.240', stop: '20', clock: NY }),
+    );
+    const id = reg.state.trade.id;
+    const exit = exitPayload('forex', { exitPrice: '151.440', clock: NY });
+    const dry = await previewExit(db, id, exit);
+    if (dry.repeated) throw new Error('repeated');
+    const ts = validateExit(openTrade(reg.state, 'forex'), exit, { now: dry.serverNow, dry: true });
+    if (!ts.ok) throw new Error(ts.code);
+    expect(ts.exit.pnlBasis).toBe('estimate');
+    expect({ pnl: dry.pnl, basis: dry.pnlBasis, points: dry.points, r: dry.r }).toEqual({
+      pnl: plain(ts.exit.pnl),
+      basis: ts.exit.pnlBasis,
+      points: plain(ts.exit.points!),
+      r: ts.r && plain(ts.r),
+    });
+    // The exit is saved and its answer reads (an unknown basis would make it bad_answer)
+    const closed = await registerExit(db, id, exit);
+    write('exit-usdjpy', lastAnswer());
+    expect(closed.exit).toMatchObject({ pnl: '-132.07', result: 'loss', pnlBasis: 'estimate', points: '-0.2', r: '-1' });
+    expect(closed.state.trade).toMatchObject({ status: 'closed', pnl: '-132.07', pnlBasis: 'estimate' });
+    expect((await fetchTradeState(db, id))?.trade.pnlBasis).toBe('estimate');
+  });
+
+  /** A broker file's row (the importers' shape), at instants on the second */
+  const fileRow = (r: {
+    line: number;
+    id: string;
+    symbol: string;
+    direction: string;
+    entry: Date;
+    exit: Date | null;
+    entryPrice: string;
+    exitPrice: string | null;
+    qty: string;
+    stake?: string;
+    payout?: string;
+    result: string;
+    pnl: string;
+    commission: string;
+  }) => {
+    const local = (d: Date | null) => (d ? d.toISOString().slice(0, 19) : null);
+    const bin = r.stake !== undefined;
+    return {
+      line: String(r.line), external_id: r.id, symbol: r.symbol, asset_type: bin ? 'binary_option' : 'futures', direction: r.direction,
+      local_entry: local(r.entry), local_exit: local(r.exit), utc_offset: '+00:00', entry_price: r.entryPrice, exit_price: r.exitPrice,
+      quantity: r.qty, stake_amount: r.stake ?? null, payout_percent: r.payout ?? null, duration_seconds: bin ? '60' : null,
+      timeframe: bin ? 'M1' : null, result: r.result, pnl: r.pnl, commission: r.commission, stop_price: null, target_price: null,
+    };
+  };
+  const onSecond = (ms: number) => new Date(Math.floor(ms / 1000) * 1000);
+  const rowOf = (rn: number, r: ReturnType<typeof fileRow>): MatchRow & LinkRow => ({
+    rn,
+    line: Number(r.line),
+    symbol: r.symbol,
+    direction: r.direction as MatchRow['direction'],
+    entryTime: new Date(`${r.local_entry}Z`),
+    exitTime: r.local_exit ? new Date(`${r.local_exit}Z`) : null,
+    quantity: r.quantity,
+    stake: r.stake_amount,
+    externalId: r.external_id,
+    entry_price: r.entry_price,
+    stake_amount: r.stake_amount,
+    payout_percent: r.payout_percent,
+    commission: r.commission,
+    exit_price: r.exit_price,
+    pnl: r.pnl,
+    result: r.result,
+  });
+  /** The app trades of an account the import may link (an entry context, no broker ID) */
+  const appTradesOf = (account: string): MatchTrade[] =>
+    (
+      JSON.parse(
+        lastLine(
+          psql(`select coalesce(jsonb_agg(jsonb_build_object('id', t.id, 'symbol', t.symbol, 'direction', t.direction, 'entry', t.entry_time,
+  'origin', x.origin, 'expires', t.expires_at, 'qty', t.quantity::text, 'stake', t.stake_amount::text)), '[]'::jsonb)
+from public.trades t join public.trade_entry_context x on x.trade_id = t.id
+where t.account_id = '${account}' and t.external_id is null;`),
+        ),
+      ) as { id: string; symbol: string; direction: MatchTrade['direction']; entry: string; origin: MatchTrade['origin']; expires: string | null; qty: string | null; stake: string | null }[]
+    ).map((t) => ({
+      id: t.id,
+      symbol: t.symbol,
+      direction: t.direction,
+      entryTime: new Date(t.entry),
+      origin: t.origin,
+      expiresAt: t.expires === null ? null : new Date(t.expires),
+      quantity: t.qty,
+      stake: t.stake,
+    }));
+  const linkTradeOf = (t: RegisteredTrade) => ({
+    externalId: null,
+    status: t.status,
+    entryTime: t.entryTime,
+    entry_price: t.entryPrice,
+    quantity: t.quantity,
+    stake_amount: t.stakeAmount,
+    payout_percent: t.payoutPercent,
+    commission: t.commission,
+    exit_price: t.exitPrice,
+    pnl: t.pnl,
+    result: t.result,
+  });
+
+  it('a file links each registered trade once, as the domain assigns and patches it (size typo, exit before the entry)', async () => {
+    const nq = await registerEntry(
+      db,
+      acc.futures,
+      entryPayload('futures', { clientKey: newClientKey(), symbol: 'NQ', direction: 'long', quantity: '2', entryPrice: '21000.25', clock: NY }),
+    );
+    const cl = await registerEntry(
+      db,
+      acc.futures,
+      entryPayload('futures', { clientKey: newClientKey(), symbol: 'CL', direction: 'short', quantity: '1', entryPrice: '75.43', clock: NY, entry: hmAgo(NY, 5) }),
+    );
+    const tNq = nq.state.trade.entryTime.getTime();
+    const tCl = cl.state.trade.entryTime.getTime();
+    const tag = uid.slice(0, 8);
+    const rows = [
+      // The NQ trade typed 2: a 3-lot row in the same minute and a 2-lot row 2 minutes before, which ended before the typed entry
+      fileRow({ line: 2, id: `NQA-${tag}`, symbol: 'NQZ6', direction: 'long', entry: onSecond(tNq - 50000), exit: onSecond(tNq - 20000),
+        entryPrice: '21000.25', exitPrice: '21001.00', qty: '3', result: 'win', pnl: '45.00', commission: '4.02' }),
+      fileRow({ line: 3, id: `NQB-${tag}`, symbol: 'NQZ6', direction: 'long', entry: onSecond(tNq - 115000), exit: onSecond(tNq - 30000),
+        entryPrice: '21000.00', exitPrice: '21001.00', qty: '2', result: 'win', pnl: '40.00', commission: '2.68' }),
+      // The CL trade typed 1 lot, 5 minutes back: the file says 2, and it ended a minute ago
+      fileRow({ line: 4, id: `CLA-${tag}`, symbol: 'CLZ6', direction: 'short', entry: onSecond(tCl + 20000), exit: onSecond(Date.now() - 60000),
+        entryPrice: '75.43', exitPrice: '75.18', qty: '2', result: 'win', pnl: '500.00', commission: '2.48' }),
+    ];
+    const links = assignImportLinks('futures', rows.map((r, i) => rowOf(i + 1, r)), appTradesOf(acc.futures));
+    expect(links).toEqual(new Map([[2, nq.state.trade.id], [3, cl.state.trade.id]]));
+
+    const preview = asUser(uid, `public.import_preview('${acc.futures}', 'topone', null, 'UTC', ${lit(rows)})`);
+    expect(preview).toMatchObject({ new: 1, linked: 2 });
+    const before = { [nq.state.trade.id]: nq.state.trade, [cl.state.trade.id]: cl.state.trade };
+    const commit = asUser(uid, `public.import_commit('${acc.futures}', 'topone', 'registrados.csv', null, 'UTC', ${lit(rows)})`);
+    expect(commit).toMatchObject({ inserted: 1, linked: 2 });
+    const now = new Date();
+
+    for (const [rn, id] of Array.from(links.entries())) {
+      const row = rowOf(rn, rows[rn - 1]);
+      const patch = linkPatch(linkTradeOf(before[id]), row, 'topone', now);
+      const after = (await fetchTradeState(db, id))!.trade;
+      const t = after as unknown as Record<string, unknown>;
+      const field: Record<string, string> = { exit_price: 'exitPrice', entry_price: 'entryPrice', stake_amount: 'stakeAmount', payout_percent: 'payoutPercent', pnl_basis: 'pnlBasis' };
+      for (const [k, v] of Object.entries(patch.set)) {
+        if (['source_platform', 'external_id', 'notes'].includes(k)) continue;
+        const got = t[field[k] ?? k.replace(/_([a-z])/g, (_m, c: string) => c.toUpperCase())];
+        expect([k, v instanceof Date ? v.getTime() : typeof v === 'string' && /^-?\d/.test(v) ? plain(v) : v]).toEqual([
+          k,
+          got instanceof Date ? got.getTime() : got,
+        ]);
+      }
+      const stored = JSON.parse(lastLine(psql(`select jsonb_build_object('key', t.external_id, 'differs', l.differs, 'closed', l.closed, 'set_key', l.set_key)
+from public.trades t join public.trade_import_links l on l.trade_id = t.id where t.id = '${id}';`)));
+      expect(stored).toEqual({ key: row.externalId, differs: patch.differs, closed: patch.closes, set_key: patch.setKey });
+    }
+    const nqAfter = (await fetchTradeState(db, nq.state.trade.id))!.trade;
+    // Ended before the typed entry: closed at the entry, with the file's money; the typed size stays (the file agrees)
+    expect(nqAfter).toMatchObject({ status: 'closed', quantity: '2', pnl: '40', pnlBasis: 'file', commission: '2.68' });
+    expect(nqAfter.exitTime!.getTime()).toBe(nq.state.trade.entryTime.getTime());
+    const clAfter = (await fetchTradeState(db, cl.state.trade.id))!.trade;
+    // «Contratos» 1, the file says 2: the file wins, once (no second CL trade)
+    expect(clAfter).toMatchObject({ status: 'closed', quantity: '2', pnl: '500', pnlBasis: 'file' });
+    expect(clAfter.exitTime!.getTime()).toBe(new Date(`${rows[2].local_exit}Z`).getTime());
+    expect(psql(`select count(*) from public.trades where account_id = '${acc.futures}' and symbol in ('CL', 'CLZ6');`).trim()).toBe('1');
+    // The 3-lot row is a trade of its own
+    expect(psql(`select quantity = 3 from public.trades where account_id = '${acc.futures}' and external_id = 'NQA-${tag}' and source = 'import';`).trim()).toBe('t');
+  });
+
+  it('the look-alike of an imported trade: any stake, and «Já fechada» within 16 minutes either way', async () => {
+    const fileEntry = onSecond(Date.now() - 3 * 60000);
+    const id = `LA-${uid.slice(0, 8)}`;
+    const row = fileRow({ line: 2, id, symbol: 'GBP/USD', direction: 'call', entry: fileEntry, exit: new Date(fileEntry.getTime() + 60000),
+      entryPrice: '1.2700', exitPrice: '1.2710', qty: '1', stake: '10.00', payout: '85', result: 'win', pnl: '8.50', commission: '0.00' });
+    expect(asUser(uid, `public.import_commit('${acc.binary}', 'ebinex', 'semelhante.csv', null, 'UTC', ${lit([row])})`)).toMatchObject({ inserted: 1, linked: 0 });
+    const importedId = lastLine(psql(`select id from public.trades where account_id = '${acc.binary}' and external_id = '${id}';`));
+    const imported = [{ id: importedId, symbol: 'GBP/USD', direction: 'call' as const, entryTime: fileEntry }];
+
+    // A live entry of another stake 3 minutes after the file's
+    const fields = { symbol: 'GBP/USD', direction: 'call' as const, stake: '20', payout: '88', durationS: 60, clock: SP };
+    const dry = await previewEntry(db, acc.binary, entryPayload('binary', fields));
+    write('entry-dry-similar', lastAnswer());
+    expect(dry.similar).toEqual([importedId]);
+    expect(similarImports('binary', { symbol: 'GBP/USD', direction: 'call', entryTime: dry.entryAt }, imported, false)).toEqual(dry.similar);
+    const payload = entryPayload('binary', { ...fields, clientKey: newClientKey() });
+    expect(await refusal(registerEntry(db, acc.binary, payload))).toEqual({ code: 'similar_trade', field: null });
+    const reg = await registerEntry(db, acc.binary, { ...payload, allow_similar: true });
+    expect(reg.similar).toEqual([importedId]);
+
+    // «Já fechada» typed 13 minutes back: the file's entry 10 minutes after it (a live entry would not look alike)
+    const after = afterPayload('binary', {
+      ...fields,
+      clientKey: newClientKey(),
+      stake: '10',
+      payout: '85',
+      day: dayOf('binary')(new Date()),
+      entry: hmAgo(SP, 13),
+      outcome: 'ganho',
+    });
+    const dryAfter = await previewAfter(db, acc.binary, after);
+    expect(dryAfter.similar).toEqual([importedId]);
+    const entry = { symbol: 'GBP/USD', direction: 'call' as const, entryTime: dryAfter.entryAt };
+    expect(similarImports('binary', entry, imported, true)).toEqual(dryAfter.similar);
+    expect(similarImports('binary', entry, imported, false)).toEqual([]);
+  });
 });
 
 /** Decimal text without trailing zeros, as the answers' JSON numbers read back */
@@ -534,10 +750,10 @@ function normalizePreview(p: ReturnType<typeof entryPreview>) {
 }
 
 /** An open trade of a state, as register_exit reads it */
-function openTrade(s: TradeState): OpenTrade {
+function openTrade(s: TradeState, market: AccountMarket = 'futures'): OpenTrade {
   const t = s.trade;
   return {
-    market: 'futures',
+    market,
     symbol: t.symbol,
     direction: t.direction,
     quantity: t.quantity,

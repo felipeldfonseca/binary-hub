@@ -1,11 +1,11 @@
 {
   "gate": {
-    "at": "2026-10-18T23:39:49.858767+00:00",
+    "at": "2026-10-19T01:25:29.25651+00:00",
     "block": {
       "state": "nao_avaliado",
       "reason": "fase5"
     },
-    "desde": "2026-09-18T23:39:49.393721+00:00",
+    "desde": "2026-09-19T01:25:28.796512+00:00",
     "label": "Registrar futures",
     "limit": {
       "usd": 400,
@@ -29,28 +29,28 @@
     "status": "liberado",
     "window": {
       "next": {
-        "opens_at": "2026-10-19T22:09:00+00:00",
-        "closes_at": "2026-10-20T01:09:00+00:00",
+        "opens_at": "2026-10-19T23:55:00+00:00",
+        "closes_at": "2026-10-20T02:55:00+00:00",
         "trading_day": "2026-10-20"
       },
       "state": "dentro",
       "reason": null,
       "current": {
-        "opens_at": "2026-10-18T22:09:00+00:00",
-        "closes_at": "2026-10-19T01:09:00+00:00"
+        "opens_at": "2026-10-18T23:55:00+00:00",
+        "closes_at": "2026-10-19T02:55:00+00:00"
       },
       "position": "dentro"
     },
     "version": {
-      "id": "92201534-a94c-4fd6-9dfb-27a1a77295ea",
+      "id": "46d328eb-0c29-4a26-a288-f1b5c3263d87",
       "origin": "criar",
       "version_no": 1,
-      "effective_from": "2026-09-18T23:39:49.393721+00:00"
+      "effective_from": "2026-09-19T01:25:28.796512+00:00"
     },
     "warnings": [],
     "desde_day": "2026-09-19",
-    "account_id": "156bfa4d-cd78-42a2-a5fc-014347f22c68",
-    "changes_at": "2026-10-19T01:09:00+00:00",
+    "account_id": "185b2da6-65fe-4ea6-a411-ab21fa3b9738",
+    "changes_at": "2026-10-19T02:55:00+00:00",
     "state_rule": {
       "state": "nao_avaliado",
       "reason": "fase5"
@@ -75,18 +75,18 @@
       "kind": "setup",
       "limpa": true,
       "value": "A",
-      "marked_at": "2026-10-18T23:39:49.858767+00:00"
+      "marked_at": "2026-10-19T01:25:29.25651+00:00"
     },
     {
       "id": 2,
       "kind": "execucao",
       "limpa": true,
       "value": "no_ponto",
-      "marked_at": "2026-10-18T23:39:49.858767+00:00"
+      "marked_at": "2026-10-19T01:25:29.25651+00:00"
     }
   ],
   "trade": {
-    "id": "9d40aa2c-8759-4c71-9be1-1924bb5b28f4",
+    "id": "dfe6c70f-77c3-4ff5-ba1f-8e2eebf91094",
     "pnl": null,
     "note": null,
     "option": null,
@@ -99,10 +99,10 @@
     "exit_time": null,
     "pnl_basis": null,
     "timeframe": null,
-    "account_id": "156bfa4d-cd78-42a2-a5fc-014347f22c68",
+    "account_id": "185b2da6-65fe-4ea6-a411-ab21fa3b9738",
     "asset_type": "futures",
     "commission": null,
-    "entry_time": "2026-10-18T23:39:49.858767+00:00",
+    "entry_time": "2026-10-19T01:25:29.25651+00:00",
     "exit_price": null,
     "expires_at": null,
     "stop_price": 7885.25,
@@ -111,7 +111,7 @@
     "stake_amount": null,
     "target_price": 7918.25,
     "note_saved_at": null,
-    "registered_at": "2026-10-18T23:39:49.858767+00:00",
+    "registered_at": "2026-10-19T01:25:29.25651+00:00",
     "payout_percent": null,
     "duration_seconds": null,
     "exit_registered_at": null
@@ -124,9 +124,9 @@
     "warnings": [],
     "in_window": true,
     "after_limit": false,
-    "captured_at": "2026-10-18T23:39:49.858767+00:00",
+    "captured_at": "2026-10-19T01:25:29.25651+00:00",
     "gate_status": "liberado",
-    "evaluated_at": "2026-10-18T23:39:49.858767+00:00",
+    "evaluated_at": "2026-10-19T01:25:29.25651+00:00",
     "state_choice": null,
     "checks_evaluated": [
       "janela",
@@ -138,17 +138,17 @@
   "dry_run": false,
   "similar": [],
   "version": {
-    "id": "92201534-a94c-4fd6-9dfb-27a1a77295ea",
+    "id": "46d328eb-0c29-4a26-a288-f1b5c3263d87",
     "version_no": 1
   },
-  "entry_at": "2026-10-18T23:39:49.858767+00:00",
+  "entry_at": "2026-10-19T01:25:29.25651+00:00",
   "repeated": false,
-  "trade_id": "9d40aa2c-8759-4c71-9be1-1924bb5b28f4",
+  "trade_id": "dfe6c70f-77c3-4ff5-ba1f-8e2eebf91094",
   "marks_now": [
     {
       "kind": "execucao",
-      "clean_at": "2026-10-18T23:39:49.858767+00:00",
-      "current_at": "2026-10-18T23:39:49.858767+00:00",
+      "clean_at": "2026-10-19T01:25:29.25651+00:00",
+      "current_at": "2026-10-19T01:25:29.25651+00:00",
       "clean_value": "no_ponto",
       "changed_after": false,
       "current_limpa": true,
@@ -156,15 +156,15 @@
     },
     {
       "kind": "setup",
-      "clean_at": "2026-10-18T23:39:49.858767+00:00",
-      "current_at": "2026-10-18T23:39:49.858767+00:00",
+      "clean_at": "2026-10-19T01:25:29.25651+00:00",
+      "current_at": "2026-10-19T01:25:29.25651+00:00",
       "clean_value": "A",
       "changed_after": false,
       "current_limpa": true,
       "current_value": "A"
     }
   ],
-  "server_now": "2026-10-18T23:39:49.858767+00:00",
+  "server_now": "2026-10-19T01:25:29.25651+00:00",
   "trading_day": "2026-10-19",
-  "registered_at": "2026-10-18T23:39:49.858767+00:00"
+  "registered_at": "2026-10-19T01:25:29.25651+00:00"
 }

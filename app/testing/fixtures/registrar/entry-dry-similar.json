@@ -1,0 +1,108 @@
+{
+  "gate": {
+    "at": "2026-10-19T01:25:30.577422+00:00",
+    "block": {
+      "state": "nao_avaliado",
+      "reason": "so_futuros"
+    },
+    "desde": "2026-09-19T01:25:28.796512+00:00",
+    "label": "Registrar binary",
+    "limit": {
+      "state": "nao_avaliado",
+      "reason": "sem_limite"
+    },
+    "today": {
+      "trades": 3,
+      "net_usd": 6.1,
+      "worst_usd": -20
+    },
+    "market": "binary",
+    "status": "liberado",
+    "window": {
+      "next": {
+        "opens_at": "2026-10-19T23:55:00+00:00",
+        "closes_at": "2026-10-20T02:55:00+00:00",
+        "trading_day": "2026-10-19"
+      },
+      "state": "dentro",
+      "reason": null,
+      "current": {
+        "opens_at": "2026-10-18T23:55:00+00:00",
+        "closes_at": "2026-10-19T02:55:00+00:00"
+      },
+      "position": "dentro"
+    },
+    "version": {
+      "id": "f920ae6f-bec8-4b98-8587-c5fc5b53c77d",
+      "origin": "criar",
+      "version_no": 1,
+      "effective_from": "2026-09-19T01:25:28.796512+00:00"
+    },
+    "warnings": [],
+    "desde_day": "2026-09-18",
+    "account_id": "c00490bd-2e05-4ab6-b251-22823136bfa6",
+    "changes_at": "2026-10-19T02:55:00+00:00",
+    "state_rule": {
+      "state": "nao_avaliado",
+      "reason": "so_futuros"
+    },
+    "trading_day": "2026-10-18",
+    "checks_evaluated": [
+      "janela"
+    ]
+  },
+  "plan": {
+    "breaks": [],
+    "verdict": "no_plano",
+    "checks_evaluated": [
+      "janela"
+    ]
+  },
+  "context": {
+    "rule_ok": null,
+    "in_block": null,
+    "warnings": [],
+    "in_window": true,
+    "after_limit": null,
+    "gate_status": "liberado",
+    "state_choice": null,
+    "checks_evaluated": [
+      "janela"
+    ],
+    "day_pnl_at_entry": null,
+    "day_worst_at_entry": null
+  },
+  "dry_run": true,
+  "preview": {
+    "if_win": 17.6,
+    "if_loss": -20
+  },
+  "similar": [
+    "9d8a4b53-9bb5-49b2-b350-884de8d16117"
+  ],
+  "version": {
+    "id": "f920ae6f-bec8-4b98-8587-c5fc5b53c77d",
+    "version_no": 1
+  },
+  "entry_at": "2026-10-19T01:25:30.577422+00:00",
+  "repeated": false,
+  "expires_at": "2026-10-19T01:27:00+00:00",
+  "instrument": {
+    "key": "GBPUSD",
+    "pip": null,
+    "pnl": "outcome",
+    "mult": null,
+    "tick": null,
+    "costs": false,
+    "known": false,
+    "stops": null,
+    "qty_dp": null,
+    "correct": false,
+    "price_dp": null,
+    "asset_type": "binary_option"
+  },
+  "server_now": "2026-10-19T01:25:30.577422+00:00",
+  "stop_price": null,
+  "trading_day": "2026-10-18",
+  "target_price": null
+}

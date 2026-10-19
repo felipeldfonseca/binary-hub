@@ -18,7 +18,8 @@ export type Direction = 'long' | 'short' | 'call' | 'put';
 export type StopUnit = 'pts' | 'pips' | 'price';
 /**
  * How the result is known: from the prices (Δ × mult × quantity), the same divided by the exit
- * price (a pair with the dollar as base: an estimate), typed by the trader, or a binary outcome
+ * price (a pair with the dollar as base: an estimate, stored with pnl_basis 'estimate', never as
+ * an exact 'prices'), typed by the trader, or a binary outcome
  */
 export type PnlMode = 'prices' | 'prices_div_exit' | 'typed' | 'outcome';
 export type OptionMode = 'no' | 'allowed' | 'required';

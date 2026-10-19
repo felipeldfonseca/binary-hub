@@ -10,7 +10,8 @@
  *   pnl        the result per market and its basis, R, the entry preview
  *   horario    the entry, exit and «Já fechada» instants, the binary expiry, «Desfazer entrada»
  *   marcas     resultKnownAt, isClean («limpa»), marksNow, entryPlanOf (the plan of a stored context)
- *   match      the import's one-to-one link of file rows to app trades, similar imports
+ *   match      the import's one-to-one link of file rows to app trades, what a link writes,
+ *              similar imports
  *   validar    a whole register_* check in the database's order
  *   montar     the payloads from the form's values
  *   numeric    Postgres numeric arithmetic (scales, rounding, division)
@@ -76,6 +77,7 @@ export {
 } from './payload';
 export { stopDistance, stopLevel, stopLevels, type Side } from './stops';
 export {
+  PNL_BASES,
   binaryResult,
   entryPreview,
   parseExit,
@@ -118,12 +120,23 @@ export {
   type MarkTiming,
 } from './marcas';
 export {
+  LINK_CLOSED_COLUMNS,
+  LINK_MONEY_COLUMNS,
   MATCH_AFTER_MS,
   MATCH_BEFORE_MS,
+  MATCH_BEFORE_RECONSTRUCTED_MS,
   assignImportLinks,
   canLink,
+  linkPatch,
   similarImports,
   type ImportedTrade,
+  type LinkDiffColumn,
+  type LinkMoneyColumn,
+  type LinkPatch,
+  type LinkRow,
+  type LinkSet,
+  type LinkTrade,
+  type LinkValues,
   type MatchRow,
   type MatchTrade,
 } from './match';

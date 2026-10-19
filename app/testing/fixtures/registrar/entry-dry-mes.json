@@ -1,11 +1,11 @@
 {
   "gate": {
-    "at": "2026-10-18T23:39:49.470339+00:00",
+    "at": "2026-10-19T01:25:28.863411+00:00",
     "block": {
       "state": "nao_avaliado",
       "reason": "fase5"
     },
-    "desde": "2026-09-18T23:39:49.393721+00:00",
+    "desde": "2026-09-19T01:25:28.796512+00:00",
     "label": "Registrar futures",
     "limit": {
       "usd": 400,
@@ -29,28 +29,28 @@
     "status": "liberado",
     "window": {
       "next": {
-        "opens_at": "2026-10-19T22:09:00+00:00",
-        "closes_at": "2026-10-20T01:09:00+00:00",
+        "opens_at": "2026-10-19T23:55:00+00:00",
+        "closes_at": "2026-10-20T02:55:00+00:00",
         "trading_day": "2026-10-20"
       },
       "state": "dentro",
       "reason": null,
       "current": {
-        "opens_at": "2026-10-18T22:09:00+00:00",
-        "closes_at": "2026-10-19T01:09:00+00:00"
+        "opens_at": "2026-10-18T23:55:00+00:00",
+        "closes_at": "2026-10-19T02:55:00+00:00"
       },
       "position": "dentro"
     },
     "version": {
-      "id": "92201534-a94c-4fd6-9dfb-27a1a77295ea",
+      "id": "46d328eb-0c29-4a26-a288-f1b5c3263d87",
       "origin": "criar",
       "version_no": 1,
-      "effective_from": "2026-09-18T23:39:49.393721+00:00"
+      "effective_from": "2026-09-19T01:25:28.796512+00:00"
     },
     "warnings": [],
     "desde_day": "2026-09-19",
-    "account_id": "156bfa4d-cd78-42a2-a5fc-014347f22c68",
-    "changes_at": "2026-10-19T01:09:00+00:00",
+    "account_id": "185b2da6-65fe-4ea6-a411-ab21fa3b9738",
+    "changes_at": "2026-10-19T02:55:00+00:00",
     "state_rule": {
       "state": "nao_avaliado",
       "reason": "fase5"
@@ -93,10 +93,10 @@
   },
   "similar": [],
   "version": {
-    "id": "92201534-a94c-4fd6-9dfb-27a1a77295ea",
+    "id": "46d328eb-0c29-4a26-a288-f1b5c3263d87",
     "version_no": 1
   },
-  "entry_at": "2026-10-18T23:39:49.470339+00:00",
+  "entry_at": "2026-10-19T01:25:28.863411+00:00",
   "repeated": false,
   "expires_at": null,
   "instrument": {
@@ -113,7 +113,7 @@
     "price_dp": 8,
     "asset_type": "futures"
   },
-  "server_now": "2026-10-18T23:39:49.470339+00:00",
+  "server_now": "2026-10-19T01:25:28.863411+00:00",
   "stop_price": 7885.25,
   "trading_day": "2026-10-19",
   "target_price": 7918.25

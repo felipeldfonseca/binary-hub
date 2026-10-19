@@ -1,10 +1,11 @@
 /**
  * Test helpers for «Registrar operação». Lives outside __tests__ so Jest does not run it as a suite.
  *
- * The JSON in fixtures/registrar is what the real functions of migration 20261020000003 (fase-3/banco)
- * answered on a throwaway local Postgres, for an invented user whose accounts (futures Top One,
- * Ebinex, …) have a rule version with a window around the time of the recording (Sun 18 Oct 2026
- * about 23:39 UTC, so the futures trading day is Mon 19 Oct) and, on futures, a US$ 400 limit.
+ * The JSON in fixtures/registrar is what the real functions of migrations 20261020000001..4
+ * (fase-3/banco, with its review fixes) answered on a throwaway local Postgres, for an invented user
+ * whose accounts (futures Top One, Ebinex, forex, …) have a rule version with a window around the
+ * time of the recording (Mon 19 Oct 2026 about 01:25 UTC, Sun 18 Oct 21:25 in New York, so the
+ * futures trading day is Mon 19 Oct and the Ebinex one Sun 18 Oct) and, on futures, a US$ 400 limit.
  * Recorded by __tests__/lib/hubRegistrar.pg.test.ts with BH_PG_RECORD; the ids are random:
  *
  *   entry-dry-mes      register_entry dry run: MES long 2 @ 7896.25, stop 11, target 22 (no hour)
@@ -21,6 +22,10 @@
  *   slots              image_slots: two new images (webp, png) on an open MGC trade
  *   extras             save_extras: both images, the second first, and a note
  *   trash-done         image_trash_done after the removed file left Storage
+ *   exit-usdjpy        register_exit of a USD/JPY short 1 lot @ 151.240 at 151.440: −US$ 132,07,
+ *                      pnl_basis 'estimate' (a pair with the dollar as base)
+ *   entry-dry-similar  register_entry dry run: GBP/USD call, US$ 20, three minutes after an imported
+ *                      GBP/USD call of US$ 10 (similar: that trade)
  */
 import fs from 'fs';
 import path from 'path';
@@ -41,7 +46,9 @@ export type RegistrarFixture =
   | 'exit-ebinex'
   | 'slots'
   | 'extras'
-  | 'trash-done';
+  | 'trash-done'
+  | 'exit-usdjpy'
+  | 'entry-dry-similar';
 
 /** The recorded JSON, as the database answered it (a fresh copy each call) */
 export function registrarJson(name: RegistrarFixture): Record<string, unknown> {

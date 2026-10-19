@@ -18,6 +18,7 @@ import {
   instrumentJson,
   instrumentSpecsJson,
   isClean,
+  linkPatch,
   marksNow,
   parseEntry,
   parseExit,
@@ -28,7 +29,10 @@ import {
   tradeInstrument,
   tradeMatchKey,
   type Direction,
+  type EntryOrigin,
   type EntryPayload,
+  type LinkRow,
+  type LinkTrade,
   type MarkEvent,
   type MarkKind,
   type MarkTiming,
@@ -89,16 +93,37 @@ interface Cases {
     scenarios: {
       label: string;
       market: string;
-      trades: { id: string; symbol: string; direction: Direction; entry_time: string; expires_at: string | null; quantity: string | null; stake: string | null; eligible: boolean }[];
+      trades: {
+        id: string;
+        symbol: string;
+        direction: Direction;
+        entry_time: string;
+        origin: EntryOrigin;
+        expires_at: string | null;
+        quantity: string | null;
+        stake: string | null;
+        eligible: boolean;
+      }[];
       rows: { rn: number; line: number; symbol: string; direction: Direction; entry_time: string; exit_time: string | null; quantity: string | null; stake: string | null; code: string | null }[];
       expected: Record<string, string>;
     }[];
   };
   similar: {
-    trades: { id: string; symbol: string; direction: Direction; entry_time: string; quantity: string; stake: null; imported: boolean }[];
-    cases: { symbol: string; direction: Direction; entry: string; quantity: string; expected: string[] }[];
+    trades: { market: string; id: string; symbol: string; direction: Direction; entry_time: string; imported: boolean }[];
+    cases: { market: string; symbol: string; direction: Direction; entry: string; reconstructed: boolean; expected: string[] }[];
+  };
+  linkPatch: {
+    now: string;
+    cases: {
+      label: string;
+      platform: string;
+      trade: Record<keyof LinkValuesJson, string | null> & { external_id: string | null; status: 'open' | 'closed'; entry_time: string };
+      row: Record<keyof LinkValuesJson, string | null> & { external_id: string; exit_time: string | null };
+      expected: { set: Record<string, string | null>; differs: string[]; closes: boolean; set_key: boolean };
+    }[];
   };
 }
+type LinkValuesJson = Omit<LinkTrade, 'externalId' | 'status' | 'entryTime'>;
 const cases = raw as unknown as Cases;
 
 const iso = (x: string | null) => (x === null ? null : new Date(x).toISOString());
@@ -292,6 +317,7 @@ describe('import_stage (SQL) = assignImportLinks (TS)', () => {
         symbol: t.symbol,
         direction: t.direction,
         entryTime: new Date(t.entry_time),
+        origin: t.origin,
         expiresAt: date(t.expires_at),
         quantity: t.quantity,
         stake: t.stake,
@@ -304,13 +330,42 @@ describe('import_stage (SQL) = assignImportLinks (TS)', () => {
 });
 
 describe('trade_similar (SQL) = similarImports (TS)', () => {
-  const imported = cases.similar.trades
-    .filter((t) => t.imported)
-    .map((t) => ({ id: t.id, symbol: t.symbol, direction: t.direction, entryTime: new Date(t.entry_time), quantity: t.quantity, stake: null }));
+  const importedOf = (market: string) =>
+    cases.similar.trades
+      .filter((t) => t.imported && t.market === market)
+      .map((t) => ({ id: t.id, symbol: t.symbol, direction: t.direction, entryTime: new Date(t.entry_time) }));
 
-  it.each(cases.similar.cases.map((c) => [`${c.symbol} ${c.direction} ${c.quantity} at ${c.entry}`, c] as const))('%s', (_l, c) => {
-    const entry = { symbol: c.symbol, direction: c.direction, entryTime: new Date(c.entry), quantity: c.quantity, stake: null };
-    expect(similarImports('futures', entry, imported)).toEqual(c.expected);
-    expect(similarImports('futures', entry, [...imported].reverse())).toEqual(c.expected);
+  it.each(cases.similar.cases.map((c) => [`${c.market} ${c.symbol} ${c.direction} at ${c.entry}${c.reconstructed ? ' («Já fechada»)' : ''}`, c] as const))(
+    '%s',
+    (_l, c) => {
+      const entry = { symbol: c.symbol, direction: c.direction, entryTime: new Date(c.entry) };
+      const imported = importedOf(c.market);
+      expect(similarImports(c.market, entry, imported, c.reconstructed)).toEqual(c.expected);
+      expect(similarImports(c.market, entry, [...imported].reverse(), c.reconstructed)).toEqual(c.expected);
+    },
+  );
+});
+
+describe('import_link_patch (SQL) = linkPatch (TS)', () => {
+  const now = new Date(cases.linkPatch.now);
+  const values = (x: Record<keyof LinkValuesJson, string | null>) => ({
+    entry_price: x.entry_price,
+    quantity: x.quantity,
+    stake_amount: x.stake_amount,
+    payout_percent: x.payout_percent,
+    commission: x.commission,
+    exit_price: x.exit_price,
+    pnl: x.pnl,
+    result: x.result,
+  });
+
+  it.each(cases.linkPatch.cases.map((c) => [c.label, c] as const))('%s', (_l, c) => {
+    const trade: LinkTrade = { ...values(c.trade), externalId: c.trade.external_id, status: c.trade.status, entryTime: new Date(c.trade.entry_time) };
+    const row: LinkRow = { ...values(c.row), externalId: c.row.external_id, exitTime: date(c.row.exit_time) };
+    const p = linkPatch(trade, row, c.platform, now);
+    const { exit_time: exitTime, ...set } = p.set;
+    const { exit_time: wantExit, ...wantSet } = c.expected.set;
+    expect({ set, differs: p.differs, closes: p.closes, set_key: p.setKey }).toEqual({ ...c.expected, set: wantSet });
+    expect(exitTime === undefined ? undefined : exitTime.toISOString()).toBe(wantExit === undefined ? undefined : iso(wantExit));
   });
 });

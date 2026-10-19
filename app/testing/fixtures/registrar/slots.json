@@ -1,19 +1,19 @@
 {
   "slots": [
     {
-      "id": "73bc9450-911d-43d8-bb2c-b8b6f5c3c243",
+      "id": "46732aa5-ef9d-4a0c-8c40-8f07e571bbe0",
       "mime": "image/webp",
       "name": "MGC_entrada.webp",
-      "path": "429ba370-b51c-45fa-bf32-0d402da33ccf/99e32de3-10d5-4040-9b07-6435f49f4506/73bc9450-911d-43d8-bb2c-b8b6f5c3c243.webp"
+      "path": "66625db4-2202-4579-8f9a-34c3535f905e/d32a979d-b10b-454e-98bd-40e1da6049ad/46732aa5-ef9d-4a0c-8c40-8f07e571bbe0.webp"
     },
     {
-      "id": "50715b6b-b74c-4a6f-843b-1a6f0dc1fda4",
+      "id": "6f90e378-200f-4796-b9c7-518e50e07b3f",
       "mime": "image/png",
       "name": "MGC_saida.png",
-      "path": "429ba370-b51c-45fa-bf32-0d402da33ccf/99e32de3-10d5-4040-9b07-6435f49f4506/50715b6b-b74c-4a6f-843b-1a6f0dc1fda4.png"
+      "path": "66625db4-2202-4579-8f9a-34c3535f905e/d32a979d-b10b-454e-98bd-40e1da6049ad/6f90e378-200f-4796-b9c7-518e50e07b3f.png"
     }
   ],
   "trash": [],
   "bucket": "trade-images",
-  "server_now": "2026-10-18T23:39:50.275428+00:00"
+  "server_now": "2026-10-19T01:25:29.71551+00:00"
 }

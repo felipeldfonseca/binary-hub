@@ -35,7 +35,7 @@ import {
   undoEntry,
   uploadImage,
 } from '@/lib/hub/registrarDb';
-import { REGISTRO_CODES, isClean, marksNow } from '@/lib/domain/registro';
+import { PNL_BASES, REGISTRO_CODES, isClean, marksNow } from '@/lib/domain/registro';
 import { registrarJson, type RegistrarFixture } from '@/testing/registrar';
 
 type Answer = { data?: unknown; error?: unknown };
@@ -153,6 +153,35 @@ describe('the Registrar calls', () => {
     }
     expect(marksNow(marks.marks)).toEqual(marks.marksNow);
     expect(marks.marksNow.find((n) => n.kind === 'setup')).toMatchObject({ currentValue: 'C', cleanValue: 'A', changedAfter: true });
+  });
+
+  it('reads a pair with the dollar as base: the exit is saved as an estimate, and reads as one', async () => {
+    const x = await registerExit(answering('exit-usdjpy').db, ID, { v: 1, exit_price: '151.440' });
+    expect(x.exit).toMatchObject({ pnl: '-132.07', result: 'loss', pnlBasis: 'estimate', points: '-0.2', r: '-1', exitPrice: '151.44' });
+    expect(x.state.trade).toMatchObject({ symbol: 'USD/JPY', assetType: 'forex', status: 'closed', pnlBasis: 'estimate' });
+  });
+
+  it('reads every pnl_basis the database stores (trades_pnl_basis_ok), and nothing else', async () => {
+    expect([...PNL_BASES]).toEqual(['prices', 'estimate', 'typed', 'outcome', 'file']);
+    const json = registrarJson('exit-usdjpy');
+    for (const basis of PNL_BASES) {
+      const answer = { ...json, pnl_basis: basis, trade: { ...(json.trade as object), pnl_basis: basis } };
+      const x = await registerExit(fakeDb(() => ({ data: answer })).db, ID, { v: 1 });
+      expect([x.exit?.pnlBasis, x.state.trade.pnlBasis]).toEqual([basis, basis]);
+    }
+    expect(parseTradeState({ ...json, trade: { ...(json.trade as object), pnl_basis: null } }).trade.pnlBasis).toBeNull();
+    for (const basis of ['exact', 'Estimate', '']) {
+      await expect(registerExit(fakeDb(() => ({ data: { ...json, pnl_basis: basis } })).db, ID, { v: 1 })).rejects.toMatchObject({ code: 'bad_answer' });
+      expect(() => parseTradeState({ ...json, trade: { ...(json.trade as object), pnl_basis: basis } })).toThrow('bad_answer');
+    }
+  });
+
+  it('previews an entry that looks like an imported trade (similar)', async () => {
+    const { db } = answering('entry-dry-similar');
+    const p = await previewEntry(db, ID, { v: 1, symbol: 'GBP/USD', direction: 'call', stake: '20', payout: '88', duration_s: 60, clock: 'America/Sao_Paulo' });
+    expect(p.similar).toHaveLength(1);
+    expect(p.similar[0]).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+    expect(p.instrument).toMatchObject({ key: 'GBPUSD', pnl: 'outcome' });
   });
 
   it('reads a repeated «Registrar saída»: the state, no exit', async () => {

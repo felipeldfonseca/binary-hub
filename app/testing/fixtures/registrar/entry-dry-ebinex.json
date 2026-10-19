@@ -1,11 +1,11 @@
 {
   "gate": {
-    "at": "2026-10-18T23:39:49.657429+00:00",
+    "at": "2026-10-19T01:25:29.053151+00:00",
     "block": {
       "state": "nao_avaliado",
       "reason": "so_futuros"
     },
-    "desde": "2026-09-18T23:39:49.393721+00:00",
+    "desde": "2026-09-19T01:25:28.796512+00:00",
     "label": "Registrar binary",
     "limit": {
       "state": "nao_avaliado",
@@ -20,28 +20,28 @@
     "status": "liberado",
     "window": {
       "next": {
-        "opens_at": "2026-10-19T22:09:00+00:00",
-        "closes_at": "2026-10-20T01:09:00+00:00",
+        "opens_at": "2026-10-19T23:55:00+00:00",
+        "closes_at": "2026-10-20T02:55:00+00:00",
         "trading_day": "2026-10-19"
       },
       "state": "dentro",
       "reason": null,
       "current": {
-        "opens_at": "2026-10-18T22:09:00+00:00",
-        "closes_at": "2026-10-19T01:09:00+00:00"
+        "opens_at": "2026-10-18T23:55:00+00:00",
+        "closes_at": "2026-10-19T02:55:00+00:00"
       },
       "position": "dentro"
     },
     "version": {
-      "id": "78eebe8f-73c3-4e08-a4a4-92cf792d91a0",
+      "id": "f920ae6f-bec8-4b98-8587-c5fc5b53c77d",
       "origin": "criar",
       "version_no": 1,
-      "effective_from": "2026-09-18T23:39:49.393721+00:00"
+      "effective_from": "2026-09-19T01:25:28.796512+00:00"
     },
     "warnings": [],
     "desde_day": "2026-09-18",
-    "account_id": "e98ecbb8-03bc-4d34-a5b3-d434f5a6b502",
-    "changes_at": "2026-10-19T01:09:00+00:00",
+    "account_id": "c00490bd-2e05-4ab6-b251-22823136bfa6",
+    "changes_at": "2026-10-19T02:55:00+00:00",
     "state_rule": {
       "state": "nao_avaliado",
       "reason": "so_futuros"
@@ -79,12 +79,12 @@
   },
   "similar": [],
   "version": {
-    "id": "78eebe8f-73c3-4e08-a4a4-92cf792d91a0",
+    "id": "f920ae6f-bec8-4b98-8587-c5fc5b53c77d",
     "version_no": 1
   },
-  "entry_at": "2026-10-18T23:39:49.657429+00:00",
+  "entry_at": "2026-10-19T01:25:29.053151+00:00",
   "repeated": false,
-  "expires_at": "2026-10-18T23:41:00+00:00",
+  "expires_at": "2026-10-19T01:27:00+00:00",
   "instrument": {
     "key": "EURUSD",
     "pip": null,
@@ -99,7 +99,7 @@
     "price_dp": null,
     "asset_type": "binary_option"
   },
-  "server_now": "2026-10-18T23:39:49.657429+00:00",
+  "server_now": "2026-10-19T01:25:29.053151+00:00",
   "stop_price": null,
   "trading_day": "2026-10-18",
   "target_price": null
