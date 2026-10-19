@@ -3,7 +3,8 @@
  * checks the database runs on them, in the database's order, so the form shows the same code and
  * field the server would answer before anything is sent:
  *
- *   checkPayload   = trade_check_payload (shape: keys, types, patterns, the market's fields)
+ *   checkPayload   = trade_check_payload (shape: keys, types, patterns, the market's fields, the
+ *                    platform's «Expiração» choices)
  *   checkMarks     = trade_check_marks
  *   parseEntry     = trade_parse_entry (against the instrument: decimals, tick, stop and target)
  *
@@ -12,7 +13,7 @@
  * refused. The codes are the database's; the field is its HINT (null when it gives none).
  */
 import type { WindowTz } from '../markets';
-import { TRADE_CAPS, tradeInstrument, type Direction, type InstrumentSpec, type OptionContract } from './caps';
+import { TRADE_CAPS, durationsOf, tradeInstrument, type Direction, type InstrumentSpec, type OptionContract } from './caps';
 import { cmp, fromInt, isMultipleOf, numeric, numericText, tradeNum, type Numeric } from './numeric';
 import { stopLevel } from './stops';
 
@@ -132,7 +133,7 @@ export interface EntryPayload {
   target_price?: string;
   /** Ações e opções */
   option?: OptionContract;
-  /** Binaries */
+  /** Binaries; duration_s is one the account's platform offers (durationsOf: Ebinex 60, 300, 900) */
   stake?: string;
   payout?: string;
   duration_s?: number;
@@ -319,11 +320,12 @@ const PRICE_FORBIDS = ['stake', 'payout', 'duration_s', 'outcome'];
 const STOP_KEYS = ['stop_pts', 'stop_pips', 'stop_price', 'target_pts', 'target_pips', 'target_price'];
 
 /**
- * trade_check_payload(mode, market, p, dry): the shape of a register_* payload for a market. What
- * depends on the instrument (decimals, tick, stop unit, a typed result) is parseEntry's and
- * parseExit's. Null = fine.
+ * trade_check_payload(mode, market, p, dry, platform): the shape of a register_* payload for a
+ * market and the account's platform (a binary's «Expiração»: durationsOf). What depends on the
+ * instrument (decimals, tick, stop unit, a typed result) is parseEntry's and parseExit's. Null =
+ * fine.
  */
-export function checkPayload(mode: PayloadMode, market: string, p: unknown, dry: boolean): FieldError | null {
+export function checkPayload(mode: PayloadMode, market: string, p: unknown, dry: boolean, platform: string | null): FieldError | null {
   const caps = (TRADE_CAPS as Record<string, (typeof TRADE_CAPS)[keyof typeof TRADE_CAPS] | undefined>)[market];
   if (!caps || !Object.prototype.hasOwnProperty.call(TRADE_CAPS, market)) return err('not_for_market');
   if (!isObj(p)) return err('bad_payload');
@@ -359,7 +361,7 @@ export function checkPayload(mode: PayloadMode, market: string, p: unknown, dry:
       const payout = tradeNum(p.payout, 3, 2);
       if (!payout || !between(payout, 1, 100)) return err('bad_payout', 'payout');
       const d = typeof p.duration_s === 'number' ? JSON.stringify(p.duration_s) : typeof p.duration_s === 'string' ? p.duration_s : null;
-      if (d === null || !/^[0-9]{1,6}$/.test(d) || !(caps.durations ?? []).includes(Number(d))) return err('bad_duration', 'duration_s');
+      if (d === null || !/^[0-9]{1,6}$/.test(d) || !durationsOf(platform).includes(Number(d))) return err('bad_duration', 'duration_s');
     } else {
       if (typeof p.quantity !== 'string') return err('bad_quantity', 'quantity');
       if (typeof p.entry_price !== 'string') return err('bad_price', 'entry_price');

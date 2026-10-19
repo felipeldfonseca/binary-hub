@@ -22,7 +22,7 @@ export interface EntryOptions {
   hasRules?: boolean;
   /** Whether a version is in force at the entry (before_rules) */
   inRules?: (entryAt: Date) => boolean;
-  /** Binaries: the account's platform (the expiry rule) */
+  /** Binaries: the account's platform (its «Expiração» choices and the expiry rule) */
   platform?: string | null;
 }
 
@@ -33,7 +33,7 @@ export function validateEntry(
   o: EntryOptions,
 ): Checked<{ entry: ParsedEntry; entryAt: Date; expiresAt: Date | null }> {
   if (o.hasRules === false) return refuse('no_rules');
-  const shape = checkPayload('entry', market, p, o.dry ?? false);
+  const shape = checkPayload('entry', market, p, o.dry ?? false, o.platform ?? null);
   if (shape) return { ok: false, ...shape };
   const payload = p as EntryPayload;
   const parsed = parseEntry(market, payload);
@@ -73,7 +73,8 @@ export function validateExit(
 ): Checked<{ exit: ExitResult; exitAt: Date; r: string | null }> {
   if (!t.registeredInApp) return refuse('not_app_trade');
   if (t.status !== 'open') return refuse('not_open');
-  const shape = checkPayload('exit', t.market, p, o.dry ?? false);
+  // An exit carries no «Expiração»: the platform changes nothing in its shape
+  const shape = checkPayload('exit', t.market, p, o.dry ?? false, null);
   if (shape) return { ok: false, ...shape };
   const payload = p as ExitPayload;
   const bin = t.market === 'binary';
@@ -101,7 +102,7 @@ export function validateAfter(
   o: AfterOptions,
 ): Checked<{ entry: ParsedEntry; entryAt: Date; exitAt: Date; expiresAt: Date | null; exit: ExitResult; r: string | null }> {
   if (o.hasRules === false) return refuse('no_rules');
-  const shape = checkPayload('after', market, p, o.dry ?? false);
+  const shape = checkPayload('after', market, p, o.dry ?? false, o.platform ?? null);
   if (shape) return { ok: false, ...shape };
   const payload = p as AfterPayload;
   const parsed = parseEntry(market, payload);

@@ -35,7 +35,7 @@ import {
   undoEntry,
   uploadImage,
 } from '@/lib/hub/registrarDb';
-import { PNL_BASES, REGISTRO_CODES, isClean, marksNow } from '@/lib/domain/registro';
+import { PNL_BASES, REGISTRO_CODES, dayLimitOf, isClean, marksNow, riskBeyondLimit } from '@/lib/domain/registro';
 import { registrarJson, type RegistrarFixture } from '@/testing/registrar';
 
 type Answer = { data?: unknown; error?: unknown };
@@ -75,6 +75,8 @@ describe('the Registrar calls', () => {
     expect(p).toMatchObject({ stopPrice: '7885.25', targetPrice: '7918.25', expiresAt: null, similar: [], version: { versionNo: 1 } });
     expect(p.instrument).toMatchObject({ key: 'MES', tick: '0.25', mult: '5', pnl: 'prices', stops: 'pts', known: true });
     expect(p.preview).toEqual({ kind: 'prices', risk: '110', reward: '220', stopPoints: '11', targetPoints: '22' });
+    // US$ 110 at risk, the whole US$ 400 left: no warning
+    expect(p.limitRoom).toEqual({ limit: '400', net: '0', reached: false, left: '400', risk: '110', above: false });
     expect(p.plan).toEqual({ breaks: [], verdict: 'no_plano', checksEvaluated: ['janela', 'limite'] });
     expect(p.context).toMatchObject({ gateStatus: 'liberado', inWindow: true, afterLimit: false, dayPnlAtEntry: '0', dayWorstAtEntry: '0' });
     expect(p.gate.status).toBe('liberado');
@@ -116,7 +118,9 @@ describe('the Registrar calls', () => {
   it('previews an Ebinex entry with its expiry on the next candle', async () => {
     const { db } = answering('entry-dry-ebinex');
     const p = await previewEntry(db, ID, { v: 1, symbol: 'EUR/USD', direction: 'call', stake: '20', payout: '88', duration_s: 60, clock: 'America/Sao_Paulo' });
-    expect(p.preview).toEqual({ kind: 'outcome', ifWin: '17.6', ifLoss: '-20' });
+    // The stake is all a binary can lose; the Ebinex account has no limit
+    expect(p.preview).toEqual({ kind: 'outcome', risk: '20', ifWin: '17.6', ifLoss: '-20' });
+    expect(p.limitRoom).toBeNull();
     expect(p.instrument).toMatchObject({ assetType: 'binary_option', pnl: 'outcome', stops: null, qtyDp: null });
     expect(p.expiresAt!.getUTCSeconds()).toBe(0);
     const ms = p.expiresAt!.getTime() - p.entryAt.getTime();
@@ -127,6 +131,49 @@ describe('the Registrar calls', () => {
     const x = await registerExit(answering('exit-ebinex').db, ID, { v: 1, outcome: 'ganho' });
     expect(x.exit).toMatchObject({ pnl: '17.6', result: 'win', pnlBasis: 'outcome', exitPrice: null, points: null, r: null });
     expect(x.state.trade.exitTime!.getTime()).toBe(x.state.trade.expiresAt!.getTime());
+  });
+
+  it('previews a stop that risks more than the day’s limit has left (the owner’s test: US$ 400, US$ 300 lost, ES stop US$ 125)', async () => {
+    const { db } = answering('entry-dry-above');
+    const p = await previewEntry(db, ID, { v: 1, symbol: 'ES', direction: 'long', quantity: '1', entry_price: '6650.25', stop_pts: '2.5', clock: 'America/New_York' });
+    expect(p.preview).toMatchObject({ kind: 'prices', risk: '125', stopPoints: '2.5' });
+    expect(p.limitRoom).toEqual({ limit: '400', net: '-300', reached: false, left: '100', risk: '125', above: true });
+    // A warning, never a block: the gate still lets the trade in
+    expect(p.gate.status).toBe('liberado');
+    expect(p.gate.limit).toMatchObject({ evaluated: true, state: 'ok', cents: 40000, netCents: -30000 });
+    // The domain says the same from the gate and the preview
+    expect(riskBeyondLimit(dayLimitOf(p.gate.limit, 'USD'), p.preview.risk)).toEqual({ currency: 'USD', left: '100.00', risk: '125', over: '25.00' });
+  });
+
+  it('reads the room of «Já fechada» at its own entry, and an account without a limit as none', async () => {
+    const after = await previewAfter(answering('after-dry-mes').db, ID, {} as never);
+    expect(after.limitRoom).toEqual({ limit: '400', net: '0', reached: false, left: '400', risk: '120', above: false });
+    const similar = await previewEntry(answering('entry-dry-similar').db, ID, {} as never);
+    expect([similar.limitRoom, similar.preview]).toEqual([null, { kind: 'outcome', risk: '20', ifWin: '17.6', ifLoss: '-20' }]);
+  });
+
+  it('refuses a dry run without the room or the binary’s risk, or with a room of another shape', async () => {
+    const dry = registrarJson('entry-dry-above');
+    const room = dry.limit_room as Record<string, unknown>;
+    const { limit_room: _room, ...withoutRoom } = dry;
+    expect(_room).not.toBeUndefined();
+    const ebinex = registrarJson('entry-dry-ebinex');
+    const { risk: _risk, ...withoutRisk } = ebinex.preview as Record<string, unknown>;
+    expect(_risk).toBe(20);
+    for (const data of [
+      withoutRoom,
+      { ...dry, limit_room: { ...room, above: 'sim' } },
+      { ...dry, limit_room: { ...room, left: '100,00' } },
+      { ...dry, limit_room: { ...room, reached: null } },
+      { ...dry, limit_room: { ...room, usd: undefined } },
+      { ...dry, limit_room: [room] },
+      { ...ebinex, preview: withoutRisk },
+    ]) {
+      await expect(previewEntry(fakeDb(() => ({ data })).db, ID, {} as never)).rejects.toMatchObject({ code: 'bad_answer' });
+    }
+    // A room without a risk to compare (no stop) reads as one
+    const noStop = await previewEntry(fakeDb(() => ({ data: { ...dry, limit_room: { ...room, risk: null, above: false } } })).db, ID, {} as never);
+    expect(noStop.limitRoom).toMatchObject({ risk: null, above: false, left: '100' });
   });
 
   it('previews and registers an exit, and the marks after it', async () => {

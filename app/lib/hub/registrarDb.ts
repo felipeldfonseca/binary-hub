@@ -30,6 +30,7 @@ import {
   type ImageMime,
   type ImageSlotsRequest,
   type InstrumentSpec,
+  type LimitRoom,
   type MarkEvent,
   type MarkKind,
   type MarkNow,
@@ -469,13 +470,31 @@ function parseInstrument(x: unknown): InstrumentSpec {
 
 function parsePreview(x: unknown): EntryPreview {
   const p = obj(x);
-  if ('if_win' in p) return { kind: 'outcome', ifWin: dec(p.if_win, MONEY), ifLoss: dec(p.if_loss, MONEY) };
+  if ('if_win' in p) return { kind: 'outcome', risk: dec(p.risk, MONEY), ifWin: dec(p.if_win, MONEY), ifLoss: dec(p.if_loss, MONEY) };
   return {
     kind: 'prices',
     risk: decOrNull(p.risk, MONEY),
     reward: decOrNull(p.reward, MONEY),
     stopPoints: decOrNull(p.stop_points, PRICE),
     targetPoints: decOrNull(p.target_points, PRICE),
+  };
+}
+
+/**
+ * trade_limit_room: the risk against what is left of the daily loss limit at the entry, or null when
+ * the gate did not evaluate the limit. The key is always in a dry run's answer.
+ */
+function parseLimitRoom(x: unknown): LimitRoom | null {
+  if (x === undefined) bad();
+  if (x === null) return null;
+  const l = obj(x);
+  return {
+    limit: dec(l.usd, MONEY),
+    net: dec(l.net_usd, MONEY),
+    reached: bool(l.reached),
+    left: dec(l.left, MONEY),
+    risk: decOrNull(l.risk, MONEY),
+    above: bool(l.above),
   };
 }
 
@@ -494,6 +513,12 @@ export interface EntryDryRun {
   stopPrice: string | null;
   targetPrice: string | null;
   preview: EntryPreview;
+  /**
+   * The preview's risk against what is left of the daily loss limit at the entry; `above` = «o
+   * stop passa do limite diário» (a warning, never a block). Null when the gate did not evaluate
+   * the limit. Amounts in the account's currency.
+   */
+  limitRoom: LimitRoom | null;
   /** Imported trades this one looks like (D30: «Esta operação parece já ter vindo do arquivo») */
   similar: string[];
 }
@@ -530,6 +555,7 @@ function parseEntryDry(s: Obj): EntryDryRun {
     stopPrice: decOrNull(s.stop_price, PRICE),
     targetPrice: decOrNull(s.target_price, PRICE),
     preview: parsePreview(s.preview),
+    limitRoom: parseLimitRoom(s.limit_room),
     similar: list(s.similar, str),
   };
 }
@@ -667,7 +693,7 @@ function parsed<T>(parse: (json: unknown) => T, json: unknown): T {
   }
 }
 
-/** «Registrar entrada», dry run: the preview the form shows (gate, plan, instrument, risk, expiry, similar) */
+/** «Registrar entrada», dry run: the preview the form shows (gate, plan, instrument, risk, the limit's room, expiry, similar) */
 export async function previewEntry(db: SupabaseClient, accountId: string, payload: EntryPayload): Promise<EntryDryRun> {
   return parsed(parseEntryDryRun, await rpc(db, 'register_entry', { p_account: accountId, p_entry: payload, p_dry_run: true }));
 }

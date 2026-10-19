@@ -56,7 +56,7 @@ describe('entryPayload', () => {
       entry: '10:07',
       marks: { setup: 'A' },
     });
-    expect(checkPayload('entry', 'futures', p, false)).toBeNull();
+    expect(checkPayload('entry', 'futures', p, false, null)).toBeNull();
   });
 
   it('names the unit by the instrument: pips on catalogued pairs, a price elsewhere', () => {
@@ -69,7 +69,7 @@ describe('entryPayload', () => {
     // A dry run needs no key; nothing absent is sent
     const dry = fx('EUR/USD');
     expect('client_key' in dry || 'entry' in dry || 'marks' in dry || 'option' in dry).toBe(false);
-    expect(checkPayload('entry', 'forex', dry, true)).toBeNull();
+    expect(checkPayload('entry', 'forex', dry, true, null)).toBeNull();
   });
 
   it('builds a binary entry without prices', () => {
@@ -87,14 +87,14 @@ describe('entryPayload', () => {
       allowSimilar: true,
     });
     expect(p).toEqual({ v: 1, client_key: CK, symbol: 'EUR/USD', direction: 'call', stake: '20', payout: '88', duration_s: 60, clock: SP, allow_similar: true });
-    expect(checkPayload('entry', 'binary', p, false)).toBeNull();
+    expect(checkPayload('entry', 'binary', p, false, 'ebinex')).toBeNull();
   });
 
   it('sends an option on Ações e opções', () => {
     const option = { right: 'call' as const, strike: '200', expires_on: '2026-11-20' };
     const p = entryPayload('stocks', { symbol: 'AAPL', direction: 'long', quantity: '2', entryPrice: '1.85', stop: '1.2', option, clock: NY });
     expect(p).toMatchObject({ option, stop_price: '1.2' });
-    expect(checkPayload('entry', 'stocks', p, true)).toBeNull();
+    expect(checkPayload('entry', 'stocks', p, true, null)).toBeNull();
     const parsed = parseEntry('stocks', p);
     expect(parsed.ok && parsed.entry.stopPrice).toBe('1.2');
   });
@@ -118,11 +118,11 @@ describe('afterPayload, exitPayload, marks, images and note', () => {
     });
     expect(p).toMatchObject({ day: '2026-12-01', entry: '10:33', exit: '10:49', exit_price: '7929.00', stop_pts: '12' });
     expect('outcome' in p).toBe(false);
-    expect(checkPayload('after', 'futures', p, false)).toBeNull();
+    expect(checkPayload('after', 'futures', p, false, null)).toBeNull();
     const b = afterPayload('binary', { clientKey: CK, symbol: 'EUR/USD', direction: 'put', stake: '20', payout: '88', durationS: 60, clock: SP, day: '2026-10-15', entry: '20:10', exit: '20:12', outcome: 'perda' });
     expect(b).toMatchObject({ outcome: 'perda' });
     expect('exit' in b).toBe(false);
-    expect(checkPayload('after', 'binary', b, false)).toBeNull();
+    expect(checkPayload('after', 'binary', b, false, 'ebinex')).toBeNull();
   });
 
   it('builds the exits', () => {
@@ -133,7 +133,7 @@ describe('afterPayload, exitPayload, marks, images and note', () => {
       ['futures', exitPayload('futures', { exitPrice: '7903.75' })],
       ['binary', exitPayload('binary', { outcome: 'ganho' })],
     ] as const) {
-      expect(checkPayload('exit', m, p, false)).toBeNull();
+      expect(checkPayload('exit', m, p, false, m === 'binary' ? 'ebinex' : null)).toBeNull();
     }
   });
 
@@ -283,11 +283,11 @@ describe('the limits the database draws, at the limit', () => {
   it('takes an option multiplier with up to 4 decimals and 8 digits before them (SQL: trade_num(multiplier, 8, 4))', () => {
     const base = { v: 1 as const, client_key: CK, symbol: 'AAPL', direction: 'long' as const, quantity: '2', entry_price: '1.85', clock: NY };
     const withMult = (multiplier: string) => ({ ...base, option: { right: 'call' as const, strike: '200', expires_on: '2026-11-20', multiplier } });
-    expect(checkPayload('entry', 'stocks', withMult('100.1234'), true)).toBeNull();
-    expect(checkPayload('entry', 'stocks', withMult('99999999.9999'), true)).toBeNull();
-    expect(checkPayload('entry', 'stocks', withMult('100.12345'), true)).toEqual({ code: 'bad_option', field: 'option.multiplier' });
-    expect(checkPayload('entry', 'stocks', withMult('100000000'), true)).toEqual({ code: 'bad_option', field: 'option.multiplier' });
-    expect(checkPayload('entry', 'stocks', withMult('0.0000'), true)).toEqual({ code: 'bad_option', field: 'option.multiplier' });
+    expect(checkPayload('entry', 'stocks', withMult('100.1234'), true, null)).toBeNull();
+    expect(checkPayload('entry', 'stocks', withMult('99999999.9999'), true, null)).toBeNull();
+    expect(checkPayload('entry', 'stocks', withMult('100.12345'), true, null)).toEqual({ code: 'bad_option', field: 'option.multiplier' });
+    expect(checkPayload('entry', 'stocks', withMult('100000000'), true, null)).toEqual({ code: 'bad_option', field: 'option.multiplier' });
+    expect(checkPayload('entry', 'stocks', withMult('0.0000'), true, null)).toEqual({ code: 'bad_option', field: 'option.multiplier' });
     const parsed = parseEntry('stocks', withMult('100.1234'));
     expect(parsed.ok && parsed.entry.option).toMatchObject({ multiplier: '100.1234' });
   });

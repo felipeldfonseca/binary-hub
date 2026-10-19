@@ -55,9 +55,11 @@ export function exitInstant(hm: string | null | undefined, clock: string, now: D
 }
 
 /**
- * When a binary registered in the app ends (trade_expiry): "next_candle" (Ebinex) = the candle
- * after the order's minute on the candle's own grid of the hour, plus its length (M1 at 20:10:05 →
- * 20:12:00; M5 at 20:43:10 → 20:50:00); otherwise entry + duration.
+ * When a binary registered in the app ends (trade_expiry). "next_candle" (Ebinex, an order book):
+ * the order waits for the next candle of its timeframe, on that timeframe's own grid of the hour,
+ * and runs that whole candle (M1 at 20:10:30 → 20:11–20:12; M5 at 20:13 or 20:14:30 → 20:15–20:20;
+ * M15 at 20:13 → 20:15–20:30). Otherwise the time runs from the click: entry + duration, whatever
+ * the moment in the candle.
  */
 export function binaryExpiry(platform: string | null | undefined, entry: Date, durationS: number): Date {
   if (expiryRuleOf(platform) === 'next_candle') {

@@ -23,7 +23,13 @@ export type StopUnit = 'pts' | 'pips' | 'price';
  */
 export type PnlMode = 'prices' | 'prices_div_exit' | 'typed' | 'outcome';
 export type OptionMode = 'no' | 'allowed' | 'required';
-/** When a binary ends: entry + duration, or the next candle on its own grid + its length */
+/**
+ * When a binary ends. 'entry': entry + duration, whatever the moment in the candle (the time runs
+ * from the click: every platform but Ebinex). 'next_candle': Ebinex's order book, where an order
+ * placed during a candle of the chosen timeframe (until 5 s before it closes) waits for the next
+ * candle on that timeframe's grid of the hour and runs that whole candle (M1 at 20:10:30 → 20:11–
+ * 20:12; M5 at 20:13 → 20:15–20:20; M15 at 20:13 → 20:15–20:30).
+ */
 export type ExpiryRule = 'entry' | 'next_candle';
 
 /** What a listed option's contract changes on the form */
@@ -56,8 +62,10 @@ export interface TradeCaps {
   optionSpec?: OptionCaps;
   /** Crypto: pairs quoted in these count as US$ (others take a typed result) */
   dollarQuotes?: readonly string[];
-  /** Binary: «Expiração» choices, in seconds */
+  /** Binary: «Expiração» choices, in seconds, on a platform durationsByPlatform does not list */
   durations?: readonly number[];
+  /** Binary: the choices a platform offers, keyed by platformKey (Ebinex: 1, 5 and 15 min only) */
+  durationsByPlatform?: Readonly<Record<string, readonly number[]>>;
   expiry?: ExpiryRule;
   expiryByPlatform?: Readonly<Record<string, ExpiryRule>>;
 }
@@ -95,8 +103,8 @@ export const TRADE_CAPS: Readonly<Record<AccountMarket, TradeCaps>> = deepFreeze
   },
   binary: {
     assetType: 'binary_option', directions: ['call', 'put'], qtyDp: null, priceDp: null, stops: null, pnl: 'outcome',
-    mult: null, correct: false, costs: false, option: 'no', durations: [60, 120, 300, 900], expiry: 'entry',
-    expiryByPlatform: { ebinex: 'next_candle' },
+    mult: null, correct: false, costs: false, option: 'no', durations: [60, 120, 300, 900],
+    durationsByPlatform: { ebinex: [60, 300, 900] }, expiry: 'entry', expiryByPlatform: { ebinex: 'next_candle' },
   },
   forex: {
     assetType: 'forex', directions: LONG_SHORT, qtyDp: 2, priceDp: 5, stops: 'price', pnl: 'typed', mult: null,
@@ -187,6 +195,9 @@ export function tradeCapsJson(c: TradeCaps): Record<string, unknown> {
   }
   if (c.dollarQuotes) out.dollar_quotes = [...c.dollarQuotes];
   if (c.durations) out.durations = [...c.durations];
+  if (c.durationsByPlatform) {
+    out.durations_by_platform = Object.fromEntries(Object.entries(c.durationsByPlatform).map(([k, v]) => [k, [...v]]));
+  }
   if (c.expiry) out.expiry = c.expiry;
   if (c.expiryByPlatform) out.expiry_by_platform = { ...c.expiryByPlatform };
   return out;
@@ -355,11 +366,28 @@ export function instrumentJson(s: InstrumentSpec): Record<string, unknown> {
   };
 }
 
+/**
+ * An account's platform as the binary descriptors are keyed: lower(btrim(coalesce(platform, '')))
+ * (btrim drops spaces only: ' Ebinex ' → 'ebinex', a tab stays)
+ */
+export const platformKey = (platform: string | null | undefined): string =>
+  String(platform ?? '').replace(/^ +| +$/g, '').toLowerCase();
+
 /** The expiry rule of a binary account's platform (trade_expiry): Ebinex runs on the next candle */
 export function expiryRuleOf(platform: string | null | undefined): ExpiryRule {
   const caps = TRADE_CAPS.binary;
-  // btrim: spaces only
-  const p = String(platform ?? '').replace(/^ +| +$/g, '').toLowerCase();
+  const p = platformKey(platform);
   const byPlatform = caps.expiryByPlatform ?? {};
   return (Object.prototype.hasOwnProperty.call(byPlatform, p) ? byPlatform[p] : caps.expiry) ?? 'entry';
+}
+
+/**
+ * The «Expiração» choices of a binary account's platform, in seconds (trade_check_payload's
+ * durations): Ebinex offers 1, 5 and 15 min; a platform not listed, the market's four.
+ */
+export function durationsOf(platform: string | null | undefined): readonly number[] {
+  const caps = TRADE_CAPS.binary;
+  const p = platformKey(platform);
+  const byPlatform = caps.durationsByPlatform ?? {};
+  return (Object.prototype.hasOwnProperty.call(byPlatform, p) ? byPlatform[p] : caps.durations) ?? [];
 }

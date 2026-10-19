@@ -4,10 +4,12 @@
  * on ../tempo, ../markets and the standard library; time is an input (the server's clock).
  *
  *   caps       TRADE_CAPS / INSTRUMENT_SPEC (= trade_caps_all() / instrument_specs()),
- *              tradeMatchKey, tradeInstrument
+ *              tradeMatchKey, tradeInstrument, a binary platform's durations and expiry rule
  *   payload    the JSON v1 payloads, checkPayload / checkMarks / parseEntry, the codes
  *   stops      stop and target: unit ↔ price level
- *   pnl        the result per market and its basis, R, the entry preview
+ *   pnl        the result per market and its basis, R, the entry preview (and its risk)
+ *   limite     the risk against what is left of the daily loss limit («o stop passa do limite
+ *              diário»: a warning, never a block)
  *   horario    the entry, exit and «Já fechada» instants, the binary expiry, «Desfazer entrada»
  *   marcas     resultKnownAt, isClean («limpa»), marksNow, entryPlanOf (the plan of a stored context)
  *   match      the import's one-to-one link of file rows to app trades, what a link writes,
@@ -21,10 +23,12 @@
 export {
   INSTRUMENT_SPEC,
   TRADE_CAPS,
+  durationsOf,
   expiryRuleOf,
   instrumentJson,
   instrumentRowJson,
   instrumentSpecsJson,
+  platformKey,
   tradeCapsJson,
   tradeInstrument,
   tradeMatchKey,
@@ -92,6 +96,15 @@ export {
   type PnlInput,
   type TradeResult,
 } from './pnl';
+export {
+  dayLimitOf,
+  limitRoom,
+  riskBeyondLimit,
+  type DayLimit,
+  type GateLimitCents,
+  type LimitRoom,
+  type LimitWarning,
+} from './limite';
 export {
   ENTRY_TYPED_BACK_MS,
   UNDO_ENTRY_MS,

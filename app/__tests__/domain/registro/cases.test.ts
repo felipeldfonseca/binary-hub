@@ -18,12 +18,14 @@ import {
   instrumentJson,
   instrumentSpecsJson,
   isClean,
+  limitRoom,
   linkPatch,
   marksNow,
   parseEntry,
   parseExit,
   rMultiple,
   resultKnownAt,
+  riskBeyondLimit,
   similarImports,
   tradeCapsJson,
   tradeInstrument,
@@ -53,8 +55,16 @@ interface Cases {
   descriptors: { trade_caps_all: Obj; instrument_specs: Obj };
   matchKey: Group<{ market: string; symbol: string | null; expected: string }>;
   instrument: Group<{ market: string; symbol: string; option?: Obj; expected: Obj | null }>;
-  shape: Group<{ label: string; mode: PayloadMode; market: string; dry: boolean; payload: unknown; expected: { code: string; field: string | null } | null }>;
-  entry: Group<{ label: string; market: string; payload: Obj; expected: Obj & { ok: boolean } }>;
+  shape: Group<{
+    label: string;
+    mode: PayloadMode;
+    market: string;
+    dry: boolean;
+    payload: unknown;
+    platform: string | null;
+    expected: { code: string; field: string | null } | null;
+  }>;
+  entry: Group<{ label: string; market: string; payload: Obj; platform: string | null; expected: Obj & { ok: boolean } }>;
   exit: Group<{
     label: string;
     market: string;
@@ -72,6 +82,14 @@ interface Cases {
   }>;
   division: Group<{ a: string; b: string; expected: { q: string; r2: string; r4: string } }>;
   expiry: Group<{ platform: string | null; entry: string; duration: number; expected: string }>;
+  limitRoom: Group<{
+    label: string;
+    state: 'ok' | 'atingido' | 'nao_avaliado' | null;
+    usd: string | null;
+    net: string | null;
+    risk: string | null;
+    expected: { usd: string; net_usd: string; reached: boolean; left: string; risk: string | null; above: boolean } | null;
+  }>;
   hmResolve: Group<{ hm: string; tz: string; at: string; expected: string }>;
   exitAfter: Group<{ entry: string; hm: string; tz: string; expected: string }>;
   localInDay: Group<{ market: AccountMarket; day: string; hm: string; tz: string; expected: string | null }>;
@@ -160,14 +178,21 @@ describe('trade_check_payload (SQL) = checkPayload (TS)', () => {
     }
   });
 
-  it.each(cases.shape.cases.map((c) => [`${c.mode} · ${c.market} · ${c.label}`, c] as const))('%s', (_l, c) => {
-    expect(checkPayload(c.mode, c.market, c.payload, c.dry)).toEqual(c.expected);
+  it('takes 2 min on every platform but Ebinex (1, 5 and 15 min only)', () => {
+    const twoMin = cases.shape.cases.filter((c) => c.market === 'binary' && c.mode !== 'exit' && (c.payload as Obj | null)?.duration_s === 120);
+    const refused = twoMin.filter((c) => c.expected?.code === 'bad_duration').map((c) => c.platform);
+    expect(refused).toEqual(['ebinex', ' Ebinex ', 'EBINEX', 'ebinex', 'ebinex']);
+    expect(twoMin.filter((c) => c.expected === null).map((c) => c.platform)).toEqual(['\tebinex', 'pocketoption', null, '']);
+  });
+
+  it.each(cases.shape.cases.map((c) => [`${c.mode} · ${c.market} · ${c.label} · ${JSON.stringify(c.platform)}`, c] as const))('%s', (_l, c) => {
+    expect(checkPayload(c.mode, c.market, c.payload, c.dry, c.platform)).toEqual(c.expected);
   });
 });
 
 describe('trade_parse_entry and trade_preview (SQL) = parseEntry and entryPreview (TS)', () => {
   it.each(cases.entry.cases.map((c) => [`${c.market} · ${c.label}`, c] as const))('%s', (_l, c) => {
-    const shape = checkPayload('entry', c.market, c.payload, true);
+    const shape = checkPayload('entry', c.market, c.payload, true, c.platform);
     if (shape) {
       expect({ ok: false, ...shape }).toEqual(c.expected);
       return;
@@ -196,7 +221,7 @@ describe('trade_parse_entry and trade_preview (SQL) = parseEntry and entryPrevie
       instrument: instrumentJson(e.spec),
       preview:
         p.kind === 'outcome'
-          ? { if_win: p.ifWin, if_loss: p.ifLoss }
+          ? { risk: p.risk, if_win: p.ifWin, if_loss: p.ifLoss }
           : { risk: p.risk, reward: p.reward, stop_points: p.stopPoints, target_points: p.targetPoints },
     }).toEqual(want);
   });
@@ -204,7 +229,7 @@ describe('trade_parse_entry and trade_preview (SQL) = parseEntry and entryPrevie
 
 describe('trade_parse_exit / trade_binary_result (SQL) = parseExit / binaryResult (TS)', () => {
   it.each(cases.exit.cases.map((c) => [`${c.market} · ${c.label}`, c] as const))('%s', (_l, c) => {
-    const shape = checkPayload('exit', c.market, c.payload, false);
+    const shape = checkPayload('exit', c.market, c.payload, false, null);
     if (shape) {
       expect({ ok: false, ...shape }).toEqual(c.expected);
       return;
@@ -244,6 +269,28 @@ describe('numeric division (SQL) = div (TS): the scale Postgres picks, then roun
 describe('trade_expiry (SQL) = binaryExpiry (TS)', () => {
   it.each(cases.expiry.cases.map((c) => [c.platform, c.entry, c.duration, c.expected] as const))('%j, %s, %i s', (platform, entry, duration, want) => {
     expect(binaryExpiry(platform, new Date(entry), duration).toISOString()).toBe(iso(want));
+  });
+});
+
+describe('trade_limit_room (SQL) = limitRoom (TS): the risk against what is left of the daily loss limit', () => {
+  const dayLimit = (c: (typeof cases.limitRoom.cases)[number]) =>
+    c.state === 'ok' || c.state === 'atingido' ? { amount: c.usd as string, currency: 'USD' as const, net: c.net as string, reached: c.state === 'atingido' } : null;
+
+  it.each(cases.limitRoom.cases.map((c) => [c.label, c] as const))('%s', (_l, c) => {
+    const r = limitRoom(dayLimit(c), c.risk);
+    expect(r && { usd: r.limit, net_usd: r.net, reached: r.reached, left: r.left, risk: r.risk, above: r.above }).toEqual(c.expected);
+    // The warning is exactly the database's "above", with what is left and the risk
+    const w = riskBeyondLimit(dayLimit(c), c.risk);
+    expect(w !== null).toBe(c.expected?.above ?? false);
+    if (w) expect([w.left, w.risk]).toEqual([c.expected!.left, c.expected!.risk]);
+  });
+
+  it('holds the owner’s example and both sides of it', () => {
+    const by = (label: string) => cases.limitRoom.cases.find((c) => c.label === label)!.expected;
+    expect(by('the owner: limit 400, lost 300, a stop risking 120')).toMatchObject({ left: '100.00', risk: '120.00', above: true });
+    expect(by('risk exactly what is left')).toMatchObject({ left: '100.00', above: false });
+    expect(by('the limit reached')).toMatchObject({ reached: true, left: '0', above: false });
+    expect(by('no limit')).toBeNull();
   });
 });
 

@@ -108,6 +108,20 @@ describe('binaryExpiry = the Phase 1 Ebinex reader’s ebinexExit (Vela + Tempo)
     expect(binaryExpiry('ebinex', d('2026-10-15T23:10:05Z'), 60)).toEqual(d('2026-10-15T23:12:00Z'));
   });
 
+  it('follows the owner’s model (2026-10-19): the order waits for the next candle of its timeframe and runs it whole', () => {
+    // Brasília is UTC−3. M1 at 20:10:30 runs 20:11–20:12
+    expect(binaryExpiry('ebinex', d('2026-10-15T23:10:30Z'), 60)).toEqual(d('2026-10-15T23:12:00Z'));
+    // M5 at 20:13 (or 20:14:30) runs 20:15–20:20; at 20:15 sharp, the candle after: 20:20–20:25
+    expect(binaryExpiry('ebinex', d('2026-10-15T23:13:00Z'), 300)).toEqual(d('2026-10-15T23:20:00Z'));
+    expect(binaryExpiry('ebinex', d('2026-10-15T23:14:30Z'), 300)).toEqual(d('2026-10-15T23:20:00Z'));
+    expect(binaryExpiry('ebinex', d('2026-10-15T23:15:00Z'), 300)).toEqual(d('2026-10-15T23:25:00Z'));
+    // M15 at 20:13 runs 20:15–20:30; at 20:59:50, 21:00–21:15
+    expect(binaryExpiry('ebinex', d('2026-10-15T23:13:00Z'), 900)).toEqual(d('2026-10-15T23:30:00Z'));
+    expect(binaryExpiry('ebinex', d('2026-10-15T23:59:50Z'), 900)).toEqual(d('2026-10-16T00:15:00Z'));
+    // Every other broker: the time runs from the click, whatever the moment in the candle
+    expect(binaryExpiry('pocketoption', d('2026-10-15T23:13:20Z'), 120)).toEqual(d('2026-10-15T23:15:20Z'));
+  });
+
   it('other platforms end at entry + duration', () => {
     expect(binaryExpiry('pocketoption', d('2026-10-15T23:10:05.250Z'), 60)).toEqual(d('2026-10-15T23:11:05.250Z'));
     expect(binaryExpiry(null, d('2026-10-15T23:10:05Z'), 300)).toEqual(d('2026-10-15T23:15:05Z'));
@@ -310,5 +324,21 @@ describe('validateEntry / validateExit / validateAfter: the first refusal, in th
       r: null,
     });
     expect(validateAfter('binary', { ...p, outcome: 'perda' }, o)).toMatchObject({ ok: true, exit: { pnl: '-20', result: 'loss', commission: '0' } });
+    // Ebinex has no 2 min, «Já fechada» included
+    expect(validateAfter('binary', { ...p, duration_s: 120, outcome: 'perda' }, o)).toEqual({ ok: false, code: 'bad_duration', field: 'duration_s' });
+  });
+
+  it('offers Ebinex 1, 5 and 15 min only; every other platform keeps 2 min, from the click', () => {
+    const p = (durationS: number) => ({ v: 1, client_key: CK, symbol: 'EUR/USD', direction: 'call', stake: '20', payout: '88', duration_s: durationS, clock: SP });
+    const now = d('2026-10-15T23:13:20Z');
+    expect(validateEntry('binary', p(120), { now, platform: 'ebinex' })).toEqual({ ok: false, code: 'bad_duration', field: 'duration_s' });
+    expect(validateEntry('binary', p(120), { now, platform: ' Ebinex ' })).toEqual({ ok: false, code: 'bad_duration', field: 'duration_s' });
+    expect([60, 300, 900].map((s) => validateEntry('binary', p(s), { now, platform: 'ebinex' }))).toMatchObject([
+      { ok: true, expiresAt: d('2026-10-15T23:15:00Z') },
+      { ok: true, expiresAt: d('2026-10-15T23:20:00Z') },
+      { ok: true, expiresAt: d('2026-10-15T23:30:00Z') },
+    ]);
+    expect(validateEntry('binary', p(120), { now, platform: 'pocketoption' })).toMatchObject({ ok: true, expiresAt: d('2026-10-15T23:15:20Z') });
+    expect(validateEntry('binary', p(120), { now })).toMatchObject({ ok: true, expiresAt: d('2026-10-15T23:15:20Z') });
   });
 });

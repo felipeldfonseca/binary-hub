@@ -152,18 +152,32 @@ export function rMultiple(points: string | null, entryPrice: string | null, stop
   return numericText(round(div(n(points), d), 4));
 }
 
-/** What the screen shows before registering (trade_preview) */
+/**
+ * What the screen shows before registering (trade_preview). `risk` is what the trade loses if it
+ * goes wrong, positive, in the account's currency: what riskBeyondLimit compares with what is left
+ * of the daily loss limit.
+ */
 export type EntryPreview =
   | {
       kind: 'prices';
-      /** |result at the stop| and |result at the target|; null without that level or a computed result */
+      /**
+       * |result at the stop| and |result at the target|, as an exit at that price would compute them
+       * (points × multiplier × quantity; ÷ that price on a pair with the dollar as base), gross of
+       * costs; null without that level or a computed result
+       */
       risk: string | null;
       reward: string | null;
       /** |entry − stop| and |target − entry| in price units */
       stopPoints: string | null;
       targetPoints: string | null;
     }
-  | { kind: 'outcome'; ifWin: string; ifLoss: string };
+  | {
+      kind: 'outcome';
+      /** The stake: all a binary can lose */
+      risk: string;
+      ifWin: string;
+      ifLoss: string;
+    };
 
 /** trade_preview: «risco US$ 110,00 · alvo US$ 220,00» or «Se acertar … · se errar …» */
 export function entryPreview(e: ParsedEntry): EntryPreview {
@@ -171,6 +185,7 @@ export function entryPreview(e: ParsedEntry): EntryPreview {
     const stake = e.stake ?? '0';
     return {
       kind: 'outcome',
+      risk: numericText(n(stake)),
       ifWin: numericText(round(div(mul(n(stake), n(e.payout ?? '0')), fromInt(100)), 2)),
       ifLoss: numericText(neg(n(stake))),
     };

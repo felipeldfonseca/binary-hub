@@ -1,11 +1,11 @@
 {
   "gate": {
-    "at": "2026-10-19T01:25:29.053151+00:00",
+    "at": "2026-10-19T13:08:29.459704+00:00",
     "block": {
       "state": "nao_avaliado",
       "reason": "so_futuros"
     },
-    "desde": "2026-09-19T01:25:28.796512+00:00",
+    "desde": "2026-09-19T13:08:29.202782+00:00",
     "label": "Registrar binary",
     "limit": {
       "state": "nao_avaliado",
@@ -20,33 +20,33 @@
     "status": "liberado",
     "window": {
       "next": {
-        "opens_at": "2026-10-19T23:55:00+00:00",
-        "closes_at": "2026-10-20T02:55:00+00:00",
-        "trading_day": "2026-10-19"
+        "opens_at": "2026-10-20T11:38:00+00:00",
+        "closes_at": "2026-10-20T14:38:00+00:00",
+        "trading_day": "2026-10-20"
       },
       "state": "dentro",
       "reason": null,
       "current": {
-        "opens_at": "2026-10-18T23:55:00+00:00",
-        "closes_at": "2026-10-19T02:55:00+00:00"
+        "opens_at": "2026-10-19T11:38:00+00:00",
+        "closes_at": "2026-10-19T14:38:00+00:00"
       },
       "position": "dentro"
     },
     "version": {
-      "id": "f920ae6f-bec8-4b98-8587-c5fc5b53c77d",
+      "id": "512c19c8-ccf8-4a71-ad5a-75019fbfc40e",
       "origin": "criar",
       "version_no": 1,
-      "effective_from": "2026-09-19T01:25:28.796512+00:00"
+      "effective_from": "2026-09-19T13:08:29.202782+00:00"
     },
     "warnings": [],
-    "desde_day": "2026-09-18",
-    "account_id": "c00490bd-2e05-4ab6-b251-22823136bfa6",
-    "changes_at": "2026-10-19T02:55:00+00:00",
+    "desde_day": "2026-09-19",
+    "account_id": "48d1ad50-3795-4c90-b572-9ebffabc1cbf",
+    "changes_at": "2026-10-19T14:38:00+00:00",
     "state_rule": {
       "state": "nao_avaliado",
       "reason": "so_futuros"
     },
-    "trading_day": "2026-10-18",
+    "trading_day": "2026-10-19",
     "checks_evaluated": [
       "janela"
     ]
@@ -74,17 +74,18 @@
   },
   "dry_run": true,
   "preview": {
+    "risk": 20,
     "if_win": 17.6,
     "if_loss": -20
   },
   "similar": [],
   "version": {
-    "id": "f920ae6f-bec8-4b98-8587-c5fc5b53c77d",
+    "id": "512c19c8-ccf8-4a71-ad5a-75019fbfc40e",
     "version_no": 1
   },
-  "entry_at": "2026-10-19T01:25:29.053151+00:00",
+  "entry_at": "2026-10-19T13:08:29.459704+00:00",
   "repeated": false,
-  "expires_at": "2026-10-19T01:27:00+00:00",
+  "expires_at": "2026-10-19T13:10:00+00:00",
   "instrument": {
     "key": "EURUSD",
     "pip": null,
@@ -99,8 +100,9 @@
     "price_dp": null,
     "asset_type": "binary_option"
   },
-  "server_now": "2026-10-19T01:25:29.053151+00:00",
+  "limit_room": null,
+  "server_now": "2026-10-19T13:08:29.459704+00:00",
   "stop_price": null,
-  "trading_day": "2026-10-18",
+  "trading_day": "2026-10-19",
   "target_price": null
 }

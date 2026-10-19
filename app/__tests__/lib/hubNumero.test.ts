@@ -122,7 +122,7 @@ describe('lerNumero', () => {
       const n = lerNumero(text);
       if (!n.ok) throw new Error('not read');
       const p = entryPayload('futures', { symbol: 'MES', direction: 'long', quantity: '2', entryPrice: n.value, clock: 'America/New_York' });
-      expect(checkPayload('entry', 'futures', p, true)).toBeNull();
+      expect(checkPayload('entry', 'futures', p, true, null)).toBeNull();
       const r = parseEntry('futures', p);
       return r.ok ? r.entry.entryPrice : r.code;
     };

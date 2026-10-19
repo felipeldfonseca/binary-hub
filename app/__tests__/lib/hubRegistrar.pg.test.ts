@@ -25,6 +25,7 @@ import {
   afterPayload,
   assignImportLinks,
   binaryExpiry,
+  dayLimitOf,
   entryPayload,
   entryPreview,
   exitPayload,
@@ -33,9 +34,11 @@ import {
   instrumentJson,
   instrumentSpecsJson,
   isClean,
+  limitRoom,
   linkPatch,
   marksNow,
   marksPayload,
+  riskBeyondLimit,
   similarImports,
   tradeCapsJson,
   undoRefusal,
@@ -43,6 +46,7 @@ import {
   validateEntry,
   validateExit,
   type EntryFields,
+  type LimitRoom,
   type LinkRow,
   type MatchRow,
   type MatchTrade,
@@ -196,6 +200,8 @@ describePg('«Registrar operação» × the real SQL', () => {
       ['crypto', 'crypto', 'binance'],
       ['b3', 'b3', 'profit'],
       ['semRegras', 'futures', 'topone'],
+      // The owner's limit test (2026-10-19), on an account of its own
+      ['limite', 'futures', 'topone'],
     ];
     for (const [key, market, platform] of labels) {
       acc[key] = await createAccountAsUser(uid, {
@@ -211,13 +217,14 @@ describePg('«Registrar operação» × the real SQL', () => {
     }
     // A window around now on each account's clock, every day; «desde» a month ago
     const accounts: Record<string, unknown> = {};
-    for (const key of ['futures', 'binary', 'forex', 'stocks', 'crypto', 'b3']) {
-      const tz = clockOf[key];
+    for (const key of ['futures', 'binary', 'forex', 'stocks', 'crypto', 'b3', 'limite']) {
+      const tz = key === 'limite' ? NY : clockOf[key];
       const m = utcToLocal(new Date(), tz).minuteOfDay;
-      const w = { tz, startMin: (m - 90 + 1440) % 1440, endMin: (m + 90) % 1440, weekdays: 127 };
+      // The limit account keeps the futures account's window (dayOf('futures') places its days)
+      const w = key === 'limite' ? windows.futures : { tz, startMin: (m - 90 + 1440) % 1440, endMin: (m + 90) % 1440, weekdays: 127 };
       windows[key] = w;
       accounts[acc[key]] = {
-        rules: key === 'futures' ? { v: 1, limit: { usd: 400, mode: 'conta', at_limit: 'encerrar' } } : { v: 1 },
+        rules: key === 'futures' || key === 'limite' ? { v: 1, limit: { usd: 400, mode: 'conta', at_limit: 'encerrar' } } : { v: 1 },
         window: { tz: w.tz, start_min: w.startMin, end_min: w.endMin, weekdays: w.weekdays },
         version: 'force',
       };
@@ -275,6 +282,9 @@ delete from public.profiles where id = '${uid}';`);
     expect(dry.targetPrice).toBe(ts.entry.targetPrice && plain(ts.entry.targetPrice));
     expect(instrumentJson(dry.instrument)).toEqual(instrumentJson(ts.entry.spec));
     expect(normalizePreview(dry.preview)).toEqual(normalizePreview(entryPreview(ts.entry)));
+    // The room the server answers is the domain's, from the same gate and risk (futures: the US$ 400 limit)
+    expect(normalizeRoom(dry.limitRoom)).toEqual(normalizeRoom(limitRoom(dayLimitOf(dry.gate.limit, MARKET_SPEC[market].currency), entryPreview(ts.entry).risk)));
+    expect(dry.limitRoom === null).toBe(market !== 'futures');
     expect(dry.tradingDay).toBe(dayOf(market)(dry.entryAt));
     expect(dry.similar).toEqual([]);
     expect(dry.plan.verdict).toBe('no_plano');
@@ -293,13 +303,15 @@ delete from public.profiles where id = '${uid}';`);
     ['an expired option', 'stocks', () => entryPayload('stocks', { symbol: 'AAPL', direction: 'long', quantity: '1', entryPrice: '1.85', option: { ...option, expires_on: '2026-01-02' }, clock: NY }), true],
     ['a stake of zero', 'binary', () => entryPayload('binary', { symbol: 'EUR/USD', direction: 'call', stake: '0', payout: '88', durationS: 60, clock: SP }), true],
     ['an expiration of 90 s', 'binary', () => entryPayload('binary', { symbol: 'EUR/USD', direction: 'call', stake: '20', payout: '88', durationS: 90, clock: SP }), true],
+    ['2 min on Ebinex (1, 5 and 15 min only)', 'binary', () => entryPayload('binary', { symbol: 'EUR/USD', direction: 'call', stake: '20', payout: '88', durationS: 120, clock: SP }), true],
+    ['2 min on Ebinex, for real', 'binary', () => entryPayload('binary', { clientKey: newClientKey(), symbol: 'EUR/USD', direction: 'call', stake: '20', payout: '88', durationS: 120, clock: SP }), false],
     ['a clock the account does not use', 'binary', () => ({ ...entryPayload('binary', { symbol: 'EUR/USD', direction: 'call', stake: '20', payout: '88', durationS: 60, clock: SP }), clock: 'UTC' }), true],
   ];
 
   it.each(refusals)('refuses %s with the code and field the domain gives', async (_l, market, payload, dry) => {
     const p = payload();
     const server = await refusal(dry ? previewEntry(db, acc[market], p as never) : registerEntry(db, acc[market], p as never));
-    const ts = validateEntry(market, p, { now: new Date(), dry, inRules: () => true });
+    const ts = validateEntry(market, p, { now: new Date(), dry, inRules: () => true, platform: market === 'binary' ? 'ebinex' : null });
     expect(ts.ok).toBe(false);
     if (!ts.ok) expect(server).toEqual({ code: ts.code, field: ts.field });
   });
@@ -457,6 +469,61 @@ delete from public.profiles where id = '${uid}';`);
     expect(b.state.trade).toMatchObject({ pnl: '-20', result: 'loss', pnlBasis: 'outcome', commission: '0' });
     const notYet = { ...bin, client_key: newClientKey(), entry: hmAgo(SP, 0) };
     expect(await refusal(previewAfter(db, acc.binary, notYet))).toEqual({ code: 'not_expired', field: 'outcome' });
+  });
+
+  it('warns, never refuses, when the risk passes what is left of the day’s limit (the owner’s test, 2026-10-19)', async () => {
+    const day = dayOf('futures')(new Date());
+    // US$ 400 limit; US$ 300 already lost today (MES short 2, 30 points against)
+    const lost = await registerAfter(db, acc.limite, afterPayload('futures', {
+      clientKey: newClientKey(), symbol: 'MES', direction: 'short', quantity: '2', entryPrice: '7900', clock: NY,
+      day, entry: hmAgo(NY, 30), exit: hmAgo(NY, 20), exitPrice: '7930',
+    }));
+    expect(lost.state.trade).toMatchObject({ pnl: '-300', result: 'loss' });
+
+    // ES 1 contract, stop 2,5 points: US$ 125 at risk, US$ 100 left
+    const es = entryPayload('futures', { symbol: 'ES', direction: 'long', quantity: '1', entryPrice: '6650.25', stop: '2.5', clock: NY });
+    const dry = await previewEntry(db, acc.limite, es);
+    write('entry-dry-above', lastAnswer());
+    expect(dry.limitRoom).toEqual({ limit: '400', net: '-300', reached: false, left: '100', risk: '125', above: true });
+    expect(dry.gate.status).toBe('liberado');
+    const ts = validateEntry('futures', es, { now: dry.serverNow, dry: true, inRules: () => true });
+    if (!ts.ok) throw new Error(ts.code);
+    const limit = dayLimitOf(dry.gate.limit, 'USD');
+    expect(riskBeyondLimit(limit, entryPreview(ts.entry).risk)).toEqual({ currency: 'USD', left: '100.00', risk: '125.00', over: '25.00' });
+
+    // MES 1 contract: stop 24 points = US$ 120 (above); 20 points = US$ 100, exactly what is left (not above); no stop
+    const mes = (stop?: string) => entryPayload('futures', { symbol: 'MES', direction: 'long', quantity: '1', entryPrice: '6650.25', stop, clock: NY });
+    expect((await previewEntry(db, acc.limite, mes('24'))).limitRoom).toMatchObject({ left: '100', risk: '120', above: true });
+    expect((await previewEntry(db, acc.limite, mes('20'))).limitRoom).toMatchObject({ left: '100', risk: '100', above: false });
+    expect((await previewEntry(db, acc.limite, mes())).limitRoom).toMatchObject({ left: '100', risk: null, above: false });
+    for (const stop of ['24', '20', undefined]) {
+      const t = validateEntry('futures', mes(stop), { now: dry.serverNow, dry: true, inRules: () => true });
+      if (!t.ok) throw new Error(t.code);
+      expect(riskBeyondLimit(limit, entryPreview(t.entry).risk) !== null).toBe(stop === '24');
+    }
+
+    // «Já fechada» answers it at its own entry, after the loss
+    const after = await previewAfter(db, acc.limite, afterPayload('futures', {
+      symbol: 'MES', direction: 'long', quantity: '1', entryPrice: '6650.25', stop: '24', clock: NY,
+      day, entry: hmAgo(NY, 5), exit: hmAgo(NY, 2), exitPrice: '6660',
+    }));
+    expect(after.limitRoom).toEqual({ limit: '400', net: '-300', reached: false, left: '100', risk: '120', above: true });
+
+    // Never a block: the entry registers, and an open trade does not count in the day's net
+    const reg = await registerEntry(db, acc.limite, { ...es, client_key: newClientKey() });
+    expect(reg.state.trade).toMatchObject({ status: 'open', symbol: 'ES', stopPrice: '6647.75' });
+    expect((await previewEntry(db, acc.limite, mes('24'))).limitRoom).toMatchObject({ net: '-300', left: '100', above: true });
+
+    // Another US$ 100 lost: the limit is reached; «Encerrado por hoje» applies and the room warns no more
+    await registerAfter(db, acc.limite, afterPayload('futures', {
+      clientKey: newClientKey(), symbol: 'MES', direction: 'short', quantity: '1', entryPrice: '7900', clock: NY,
+      day, entry: hmAgo(NY, 15), exit: hmAgo(NY, 10), exitPrice: '7920',
+    }));
+    const closed = await previewEntry(db, acc.limite, mes('24'));
+    expect(closed.gate.status).toBe('encerrado');
+    expect(closed.limitRoom).toEqual({ limit: '400', net: '-400', reached: true, left: '0', risk: '120', above: false });
+    expect(riskBeyondLimit(dayLimitOf(closed.gate.limit, 'USD'), '120.00')).toBeNull();
+    expect(normalizeRoom(closed.limitRoom)).toEqual(normalizeRoom(limitRoom(dayLimitOf(closed.gate.limit, 'USD'), '120.00')));
   });
 
   it('an Ebinex result only after the expiry (next candle)', async () => {
@@ -745,8 +812,12 @@ function plain(x: string): string {
 function normalizePreview(p: ReturnType<typeof entryPreview>) {
   const n = (x: string | null) => (x === null ? null : plain(x));
   return p.kind === 'outcome'
-    ? { kind: p.kind, ifWin: plain(p.ifWin), ifLoss: plain(p.ifLoss) }
+    ? { kind: p.kind, risk: plain(p.risk), ifWin: plain(p.ifWin), ifLoss: plain(p.ifLoss) }
     : { kind: p.kind, risk: n(p.risk), reward: n(p.reward), stopPoints: n(p.stopPoints), targetPoints: n(p.targetPoints) };
+}
+
+function normalizeRoom(r: LimitRoom | null) {
+  return r && { ...r, limit: plain(r.limit), net: plain(r.net), left: plain(r.left), risk: r.risk === null ? null : plain(r.risk) };
 }
 
 /** An open trade of a state, as register_exit reads it */

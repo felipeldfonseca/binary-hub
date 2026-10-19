@@ -6,7 +6,10 @@
  * whose accounts (futures Top One, Ebinex, forex, …) have a rule version with a window around the
  * time of the recording (Mon 19 Oct 2026 about 01:25 UTC, Sun 18 Oct 21:25 in New York, so the
  * futures trading day is Mon 19 Oct and the Ebinex one Sun 18 Oct) and, on futures, a US$ 400 limit.
- * Recorded by __tests__/lib/hubRegistrar.pg.test.ts with BH_PG_RECORD; the ids are random:
+ * Recorded by __tests__/lib/hubRegistrar.pg.test.ts with BH_PG_RECORD; the ids are random. The dry
+ * runs (entry-dry-*, after-dry-mes) were recorded again on Mon 19 Oct 2026 about 13:08 UTC (09:08 in
+ * New York, 10:08 in Brasília: both trading days Mon 19 Oct), when the database added the binary's
+ * "risk" to the preview and "limit_room" to the dry runs:
  *
  *   entry-dry-mes      register_entry dry run: MES long 2 @ 7896.25, stop 11, target 22 (no hour)
  *   entry-dry-ebinex   register_entry dry run: EUR/USD call, US$ 20 at 88 %, 1 min (the next candle)
@@ -26,6 +29,9 @@
  *                      pnl_basis 'estimate' (a pair with the dollar as base)
  *   entry-dry-similar  register_entry dry run: GBP/USD call, US$ 20, three minutes after an imported
  *                      GBP/USD call of US$ 10 (similar: that trade)
+ *   entry-dry-above    register_entry dry run on a futures account with a US$ 400 limit and US$ 300
+ *                      lost today: ES long 1 @ 6650.25, stop 2,5 points = US$ 125 at risk, US$ 100
+ *                      left (limit_room "above": the owner's test of 2026-10-19)
  */
 import fs from 'fs';
 import path from 'path';
@@ -48,7 +54,8 @@ export type RegistrarFixture =
   | 'extras'
   | 'trash-done'
   | 'exit-usdjpy'
-  | 'entry-dry-similar';
+  | 'entry-dry-similar'
+  | 'entry-dry-above';
 
 /** The recorded JSON, as the database answered it (a fresh copy each call) */
 export function registrarJson(name: RegistrarFixture): Record<string, unknown> {

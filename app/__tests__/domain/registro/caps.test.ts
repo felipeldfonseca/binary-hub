@@ -12,8 +12,10 @@ import path from 'node:path';
 import {
   INSTRUMENT_SPEC,
   TRADE_CAPS,
+  durationsOf,
   expiryRuleOf,
   instrumentSpecsJson,
+  platformKey,
   tradeCapsJson,
   tradeInstrument,
   tradeMatchKey,
@@ -61,6 +63,7 @@ describe('the descriptors', () => {
   it('is frozen', () => {
     expect(Object.isFrozen(TRADE_CAPS)).toBe(true);
     expect(Object.isFrozen(TRADE_CAPS.binary.durations)).toBe(true);
+    expect(Object.isFrozen(TRADE_CAPS.binary.durationsByPlatform!.ebinex)).toBe(true);
     expect(Object.isFrozen(INSTRUMENT_SPEC.futures)).toBe(true);
     expect(Object.isFrozen(INSTRUMENT_SPEC.futures!.MES)).toBe(true);
   });
@@ -104,8 +107,20 @@ describe('the descriptors', () => {
     }
   });
 
-  it('gives binaries four expirations and the Ebinex candle rule', () => {
+  it('gives binaries four expirations, Ebinex three (1, 5 and 15 min: the owner, 2026-10-19), and the Ebinex candle rule', () => {
     expect(TRADE_CAPS.binary.durations).toEqual([60, 120, 300, 900]);
+    expect(TRADE_CAPS.binary.durationsByPlatform).toEqual({ ebinex: [60, 300, 900] });
+    expect(durationsOf('ebinex')).toEqual([60, 300, 900]);
+    expect(durationsOf(' Ebinex ')).toEqual([60, 300, 900]);
+    expect(durationsOf('EBINEX')).toEqual([60, 300, 900]);
+    expect(durationsOf('pocketoption')).toEqual([60, 120, 300, 900]);
+    expect(durationsOf(null)).toEqual([60, 120, 300, 900]);
+    expect(durationsOf('')).toEqual([60, 120, 300, 900]);
+    // btrim drops spaces only; an inherited key is no platform
+    expect(durationsOf('\tebinex')).toEqual([60, 120, 300, 900]);
+    expect(durationsOf('constructor')).toEqual([60, 120, 300, 900]);
+    expect(platformKey('  Ebinex ')).toBe('ebinex');
+    expect(platformKey(undefined)).toBe('');
     expect(TRADE_CAPS.binary.directions).toEqual(['call', 'put']);
     expect(expiryRuleOf('ebinex')).toBe('next_candle');
     expect(expiryRuleOf(' Ebinex ')).toBe('next_candle');
@@ -113,6 +128,7 @@ describe('the descriptors', () => {
     expect(expiryRuleOf(null)).toBe('entry');
     // btrim drops spaces only
     expect(expiryRuleOf('\tebinex')).toBe('entry');
+    expect(expiryRuleOf('constructor')).toBe('entry');
   });
 
   it('gives each market the asset type the accounts use', () => {
