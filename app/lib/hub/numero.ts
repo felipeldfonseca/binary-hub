@@ -5,10 +5,15 @@
  * result). Pure; no React.
  *
  * The approved board's `num` (RegistrarOperacao, revised for the new markets):
- *   «7.896,25» «7896,25» «7896.25» «1.234.567,8» → with a comma, dots group thousands and the comma
- *   is the decimal mark; without one, a dot followed by groups of exactly three digits groups
- *   thousands («7.896» = 7896), except after a lone zero («0.250» = 0,25); any other dot is the
- *   decimal mark. Spaces are ignored. Anything else is 'invalid' («Use só números, como 7.896,25.»).
+ *   «7.896,25» «7896,25» «7896.25» «1.234.567,8» → with a comma, the comma is the decimal mark and
+ *   any dots must group thousands («1.234.567,8»); without one, a dot followed by groups of exactly
+ *   three digits groups thousands («7.896» = 7896), except when the integer part starts with zero
+ *   («0.250», «00.250» = 0,25); any other dot is the decimal mark. Spaces are ignored. Anything else
+ *   is 'invalid' («Use só números, como 7.896,25.»), including the US way with a comma before the
+ *   thousands and a dot before the decimals («7,896.25», «1,234.50»): the board's `num` deleted
+ *   every dot once it saw a comma and read those at a thousandth of their value; this reader
+ *   refuses them (registrar.md §5.2: accepts «7.896,25», «7896,25», «7896.25», anything else is the
+ *   "only numbers" error).
  * With `ponto` (Forex, ações e opções: prices like 1.085 are common), a single dot is always the
  * decimal mark («1.085» = 1,085). With `sinal` (a typed result), a leading minus (− or -) or plus
  * is read.
@@ -20,7 +25,10 @@
 export type NumeroLido = { ok: true; value: string } | { ok: false; reason: 'empty' | 'invalid' };
 
 const PLAIN = /^\d+(\.\d+)?$/;
-const THOUSANDS = /^\d{1,3}(\.\d{3})+$/;
+/** Dots grouping thousands: the first group has 1 to 3 digits and does not start with zero */
+const THOUSANDS = /^[1-9]\d{0,2}(\.\d{3})+$/;
+/** With a comma: plain digits, or thousands grouped by dots, then the comma and the decimals */
+const WITH_COMMA = /^(\d+|[1-9]\d{0,2}(\.\d{3})+),\d+$/;
 
 function normalize(x: string, negative: boolean): NumeroLido {
   if (!PLAIN.test(x)) return { ok: false, reason: 'invalid' };
@@ -32,10 +40,10 @@ function normalize(x: string, negative: boolean): NumeroLido {
   return { ok: true, value: negative && !zero ? `-${body}` : body };
 }
 
-/** The board's num: comma or grouped thousands */
+/** The board's num: comma or grouped thousands. Text it cannot read comes back as '' (invalid). */
 function num(x: string): string {
-  if (x.includes(',')) return x.replace(/\./g, '').replace(',', '.');
-  if (THOUSANDS.test(x) && !/^0\./.test(x)) return x.replace(/\./g, '');
+  if (x.includes(',')) return WITH_COMMA.test(x) ? x.replace(/\./g, '').replace(',', '.') : '';
+  if (THOUSANDS.test(x)) return x.replace(/\./g, '');
   return x;
 }
 

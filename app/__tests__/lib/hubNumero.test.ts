@@ -37,6 +37,61 @@ describe('lerNumero', () => {
     expect(lerNumero(text)).toEqual(invalid);
   });
 
+  // The US way (a comma before the thousands, a dot before the decimals), as Binance or IBKR
+  // write a price, and dots that do not group thousands before a comma: the board's num deleted
+  // every dot once it saw a comma («112,400.50» became 112,4005)
+  it.each([
+    '112,400.50',
+    '7,896.25',
+    '1,234.50',
+    '1,234,567.89',
+    '12.34,5',
+    '1,5.5',
+    '1.23,5',
+    '1.2345,6',
+    '7.896.2,5',
+    '7896.25,5',
+    '0.250,5',
+    '00.250,5',
+    '.896,25',
+    '7.,25',
+  ])('%j is not a number (a dot that does not group thousands before a comma)', (text) => {
+    expect(lerNumero(text)).toEqual(invalid);
+    expect(lerNumero(text, { ponto: true })).toEqual(invalid);
+    expect(lerNumero(`-${text}`, { sinal: true })).toEqual(invalid);
+    expect(lerNumero(`−${text}`, { sinal: true, ponto: true })).toEqual(invalid);
+  });
+
+  it('reads a dot after a leading zero as the decimal mark, however many zeros', () => {
+    expect(lerNumero('0.250')).toEqual(ok('0.25'));
+    expect(lerNumero('00.250')).toEqual(ok('0.25'));
+    expect(lerNumero('000.250')).toEqual(ok('0.25'));
+    expect(lerNumero('012.345')).toEqual(ok('12.345'));
+    expect(lerNumero('0.250.000')).toEqual(invalid);
+    expect(lerNumero('0,250')).toEqual(ok('0.25'));
+    expect(lerNumero('00,5')).toEqual(ok('0.5'));
+  });
+
+  it('reads every pt-BR writing of a number and refuses its US writing', () => {
+    // Invented values from a fixed seed: the pt-BR text gives the number back; the US text with a
+    // dot before the decimals and a comma before the thousands is never read as a number
+    let seed = 20261018;
+    const rnd = (n: number) => ((seed = (seed * 1103515245 + 12345) % 2147483648), seed % n);
+    for (let i = 0; i < 2000; i++) {
+      const int = String(1000 + rnd(10 ** (4 + rnd(6))));
+      const frac = String(rnd(100)).padStart(2, '0');
+      const value = `${int}.${frac}`.replace(/\.?0+$/, '');
+      const ptBr = formatDecimal(`${int}.${frac}`);
+      expect(lerNumero(ptBr)).toEqual(ok(value));
+      expect(lerNumero(ptBr, { ponto: true })).toEqual(ok(value));
+      expect(lerNumero(`${int},${frac}`)).toEqual(ok(value));
+      const us = `${int.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}.${frac}`;
+      expect(lerNumero(us)).toEqual(invalid);
+      expect(lerNumero(us, { ponto: true })).toEqual(invalid);
+      expect(lerNumero(`−${us}`, { sinal: true })).toEqual(invalid);
+    }
+  });
+
   it('says when nothing was typed', () => {
     for (const text of ['', '   ', null as unknown as string]) expect(lerNumero(text)).toEqual({ ok: false, reason: 'empty' });
   });
@@ -49,6 +104,7 @@ describe('lerNumero', () => {
     expect(lerNumero('1.085,5', { ponto: true })).toEqual(ok('1085.5'));
     expect(lerNumero('1.234.567', { ponto: true })).toEqual(ok('1234567'));
     expect(lerNumero('1,08520', { ponto: true })).toEqual(ok('1.0852'));
+    expect(lerNumero('1,234.50', { ponto: true })).toEqual(invalid);
   });
 
   it('reads a sign on a typed result', () => {
@@ -58,6 +114,7 @@ describe('lerNumero', () => {
     expect(lerNumero('-0,00', { sinal: true })).toEqual(ok('0'));
     expect(lerNumero('-', { sinal: true })).toEqual(invalid);
     expect(lerNumero('--5', { sinal: true })).toEqual(invalid);
+    expect(lerNumero('−1,234.5', { sinal: true })).toEqual(invalid);
   });
 
   it('gives what the database takes, and what its checks refuse stays theirs', () => {
