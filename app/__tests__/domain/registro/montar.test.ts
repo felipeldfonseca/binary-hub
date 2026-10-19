@@ -168,6 +168,16 @@ describe('imageName: at most 120 characters, the extension kept', () => {
     // Characters, not UTF-16 units: an emoji counts once
     expect(Array.from(imageName('😀'.repeat(130)))).toHaveLength(120);
   });
+
+  it('keeps a name of exactly 120 characters as it is (SQL: char_length between 1 and 120)', () => {
+    const exact = `${'a'.repeat(116)}.png`;
+    expect(imageName(exact)).toBe(exact);
+    expect(imageName('😀'.repeat(120))).toBe('😀'.repeat(120));
+    const over = `${'a'.repeat(117)}.png`;
+    expect(Array.from(imageName(over))).toHaveLength(120);
+    expect(imageName(over)).toContain('…');
+    expect(imageName(over).endsWith('.png')).toBe(true);
+  });
 });
 
 describe('jsonbTextBytes: the 8 KB limit as the database measures it', () => {
@@ -229,6 +239,57 @@ describe('stopLevels and pnlFor: one call per form', () => {
       points: null,
     });
     expect(pnlFor(ebx, { direction: 'put', stake: '20', payout: '88', commission: '0' })).toEqual({ ok: false, code: 'bad_outcome', field: 'outcome' });
+  });
+});
+
+describe('the limits the database draws, at the limit', () => {
+  const mes = tradeInstrument('futures', 'MES')!;
+  const aapl = tradeInstrument('stocks', 'AAPL')!;
+
+  it('refuses a stop or target typed as a price exactly at the entry (SQL: (lvl − px) × sgn >= 0 / <= 0)', () => {
+    expect(stopLevels(aapl, 1, '231.40', { stop: '231.40' })).toEqual({ ok: false, code: 'bad_stop', field: 'stop' });
+    expect(stopLevels(aapl, 1, '231.40', { target: '231.40' })).toEqual({ ok: false, code: 'bad_target', field: 'target' });
+    expect(stopLevels(aapl, -1, '231.40', { stop: '231.4' })).toEqual({ ok: false, code: 'bad_stop', field: 'stop' });
+    expect(stopLevels(aapl, -1, '231.40', { target: '231.4000' })).toEqual({ ok: false, code: 'bad_target', field: 'target' });
+    // One step away is taken, on the right side only
+    expect(stopLevels(aapl, 1, '231.40', { stop: '231.3999', target: '231.4001' })).toEqual({ ok: true, stopPrice: '231.3999', targetPrice: '231.4001' });
+    expect(stopLevels(aapl, -1, '231.40', { stop: '231.4001', target: '231.3999' })).toEqual({ ok: true, stopPrice: '231.4001', targetPrice: '231.3999' });
+    expect(stopLevels(aapl, -1, '231.40', { stop: '231.3999' })).toEqual({ ok: false, code: 'bad_stop', field: 'stop' });
+  });
+
+  it('refuses a level of exactly 10^10 or of zero (SQL: lvl <= 0 or lvl >= 10000000000)', () => {
+    expect(stopLevels(mes, 1, '9999999999.75', { target: '0.25' })).toEqual({ ok: false, code: 'bad_target', field: 'target' });
+    expect(stopLevels(mes, -1, '9999999999.75', { stop: '0.25' })).toEqual({ ok: false, code: 'bad_stop', field: 'stop' });
+    expect(stopLevels(mes, 1, '9999999999.50', { target: '0.25' })).toEqual({ ok: true, stopPrice: null, targetPrice: '9999999999.75' });
+    expect(stopLevels(mes, 1, '0.25', { stop: '0.25' })).toEqual({ ok: false, code: 'bad_stop', field: 'stop' });
+    expect(stopLevels(mes, 1, '0.50', { stop: '0.25' })).toEqual({ ok: true, stopPrice: '0.25', targetPrice: null });
+    const eurusd = tradeInstrument('forex', 'EUR/USD')!;
+    expect(stopLevels(eurusd, 1, '9999999999.99990', { target: '1' })).toEqual({ ok: false, code: 'bad_target', field: 'target' });
+    expect(stopLevels(eurusd, 1, '9999999999.99980', { target: '1' })).toEqual({ ok: true, stopPrice: null, targetPrice: '9999999999.99990' });
+  });
+
+  it('refuses a result of exactly ±10^16 (SQL: abs(v_pnl) >= 10000000000000000)', () => {
+    // 4·10^9 points × US$ 5 × 500 000 contracts = 10^16
+    const at = (direction: 'long' | 'short', entryPrice: string, exitPrice: string) =>
+      pnlFor(mes, { direction, quantity: '500000', entryPrice, exitPrice, commission: null });
+    expect(at('long', '0.25', '4000000000.25')).toEqual({ ok: false, code: 'bad_pnl', field: 'pnl' });
+    expect(at('long', '4000000000.25', '0.25')).toEqual({ ok: false, code: 'bad_pnl', field: 'pnl' });
+    expect(at('short', '4000000000.25', '0.25')).toEqual({ ok: false, code: 'bad_pnl', field: 'pnl' });
+    expect(at('long', '0.25', '4000000000.00')).toMatchObject({ ok: true, pnl: '9999999999375000.00', result: 'win' });
+    expect(at('short', '4000000000.00', '0.25')).toMatchObject({ ok: true, pnl: '9999999999375000.00', result: 'win' });
+    expect(at('long', '4000000000.00', '0.25')).toMatchObject({ ok: true, pnl: '-9999999999375000.00', result: 'loss' });
+  });
+
+  it('takes an option multiplier with up to 4 decimals and 8 digits before them (SQL: trade_num(multiplier, 8, 4))', () => {
+    const base = { v: 1 as const, client_key: CK, symbol: 'AAPL', direction: 'long' as const, quantity: '2', entry_price: '1.85', clock: NY };
+    const withMult = (multiplier: string) => ({ ...base, option: { right: 'call' as const, strike: '200', expires_on: '2026-11-20', multiplier } });
+    expect(checkPayload('entry', 'stocks', withMult('100.1234'), true)).toBeNull();
+    expect(checkPayload('entry', 'stocks', withMult('99999999.9999'), true)).toBeNull();
+    expect(checkPayload('entry', 'stocks', withMult('100.12345'), true)).toEqual({ code: 'bad_option', field: 'option.multiplier' });
+    expect(checkPayload('entry', 'stocks', withMult('100000000'), true)).toEqual({ code: 'bad_option', field: 'option.multiplier' });
+    expect(checkPayload('entry', 'stocks', withMult('0.0000'), true)).toEqual({ code: 'bad_option', field: 'option.multiplier' });
+    const parsed = parseEntry('stocks', withMult('100.1234'));
+    expect(parsed.ok && parsed.entry.option).toMatchObject({ multiplier: '100.1234' });
   });
 });
 

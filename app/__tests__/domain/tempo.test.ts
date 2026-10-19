@@ -496,6 +496,17 @@ describe('an "HH:MM" typed on a clock, as an instant (Phase 3; the SQL parity is
     expect(localHmInTradingDay('2026-10-15', '18:30', NYC, futuresDay)).toEqual(new Date('2026-10-14T22:30:00Z'));
     expect(localHmInTradingDay('2026-10-15', '10:00', NYC, futuresDay)).toEqual(new Date('2026-10-15T14:00:00Z'));
     expect(localHmInTradingDay('2026-10-15', '10:00', NYC, () => '2026-10-16')).toBeNull();
+    // Two candidates on the same trading day: the latest wins (SQL: order by c desc limit 1).
+    // An overnight window 15:01–04:37 that does not open on Tuesday: Tue 20 Oct 22:16 is outside any
+    // window, so it counts on the futures clock (after 18:00 → Wed 21); Wed 21 22:16 is inside
+    // Wednesday's window, which opened on Wed 21; Thu 22 22:16 is Thursday's.
+    const night = { tz: NYC, startMin: 901, endMin: 277, weekdays: weekdayMask(['mon', 'wed', 'thu', 'fri']) };
+    const withWindow = (d: Date) => tradingDayFor(d, { tz: NYC, startMin: 1080 }, [night]);
+    expect(withWindow(new Date('2026-10-21T02:16:00Z'))).toBe('2026-10-21');
+    expect(withWindow(new Date('2026-10-22T02:16:00Z'))).toBe('2026-10-21');
+    expect(localHmInTradingDay('2026-10-21', '22:16', NYC, withWindow)).toEqual(new Date('2026-10-22T02:16:00Z'));
+    // Every candidate on the day: the day after's
+    expect(localHmInTradingDay('2026-10-15', '10:00', NYC, () => '2026-10-15')).toEqual(new Date('2026-10-16T14:00:00Z'));
     expect(firstLocalHmAtOrAfter(new Date('2026-10-14T14:33:00Z'), '10:33', NYC)).toEqual(new Date('2026-10-14T14:33:00Z'));
     expect(firstLocalHmAtOrAfter(new Date('2026-10-14T14:33:00Z'), '10:20', NYC)).toEqual(new Date('2026-10-15T14:20:00Z'));
   });

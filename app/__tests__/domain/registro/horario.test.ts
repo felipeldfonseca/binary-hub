@@ -10,6 +10,7 @@ import {
   entryInstant,
   exitInstant,
   isExpired,
+  optionExpiredAt,
   undoRefusal,
   undoUntil,
   validateAfter,
@@ -168,6 +169,24 @@ describe('afterInstants («Já fechada»)', () => {
     expect(afterInstants({ day: '2026-10-15', entry: '10:33', exit: '11:02', clock: NY, now, dayOf: futuresDay })).toEqual({ ok: false, code: 'exit_in_future', field: 'exit' });
   });
 
+  it('dates an option’s expiry on New York’s calendar, also between 20:00 and midnight ET', () => {
+    // 21:30 ET on Wed 14 Oct is 01:30 UTC on Thu 15: still the 14th in New York (SQL:
+    // (entry_at at time zone 'America/New_York')::date), so an option of the 14th has not expired
+    expect(optionExpiredAt('2026-10-14', d('2026-10-15T01:30:00Z'))).toBe(false);
+    expect(optionExpiredAt('2026-10-14', d('2026-10-15T03:59:59Z'))).toBe(false);
+    expect(optionExpiredAt('2026-10-14', d('2026-10-15T04:00:00Z'))).toBe(true);
+    expect(optionExpiredAt('2026-10-13', d('2026-10-15T01:30:00Z'))).toBe(true);
+    const stocksDay = (at: Date) => tradingDayOn(at, MARKET_SPEC.stocks.day);
+    const late = { day: '2026-10-15', entry: '21:30', exit: '21:45', clock: NY, now: d('2026-10-15T02:00:00Z'), dayOf: stocksDay };
+    expect(afterInstants({ ...late, optionExpiresOn: '2026-10-14' })).toEqual({
+      ok: true,
+      entryAt: d('2026-10-15T01:30:00Z'),
+      exitAt: d('2026-10-15T01:45:00Z'),
+      expiresAt: null,
+    });
+    expect(afterInstants({ ...late, optionExpiresOn: '2026-10-13' })).toEqual({ ok: false, code: 'bad_option', field: 'option.expires_on' });
+  });
+
   it('ends a binary at its expiry, once it has passed', () => {
     const later = d('2026-10-15T23:12:00Z');
     const binary = { platform: 'ebinex', durationS: 60 };
@@ -209,6 +228,13 @@ describe('validateEntry / validateExit / validateAfter: the first refusal, in th
     const option = { ...entry, symbol: 'AAPL', entry_price: '1.85', stop_pts: undefined, option: { right: 'call', strike: '200', expires_on: '2026-10-13' } };
     expect(validateEntry('stocks', option, { now })).toEqual({ ok: false, code: 'bad_option', field: 'option.expires_on' });
     expect(validateEntry('stocks', { ...option, option: { ...option.option, expires_on: '2026-10-14' } }, { now })).toMatchObject({ ok: true });
+    // 21:30 ET is already the 15th in UTC; the option of the 14th is still alive in New York
+    const night = { now: d('2026-10-15T01:35:00Z') };
+    expect(validateEntry('stocks', { ...option, entry: '21:30', option: { ...option.option, expires_on: '2026-10-14' } }, night)).toMatchObject({
+      ok: true,
+      entryAt: d('2026-10-15T01:30:00Z'),
+    });
+    expect(validateEntry('stocks', { ...option, entry: '21:30' }, night)).toEqual({ ok: false, code: 'bad_option', field: 'option.expires_on' });
   });
 
   const open: OpenTrade = {
@@ -267,5 +293,22 @@ describe('validateEntry / validateExit / validateAfter: the first refusal, in th
     });
     expect(validateAfter('futures', { ...p, exit_price: '7929.10' }, { now, dayOf })).toEqual({ ok: false, code: 'off_tick', field: 'exit_price' });
     expect(validateAfter('futures', { ...p, day: '2026-10-15' }, { now, dayOf })).toEqual({ ok: false, code: 'entry_in_future', field: 'entry' });
+  });
+
+  it('registers a «Já fechada» binary with commission 0 (the broker’s cut is inside the payout)', () => {
+    const dayOf = (at: Date) => tradingDayOn(at, MARKET_SPEC.binary.day);
+    const p = { v: 1, client_key: CK, symbol: 'EUR/USD', direction: 'call', stake: '20', payout: '88', duration_s: 60, clock: SP, day: '2026-10-15', entry: '20:10' };
+    const o = { now: d('2026-10-15T23:30:00Z'), dayOf, platform: 'ebinex' };
+    // SQL register_after: jsonb_build_object(…, 'commission', 0, …)
+    expect(validateAfter('binary', { ...p, outcome: 'ganho' }, o)).toEqual({
+      ok: true,
+      entry: expect.anything(),
+      entryAt: d('2026-10-15T23:10:00Z'),
+      exitAt: d('2026-10-15T23:12:00Z'),
+      expiresAt: d('2026-10-15T23:12:00Z'),
+      exit: { exitPrice: null, pnl: '17.60', pnlBasis: 'outcome', result: 'win', commission: '0', points: null },
+      r: null,
+    });
+    expect(validateAfter('binary', { ...p, outcome: 'perda' }, o)).toMatchObject({ ok: true, exit: { pnl: '-20', result: 'loss', commission: '0' } });
   });
 });

@@ -93,6 +93,26 @@ describe('the Registrar calls', () => {
     expect(r.state.images).toEqual([]);
   });
 
+  it('reads prices, quantities and points with all 8 decimals (crypto: qty_dp and price_dp 8)', async () => {
+    // The database answers numeric as JSON numbers; each one is read at 8 decimals, no fewer, no more
+    const state = registrarJson('entry-mes');
+    const trade = { ...(state.trade as object), quantity: 0.12345678, entry_price: 0.00012345, stop_price: 0.00012001, target_price: 98765.43210987 };
+    expect(parseTradeState({ ...state, trade }).trade).toMatchObject({
+      quantity: '0.12345678',
+      entryPrice: '0.00012345',
+      stopPrice: '0.00012001',
+      targetPrice: '98765.43210987',
+    });
+    const dry = registrarJson('entry-dry-mes');
+    const answer = { ...dry, stop_price: 0.00012001, target_price: 0.00013, preview: { risk: 0.01, reward: 0.02, stop_points: 0.00000344, target_points: 0.00000655 } };
+    const p = await previewEntry(fakeDb(() => ({ data: answer })).db, ID, {} as never);
+    expect([p.stopPrice, p.targetPrice, p.preview]).toEqual([
+      '0.00012001',
+      '0.00013',
+      { kind: 'prices', risk: '0.01', reward: '0.02', stopPoints: '0.00000344', targetPoints: '0.00000655' },
+    ]);
+  });
+
   it('previews an Ebinex entry with its expiry on the next candle', async () => {
     const { db } = answering('entry-dry-ebinex');
     const p = await previewEntry(db, ID, { v: 1, symbol: 'EUR/USD', direction: 'call', stake: '20', payout: '88', duration_s: 60, clock: 'America/Sao_Paulo' });
