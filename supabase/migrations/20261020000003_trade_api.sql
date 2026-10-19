@@ -19,6 +19,18 @@
 --        "clock": "America/New_York" | "America/Sao_Paulo", "entry": "HH:MM" (absent = now),
 --        "marks": {"setup" | "execucao" | "emocao" | "seguiu_texto": value | null},
 --        "allow_similar": bool}
+--     The dry run's answer: "dry_run", "repeated", "server_now", "entry_at", "trading_day",
+--     "expires_at" (binary), "version", "gate" (gate_at at the entry), "context", "plan",
+--     "instrument", "stop_price", "target_price", "similar", and
+--       "preview"     price markets: "risk" (the loss if the stop is hit: points × multiplier ×
+--                     quantity in the account's currency, gross of costs; null without a stop or
+--                     when the instrument's result is typed), "reward", "stop_points",
+--                     "target_points"; binary: "risk" (the stake: all a binary can lose),
+--                     "if_win", "if_loss"
+--       "limit_room"  the risk against what is left of the daily loss limit at the entry
+--                     (trade_limit_room: «o stop passa do limite diário», a warning, never a
+--                     block): null when the gate did not evaluate the limit, else {"usd",
+--                     "net_usd", "reached", "left", "risk", "above"}
 --   register_exit(p_trade uuid, p_exit jsonb, p_dry_run boolean default false) returns jsonb
 --     «Registrar saída» / «Registrar resultado». The server computes the result from the prices
 --     (instrument_specs; pnl_basis 'prices', or 'estimate' for a forex pair with the dollar as base,
@@ -28,7 +40,9 @@
 --        "ganho" | "perda" | "devolvida"}
 --   register_after(p_account uuid, p_trade jsonb, p_dry_run boolean default false) returns jsonb
 --     «Já fechada»: the entry fields plus "day" (a trading day from the account's «desde» to today),
---     "entry", "exit" (price markets), "exit_price", "pnl", "costs" or "outcome".
+--     "entry", "exit" (price markets), "exit_price", "pnl", "costs" or "outcome". Its dry run answers
+--     the same keys as register_entry's (the gate and "limit_room" at the reconstructed entry), plus
+--     the exit's.
 --   add_marks(p_trade uuid, p_marks jsonb) returns jsonb       {"v": 1, "marks": {...}}
 --   undo_entry(p_trade uuid) returns jsonb                       «Desfazer entrada»: an open live trade,
 --                                                                within 15 minutes of registered_at
@@ -742,7 +756,9 @@ as $$
 $$;
 
 -- What the screen previews before registering: the money at the stop and at the target (prices
--- markets), the binary «Se acertar … · se errar …»
+-- markets), the binary «Se acertar … · se errar …». "risk" is what the trade loses if it goes
+-- wrong, positive, in the account's currency: at the stop (gross of costs; null without a stop or
+-- when the instrument's result is typed), or a binary's stake
 create or replace function public.trade_preview(p_fields jsonb)
 returns jsonb
 language sql
@@ -751,6 +767,7 @@ set search_path = ''
 as $$
   select case
     when p_fields->'spec'->>'pnl' = 'outcome' then jsonb_build_object(
+      'risk', (p_fields->>'stake')::numeric,
       'if_win', round((p_fields->>'stake')::numeric * (p_fields->>'payout')::numeric / 100, 2),
       'if_loss', -(p_fields->>'stake')::numeric)
     else jsonb_build_object(
@@ -761,6 +778,37 @@ as $$
       'stop_points', abs((p_fields->>'entry_price')::numeric - (p_fields->>'stop_price')::numeric),
       'target_points', abs((p_fields->>'target_price')::numeric - (p_fields->>'entry_price')::numeric))
   end
+$$;
+
+-- The risk of a new entry against what is left of the daily loss limit, from the gate at the entry
+-- (the owner's «o stop está acima do limite diário de perda»: a warning, never a block; the trade
+-- registers whatever it says). Null when the gate did not evaluate the limit (no limit, no rules
+-- version, the day's result unknown). Else, in the account's currency (the gate's "usd" keys hold
+-- it, whatever the currency):
+--   usd      the daily limit
+--   net_usd  the day's realized net at the entry, on the limit's scope (the account, or the sum of
+--            the futures accounts); open trades never count
+--   reached  the limit was reached by the entry: the gate's «Encerrado por hoje» (or its 'limite'
+--            warning) applies instead, and "above" is false
+--   left     what is left before the running net reaches −usd: usd + net_usd; 0 once reached
+--   risk     trade_preview's "risk" (null: nothing to compare, no warning)
+--   above    not reached and risk > left: the form warns (a stop that loses exactly what is left
+--            reaches the limit, it does not pass it)
+create or replace function public.trade_limit_room(p_gate jsonb, p_risk numeric)
+returns jsonb
+language sql
+immutable
+set search_path = ''
+as $$
+  select case when x.state in ('ok', 'atingido') then jsonb_build_object(
+    'usd', x.usd,
+    'net_usd', x.net,
+    'reached', x.state = 'atingido',
+    'left', case when x.state = 'ok' then x.usd + x.net else 0 end,
+    'risk', p_risk,
+    'above', x.state = 'ok' and coalesce(p_risk > x.usd + x.net, false)) end
+  from (select p_gate#>>'{limit,state}' as state, (p_gate#>>'{limit,usd}')::numeric as usd,
+               (p_gate#>>'{limit,net_usd}')::numeric as net) x
 $$;
 
 -- =============================================================================================
@@ -877,7 +925,8 @@ begin
       'version', jsonb_build_object('id', ver.id, 'version_no', ver.version_no),
       'gate', v_gate, 'context', ctx, 'plan', public.trade_entry_plan(ctx),
       'instrument', spec, 'stop_price', f->'stop_price', 'target_price', f->'target_price',
-      'preview', public.trade_preview(f), 'similar', v_similar);
+      'preview', public.trade_preview(f),
+      'limit_room', public.trade_limit_room(v_gate, (public.trade_preview(f)->>'risk')::numeric), 'similar', v_similar);
   end if;
 
   if jsonb_array_length(v_similar) > 0 and not coalesce((p_entry->>'allow_similar')::boolean, false) then
@@ -1157,6 +1206,7 @@ begin
       'expires_at', exp_at, 'version', jsonb_build_object('id', ver.id, 'version_no', ver.version_no),
       'gate', v_gate, 'context', ctx, 'plan', public.trade_entry_plan(ctx), 'instrument', spec,
       'stop_price', f->'stop_price', 'target_price', f->'target_price', 'preview', public.trade_preview(f),
+      'limit_room', public.trade_limit_room(v_gate, (public.trade_preview(f)->>'risk')::numeric),
       'exit_price', x->'exit_price', 'pnl', x->'pnl', 'result', x->'result', 'pnl_basis', x->'pnl_basis',
       'commission', x->'commission', 'points', x->'points', 'r', v_r, 'similar', v_similar);
   end if;
@@ -1611,6 +1661,7 @@ revoke all on function public.trade_state(uuid) from public, anon, authenticated
 revoke all on function public.trade_similar(uuid, text, text, text, timestamptz, boolean) from public, anon, authenticated;
 revoke all on function public.trade_insert_marks(uuid, uuid, jsonb) from public, anon, authenticated;
 revoke all on function public.trade_preview(jsonb) from public, anon, authenticated;
+revoke all on function public.trade_limit_room(jsonb, numeric) from public, anon, authenticated;
 
 -- =============================================================================================
 -- 11. Nothing that existed moved, and the privileges hold

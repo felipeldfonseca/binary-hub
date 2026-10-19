@@ -2052,7 +2052,7 @@ select tests.eq(public.trade_entry_plan('{"in_window": true, "after_limit": null
                 'plan: the window checked and kept');
 
 -- =============================================================================================
--- 16. Ebinex's expirations (the owner's answers of 2026-10-19)
+-- 16. Ebinex's expirations, and the risk against the daily limit (the owner's answers of 2026-10-19)
 -- =============================================================================================
 --
 -- Ebinex is an order book: an order placed during a candle of its timeframe (1, 5 or 15 min only) waits
@@ -2110,6 +2110,110 @@ select tests.ok((select external_id = 'WV1' and stake_amount = 15 and pnl = 12.7
 select tests.eq(public.import_undo(((:'cv'::jsonb)->>'batch_id')::uuid), '{"deleted": 0}'::jsonb, 'undo the M5/M15 file');
 select tests.ok((select bool_and(stake_amount = 10 and external_id is null) from public.trades where id in (:'v_m5', :'v_m15')),
                 'the stakes typed come back');
+commit;
+
+-- The risk against what is left of the daily limit (a warning, never a block). His test: limit US$ 400,
+-- US$ 300 lost, US$ 100 left; a stop risking US$ 120 is above it.
+begin;
+select set_config('request.jwt.claim.sub', :P, true);
+set local role authenticated;
+insert into public.trading_accounts (user_id, market, label, platform) values
+  (:P, 'futures', 'Risco P', 'topone'), (:P, 'binary', 'Risco Ebinex P', 'ebinex');
+commit;
+select id as risco from public.trading_accounts where user_id = :P and label = 'Risco P' \gset
+select id as rebx from public.trading_accounts where user_id = :P and label = 'Risco Ebinex P' \gset
+begin;
+select set_config('request.jwt.claim.sub', :P, true);
+set local role authenticated;
+select tests.eq(jsonb_array_length(public.save_rules(jsonb_build_object('v', 1, 'base_rev', public.rules_config()->>'rev', 'accounts', jsonb_build_object(
+  :'risco', jsonb_build_object('rules', '{"v": 1, "limit": {"usd": 400, "mode": "conta", "at_limit": "encerrar"}}'::jsonb,
+                               'window', tests.win('America/New_York', -90, 90), 'version', 'force'),
+  :'rebx', jsonb_build_object('rules', '{"v": 1, "limit": {"usd": 50, "mode": "conta", "at_limit": "encerrar"}}'::jsonb,
+                              'window', tests.win('America/Sao_Paulo', -90, 90), 'version', 'force'))))->'versions'),
+  2, 'two accounts with a daily limit');
+commit;
+alter table public.account_rule_versions disable trigger account_rule_versions_guard;
+update public.account_rule_versions v set effective_from = v.effective_from - interval '30 days'
+where v.account_id in (:'risco', :'rebx');
+alter table public.account_rule_versions enable trigger account_rule_versions_guard;
+
+begin;
+select set_config('request.jwt.claim.sub', :P, true);
+set local role authenticated;
+insert into public.trades (user_id, account_id, symbol, asset_type, direction, entry_time, exit_time, quantity, result, pnl, commission)
+values (:P, :'risco', 'MESZ6', 'futures', 'long', now() - interval '40 minutes', now() - interval '20 minutes', 2, 'loss', -298, 2);
+insert into public.trades (user_id, account_id, symbol, asset_type, direction, entry_time, exit_time, quantity, stake_amount,
+                           payout_percent, duration_seconds, timeframe, result, pnl, commission)
+values (:P, :'rebx', 'EUR/USD', 'binary_option', 'put', now() - interval '22 minutes', now() - interval '20 minutes', 1, 40, 85, 60,
+        'M1', 'loss', -40, 0);
+commit;
+
+begin;
+select set_config('request.jwt.claim.sub', :P, true);
+set local role authenticated;
+select public.register_entry(:'risco', '{"v": 1, "symbol": "MES", "direction": "long", "quantity": "1", "entry_price": "7896.25", "stop_pts": "24"}', true) as d \gset
+select tests.eq((:'d'::jsonb)->'limit_room', '{"usd": 400, "net_usd": -300, "reached": false, "left": 100, "risk": 120, "above": true}'::jsonb,
+                'US$ 300 lost of 400, a MES stop of 24 pts risks US$ 120: above the US$ 100 left');
+select tests.ok((:'d'::jsonb)#>>'{gate,status}' = 'liberado' and (:'d'::jsonb)#>>'{preview,risk}' = '120.00'
+                and ((:'d'::jsonb)#>>'{limit_room,net_usd}')::numeric = ((:'d'::jsonb)#>>'{gate,limit,net_usd}')::numeric,
+                'the gate still says «Liberado»; the risk is the preview''s, the net the gate''s (net of costs)');
+select tests.eq(public.register_entry(:'risco', '{"v": 1, "symbol": "MES", "direction": "long", "quantity": "1", "entry_price": "7896.25", "stop_pts": "20"}', true)->'limit_room',
+                '{"usd": 400, "net_usd": -300, "reached": false, "left": 100, "risk": 100, "above": false}'::jsonb,
+                'a stop that loses exactly what is left reaches the limit, it does not pass it');
+select tests.eq(public.register_entry(:'risco', '{"v": 1, "symbol": "ES", "direction": "short", "quantity": "1", "entry_price": "6850.00", "stop_pts": "2.5"}', true)#>'{limit_room,above}',
+                'true'::jsonb, 'ES, 1 contract, stop 2,5 pts: US$ 125, above');
+select tests.eq(public.register_entry(:'risco', '{"v": 1, "symbol": "MES", "direction": "long", "quantity": "1", "entry_price": "7896.25"}', true)->'limit_room',
+                '{"usd": 400, "net_usd": -300, "reached": false, "left": 100, "risk": null, "above": false}'::jsonb,
+                'no stop: nothing to compare, no warning');
+select tests.eq(public.register_entry(:'risco', '{"v": 1, "symbol": "ZN", "direction": "long", "quantity": "1", "entry_price": "112.5", "stop_pts": "0.5"}', true)#>'{limit_room,risk}',
+                'null'::jsonb, 'an instrument whose result is typed: no risk, no warning');
+select public.register_entry(:'risco', jsonb_build_object('v', 1, 'client_key', tests.ck(), 'symbol', 'MES', 'direction', 'long',
+                             'quantity', '1', 'entry_price', '7896.25', 'stop_pts', '24')) as r \gset
+select tests.ok((:'r'::jsonb)#>>'{trade,status}' = 'open' and (:'r'::jsonb)->>'repeated' = 'false',
+                'above the limit left: it registers all the same');
+select tests.eq(public.register_entry(:'risco', '{"v": 1, "symbol": "MES", "direction": "long", "quantity": "1", "entry_price": "7896.25", "stop_pts": "24"}', true)#>'{limit_room,net_usd}',
+                '-300'::jsonb, 'the open trade does not count in the net');
+select tests.eq(public.register_entry(:'rebx', '{"v": 1, "symbol": "EUR/USD", "direction": "call", "stake": "20", "payout": "88", "duration_s": 300}', true)->'limit_room',
+                '{"usd": 50, "net_usd": -40, "reached": false, "left": 10, "risk": 20, "above": true}'::jsonb,
+                'a binary risks its stake: US$ 20 with US$ 10 left is above');
+select tests.eq(public.register_entry(:'rebx', '{"v": 1, "symbol": "EUR/USD", "direction": "call", "stake": "10", "payout": "88", "duration_s": 300}', true)#>'{preview,risk}',
+                '10'::jsonb, 'a binary''s preview risk is its stake');
+select tests.eq(public.register_entry(:'rebx', '{"v": 1, "symbol": "EUR/USD", "direction": "call", "stake": "10", "payout": "88", "duration_s": 300}', true)#>'{limit_room,above}',
+                'false'::jsonb, 'a stake of exactly what is left is not above');
+select tests.eq(public.register_entry(:'ebx', '{"v": 1, "symbol": "EUR/USD", "direction": "call", "stake": "20", "payout": "88", "duration_s": 60}', true)->'limit_room',
+                'null'::jsonb, 'an account without a limit: no limit_room');
+select public.register_entry(:'b3', '{"v": 1, "symbol": "WIN", "direction": "short", "quantity": "3", "entry_price": "131250", "stop_pts": "100"}', true) as d \gset
+select tests.ok((:'d'::jsonb)#>>'{limit_room,usd}' = '500' and (:'d'::jsonb)#>>'{limit_room,risk}' = '60.00'
+                and ((:'d'::jsonb)#>>'{limit_room,left}')::numeric = 500 + ((:'d'::jsonb)#>>'{gate,limit,net_usd}')::numeric
+                and (:'d'::jsonb)#>>'{limit_room,above}' = 'false',
+                'B3: the limit and the risk in reais (WIN 3 ct, stop 100 pts: R$ 60)');
+select tests.eq(public.register_after(:'risco', jsonb_build_object('v', 1, 'symbol', 'MES', 'direction', 'long', 'quantity', '1',
+                  'entry_price', '7896.25', 'stop_pts', '24', 'exit_price', '7890.00', 'clock', 'America/New_York',
+                  'day', public.compute_trading_day(:'risco', now())::text, 'entry', tests.hm('America/New_York', -10),
+                  'exit', tests.hm('America/New_York', -1)), true)->'limit_room',
+                '{"usd": 400, "net_usd": -300, "reached": false, "left": 100, "risk": 120, "above": true}'::jsonb,
+                '«Já fechada»: the same answer at the reconstructed entry');
+commit;
+
+-- Another US$ 150 lost a few minutes ago: the limit is reached now (the gate's «Encerrado por hoje»
+-- applies, never "above"), but not at an entry typed before that loss
+begin;
+select set_config('request.jwt.claim.sub', :P, true);
+set local role authenticated;
+insert into public.trades (user_id, account_id, symbol, asset_type, direction, entry_time, exit_time, quantity, result, pnl, commission)
+values (:P, :'risco', 'MESZ6', 'futures', 'short', now() - interval '8 minutes', now() - interval '5 minutes', 1, 'loss', -150, 0);
+commit;
+begin;
+select set_config('request.jwt.claim.sub', :P, true);
+set local role authenticated;
+select public.register_entry(:'risco', '{"v": 1, "symbol": "MES", "direction": "long", "quantity": "1", "entry_price": "7896.25", "stop_pts": "24"}', true) as d \gset
+select tests.ok((:'d'::jsonb)#>>'{gate,status}' = 'encerrado'
+                and (:'d'::jsonb)->'limit_room' = '{"usd": 400, "net_usd": -450, "reached": true, "left": 0, "risk": 120, "above": false}'::jsonb,
+                'the limit reached: «Encerrado por hoje», left 0, never above');
+select tests.eq(public.register_entry(:'risco', jsonb_build_object('v', 1, 'symbol', 'MES', 'direction', 'long', 'quantity', '1',
+                  'entry_price', '7896.25', 'stop_pts', '24', 'clock', 'America/New_York', 'entry', tests.hm('America/New_York', -10)), true)->'limit_room',
+                '{"usd": 400, "net_usd": -300, "reached": false, "left": 100, "risk": 120, "above": true}'::jsonb,
+                'an entry typed 10 minutes back: the day as it was then');
 commit;
 
 -- =============================================================================================
