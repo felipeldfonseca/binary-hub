@@ -1,0 +1,13 @@
+[
+  {
+    "source": "live",
+    "symbol": "BTC/USDT",
+    "quantity": 0.25,
+    "direction": "short",
+    "asset_type": "crypto",
+    "entry_time": "2026-10-17T23:35:05.310549+00:00",
+    "stake_amount": null,
+    "payout_percent": null,
+    "duration_seconds": null
+  }
+]

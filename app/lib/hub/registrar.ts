@@ -43,6 +43,11 @@ export const CONTRACT_CHIPS = ['1', '2', '3'] as const;
 /** One of the account's recent trades, as registrarDb.fetchRecentTrades reads it (newest first) */
 export interface RecentTrade {
   symbol: string;
+  /**
+   * trades.asset_type ('option' tells an option from a stock on Ações e opções; 'futures' a B3
+   * contract from a B3 stock); null when not read (3-3's recorded rows)
+   */
+  assetType?: string | null;
   direction: Direction;
   quantity: string | null;
   stake: string | null;

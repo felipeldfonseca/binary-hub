@@ -1,0 +1,57 @@
+[
+  {
+    "source": "live",
+    "symbol": "WIN",
+    "quantity": 3,
+    "direction": "short",
+    "asset_type": "futures",
+    "entry_time": "2026-10-15T13:20:05.48316+00:00",
+    "stake_amount": null,
+    "payout_percent": null,
+    "duration_seconds": null
+  },
+  {
+    "source": "after",
+    "symbol": "BGIX26",
+    "quantity": 2,
+    "direction": "long",
+    "asset_type": "b3",
+    "entry_time": "2026-10-15T13:17:00+00:00",
+    "stake_amount": null,
+    "payout_percent": null,
+    "duration_seconds": null
+  },
+  {
+    "source": "after",
+    "symbol": "WDO",
+    "quantity": 3,
+    "direction": "long",
+    "asset_type": "futures",
+    "entry_time": "2026-10-15T13:13:00+00:00",
+    "stake_amount": null,
+    "payout_percent": null,
+    "duration_seconds": null
+  },
+  {
+    "source": "after",
+    "symbol": "WIN",
+    "quantity": 5,
+    "direction": "short",
+    "asset_type": "futures",
+    "entry_time": "2026-10-15T13:07:00+00:00",
+    "stake_amount": null,
+    "payout_percent": null,
+    "duration_seconds": null
+  },
+  {
+    "source": "after",
+    "symbol": "WIN",
+    "quantity": 3,
+    "direction": "long",
+    "asset_type": "futures",
+    "entry_time": "2026-10-15T13:01:00+00:00",
+    "stake_amount": null,
+    "payout_percent": null,
+    "duration_seconds": null
+  }
+]

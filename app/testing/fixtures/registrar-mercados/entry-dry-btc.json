@@ -1,0 +1,109 @@
+{
+  "gate": {
+    "at": "2026-10-17T23:35:05.275637+00:00",
+    "block": {
+      "state": "nao_avaliado",
+      "reason": "so_futuros"
+    },
+    "desde": "2026-10-13T13:00:05.70898+00:00",
+    "label": "Binance",
+    "limit": {
+      "state": "nao_avaliado",
+      "reason": "sem_limite"
+    },
+    "today": {
+      "trades": 0,
+      "net_usd": 0,
+      "worst_usd": 0
+    },
+    "market": "crypto",
+    "status": "liberado",
+    "window": {
+      "next": {
+        "opens_at": "2026-10-18T23:00:00+00:00",
+        "closes_at": "2026-10-19T01:00:00+00:00",
+        "trading_day": "2026-10-18"
+      },
+      "state": "dentro",
+      "reason": null,
+      "current": {
+        "opens_at": "2026-10-17T23:00:00+00:00",
+        "closes_at": "2026-10-18T01:00:00+00:00"
+      },
+      "position": "dentro"
+    },
+    "version": {
+      "id": "92c49dec-8777-431a-8de0-ef61ad130daa",
+      "origin": "criar",
+      "version_no": 1,
+      "effective_from": "2026-10-13T13:00:05.70898+00:00"
+    },
+    "warnings": [],
+    "desde_day": "2026-10-13",
+    "account_id": "8c0425ea-c799-4036-b4c0-bb489d054cc3",
+    "changes_at": "2026-10-18T01:00:00+00:00",
+    "state_rule": {
+      "state": "nao_avaliado",
+      "reason": "so_futuros"
+    },
+    "trading_day": "2026-10-17",
+    "checks_evaluated": [
+      "janela"
+    ]
+  },
+  "plan": {
+    "breaks": [],
+    "verdict": "no_plano",
+    "checks_evaluated": [
+      "janela"
+    ]
+  },
+  "context": {
+    "rule_ok": null,
+    "in_block": null,
+    "warnings": [],
+    "in_window": true,
+    "after_limit": null,
+    "gate_status": "liberado",
+    "state_choice": null,
+    "checks_evaluated": [
+      "janela"
+    ],
+    "day_pnl_at_entry": null,
+    "day_worst_at_entry": null
+  },
+  "dry_run": true,
+  "preview": {
+    "risk": 100,
+    "reward": 200,
+    "stop_points": 400,
+    "target_points": 800
+  },
+  "similar": [],
+  "version": {
+    "id": "92c49dec-8777-431a-8de0-ef61ad130daa",
+    "version_no": 1
+  },
+  "entry_at": "2026-10-17T23:35:05.275637+00:00",
+  "repeated": false,
+  "expires_at": null,
+  "instrument": {
+    "key": "BTCUSDT",
+    "pip": null,
+    "pnl": "prices",
+    "mult": "1",
+    "tick": null,
+    "costs": true,
+    "known": false,
+    "stops": "price",
+    "qty_dp": 8,
+    "correct": true,
+    "price_dp": 8,
+    "asset_type": "crypto"
+  },
+  "limit_room": null,
+  "server_now": "2026-10-17T23:35:05.275637+00:00",
+  "stop_price": 112800,
+  "trading_day": "2026-10-17",
+  "target_price": 111600
+}
