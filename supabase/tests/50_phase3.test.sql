@@ -225,8 +225,8 @@ select tests.eq((select count(*) from public.trades where source = 'import' and 
                    and registered_at is null), 0::bigint, 'old imported rows keep a null pnl_basis');
 select tests.eq((select jsonb_agg(tgname::text order by tgname) from pg_trigger
                  where tgrelid = 'public.trades'::regclass and not tgisinternal),
-                '["trades_bridge", "trades_delete_log", "trades_guard", "update_session_stats_on_delete", "update_session_stats_on_insert", "update_session_stats_on_update", "update_trades_updated_at"]'::jsonb,
-                'trades triggers: the guard sorts between the bridge and updated_at');
+                '["trades_bridge", "trades_delete_log", "trades_exits_sums", "trades_guard", "update_session_stats_on_delete", "update_session_stats_on_insert", "update_session_stats_on_update", "update_trades_updated_at"]'::jsonb,
+                'trades triggers: the guard sorts between the bridge and updated_at (Phase 3c: + the deferred sums check)');
 
 -- =============================================================================================
 -- 2. Descriptors and helpers
@@ -900,8 +900,8 @@ select tests.eq((select jsonb_agg(p.proname::text order by p.proname) from pg_pr
                  where p.pronamespace = 'public'::regnamespace
                    and p.proname ~ '^(trade_|trades_guard$|trades_delete_log$|instrument_specs$|register_|add_marks$|undo_entry$|image_|save_extras$)'
                    and has_function_privilege('authenticated', p.oid, 'EXECUTE')),
-                '["add_marks", "image_slots", "image_trash_done", "instrument_specs", "register_after", "register_entry", "register_exit", "save_extras", "trade_caps", "trade_caps_all", "trade_image_delete_ok", "trade_image_upload_ok", "trade_instrument", "trade_match_key", "trade_result_known_at", "undo_entry"]'::jsonb,
-                'authenticated runs the API, the descriptors and what views and policies call; nothing internal');
+                '["add_marks", "image_slots", "image_trash_done", "instrument_specs", "register_after", "register_entry", "register_exit", "register_partial", "save_extras", "trade_caps", "trade_caps_all", "trade_image_delete_ok", "trade_image_upload_ok", "trade_instrument", "trade_match_key", "trade_result_known_at", "undo_entry"]'::jsonb,
+                'authenticated runs the API, the descriptors and what views and policies call; nothing internal (Phase 3c: + register_partial)');
 select tests.eq((select count(*) from pg_proc p
                  where p.pronamespace = 'public'::regnamespace and p.prosecdef
                    and p.proname ~ '^(trade_|trades_|register_|add_marks$|undo_entry$|image_|save_extras$|import_)'

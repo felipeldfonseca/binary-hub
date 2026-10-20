@@ -61,6 +61,8 @@ export interface MarketSpec {
     soma: boolean;
     /** A «Padrão» entity in «Suas regras» */
     padrao: boolean;
+    /** «Mover para o breakeven com +N pontos» (Phase 3c): every price market, never binaries */
+    breakeven: boolean;
   };
   /** The window clocks offered */
   windowTzs: readonly WindowTz[];
@@ -76,7 +78,7 @@ const NY: WindowTz = 'America/New_York';
 const SP: WindowTz = 'America/Sao_Paulo';
 const MON_TO_FRI = 31;
 const EVERY_DAY = 127;
-const ONLY_WINDOW_AND_LIMIT = { block: false, states: false, soma: false, padrao: false };
+const ONLY_WINDOW_AND_LIMIT = { block: false, states: false, soma: false, padrao: false, breakeven: true };
 
 function deepFreeze<T>(x: T): T {
   if (typeof x === 'object' && x !== null && !Object.isFrozen(x)) {
@@ -92,7 +94,7 @@ export const MARKET_SPEC: Readonly<Record<AccountMarket, MarketSpec>> = deepFree
     reader: true,
     currency: 'USD',
     day: { tz: NY, startMin: 1080 },
-    rules: { block: true, states: true, soma: true, padrao: true },
+    rules: { block: true, states: true, soma: true, padrao: true, breakeven: true },
     windowTzs: WINDOW_TZS,
     windowTz: NY,
     window: { startMin: 600, endMin: 660, weekdays: MON_TO_FRI },
@@ -103,7 +105,7 @@ export const MARKET_SPEC: Readonly<Record<AccountMarket, MarketSpec>> = deepFree
     reader: true,
     currency: 'USD',
     day: { tz: SP, startMin: 0 },
-    rules: { ...ONLY_WINDOW_AND_LIMIT },
+    rules: { ...ONLY_WINDOW_AND_LIMIT, breakeven: false },
     windowTzs: WINDOW_TZS,
     windowTz: SP,
     window: { startMin: 1200, endMin: 1260, weekdays: MON_TO_FRI },
@@ -188,7 +190,13 @@ export function marketCapsJson(s: MarketSpec): Record<string, unknown> {
     reader: s.reader,
     currency: s.currency,
     day: { tz: s.day.tz, start_min: s.day.startMin },
-    rules: { block: s.rules.block, states: s.rules.states, soma: s.rules.soma, padrao: s.rules.padrao },
+    rules: {
+      block: s.rules.block,
+      states: s.rules.states,
+      soma: s.rules.soma,
+      padrao: s.rules.padrao,
+      breakeven: s.rules.breakeven,
+    },
     window_tzs: [...s.windowTzs],
     window_tz: s.windowTz,
     window: { start_min: s.window.startMin, end_min: s.window.endMin, weekdays: s.window.weekdays },
