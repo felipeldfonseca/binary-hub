@@ -1,0 +1,15 @@
+{
+  "user": "f7f2a1bb-17f4-4901-9c5e-d21aa7371300",
+  "accounts": {
+    "topOne": "1dc03d72-29c1-4ff3-ad8a-94f63027f4f8",
+    "ebinex": "a99b3430-1b77-43ca-a895-bd88067e6994",
+    "ftmo": "ca17a3d9-5839-4798-b15c-679f18e0ea43"
+  },
+  "trades": {
+    "mnqQua": "5ec0e298-dc4b-4326-be25-3364f1b7217a",
+    "mnqQui": "c71f2bad-25d7-464b-872b-3abdaffddd6e",
+    "mes": "47927139-8758-482a-b169-f6cf7bd74750",
+    "mgc": "f1c6c3b8-f4f5-4ff8-8a90-f2616bb546ad",
+    "ebx": "7187b068-dd8e-44aa-8bd1-3b049821a7e1"
+  }
+}
