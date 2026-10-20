@@ -14,6 +14,7 @@ import {
   useAddMarks,
   useDayTrades,
   useEntryPreview,
+  useExitPreview,
   useGateAt,
   useImageTrashSweep,
   useOpenTrades,
@@ -57,6 +58,7 @@ jest.mock('@/lib/hub/registrarDb', () => ({
   fetchGateAt: jest.fn(),
   fetchRecentTrades: jest.fn(),
   previewEntry: jest.fn(),
+  previewExit: jest.fn(),
   registerEntry: jest.fn(),
   registerExit: jest.fn(),
   registerAfter: jest.fn(),
@@ -80,6 +82,8 @@ function setup() {
 }
 
 const ids = idsTelas()
+/** register_exit's dry run for the MES exit (the shape the parser gives) */
+const previewExitAnswer = (): registrarDb.ExitDryRun => ({ repeated: false, serverNow: new Date('2026-10-22T14:37:00Z'), tradeId: ids.trades.mes, ...(saidaTelas('exit-mes-oitenta').exit as NonNullable<registrarDb.ExitRegistered['exit']>) })
 const top = { id: ids.accounts.topOne, market: 'futures' as const }
 let online = true
 
@@ -128,13 +132,14 @@ describe('cache keys and what each write makes stale', () => {
     const queryClient = new QueryClient()
     const spy = jest.spyOn(queryClient, 'invalidateQueries')
     await invalidateAfterRegistrar(queryClient, 'u', 'saida')
-    expect(spy.mock.calls.map(([f]) => (f as { queryKey: unknown[] }).queryKey)).toEqual([
-      ['hub', 'u', 'registrar', 'abertas'],
-      ['hub', 'u', 'registrar', 'dia'],
-      ['hub', 'u', 'registrar', 'previa'],
-      regrasKeys.agora('u'),
-      ['trades'],
-      ['trade-stats'],
+    expect(spy.mock.calls.map(([f]) => f)).toEqual([
+      { queryKey: ['hub', 'u', 'registrar', 'abertas'] },
+      { queryKey: ['hub', 'u', 'registrar', 'dia'] },
+      // The dry runs only go stale: the one on screen is not asked again about what was just written
+      { queryKey: ['hub', 'u', 'registrar', 'previa'], refetchType: 'none' },
+      { queryKey: regrasKeys.agora('u') },
+      { queryKey: ['trades'] },
+      { queryKey: ['trade-stats'] },
     ])
     spy.mockClear()
     await invalidateAfterRegistrar(queryClient, 'u', 'entrada')
@@ -213,6 +218,65 @@ describe('the entry preview', () => {
     expect(db.fetchGateAt).toHaveBeenCalledWith(expect.anything(), top.id, new Date('2026-10-22T14:20:00Z'))
   })
 
+  it('a payload built on every render (the server clock ticks) does not redraw the form every 300 ms', async () => {
+    jest.useFakeTimers()
+    db.previewEntry.mockResolvedValue(previaTelas('entry-dry-mes-digitada'))
+    const { wrapper } = setup()
+    let renders = 0
+    const { rerender } = renderHook(
+      ({ tick }: { tick: number }) => {
+        renders += tick >= 0 ? 1 : 0
+        return useEntryPreview(top.id, { ...buildEntry('futures', { symbol: 'MES', direction: 'long', quantity: '2', entryPrice: '7905.25', clock: 'America/New_York' }), client_key: newClientKey() })
+      },
+      { wrapper, initialProps: { tick: 0 } },
+    )
+    await act(async () => {
+      jest.advanceTimersByTime(1000)
+    })
+    rerender({ tick: 1 })
+    await act(async () => {
+      jest.advanceTimersByTime(1000)
+    })
+    const settled = renders
+    for (let k = 0; k < 10; k++) {
+      await act(async () => {
+        jest.advanceTimersByTime(400)
+      })
+    }
+    expect(renders).toBe(settled)
+    expect(db.previewEntry).toHaveBeenCalledTimes(1)
+  })
+
+  it('an incomplete form shows no dry run at once; another account never shows this one’s answer', async () => {
+    const mes = previaTelas('entry-dry-mes-digitada')
+    db.previewEntry.mockImplementation(async (_db, accountId) => (accountId === top.id ? mes : new Promise<never>(() => {})))
+    const { wrapper } = setup()
+    const payload = buildEntry('futures', { symbol: 'MES', direction: 'long', quantity: '2', entryPrice: '7905.25', stop: '10', clock: 'America/New_York', entry: '10:20' })
+    const { result, rerender } = renderHook(({ acc, p }: { acc: string; p: EntryPayload | null }) => useEntryPreview(acc, p, { debounceMs: 0 }), {
+      wrapper,
+      initialProps: { acc: top.id, p: payload as EntryPayload | null },
+    })
+    await waitFor(() => expect(result.current.data?.limitRoom).toMatchObject({ above: false }))
+    // The price erased: no warning left over from the last complete form
+    rerender({ acc: top.id, p: null })
+    expect(result.current.data).toBeUndefined()
+    rerender({ acc: top.id, p: payload })
+    await waitFor(() => expect(result.current.data).toBeDefined())
+    // Another account: nothing until its own answer
+    rerender({ acc: ids.accounts.ebinex, p: payload })
+    await waitFor(() => expect(db.previewEntry).toHaveBeenLastCalledWith(expect.anything(), ids.accounts.ebinex, expect.anything()))
+    expect(result.current.data).toBeUndefined()
+  })
+
+  it('the gate at the current minute (null) has no data, even after a typed hour', async () => {
+    db.fetchGateAt.mockResolvedValue(agoraTelas('agora-qui-1031-et').accounts[0])
+    const { wrapper } = setup()
+    const { result, rerender } = renderHook(({ at }: { at: Date | null }) => useGateAt(top.id, at, { debounceMs: 0 }), { wrapper, initialProps: { at: new Date('2026-10-22T14:20:00Z') as Date | null } })
+    await waitFor(() => expect(result.current.data).toBeDefined())
+    rerender({ at: null })
+    expect(result.current.data).toBeUndefined()
+  })
+
   it('a stable key whatever the key order', () => {
     expect(previewKey({ b: 1, a: { d: 2, c: 3 }, client_key: 'x' })).toBe(previewKey({ a: { c: 3, d: 2 }, b: 1 }))
   })
@@ -269,6 +333,22 @@ describe('writes', () => {
     expect(done?.limitBefore).toMatchObject({ tradingDay: '2026-10-22', limit: { worstCents: -24500, near: false } })
     expect(done?.gateNow?.limit).toMatchObject({ near: true })
     expect(queryClient.getQueryData(registrarKeys.operacao('user-1', ids.trades.mes))).toMatchObject({ trade: { status: 'closed' } })
+  })
+
+  it('«Registrar saída» never asks the dry run on screen again (it would answer `repeated`); it is only stale', async () => {
+    db.previewExit.mockResolvedValue(previewExitAnswer())
+    db.registerExit.mockResolvedValue(saidaTelas('exit-mes-oitenta'))
+    const { queryClient, wrapper } = setup()
+    const payload = exitPayload('futures', { exitPrice: '7902.50', clock: 'America/New_York' })
+    const { result } = renderHook(() => ({ preview: useExitPreview(ids.trades.mes, payload, { debounceMs: 0 }), exit: useRegisterExit() }), { wrapper })
+    await waitFor(() => expect(result.current.preview.data).toBeDefined())
+    await act(async () => {
+      await result.current.exit.mutateAsync({ tradeId: ids.trades.mes, accountId: top.id, payload })
+    })
+    expect(db.previewExit).toHaveBeenCalledTimes(1)
+    const previa = queryClient.getQueryCache().findAll({ queryKey: ['hub', 'user-1', 'registrar', 'previa'] })
+    expect(previa.length).toBeGreaterThan(0)
+    expect(previa.every((q) => q.state.isInvalidated)).toBe(true)
   })
 
   it('«Já fechada», a mark, «Desfazer entrada», «Salvar imagens e nota»', async () => {

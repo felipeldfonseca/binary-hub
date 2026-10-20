@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { keepPreviousData, useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { useHubDb } from '@/hooks/useContas';
 import { regrasKeys } from '@/hooks/useRegras';
 import { useAgora } from '@/hooks/useAgora';
@@ -95,26 +95,32 @@ export const REGISTRAR_INVALIDATIONS: Readonly<Record<RegistrarWrite, readonly (
   extras: ['dia'],
 };
 
+/**
+ * Marks those caches stale and reads the ones on screen again, except the dry runs: they are only
+ * marked stale (read again when their form asks for them), so the dry run still on screen is never
+ * asked once more about the trade the write just changed (an exit's own dry run would then answer
+ * `repeated`, which reads as «Esta operação já foi fechada em outro lugar.»).
+ */
 export function invalidateAfterRegistrar(queryClient: QueryClient, uid: string | undefined, write: RegistrarWrite): Promise<unknown> {
-  const keys: (readonly unknown[])[] = REGISTRAR_INVALIDATIONS[write].flatMap((k): (readonly unknown[])[] => {
+  const filters = REGISTRAR_INVALIDATIONS[write].flatMap((k): { queryKey: unknown[]; refetchType?: 'none' }[] => {
     switch (k) {
       case 'abertas':
-        return [prefix.abertas(uid)];
+        return [{ queryKey: [...prefix.abertas(uid)] }];
       case 'dia':
-        return [prefix.dia(uid)];
+        return [{ queryKey: [...prefix.dia(uid)] }];
       case 'recentes':
-        return [prefix.recentes(uid)];
+        return [{ queryKey: [...prefix.recentes(uid)] }];
       case 'previa':
-        return [prefix.previa(uid)];
+        return [{ queryKey: [...prefix.previa(uid)], refetchType: 'none' }];
       case 'regrasAgora':
-        return [regrasKeys.agora(uid)];
+        return [{ queryKey: [...regrasKeys.agora(uid)] }];
       case 'atividade':
-        return [prefix.atividade(uid)];
+        return [{ queryKey: [...prefix.atividade(uid)] }];
       case 'paginasAntigas':
-        return [['trades'], ['trade-stats']];
+        return [{ queryKey: ['trades'] }, { queryKey: ['trade-stats'] }];
     }
   });
-  return Promise.all(keys.map((queryKey) => queryClient.invalidateQueries({ queryKey: [...queryKey] })));
+  return Promise.all(filters.map((f) => queryClient.invalidateQueries(f)));
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -257,11 +263,6 @@ export function previewKey(payload: object): string {
   return JSON.stringify(sort(payload));
 }
 
-const withoutKey = <T extends { client_key?: string }>(p: T): T => {
-  const { client_key: _k, ...rest } = p;
-  return rest as T;
-};
-
 /** A refusal is the answer (the form shows its field's error); only a lost request is asked again, once */
 const retryNetwork = (count: number, error: RegistrarDataError) => error.code === 'network' && count < 1;
 
@@ -270,75 +271,68 @@ interface PreviewOptions {
   debounceMs?: number;
 }
 
+/** The position of `target` (the account or the trade) in registrarKeys.previa */
+const PREVIA_TARGET = 5;
+
 /**
- * «Posso operar hoje? Na entrada:» and the «Limite do dia» line at a typed hour or another «Dia»
- * (gate_at; C24): null `at` (the hour field on the current minute) asks nothing, the card's
- * rules_now answers it. Debounced like the dry runs.
+ * A dry run keyed by its text (previewKey): the text, not the payload object, is what waits for
+ * the quiet, so a form that builds its payload on every render (the server clock ticks each
+ * second) does not restart the wait and redraw every 300 ms. A null text (an incomplete form, the
+ * hour back on the current minute) asks nothing and shows nothing at once: the last answer is kept
+ * while the next one is asked only for the same account or trade, never for an incomplete form.
  */
-export function useGateAt(accountId: string | null, at: Date | null, options: PreviewOptions = {}) {
+function usePreview<T>(
+  kind: 'entrada' | 'saida' | 'fechada' | 'gate',
+  target: string | null,
+  text: string | null,
+  ask: (db: ReturnType<typeof useHubDb>['db'], target: string, text: string) => Promise<T>,
+  options: PreviewOptions,
+) {
   const { db, userId } = useHubDb();
-  const settled = useDebounced(at ? at.toISOString() : null, options.debounceMs);
-  return useQuery<AccountNow, RegistrarDataError>({
-    queryKey: registrarKeys.previa(userId, 'gate', accountId ?? '', settled ?? ''),
-    queryFn: () => fetchGateAt(db, accountId as string, new Date(settled as string)),
-    enabled: !!userId && !!accountId && !!settled && (options.enabled ?? true),
-    placeholderData: keepPreviousData,
+  const debounced = useDebounced(text, options.debounceMs);
+  const settled = text === null ? null : debounced;
+  return useQuery<T, RegistrarDataError>({
+    queryKey: registrarKeys.previa(userId, kind, target ?? '', settled ?? ''),
+    queryFn: () => ask(db, target as string, settled as string),
+    enabled: !!userId && !!target && !!settled && (options.enabled ?? true),
+    placeholderData: settled ? (previous, previousQuery) => (previousQuery?.queryKey[PREVIA_TARGET] === target ? previous : undefined) : undefined,
     retry: retryNetwork,
     staleTime: 15 * 1000,
   });
+}
+
+/**
+ * «Posso operar hoje? Na entrada:» and the «Limite do dia» line at a typed hour or another «Dia»
+ * (gate_at; C24): null `at` (the hour field on the current minute) asks nothing and has no data,
+ * the card's rules_now answers it. Debounced like the dry runs.
+ */
+export function useGateAt(accountId: string | null, at: Date | null, options: PreviewOptions = {}) {
+  return usePreview<AccountNow>('gate', accountId, at ? at.toISOString() : null, (db, id, iso) => fetchGateAt(db, id, new Date(iso)), options);
 }
 
 /**
  * register_entry's dry run for the form as it is (debounced): the gate and plan at the typed
  * hour, the instrument, the stop and target levels, the risk preview, «limit_room» («Se o stop for
  * atingido, o dia passa do limite…»), the binary expiry, `similar`. Null payload: nothing to ask
- * (incomplete form). The last answer stays while the next one is asked (keepPreviousData).
+ * (incomplete form) and no data. The last answer of the same account stays while the next one is
+ * asked.
  */
 export function useEntryPreview(accountId: string | null, payload: EntryPayload | null, options: PreviewOptions = {}) {
-  const { db, userId } = useHubDb();
-  const p = useDebounced(payload ? withoutKey(payload) : null, options.debounceMs);
-  const key = p ? previewKey(p) : '';
-  return useQuery<EntryDryRun, RegistrarDataError>({
-    queryKey: registrarKeys.previa(userId, 'entrada', accountId ?? '', key),
-    queryFn: async () => {
-      const answer = await previewEntry(db, accountId as string, p as EntryPayload);
-      return answer;
-    },
-    enabled: !!userId && !!accountId && !!p && (options.enabled ?? true),
-    placeholderData: keepPreviousData,
-    retry: retryNetwork,
-    staleTime: 15 * 1000,
-  });
+  return usePreview<EntryDryRun>('entrada', accountId, payload ? previewKey(payload) : null, (db, id, text) => previewEntry(db, id, JSON.parse(text) as EntryPayload), options);
 }
 
 /** register_after's dry run («Já fechada»): the entry's preview and the exit's result */
 export function useAfterPreview(accountId: string | null, payload: AfterPayload | null, options: PreviewOptions = {}) {
-  const { db, userId } = useHubDb();
-  const p = useDebounced(payload ? withoutKey(payload) : null, options.debounceMs);
-  const key = p ? previewKey(p) : '';
-  return useQuery<AfterDryRun, RegistrarDataError>({
-    queryKey: registrarKeys.previa(userId, 'fechada', accountId ?? '', key),
-    queryFn: () => previewAfter(db, accountId as string, p as AfterPayload),
-    enabled: !!userId && !!accountId && !!p && (options.enabled ?? true),
-    placeholderData: keepPreviousData,
-    retry: retryNetwork,
-    staleTime: 15 * 1000,
-  });
+  return usePreview<AfterDryRun>('fechada', accountId, payload ? previewKey(payload) : null, (db, id, text) => previewAfter(db, id, JSON.parse(text) as AfterPayload), options);
 }
 
-/** register_exit's dry run: the result the exit would get, or `repeated` (closed elsewhere) */
+/**
+ * register_exit's dry run: the result the exit would get, or `repeated` (closed elsewhere). A
+ * `repeated` answer after this sheet's own «Registrar saída» is not «fechada em outro lugar»: the
+ * writes never ask a dry run again (REGISTRAR_INVALIDATIONS: previews are only marked stale).
+ */
 export function useExitPreview(tradeId: string | null, payload: ExitPayload | null, options: PreviewOptions = {}) {
-  const { db, userId } = useHubDb();
-  const p = useDebounced(payload, options.debounceMs);
-  const key = p ? previewKey(p) : '';
-  return useQuery<ExitDryRun, RegistrarDataError>({
-    queryKey: registrarKeys.previa(userId, 'saida', tradeId ?? '', key),
-    queryFn: () => previewExit(db, tradeId as string, p as ExitPayload),
-    enabled: !!userId && !!tradeId && !!p && (options.enabled ?? true),
-    placeholderData: keepPreviousData,
-    retry: retryNetwork,
-    staleTime: 15 * 1000,
-  });
+  return usePreview<ExitDryRun>('saida', tradeId, payload ? previewKey(payload) : null, (db, id, text) => previewExit(db, id, JSON.parse(text) as ExitPayload), options);
 }
 
 // ---------------------------------------------------------------------------------------------

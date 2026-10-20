@@ -10,8 +10,9 @@
  *      JPEG where the browser cannot write WebP, longest side ≤ 4096 px), which drops the camera's
  *      metadata (location). A PNG or WebP whose re-encoding is larger keeps its own pixels; a JPEG
  *      is never uploaded as chosen. Whenever the file's own bytes go up, their metadata goes first
- *      (stripImageMetadata: JPEG APP1/APP13 apart from the orientation, PNG text and eXIf chunks,
- *      WebP EXIF and XMP chunks).
+ *      (stripImageMetadata: in a JPEG every APPn but JFIF, the colour profile and Adobe's, the
+ *      comments and whatever follows the end marker, the orientation kept; PNG text and eXIf
+ *      chunks; WebP EXIF and XMP chunks and anything after the RIFF).
  *   3. saveImagesAndNote: image_slots reserves one path per new image (four in all, the database
  *      checks it three times), each prepared file is uploaded with the user's session (plain
  *      upload, never upsert), save_extras saves the final ordered list and the note with one
@@ -130,31 +131,35 @@ function orientationSegment(o: number): Uint8Array {
   return Uint8Array.from([0xff, 0xe1, len >> 8, len & 0xff, ...data]);
 }
 
+/** The APPn segments a decoder needs (the rest is metadata): JFIF, the colour profile, Adobe's colour transform */
+function keepAppSegment(marker: number, data: Uint8Array): boolean {
+  if (marker === 0xe0) return ascii(data, 0, 5) === 'JFIF\0';
+  if (marker === 0xe2) return ascii(data, 0, 12) === 'ICC_PROFILE\0';
+  if (marker === 0xee) return ascii(data, 0, 5) === 'Adobe';
+  return false;
+}
+
 /**
- * A JPEG without its APP1 (EXIF, GPS, XMP) and APP13 (IPTC) segments; the orientation, when the
- * EXIF had one, is kept in a minimal APP1 so the photo does not turn. Null when the bytes are not
- * a JPEG this can walk.
+ * A JPEG with only what draws it: no APP1 (EXIF, GPS, XMP), APP13 (IPTC), comments or other APPn
+ * segments (an MPF index, maker data), and nothing after the end marker (a phone's gain map or
+ * depth image, a Motion Photo's video: files of their own, with their own metadata). The JFIF
+ * APP0, the ICC profile and the Adobe APP14 stay; the orientation, when the EXIF had one, is kept
+ * in a minimal APP1 so the photo does not turn. Null when the bytes are not a JPEG this can walk.
  */
 export function stripJpegMetadata(bytes: Uint8Array): Uint8Array | null {
   if (bytes.length < 4 || bytes[0] !== 0xff || bytes[1] !== 0xd8) return null;
   const parts: Uint8Array[] = [bytes.subarray(0, 2)];
   let orientation: number | null = null;
   let i = 2;
-  while (i < bytes.length) {
-    if (bytes[i] !== 0xff) return null;
-    let marker = bytes[i + 1];
-    // Fill bytes
-    while (marker === 0xff && i + 2 < bytes.length) {
-      i += 1;
-      marker = bytes[i + 1];
-    }
+  for (;;) {
+    // No end marker: a truncated file
+    if (i + 1 >= bytes.length || bytes[i] !== 0xff) return null;
+    // Fill bytes before a marker
+    while (i + 2 < bytes.length && bytes[i + 1] === 0xff) i += 1;
+    const marker = bytes[i + 1];
+    // End of image: whatever follows is another file
     if (marker === 0xd9) {
-      parts.push(bytes.subarray(i));
-      break;
-    }
-    // Start of scan: the rest is image data (and the end marker)
-    if (marker === 0xda) {
-      parts.push(bytes.subarray(i));
+      parts.push(bytes.subarray(i, i + 2));
       break;
     }
     // Markers without a length
@@ -166,13 +171,23 @@ export function stripJpegMetadata(bytes: Uint8Array): Uint8Array | null {
     if (i + 4 > bytes.length) return null;
     const len = u16be(bytes, i + 2);
     if (len < 2 || i + 2 + len > bytes.length) return null;
-    const seg = bytes.subarray(i, i + 2 + len);
-    if (marker === 0xe1) {
-      orientation = orientation ?? exifOrientation(bytes.subarray(i + 4, i + 2 + len));
-    } else if (marker !== 0xed) {
-      parts.push(seg);
+    const end = i + 2 + len;
+    if (marker === 0xda) {
+      // Start of scan: its header, then the coded data up to the next marker that is neither a
+      // stuffed 0xFF00 nor a restart marker (a progressive JPEG has several scans)
+      let j = end;
+      while (j + 1 < bytes.length && !(bytes[j] === 0xff && bytes[j + 1] !== 0x00 && !(bytes[j + 1] >= 0xd0 && bytes[j + 1] <= 0xd7))) j += 1;
+      if (j + 1 >= bytes.length) return null;
+      parts.push(bytes.subarray(i, j));
+      i = j;
+      continue;
     }
-    i += 2 + len;
+    const data = bytes.subarray(i + 4, end);
+    if (marker === 0xe1) orientation = orientation ?? exifOrientation(data);
+    else if (marker === 0xfe || (marker >= 0xe0 && marker <= 0xef)) {
+      if (keepAppSegment(marker, data)) parts.push(bytes.subarray(i, end));
+    } else parts.push(bytes.subarray(i, end));
+    i = end;
   }
   // After SOI and, when present, the JFIF APP0 that must follow it
   if (orientation !== null && orientation !== 1) {
@@ -206,15 +221,18 @@ export function stripPngMetadata(bytes: Uint8Array): Uint8Array | null {
 /** A WebP without its EXIF and XMP chunks (and their flags in VP8X); null when not a WebP */
 export function stripWebpMetadata(bytes: Uint8Array): Uint8Array | null {
   if (bytes.length < 12 || ascii(bytes, 0, 4) !== 'RIFF' || ascii(bytes, 8, 4) !== 'WEBP') return null;
+  // The RIFF's own length: anything after it (appended data) is not the image
+  const riffEnd = 8 + u32le(bytes, 4);
+  if (riffEnd < 12 || riffEnd > bytes.length) return null;
   const parts: Uint8Array[] = [];
   let i = 12;
-  while (i < bytes.length) {
-    if (i + 8 > bytes.length) return null;
+  while (i < riffEnd) {
+    if (i + 8 > riffEnd) return null;
     const type = ascii(bytes, i, 4);
     const size = u32le(bytes, i + 4);
     const end = i + 8 + size + (size % 2);
-    if (i + 8 + size > bytes.length) return null;
-    const chunk = bytes.slice(i, Math.min(end, bytes.length));
+    if (i + 8 + size > riffEnd) return null;
+    const chunk = bytes.slice(i, Math.min(end, riffEnd));
     if (type === 'VP8X' && chunk.length > 8) chunk[8] &= ~(0x08 | 0x04);
     if (type !== 'EXIF' && type !== 'XMP ') parts.push(chunk);
     i = end;

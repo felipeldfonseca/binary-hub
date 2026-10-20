@@ -234,7 +234,8 @@ export function pgClient(uid: string, log: { name: string; args: Record<string, 
           try {
             asUserExec(
               uid,
-              `insert into storage.objects (bucket_id, name, owner_id, metadata) values (${sqlArg(bucket)}, ${sqlArg(p)}, '${uid}', ${lit({ size: file.size, mimetype: o.contentType })});`,
+              // As the Storage API records a Blob's form part: its own type (the contentType option is not sent)
+              `insert into storage.objects (bucket_id, name, owner_id, metadata) values (${sqlArg(bucket)}, ${sqlArg(p)}, '${uid}', ${lit({ size: file.size, mimetype: file.type || o.contentType })});`,
             );
             return { data: { path: p }, error: null };
           } catch (e) {

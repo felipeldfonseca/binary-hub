@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { fireEvent, render, screen } from '@testing-library/react'
+import { act, fireEvent, render, screen } from '@testing-library/react'
 import ImportSheetProvider, { useImportSheet } from '@/components/hub/importar/ImportSheetProvider'
 import { OPERACOES_DO_DIA_ID, useRegistrarSheet } from '@/components/hub/registrar/abrir'
 
@@ -71,6 +71,28 @@ function Page() {
   )
 }
 
+/** A page whose «Operações do dia» arrives later (the sheet went to /diario before closing) */
+function LatePage() {
+  const registrar = useRegistrarSheet()
+  const [diario, setDiario] = useState(false)
+  return (
+    <div>
+      <h1 tabIndex={-1}>Personalizar</h1>
+      <button type="button" onClick={(e) => registrar.open({ accountId: 'top-one', opener: e.currentTarget })}>
+        Abrir Registrar
+      </button>
+      <button type="button" onClick={() => setTimeout(() => setDiario(true), 200)}>
+        navegar
+      </button>
+      {diario && (
+        <h2 id={OPERACOES_DO_DIA_ID} tabIndex={-1}>
+          Operações do dia
+        </h2>
+      )}
+    </div>
+  )
+}
+
 function renderPage() {
   return render(
     <ImportSheetProvider>
@@ -104,6 +126,33 @@ describe('«Registrar operação» in the hub’s sheet provider', () => {
     expect(document.activeElement).toBe(screen.getByRole('heading', { name: 'Operações do dia' }))
   })
 
+  it('«Ver no Diário» from another page: waits for the heading of the page on its way, then focuses it', () => {
+    jest.useFakeTimers()
+    try {
+      render(
+        <ImportSheetProvider>
+          <LatePage />
+        </ImportSheetProvider>,
+      )
+      fireEvent.click(screen.getByRole('button', { name: 'Abrir Registrar' }))
+      // The sheet pushes /diario, then closes on «Operações do dia»
+      fireEvent.click(screen.getByRole('button', { name: 'navegar', hidden: true }))
+      fireEvent.click(screen.getByRole('button', { name: 'Ver no Diário' }))
+      expect(document.activeElement).toBe(document.body)
+      // The next page draws its heading…
+      act(() => {
+        jest.advanceTimersByTime(200)
+      })
+      // …and the wait finds it
+      act(() => {
+        jest.advanceTimersByTime(100)
+      })
+      expect(document.activeElement).toBe(screen.getByRole('heading', { name: 'Operações do dia' }))
+    } finally {
+      jest.useRealTimers()
+    }
+  })
+
   it('one sheet at a time: the import’s end screen hands over to Registrar, and focus returns to the first opener', () => {
     renderPage()
     const add = screen.getByRole('button', { name: '+ Adicionar conta' })
@@ -121,19 +170,5 @@ describe('«Registrar operação» in the hub’s sheet provider', () => {
     renderPage()
     fireEvent.click(screen.getByRole('button', { name: 'flags' }))
     expect(screen.getByTestId('flags')).toHaveTextContent('false/false')
-  })
-})
-
-describe('the placeholder sheet of the shared base', () => {
-  it('is a labelled modal dialog that closes with Escape and «Fechar»', () => {
-    const onClose = jest.fn()
-    const RealRegistrarSheet = jest.requireActual('@/components/hub/registrar/RegistrarSheet').default
-    render(<RealRegistrarSheet accountId="top-one" tradeId={null} onClose={onClose} />)
-    const dialog = screen.getByRole('dialog', { name: 'Registrar operação' })
-    expect(dialog).toHaveAttribute('aria-modal', 'true')
-    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Fechar' }))
-    fireEvent.keyDown(dialog, { key: 'Escape' })
-    fireEvent.click(screen.getByRole('button', { name: 'Fechar' }))
-    expect(onClose).toHaveBeenCalledTimes(2)
   })
 })

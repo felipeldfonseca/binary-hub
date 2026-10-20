@@ -137,6 +137,43 @@ describe('metadata out of the bytes', () => {
     expect(stripJpegMetadata(bytes(0xff, 0xd8, 0xff, 0xe1, 0x00, 0x40))).toBeNull();
   });
 
+  it('JPEG: comments, other APPn (an MPF index) and whatever follows the end marker (a gain map, a Motion Photo’s video) go; JFIF, ICC and Adobe stay', () => {
+    const seg = (m: number, s: string) => [0xff, m, ...be16(s.length + 2), ...Array.from(s, (c) => c.charCodeAt(0))];
+    const photo = bytes(
+      0xff, 0xd8,
+      ...seg(0xe0, 'JFIF\0\x01\x01\0\0\x01\0\x01\0\0'),
+      ...seg(0xe2, 'ICC_PROFILE\0\x01\x01sRGB'),
+      ...seg(0xe2, 'MPF\0MM\0*GPS-index'),
+      ...seg(0xec, 'Ducky-GPS'),
+      ...seg(0xee, 'Adobe\0d\0\0\0\0\x01'),
+      ...seg(0xfe, 'Comment GPS-22.9S'),
+      0xff, 0xdb, ...be16(4), 0x00, 0x01,
+      // A progressive JPEG: two scans with a Huffman table between them, a restart marker inside
+      0xff, 0xda, ...be16(4), 0x01, 0x02, 0x11, 0xff, 0x00, 0x22, 0xff, 0xd0, 0x23,
+      0xff, 0xc4, ...be16(4), 0x10, 0x01,
+      0xff, 0xda, ...be16(4), 0x01, 0x03, 0x44, 0x55,
+      0xff, 0xff, 0xd9,
+      // Appended after the end: a second JPEG with its own EXIF, then a video
+      0xff, 0xd8, ...seg(0xe1, 'Exif\0\0GPS-gainmap'), 0xff, 0xd9,
+      ...Array.from('ftypmp42 GPS-video', (c) => c.charCodeAt(0)),
+    );
+    const out = stripJpegMetadata(photo)!;
+    expect(text(out)).not.toMatch(/GPS|MPF|Ducky|Comment|ftyp|gainmap/);
+    expect(text(out)).toContain('JFIF');
+    expect(text(out)).toContain('ICC_PROFILE');
+    expect(text(out)).toContain('Adobe');
+    expect(text(out)).toContain('\x11\xff\x00\x22\xff\xd0\x23');
+    expect(text(out)).toContain('\xff\xc4');
+    expect(text(out)).toContain('\x44\x55');
+    expect(Array.from(out.subarray(out.length - 2))).toEqual([0xff, 0xd9]);
+    expect(text(out).indexOf('\xff\xd9')).toBe(out.length - 2);
+  });
+
+  it('JPEG: a file cut before its end marker is not walked', () => {
+    const cut = jpeg(6).subarray(0, jpeg(6).length - 2);
+    expect(stripJpegMetadata(cut)).toBeNull();
+  });
+
   it('PNG: text and eXIf chunks go, the image chunks stay', () => {
     const out = stripPngMetadata(png())!;
     expect(text(out)).not.toMatch(/GPS|Autor|tEXt|eXIf/);
@@ -153,6 +190,13 @@ describe('metadata out of the bytes', () => {
     expect(out[4] | (out[5] << 8) | (out[6] << 16) | (out[7] << 24)).toBe(out.length - 8);
     expect(out[20]).toBe(0x00);
     expect(stripWebpMetadata(bytes('RIFF', 0, 0, 0, 0, 'WAVE'))).toBeNull();
+  });
+
+  it('WebP: anything appended after the RIFF goes too', () => {
+    const out = stripWebpMetadata(bytes(...Array.from(webp()), ...Array.from('Exif\0\0GPS-trailer', (c) => c.charCodeAt(0))))!;
+    expect(text(out)).not.toMatch(/GPS|trailer/);
+    expect(out[4] | (out[5] << 8) | (out[6] << 16) | (out[7] << 24)).toBe(out.length - 8);
+    expect(stripWebpMetadata(bytes('RIFF', ...le32(400), 'WEBP'))).toBeNull();
   });
 
   it('picks the walker by type', () => {

@@ -444,6 +444,14 @@ describe('the image bucket', () => {
     expect(SIGNED_URL_SECONDS).toBe(600);
   });
 
+  it('sends the bytes typed as reserved (the Storage client types a Blob’s form part by the Blob, never by contentType)', async () => {
+    const { db, calls } = fakeStorage(() => ({ data: {}, error: null }));
+    await uploadImage(db, { path: 'u/t/a.png', mime: 'image/png' }, new Blob([new Uint8Array([1, 2, 3])]));
+    const sent = calls[0][3] as Blob;
+    expect(sent.type).toBe('image/png');
+    expect(Array.from(new Uint8Array(await sent.arrayBuffer()))).toEqual([1, 2, 3]);
+  });
+
   it('turns a Storage failure into a code', async () => {
     const { db } = fakeStorage(() => ({ data: null, error: { message: 'The resource already exists', statusCode: '409' } }));
     await expect(uploadImage(db, { path: 'u/t/a.webp', mime: 'image/webp' }, new Blob(['x']))).rejects.toMatchObject({ code: 'unknown' });

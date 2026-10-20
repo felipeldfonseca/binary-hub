@@ -1066,9 +1066,15 @@ async function storageCall<T>(fn: () => Promise<StorageResult<T>> | PromiseLike<
   return r.data;
 }
 
-/** Uploads one reserved file (never overwrites: the bucket has no update policy) */
+/**
+ * Uploads one reserved file (never overwrites: the bucket has no update policy). The Storage client
+ * sends a Blob as a form part typed by the Blob itself (its `contentType` option only applies to
+ * other bodies), and save_extras refuses a file whose recorded type is not the reserved one
+ * (upload_mismatch): the bytes always go typed as reserved.
+ */
 export async function uploadImage(db: SupabaseClient, slot: Pick<ImageSlot, 'path' | 'mime'>, file: Blob): Promise<void> {
-  await storageCall(() => db.storage.from(IMAGE_BUCKET).upload(slot.path, file, { contentType: slot.mime, upsert: false }));
+  const typed = file.type === slot.mime ? file : new Blob([file], { type: slot.mime });
+  await storageCall(() => db.storage.from(IMAGE_BUCKET).upload(slot.path, typed, { contentType: slot.mime, upsert: false }));
 }
 
 /** A thumbnail's URL, valid for 10 minutes */
