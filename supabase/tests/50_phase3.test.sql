@@ -2174,7 +2174,7 @@ select tests.eq(public.register_entry(:'risco', '{"v": 1, "symbol": "ES", "direc
 select tests.eq(public.register_entry(:'risco', '{"v": 1, "symbol": "MES", "direction": "long", "quantity": "1", "entry_price": "7896.25"}', true)->'limit_room',
                 '{"usd": 400, "net_usd": -300, "reached": false, "left": 100, "risk": null, "above": false}'::jsonb,
                 'no stop: nothing to compare, no warning');
-select tests.eq(public.register_entry(:'risco', '{"v": 1, "symbol": "ZN", "direction": "long", "quantity": "1", "entry_price": "112.5", "stop_pts": "0.5"}', true)#>'{limit_room,risk}',
+select tests.eq(public.register_entry(:'risco', '{"v": 1, "symbol": "ZN", "direction": "long", "quantity": "1", "entry_price": "112.5", "stop_price": "112"}', true)#>'{limit_room,risk}',
                 'null'::jsonb, 'an instrument whose result is typed: no risk, no warning');
 select public.register_entry(:'risco', jsonb_build_object('v', 1, 'client_key', tests.ck(), 'symbol', 'MES', 'direction', 'long',
                              'quantity', '1', 'entry_price', '7896.25', 'stop_pts', '24')) as r \gset
