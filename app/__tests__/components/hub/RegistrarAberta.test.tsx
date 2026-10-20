@@ -1,0 +1,320 @@
+/**
+ * «Registrar operação» step 2 (PR 3-3, lane A): «Operação aberta» / «Opção vencida» with the
+ * recorded answers of the owner's day (testing/registrarTelas; invented data): the summary, the
+ * marks on the server's clock, the exit and its banner (80 % with the preference, the limit
+ * reached always, nothing for yesterday's trade), the binary's expiry, «Desfazer entrada», a trade
+ * closed elsewhere and the retries.
+ */
+import React from 'react'
+import { act, render, screen, waitFor, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import * as contasDb from '@/lib/hub/contasDb'
+import * as regrasDb from '@/lib/hub/regrasDb'
+import * as registrarDb from '@/lib/hub/registrarDb'
+import { parseRulesNow } from '@/lib/hub/regras'
+import RegistrarSheet from '@/components/hub/registrar/RegistrarSheet'
+import {
+  agoraTelas,
+  contasTelas,
+  entradaTelas,
+  estadoTelas,
+  idsTelas,
+  operacaoTelas,
+  recentesTelas,
+  saidaTelas,
+  telasJson,
+  type TelasAgora,
+} from '@/testing/registrarTelas'
+
+jest.mock('@/lib/supabase', () => ({ createDataClient: jest.fn(() => ({ storage: { from: () => ({}) } })) }))
+jest.mock('@/hooks/useAuth', () => ({ useAuth: () => ({ user: { id: 'user-1' }, session: { access_token: 'user-jwt' } }) }))
+jest.mock('@/lib/hub/contasDb', () => ({ ...jest.requireActual('@/lib/hub/contasDb'), fetchAccounts: jest.fn(), fetchPreferences: jest.fn() }))
+jest.mock('@/lib/hub/regrasDb', () => ({ ...jest.requireActual('@/lib/hub/regrasDb'), fetchRulesNow: jest.fn(), mergePreferences: jest.fn() }))
+jest.mock('@/lib/hub/registrarDb', () => ({
+  ...jest.requireActual('@/lib/hub/registrarDb'),
+  fetchOpenTrades: jest.fn(),
+  fetchTradeState: jest.fn(),
+  fetchGateAt: jest.fn(),
+  fetchRecentTrades: jest.fn(),
+  previewEntry: jest.fn(),
+  previewExit: jest.fn(),
+  previewAfter: jest.fn(),
+  registerEntry: jest.fn(),
+  registerExit: jest.fn(),
+  registerAfter: jest.fn(),
+  addMarks: jest.fn(),
+  undoEntry: jest.fn(),
+  drainImageTrash: jest.fn(),
+  signedImageUrl: jest.fn(),
+}))
+
+const db = registrarDb as jest.Mocked<typeof registrarDb>
+const fetchRulesNow = regrasDb.fetchRulesNow as jest.MockedFunction<typeof regrasDb.fetchRulesNow>
+const fetchAccounts = contasDb.fetchAccounts as jest.MockedFunction<typeof contasDb.fetchAccounts>
+const fetchPreferences = contasDb.fetchPreferences as jest.MockedFunction<typeof contasDb.fetchPreferences>
+const ids = idsTelas()
+
+type Json = Record<string, any>
+
+/** A recorded rules_now answer as if the server had answered it at `iso` */
+const agoraAs = (name: TelasAgora, iso: string) => {
+  const json = telasJson(name) as Json
+  json.server_now = iso
+  return parseRulesNow(json)
+}
+
+beforeEach(() => {
+  jest.clearAllMocks()
+  sessionStorage.clear()
+  fetchAccounts.mockResolvedValue(contasTelas())
+  fetchPreferences.mockResolvedValue({})
+  fetchRulesNow.mockResolvedValue(agoraTelas('agora-qui-1031-et'))
+  db.fetchOpenTrades.mockResolvedValue([])
+  db.fetchRecentTrades.mockImplementation(async (_db, id) => recentesTelas(id === ids.accounts.ebinex ? 'recentes-ebinex' : 'recentes-top-one'))
+  db.drainImageTrash.mockResolvedValue({ cleared: 0, remaining: 0 })
+  db.signedImageUrl.mockResolvedValue('https://storage.invalid/imagem.webp?token=t')
+  db.previewExit.mockRejectedValue(new registrarDb.RegistrarDataError('network'))
+  db.previewEntry.mockRejectedValue(new registrarDb.RegistrarDataError('network'))
+  db.fetchGateAt.mockImplementation(async (_db, id) => agoraTelas('agora-qui-1031-et').accounts.find((a) => a.accountId === id)!)
+})
+
+afterEach(() => {
+  jest.useRealTimers()
+})
+
+function abrir(tradeId: string, accountId: string = ids.accounts.topOne) {
+  const onClose = jest.fn()
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: Infinity } } })
+  const view = render(
+    <QueryClientProvider client={queryClient}>
+      <RegistrarSheet accountId={accountId} tradeId={tradeId} onClose={onClose} />
+    </QueryClientProvider>,
+  )
+  return { ...view, onClose, queryClient }
+}
+
+const mesAberta = () => operacaoTelas('operacao-mes-aberta')
+
+describe('the open futures trade', () => {
+  it('shows its summary, its plan and its marks with the server’s times', async () => {
+    db.fetchTradeState.mockResolvedValue(mesAberta())
+    abrir(ids.trades.mes)
+    expect(await screen.findByRole('heading', { level: 3, name: 'Operação aberta' })).toBeInTheDocument()
+    expect(screen.getByText('Entrada registrada às 10:12 ET.')).toBeInTheDocument()
+    const resumo = screen.getByText('MES · Compra · 2 ct').parentElement as HTMLElement
+    expect(resumo).toHaveTextContent('MES · Compra · 2 ct7.912,50 às 10:12 ETstop 10 · alvo 20 pts · risco US$ 100,00')
+    expect(screen.getByText('No plano')).toBeInTheDocument()
+    expect(screen.getByText('Conferidos: janela e limite.')).toBeInTheDocument()
+    const marcas = screen.getByText('Suas marcas').parentElement as HTMLElement
+    expect(within(marcas).getAllByRole('listitem').map((li) => li.textContent)).toEqual([
+      'Setup A às 10:12 · antes da saída',
+      'Execução: no ponto às 10:12 · antes da saída',
+    ])
+    expect(within(screen.getByRole('group', { name: 'Como você está?' })).getByRole('button', { name: 'Calmo' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByText('às 10:31 · antes da saída')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Registrar saída' })).toBeInTheDocument()
+  })
+
+  it('one tap = one mark: «salvando…» until the answer, the tap again is «desmarcar», a failure puts it back', async () => {
+    db.fetchTradeState.mockResolvedValue(entradaTelas('entry-mes').state)
+    let answer: (s: registrarDb.TradeState) => void = () => undefined
+    db.addMarks.mockImplementationOnce(() => new Promise((resolve) => (answer = resolve)))
+    abrir(ids.trades.mes)
+    await screen.findByRole('heading', { level: 3, name: 'Operação aberta' })
+    const calmo = within(screen.getByRole('group', { name: 'Como você está?' })).getByRole('button', { name: 'Calmo' })
+    expect(calmo).toHaveAttribute('aria-pressed', 'false')
+    await userEvent.click(calmo)
+    expect(calmo).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByText('salvando…')).toBeInTheDocument()
+    expect(db.addMarks).toHaveBeenCalledWith(expect.anything(), ids.trades.mes, { v: 1, marks: { emocao: 'calmo' } })
+    await act(async () => answer(estadoTelas('marks-mes-aberta')))
+    expect(await screen.findByText('às 10:31 · antes da saída')).toBeInTheDocument()
+    expect(screen.getByText('Emoção: Calmo, às 10:31, antes da saída.')).toBeInTheDocument()
+    // Tapping it again clears it (null)
+    db.addMarks.mockRejectedValueOnce(new registrarDb.RegistrarDataError('network'))
+    await userEvent.click(calmo)
+    await waitFor(() => expect(db.addMarks).toHaveBeenLastCalledWith(expect.anything(), ids.trades.mes, { v: 1, marks: { emocao: null } }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('A marca não foi salva. Tente de novo.')
+    expect(calmo).toHaveAttribute('aria-pressed', 'true')
+  })
+
+  it('the exit: preview, the payload, step 3 with the 80 % banner when the preference is on', async () => {
+    fetchPreferences.mockResolvedValue({ alerts: { limit_80: true } })
+    db.fetchTradeState.mockResolvedValue(mesAberta())
+    db.registerExit.mockResolvedValue(saidaTelas('exit-mes-oitenta'))
+    abrir(ids.trades.mes)
+    await screen.findByRole('heading', { level: 3, name: 'Operação aberta' })
+    expect(screen.getByText('Resultado: informe o preço de saída.')).toBeInTheDocument()
+    expect(screen.getByLabelText('Hora da saída (ET)')).toHaveValue('10:31')
+    await userEvent.type(screen.getByLabelText('Preço de saída'), '7903,8')
+    expect(screen.getByText('Resultado: confira o preço de saída (o MES anda de 0,25 em 0,25).')).toBeInTheDocument()
+    await userEvent.clear(screen.getByLabelText('Preço de saída'))
+    await userEvent.type(screen.getByLabelText('Preço de saída'), '7.902,50')
+    expect(screen.getByText('Se sair a 7.902,50: −10,00 pts · −US$ 100,00')).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Registrar saída' }))
+    await waitFor(() => expect(db.registerExit).toHaveBeenCalledTimes(1))
+    const [, tradeId, payload] = db.registerExit.mock.calls[0]
+    expect(tradeId).toBe(ids.trades.mes)
+    expect(payload).toEqual({ v: 1, exit_price: '7902.5', clock: 'America/New_York' })
+    expect(await screen.findByRole('heading', { level: 3, name: 'Operação fechada' })).toHaveFocus()
+    expect(screen.getByText('Você chegou a 80% do limite do dia: −US$ 345 de US$ 400.')).toBeInTheDocument()
+    expect(screen.getByText('−US$ 100,00')).toBeInTheDocument()
+    expect(screen.getByText('MES · Compra · 2 ct · 7.912,50 → 7.902,50 · −10,00 pts · 10:12–10:38 ET')).toBeInTheDocument()
+    expect(screen.getByText('−1,00 R')).toBeInTheDocument()
+    expect(screen.getByText('com stop de 10 pts', { exact: false })).toBeInTheDocument()
+  })
+
+  it('the 80 % banner needs the preference', async () => {
+    db.fetchTradeState.mockResolvedValue(mesAberta())
+    db.registerExit.mockResolvedValue(saidaTelas('exit-mes-oitenta'))
+    abrir(ids.trades.mes)
+    await screen.findByRole('heading', { level: 3, name: 'Operação aberta' })
+    await userEvent.type(screen.getByLabelText('Preço de saída'), '7902,5')
+    await userEvent.click(screen.getByRole('button', { name: 'Registrar saída' }))
+    await screen.findByRole('heading', { level: 3, name: 'Operação fechada' })
+    expect(screen.queryByText(/Você chegou a 80%/)).not.toBeInTheDocument()
+  })
+
+  it('the limit reached: «Limite do dia atingido às 10:40: −US$ 505 de US$ 400. Pelas suas regras, o dia está encerrado.»', async () => {
+    db.fetchTradeState.mockResolvedValue(entradaTelas('entry-mgc').state)
+    db.registerExit.mockResolvedValue(saidaTelas('exit-mgc-atingido'))
+    abrir(ids.trades.mgc)
+    await screen.findByRole('heading', { level: 3, name: 'Operação aberta' })
+    await userEvent.type(screen.getByLabelText('Preço de saída'), '4437,3')
+    await userEvent.click(screen.getByRole('button', { name: 'Registrar saída' }))
+    await screen.findByRole('heading', { level: 3, name: 'Operação fechada' })
+    const banner = screen.getByText('Limite do dia atingido às 10:40: −US$ 505 de US$ 400. Pelas suas regras, o dia está encerrado.')
+    expect(banner).toHaveAttribute('role', 'status')
+    expect(banner).toHaveClass('hub-reg-aviso-lim--atingido')
+  })
+
+  it('yesterday’s open MNQ closed today: no banner, and the period across the two days', async () => {
+    db.fetchTradeState.mockResolvedValue(entradaTelas('entry-mnq-qua').state)
+    db.registerExit.mockResolvedValue(saidaTelas('exit-mnq-ontem'))
+    fetchRulesNow.mockResolvedValue(agoraTelas('agora-qui-1042-et'))
+    abrir(ids.trades.mnqQua)
+    await screen.findByRole('heading', { level: 3, name: 'Operação aberta' })
+    expect(screen.getByText('Entrada de ontem, às 10:52 ET.')).toBeInTheDocument()
+    expect(screen.getByText('30.880,50 ontem, às 10:52 ET')).toBeInTheDocument()
+    expect(screen.getByText('Setup A', { exact: false }).textContent).toBe('Setup A ontem às 10:52 · antes da saída')
+    await userEvent.type(screen.getByLabelText('Preço de saída'), '30912,75')
+    await userEvent.click(screen.getByRole('button', { name: 'Registrar saída' }))
+    await screen.findByRole('heading', { level: 3, name: 'Operação fechada' })
+    expect(screen.queryByText(/Limite do dia atingido|Você chegou a 80%/)).not.toBeInTheDocument()
+    expect(screen.getByText('+US$ 64,50')).toBeInTheDocument()
+    expect(screen.getByText('MNQ · Compra · 1 ct · 30.880,50 → 30.912,75 · +32,25 pts · 21 out, 10:52 → 22 out, 10:42 ET')).toBeInTheDocument()
+  })
+
+  it('a lost answer: the retried exit answers «repeated», which is success without a banner and never «outro lugar» (C5)', async () => {
+    fetchPreferences.mockResolvedValue({ alerts: { limit_80: true } })
+    db.fetchTradeState.mockResolvedValue(mesAberta())
+    const done = saidaTelas('exit-mes-oitenta')
+    db.registerExit.mockRejectedValueOnce(new registrarDb.RegistrarDataError('network')).mockResolvedValueOnce({ ...done, repeated: true, exit: null, gateNow: null })
+    abrir(ids.trades.mes)
+    await screen.findByRole('heading', { level: 3, name: 'Operação aberta' })
+    await userEvent.type(screen.getByLabelText('Preço de saída'), '7902,5')
+    await userEvent.click(screen.getByRole('button', { name: 'Registrar saída' }))
+    expect(await screen.findByText('Não foi possível falar com o servidor. Confira sua conexão e tente de novo.')).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Registrar saída' }))
+    await screen.findByRole('heading', { level: 3, name: 'Operação fechada' })
+    expect(screen.queryByText(/Você chegou a 80%/)).not.toBeInTheDocument()
+    expect(screen.queryByText('Esta operação já foi fechada em outro lugar.')).not.toBeInTheDocument()
+    expect(screen.getByText('−US$ 100,00')).toBeInTheDocument()
+  })
+
+  it('closed on another device: the exit’s dry run says so → step 3 with «Esta operação já foi fechada em outro lugar.»', async () => {
+    db.fetchTradeState.mockResolvedValue(mesAberta())
+    const fechada = saidaTelas('exit-mes-oitenta').state
+    db.previewExit.mockResolvedValue({ repeated: true, serverNow: fechada.serverNow, tradeId: ids.trades.mes, state: fechada })
+    abrir(ids.trades.mes)
+    await screen.findByRole('heading', { level: 3, name: 'Operação aberta' })
+    await userEvent.type(screen.getByLabelText('Preço de saída'), '7902,5')
+    expect(await screen.findByRole('heading', { level: 3, name: 'Operação fechada' })).toBeInTheDocument()
+    expect(screen.getByText('Esta operação já foi fechada em outro lugar.')).toBeInTheDocument()
+    expect(db.registerExit).not.toHaveBeenCalled()
+  })
+})
+
+describe('«Desfazer entrada» (Q3 a)', () => {
+  it('within 15 minutes: the link, its confirmation, «Manter» and «Sim, desfazer»', async () => {
+    fetchRulesNow.mockResolvedValue(agoraAs('agora-qui-1031-et', '2026-10-22T14:13:00.000Z'))
+    db.fetchTradeState.mockResolvedValue(entradaTelas('entry-mes').state)
+    db.undoEntry.mockResolvedValue({ serverNow: new Date('2026-10-22T14:13:10Z'), tradeId: ids.trades.mes, trash: [] })
+    abrir(ids.trades.mes)
+    await screen.findByRole('heading', { level: 3, name: 'Operação aberta' })
+    expect(screen.getByText('Até 10:27, 15 minutos depois do registro.')).toBeInTheDocument()
+    const link = screen.getByRole('button', { name: 'Desfazer entrada' })
+    await userEvent.click(link)
+    const grupo = screen.getByRole('group', {
+      name: 'Desfazer a entrada das 10:12 (MES · Compra · 2 ct)? A operação e as marcas dela saem do diário. O app guarda só que uma operação registrada foi apagada, com a data e a hora.',
+    })
+    expect(within(grupo).getByRole('button', { name: 'Sim, desfazer' })).toHaveFocus()
+    await userEvent.click(within(grupo).getByRole('button', { name: 'Manter' }))
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Desfazer entrada' })).toHaveFocus())
+    await userEvent.click(screen.getByRole('button', { name: 'Desfazer entrada' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Sim, desfazer' }))
+    expect(await screen.findByRole('heading', { level: 3, name: 'Entrada' })).toBeInTheDocument()
+    expect(screen.getByText('Entrada das 10:12 desfeita às 10:13.')).toBeInTheDocument()
+    expect(db.undoEntry).toHaveBeenCalledWith(expect.anything(), ids.trades.mes)
+  })
+
+  it('after the limit, the link is gone', async () => {
+    db.fetchTradeState.mockResolvedValue(entradaTelas('entry-mes').state)
+    abrir(ids.trades.mes)
+    await screen.findByRole('heading', { level: 3, name: 'Operação aberta' })
+    expect(screen.queryByRole('button', { name: 'Desfazer entrada' })).not.toBeInTheDocument()
+  })
+
+  it('an undo retried after a lost answer comes back unknown_trade: it was done (C5)', async () => {
+    fetchRulesNow.mockResolvedValue(agoraAs('agora-qui-1031-et', '2026-10-22T14:13:00.000Z'))
+    db.fetchTradeState.mockResolvedValue(entradaTelas('entry-mes').state)
+    db.undoEntry.mockRejectedValueOnce(new registrarDb.RegistrarDataError('network')).mockRejectedValueOnce(new registrarDb.RegistrarDataError('unknown_trade'))
+    abrir(ids.trades.mes)
+    await screen.findByRole('heading', { level: 3, name: 'Operação aberta' })
+    await userEvent.click(screen.getByRole('button', { name: 'Desfazer entrada' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Sim, desfazer' }))
+    expect(await screen.findByText('Não foi possível falar com o servidor. Confira sua conexão e tente de novo.')).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Desfazer entrada' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Sim, desfazer' }))
+    expect(await screen.findByRole('heading', { level: 3, name: 'Entrada' })).toBeInTheDocument()
+    expect(screen.getByText(/^Entrada das 10:12 desfeita às 10:1\d\.$/)).toBeInTheDocument()
+  })
+})
+
+describe('the Ebinex option', () => {
+  it('waits for the expiry, becomes «Opção vencida», then «Registrar resultado» sends the outcome', async () => {
+    jest.useFakeTimers({ now: new Date('2026-10-22T23:11:30.000Z'), doNotFake: ['queueMicrotask'] })
+    const user = userEvent.setup({ advanceTimers: jest.advanceTimersByTime })
+    fetchRulesNow.mockResolvedValue(agoraAs('agora-qui-2024-brt', '2026-10-22T23:11:30.000Z'))
+    db.fetchTradeState.mockResolvedValue(entradaTelas('entry-ebinex-put').state)
+    db.registerExit.mockResolvedValue(saidaTelas('exit-ebinex-perda'))
+    abrir(ids.trades.ebx, ids.accounts.ebinex)
+    expect(await screen.findByRole('heading', { level: 3, name: 'Operação aberta' })).toBeInTheDocument()
+    expect(screen.getByText('EUR/USD · Baixa · 1 min')).toBeInTheDocument()
+    expect(screen.getByText('US$ 20 · payout 88% · 20:10–20:12 de Brasília')).toBeInTheDocument()
+    expect(screen.getByText('Vence às 20:12 de Brasília.')).toBeInTheDocument()
+    expect(screen.getByText('Se acertar: +US$ 17,60 · se errar: −US$ 20,00')).toBeInTheDocument()
+    const perda = within(screen.getByRole('group', { name: 'Como terminou?' })).getByRole('button', { name: 'Perda' })
+    expect(perda).toHaveAttribute('aria-disabled', 'true')
+    await user.click(screen.getByRole('button', { name: 'Registrar resultado' }))
+    expect(screen.getByText('Ainda não venceu.')).toBeInTheDocument()
+    expect(db.registerExit).not.toHaveBeenCalled()
+    await act(async () => {
+      jest.advanceTimersByTime(31_000)
+    })
+    expect(screen.getByRole('heading', { level: 3, name: 'Opção vencida' })).toBeInTheDocument()
+    expect(screen.getByText('Passo 2 de 3 · Vencida')).toBeInTheDocument()
+    expect(screen.getByText('Venceu às 20:12 de Brasília.')).toBeInTheDocument()
+    expect(screen.getByText('Marcas feitas agora contam como depois do resultado.')).toBeInTheDocument()
+    expect(perda).not.toHaveAttribute('aria-disabled')
+    await user.click(perda)
+    expect(screen.getByText('Resultado: −US$ 20,00')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Registrar resultado' }))
+    await waitFor(() => expect(db.registerExit).toHaveBeenCalledTimes(1))
+    expect(db.registerExit.mock.calls[0][2]).toEqual({ v: 1, outcome: 'perda' })
+    expect(await screen.findByRole('heading', { level: 3, name: 'Operação fechada' })).toBeInTheDocument()
+    expect(screen.getByText('EUR/USD · Baixa · 1 min · perda · 20:10–20:12 de Brasília')).toBeInTheDocument()
+    expect(screen.queryByText(/Limite do dia atingido/)).not.toBeInTheDocument()
+  })
+})
