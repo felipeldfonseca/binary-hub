@@ -895,7 +895,7 @@ export default function ImportSheet({ mode, accountId, onClose }: { mode: SheetM
       const created = flow.created
       const title = FIM_CONTA.title(created?.label ?? label)
       // Phase 3: «Registrar operação» on the new account (it replaces this sheet; focus goes back to
-      // what opened it), for a market whose Registrar exists (D36: Futuros and binárias in 3-3)
+      // what opened it); every market registers since 3-4 (the end of D36)
       const registrarNa = created && podeRegistrar(created.market) ? created : null
       const registrarAction: Primary | null = registrarNa
         ? { label: FIM_CONTA.registrar, run: () => registrar.open({ accountId: registrarNa.id }) }
@@ -906,7 +906,7 @@ export default function ImportSheet({ mode, accountId, onClose }: { mode: SheetM
           <PassoFim
             headingRef={headingRef}
             title={title}
-            lines={[FIM_CONTA.semLeitor(created.market), FIM_CONTA.semLeitorArquivo(created.market, created.platform)]}
+            lines={[FIM_CONTA.semLeitor, FIM_CONTA.semLeitorArquivo(created.market, created.platform)]}
           />
         )
         primary = registrarAction ?? closeAction

@@ -4,6 +4,7 @@
  * data) at fixed instants. Every amount the form previews is compared with what the server answered
  * for the same entry or exit (the dry runs and the registrations).
  */
+import { resolveLocalHm } from '@/lib/domain/tempo'
 import type { AccountNow } from '@/lib/hub/regras'
 import { padroesDoRegistrar } from '@/lib/hub/registrar'
 import {
@@ -474,6 +475,40 @@ describe('scenario 7 · Ações e opções (IBKR, no window, Thu 15 Oct 09:52 ET
     expect(ativoCurto(t, 'stocks')).toBe('SPY Call 790')
     expect(opTexto(saidaMercados('aapl').state.trade, 'stocks')).toBe('AAPL · Compra · 100 ações')
     expect(cartaoFechada(ibkr, saidaMercados('aapl').state.trade, n).linha).toBe('AAPL · Compra · 100 ações · 231,40 → 232,15 · +0,75 por ação · 09:52–10:00 ET')
+  })
+
+  it('step 2 the next day: «Venceu sem valor» only while 16:00 still names the expiry’s close (until 04:00:00 ET)', () => {
+    // register_exit reads the hour against now (trade_hm_resolve): today's, or yesterday's while
+    // today's is more than 12 hours ahead. On Fri 10:00 «16:00» is Friday's (ahead: exit_in_future);
+    // on Fri 17:00 or Mon it is that day's, a day or more after the expiry.
+    const t = entradaMercados('spy-call-aberta').state.trade
+    const fim = '2026-10-15T20:00:00.000Z'
+    const tarde = 'Venceu em 15 out, às 16:00 ET: essa saída só pode ser registrada até as 04:00 ET do dia seguinte.'
+    const saida = (iso: string, clock = ibkr) => modeloSaida(clock, t, { preco: '', hora: null, vsv: true }, at(iso), false)
+    // In the close's own minute the exit is now (no hour sent), as on the server
+    expect(saida('2026-10-15T20:00:30Z').vsv).toMatchObject({ ligado: true, disponivel: true })
+    expect(saida('2026-10-15T20:00:30Z').payload).toEqual({ v: 1, exit_price: '0', clock: NY })
+    for (const iso of ['2026-10-15T20:05:05Z', '2026-10-16T03:59:05Z', '2026-10-16T04:30:05Z', '2026-10-16T08:00:00Z']) {
+      const s = saida(iso)
+      expect([iso, s.vsv]).toEqual([iso, { ligado: true, disponivel: true, nota: '', hora: '16:00' }])
+      expect(s.payload).toEqual({ v: 1, exit_price: '0', exit: '16:00', clock: NY })
+      expect(s.erros).toEqual({})
+      // What the server makes of the hour, by its own rule
+      expect(resolveLocalHm('16:00', NY, at(iso)).toISOString()).toBe(fim)
+    }
+    for (const iso of ['2026-10-16T08:00:01Z', '2026-10-16T08:00:59Z', '2026-10-16T14:00:05Z', '2026-10-16T21:00:05Z', '2026-10-19T14:00:05Z', '2026-10-19T21:00:05Z']) {
+      const s = saida(iso)
+      expect([iso, s.vsv]).toEqual([iso, { ligado: false, disponivel: false, nota: tarde, hora: '16:00' }])
+      expect([s.precoCampo, s.payload]).toEqual(['', null])
+      expect(resolveLocalHm('16:00', NY, at(iso)).toISOString()).not.toBe(fim)
+    }
+    // A Brasília clock: 17:00 (October), the same instants
+    const sp: ContaReg = { ...ibkr, clock: SP }
+    expect(saida('2026-10-16T08:00:00Z', sp).vsv).toEqual({ ligado: true, disponivel: true, nota: '', hora: '17:00' })
+    expect(saida('2026-10-16T08:00:00Z', sp).payload).toEqual({ v: 1, exit_price: '0', exit: '17:00', clock: SP })
+    expect(saida('2026-10-16T08:00:01Z', sp).vsv).toMatchObject({ disponivel: false, nota: tarde })
+    // «Já fechada» sends the «Dia» with the hour: still available days later
+    expect(estadoVsv(ibkr, '2026-10-15', '2026-10-15', '2026-10-19', true, at('2026-10-19T21:00:05Z'))).toEqual({ ligado: true, disponivel: true, nota: '', hora: '16:00' })
   })
 
   it('an `options` account: «Opção» fixed, no «O que você operou?»', () => {

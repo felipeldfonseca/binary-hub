@@ -2,8 +2,8 @@
  * «Registrar operação» (Phase 3, PR 3-3): what both screen lanes need besides the database calls
  * (registrarDb) and the hooks (hooks/useRegistrar). Pure: no React, no client.
  *
- *   podeRegistrar        which accounts get the button and the sheet in 3-3 (Futuros and Ebinex;
- *                        the new markets keep their interim state until 3-4, D36)
+ *   podeRegistrar        which accounts get the button and the sheet: every market since 3-4 (the
+ *                        end of D36)
  *   padroesDoRegistrar   the form's starting values from the account's recent trades (D5, D6)
  *   diaDeHoje            the account's trading day now (rules_now's, else its day clock's)
  *   inicioDoDia          the instant today's trading day began (the bridge's «fechadas hoje»)
@@ -16,7 +16,7 @@
  * lib/hub/registrarAtivos'.
  */
 import { tradingDayBounds, tradingDayOn, type DayClock } from '@/lib/domain';
-import { MARKET_SPEC, type AccountMarket, type Currency } from '@/lib/domain/markets';
+import { ACCOUNT_MARKETS, MARKET_SPEC, type AccountMarket, type Currency } from '@/lib/domain/markets';
 import { currencyOf, type LimitCheck } from '@/lib/domain/gate';
 import { tradeMatchKey, type Direction } from '@/lib/domain/registro';
 
@@ -25,11 +25,12 @@ import { tradeMatchKey, type Direction } from '@/lib/domain/registro';
 // ---------------------------------------------------------------------------------------------
 
 /**
- * The markets whose Registrar form PR 3-3 builds. Forex, Ações e opções, Cripto and B3 accounts get
- * no «Registrar operação» (header, end of account creation, the sheet's account list) and keep
- * their «… na Fase 3» texts until PR 3-4 ships their variants (D36).
+ * The markets whose accounts register: every one since PR 3-4 (Futuros and binárias in 3-3; Forex,
+ * Ações e opções, Cripto and B3 in 3-4, and a backfilled `options` account with «Opção» fixed). The
+ * header button, /diario?registrar=1, the end of account creation, the sheet's account list and
+ * «Operações do dia» follow it; the interim «… na Fase 3» texts of D36 are gone.
  */
-export const REGISTRAR_MARKETS: readonly AccountMarket[] = ['futures', 'binary'];
+export const REGISTRAR_MARKETS: readonly AccountMarket[] = ACCOUNT_MARKETS;
 
 export function podeRegistrar(market: AccountMarket | null | undefined): boolean {
   return !!market && (REGISTRAR_MARKETS as readonly string[]).includes(market);

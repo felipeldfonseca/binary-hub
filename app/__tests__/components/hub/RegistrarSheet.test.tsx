@@ -280,7 +280,8 @@ describe('the account inside the sheet (D4)', () => {
     await screen.findByRole('heading', { level: 3, name: 'Entrada' })
     await userEvent.click(screen.getByRole('button', { name: 'Trocar a conta: Top One #1' }))
     expect(screen.getByText('Contas de mercados diferentes nunca são somadas.')).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: /FTMO/ })).not.toBeInTheDocument()
+    // Every market registers since 3-4 (the end of D36): FTMO (forex) is in the list too
+    expect(screen.getByRole('button', { name: 'FTMO · Avaliação' })).toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: 'Ebinex · Pessoal' }))
     expect(await screen.findByRole('button', { name: 'Trocar a conta: Ebinex' })).toBeInTheDocument()
     expect(screen.getByRole('group', { name: 'Par' })).toBeInTheDocument()

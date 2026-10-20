@@ -658,6 +658,13 @@ export const VSV = {
   venceHoje: 'Vence hoje às 16:00 ET.', // B l.971
   /** «Vence em 14 out, às 16:00 ET.» */
   venceEm: (dia: string) => `Vence em ${dia}, às 16:00 ET.`, // B l.972
+  /**
+   * «Venceu em 15 out, às 16:00 ET: essa saída só pode ser registrada até as 04:00 ET do dia seguinte.»
+   * N (the board never reaches it): step 2 of an open option, too late for the exit hour to name the
+   * expiry's close (register_exit reads the hour as today's, or yesterday's while today's is more
+   * than 12 hours ahead)
+   */
+  tarde: (dia: string) => `Venceu em ${dia}, às 16:00 ET: essa saída só pode ser registrada até as 04:00 ET do dia seguinte.`,
 }
 
 /** The new markets' field errors (RO l.1022–1053); the side of a stop or target: N */

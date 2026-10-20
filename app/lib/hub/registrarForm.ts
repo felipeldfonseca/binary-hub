@@ -759,9 +759,13 @@ function blocoResultado(x: BlocoEntrada): BlocoSaida {
 export interface EstadoVsv {
   /** The pill is on (premium 0 at 16:00 ET) */
   ligado: boolean;
-  /** Only when the expiry is the entry's day and that day's 16:00 ET has passed (board choice 21); else aria-disabled */
+  /**
+   * Only when the expiry is the entry's day and that day's 16:00 ET has passed (board choice 21); on
+   * step 2 also only while the exit hour still names that close (until about 04:00 ET the next day);
+   * else aria-disabled
+   */
   disponivel: boolean;
-  /** «Escolha o vencimento primeiro.» / «Vence hoje às 16:00 ET.» / «Vence em 14 out, às 16:00 ET.»; '' when available */
+  /** «Escolha o vencimento primeiro.» / «Vence hoje às 16:00 ET.» / «Vence em 14 out, às 16:00 ET.» / (step 2, too late) «Venceu em 15 out, …»; '' when available */
   nota: string;
   /** 16:00 ET of the expiry on the account's clock («16:00»; «17:00» on Brasília in October): the exit hour it writes */
   hora: string | null;
@@ -773,10 +777,45 @@ const fimDoPregao = (date: string): Date => {
   return localToUtc({ year: y, month: m, day: d, hour: 16, minute: 0 }, 'America/New_York');
 };
 
-export function estadoVsv(conta: Pick<ContaReg, 'clock'>, vencimento: string | null, dia: string, hoje: string, ligado: boolean, now: Date): EstadoVsv {
+/**
+ * Step 2's exit carries only an hour, and register_exit reads it against now (trade_hm_resolve: the
+ * current minute is now; else today's, or yesterday's while today's is more than 12 hours ahead).
+ * The pill's 16:00 ET names the expiry's close only from that close until about 04:00 ET the next
+ * day; later it would land on a later day (or ahead of now).
+ */
+function horaAlcancaFim(conta: Pick<ContaReg, 'clock'>, fim: Date, now: Date): boolean {
+  const hm = hora(conta, fim);
+  const at = hm === hmOn(now, conta.clock) ? now : resolveLocalHm(hm, conta.clock, now);
+  return Math.floor(at.getTime() / 60_000) === Math.floor(fim.getTime() / 60_000);
+}
+
+/**
+ * «Venceu sem valor»: `porHora` is step 2, where the exit is sent as an hour only (register_exit),
+ * so the pill is also limited to the times that hour still names the expiry's close («Já fechada»
+ * sends the «Dia» with it).
+ */
+export function estadoVsv(
+  conta: Pick<ContaReg, 'clock'>,
+  vencimento: string | null,
+  dia: string,
+  hoje: string,
+  ligado: boolean,
+  now: Date,
+  porHora = false,
+): EstadoVsv {
   const fim = vencimento ? fimDoPregao(vencimento) : null;
-  const disponivel = !!vencimento && vencimento === dia && !!fim && now.getTime() >= fim.getTime();
-  const nota = disponivel ? '' : !vencimento ? VSV.escolhaVencimento : vencimento === hoje ? VSV.venceHoje : VSV.venceEm(formatDiaMes(vencimento));
+  const depois = !!vencimento && vencimento === dia && !!fim && now.getTime() >= fim.getTime();
+  const tarde = depois && porHora && !horaAlcancaFim(conta, fim as Date, now);
+  const disponivel = depois && !tarde;
+  const nota = disponivel
+    ? ''
+    : !vencimento
+      ? VSV.escolhaVencimento
+      : tarde
+        ? VSV.tarde(formatDiaMes(vencimento))
+        : vencimento === hoje
+          ? VSV.venceHoje
+          : VSV.venceEm(formatDiaMes(vencimento));
   return { ligado: ligado && disponivel, disponivel, nota, hora: fim ? hora(conta, fim) : null };
 }
 
@@ -1707,7 +1746,7 @@ export function modeloSaida(conta: ContaReg, t: RegisteredTrade, c: SaidaCampos,
   const atual = hmOn(now, conta.clock);
   const vsv =
     forma?.tipo === 'opcao' && t.option
-      ? estadoVsv(conta, t.option.expiresOn, t.tradingDay ?? diaDe(conta, t.entryTime), diaDe(conta, now), !!c.vsv, now)
+      ? estadoVsv(conta, t.option.expiresOn, t.tradingDay ?? diaDe(conta, t.entryTime), diaDe(conta, now), !!c.vsv, now, true)
       : null;
   const precoCampo = c.preco !== '' ? c.preco : vsv?.ligado ? '0' : '';
   const horaCampo = c.hora ?? (vsv?.ligado && vsv.hora ? vsv.hora : atual);

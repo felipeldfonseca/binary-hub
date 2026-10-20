@@ -4,6 +4,8 @@
  * lib/hub/registrar (which accounts, the form's starting values, today's trading day, the exit
  * banner) and lib/hub/relogio (the server's clock on the device).
  */
+import fs from 'fs';
+import path from 'path';
 import { ACCOUNT_MARKETS } from '@/lib/domain/markets';
 import type { LimitCheck } from '@/lib/domain/gate';
 import {
@@ -20,13 +22,32 @@ import {
 import { msUntil, newestClock, serverClockOf, serverNowFrom } from '@/lib/hub/relogio';
 import { agoraTelas, saidaTelas } from '@/testing/registrarTelas';
 
-describe('which accounts get «Registrar operação» in 3-3 (D36)', () => {
-  it('Futuros and binárias; the new markets wait for 3-4', () => {
-    expect(REGISTRAR_MARKETS).toEqual(['futures', 'binary']);
-    expect(ACCOUNT_MARKETS.filter(podeRegistrar)).toEqual(['futures', 'binary']);
+describe('which accounts get «Registrar operação» (3-4 ends D36)', () => {
+  it('every market: Futuros and binárias since 3-3; Forex, Ações e opções, Cripto, B3 and options since 3-4', () => {
+    expect(REGISTRAR_MARKETS).toEqual(ACCOUNT_MARKETS);
+    expect(ACCOUNT_MARKETS.filter(podeRegistrar)).toEqual(['futures', 'binary', 'forex', 'stocks', 'crypto', 'b3', 'options']);
     expect(podeRegistrar(null)).toBe(false);
+    expect(podeRegistrar(undefined)).toBe(false);
+    expect(podeRegistrar('cfd' as never)).toBe(false);
     expect(FUTURES_CHIPS).toEqual(['MES', 'MNQ', 'MGC', 'ES', 'NQ', 'GC']);
     expect(CONTRACT_CHIPS).toEqual(['1', '2', '3']);
+  });
+
+  it('no interim text of D36 is left in app/components or app/lib («, na Fase 3», «que chega na Fase 3»)', () => {
+    const arquivos = (dir: string): string[] =>
+      fs.readdirSync(dir, { withFileTypes: true }).flatMap((e) => {
+        const p = path.join(dir, e.name);
+        return e.isDirectory() ? arquivos(p) : /\.(ts|tsx)$/.test(e.name) ? [p] : [];
+      });
+    const raiz = path.join(__dirname, '../..');
+    const lidos = [...arquivos(path.join(raiz, 'components')), ...arquivos(path.join(raiz, 'lib'))];
+    expect(lidos.length).toBeGreaterThan(50);
+    const sobra = lidos.filter((f) => /, na Fase 3|que chega na Fase 3/.test(fs.readFileSync(f, 'utf8'))).map((f) => path.relative(raiz, f));
+    expect(sobra).toEqual([]);
+    // The approved texts that name a phase stay: the before-«desde» text of the new markets and the Diário's placeholder
+    const registrarCopy = fs.readFileSync(path.join(raiz, 'components/hub/registrar/copy.ts'), 'utf8');
+    expect(registrarCopy).toContain('essas operações entram pela importação por colunas, logo depois da Fase 3.');
+    expect(fs.readFileSync(path.join(raiz, 'app/(hub)/diario/page.tsx'), 'utf8')).toContain('O Diário chega na Fase 4.');
   });
 });
 

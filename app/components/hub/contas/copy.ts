@@ -11,7 +11,6 @@ import type { AccountMarket, AccountPhase, ZoneKey } from '@/lib/hub/contas'
 import { ALL_FILE_ZONES, LABEL_MAX, MARKET_ORDER } from '@/lib/hub/contas'
 import type { HubErrorCode } from '@/lib/hub/contasDb'
 import { SIMBOLO_MOEDA, formatInt } from '@/lib/hub/formato'
-import { podeRegistrar } from '@/lib/hub/registrar'
 import { MERCADO, USDT_COMO_DOLAR, viraODia } from '@/components/hub/copyMercados'
 
 // ------------------------------------------------------------------------------------------------
@@ -114,13 +113,6 @@ export const PERSONALIZAR = {
   sub: 'Ajuste o Binary Hub às suas contas e ao que você opera.',
 }
 
-/**
- * The markets whose trades come in only through «Registrar operação» (no file reader yet). Their
- * «… na Fase 3» texts stay until PR 3-4 adds them to REGISTRAR_MARKETS (D36); then each text below
- * switches by itself, with no copy edit (contract §5.7).
- */
-const SO_REGISTRAR: readonly AccountMarket[] = ['forex', 'stocks', 'crypto', 'b3']
-
 const INFO_CONTAS_ANTES =
   'Uma linha por conta. Cada conta é de um mercado só, com janela, limite e regras próprias. Arquivar vale na hora, guarda o histórico e pode ser desfeito. O Binary Hub não se conecta à sua corretora: as operações chegam por arquivo ou à mão. Por enquanto, lemos o CSV da Ebinex e o Trade History da Top One.'
 const INFO_CONTAS_DEPOIS =
@@ -133,22 +125,13 @@ export const CONTAS = {
   // ADAPTED (board Personalizar `D.txt.infoContas`, Fase 2b): "Duplicar e arquivar valem na hora;
   // arquivar guarda…" → archive only (no duplicate yet); the sentences about the Apex examples and
   // copy groups are dropped, as in Phase 1.
-  // Fase 3 (D19, D36): «…, que chega na Fase 3, e logo depois também por um CSV…» until the four
-  // markets can register (PR 3-4), then «… e, em breve, também por um CSV…» (ADAPTED)
-  get info(): string {
-    const meio = SO_REGISTRAR.every((m) => podeRegistrar(m))
-      ? 'Nas contas de Forex, de Ações, de Cripto e da B3, as operações entram pelo “Registrar operação” e, em breve, também por um CSV em que você diz o que é cada coluna.'
-      : 'Nas contas de Forex, de Ações, de Cripto e da B3, as operações entram pelo “Registrar operação”, que chega na Fase 3, e logo depois também por um CSV em que você diz o que é cada coluna.'
-    return `${INFO_CONTAS_ANTES} ${meio} ${INFO_CONTAS_DEPOIS}`
-  },
+  // Fase 3 (D19; 3-4 ended D36): the four markets register, «… e, em breve, também por um CSV…» (ADAPTED)
+  info: `${INFO_CONTAS_ANTES} Nas contas de Forex, de Ações, de Cripto e da B3, as operações entram pelo “Registrar operação” e, em breve, também por um CSV em que você diz o que é cada coluna. ${INFO_CONTAS_DEPOIS}`,
   /**
    * Under the group of a market whose files the app cannot read yet (board Personalizar
-   * `g.semLeitorTxt`). Fase 3 (D19, D36): «, na Fase 3» goes once the market can register (ADAPTED)
+   * `g.semLeitorTxt`). Fase 3 (D19; 3-4 ended D36): the interim phase name is gone (ADAPTED)
    */
-  semLeitor: (market: AccountMarket) =>
-    podeRegistrar(market)
-      ? `Ainda não lemos arquivos ${MERCADO[market].de}: as operações entram pelo “Registrar operação”.`
-      : `Ainda não lemos arquivos ${MERCADO[market].de}: as operações entram pelo “Registrar operação”, na Fase 3.`,
+  semLeitor: (market: AccountMarket) => `Ainda não lemos arquivos ${MERCADO[market].de}: as operações entram pelo “Registrar operação”.`,
   empty: 'Traga o histórico da sua corretora.',
   importShort: 'Importar',
   importAria: (label: string) => `Importar arquivo para ${label}`,
@@ -415,13 +398,11 @@ export const PASSO_I1 = {
   note: 'Cada conta é de um mercado só.',
   hint: 'Escolha o mercado.',
   /**
-   * Under the pills, for a market whose files the app cannot read yet (board `I1.nota`). Fase 3
-   * (D19, D36): «, na Fase 3» goes once the market can register (ADAPTED)
+   * Under the pills, for a market whose files the app cannot read yet (board `I1.nota`). Fase 3 (D19;
+   * 3-4 ended D36): the interim phase name is gone (ADAPTED)
    */
   semLeitor: (market: AccountMarket) =>
-    podeRegistrar(market)
-      ? `Ainda não lemos arquivos ${MERCADO[market].de}: as operações desta conta entram pelo “Registrar operação”.`
-      : `Ainda não lemos arquivos ${MERCADO[market].de}: as operações desta conta entram pelo “Registrar operação”, na Fase 3.`,
+    `Ainda não lemos arquivos ${MERCADO[market].de}: as operações desta conta entram pelo “Registrar operação”.`,
 }
 
 const MESES = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro']
@@ -675,14 +656,11 @@ export const FIM_CONTA = {
   /** The end screen's link (board `temLinkAntes`) or primary button (`temLinkDepois`) */
   registrar: 'Registrar operação',
   /**
-   * Fase 2b, a market without a file reader (board `FM` linhasNovo): no «Importar histórico». Until
-   * the market can register (PR 3-4, D36) the board's interim text with «Fechar»; then the IQ Option
-   * wording with «Registrar operação» as the primary (ADAPTED, D19)
+   * Fase 2b, a market without a file reader (board `FM` linhasNovo): no «Importar histórico». Since
+   * 3-4 (the end of D36) the IQ Option wording, with «Registrar operação» as the primary (ADAPTED,
+   * D19); the board's interim text (the Registrar «arriving» in Phase 3) is gone
    */
-  semLeitor: (market: AccountMarket) =>
-    podeRegistrar(market)
-      ? 'Nada ainda. Registre a primeira operação.'
-      : 'Nada ainda: as operações desta conta entram pelo “Registrar operação”, que chega na Fase 3.',
+  semLeitor: 'Nada ainda. Registre a primeira operação.',
   /** «Ainda não lemos arquivos de Forex. » and what comes later: MetaTrader's own reader, or the CSV mapping */
   semLeitorArquivo: (market: AccountMarket, platform: string | null) =>
     `Ainda não lemos arquivos ${MERCADO[market].de}. ${
