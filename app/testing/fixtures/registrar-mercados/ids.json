@@ -1,0 +1,21 @@
+{
+  "user": "be400f51-69a0-4c22-b760-9be32ad3d2c1",
+  "accounts": {
+    "topOne": "300bee77-df10-4174-bc56-df61c0e50b0a",
+    "ftmo": "3434de2d-2828-43b9-9b21-5c19a23fa22f",
+    "ibkr": "24916314-b68f-47e1-9055-dff69eae3936",
+    "binance": "8c0425ea-c799-4036-b4c0-bb489d054cc3",
+    "clear": "1e9055ca-4837-489c-a2c9-1e08efe0b4c8"
+  },
+  "trades": {
+    "eurusd": "3adbbb38-e32e-4a57-9c06-4cfdf1479557",
+    "usdjpy": "166c857d-a251-4cce-a71c-06903d07a77a",
+    "usdjpyCorrigida": "c9e5b9fe-c79b-44f4-a140-e7231c6807de",
+    "eurgbp": "33cae85d-bebe-49d3-bfc3-f9e8dba8c950",
+    "win": "8445a7f2-3ab8-4a13-b120-fe8265a64345",
+    "aapl": "04d738ad-4430-4454-b2d8-4095591f59c5",
+    "spyCall": "f40b3ab9-9bdb-491d-8e7f-7e78ccf21234",
+    "zn": "2c1a0fa8-e0cd-4b50-977e-c8a918e23ee3",
+    "btc": "c812757b-f866-4439-8f60-71a5378f15ac"
+  }
+}

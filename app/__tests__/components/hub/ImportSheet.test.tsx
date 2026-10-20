@@ -6,9 +6,11 @@ import * as regrasDb from '@/lib/hub/regrasDb'
 import { readImportFile } from '@/lib/domain/import'
 import { useImportSheet, type SheetMode } from '@/components/hub/importar/ImportSheetProvider'
 import { EMPTY_FORM, PassoNovaConta } from '@/components/hub/importar/passos'
+import { toastDoLote } from '@/components/hub/importar/ImportSheet'
 import { PASSO_G } from '@/components/hub/contas/copy'
 import { changedOnlyHere } from '@/hooks/useRegras'
 import type { AccountConfig, RulesConfig, SaveRulesResult } from '@/lib/hub/regras'
+import type { AccountMarket } from '@/lib/domain/markets'
 import { csvFile, fixtureFile, makeAccount, makePreview, renderHub } from '@/testing/hubHarness'
 import { configAntes, configDepois, configMercados, contasMercados, idsDono, idsMercados } from '@/testing/regras'
 import { brt, et } from '@/testing/gate'
@@ -17,6 +19,23 @@ import { brt, et } from '@/testing/gate'
 const SEP = '\u00a0·\u00a0'
 
 jest.mock('@/lib/supabase', () => ({ createDataClient: jest.fn(() => ({})) }))
+
+// Phase 3: the end of account creation opens the Registrar sheet (lane A's): a stand-in that
+// records its props (contract §6.2, C9)
+const mockRegistrarSheet = jest.fn()
+jest.mock('@/components/hub/registrar/RegistrarSheet', () => ({
+  __esModule: true,
+  default: function RegistrarSheetStub(props: { accountId: string | null; tradeId: string | null; onClose: () => void }) {
+    mockRegistrarSheet({ accountId: props.accountId, tradeId: props.tradeId })
+    return (
+      <section role="dialog" aria-label="Registrar operação">
+        <button type="button" onClick={() => props.onClose()}>
+          Fechar registro
+        </button>
+      </section>
+    )
+  },
+}))
 
 jest.mock('@/hooks/useAuth', () => ({
   useAuth: () => ({ user: { id: 'user-1' }, session: { access_token: 'user-jwt' } }),
@@ -164,6 +183,7 @@ beforeEach(() => {
   fetchRulesConfig.mockResolvedValue(configAntes())
   saveRules.mockResolvedValue(savedV1('rev-1'))
   mockAgora.at = new Date('2026-10-19T16:00:00Z')
+  mockRegistrarSheet.mockReset()
 })
 
 describe('ImportSheet · import a file', () => {
@@ -2040,7 +2060,8 @@ describe('ImportSheet · Fase 2b · «Qual mercado?» (i1)', () => {
     ]
     for (const [pill, de] of notes) {
       await userEvent.click(within(group).getByRole('button', { name: pill }))
-      const note = `Ainda não lemos arquivos ${de}: as operações desta conta entram pelo “Registrar operação”, na Fase 3.`
+      // Since 3-4 every market registers (the end of D36): no «, na Fase 3»
+      const note = `Ainda não lemos arquivos ${de}: as operações desta conta entram pelo “Registrar operação”.`
       expect(within(live).getByText(note)).toHaveAttribute('id', 'nota-leitor')
       expect(group).toHaveAttribute('aria-describedby', 'nota-mercado nota-leitor')
       expect(group).toHaveAccessibleDescription(`Cada conta é de um mercado só. ${note}`)
@@ -2349,17 +2370,19 @@ describe('ImportSheet · Fase 2b · «Nova conta de …» (step b) and «{conta}
       window: null,
       version: 'force',
     })
-    // The end screen: where trades will come from, the MetaTrader 5 report, «Fechar»
-    expect(within(dialog).getByText('Nada ainda: as operações desta conta entram pelo “Registrar operação”, que chega na Fase 3.')).toBeInTheDocument()
+    // The end screen: «Registrar operação» as the primary (3-4 ended D36), the MetaTrader 5 report
+    expect(within(dialog).getByText('Nada ainda. Registre a primeira operação.')).toBeInTheDocument()
     expect(
       within(dialog).getByText(
         'Ainda não lemos arquivos de Forex. O relatório do MetaTrader 5 sai em HTML ou PDF e vai precisar de um leitor próprio, que vem depois.',
       ),
     ).toBeInTheDocument()
     expect(within(dialog).queryByRole('button', { name: 'Importar histórico' })).not.toBeInTheDocument()
-    expect(primaryOf(dialog)).toHaveTextContent('Fechar')
+    expect(primaryOf(dialog)).toHaveTextContent('Registrar operação')
     await userEvent.click(primaryOf(dialog))
-    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(mockRegistrarSheet).toHaveBeenLastCalledWith({ accountId: 'nova', tradeId: null })
+    expect(screen.getAllByRole('dialog')).toHaveLength(1)
+    expect(screen.getByRole('dialog', { name: 'Registrar operação' })).toBeInTheDocument()
   })
 
   it('the end screen names the MetaTrader 4 report, and the CSV mapping for other platforms', async () => {
@@ -2372,7 +2395,8 @@ describe('ImportSheet · Fase 2b · «Nova conta de …» (step b) and «{conta}
         'Ainda não lemos arquivos de Forex. O relatório do MetaTrader 4 sai em HTML e vai precisar de um leitor próprio, que vem depois.',
       ),
     ).toBeInTheDocument()
-    await userEvent.click(primaryOf(mt4))
+    // The primary is «Registrar operação» since 3-4: close with the ×
+    await userEvent.click(within(mt4).getByRole('button', { name: 'Fechar' }))
 
     createAccount.mockResolvedValue({ ...ftmo, platform: 'ctrader' })
     await userEvent.click(screen.getByRole('button', { name: 'Abrir' }))
@@ -2590,5 +2614,220 @@ describe('ImportSheet · Fase 2b · an account without a file reader is never a 
     expect(PASSO_G.accountIs('binary')).toBe('A conta escolhida é de binárias.')
     expect(PASSO_G.accountIs('forex')).toBe('A conta escolhida é de Forex.')
     expect(PASSO_G.accountIs('b3')).toBe('A conta escolhida é da B3.')
+  })
+})
+
+describe('ImportSheet · Phase 3 · «Registrar operação» at the end of account creation', () => {
+  const footerNames = (dialog: HTMLElement) =>
+    Array.from(dialog.querySelectorAll('.hub-rodape button')).map((b) => [b.textContent, b.classList.contains('hub-btn--pri')])
+
+  it('Futuros: «Registrar operação» before the primary «Importar histórico»; it opens the Registrar sheet on the new account', async () => {
+    const created = makeAccount({ label: 'Apex A', market: 'futures', platform: 'rithmic', phase: 'avaliacao' })
+    createAccount.mockResolvedValue(created)
+    const dialog = await openSheet({ mode: 'adicionar' })
+    const opener = screen.getByRole('button', { name: 'Abrir', hidden: true })
+    await fillNewFuturesAccount(dialog, 'Apex A')
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Criar Apex A' }))
+
+    expect(await within(dialog).findByRole('heading', { name: 'Apex A criada.' })).toHaveFocus()
+    expect(within(dialog).getByText('Nada ainda. Importe o histórico ou registre a primeira operação.')).toBeInTheDocument()
+    expect(footerNames(dialog)).toEqual([
+      ['Registrar operação', false],
+      ['Importar histórico', true],
+    ])
+
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Registrar operação' }))
+
+    // One sheet at a time: Registrar replaces the import sheet, on the account just created
+    expect(mockRegistrarSheet).toHaveBeenLastCalledWith({ accountId: created.id, tradeId: null })
+    expect(screen.getAllByRole('dialog')).toHaveLength(1)
+    expect(screen.getByRole('dialog', { name: 'Registrar operação' })).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Fechar registro' }))
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    // Focus goes back to what opened the import sheet
+    expect(opener).toHaveFocus()
+  })
+
+  it('IQ Option (no history to export): «Registrar operação» is the only action, primary', async () => {
+    const created = makeAccount({ label: 'IQ', market: 'binary', platform: 'iq', phase: 'pessoal' })
+    createAccount.mockResolvedValue(created)
+    const dialog = await toNewAccountStep('Opções binárias', 'IQ Option', 'IQ')
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Criar IQ' }))
+
+    expect(await within(dialog).findByRole('heading', { name: 'IQ criada.' })).toHaveFocus()
+    expect(within(dialog).getByText('Nada ainda. Registre a primeira operação.')).toBeInTheDocument()
+    expect(footerNames(dialog)).toEqual([['Registrar operação', true]])
+    expect(within(dialog).queryByRole('button', { name: 'Importar histórico' })).not.toBeInTheDocument()
+
+    await userEvent.click(primaryOf(dialog))
+    expect(mockRegistrarSheet).toHaveBeenLastCalledWith({ accountId: created.id, tradeId: null })
+  })
+
+  describe('every new market registers since 3-4 (the end of D36)', () => {
+    it.each([
+      ['Forex e CFDs', 'MetaTrader 5', 'forex', 'mt5', 'de Forex. O relatório do MetaTrader 5 sai em HTML ou PDF e vai precisar de um leitor próprio, que vem depois.'],
+      ['Ações e opções (EUA)', 'Interactive Brokers', 'stocks', 'ibkr', 'de Ações. Depois vem a importação de CSV em que você diz o que é cada coluna.'],
+      ['Cripto', 'Binance', 'crypto', 'binance', 'de Cripto. Depois vem a importação de CSV em que você diz o que é cada coluna.'],
+      ['B3', 'Profit (Nelogica)', 'b3', 'profit', 'da B3. Depois vem a importação de CSV em que você diz o que é cada coluna.'],
+    ])('%s: «Nada ainda. Registre a primeira operação.» and the primary «Registrar operação»', async (pill, platform, market, platformId, arquivo) => {
+      const created = makeAccount({ id: 'nova', label: 'Conta nova', market: market as AccountMarket, platform: platformId, phase: 'pessoal' })
+      createAccount.mockResolvedValue(created)
+      const dialog = await toNewAccountStep(pill, platform, 'Conta nova')
+      const fase = within(dialog).queryByRole('group', { name: 'Fase' })
+      if (fase) await userEvent.click(within(fase).getByRole('button', { name: 'Pessoal' }))
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Criar Conta nova' }))
+
+      expect(await within(dialog).findByRole('heading', { name: 'Conta nova criada.' })).toBeInTheDocument()
+      expect(within(dialog).getByText('Nada ainda. Registre a primeira operação.')).toBeInTheDocument()
+      // Where the files will come from stays
+      expect(within(dialog).getByText(`Ainda não lemos arquivos ${arquivo}`)).toBeInTheDocument()
+      expect(within(dialog).queryByText(/Fase 3/)).not.toBeInTheDocument()
+      expect(footerNames(dialog)).toEqual([['Registrar operação', true]])
+      await userEvent.click(primaryOf(dialog))
+      expect(mockRegistrarSheet).toHaveBeenLastCalledWith({ accountId: 'nova', tradeId: null })
+    })
+
+    it('PASSO_I1.semLeitor: «… entram pelo “Registrar operação”.» without «na Fase 3»', async () => {
+      const dialog = await openSheet({ mode: 'adicionar' })
+      await userEvent.click(within(within(dialog).getByRole('group', { name: 'Qual mercado?' })).getByRole('button', { name: 'B3' }))
+      expect(within(dialog).getByText('Ainda não lemos arquivos da B3: as operações desta conta entram pelo “Registrar operação”.')).toHaveAttribute('id', 'nota-leitor')
+      expect(within(dialog).queryByText(/Fase 3/)).not.toBeInTheDocument()
+    })
+  })
+})
+
+describe('ImportSheet · Phase 3 · a file with trades registered in the app (D29)', () => {
+  /** The preview's count row as read («7 linhas · 3 novas · …») */
+  const contagem = (dialog: HTMLElement) =>
+    (dialog.querySelector('.hub-contagem')?.textContent ?? '').replace(/\s+/g, ' ').replace(/\s*·\s*/g, ' · ').trim()
+
+  it('counts the rows that complete a registered trade in the count row, after «novas» (singular too)', async () => {
+    readFile.mockResolvedValue(fixtureFile('topone_ok'))
+    importPreview.mockResolvedValue(makePreview({ new: 3, duplicate: 1, linked: 2, other_account: 1, rows_total: 7 }))
+    const dialog = await openSheet({ accountId: topOne.id })
+    await chooseFile(dialog)
+    await within(dialog).findByRole('heading', { name: 'Prévia' })
+    expect(contagem(dialog)).toBe('7 linhas · 3 novas · 2 já registradas por você · 1 em outra conta · 1 já estavam (mesmo ID) · 0 com erro')
+  })
+
+  it('a single registered trade: «1 já registrada por você» in the count row', async () => {
+    readFile.mockResolvedValue(fixtureFile('topone_ok'))
+    importPreview.mockResolvedValue(makePreview({ new: 6, linked: 1, rows_total: 7 }))
+    const dialog = await openSheet({ accountId: topOne.id })
+    await chooseFile(dialog)
+    await within(dialog).findByRole('heading', { name: 'Prévia' })
+    expect(contagem(dialog)).toBe('7 linhas · 6 novas · 1 já registrada por você · 0 já estavam · 0 com erro')
+  })
+
+  it('a batch kept only because it completed a registered trade an earlier file linked: the toast says what it did, never «0 operações em …»', async () => {
+    readFile.mockResolvedValue(fixtureFile('topone_ok'))
+    importPreview.mockResolvedValue(makePreview({ new: 0, duplicate: 1, completable: 1, rows_total: 1 }))
+    // supabase/tests/50_phase3.test.sql: inserted 0, completed 1, linked 0, with a batch
+    importCommit.mockResolvedValue({ batch_id: 'batch-11', inserted: 0, duplicate: 1, completed: 1, other_account: 0, linked: 0, errors: [] })
+    const dialog = await openSheet({ accountId: topOne.id })
+    await chooseFile(dialog)
+    await within(dialog).findByRole('heading', { name: 'Prévia' })
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Completar 1 operação' }))
+
+    await within(dialog).findByRole('heading', { name: 'Importação feita' })
+    const toast = toastOf(dialog)
+    expect(toast).toHaveTextContent('1 que já estava ganhou os campos que faltavam.')
+    expect(toast).not.toHaveTextContent('0 operações')
+    expect(within(toast).getByRole('button', { name: 'Desfazer: 1 que já estava ganhou os campos que faltavam.' })).toBeInTheDocument()
+  })
+
+  it('toastDoLote: the inserted trades first; else what it completed and linked', () => {
+    expect(toastDoLote({ inserted: 4, completed: 1, linked: 2 }, 'Top One #1')).toBe('4 operações em Top One #1.')
+    expect(toastDoLote({ inserted: 0, completed: 0, linked: 3 }, 'Top One #1')).toBe('3 já registradas por você foram completadas.')
+    expect(toastDoLote({ inserted: 0, completed: 2, linked: 1 }, 'Top One #1')).toBe(
+      '1 já registrada por você foi completada. 2 que já estavam ganharam os campos que faltavam.',
+    )
+    // Before the migration (no «linked» key)
+    expect(toastDoLote({ inserted: 0, completed: 1 }, 'Top One #1')).toBe('1 que já estava ganhou os campos que faltavam.')
+  })
+
+  it('says how many it completes and how many the file corrects, after the completed ones', async () => {
+    readFile.mockResolvedValue(fixtureFile('topone_ok'))
+    importPreview.mockResolvedValue(makePreview({ new: 3, duplicate: 1, completable: 1, linked: 2, linked_differs: 1, rows_total: 7 }))
+
+    const dialog = await openSheet({ accountId: topOne.id })
+    await chooseFile(dialog)
+
+    await within(dialog).findByRole('heading', { name: 'Prévia' })
+    const completed = within(dialog).getByText(/^1 que já estava ganha os campos que faltavam/)
+    const linked = within(dialog).getByText('2 já registradas por você: o arquivo completa a comissão.')
+    const differs = within(dialog).getByText('1 com preço ou resultado diferente: vale o do arquivo.')
+    const follows = (a: Node, b: Node) => (a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0
+    expect(follows(completed, linked)).toBe(true)
+    expect(follows(linked, differs)).toBe(true)
+    expect(primaryOf(dialog)).toHaveTextContent('Importar 3 operações')
+  })
+
+  it('singular and plural', async () => {
+    readFile.mockResolvedValue(fixtureFile('topone_ok'))
+    importPreview.mockResolvedValue(makePreview({ new: 6, linked: 1, linked_differs: 2, rows_total: 7 }))
+
+    const dialog = await openSheet({ accountId: topOne.id })
+    await chooseFile(dialog)
+
+    await within(dialog).findByRole('heading', { name: 'Prévia' })
+    expect(within(dialog).getByText('1 já registrada por você: o arquivo completa a comissão.')).toBeInTheDocument()
+    expect(within(dialog).getByText('2 com preço ou resultado diferente: vale o do arquivo.')).toBeInTheDocument()
+  })
+
+  it('no line when nothing links (a preview from before the migration has no such keys)', async () => {
+    readFile.mockResolvedValue(fixtureFile('topone_ok'))
+    importPreview.mockResolvedValue(makePreview({ new: 7, rows_total: 7 }))
+
+    const dialog = await openSheet({ accountId: topOne.id })
+    await chooseFile(dialog)
+
+    await within(dialog).findByRole('heading', { name: 'Prévia' })
+    expect(within(dialog).queryByText(/registrada|registradas por você/)).not.toBeInTheDocument()
+    expect(within(dialog).queryByText(/vale o do arquivo/)).not.toBeInTheDocument()
+  })
+
+  it('a file that only completes registered trades is not «Nada novo»: «Completar», the commit, a batch that can be undone', async () => {
+    readFile.mockResolvedValue(fixtureFile('topone_ok'))
+    importPreview.mockResolvedValue(makePreview({ new: 0, duplicate: 0, completable: 0, other_account: 0, linked: 3, rows_total: 3 }))
+    importCommit.mockResolvedValue({ batch_id: 'batch-9', inserted: 0, duplicate: 0, completed: 0, other_account: 0, linked: 3, errors: [] })
+    importUndo.mockResolvedValue({ deleted: 0 })
+
+    const dialog = await openSheet({ accountId: topOne.id })
+    await chooseFile(dialog)
+
+    expect(await within(dialog).findByRole('heading', { name: 'Prévia' })).toHaveFocus()
+    expect(within(dialog).queryByText(/^Nada novo/)).not.toBeInTheDocument()
+    // The count row adds up: the matched rows are neither «novas» nor «já estavam» (lane B review)
+    expect(contagem(dialog)).toBe('3 linhas · 0 novas · 3 já registradas por você · 0 já estavam · 0 com erro')
+    expect(within(dialog).getByText('3 já registradas por você: o arquivo completa a comissão.')).toBeInTheDocument()
+
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Completar 3 operações' }))
+
+    expect(importCommit).toHaveBeenCalledTimes(1)
+    expect(await within(dialog).findByRole('heading', { name: 'Importação feita' })).toHaveFocus()
+    expect(within(dialog).getByText('3 já registradas por você foram completadas.', { selector: '.hub-passo__txt' })).toBeInTheDocument()
+    expect(within(dialog).getByText('Desfazer depois: Personalizar › Suas contas › Importações.')).toBeInTheDocument()
+    // The toast says what the batch did (never «0 operações em Top One.») and undoes it
+    const toast = toastOf(dialog)
+    expect(toast).toHaveTextContent('3 já registradas por você foram completadas.')
+    expect(toast).not.toHaveTextContent('0 operações')
+    await userEvent.click(within(toast).getByRole('button', { name: 'Desfazer: 3 já registradas por você foram completadas.' }))
+    expect(importUndo).toHaveBeenCalledWith(expect.anything(), 'batch-9')
+  })
+
+  it('completes the ones the file fills and the registered ones together: «Completar {n} operações»', async () => {
+    readFile.mockResolvedValue(fixtureFile('topone_ok'))
+    importPreview.mockResolvedValue(makePreview({ new: 0, duplicate: 2, completable: 2, linked: 1, rows_total: 3 }))
+    importCommit.mockResolvedValue({ batch_id: 'batch-10', inserted: 0, duplicate: 2, completed: 2, other_account: 0, linked: 1, errors: [] })
+
+    const dialog = await openSheet({ accountId: topOne.id })
+    await chooseFile(dialog)
+    await within(dialog).findByRole('heading', { name: 'Prévia' })
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Completar 3 operações' }))
+
+    await within(dialog).findByRole('heading', { name: 'Importação feita' })
+    expect(within(dialog).getByText('2 que já estavam ganharam os campos que faltavam.')).toBeInTheDocument()
+    expect(within(dialog).getByText('1 já registrada por você foi completada.', { selector: '.hub-passo__txt' })).toBeInTheDocument()
   })
 })

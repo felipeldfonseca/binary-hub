@@ -1,0 +1,108 @@
+{
+  "gate": {
+    "at": "2026-10-19T13:08:29.459704+00:00",
+    "block": {
+      "state": "nao_avaliado",
+      "reason": "so_futuros"
+    },
+    "desde": "2026-09-19T13:08:29.202782+00:00",
+    "label": "Registrar binary",
+    "limit": {
+      "state": "nao_avaliado",
+      "reason": "sem_limite"
+    },
+    "today": {
+      "trades": 0,
+      "net_usd": 0,
+      "worst_usd": 0
+    },
+    "market": "binary",
+    "status": "liberado",
+    "window": {
+      "next": {
+        "opens_at": "2026-10-20T11:38:00+00:00",
+        "closes_at": "2026-10-20T14:38:00+00:00",
+        "trading_day": "2026-10-20"
+      },
+      "state": "dentro",
+      "reason": null,
+      "current": {
+        "opens_at": "2026-10-19T11:38:00+00:00",
+        "closes_at": "2026-10-19T14:38:00+00:00"
+      },
+      "position": "dentro"
+    },
+    "version": {
+      "id": "512c19c8-ccf8-4a71-ad5a-75019fbfc40e",
+      "origin": "criar",
+      "version_no": 1,
+      "effective_from": "2026-09-19T13:08:29.202782+00:00"
+    },
+    "warnings": [],
+    "desde_day": "2026-09-19",
+    "account_id": "48d1ad50-3795-4c90-b572-9ebffabc1cbf",
+    "changes_at": "2026-10-19T14:38:00+00:00",
+    "state_rule": {
+      "state": "nao_avaliado",
+      "reason": "so_futuros"
+    },
+    "trading_day": "2026-10-19",
+    "checks_evaluated": [
+      "janela"
+    ]
+  },
+  "plan": {
+    "breaks": [],
+    "verdict": "no_plano",
+    "checks_evaluated": [
+      "janela"
+    ]
+  },
+  "context": {
+    "rule_ok": null,
+    "in_block": null,
+    "warnings": [],
+    "in_window": true,
+    "after_limit": null,
+    "gate_status": "liberado",
+    "state_choice": null,
+    "checks_evaluated": [
+      "janela"
+    ],
+    "day_pnl_at_entry": null,
+    "day_worst_at_entry": null
+  },
+  "dry_run": true,
+  "preview": {
+    "risk": 20,
+    "if_win": 17.6,
+    "if_loss": -20
+  },
+  "similar": [],
+  "version": {
+    "id": "512c19c8-ccf8-4a71-ad5a-75019fbfc40e",
+    "version_no": 1
+  },
+  "entry_at": "2026-10-19T13:08:29.459704+00:00",
+  "repeated": false,
+  "expires_at": "2026-10-19T13:10:00+00:00",
+  "instrument": {
+    "key": "EURUSD",
+    "pip": null,
+    "pnl": "outcome",
+    "mult": null,
+    "tick": null,
+    "costs": false,
+    "known": false,
+    "stops": null,
+    "qty_dp": null,
+    "correct": false,
+    "price_dp": null,
+    "asset_type": "binary_option"
+  },
+  "limit_room": null,
+  "server_now": "2026-10-19T13:08:29.459704+00:00",
+  "stop_price": null,
+  "trading_day": "2026-10-19",
+  "target_price": null
+}

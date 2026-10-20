@@ -1,0 +1,128 @@
+{
+  "gate": {
+    "at": "2026-10-15T13:06:00+00:00",
+    "block": {
+      "state": "nao_avaliado",
+      "reason": "so_futuros"
+    },
+    "desde": "2026-10-13T13:00:05.70898+00:00",
+    "label": "Clear",
+    "limit": {
+      "usd": 500,
+      "mode": "conta",
+      "near": false,
+      "used": 0.36,
+      "state": "ok",
+      "hit_at": null,
+      "reason": null,
+      "trades": 1,
+      "net_usd": -180,
+      "at_limit": "encerrar",
+      "worst_usd": -180
+    },
+    "today": {
+      "trades": 1,
+      "net_usd": -180,
+      "worst_usd": -180
+    },
+    "market": "b3",
+    "status": "liberado",
+    "window": {
+      "next": {
+        "opens_at": "2026-10-16T13:00:00+00:00",
+        "closes_at": "2026-10-16T14:00:00+00:00",
+        "trading_day": "2026-10-16"
+      },
+      "state": "dentro",
+      "reason": null,
+      "current": {
+        "opens_at": "2026-10-15T13:00:00+00:00",
+        "closes_at": "2026-10-15T14:00:00+00:00"
+      },
+      "position": "dentro"
+    },
+    "version": {
+      "id": "42913169-a1df-4e97-b071-e62c992b2a3f",
+      "origin": "criar",
+      "version_no": 1,
+      "effective_from": "2026-10-13T13:00:05.70898+00:00"
+    },
+    "warnings": [],
+    "desde_day": "2026-10-13",
+    "account_id": "1e9055ca-4837-489c-a2c9-1e08efe0b4c8",
+    "changes_at": "2026-10-15T14:00:00+00:00",
+    "state_rule": {
+      "state": "nao_avaliado",
+      "reason": "so_futuros"
+    },
+    "trading_day": "2026-10-15",
+    "checks_evaluated": [
+      "janela",
+      "limite"
+    ]
+  },
+  "plan": {
+    "breaks": [],
+    "verdict": "no_plano",
+    "checks_evaluated": [
+      "janela",
+      "limite"
+    ]
+  },
+  "context": {
+    "rule_ok": null,
+    "in_block": null,
+    "warnings": [],
+    "in_window": true,
+    "after_limit": false,
+    "gate_status": "liberado",
+    "state_choice": null,
+    "checks_evaluated": [
+      "janela",
+      "limite"
+    ],
+    "day_pnl_at_entry": -180,
+    "day_worst_at_entry": -180
+  },
+  "dry_run": true,
+  "preview": {
+    "risk": 360,
+    "reward": 120,
+    "stop_points": 600,
+    "target_points": 200
+  },
+  "similar": [],
+  "version": {
+    "id": "42913169-a1df-4e97-b071-e62c992b2a3f",
+    "version_no": 1
+  },
+  "entry_at": "2026-10-15T13:06:00+00:00",
+  "repeated": false,
+  "expires_at": null,
+  "instrument": {
+    "key": "WIN",
+    "pip": null,
+    "pnl": "prices",
+    "mult": "0.20",
+    "tick": "5",
+    "costs": true,
+    "known": true,
+    "stops": "pts",
+    "qty_dp": 0,
+    "correct": true,
+    "price_dp": 8,
+    "asset_type": "futures"
+  },
+  "limit_room": {
+    "usd": 500,
+    "left": 320,
+    "risk": 360,
+    "above": true,
+    "net_usd": -180,
+    "reached": false
+  },
+  "server_now": "2026-10-15T13:20:05.359412+00:00",
+  "stop_price": 131850,
+  "trading_day": "2026-10-15",
+  "target_price": 131050
+}

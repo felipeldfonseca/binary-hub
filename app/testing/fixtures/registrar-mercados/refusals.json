@@ -1,0 +1,38 @@
+{
+  "eurgbp-sem-pnl": {
+    "code": "pnl_required",
+    "field": "pnl"
+  },
+  "xauusd-sem-pnl": {
+    "code": "pnl_required",
+    "field": "pnl"
+  },
+  "petr4-5dp": {
+    "code": "bad_price",
+    "field": "entry_price"
+  },
+  "bgix26-sem-pnl": {
+    "code": "pnl_required",
+    "field": "pnl"
+  },
+  "aapl-stop-acima": {
+    "code": "bad_stop",
+    "field": "stop"
+  },
+  "spy-vencida": {
+    "code": "bad_option",
+    "field": "option.expires_on"
+  },
+  "zn-pontos": {
+    "code": "bad_stop",
+    "field": "stop"
+  },
+  "zn-sem-pnl": {
+    "code": "pnl_required",
+    "field": "pnl"
+  },
+  "zn-custos": {
+    "code": "not_for_market",
+    "field": "costs"
+  }
+}

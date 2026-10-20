@@ -1014,3 +1014,119 @@ describe('save, discard and the bar', () => {
     expect(leave()).toBe(false)
   })
 })
+
+describe('Preferências · «Avisar ao chegar em 80% do limite do dia» (Phase 3)', () => {
+  const fetchPreferences = contasDb.fetchPreferences as jest.MockedFunction<typeof contasDb.fetchPreferences>
+  const mergePreferences = regrasDb.mergePreferences as jest.MockedFunction<typeof regrasDb.mergePreferences>
+  const chave = () => screen.findByRole('switch', { name: 'Avisar ao chegar em 80% do limite do dia' })
+  // The amounts keep their symbol with a no-break space (dinheiroCompacto)
+  const LIMITES = 'Com os limites atuais: Top One #1 US$\u00a0320, FTMO US$\u00a0800 e Clear R$\u00a0400 de perda.'
+
+  beforeEach(() => {
+    fetchAccounts.mockResolvedValue(contasMercados())
+    fetchRulesConfig.mockResolvedValue(configMercados())
+    fetchTradesSince.mockResolvedValue({})
+    fetchPreferences.mockReset().mockResolvedValue({ theme: 'escuro' })
+    mergePreferences.mockReset().mockImplementation(async (_db, patch) => ({ theme: 'escuro', ...patch }) as contasDb.HubPreferences)
+  })
+
+  it('is off by default, names the limits at 80 %, and saves at once with merge_preferences (no save bar)', async () => {
+    renderPage()
+    await ready()
+    const sw = await chave()
+    await waitFor(() => expect(sw).not.toHaveAttribute('aria-disabled'))
+    expect(sw).toHaveAttribute('aria-checked', 'false')
+    expect(sw).toHaveAccessibleDescription(LIMITES)
+
+    await userEvent.click(sw)
+
+    expect(sw).toHaveAttribute('aria-checked', 'true')
+    await waitFor(() => expect(mergePreferences).toHaveBeenCalledWith(expect.anything(), { alerts: { limit_80: true } }))
+    expect(mergePreferences).toHaveBeenCalledTimes(1)
+    expect(saveRules).not.toHaveBeenCalled()
+    expect(barra()).toBeNull()
+    expect(sw).toHaveAttribute('aria-checked', 'true')
+
+    await userEvent.click(sw)
+    await waitFor(() => expect(mergePreferences).toHaveBeenLastCalledWith(expect.anything(), { alerts: { limit_80: false } }))
+    expect(sw).toHaveAttribute('aria-checked', 'false')
+  })
+
+  it('names only the active accounts: never an archived or an example one', async () => {
+    const config = configMercados()
+    fetchRulesConfig.mockResolvedValue({
+      ...config,
+      accounts: config.accounts.map((a) =>
+        a.id === idsMercados().ftmo ? { ...a, archivedAt: '2026-10-01T00:00:00Z' } : a.id === idsMercados().clear ? { ...a, isExample: true } : a,
+      ),
+    })
+    renderPage()
+    await ready()
+    expect(await chave()).toHaveAccessibleDescription('Com os limites atuais: Top One #1 US$\u00a0320 de perda.')
+  })
+
+  it('follows the limits as «Suas regras» shows them, before they are saved', async () => {
+    renderPage()
+    await ready()
+    const sw = await chave()
+    expect(sw).toHaveAccessibleDescription(LIMITES)
+
+    await mudarLimite('500')
+
+    expect(sw).toHaveAccessibleDescription('Com os limites atuais: Top One #1 US$\u00a0400, FTMO US$\u00a0800 e Clear R$\u00a0400 de perda.')
+    expect(saveRules).not.toHaveBeenCalled()
+  })
+
+  it('starts on when the profile has it on, and waits for the profile before it can be used', async () => {
+    let answer!: (p: contasDb.HubPreferences) => void
+    fetchPreferences.mockReturnValue(new Promise((r) => (answer = r)))
+    renderPage()
+    const sw = await chave()
+    expect(sw).toHaveAttribute('aria-disabled', 'true')
+    await userEvent.click(sw)
+    expect(mergePreferences).not.toHaveBeenCalled()
+
+    await act(async () => answer({ alerts: { limit_80: true } }))
+
+    await waitFor(() => expect(sw).not.toHaveAttribute('aria-disabled'))
+    expect(sw).toHaveAttribute('aria-checked', 'true')
+  })
+
+  it('a failed save puts the switch back and says so; the next tap tries again', async () => {
+    mergePreferences.mockRejectedValueOnce(new regrasDb.RegrasDataError('network'))
+    renderPage()
+    await ready()
+    const sw = await chave()
+    await waitFor(() => expect(sw).not.toHaveAttribute('aria-disabled'))
+
+    await userEvent.click(sw)
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Não foi possível salvar. Tente de novo.')
+    expect(sw).toHaveAttribute('aria-checked', 'false')
+
+    await userEvent.click(sw)
+    await waitFor(() => expect(screen.queryByText('Não foi possível salvar. Tente de novo.')).not.toBeInTheDocument())
+    await waitFor(() => expect(mergePreferences).toHaveBeenCalledTimes(2))
+    expect(sw).toHaveAttribute('aria-checked', 'true')
+  })
+
+  it('a second tap while the first save runs is saved after it: the last position wins', async () => {
+    const first = deferred<contasDb.HubPreferences>()
+    mergePreferences.mockReturnValueOnce(first.promise)
+    renderPage()
+    await ready()
+    const sw = await chave()
+    await waitFor(() => expect(sw).not.toHaveAttribute('aria-disabled'))
+
+    await userEvent.click(sw)
+    await userEvent.click(sw)
+    expect(sw).toHaveAttribute('aria-checked', 'false')
+    expect(mergePreferences).toHaveBeenCalledTimes(1)
+
+    await act(async () => first.resolve({ theme: 'escuro', alerts: { limit_80: true } }))
+
+    await waitFor(() => expect(mergePreferences).toHaveBeenCalledTimes(2))
+    expect(mergePreferences).toHaveBeenLastCalledWith(expect.anything(), { alerts: { limit_80: false } })
+    await waitFor(() => expect(sw).toHaveAttribute('aria-checked', 'false'))
+  })
+})

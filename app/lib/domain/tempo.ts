@@ -464,3 +464,59 @@ export function formatHhMm(minuteOfDay: number): string {
   }
   return `${pad(Math.floor(minuteOfDay / 60))}:${pad(minuteOfDay % 60)}`;
 }
+
+// ---------------------------------------------------------------------------------------------
+// An "HH:MM" typed on a clock, as the instant it names (Phase 3: the Registrar's hours)
+// ---------------------------------------------------------------------------------------------
+
+function hmMinute(hm: string): number {
+  const m = parseHhMm(hm);
+  if (m === null) throw new RangeError('Invalid time');
+  return m;
+}
+
+const TWELVE_HOURS_MS = 12 * 60 * 60 * 1000;
+
+/** The current minute on a clock as "HH:MM" (Postgres to_char(at at time zone tz, 'HH24:MI')) */
+export function hmOn(at: Date, tz: string): string {
+  return formatHhMm(utcToLocal(at, tz).minuteOfDay);
+}
+
+/**
+ * An "HH:MM" on `tz`'s clock as the instant the trader means near `at` (SQL trade_hm_resolve):
+ * today's when it is not in the future; today's too when it is less than 12 hours ahead, so the
+ * caller can say "não pode ser depois de agora"; otherwise yesterday's (23:58 typed at 00:03 is
+ * yesterday's). Wall clocks follow localToUtc (a skipped time moves forward, a repeated one takes
+ * the later occurrence), as `(date + time) at time zone tz` does.
+ */
+export function resolveLocalHm(hm: string, tz: string, at: Date): Date {
+  const minute = hmMinute(hm);
+  const today = utcToLocal(at, tz).date;
+  const c0 = wallClock(today, minute, tz);
+  if (c0.getTime() <= at.getTime() || c0.getTime() - at.getTime() < TWELVE_HOURS_MS) return c0;
+  return wallClock(addDays(today, -1), minute, tz);
+}
+
+/**
+ * The instant of an "HH:MM" on `tz`'s clock that belongs to trading day `day` (SQL
+ * trade_local_in_day): the latest of that time on the day before, the day and the day after
+ * whose trading day (`dayOf`, the account's compute_trading_day) is `day`; null when none is.
+ * Futures: 18:30 ET belongs to the next day's trading day.
+ */
+export function localHmInTradingDay(day: string, hm: string, tz: string, dayOf: (instant: Date) => string): Date | null {
+  const minute = hmMinute(hm);
+  let best: Date | null = null;
+  for (let k = -1; k <= 1; k++) {
+    const c = wallClock(addDays(day, k), minute, tz);
+    if (dayOf(c) === day && (best === null || c.getTime() > best.getTime())) best = c;
+  }
+  return best;
+}
+
+/** The first instant at or after `from` with this "HH:MM" on `tz`'s clock (SQL trade_exit_after) */
+export function firstLocalHmAtOrAfter(from: Date, hm: string, tz: string): Date {
+  const minute = hmMinute(hm);
+  const date = utcToLocal(from, tz).date;
+  const c0 = wallClock(date, minute, tz);
+  return c0.getTime() >= from.getTime() ? c0 : wallClock(addDays(date, 1), minute, tz);
+}

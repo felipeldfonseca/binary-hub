@@ -362,7 +362,8 @@ export const VERSAO = {
   antes: (d: string) => `Antes de ${d}: Histórico importado${SEP}só resultado.`,
   analises: 'As Análises contam a partir daqui.',
   nenhuma: 'Nenhuma versão salva',
-  ateSalvar: `Até salvar, as operações ficam em “Histórico importado${SEP}só resultado”.`,
+  // ADAPTED (Fase 3, D18): the Registrar asks for the rules before registering on an account without a version
+  ateSalvar: `Até salvar, as operações importadas ficam em “Histórico importado${SEP}só resultado”, e o “Registrar operação” pede as regras antes.`,
   comecar: 'Começar as regras hoje', // NEW (personalizar.md P12)
   desde: (d: string) => `desde ${d}`,
   hoje: ' (hoje)',
@@ -413,7 +414,7 @@ export const CALENDARIO_NOME: Record<CalendarCode, string> = {
 }
 
 // ------------------------------------------------------------------------------------------------
-// «Preferências» (#preferencias): Tema and Horários na tela only in Phase 2
+// «Preferências» (#preferencias): Tema and Horários na tela (Phase 2); the 80 % switch (Phase 3, D9)
 // ------------------------------------------------------------------------------------------------
 
 export const PREFERENCIAS = {
@@ -424,6 +425,13 @@ export const PREFERENCIAS = {
   escuro: 'Escuro',
   horarios: 'Horários na tela',
   horariosNota: 'Agenda, sessões e registros. Janelas e leituras usam o relógio da janela.',
+  // Phase 3 (D9; board Personalizar l.690, script `avisoLimiteTexto` l.2351). The two other «Avisar …»
+  // switches of the board wait for Phase 5.
+  aviso80: 'Avisar ao chegar em 80% do limite do dia',
+  /** «Com os limites atuais: Top One #1 US$ 320, FTMO US$ 800 e Clear R$ 400 de perda.» (each item «{conta} {80 %}») */
+  aviso80Limites: (itens: readonly string[]) => `Com os limites atuais: ${lista(itens)} de perda.`,
+  aviso80SemLimite: 'Nenhuma conta tem limite do dia.',
+  aviso80Erro: 'Não foi possível salvar. Tente de novo.', // NEW (the switch went back)
 }
 
 export const HORARIOS_OPCOES: readonly { valor: DisplayTz; texto: string }[] = [

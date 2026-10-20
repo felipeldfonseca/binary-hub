@@ -167,6 +167,18 @@ describe('ebinexExit: Vela opening + one candle', () => {
     expect(ebinexExit(br('2026-03-16T20:40:40'), '20:45', 300)).toBe('2026-03-16T20:50:00');
   });
 
+  // The owner's model (2026-10-19): the order waits for the next candle of its timeframe and runs
+  // that whole candle. trade_expiry in the database gives the same ends (50_phase3.test.sql).
+  it.each([
+    ['M1 at 20:10:30 runs 20:11–20:12', '2026-10-15T20:10:30', '20:11', 60, '2026-10-15T20:12:00'],
+    ['M5 at 20:13 runs 20:15–20:20', '2026-10-15T20:13:20', '20:15', 300, '2026-10-15T20:20:00'],
+    ['M5 at 20:14:30 still runs 20:15–20:20', '2026-10-15T20:14:30', '20:15', 300, '2026-10-15T20:20:00'],
+    ['M15 at 20:13 runs 20:15–20:30', '2026-10-15T20:13:40', '20:15', 900, '2026-10-15T20:30:00'],
+    ['M15 at 20:59:50 runs 21:00–21:15', '2026-10-15T20:59:50', '21:00', 900, '2026-10-15T21:15:00'],
+  ])('%s', (_label, entry, vela, candle, exit) => {
+    expect(ebinexExit(br(entry), vela, candle)).toBe(exit);
+  });
+
   it('ISO UTC row, Vela on the Brasília clock: matched by minute of the hour', () => {
     expect(ebinexExit(utc('2025-08-12T23:41:57.318'), '20:42', 60)).toBe('2025-08-12T23:43:00');
   });

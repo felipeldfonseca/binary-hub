@@ -1,0 +1,610 @@
+/*
+ * Phase 3 · lane A: the «Registrar operação» sheet (RegistrarOperacao.dc.html v57). Every rule is
+ * scoped to .hub. The frame (.hub-folha, .hub-veu, .hub-ind, .hub-passo, .hub-rodape), the pills,
+ * fields, info buttons and blocks come from hub.css; these are the board's pieces of this sheet.
+ * Contrast (Phase 2 measurement): nothing sits on --surface over --surface in claro; the sheet is on
+ * --bg.
+ */
+
+/* The step's groups and rows */
+.hub .hub-reg-grupo {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+.hub .hub-reg-cab {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  min-width: 0;
+}
+.hub .hub-reg-cab--inicio {
+  justify-content: flex-start;
+}
+/* RO v55: a little room under the «Expiração» ⓘ, so a tap on the top edge of «5 min» is not the ⓘ */
+.hub .hub-reg-grupo > .hub-reg-cab {
+  margin-bottom: 4px;
+}
+.hub .hub-reg-col {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.hub .hub-reg-txt {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  text-wrap: pretty;
+}
+.hub .hub-reg-st {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  text-wrap: pretty;
+}
+
+/* Errors in this sheet are the board's red (RO `.erro`) */
+.hub .hub-reg .hub-erro,
+.hub .hub-reg-erro {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--red);
+  text-wrap: pretty;
+}
+.hub .hub-reg .hub-entrada[aria-invalid='true'] {
+  border-color: var(--red);
+  box-shadow: 0 0 0 1px var(--red);
+}
+.hub .hub-reg .hub-entrada--mono {
+  font-variant-numeric: tabular-nums;
+}
+
+/* A disabled pill (aria-disabled, still focusable): dashed, muted (RO `.pill[aria-disabled]`) */
+.hub .hub-reg .hub-pill[aria-disabled='true'],
+.hub .hub-reg .hub-pill[aria-disabled='true']:focus-visible {
+  border-style: dashed;
+  color: var(--text-2);
+  cursor: not-allowed;
+}
+/* Pressed wins over disabled (RO: the pressed pill is `!important`): «Ganho» chosen, then an entry
+   hour that has not expired yet keeps it pressed and readable (#26301F on mint) */
+.hub .hub-reg .hub-pill[aria-pressed='true'][aria-disabled='true'],
+.hub .hub-reg .hub-pill[aria-pressed='true'][aria-disabled='true']:focus-visible {
+  border-color: var(--mint);
+  color: #26301f;
+}
+.hub .hub-reg .hub-btn[aria-disabled='true'],
+.hub .hub-reg .hub-btn[aria-disabled='true']:focus-visible {
+  opacity: 1;
+  border-style: dashed;
+  color: var(--text-2);
+  cursor: not-allowed;
+}
+.hub .hub-reg .hub-btn--pri[aria-disabled='true'],
+.hub .hub-reg .hub-btn--pri[aria-disabled='true']:focus-visible {
+  opacity: 0.6;
+  border-style: solid;
+  color: #26301f;
+}
+.hub .hub-reg .hub-pill {
+  min-width: 44px;
+}
+/* «Contratos» (board: min-width 52): as specific as the rule above, and after it */
+.hub .hub-reg .hub-reg-pill-q {
+  min-width: 52px;
+}
+.hub .hub-reg-auto {
+  align-self: flex-start;
+}
+
+/* «Dia»: the pills and «Outro dia» side by side */
+.hub .hub-reg-dia {
+  display: flex;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+}
+
+/* The context block: account, «Posso operar hoje?», «Limite do dia» */
+.hub .hub-reg-contexto {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: var(--inset);
+}
+.hub .hub-reg-ctx-linha {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  min-width: 0;
+  font-size: 13px;
+}
+.hub .hub-reg-rot,
+.hub .hub-reg-muted {
+  color: var(--text-2);
+}
+.hub .hub-reg-ponto {
+  display: inline-block;
+  flex: 0 0 auto;
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+}
+.hub .hub-reg-chip-botao {
+  min-height: 44px;
+  padding: 0 14px;
+  border: 1px solid var(--neutral-border);
+  color: var(--text);
+  font-family: inherit;
+  cursor: pointer;
+}
+.hub .hub-reg-menu-conta {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px 14px;
+  border-radius: 16px;
+  border: 1px solid var(--neutral-border);
+  background: var(--bg);
+}
+.hub .hub-reg-menu-conta .hub-pill {
+  text-align: left;
+}
+.hub .hub-reg-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 4px;
+  border: 0;
+  background: transparent;
+  color: var(--mint);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+.hub .hub-reg-link--perigo {
+  color: var(--red);
+}
+
+/* 3-4: «Buscar ativo / par / moeda» (RO l.340: 280 px, the whole width below that), the short fields
+   (RO: «Quantos …», «Quantidade», «Resultado, US$», «Custos, US$»: 200 px) and the estimate note
+   under the result line (RO l.411) */
+.hub .hub-reg .hub-reg-busca {
+  max-width: 280px;
+  -webkit-appearance: none;
+  appearance: none;
+}
+.hub .hub-reg .hub-reg-curto {
+  max-width: 200px;
+}
+.hub .hub-reg-busca-campo {
+  margin-top: 4px;
+}
+.hub .hub-reg-nota-est {
+  margin-top: -10px;
+}
+
+/* The result line and «Corrigir» / «Usar o calculado» (RO `.linha-i`, l.99): the link drops under a
+   line it does not fit beside, never squeezing either (hub.css's .hub-linha-i is shared: not there) */
+.hub .hub-reg .hub-linha-i {
+  flex-wrap: wrap;
+  gap: 0 10px;
+}
+
+/* «Stop e alvo» and «Stake/Payout» keep two columns on narrow phones (RO `campos2 sempre`) */
+@media (max-width: 420px) {
+  .hub .hub-reg-sempre {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* «Se o stop for atingido, o dia passa do limite…» and step 3's banner (RO `.aviso-lim`) */
+.hub .hub-reg-aviso-lim {
+  margin: 4px 0 0;
+  padding: 12px 14px;
+  border-radius: 14px;
+  border: 1px solid var(--amber-border);
+  background: var(--amber-bg);
+  color: var(--amber);
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.5;
+  text-wrap: pretty;
+}
+.hub .hub-reg-aviso-lim--atingido {
+  border-color: var(--red-border);
+  background: var(--red-bg);
+  color: var(--red);
+}
+
+/* The plan: «No plano», «● fora da janela», «—» */
+.hub .hub-reg-plano-linha {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+  font-size: 13px;
+}
+.hub .hub-reg-marca {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+}
+.hub .hub-reg-marca--fora {
+  border: 1px solid var(--amber-border);
+  background: var(--amber-bg);
+  color: var(--amber);
+}
+.hub .hub-reg-marca--ok {
+  border: 1px solid var(--mint-border);
+  color: var(--mint);
+}
+.hub .hub-reg-marca--nada {
+  border: 1px solid var(--neutral-border);
+  color: var(--text-2);
+}
+
+/* The ⓘ on the context block's inset and on the setup card's mint: full text colour (the muted one
+   is 4,2:1 on the mint card in claro) */
+.hub .hub-reg-contexto .hub-info:not([aria-expanded='true']),
+.hub .hub-reg-toque .hub-info:not([aria-expanded='true']) {
+  color: var(--text);
+}
+
+/* «Como está o setup?»: the card to tap (mint), neutral once the result is known */
+.hub .hub-reg-toque {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 16px;
+  border-radius: 16px;
+  border: 1px solid var(--mint-border);
+  background: var(--mint-bg);
+}
+.hub .hub-reg-toque--depois {
+  border-color: var(--neutral-border);
+  background: var(--surface);
+}
+.hub .hub-reg-toque .hub-reg-cab--inicio {
+  flex-wrap: nowrap;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+.hub .hub-reg-toque-tit {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text);
+}
+.hub .hub-reg-abc {
+  gap: 8px;
+}
+.hub .hub-reg-abc .hub-pill {
+  min-width: 60px;
+  min-height: 52px;
+  justify-content: center;
+  text-align: center;
+  font-size: 18px;
+}
+.hub .hub-reg-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px 14px 14px;
+  border-radius: 14px;
+  border: 1px dashed var(--neutral-border);
+}
+
+/* The time of a mark: «às 10:12 · antes da saída» */
+.hub .hub-reg-tempo {
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start;
+  padding: 2px 9px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  text-wrap: pretty;
+}
+.hub .hub-reg-tempo--antes {
+  border: 1px solid var(--mint-border);
+  color: var(--mint);
+}
+.hub .hub-reg-tempo--depois {
+  border: 1px solid var(--neutral-border);
+  color: var(--text-2);
+}
+.hub .hub-reg-tempo--fraco {
+  border: 1px dashed var(--text-2);
+  color: var(--text-2);
+}
+.hub .hub-reg-toque .hub-reg-tempo--fraco {
+  color: var(--text);
+}
+
+/* D30: «Esta operação parece já ter vindo do arquivo…» */
+.hub .hub-reg-amber {
+  margin: 0;
+  color: var(--amber);
+  font-weight: 700;
+  line-height: 1.5;
+}
+
+/* Step 2: the summary, the marks, «Desfazer entrada» */
+.hub .hub-reg-resumo {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: var(--inset);
+  font-size: 13px;
+}
+.hub .hub-reg-resumo b {
+  font-size: 14px;
+}
+.hub .hub-reg-lista-marcas {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.hub .hub-reg-lista-marcas li {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 13px;
+}
+.hub .hub-reg-hist {
+  font-size: 12px;
+  color: var(--text-2);
+}
+.hub .hub-reg-sub-rot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.hub .hub-reg-desfazer {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--border);
+}
+.hub .hub-reg-confirma {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  border: 1px solid var(--red-border);
+  background: var(--red-bg);
+}
+
+/* Step 3: the result */
+.hub .hub-reg-resultado {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 14px 16px;
+  border-radius: 16px;
+  background: var(--inset);
+}
+.hub .hub-reg-res-num {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 28px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+/* «Operações abertas» */
+.hub .hub-reg-escolha {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.hub .hub-reg-escolha li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  padding: 10px 12px 10px 14px;
+  border-radius: 14px;
+  background: var(--inset);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+/* «Imagens e nota» */
+.hub .hub-reg-sobre {
+  border-color: var(--mint);
+  box-shadow: inset 0 0 0 1px var(--mint);
+}
+.hub .hub-reg-zona {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  min-width: 0;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px dashed var(--field-border);
+  background: var(--inset);
+}
+.hub .hub-reg-zona:focus {
+  outline: none;
+  border-style: solid;
+  border-color: var(--mint);
+}
+.hub .hub-reg-zona:focus-visible {
+  outline: 2px solid var(--mint);
+  outline-offset: 2px;
+}
+.hub .hub-reg-zona.hub-reg-sobre {
+  border-style: solid;
+}
+.hub .hub-reg-minis {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.hub .hub-reg-mini {
+  display: grid;
+  grid-template-columns: 120px minmax(0, 1fr);
+  align-items: start;
+  gap: 4px 12px;
+  min-width: 0;
+}
+.hub .hub-reg-mini > .hub-reg-mini-img {
+  grid-row: 1 / span 3;
+}
+.hub .hub-reg-mini-img {
+  display: block;
+  width: 120px;
+  height: 80px;
+  object-fit: cover;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--inset);
+  box-sizing: border-box;
+}
+.hub .hub-reg-mini-img--res {
+  width: 72px;
+  height: 48px;
+  border-radius: 8px;
+}
+.hub .hub-reg-mini-vazia {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  color: var(--text-2);
+}
+.hub .hub-reg-mini-nome {
+  max-width: 100%;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+.hub .hub-reg-mini-info {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 6px;
+  font-size: 12px;
+  color: var(--text-2);
+}
+.hub .hub-reg-mini .hub-btn {
+  justify-self: start;
+  padding: 0 12px;
+}
+.hub .hub-reg-area {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--field-border);
+  background: var(--inset);
+  color: var(--text);
+  font-family: inherit;
+  font-size: 14px;
+  line-height: 1.45;
+  box-sizing: border-box;
+  resize: vertical;
+}
+.hub .hub-reg-area::placeholder {
+  color: var(--text-2);
+  opacity: 1;
+}
+.hub .hub-reg-contador {
+  align-self: flex-end;
+  font-variant-numeric: tabular-nums;
+}
+.hub .hub-reg-minis-res {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.hub .hub-reg-nota-res {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* The footer and the note under it */
+.hub .hub-reg-rodape {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.hub .hub-reg-naoenvia {
+  margin-top: -8px;
+}
+
+/* Phones: the sheet is the whole screen (hub.css); the footer stays at the bottom (D13) */
+@media (max-width: 640px) {
+  /* What the focus or scrollIntoView shows stays above the sticky footer (WCAG 2.4.11): its height
+     comes from the footer itself (Rodape → --reg-rodape-h), with room for two rows of buttons before */
+  .hub .hub-folha.hub-reg {
+    scroll-padding-bottom: calc(var(--reg-rodape-h, 128px) + 12px);
+  }
+  .hub .hub-reg .hub-reg-rodape {
+    position: sticky;
+    /* Sticky offsets count from inside the sheet's 28px bottom padding: reach the screen's edge */
+    bottom: -28px;
+    z-index: 1;
+    margin: 0 -16px;
+    padding: 0 16px calc(12px + env(safe-area-inset-bottom));
+    background: var(--bg);
+  }
+  .hub[data-tema='escuro'] .hub-reg .hub-reg-rodape {
+    background: #1e2123;
+  }
+  .hub .hub-reg .hub-reg-naoenvia {
+    margin-top: 0;
+  }
+  /* iOS zooms into fields under 16px */
+  .hub .hub-reg .hub-entrada,
+  .hub .hub-reg .hub-reg-area {
+    font-size: 16px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hub .hub-reg .hub-seta {
+    transition: none;
+  }
+}

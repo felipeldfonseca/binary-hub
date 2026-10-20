@@ -1,0 +1,62 @@
+[
+  {
+    "source": "live",
+    "symbol": "MGC",
+    "quantity": 1,
+    "direction": "short",
+    "entry_time": "2026-10-22T14:24:04.855863+00:00",
+    "stake_amount": null,
+    "payout_percent": null,
+    "duration_seconds": null
+  },
+  {
+    "source": "live",
+    "symbol": "MES",
+    "quantity": 2,
+    "direction": "long",
+    "entry_time": "2026-10-22T14:12:04.826542+00:00",
+    "stake_amount": null,
+    "payout_percent": null,
+    "duration_seconds": null
+  },
+  {
+    "source": "live",
+    "symbol": "MNQ",
+    "quantity": 2,
+    "direction": "short",
+    "entry_time": "2026-10-22T14:01:04.754123+00:00",
+    "stake_amount": null,
+    "payout_percent": null,
+    "duration_seconds": null
+  },
+  {
+    "source": "live",
+    "symbol": "MNQ",
+    "quantity": 1,
+    "direction": "long",
+    "entry_time": "2026-10-21T14:52:04.678817+00:00",
+    "stake_amount": null,
+    "payout_percent": null,
+    "duration_seconds": null
+  },
+  {
+    "source": "import",
+    "symbol": "MNQZ6",
+    "quantity": 1,
+    "direction": "short",
+    "entry_time": "2026-10-15T14:31:00+00:00",
+    "stake_amount": null,
+    "payout_percent": null,
+    "duration_seconds": null
+  },
+  {
+    "source": "import",
+    "symbol": "MESZ6",
+    "quantity": 2,
+    "direction": "long",
+    "entry_time": "2026-10-15T14:12:30+00:00",
+    "stake_amount": null,
+    "payout_percent": null,
+    "duration_seconds": null
+  }
+]

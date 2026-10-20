@@ -113,18 +113,25 @@ export const PERSONALIZAR = {
   sub: 'Ajuste o Binary Hub às suas contas e ao que você opera.',
 }
 
+const INFO_CONTAS_ANTES =
+  'Uma linha por conta. Cada conta é de um mercado só, com janela, limite e regras próprias. Arquivar vale na hora, guarda o histórico e pode ser desfeito. O Binary Hub não se conecta à sua corretora: as operações chegam por arquivo ou à mão. Por enquanto, lemos o CSV da Ebinex e o Trade History da Top One.'
+const INFO_CONTAS_DEPOIS =
+  'O relatório do MetaTrader sai em HTML ou PDF, não em CSV: vai precisar de um leitor próprio, que vem depois. O resultado fica na moeda da conta: R$ na B3; US$ nos outros mercados, com USDT e USDC contados como dólar.'
+
 export const CONTAS = {
   title: 'Suas contas',
   sub: 'Cada conta é de um mercado só e tem as suas regras.',
   infoAria: 'Como ler: Suas contas',
   // ADAPTED (board Personalizar `D.txt.infoContas`, Fase 2b): "Duplicar e arquivar valem na hora;
   // arquivar guarda…" → archive only (no duplicate yet); the sentences about the Apex examples and
-  // copy groups are dropped, as in Phase 1
-  info:
-    'Uma linha por conta. Cada conta é de um mercado só, com janela, limite e regras próprias. Arquivar vale na hora, guarda o histórico e pode ser desfeito. O Binary Hub não se conecta à sua corretora: as operações chegam por arquivo ou à mão. Por enquanto, lemos o CSV da Ebinex e o Trade History da Top One. Nas contas de Forex, de Ações, de Cripto e da B3, as operações entram pelo “Registrar operação”, que chega na Fase 3, e logo depois também por um CSV em que você diz o que é cada coluna. O relatório do MetaTrader sai em HTML ou PDF, não em CSV: vai precisar de um leitor próprio, que vem depois. O resultado fica na moeda da conta: R$ na B3; US$ nos outros mercados, com USDT e USDC contados como dólar.',
-  /** Under the group of a market whose files the app cannot read yet (board Personalizar `g.semLeitorTxt`) */
-  semLeitor: (market: AccountMarket) =>
-    `Ainda não lemos arquivos ${MERCADO[market].de}: as operações entram pelo “Registrar operação”, na Fase 3.`,
+  // copy groups are dropped, as in Phase 1.
+  // Fase 3 (D19; 3-4 ended D36): the four markets register, «… e, em breve, também por um CSV…» (ADAPTED)
+  info: `${INFO_CONTAS_ANTES} Nas contas de Forex, de Ações, de Cripto e da B3, as operações entram pelo “Registrar operação” e, em breve, também por um CSV em que você diz o que é cada coluna. ${INFO_CONTAS_DEPOIS}`,
+  /**
+   * Under the group of a market whose files the app cannot read yet (board Personalizar
+   * `g.semLeitorTxt`). Fase 3 (D19; 3-4 ended D36): the interim phase name is gone (ADAPTED)
+   */
+  semLeitor: (market: AccountMarket) => `Ainda não lemos arquivos ${MERCADO[market].de}: as operações entram pelo “Registrar operação”.`,
   empty: 'Traga o histórico da sua corretora.',
   importShort: 'Importar',
   importAria: (label: string) => `Importar arquivo para ${label}`,
@@ -198,6 +205,11 @@ export const IMPORTACOES = {
   legacyNote: 'não dá para desfazer', // NEW
   noName: 'arquivo sem nome', // NEW
   inserted: (count: number) => `${formatInt(count)} novas`,
+  /**
+   * NEW (Fase 3, D29): trades registered in the app that the batch completed (import_batches
+   * .rows_linked); undoing gives them back
+   */
+  linked: (count: number) => (count === 1 ? '1 já registrada por você' : `${formatInt(count)} já registradas por você`),
   duplicate: (count: number) => `${formatInt(count)} já estavam`,
   completed: (count: number) => `${formatInt(count)} completadas`, // NEW
   other: (count: number) => `${formatInt(count)} em outra conta`, // NEW
@@ -205,14 +217,40 @@ export const IMPORTACOES = {
   undoneOn: (day: string) => `Desfeita em ${day}`, // NEW
   undo: UNDO,
   undoAria: (when: string) => `Desfazer a importação de ${when}`, // NEW
-  confirm: (count: number) =>
-    count === 1
-      ? 'Desfazer apaga a operação desta importação.' // NEW
-      : `Desfazer apaga as ${formatInt(count)} operações desta importação.`, // NEW
-  confirmYes: 'Desfazer e apagar', // NEW
+  /**
+   * NEW. Fase 3 (D29): a batch that completed trades registered in the app also says that undoing
+   * gives them back (import_undo reverts what it wrote, reopens what it closed, never deletes them)
+   */
+  confirm: (count: number, linked = 0) => {
+    if (linked === 0) {
+      return count === 1 ? 'Desfazer apaga a operação desta importação.' : `Desfazer apaga as ${formatInt(count)} operações desta importação.`
+    }
+    if (count === 0) {
+      return linked === 1
+        ? 'Desfazer não apaga nada: a operação registrada por você volta a ser como estava antes desta importação.'
+        : `Desfazer não apaga nada: as ${formatInt(linked)} operações registradas por você voltam a ser como estavam antes desta importação.`
+    }
+    const apaga = count === 1 ? 'Desfazer apaga a operação desta importação' : `Desfazer apaga as ${formatInt(count)} operações desta importação`
+    return linked === 1
+      ? `${apaga}, e a registrada por você volta a ser como estava antes dela.`
+      : `${apaga}, e as ${formatInt(linked)} registradas por você voltam a ser como estavam antes dela.`
+  },
+  /** NEW; «Desfazer» alone when nothing is deleted (a batch that only completed registered trades) */
+  confirmYes: (count: number) => (count === 0 ? UNDO : 'Desfazer e apagar'),
   confirmNo: 'Manter', // NEW
-  undone: (deleted: number) =>
-    deleted === 1 ? 'Importação desfeita: 1 operação apagada.' : `Importação desfeita: ${formatInt(deleted)} operações apagadas.`, // NEW
+  /** NEW; Fase 3 (D29): with the registered trades the batch had completed (`linked`) */
+  undone: (deleted: number, linked = 0) => {
+    const apagadas = deleted === 1 ? '1 operação apagada' : `${formatInt(deleted)} operações apagadas`
+    if (linked === 0) return `Importação desfeita: ${apagadas}.`
+    if (deleted === 0) {
+      return linked === 1
+        ? 'Importação desfeita: a operação registrada por você voltou a ser como estava.'
+        : `Importação desfeita: as ${formatInt(linked)} operações registradas por você voltaram a ser como estavam.`
+    }
+    return linked === 1
+      ? `Importação desfeita: ${apagadas}, e a registrada por você voltou a ser como estava.`
+      : `Importação desfeita: ${apagadas}, e as ${formatInt(linked)} registradas por você voltaram a ser como estavam.`
+  },
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -227,6 +265,8 @@ export const SELETOR = {
 export const DIARIO = {
   title: 'Diário',
   importFile: IMPORT_FILE,
+  /** The header's primary action (RegistrarOperacao board RO l.236, `btn pri`), before «Importar arquivo» */
+  registrar: 'Registrar operação',
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -357,9 +397,12 @@ export const PASSO_I1 = {
   title: 'Qual mercado?',
   note: 'Cada conta é de um mercado só.',
   hint: 'Escolha o mercado.',
-  /** Under the pills, for a market whose files the app cannot read yet (board `I1.nota`) */
+  /**
+   * Under the pills, for a market whose files the app cannot read yet (board `I1.nota`). Fase 3 (D19;
+   * 3-4 ended D36): the interim phase name is gone (ADAPTED)
+   */
   semLeitor: (market: AccountMarket) =>
-    `Ainda não lemos arquivos ${MERCADO[market].de}: as operações desta conta entram pelo “Registrar operação”, na Fase 3.`,
+    `Ainda não lemos arquivos ${MERCADO[market].de}: as operações desta conta entram pelo “Registrar operação”.`,
 }
 
 const MESES = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro']
@@ -480,6 +523,15 @@ export const PASSO_D = {
     count === 1
       ? '1 que já estava ganha os campos que faltavam (comissão, stop, alvo, saída ou payout).' // NEW
       : `${formatInt(count)} que já estavam ganham os campos que faltavam (comissão, stop, alvo, saída ou payout).`, // NEW
+  // NEW (Fase 3, D29): in the count row, the rows that complete a trade registered in the app (the
+  // server counts them neither as «novas» nor as «já estavam»)
+  linkedCount: (count: number) => (count === 1 ? 'já registrada por você' : 'já registradas por você'),
+  // NEW (Fase 3, D29): rows of the file that complete a trade registered in the app (never inserted again)
+  linked: (count: number) =>
+    count === 1 ? '1 já registrada por você: o arquivo completa a comissão.' : `${formatInt(count)} já registradas por você: o arquivo completa a comissão.`,
+  // NEW (Fase 3, D29 with Q2 a): the file wins on money
+  linkedDiffers: (count: number) =>
+    count === 1 ? '1 com preço ou resultado diferente: vale o do arquivo.' : `${formatInt(count)} com preço ou resultado diferente: vale o do arquivo.`,
   offsets: (list: string) => `Os horários já trazem o fuso (${list}).`,
   unsignedLosses: (count: number) => `Perdas com valor positivo: gravamos como negativas (${formatInt(count)}).`,
   refunds: (count: number) => `Estornadas entram com resultado zero (${formatInt(count)}).`, // NEW
@@ -547,6 +599,9 @@ export const FIM = {
   inHistory: (count: number) => `${ops(count)} em Histórico importado · só resultado, à parte do Diário.`,
   completed: (count: number) =>
     count === 1 ? '1 que já estava ganhou os campos que faltavam.' : `${formatInt(count)} que já estavam ganharam os campos que faltavam.`, // NEW
+  // NEW (Fase 3, D29): the trades registered in the app that this file completed
+  linked: (count: number) =>
+    count === 1 ? '1 já registrada por você foi completada.' : `${formatInt(count)} já registradas por você foram completadas.`,
   undoLater: 'Desfazer depois: Personalizar › Suas contas › Importações.', // ADAPTED: "› Editar." had no destination
   toast: (count: number, label: string) => `${ops(count)} em ${label}.`,
   created: (label: string) => `${label} criada.`,
@@ -593,12 +648,19 @@ export const PASSO_G = {
 
 export const FIM_CONTA = {
   title: (label: string) => `${label} criada.`,
-  // ADAPTED: Registrar operação arrives in Phase 3, so "Importar histórico" is the only action
+  // Board ImportarConta 2b `FM` (fimConta): with «Registrar operação» (Fase 3) before «Importar
+  // histórico», or as the only action when the platform has no history to export (IQ Option)
   text: 'Nada ainda. Importe o histórico ou registre a primeira operação.',
   textIq: 'Nada ainda. Registre a primeira operação.',
   importHistory: 'Importar histórico',
-  // Fase 2b, a market without a file reader (board `FM` linhasNovo): no «Importar histórico»
-  semLeitor: 'Nada ainda: as operações desta conta entram pelo “Registrar operação”, que chega na Fase 3.',
+  /** The end screen's link (board `temLinkAntes`) or primary button (`temLinkDepois`) */
+  registrar: 'Registrar operação',
+  /**
+   * Fase 2b, a market without a file reader (board `FM` linhasNovo): no «Importar histórico». Since
+   * 3-4 (the end of D36) the IQ Option wording, with «Registrar operação» as the primary (ADAPTED,
+   * D19); the board's interim text (the Registrar «arriving» in Phase 3) is gone
+   */
+  semLeitor: 'Nada ainda. Registre a primeira operação.',
   /** «Ainda não lemos arquivos de Forex. » and what comes later: MetaTrader's own reader, or the CSV mapping */
   semLeitorArquivo: (market: AccountMarket, platform: string | null) =>
     `Ainda não lemos arquivos ${MERCADO[market].de}. ${

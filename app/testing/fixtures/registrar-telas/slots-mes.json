@@ -1,0 +1,19 @@
+{
+  "slots": [
+    {
+      "id": "4a207951-3b04-458b-860a-13807ee16991",
+      "mime": "image/webp",
+      "name": "MES_10-12_entrada.webp",
+      "path": "f7f2a1bb-17f4-4901-9c5e-d21aa7371300/47927139-8758-482a-b169-f6cf7bd74750/4a207951-3b04-458b-860a-13807ee16991.webp"
+    },
+    {
+      "id": "a3314991-1ce4-4e76-87f9-ee839ef8dacc",
+      "mime": "image/webp",
+      "name": "MES_10-38_saida.webp",
+      "path": "f7f2a1bb-17f4-4901-9c5e-d21aa7371300/47927139-8758-482a-b169-f6cf7bd74750/a3314991-1ce4-4e76-87f9-ee839ef8dacc.webp"
+    }
+  ],
+  "trash": [],
+  "bucket": "trade-images",
+  "server_now": "2026-10-22T14:38:05.268667+00:00"
+}

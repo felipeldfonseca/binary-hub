@@ -174,7 +174,7 @@ set local role authenticated;
 
 select public.import_preview(:'ebinex', 'ebinex', :sha, 'America/Sao_Paulo', (select body from tests.fixture where name = 'rows'), (select body from tests.fixture where name = 'errors'), 9) as preview \gset
 select tests.eq(:'preview'::jsonb - 'errors' - 'first_day' - 'last_day',
-                '{"new": 2, "duplicate": 1, "completable": 0, "other_account": 0, "day_changes": 1,
+                '{"new": 2, "duplicate": 1, "completable": 0, "other_account": 0, "linked": 0, "linked_differs": 0, "day_changes": 1,
                   "already_imported": false, "tz_status": "ok", "account_tz": "America/Sao_Paulo",
                   "tz_confirmed": true, "rows_total": 9}'::jsonb,
                 'preview counts');
@@ -186,7 +186,7 @@ select tests.ok(position('12,34' in :'preview') = 0, 'no value from the file in 
 
 select public.import_commit(:'ebinex', 'ebinex', 'operacoes.csv', :sha, 'America/Sao_Paulo', (select body from tests.fixture where name = 'rows'), (select body from tests.fixture where name = 'errors'), 9) as committed \gset
 select tests.eq(:'committed'::jsonb - 'batch_id' - 'errors',
-                '{"inserted": 2, "duplicate": 1, "completed": 0, "other_account": 0}'::jsonb, 'commit counts');
+                '{"inserted": 2, "duplicate": 1, "completed": 0, "other_account": 0, "linked": 0}'::jsonb, 'commit counts');
 select (:'committed'::jsonb)->>'batch_id' as batch \gset
 select tests.ok((select rows_inserted = 2 and rows_duplicate = 1 and rows_error = 5 and rows_total = 9
                         and file_name = 'operacoes.csv' and file_tz = 'America/Sao_Paulo' and status = 'done'
@@ -201,7 +201,7 @@ select tests.ok((select entry_time = '2025-08-13 00:01:00.25+00' and source_loca
 select tests.eq(public.import_preview(:'ebinex', 'ebinex', :sha, 'America/Sao_Paulo', (select body from tests.fixture where name = 'rows'))->'already_imported',
                 'true'::jsonb, 'the same file is recognised');
 select tests.eq(public.import_commit(:'ebinex', 'ebinex', 'operacoes.csv', :sha, 'America/Sao_Paulo', (select body from tests.fixture where name = 'rows')) - 'errors',
-                '{"batch_id": null, "inserted": 0, "duplicate": 3, "completed": 0, "other_account": 0}'::jsonb,
+                '{"batch_id": null, "inserted": 0, "duplicate": 3, "completed": 0, "other_account": 0, "linked": 0}'::jsonb,
                 're-importing adds nothing and creates no batch');
 commit;
 
@@ -213,7 +213,7 @@ set local role authenticated;
 select tests.eq(public.import_commit(:'topone', 'topone', 'trades.csv', null, 'UTC',
                   '[{"line":2,"external_id":"MNQM6/1","symbol":"MNQM6","asset_type":"futures","direction":"long","local_entry":"2026-05-04T14:30:00","local_exit":"2026-05-04T14:40:00","utc_offset":null,"entry_price":"21000","exit_price":"21010","quantity":"1","stake_amount":null,"payout_percent":null,"duration_seconds":null,"timeframe":null,"result":"win","pnl":"50.00","commission":"2.68","stop_price":"20990.25","target_price":"21050"}]'::jsonb)
                 - 'errors',
-                '{"batch_id": null, "inserted": 0, "duplicate": 1, "completed": 1, "other_account": 0}'::jsonb,
+                '{"batch_id": null, "inserted": 0, "duplicate": 1, "completed": 1, "other_account": 0, "linked": 0}'::jsonb,
                 're-import completes missing fields');
 select tests.ok((select commission = 2.68 and stop_price = 20990.25 and target_price = 21050 and pnl = 50
                  from public.trades where notes = 'topone:MNQM6/1'), 'only missing fields were filled');
@@ -242,7 +242,7 @@ select tests.eq(public.import_preview(:'ebinex', 'ebinex', null, 'Brasilia', '[]
 insert into public.trading_accounts (user_id, market, label, platform) values (:A, 'binary', 'Ebinex 2', 'ebinex');
 select id as ebinex2 from public.trading_accounts where user_id = :A and label = 'Ebinex 2' \gset
 select tests.eq(public.import_commit(:'ebinex2', 'ebinex', null, null, 'America/Sao_Paulo', (select body from tests.fixture where name = 'rows')) - 'errors',
-                '{"batch_id": null, "inserted": 0, "duplicate": 0, "completed": 0, "other_account": 3}'::jsonb,
+                '{"batch_id": null, "inserted": 0, "duplicate": 0, "completed": 0, "other_account": 3, "linked": 0}'::jsonb,
                 'trades already in another account stay where they are');
 commit;
 

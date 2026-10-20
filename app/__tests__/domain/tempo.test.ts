@@ -7,14 +7,18 @@ import {
   addDays,
   assertTimeZone,
   classifyLocalTime,
+  firstLocalHmAtOrAfter,
   formatHhMm,
+  hmOn,
   inWindow,
   isValidWindow,
   isoWeekdayOf,
+  localHmInTradingDay,
   localToUtc,
   nextOffsetChange,
   opensOn,
   parseHhMm,
+  resolveLocalHm,
   tradingDay,
   tradingDayBounds,
   tradingDayFor,
@@ -468,5 +472,48 @@ describe('"HH:MM" without Date', () => {
     expect(formatHhMm(1439)).toBe('23:59');
     expect(() => formatHhMm(1440)).toThrow(RangeError);
     for (let m = 0; m < 1440; m += 7) expect(parseHhMm(formatHhMm(m))).toBe(m);
+  });
+});
+
+describe('an "HH:MM" typed on a clock, as an instant (Phase 3; the SQL parity is in registro/cases.test.ts)', () => {
+  const NYC = 'America/New_York';
+  const SAO = 'America/Sao_Paulo';
+
+  it('reads the current minute on a clock', () => {
+    expect(hmOn(new Date('2026-10-14T14:07:59.999Z'), NYC)).toBe('10:07');
+    expect(hmOn(new Date('2026-10-14T14:07:59.999Z'), SAO)).toBe('11:07');
+  });
+
+  it('resolves near an instant: today’s, or yesterday’s when 12 hours or more ahead', () => {
+    const at = new Date('2026-10-14T14:07:30Z');
+    expect(resolveLocalHm('10:07', NYC, at)).toEqual(new Date('2026-10-14T14:07:00Z'));
+    expect(resolveLocalHm('22:07', NYC, at)).toEqual(new Date('2026-10-15T02:07:00Z'));
+    expect(resolveLocalHm('22:08', NYC, at)).toEqual(new Date('2026-10-14T02:08:00Z'));
+  });
+
+  it('places an hour on a trading day, and an exit at or after an entry', () => {
+    const futuresDay = (d: Date) => tradingDayOn(d, { tz: NYC, startMin: 1080 });
+    expect(localHmInTradingDay('2026-10-15', '18:30', NYC, futuresDay)).toEqual(new Date('2026-10-14T22:30:00Z'));
+    expect(localHmInTradingDay('2026-10-15', '10:00', NYC, futuresDay)).toEqual(new Date('2026-10-15T14:00:00Z'));
+    expect(localHmInTradingDay('2026-10-15', '10:00', NYC, () => '2026-10-16')).toBeNull();
+    // Two candidates on the same trading day: the latest wins (SQL: order by c desc limit 1).
+    // An overnight window 15:01–04:37 that does not open on Tuesday: Tue 20 Oct 22:16 is outside any
+    // window, so it counts on the futures clock (after 18:00 → Wed 21); Wed 21 22:16 is inside
+    // Wednesday's window, which opened on Wed 21; Thu 22 22:16 is Thursday's.
+    const night = { tz: NYC, startMin: 901, endMin: 277, weekdays: weekdayMask(['mon', 'wed', 'thu', 'fri']) };
+    const withWindow = (d: Date) => tradingDayFor(d, { tz: NYC, startMin: 1080 }, [night]);
+    expect(withWindow(new Date('2026-10-21T02:16:00Z'))).toBe('2026-10-21');
+    expect(withWindow(new Date('2026-10-22T02:16:00Z'))).toBe('2026-10-21');
+    expect(localHmInTradingDay('2026-10-21', '22:16', NYC, withWindow)).toEqual(new Date('2026-10-22T02:16:00Z'));
+    // Every candidate on the day: the day after's
+    expect(localHmInTradingDay('2026-10-15', '10:00', NYC, () => '2026-10-15')).toEqual(new Date('2026-10-16T14:00:00Z'));
+    expect(firstLocalHmAtOrAfter(new Date('2026-10-14T14:33:00Z'), '10:33', NYC)).toEqual(new Date('2026-10-14T14:33:00Z'));
+    expect(firstLocalHmAtOrAfter(new Date('2026-10-14T14:33:00Z'), '10:20', NYC)).toEqual(new Date('2026-10-15T14:20:00Z'));
+  });
+
+  it('refuses what is not an hour', () => {
+    expect(() => resolveLocalHm('24:00', NYC, new Date())).toThrow(RangeError);
+    expect(() => firstLocalHmAtOrAfter(new Date(), '10h', NYC)).toThrow(RangeError);
+    expect(() => resolveLocalHm('10:00', '-03:00', new Date())).toThrow(RangeError);
   });
 });

@@ -8,6 +8,7 @@ import userEvent from '@testing-library/user-event'
 import { focusManager, onlineManager } from '@tanstack/react-query'
 import * as contasDb from '@/lib/hub/contasDb'
 import * as regrasDb from '@/lib/hub/regrasDb'
+import * as registrarDb from '@/lib/hub/registrarDb'
 import { parseRulesNow } from '@/lib/hub/regras'
 import PossoOperarHoje, { type PossoEstado } from '@/components/hub/posso/PossoOperarHoje'
 import PossoOperarHojeDiario from '@/components/hub/posso/PossoOperarHojeDiario'
@@ -42,11 +43,18 @@ jest.mock('@/lib/hub/regrasDb', () => ({
   mergePreferences: jest.fn(),
 }))
 
+// Phase 3: /diario also has «Operações do dia» (its own tests: OperacoesDoDia.test.tsx)
+jest.mock('@/lib/hub/registrarDb', () => ({
+  ...jest.requireActual('@/lib/hub/registrarDb'),
+  fetchDayTrades: jest.fn(),
+}))
+
 const fetchRulesNow = regrasDb.fetchRulesNow as jest.MockedFunction<typeof regrasDb.fetchRulesNow>
 const mergePreferences = regrasDb.mergePreferences as jest.MockedFunction<typeof regrasDb.mergePreferences>
 const fetchAccounts = contasDb.fetchAccounts as jest.MockedFunction<typeof contasDb.fetchAccounts>
 const fetchPreferences = contasDb.fetchPreferences as jest.MockedFunction<typeof contasDb.fetchPreferences>
 const fetchImportFormats = contasDb.fetchImportFormats as jest.MockedFunction<typeof contasDb.fetchImportFormats>
+const fetchDayTrades = registrarDb.fetchDayTrades as jest.MockedFunction<typeof registrarDb.fetchDayTrades>
 
 beforeEach(() => {
   fetchRulesNow.mockReset().mockResolvedValue(agora('agora-seg-0930-et'))
@@ -54,6 +62,7 @@ beforeEach(() => {
   fetchAccounts.mockReset().mockResolvedValue([])
   fetchPreferences.mockReset().mockResolvedValue({})
   fetchImportFormats.mockReset().mockResolvedValue({})
+  fetchDayTrades.mockReset().mockResolvedValue([])
 })
 
 afterEach(() => {
@@ -731,7 +740,7 @@ describe('PossoOperarHojeDiario with the app’s query defaults (QueryProvider)'
 })
 
 describe('/diario', () => {
-  it('places the card between the Diário header and the placeholder, and the window under the selector', async () => {
+  it('places the card between the Diário header and «Operações do dia», then the placeholder, and the window under the selector', async () => {
     const ids = idsDono()
     fetchAccounts.mockResolvedValue([
       makeAccount({ id: ids.topOne, label: 'Top One #1', market: 'futures' }),
@@ -742,15 +751,18 @@ describe('/diario', () => {
     const selector = await screen.findByRole('button', { name: /^Conta: / })
     const h1 = screen.getByRole('heading', { level: 1, name: 'Diário' })
     const card = await screen.findByRole('region', { name: 'Posso operar hoje?' })
+    const bridge = await screen.findByRole('region', { name: 'Operações do dia' })
     const placeholder = screen.getByText('O Diário chega na Fase 4.')
     const follows = (a: Node, b: Node) => (a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0
     expect(follows(h1, selector)).toBe(true)
     expect(follows(selector, card)).toBe(true)
-    expect(follows(card, placeholder)).toBe(true)
+    expect(follows(card, bridge)).toBe(true)
+    expect(follows(bridge, placeholder)).toBe(true)
 
     expect(await within(card).findAllByRole('listitem')).toHaveLength(2)
     await waitFor(() => expect(selector).toHaveAccessibleDescription('Janela 20:00–21:00 · Brasília'))
-    // One read of rules_now serves the card and the window line
+    // One read of rules_now serves the card, the window line and the day of «Operações do dia»
+    expect(await within(bridge).findByText('Nenhuma operação registrada hoje.')).toBeInTheDocument()
     expect(fetchRulesNow).toHaveBeenCalledTimes(1)
   })
 })

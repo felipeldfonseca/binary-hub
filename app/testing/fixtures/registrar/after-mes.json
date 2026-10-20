@@ -1,0 +1,218 @@
+{
+  "r": 0.7917,
+  "gate": {
+    "at": "2026-10-19T00:45:00+00:00",
+    "block": {
+      "state": "nao_avaliado",
+      "reason": "fase5"
+    },
+    "desde": "2026-09-19T01:25:28.796512+00:00",
+    "label": "Registrar futures",
+    "limit": {
+      "usd": 400,
+      "mode": "conta",
+      "near": false,
+      "used": 0,
+      "state": "ok",
+      "hit_at": null,
+      "reason": null,
+      "trades": 0,
+      "net_usd": 0,
+      "at_limit": "encerrar",
+      "worst_usd": 0
+    },
+    "today": {
+      "trades": 0,
+      "net_usd": 0,
+      "worst_usd": 0
+    },
+    "market": "futures",
+    "status": "liberado",
+    "window": {
+      "next": {
+        "opens_at": "2026-10-19T23:55:00+00:00",
+        "closes_at": "2026-10-20T02:55:00+00:00",
+        "trading_day": "2026-10-20"
+      },
+      "state": "dentro",
+      "reason": null,
+      "current": {
+        "opens_at": "2026-10-18T23:55:00+00:00",
+        "closes_at": "2026-10-19T02:55:00+00:00"
+      },
+      "position": "dentro"
+    },
+    "version": {
+      "id": "46d328eb-0c29-4a26-a288-f1b5c3263d87",
+      "origin": "criar",
+      "version_no": 1,
+      "effective_from": "2026-09-19T01:25:28.796512+00:00"
+    },
+    "warnings": [],
+    "desde_day": "2026-09-19",
+    "account_id": "185b2da6-65fe-4ea6-a411-ab21fa3b9738",
+    "changes_at": "2026-10-19T02:55:00+00:00",
+    "state_rule": {
+      "state": "nao_avaliado",
+      "reason": "fase5"
+    },
+    "trading_day": "2026-10-19",
+    "checks_evaluated": [
+      "janela",
+      "limite"
+    ]
+  },
+  "plan": {
+    "breaks": [],
+    "verdict": "no_plano",
+    "checks_evaluated": [
+      "janela",
+      "limite"
+    ]
+  },
+  "marks": [
+    {
+      "id": 5,
+      "kind": "setup",
+      "limpa": false,
+      "value": "B",
+      "marked_at": "2026-10-19T01:25:29.563663+00:00"
+    }
+  ],
+  "trade": {
+    "id": "d9328b7b-fbaf-4e4b-a04b-167206a4f673",
+    "pnl": 95,
+    "note": null,
+    "option": null,
+    "result": "win",
+    "source": "after",
+    "status": "closed",
+    "symbol": "MES",
+    "quantity": 2,
+    "direction": "short",
+    "exit_time": "2026-10-19T01:00:00+00:00",
+    "pnl_basis": "prices",
+    "timeframe": null,
+    "account_id": "185b2da6-65fe-4ea6-a411-ab21fa3b9738",
+    "asset_type": "futures",
+    "commission": null,
+    "entry_time": "2026-10-19T00:45:00+00:00",
+    "exit_price": 7929,
+    "expires_at": null,
+    "stop_price": 7950.5,
+    "entry_price": 7938.5,
+    "trading_day": "2026-10-19",
+    "stake_amount": null,
+    "target_price": null,
+    "note_saved_at": null,
+    "registered_at": "2026-10-19T01:25:29.563663+00:00",
+    "payout_percent": null,
+    "duration_seconds": null,
+    "exit_registered_at": "2026-10-19T01:25:29.563663+00:00"
+  },
+  "images": [],
+  "points": 9.5,
+  "context": {
+    "origin": "reconstructed",
+    "rule_ok": null,
+    "in_block": null,
+    "warnings": [],
+    "in_window": true,
+    "after_limit": false,
+    "captured_at": "2026-10-19T01:25:29.563663+00:00",
+    "gate_status": "liberado",
+    "evaluated_at": "2026-10-19T00:45:00+00:00",
+    "state_choice": null,
+    "checks_evaluated": [
+      "janela",
+      "limite"
+    ],
+    "day_pnl_at_entry": 0,
+    "day_worst_at_entry": 0
+  },
+  "dry_run": false,
+  "similar": [],
+  "version": {
+    "id": "46d328eb-0c29-4a26-a288-f1b5c3263d87",
+    "version_no": 1
+  },
+  "entry_at": "2026-10-19T00:45:00+00:00",
+  "gate_now": {
+    "at": "2026-10-19T01:25:29.563663+00:00",
+    "block": {
+      "state": "nao_avaliado",
+      "reason": "fase5"
+    },
+    "desde": "2026-09-19T01:25:28.796512+00:00",
+    "label": "Registrar futures",
+    "limit": {
+      "usd": 400,
+      "mode": "conta",
+      "near": false,
+      "used": 0,
+      "state": "ok",
+      "hit_at": null,
+      "reason": null,
+      "trades": 2,
+      "net_usd": 170,
+      "at_limit": "encerrar",
+      "worst_usd": 0
+    },
+    "today": {
+      "trades": 2,
+      "net_usd": 170,
+      "worst_usd": 0
+    },
+    "market": "futures",
+    "status": "liberado",
+    "window": {
+      "next": {
+        "opens_at": "2026-10-19T23:55:00+00:00",
+        "closes_at": "2026-10-20T02:55:00+00:00",
+        "trading_day": "2026-10-20"
+      },
+      "state": "dentro",
+      "reason": null,
+      "current": {
+        "opens_at": "2026-10-18T23:55:00+00:00",
+        "closes_at": "2026-10-19T02:55:00+00:00"
+      },
+      "position": "dentro"
+    },
+    "version": {
+      "id": "46d328eb-0c29-4a26-a288-f1b5c3263d87",
+      "origin": "criar",
+      "version_no": 1,
+      "effective_from": "2026-09-19T01:25:28.796512+00:00"
+    },
+    "warnings": [],
+    "desde_day": "2026-09-19",
+    "account_id": "185b2da6-65fe-4ea6-a411-ab21fa3b9738",
+    "changes_at": "2026-10-19T02:55:00+00:00",
+    "state_rule": {
+      "state": "nao_avaliado",
+      "reason": "fase5"
+    },
+    "trading_day": "2026-10-19",
+    "checks_evaluated": [
+      "janela",
+      "limite"
+    ]
+  },
+  "repeated": false,
+  "trade_id": "d9328b7b-fbaf-4e4b-a04b-167206a4f673",
+  "marks_now": [
+    {
+      "kind": "setup",
+      "clean_at": null,
+      "current_at": "2026-10-19T01:25:29.563663+00:00",
+      "clean_value": null,
+      "changed_after": false,
+      "current_limpa": false,
+      "current_value": "B"
+    }
+  ],
+  "server_now": "2026-10-19T01:25:29.563663+00:00",
+  "trading_day": "2026-10-19",
+  "registered_at": "2026-10-19T01:25:29.563663+00:00"
+}

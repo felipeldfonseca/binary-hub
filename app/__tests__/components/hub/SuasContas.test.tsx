@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event'
 import * as data from '@/lib/hub/contasDb'
 import * as regrasDb from '@/lib/hub/regrasDb'
 import SuasContas from '@/components/hub/contas/SuasContas'
+import { CONTAS, IMPORTACOES } from '@/components/hub/contas/copy'
 import HubRoot from '@/components/hub/HubRoot'
 import PersonalizarPagina from '@/components/hub/personalizar/PersonalizarPagina'
 import type { RulesConfig } from '@/lib/hub/regras'
@@ -605,6 +606,66 @@ describe('Importações', () => {
     expect(await screen.findByText('Nenhuma importação nesta conta.')).toBeInTheDocument()
   })
 
+  describe('Phase 3 · a batch that completed trades registered in the app (rows_linked, D29)', () => {
+    it('only completed them: says so, undoes without «apagar», and says they came back as they were', async () => {
+      // A file whose 3 rows were the owner's registered trades: nothing inserted, kept to be undone
+      fetchBatches.mockResolvedValue([makeBatch({ id: 'b-link', rows_total: 3, rows_inserted: 0, rows_duplicate: 0, rows_linked: 3 })])
+      importUndo.mockResolvedValue({ deleted: 0 })
+      renderHub(<SuasContas />)
+
+      await userEvent.click(within(await openMenu('Top One #1')).getByRole('button', { name: 'Importações' }))
+      const panel = screen.getByRole('group', { name: 'Importações de Top One #1' })
+      const [item] = await within(panel).findAllByRole('listitem')
+      expect(parts(item)).toBe('0 novas · 3 já registradas por você · 0 já estavam · 0 com erro')
+
+      await userEvent.click(within(item).getByRole('button', { name: /^Desfazer a importação/ }))
+      expect(within(item).getByRole('group', { name: 'Desfazer não apaga nada: as 3 operações registradas por você voltam a ser como estavam antes desta importação.' })).toBeInTheDocument()
+      expect(within(item).queryByRole('button', { name: 'Desfazer e apagar' })).not.toBeInTheDocument()
+      await userEvent.click(within(item).getByRole('button', { name: 'Desfazer' }))
+
+      expect(importUndo).toHaveBeenCalledWith(expect.anything(), 'b-link')
+      expect(await within(panel).findByText('Importação desfeita: as 3 operações registradas por você voltaram a ser como estavam.')).toBeInTheDocument()
+      expect(within(panel).queryByText(/0 operações apagadas/)).not.toBeInTheDocument()
+    })
+
+    it('inserted some and completed one: deletes the new ones and gives the registered one back', async () => {
+      fetchBatches.mockResolvedValue([makeBatch({ id: 'b-mix', rows_total: 7, rows_inserted: 4, rows_duplicate: 2, rows_linked: 1 })])
+      importUndo.mockResolvedValue({ deleted: 4 })
+      renderHub(<SuasContas />)
+
+      await userEvent.click(within(await openMenu('Top One #1')).getByRole('button', { name: 'Importações' }))
+      const panel = screen.getByRole('group', { name: 'Importações de Top One #1' })
+      const [item] = await within(panel).findAllByRole('listitem')
+      expect(parts(item)).toBe('4 novas · 1 já registrada por você · 2 já estavam · 0 com erro')
+
+      await userEvent.click(within(item).getByRole('button', { name: /^Desfazer a importação/ }))
+      expect(within(item).getByText('Desfazer apaga as 4 operações desta importação, e a registrada por você volta a ser como estava antes dela.')).toBeInTheDocument()
+      await userEvent.click(within(item).getByRole('button', { name: 'Desfazer e apagar' }))
+
+      expect(await within(panel).findByText('Importação desfeita: 4 operações apagadas, e a registrada por você voltou a ser como estava.')).toBeInTheDocument()
+    })
+
+    it('the other wordings: one registered trade alone, several with one deleted', () => {
+      expect(IMPORTACOES.confirm(0, 1)).toBe('Desfazer não apaga nada: a operação registrada por você volta a ser como estava antes desta importação.')
+      expect(IMPORTACOES.confirm(1, 2)).toBe('Desfazer apaga a operação desta importação, e as 2 registradas por você voltam a ser como estavam antes dela.')
+      expect(IMPORTACOES.undone(0, 1)).toBe('Importação desfeita: a operação registrada por você voltou a ser como estava.')
+      expect(IMPORTACOES.undone(1, 2)).toBe('Importação desfeita: 1 operação apagada, e as 2 registradas por você voltaram a ser como estavam.')
+      // Before the migration, or a batch with none: as before
+      expect(IMPORTACOES.confirm(5)).toBe('Desfazer apaga as 5 operações desta importação.')
+      expect(IMPORTACOES.undone(5)).toBe('Importação desfeita: 5 operações apagadas.')
+      expect(IMPORTACOES.confirmYes(5)).toBe('Desfazer e apagar')
+    })
+
+    it('reads rows_linked with the batches', async () => {
+      const { fetchBatches: realFetch } = jest.requireActual('@/lib/hub/contasDb') as typeof data
+      const select = jest.fn()
+      const chain = { select, eq: () => chain, order: () => chain, then: (ok: (r: unknown) => unknown) => Promise.resolve({ data: [], error: null }).then(ok) }
+      select.mockReturnValue(chain)
+      await realFetch({ from: () => chain } as never, 'acc-1')
+      expect(select.mock.calls[0][0].split(', ')).toContain('rows_linked')
+    })
+  })
+
   it('maps a refused undo to its own copy', async () => {
     fetchBatches.mockResolvedValue([makeBatch({ id: 'b1' })])
     importUndo.mockRejectedValue({ code: '22023', message: 'already_undone' })
@@ -783,7 +844,8 @@ describe('Suas contas · the rules of each account (Phase 2)', () => {
 
 describe('Suas contas · Fase 2b markets', () => {
   const ids = idsMercados()
-  const NOTA = (de: string) => `Ainda não lemos arquivos ${de}: as operações entram pelo “Registrar operação”, na Fase 3.`
+  // Since 3-4 every market registers (the end of D36): no «, na Fase 3»
+  const NOTA = (de: string) => `Ainda não lemos arquivos ${de}: as operações entram pelo “Registrar operação”.`
   const personalizar = () =>
     renderHub(
       <HubRoot>
@@ -828,6 +890,7 @@ describe('Suas contas · Fase 2b markets', () => {
       expect(screen.getByRole('heading', { level: 3, name: group }).nextElementSibling?.tagName).toBe('UL')
     }
     expect(screen.queryAllByText(/^Ainda não lemos arquivos/)).toHaveLength(4)
+    expect(screen.queryByText(/Fase 3/)).not.toBeInTheDocument()
   })
 
   it('no «Importar» on the accounts of those markets; the Top One and the Ebinex keep theirs', async () => {
@@ -894,9 +957,14 @@ describe('Suas contas · Fase 2b markets', () => {
     renderHub(<SuasContas />)
     await userEvent.click(screen.getByRole('button', { name: 'Como ler: Suas contas' }))
     expect(document.getElementById('info-contas')).toHaveTextContent(
-      'Uma linha por conta. Cada conta é de um mercado só, com janela, limite e regras próprias. Arquivar vale na hora, guarda o histórico e pode ser desfeito. O Binary Hub não se conecta à sua corretora: as operações chegam por arquivo ou à mão. Por enquanto, lemos o CSV da Ebinex e o Trade History da Top One. Nas contas de Forex, de Ações, de Cripto e da B3, as operações entram pelo “Registrar operação”, que chega na Fase 3, e logo depois também por um CSV em que você diz o que é cada coluna. O relatório do MetaTrader sai em HTML ou PDF, não em CSV: vai precisar de um leitor próprio, que vem depois. O resultado fica na moeda da conta: R$ na B3; US$ nos outros mercados, com USDT e USDC contados como dólar.',
+      'Uma linha por conta. Cada conta é de um mercado só, com janela, limite e regras próprias. Arquivar vale na hora, guarda o histórico e pode ser desfeito. O Binary Hub não se conecta à sua corretora: as operações chegam por arquivo ou à mão. Por enquanto, lemos o CSV da Ebinex e o Trade History da Top One. Nas contas de Forex, de Ações, de Cripto e da B3, as operações entram pelo “Registrar operação” e, em breve, também por um CSV em que você diz o que é cada coluna. O relatório do MetaTrader sai em HTML ou PDF, não em CSV: vai precisar de um leitor próprio, que vem depois. O resultado fica na moeda da conta: R$ na B3; US$ nos outros mercados, com USDT e USDC contados como dólar.',
     )
     expect(screen.getByText('Contas de mercados diferentes nunca são somadas.')).toBeInTheDocument()
+  })
+
+  it('no interim «… na Fase 3» text is left in the account screens’ copy (3-4 ended D36)', () => {
+    expect(CONTAS.info).toContain('entram pelo “Registrar operação” e, em breve, também por um CSV')
+    for (const m of ['forex', 'stocks', 'crypto', 'b3', 'options'] as const) expect(CONTAS.semLeitor(m)).not.toMatch(/Fase 3/)
   })
 })
 

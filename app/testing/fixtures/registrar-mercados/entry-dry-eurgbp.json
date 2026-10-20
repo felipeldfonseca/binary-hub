@@ -1,0 +1,128 @@
+{
+  "gate": {
+    "at": "2026-10-15T12:40:04.876811+00:00",
+    "block": {
+      "state": "nao_avaliado",
+      "reason": "so_futuros"
+    },
+    "desde": "2026-10-13T13:00:05.70898+00:00",
+    "label": "FTMO",
+    "limit": {
+      "usd": 1000,
+      "mode": "conta",
+      "near": false,
+      "used": 0,
+      "state": "ok",
+      "hit_at": null,
+      "reason": null,
+      "trades": 0,
+      "net_usd": 0,
+      "at_limit": "encerrar",
+      "worst_usd": 0
+    },
+    "today": {
+      "trades": 0,
+      "net_usd": 0,
+      "worst_usd": 0
+    },
+    "market": "forex",
+    "status": "liberado",
+    "window": {
+      "next": {
+        "opens_at": "2026-10-16T12:00:00+00:00",
+        "closes_at": "2026-10-16T14:00:00+00:00",
+        "trading_day": "2026-10-16"
+      },
+      "state": "dentro",
+      "reason": null,
+      "current": {
+        "opens_at": "2026-10-15T12:00:00+00:00",
+        "closes_at": "2026-10-15T14:00:00+00:00"
+      },
+      "position": "dentro"
+    },
+    "version": {
+      "id": "458beaa9-e085-4e82-b4d4-d01314d639d7",
+      "origin": "criar",
+      "version_no": 1,
+      "effective_from": "2026-10-13T13:00:05.70898+00:00"
+    },
+    "warnings": [],
+    "desde_day": "2026-10-13",
+    "account_id": "3434de2d-2828-43b9-9b21-5c19a23fa22f",
+    "changes_at": "2026-10-15T14:00:00+00:00",
+    "state_rule": {
+      "state": "nao_avaliado",
+      "reason": "so_futuros"
+    },
+    "trading_day": "2026-10-15",
+    "checks_evaluated": [
+      "janela",
+      "limite"
+    ]
+  },
+  "plan": {
+    "breaks": [],
+    "verdict": "no_plano",
+    "checks_evaluated": [
+      "janela",
+      "limite"
+    ]
+  },
+  "context": {
+    "rule_ok": null,
+    "in_block": null,
+    "warnings": [],
+    "in_window": true,
+    "after_limit": false,
+    "gate_status": "liberado",
+    "state_choice": null,
+    "checks_evaluated": [
+      "janela",
+      "limite"
+    ],
+    "day_pnl_at_entry": 0,
+    "day_worst_at_entry": 0
+  },
+  "dry_run": true,
+  "preview": {
+    "risk": null,
+    "reward": null,
+    "stop_points": 0.001,
+    "target_points": 0.002
+  },
+  "similar": [],
+  "version": {
+    "id": "458beaa9-e085-4e82-b4d4-d01314d639d7",
+    "version_no": 1
+  },
+  "entry_at": "2026-10-15T12:40:04.876811+00:00",
+  "repeated": false,
+  "expires_at": null,
+  "instrument": {
+    "key": "EURGBP",
+    "pip": "0.0001",
+    "pnl": "typed",
+    "mult": null,
+    "tick": null,
+    "costs": true,
+    "known": true,
+    "stops": "pips",
+    "qty_dp": 2,
+    "correct": true,
+    "price_dp": 5,
+    "asset_type": "forex"
+  },
+  "limit_room": {
+    "usd": 1000,
+    "left": 1000,
+    "risk": null,
+    "above": false,
+    "net_usd": 0,
+    "reached": false
+  },
+  "server_now": "2026-10-15T12:40:04.876811+00:00",
+  "stop_price": 0.8722,
+  "trading_day": "2026-10-15",
+  "target_price": 0.8692
+}
