@@ -1,10 +1,12 @@
 /**
  * «Registrar operação» (Phase 3): the same rules as the database's Registrar functions
- * (supabase/migrations/20261020000001..4), for the form's checks and previews. Pure: depends only
+ * (supabase/migrations/20261020000001..4, descriptors as of 20261022000001), for the form's checks and previews. Pure: depends only
  * on ../tempo, ../markets and the standard library; time is an input (the server's clock).
  *
  *   caps       TRADE_CAPS / INSTRUMENT_SPEC (= trade_caps_all() / instrument_specs()),
  *              tradeMatchKey, tradeInstrument, a binary platform's durations and expiry rule
+ *   catalogo   the instruments «Buscar ativo» offers per market (the approved 2b catalogs, codes
+ *              only); the B3 stock rows of INSTRUMENT_SPEC are built from it
  *   payload    the JSON v1 payloads, checkPayload / checkMarks / parseEntry, the codes
  *   stops      stop and target: unit ↔ price level
  *   pnl        the result per market and its basis, R, the entry preview (and its risk)
@@ -43,6 +45,18 @@ export {
   type StopUnit,
   type TradeCaps,
 } from './caps';
+export {
+  ACOES_B3,
+  ACOES_EUA,
+  ALIASES_B3,
+  B3_FUTUROS,
+  CATALOGO,
+  CATALOGO_REVISTO,
+  CRIPTO_CATALOGO,
+  FOREX_CATALOGO,
+  FUTUROS_CATALOGO,
+  INDICES_OPCOES,
+} from './catalogo';
 export {
   CLOCKS,
   IMAGE_MIMES,

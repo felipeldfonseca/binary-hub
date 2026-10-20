@@ -1,9 +1,11 @@
 /**
  * What each market's «Registrar operação» form takes, and the instruments whose result the server
- * computes: the TypeScript side of the database's trade_caps_all() and instrument_specs()
- * (supabase/migrations/20261020000001_trade_cycle.sql). Both hold the same values;
+ * computes: the TypeScript side of the database's trade_caps_all() and instrument_specs(), as the
+ * newest migration that defines them writes them (supabase/migrations/20261022000001_registrar_mercados.sql;
+ * the shape is the one 20261020000001_trade_cycle.sql documents). Both hold the same values;
  * __tests__/domain/registro/caps.test.ts parses the SQL literals and compares them with
- * TRADE_CAPS and INSTRUMENT_SPEC.
+ * TRADE_CAPS and INSTRUMENT_SPEC. INSTRUMENT_SPEC.b3's stock rows are built from the catalog
+ * (catalogo.ACOES_B3), so the SQL rows and the search list cannot drift apart.
  *
  * Amounts are decimal strings ('0.25', '50'), never floats. tradeMatchKey and tradeInstrument
  * follow trade_match_key and trade_instrument step by step.
@@ -11,6 +13,7 @@
  * Pure: depends on nothing at run time.
  */
 import { ACCOUNT_MARKETS, type AccountMarket } from '../markets';
+import { ACOES_B3 } from './catalogo';
 import { cmp, parseNumeric } from './numeric';
 
 export type Direction = 'long' | 'short' | 'call' | 'put';
@@ -97,8 +100,9 @@ const OPTION: OptionCaps = { assetType: 'option', qtyDp: 0, priceDp: 2, stops: '
 const LONG_SHORT: readonly Direction[] = ['long', 'short'];
 
 export const TRADE_CAPS: Readonly<Record<AccountMarket, TradeCaps>> = deepFreeze({
+  // A root outside INSTRUMENT_SPEC (ZN, SR3, NG…): typed result, stop and target as a price (3-4)
   futures: {
-    assetType: 'futures', directions: LONG_SHORT, qtyDp: 0, priceDp: 8, stops: 'pts', pnl: 'typed', mult: null,
+    assetType: 'futures', directions: LONG_SHORT, qtyDp: 0, priceDp: 8, stops: 'price', pnl: 'typed', mult: null,
     correct: false, costs: false, option: 'no',
   },
   binary: {
@@ -122,15 +126,18 @@ export const TRADE_CAPS: Readonly<Record<AccountMarket, TradeCaps>> = deepFreeze
     assetType: 'crypto', directions: LONG_SHORT, qtyDp: 8, priceDp: 8, stops: 'price', pnl: 'prices', mult: '1',
     correct: true, costs: true, option: 'no', dollarQuotes: ['USDT', 'USDC', 'USD'],
   },
+  // A code outside the catalog (BGIX26, an unlisted stock): typed result, up to 8 decimals (3-4)
   b3: {
-    assetType: 'b3', directions: LONG_SHORT, qtyDp: 0, priceDp: 2, stops: 'price', pnl: 'prices', mult: '1',
+    assetType: 'b3', directions: LONG_SHORT, qtyDp: 0, priceDp: 8, stops: 'price', pnl: 'typed', mult: null,
     correct: true, costs: true, option: 'no',
   },
 });
 
 const fx = (pip: string | null, mult: string | null, stops: StopUnit, pnl: PnlMode): InstrumentRow => ({ pip, mult, stops, pnl });
-const fut = (tick: string, mult: string): InstrumentRow => ({ tick, mult, pnl: 'prices' });
+const fut = (tick: string, mult: string): InstrumentRow => ({ tick, mult, stops: 'pts', pnl: 'prices' });
 const b3fut = (tick: string, mult: string): InstrumentRow => ({ assetType: 'futures', tick, mult, priceDp: 8, stops: 'pts', pnl: 'prices' });
+/** A B3 catalog stock or ETF: 1:1 in R$, up to 4 decimals, no tick check (board choice 27) */
+const b3acao = (): InstrumentRow => ({ priceDp: 4, mult: '1', pnl: 'prices' });
 
 /** Keyed by tradeMatchKey: MESM6 → MES, WINZ26 → WIN, EUR/USD → EURUSD */
 export const INSTRUMENT_SPEC: Readonly<Partial<Record<AccountMarket, Readonly<Record<string, InstrumentRow>>>>> = deepFreeze({
@@ -150,6 +157,7 @@ export const INSTRUMENT_SPEC: Readonly<Partial<Record<AccountMarket, Readonly<Re
     WDO: b3fut('0.5', '10'),
     DOL: b3fut('0.5', '50'),
     DI1: { assetType: 'futures', tick: null, mult: null, priceDp: 3, stops: 'price', pnl: 'typed' },
+    ...Object.fromEntries(ACOES_B3.map((code) => [code, b3acao()])),
   },
   forex: {
     EURUSD: fx('0.0001', '100000', 'pips', 'prices'),
