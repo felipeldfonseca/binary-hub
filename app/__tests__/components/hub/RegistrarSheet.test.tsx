@@ -233,16 +233,16 @@ describe('where it starts (§4.2)', () => {
     expect(screen.queryByRole('button', { name: 'Registrar entrada' })).not.toBeInTheDocument()
   })
 
-  it('an account that cannot register (FTMO) opens on the first one that can, primary first', async () => {
-    abrir({ accountId: ids.accounts.ftmo })
+  it('an account the sheet cannot register on (not among the active ones) opens on the first one that can, primary first', async () => {
+    abrir({ accountId: 'conta-arquivada' })
     await screen.findByRole('heading', { level: 3, name: 'Entrada' })
     expect(screen.getByRole('button', { name: 'Trocar a conta: Top One #1' })).toBeInTheDocument()
   })
 
-  it('no account to register on: says so, with «Fechar»', async () => {
-    fetchAccounts.mockResolvedValue(contasTelas().filter((a) => a.market === 'forex'))
+  it('no active account: says so, with «Fechar» (3-4: every market registers)', async () => {
+    fetchAccounts.mockResolvedValue([])
     const { onClose } = abrir({ accountId: null })
-    expect(await screen.findByText('Nenhuma conta de Futuros ou de binárias para registrar.')).toBeInTheDocument()
+    expect(await screen.findByText('Nenhuma conta ativa para registrar.')).toBeInTheDocument()
     const fechar = screen.getAllByRole('button', { name: 'Fechar' })
     await userEvent.click(fechar[fechar.length - 1])
     expect(onClose).toHaveBeenCalled()
@@ -280,7 +280,8 @@ describe('the account inside the sheet (D4)', () => {
     await screen.findByRole('heading', { level: 3, name: 'Entrada' })
     await userEvent.click(screen.getByRole('button', { name: 'Trocar a conta: Top One #1' }))
     expect(screen.getByText('Contas de mercados diferentes nunca são somadas.')).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: /FTMO/ })).not.toBeInTheDocument()
+    // Every market registers since 3-4 (the end of D36): FTMO (forex) is in the list too
+    expect(screen.getByRole('button', { name: 'FTMO · Avaliação' })).toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: 'Ebinex · Pessoal' }))
     expect(await screen.findByRole('button', { name: 'Trocar a conta: Ebinex' })).toBeInTheDocument()
     expect(screen.getByRole('group', { name: 'Par' })).toBeInTheDocument()

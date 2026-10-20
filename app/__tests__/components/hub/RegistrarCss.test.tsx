@@ -9,7 +9,8 @@ import fs from 'fs'
 import path from 'path'
 import React from 'react'
 import { render } from '@testing-library/react'
-import { GrupoPills } from '@/components/hub/registrar/ui'
+import { CampoTexto, GrupoPills } from '@/components/hub/registrar/ui'
+import BlocoResultado from '@/components/hub/registrar/BlocoResultado'
 
 const lerCss = (nome: string) => fs.readFileSync(path.join(__dirname, '../../../styles', nome), 'utf8')
 const css = lerCss('hub-registrar.css')
@@ -206,5 +207,103 @@ describe('the cascade on the sheet’s pills', () => {
       expect(vencedora(lado, 'min-width', medias)?.valor).toBe('44px')
       expect(vencedora(lado, 'min-height', medias)?.valor).toBe('44px')
     }
+  })
+})
+
+describe('the 3-4 fields of the price markets (contract 3-4 §5.11)', () => {
+  const noop = () => undefined
+  const PHONE = ['(max-width: 640px)', '(max-width: 420px)']
+
+  function campos() {
+    const { container } = render(
+      <div className="hub" data-tema="claro">
+        <section className="hub-folha hub-reg">
+          <CampoTexto id="f-busca" rotulo="Buscar ativo" valor="" aoMudar={noop} tipo="search" mono={false} classe="hub-reg-busca" />
+          <CampoTexto id="f-q" rotulo="Quantos lotes?" valor="" aoMudar={noop} decimal classe="hub-reg-curto" />
+          <CampoTexto id="f-res" rotulo="Resultado, US$" valor="" aoMudar={noop} classe="hub-reg-curto" notaTexto="Antes da comissão." />
+          <div className="hub-campos2">
+            <CampoTexto id="f-preco" rotulo="Preço de entrada" valor="" aoMudar={noop} decimal />
+            <CampoTexto id="f-hora" rotulo="Hora (ET)" valor="" aoMudar={noop} tipo="time" />
+          </div>
+          <div className="hub-campos2 hub-reg-sempre">
+            <CampoTexto id="f-stop" rotulo="Stop" valor="" aoMudar={noop} decimal />
+            <CampoTexto id="f-alvo" rotulo="Alvo" valor="" aoMudar={noop} decimal />
+          </div>
+        </section>
+      </div>,
+    )
+    const el = (id: string) => container.querySelector(`#${id}`) as HTMLElement
+    return { el, pares: Array.from(container.querySelectorAll('.hub-campos2')) as HTMLElement[] }
+  }
+
+  it('«Buscar ativo» is 280 px at most and the whole width below that; the short fields 200 px', () => {
+    const { el } = campos()
+    for (const medias of [[], PHONE]) {
+      expect(vencedora(el('f-busca'), 'max-width', medias)?.valor).toBe('280px')
+      expect(vencedora(el('f-busca'), 'width', medias)?.valor).toBe('100%')
+      expect(vencedora(el('f-q'), 'max-width', medias)?.valor).toBe('200px')
+      expect(vencedora(el('f-res'), 'max-width', medias)?.valor).toBe('200px')
+      expect(vencedora(el('f-q'), 'width', medias)?.valor).toBe('100%')
+    }
+    expect(el('f-busca')).toHaveAttribute('type', 'search')
+    expect(el('f-res')).toHaveAttribute('aria-describedby', 'n-res')
+  })
+
+  it('writes the search and the new fields at 16 px on phones (iOS zooms below that)', () => {
+    const { el } = campos()
+    for (const id of ['f-busca', 'f-q', 'f-res']) {
+      expect(vencedora(el(id), 'font-size', PHONE)?.valor).toBe('16px')
+      expect(vencedora(el(id), 'min-height')?.valor).toBe('44px')
+    }
+  })
+
+  it('at 420 px the price and hour pairs fall to one column; «Stop/Alvo» keep two', () => {
+    const { pares } = campos()
+    const [precoHora, stopAlvo] = pares
+    expect(vencedora(precoHora, 'grid-template-columns')?.valor).toBe('repeat(2, minmax(0, 1fr))')
+    expect(vencedora(precoHora, 'grid-template-columns', PHONE)?.valor).toBe('minmax(0, 1fr)')
+    expect(vencedora(stopAlvo, 'grid-template-columns', PHONE)?.valor).toBe('repeat(2, minmax(0, 1fr))')
+  })
+
+  it('the result line wraps: «Corrigir» / «Usar o calculado» drops under a line it does not fit beside (RO `.linha-i`, l.99); outside the sheet, hub.css as it was', () => {
+    const bloco = {
+      linha: 'Resultado: +26,0 pips · ≈ +US$ 51,66',
+      corrigir: { rotulo: 'Usar o calculado', aberto: true },
+      notaEstimativa: null,
+      campo: null,
+      custos: null,
+      calculado: '51,66',
+    }
+    const { container } = render(
+      <div className="hub" data-tema="claro">
+        <section className="hub-folha hub-reg">
+          <BlocoResultado linha={bloco.linha} bloco={bloco} aoCorrigir={noop} aoMudarRes={noop} aoMudarCustos={noop} />
+        </section>
+        <div className="hub-linha-i" data-testid="fora">
+          <span>Importação</span>
+        </div>
+      </div>,
+    )
+    const linha = container.querySelector('.hub-reg .hub-linha-i') as HTMLElement
+    expect(linha).toContainElement(container.querySelector('button[aria-controls="caixa-res"]') as HTMLElement)
+    for (const medias of [[], PHONE]) {
+      expect(vencedora(linha, 'flex-wrap', medias)?.valor).toBe('wrap')
+      expect(vencedora(linha, 'gap', medias)?.valor).toMatch(/^0(px)? 10px$/)
+    }
+    const fora = container.querySelector('[data-testid="fora"]') as HTMLElement
+    expect(vencedora(fora, 'flex-wrap')).toBeNull()
+    expect(vencedora(fora, 'gap')?.valor).toBe('10px')
+  })
+
+  it('pills wrap (B3 contracts are six, «Cotada em» four)', () => {
+    const { container } = render(
+      <div className="hub" data-tema="escuro">
+        <section className="hub-folha hub-reg">
+          <GrupoPills id="q" titulo="Contratos" opcoes={['1', '2', '3', '5', '10', 'Outro'].map((v) => ({ valor: v, rotulo: v }))} valor="1" aoEscolher={noop} pillClasse="hub-reg-pill-q" />
+        </section>
+      </div>,
+    )
+    const grupo = container.querySelector('[role="group"]') as HTMLElement
+    expect(vencedora(grupo, 'flex-wrap', PHONE)?.valor).toBe('wrap')
   })
 })

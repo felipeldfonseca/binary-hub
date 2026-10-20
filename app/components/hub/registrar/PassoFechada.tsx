@@ -27,8 +27,9 @@ export interface PassoFechadaProps {
 const TOM: Record<'mint' | 'red' | 'neutral', string> = { mint: 'var(--mint)', red: 'var(--red)', neutral: 'var(--text)' }
 
 /**
- * Step 3 · «Operação fechada» (RO l.484–546, 1291–1346): the result, the exit banner, the plan,
- * the marks before the exit and after the result, «Marcar ou mudar», «Imagens e nota», and
+ * Step 3 · «Operação fechada» (RO l.484–546, 1291–1346): the result (3-4: with how it is known, a
+ * typed or estimated result, and the costs with the net), the exit banner, the plan, the marks
+ * before the exit and after the result, «Marcar ou mudar», «Imagens e nota», and
  * «Registrar outra» / «Ver no Diário» (both save what is pending first).
  */
 export default function PassoFechada({ conta, view, aviso, fora, headingRef, aoRegistrarOutra, aoVerNoDiario }: PassoFechadaProps) {
@@ -75,6 +76,9 @@ export default function PassoFechada({ conta, view, aviso, fora, headingRef, aoR
           {cartao.valor}
         </span>
         <span className="hub-nota hub-num">{cartao.linha}</span>
+        {/* 3-4 (RO l.490–491): «Resultado digitado por você.» / the estimate's base, and «Custos US$ 7,00 · líquido +US$ 50,50» */}
+        {cartao.base && <span className="hub-nota">{cartao.base}</span>}
+        {cartao.custos && <span className="hub-nota hub-num">{cartao.custos}</span>}
         {cartao.r && (
           <span className="hub-reg-txt">
             <b className="hub-num">{cartao.r.valor}</b> {cartao.r.sub}

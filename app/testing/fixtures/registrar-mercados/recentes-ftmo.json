@@ -1,0 +1,57 @@
+[
+  {
+    "source": "after",
+    "symbol": "XAUUSD",
+    "quantity": 0.2,
+    "direction": "short",
+    "asset_type": "forex",
+    "entry_time": "2026-10-15T12:45:00+00:00",
+    "stake_amount": null,
+    "payout_percent": null,
+    "duration_seconds": null
+  },
+  {
+    "source": "live",
+    "symbol": "EUR/GBP",
+    "quantity": 0.5,
+    "direction": "short",
+    "asset_type": "forex",
+    "entry_time": "2026-10-15T12:40:04.981089+00:00",
+    "stake_amount": null,
+    "payout_percent": null,
+    "duration_seconds": null
+  },
+  {
+    "source": "live",
+    "symbol": "USD/JPY",
+    "quantity": 0.3,
+    "direction": "short",
+    "asset_type": "forex",
+    "entry_time": "2026-10-15T12:40:04.960558+00:00",
+    "stake_amount": null,
+    "payout_percent": null,
+    "duration_seconds": null
+  },
+  {
+    "source": "live",
+    "symbol": "USD/JPY",
+    "quantity": 0.3,
+    "direction": "short",
+    "asset_type": "forex",
+    "entry_time": "2026-10-15T12:40:04.939682+00:00",
+    "stake_amount": null,
+    "payout_percent": null,
+    "duration_seconds": null
+  },
+  {
+    "source": "live",
+    "symbol": "EUR/USD",
+    "quantity": 0.5,
+    "direction": "long",
+    "asset_type": "forex",
+    "entry_time": "2026-10-15T12:40:04.913598+00:00",
+    "stake_amount": null,
+    "payout_percent": null,
+    "duration_seconds": null
+  }
+]

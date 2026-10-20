@@ -259,7 +259,7 @@ delete from public.profiles where id = '${uid}';`);
   const entries: [string, AccountMarket, Omit<EntryFields, 'clock'>][] = [
     ['MES long 2, stop 11, target 22', 'futures', { symbol: 'MES', direction: 'long', quantity: '2', entryPrice: '7896.25', stop: '11', target: '22' }],
     ['MESM6 short 1, typed 5 minutes back', 'futures', { symbol: 'MESM6', direction: 'short', quantity: '1', entryPrice: '7957', stop: '9', entry: hmAgo(NY, 5) }],
-    ['RTY (typed result)', 'futures', { symbol: 'RTY', direction: 'long', quantity: '1', entryPrice: '2250.1', stop: '5.5' }],
+    ['RTY (typed result, a price stop)', 'futures', { symbol: 'RTY', direction: 'long', quantity: '1', entryPrice: '2250.1', stop: '2244.6' }],
     ['EUR/USD in pips', 'forex', { symbol: 'EUR/USD', direction: 'long', quantity: '0.25', entryPrice: '1.08520', stop: '15', target: '30' }],
     ['USD/JPY short', 'forex', { symbol: 'USD/JPY', direction: 'short', quantity: '1', entryPrice: '151.240', stop: '20', target: '35' }],
     ['AAPL shares', 'stocks', { symbol: 'AAPL', direction: 'long', quantity: '10.5', entryPrice: '231.4', stop: '225', target: '240' }],

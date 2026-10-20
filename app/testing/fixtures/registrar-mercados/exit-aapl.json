@@ -1,0 +1,174 @@
+{
+  "r": 1.5,
+  "pnl": 75,
+  "gate": {
+    "at": "2026-10-15T13:52:04.824234+00:00",
+    "block": {
+      "state": "nao_avaliado",
+      "reason": "so_futuros"
+    },
+    "desde": "2026-10-13T13:00:05.70898+00:00",
+    "label": "IBKR",
+    "limit": {
+      "state": "nao_avaliado",
+      "reason": "sem_limite"
+    },
+    "today": {
+      "trades": 1,
+      "net_usd": 110,
+      "worst_usd": 0
+    },
+    "market": "stocks",
+    "status": null,
+    "window": {
+      "state": "nao_avaliado",
+      "reason": "sem_janela"
+    },
+    "version": {
+      "id": "f31a8f0f-784b-4af6-a5d2-b505f9c6943c",
+      "origin": "criar",
+      "version_no": 1,
+      "effective_from": "2026-10-13T13:00:05.70898+00:00"
+    },
+    "warnings": [],
+    "desde_day": "2026-10-13",
+    "account_id": "24916314-b68f-47e1-9055-dff69eae3936",
+    "changes_at": "2026-10-16T00:00:00+00:00",
+    "state_rule": {
+      "state": "nao_avaliado",
+      "reason": "so_futuros"
+    },
+    "trading_day": "2026-10-15",
+    "checks_evaluated": []
+  },
+  "plan": {
+    "breaks": [],
+    "verdict": "nao_avaliado",
+    "checks_evaluated": []
+  },
+  "marks": [
+    {
+      "id": 21,
+      "kind": "setup",
+      "limpa": true,
+      "value": "B",
+      "marked_at": "2026-10-15T13:52:04.824234+00:00"
+    }
+  ],
+  "trade": {
+    "id": "04d738ad-4430-4454-b2d8-4095591f59c5",
+    "pnl": 75,
+    "note": null,
+    "option": null,
+    "result": "win",
+    "source": "live",
+    "status": "closed",
+    "symbol": "AAPL",
+    "quantity": 100,
+    "direction": "long",
+    "exit_time": "2026-10-15T14:00:04.961166+00:00",
+    "pnl_basis": "prices",
+    "timeframe": null,
+    "account_id": "24916314-b68f-47e1-9055-dff69eae3936",
+    "asset_type": "stock",
+    "commission": null,
+    "entry_time": "2026-10-15T13:52:04.824234+00:00",
+    "exit_price": 232.15,
+    "expires_at": null,
+    "stop_price": 230.9,
+    "entry_price": 231.4,
+    "trading_day": "2026-10-15",
+    "stake_amount": null,
+    "target_price": 232.4,
+    "note_saved_at": null,
+    "registered_at": "2026-10-15T13:52:04.824234+00:00",
+    "payout_percent": null,
+    "duration_seconds": null,
+    "exit_registered_at": "2026-10-15T14:00:04.961166+00:00"
+  },
+  "images": [],
+  "points": 0.75,
+  "result": "win",
+  "context": {
+    "origin": "live",
+    "rule_ok": null,
+    "in_block": null,
+    "warnings": [],
+    "in_window": null,
+    "after_limit": null,
+    "captured_at": "2026-10-15T13:52:04.824234+00:00",
+    "gate_status": null,
+    "evaluated_at": "2026-10-15T13:52:04.824234+00:00",
+    "state_choice": null,
+    "checks_evaluated": [],
+    "day_pnl_at_entry": null,
+    "day_worst_at_entry": null
+  },
+  "dry_run": false,
+  "exit_at": "2026-10-15T14:00:04.961166+00:00",
+  "version": {
+    "id": "f31a8f0f-784b-4af6-a5d2-b505f9c6943c",
+    "version_no": 1
+  },
+  "entry_at": "2026-10-15T13:52:04.824234+00:00",
+  "gate_now": {
+    "at": "2026-10-15T14:00:04.961166+00:00",
+    "block": {
+      "state": "nao_avaliado",
+      "reason": "so_futuros"
+    },
+    "desde": "2026-10-13T13:00:05.70898+00:00",
+    "label": "IBKR",
+    "limit": {
+      "state": "nao_avaliado",
+      "reason": "sem_limite"
+    },
+    "today": {
+      "trades": 2,
+      "net_usd": 185,
+      "worst_usd": 0
+    },
+    "market": "stocks",
+    "status": null,
+    "window": {
+      "state": "nao_avaliado",
+      "reason": "sem_janela"
+    },
+    "version": {
+      "id": "f31a8f0f-784b-4af6-a5d2-b505f9c6943c",
+      "origin": "criar",
+      "version_no": 1,
+      "effective_from": "2026-10-13T13:00:05.70898+00:00"
+    },
+    "warnings": [],
+    "desde_day": "2026-10-13",
+    "account_id": "24916314-b68f-47e1-9055-dff69eae3936",
+    "changes_at": "2026-10-16T00:00:00+00:00",
+    "state_rule": {
+      "state": "nao_avaliado",
+      "reason": "so_futuros"
+    },
+    "trading_day": "2026-10-15",
+    "checks_evaluated": []
+  },
+  "repeated": false,
+  "trade_id": "04d738ad-4430-4454-b2d8-4095591f59c5",
+  "marks_now": [
+    {
+      "kind": "setup",
+      "clean_at": "2026-10-15T13:52:04.824234+00:00",
+      "current_at": "2026-10-15T13:52:04.824234+00:00",
+      "clean_value": "B",
+      "changed_after": false,
+      "current_limpa": true,
+      "current_value": "B"
+    }
+  ],
+  "pnl_basis": "prices",
+  "commission": null,
+  "exit_price": 232.15,
+  "server_now": "2026-10-15T14:00:04.961166+00:00",
+  "trading_day": "2026-10-15",
+  "registered_at": "2026-10-15T13:52:04.824234+00:00",
+  "exit_registered_at": "2026-10-15T14:00:04.961166+00:00"
+}

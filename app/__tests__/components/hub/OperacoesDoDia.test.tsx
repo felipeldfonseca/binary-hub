@@ -2,7 +2,8 @@
  * «Operações do dia» on /diario (Phase 3, lane B; D16): the rows of the approved board from the
  * recorded fixtures of the board's scenario 10 (invented data, real SQL answers), its states, the
  * row's action (the Registrar sheet, stubbed: lane A's), and /diario around it at the owner's test
- * instants.
+ * instants. Since 3-4 (the end of D36) every market has it: the board's FTMO, IBKR, Binance and Clear
+ * rows from the 3-4 recordings (testing/registrarMercados).
  */
 import fs from 'fs'
 import path from 'path'
@@ -27,6 +28,7 @@ import { regrasKeys } from '@/hooks/useRegras'
 import { registrarKeys } from '@/hooks/useRegistrar'
 import type { RulesNow } from '@/lib/hub/regras'
 import { agoraTelas, contasTelas, diaRowsTelas, diaTelas, idsTelas } from '@/testing/registrarTelas'
+import { agoraMercados, contasMercados, diaMercados, diaRowsMercados, idsMercados } from '@/testing/registrarMercados'
 
 jest.mock('@/lib/supabase', () => ({ createDataClient: jest.fn(() => ({})) }))
 
@@ -262,6 +264,90 @@ describe('«Operações do dia» · the rows of the board', () => {
   })
 })
 
+describe('«Operações do dia» · the new markets (3-4; RO l.1649–1662)', () => {
+  const m = idsMercados()
+
+  /** /diario's bridge on one of the board's 3-4 accounts, at the recorded instant */
+  async function rowsDe(conta: string, agora: Parameters<typeof agoraMercados>[0], dia: Parameters<typeof diaMercados>[0]) {
+    fetchAccounts.mockResolvedValue(contasMercados())
+    fetchPreferences.mockResolvedValue({ conta_atual: conta })
+    fetchRulesNow.mockResolvedValue(agoraMercados(agora))
+    fetchDayTrades.mockResolvedValue(diaMercados(dia))
+    renderHub(<OperacoesDoDia />)
+    return rowsOf()
+  }
+
+  it('FTMO (forex): lots, the estimate and the corrected USD/JPY, the open EUR/GBP asking for its exit, XAUUSD typed', async () => {
+    expect(await rowsDe(m.accounts.ftmo, 'ftmo-qui-0840', 'ftmo')).toEqual([
+      ['08:40–09:01', 'EUR/USD · Compra · 0,50 lote', '+US$ 57,50', 'No plano', 'Abrir'],
+      ['08:40–09:01', 'USD/JPY · Venda · 0,30 lote', '+US$ 51,66', 'No plano', 'Abrir'],
+      ['08:40–09:01', 'USD/JPY · Venda · 0,30 lote', '+US$ 50,10', 'No plano', 'Abrir'],
+      ['08:40', 'EUR/GBP · Venda · 0,50 lote', 'aberta', 'No plano', 'Registrar saída'],
+      ['08:45–08:58', 'XAUUSD · Venda · 0,20 lote', '+US$ 105,00', 'No plano', 'Abrir'],
+    ])
+    expect(fetchDayTrades).toHaveBeenCalledWith(expect.anything(), m.accounts.ftmo, '2026-10-15', expect.any(Date))
+    const region = await ponte()
+    expect(within(region).getByRole('button', { name: 'Registrar saída: Venda de EUR/GBP às 08:40' })).toBeInTheDocument()
+  })
+
+  it('IBKR (stocks): the option as «SPY Call 790 · vence 15 out», shares, «Venceu sem valor» at 16:00; plan «—» without a window', async () => {
+    expect(await rowsDe(m.accounts.ibkr, 'ibkr-qui-0952', 'ibkr')).toEqual([
+      ['09:35–09:48', 'SPY Call 790 · vence 15 out · Compra · 2 ct', '+US$ 110,00', '—plano não avaliado', 'Abrir'],
+      ['09:52–10:00', 'AAPL · Compra · 100 ações', '+US$ 75,00', '—plano não avaliado', 'Abrir'],
+      ['09:52–16:00', 'SPY Call 790 · vence 15 out · Compra · 2 ct', '−US$ 370,00', '—plano não avaliado', 'Abrir'],
+    ])
+    const region = await ponte()
+    expect(within(region).getByRole('button', { name: 'Abrir no Registrar: Compra de SPY Call 790 às 09:35' })).toBeInTheDocument()
+    expect(within(region).getByRole('button', { name: 'Abrir no Registrar: Compra de AAPL às 09:52' })).toBeInTheDocument()
+  })
+
+  it('an open option asks for its exit: «Registrar saída: Compra de SPY Call 790 às 09:35» (RO l.1661)', () => {
+    const rows = diaRowsMercados('ibkr') as { trades: Record<string, unknown>[] } & DayTradesRows
+    rows.trades[0] = { ...rows.trades[0], status: 'open', exit_time: null, exit_price: null, pnl: null, result: 'pending' }
+    const [aberta] = dayTradesOfRows(rows)
+    expect(linhaDoDia(aberta, { market: 'stocks', day: '2026-10-15', tz: 'America/New_York' })).toMatchObject({
+      hora: '09:35',
+      operacao: 'SPY Call 790 · vence 15 out · Compra · 2\u00a0ct',
+      resultado: null,
+      acao: 'Registrar saída',
+      acaoAria: 'Registrar saída: Compra de SPY Call 790 às 09:35',
+    })
+  })
+
+  it('Binance (crypto) on Brasília’s clock on a Saturday: «BTC/USDT · Venda · 0,25 BTC»', async () => {
+    expect(await rowsDe(m.accounts.binance, 'binance-sab-2035', 'binance')).toEqual([
+      ['20:35–21:02', 'BTC/USDT · Venda · 0,25 BTC', '+US$ 112,50', 'No plano', 'Abrir'],
+    ])
+    expect(fetchDayTrades).toHaveBeenCalledWith(expect.anything(), m.accounts.binance, '2026-10-17', new Date('2026-10-17T03:00:00Z'))
+    const region = await ponte()
+    expect(within(region).getByRole('button', { name: 'Abrir no Registrar: Venda de BTC/USDT às 20:35' })).toBeInTheDocument()
+  })
+
+  it('Clear (B3): every amount in R$, contracts, «2 un.» outside the catalog, «● depois do limite» after 10:16', async () => {
+    const rows = await rowsDe(m.accounts.clear, 'clear-qui-1020', 'clear')
+    expect(rows).toEqual([
+      ['10:01–10:05', 'WIN · Compra · 3 ct', '−R$ 180,00', 'No plano', 'Abrir'],
+      ['10:07–10:11', 'WIN · Venda · 5 ct', '−R$ 210,00', 'No plano', 'Abrir'],
+      ['10:13–10:16', 'WDO · Compra · 3 ct', '−R$ 150,00', 'No plano', 'Abrir'],
+      ['10:17–10:19', 'BGIX26 · Compra · 2 un.', '+R$ 150,00', '● depois do limite', 'Abrir'],
+      ['10:20–10:31', 'WIN · Venda · 3 ct', '+R$ 90,00', '● depois do limite', 'Abrir'],
+    ])
+    const region = await ponte()
+    expect(within(region).getByText('−R$ 180,00')).toHaveClass('hub-tom--red')
+    expect(within(region).getByText('+R$ 90,00')).toHaveClass('hub-tom--mint')
+    expect(within(region).queryByText(/US\$/)).not.toBeInTheDocument()
+  })
+
+  it('keeps the amount with its unit (no-break space) in every market', () => {
+    const ops = (['ftmo', 'ibkr', 'binance', 'clear'] as const).flatMap((n) =>
+      linhasDoDia(diaMercados(n), { market: contasMercados().find((c) => c.id === m.accounts[n])!.market, day: '2026-10-15', tz: 'America/New_York' }).map(
+        (l) => l.operacao.split(' · ').pop()!,
+      ),
+    )
+    expect(ops).toEqual(['0,50\u00a0lote', '0,30\u00a0lote', '0,30\u00a0lote', '0,50\u00a0lote', '0,20\u00a0lote', '2\u00a0ct', '100\u00a0ações', '2\u00a0ct', '0,25\u00a0BTC', '3\u00a0ct', '5\u00a0ct', '3\u00a0ct', '2\u00a0un.', '3\u00a0ct'])
+  })
+})
+
 describe('«Operações do dia» · states', () => {
   it('«Carregando…» while the day is read', async () => {
     fetchDayTrades.mockReturnValue(new Promise(() => {}))
@@ -370,20 +456,21 @@ describe('«Operações do dia» · states', () => {
     expect(await within(region).findByRole('table')).toBeInTheDocument()
   })
 
-  it('nothing for an account without a Registrar in 3-3 (FTMO, forex), nor without an account', async () => {
+  it('every market registers since 3-4 (the end of D36): FTMO (forex) reads its day; nothing without an account', async () => {
     fetchPreferences.mockResolvedValue({ conta_atual: ids.accounts.ftmo })
+    fetchDayTrades.mockResolvedValue([])
     const view = renderHub(
       <>
         <DiarioCabecalho />
         <OperacoesDoDia />
       </>,
     )
-    // The accounts are there: the selector shows FTMO
+    // The accounts are there: the selector shows FTMO, and the bridge reads FTMO's day
     expect(await screen.findByRole('button', { name: /^Conta: FTMO/ })).toBeInTheDocument()
-    await waitFor(() => expect(fetchRulesNow).toHaveBeenCalled())
-    expect(screen.queryByRole('region', { name: 'Operações do dia' })).not.toBeInTheDocument()
-    expect(fetchDayTrades).not.toHaveBeenCalled()
+    expect(await within(await ponte()).findByText('Nenhuma operação registrada hoje.')).toBeInTheDocument()
+    expect(fetchDayTrades).toHaveBeenCalledWith(expect.anything(), ids.accounts.ftmo, '2026-10-22', expect.any(Date))
     view.unmount()
+    fetchDayTrades.mockClear()
 
     fetchAccounts.mockResolvedValue([])
     renderHub(

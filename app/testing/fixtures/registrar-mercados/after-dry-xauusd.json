@@ -1,0 +1,136 @@
+{
+  "r": 1.5,
+  "pnl": 105,
+  "gate": {
+    "at": "2026-10-15T12:45:00+00:00",
+    "block": {
+      "state": "nao_avaliado",
+      "reason": "so_futuros"
+    },
+    "desde": "2026-10-13T13:00:05.70898+00:00",
+    "label": "FTMO",
+    "limit": {
+      "usd": 1000,
+      "mode": "conta",
+      "near": false,
+      "used": 0,
+      "state": "ok",
+      "hit_at": null,
+      "reason": null,
+      "trades": 0,
+      "net_usd": 0,
+      "at_limit": "encerrar",
+      "worst_usd": 0
+    },
+    "today": {
+      "trades": 0,
+      "net_usd": 0,
+      "worst_usd": 0
+    },
+    "market": "forex",
+    "status": "liberado",
+    "window": {
+      "next": {
+        "opens_at": "2026-10-16T12:00:00+00:00",
+        "closes_at": "2026-10-16T14:00:00+00:00",
+        "trading_day": "2026-10-16"
+      },
+      "state": "dentro",
+      "reason": null,
+      "current": {
+        "opens_at": "2026-10-15T12:00:00+00:00",
+        "closes_at": "2026-10-15T14:00:00+00:00"
+      },
+      "position": "dentro"
+    },
+    "version": {
+      "id": "458beaa9-e085-4e82-b4d4-d01314d639d7",
+      "origin": "criar",
+      "version_no": 1,
+      "effective_from": "2026-10-13T13:00:05.70898+00:00"
+    },
+    "warnings": [],
+    "desde_day": "2026-10-13",
+    "account_id": "3434de2d-2828-43b9-9b21-5c19a23fa22f",
+    "changes_at": "2026-10-15T14:00:00+00:00",
+    "state_rule": {
+      "state": "nao_avaliado",
+      "reason": "so_futuros"
+    },
+    "trading_day": "2026-10-15",
+    "checks_evaluated": [
+      "janela",
+      "limite"
+    ]
+  },
+  "plan": {
+    "breaks": [],
+    "verdict": "no_plano",
+    "checks_evaluated": [
+      "janela",
+      "limite"
+    ]
+  },
+  "points": 5.25,
+  "result": "win",
+  "context": {
+    "rule_ok": null,
+    "in_block": null,
+    "warnings": [],
+    "in_window": true,
+    "after_limit": false,
+    "gate_status": "liberado",
+    "state_choice": null,
+    "checks_evaluated": [
+      "janela",
+      "limite"
+    ],
+    "day_pnl_at_entry": 0,
+    "day_worst_at_entry": 0
+  },
+  "dry_run": true,
+  "exit_at": "2026-10-15T12:58:00+00:00",
+  "preview": {
+    "risk": null,
+    "reward": null,
+    "stop_points": 3.5,
+    "target_points": 9.5
+  },
+  "similar": [],
+  "version": {
+    "id": "458beaa9-e085-4e82-b4d4-d01314d639d7",
+    "version_no": 1
+  },
+  "entry_at": "2026-10-15T12:45:00+00:00",
+  "repeated": false,
+  "pnl_basis": "typed",
+  "commission": 7,
+  "exit_price": 4404.55,
+  "expires_at": null,
+  "instrument": {
+    "key": "XAUUSD",
+    "pip": null,
+    "pnl": "typed",
+    "mult": null,
+    "tick": null,
+    "costs": true,
+    "known": false,
+    "stops": "price",
+    "qty_dp": 2,
+    "correct": true,
+    "price_dp": 5,
+    "asset_type": "forex"
+  },
+  "limit_room": {
+    "usd": 1000,
+    "left": 1000,
+    "risk": null,
+    "above": false,
+    "net_usd": 0,
+    "reached": false
+  },
+  "server_now": "2026-10-15T13:01:05.099798+00:00",
+  "stop_price": 4413.3,
+  "trading_day": "2026-10-15",
+  "target_price": 4400.3
+}

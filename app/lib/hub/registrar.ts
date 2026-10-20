@@ -2,16 +2,21 @@
  * «Registrar operação» (Phase 3, PR 3-3): what both screen lanes need besides the database calls
  * (registrarDb) and the hooks (hooks/useRegistrar). Pure: no React, no client.
  *
- *   podeRegistrar        which accounts get the button and the sheet in 3-3 (Futuros and Ebinex;
- *                        the new markets keep their interim state until 3-4, D36)
+ *   podeRegistrar        which accounts get the button and the sheet: every market since 3-4 (the
+ *                        end of D36)
  *   padroesDoRegistrar   the form's starting values from the account's recent trades (D5, D6)
  *   diaDeHoje            the account's trading day now (rules_now's, else its day clock's)
  *   inicioDoDia          the instant today's trading day began (the bridge's «fechadas hoje»)
  *   avisoDoLimite        the exit banner: the limit reached (always) or 80 % of it (with the
  *                        preference on), only when this exit crossed it (D9, registrar §11.4)
+ *
+ * 3-4 adds the new markets' starting values (padroesDoRegistrar: the last instruments, the quote,
+ * the quantities per kind), their chips (LOT_CHIPS, B3_CONTRACT_CHIPS, B3_CHIPS, EXEMPLOS_ATIVO) and
+ * «Cotada em» (COTACOES, cotacaoDoSimbolo). What each instrument's form looks like is
+ * lib/hub/registrarAtivos'.
  */
 import { tradingDayBounds, tradingDayOn, type DayClock } from '@/lib/domain';
-import { MARKET_SPEC, type AccountMarket, type Currency } from '@/lib/domain/markets';
+import { ACCOUNT_MARKETS, MARKET_SPEC, type AccountMarket, type Currency } from '@/lib/domain/markets';
 import { currencyOf, type LimitCheck } from '@/lib/domain/gate';
 import { tradeMatchKey, type Direction } from '@/lib/domain/registro';
 
@@ -20,11 +25,12 @@ import { tradeMatchKey, type Direction } from '@/lib/domain/registro';
 // ---------------------------------------------------------------------------------------------
 
 /**
- * The markets whose Registrar form PR 3-3 builds. Forex, Ações e opções, Cripto and B3 accounts get
- * no «Registrar operação» (header, end of account creation, the sheet's account list) and keep
- * their «… na Fase 3» texts until PR 3-4 ships their variants (D36).
+ * The markets whose accounts register: every one since PR 3-4 (Futuros and binárias in 3-3; Forex,
+ * Ações e opções, Cripto and B3 in 3-4, and a backfilled `options` account with «Opção» fixed). The
+ * header button, /diario?registrar=1, the end of account creation, the sheet's account list and
+ * «Operações do dia» follow it; the interim «… na Fase 3» texts of D36 are gone.
  */
-export const REGISTRAR_MARKETS: readonly AccountMarket[] = ['futures', 'binary'];
+export const REGISTRAR_MARKETS: readonly AccountMarket[] = ACCOUNT_MARKETS;
 
 export function podeRegistrar(market: AccountMarket | null | undefined): boolean {
   return !!market && (REGISTRAR_MARKETS as readonly string[]).includes(market);
@@ -36,6 +42,49 @@ export const FUTURES_CHIPS = ['MES', 'MNQ', 'MGC', 'ES', 'NQ', 'GC'] as const;
 /** «Contratos» shortcuts (RO `QF.chips`); anything else is «Outro» */
 export const CONTRACT_CHIPS = ['1', '2', '3'] as const;
 
+/** B3 futures «Contratos» shortcuts (RO `QB.chips`, 3-4) */
+export const B3_CONTRACT_CHIPS = ['1', '2', '3', '5', '10'] as const;
+
+/** Forex «Lotes» shortcuts as decimal text (RO `QL.chips`: «0,01» «0,10» «0,50» «1,00»; 3-4) */
+export const LOT_CHIPS = ['0.01', '0.1', '0.5', '1'] as const;
+
+/** The B3 instrument shortcuts (RO `conta.recentes` of Clear; 3-4) */
+export const B3_CHIPS = ['WIN', 'WDO', 'IND', 'DOL'] as const;
+
+/**
+ * The board's instrument examples when the account has no trade of that kind yet (RO l.590–593):
+ * forex, ações, opções (the underlying) and cripto (the coin). 3-4.
+ */
+export const EXEMPLOS_ATIVO = {
+  forex: ['EUR/USD', 'GBP/USD', 'USD/JPY', 'EUR/GBP', 'AUD/USD'],
+  acao: ['SPY', 'AAPL', 'NVDA', 'TSLA', 'QQQ'],
+  opcao: ['SPY', 'QQQ', 'SPX', 'NVDA', 'TSLA'],
+  crypto: ['BTC', 'ETH', 'SOL', 'XRP', 'DOGE'],
+} as const;
+
+/** «Cotada em» (cripto): the quote coins the form offers; «R$» is stored as BRL. 3-4 */
+export type Cotacao = 'USDT' | 'USDC' | 'USD' | 'R$';
+export const COTACOES: readonly Cotacao[] = ['USDT', 'USDC', 'USD', 'R$'];
+
+/**
+ * A crypto symbol as the form shows it: the coin and its quote («BTC/USDT» → BTC, USDT; «BTCUSDT»
+ * splits by the known quote suffix; «BTC/BRL» → R$). A pair quoted in anything else keeps the whole
+ * symbol as the coin, with no quote. 3-4.
+ */
+export function cotacaoDoSimbolo(symbol: string): { ativo: string; cotacao: Cotacao | null } {
+  const s = String(symbol ?? '').trim().toUpperCase();
+  const of = (q: string): Cotacao | null => (q === 'BRL' ? 'R$' : q === 'USDT' || q === 'USDC' || q === 'USD' ? q : null);
+  const slash = s.indexOf('/');
+  if (slash > 0) {
+    const q = of(s.slice(slash + 1).trim());
+    return q ? { ativo: s.slice(0, slash).trim(), cotacao: q } : { ativo: s, cotacao: null };
+  }
+  for (const q of ['USDT', 'USDC', 'BRL', 'USD']) {
+    if (s.length > q.length && s.endsWith(q)) return { ativo: s.slice(0, -q.length), cotacao: of(q) };
+  }
+  return { ativo: s, cotacao: null };
+}
+
 // ---------------------------------------------------------------------------------------------
 // Starting values
 // ---------------------------------------------------------------------------------------------
@@ -43,6 +92,11 @@ export const CONTRACT_CHIPS = ['1', '2', '3'] as const;
 /** One of the account's recent trades, as registrarDb.fetchRecentTrades reads it (newest first) */
 export interface RecentTrade {
   symbol: string;
+  /**
+   * trades.asset_type ('option' tells an option from a stock on Ações e opções; 'futures' a B3
+   * contract from a B3 stock); null when not read (3-3's recorded rows)
+   */
+  assetType?: string | null;
   direction: Direction;
   quantity: string | null;
   stake: string | null;
@@ -70,6 +124,23 @@ export interface RegistrarDefaults {
   payoutBySymbol: Record<string, string>;
   /** Binary: the last stake used in the account; null = the field starts empty */
   stake: string | null;
+  /**
+   * 3-4 (forex, stocks, options, crypto, b3): the account's last five distinct instruments of the
+   * kind, newest first (a forex pair, a stock or ETF, a crypto coin without its quote, a B3 code);
+   * absent on futures and binary
+   */
+  simbolos?: string[];
+  /** 3-4 (stocks, options): the last five distinct option underlyings, newest first */
+  simbolosOpcao?: string[];
+  /** 3-4 (stocks): what the last trade was, «Ação ou ETF» or «Opção» */
+  tipoEua?: 'acao' | 'opcao';
+  /** 3-4 (crypto): the quote of the last trade quoted in one the form offers, else USDT */
+  cotacao?: Cotacao;
+  /**
+   * 3-4: the last quantity used per quantity kind that has chips (lots on forex, contracts of an
+   * option, B3 contracts), decimal text; the form starts on that chip, or «Outro» with it
+   */
+  quantidades?: Partial<Record<'contratos' | 'contratosB3' | 'lotes', string>>;
 }
 
 const WHOLE = /^[1-9][0-9]{0,5}$/;
@@ -92,6 +163,9 @@ export function padroesDoRegistrar(market: AccountMarket, recent: readonly Recen
     if (q && q.quantity !== null) out.quantity = plainDecimal(q.quantity);
     return out;
   }
+  if (market === 'forex' || market === 'stocks' || market === 'options' || market === 'crypto' || market === 'b3') {
+    return padroesNovos(market, recent, out);
+  }
   if (market === 'binary') {
     const count = new Map<string, { n: number; last: number }>();
     recent.forEach((t, i) => {
@@ -110,6 +184,47 @@ export function padroesDoRegistrar(market: AccountMarket, recent: readonly Recen
     out.stake = st && st.stake !== null ? plainDecimal(st.stake) : null;
     return out;
   }
+  return out;
+}
+
+/** The first `n` distinct values, in order */
+function distintos(values: readonly string[], n: number): string[] {
+  const out: string[] = [];
+  for (const v of values) {
+    if (v && !out.includes(v)) out.push(v);
+    if (out.length === n) break;
+  }
+  return out;
+}
+
+const isOption = (t: RecentTrade) => t.assetType === 'option';
+
+/** 3-4: the starting values of a new market's form (the chips of recent instruments, the quote, the quantities) */
+function padroesNovos(market: 'forex' | 'stocks' | 'options' | 'crypto' | 'b3', recent: readonly RecentTrade[], out: RegistrarDefaults): RegistrarDefaults {
+  const sym = (t: RecentTrade) => t.symbol.trim().toUpperCase();
+  const qtd = (t: RecentTrade | undefined) => (t && t.quantity !== null ? plainDecimal(t.quantity) : undefined);
+  const quantidades: NonNullable<RegistrarDefaults['quantidades']> = {};
+  if (market === 'forex') {
+    out.simbolos = distintos(recent.map(sym), 5);
+    const q = qtd(recent.find((t) => t.quantity !== null));
+    if (q) quantidades.lotes = q;
+  } else if (market === 'stocks' || market === 'options') {
+    out.simbolos = market === 'stocks' ? distintos(recent.filter((t) => !isOption(t)).map(sym), 5) : [];
+    out.simbolosOpcao = distintos(recent.filter((t) => market === 'options' || isOption(t)).map(sym), 5);
+    out.tipoEua = market === 'options' || (recent[0] && isOption(recent[0])) ? 'opcao' : 'acao';
+    const q = qtd(recent.find((t) => (market === 'options' || isOption(t)) && t.quantity !== null && WHOLE.test(plainDecimal(t.quantity))));
+    if (q) quantidades.contratos = q;
+  } else if (market === 'crypto') {
+    const split = recent.map((t) => cotacaoDoSimbolo(t.symbol));
+    out.simbolos = distintos(split.map((x) => x.ativo), 5);
+    out.cotacao = split.find((x) => x.cotacao !== null)?.cotacao ?? 'USDT';
+  } else {
+    out.simbolos = distintos(recent.map(sym), 5);
+    const q = qtd(recent.find((t) => t.assetType === 'futures' && t.quantity !== null && WHOLE.test(plainDecimal(t.quantity))));
+    if (q) quantidades.contratosB3 = q;
+  }
+  out.symbol = (market === 'options' || out.tipoEua === 'opcao' ? out.simbolosOpcao?.[0] : out.simbolos?.[0]) ?? null;
+  out.quantidades = quantidades;
   return out;
 }
 

@@ -8,22 +8,25 @@ import type { GateResult, Rules } from '@/lib/domain/gate'
 import { groupByMarket, type TradingAccount } from '@/lib/hub/contas'
 import type { AccountNow } from '@/lib/hub/regras'
 import { janelaLinha, type Tom } from '@/lib/hub/posso'
-import { avisoDoLimite, FUTURES_CHIPS, type AvisoDoLimite, type RegistrarDefaults } from '@/lib/hub/registrar'
+import { avisoDoLimite, type AvisoDoLimite, type RegistrarDefaults } from '@/lib/hub/registrar'
 import { RegistrarDataError, type RegistrarErrorCode } from '@/lib/hub/registrarDb'
 import { formatDecimal } from '@/lib/hub/numero'
 import { formatDiaMes } from '@/lib/hub/formato'
 import {
   DURACOES_EBINEX,
+  alternarCorrigir,
   avisoLimiteEntrada,
   descricaoSimilar,
   diaDe,
   horaRel,
   linhaGate,
   linhaLimite,
+  mercadoNovo,
   modeloEntrada,
   perguntaGate,
   quebrasDoGate,
   rascunhoMexido,
+  textoDaRecusa,
   textoQuebras,
   type CampoEntrada,
   type ContaReg,
@@ -33,7 +36,9 @@ import {
 } from '@/lib/hub/registrarForm'
 import { MARKET_LABEL, PHASE_LABEL } from '@/components/hub/contas/copy'
 import { Disclosure, InfoButton, InfoPanel, useToggle } from '@/components/hub/contas/ui'
-import { EBINEX, ENTRADA, ERRO_REGISTRAR, ERROS, FUTUROS, GATE, MARCAS, NEVER_SUMMED, RODAPE, SIMILAR } from './copy'
+import BlocoResultado from './BlocoResultado'
+import CamposPrecos from './CamposPrecos'
+import { EBINEX, ENTRADA, ERRO_REGISTRAR, ERROS, ERROS_PRECOS, GATE, MARCAS, NEVER_SUMMED, RODAPE, SIMILAR } from './copy'
 import { PillsMarca } from './Marcas'
 import { CampoTexto, Erro, GrupoPills, PRIMARIA_ID, PlanoPill, Rodape, descrito, useMexido } from './ui'
 
@@ -192,107 +197,6 @@ interface CamposProps {
   mudar: (patch: Partial<Rascunho>, foco?: string) => void
   aviso: string | null
   sufixoCampo: string
-}
-
-/** «Ativo», «Lado», «Contratos», prices, hours, «Stop e alvo» (RO l.336–388) */
-export function CamposFuturos({ r, m, erros, mudar, aviso, sufixoCampo }: CamposProps) {
-  const fechada = r.modo === 'fechada'
-  const chips = (FUTURES_CHIPS as readonly string[]).includes(r.ativo ?? '') ? [...FUTURES_CHIPS] : [...FUTURES_CHIPS, r.ativo ?? 'MES']
-  return (
-    <>
-      <GrupoPills
-        id="ativo"
-        titulo={FUTUROS.ativo}
-        opcoes={chips.map((s) => ({ valor: s, rotulo: s }))}
-        valor={r.ativo}
-        aoEscolher={(s) => {
-          if (s !== r.ativo) mudar({ ativo: s, preco: '', stop: '', alvo: '', precoSaida: '' })
-        }}
-      />
-      <GrupoPills
-        id="lado"
-        titulo={FUTUROS.lado}
-        opcoes={[
-          { valor: 'long', rotulo: FUTUROS.compra },
-          { valor: 'short', rotulo: FUTUROS.venda },
-        ]}
-        valor={r.lado}
-        aoEscolher={(v) => mudar({ lado: v as 'long' | 'short' })}
-        descricao={erros.lado ? 'e-lado' : undefined}
-        depois={<Erro id="e-lado" texto={erros.lado} />}
-      />
-      <GrupoPills
-        id="q"
-        titulo={FUTUROS.contratos}
-        opcoes={[
-          { valor: '1', rotulo: '1' },
-          { valor: '2', rotulo: '2' },
-          { valor: '3', rotulo: '3' },
-          { valor: 'outro', rotulo: FUTUROS.outro },
-        ]}
-        pillClasse="hub-reg-pill-q"
-        valor={r.qtdOutro ? 'outro' : r.qtd}
-        aoEscolher={(v) => (v === 'outro' ? mudar({ qtdOutro: true, qtd: r.qtdOutro ? r.qtd : '' }, 'f-q') : mudar({ qtdOutro: false, qtd: v }))}
-        depois={
-          <>
-            {r.qtdOutro && (
-              <CampoTexto
-                id="f-q"
-                rotulo={FUTUROS.quantos}
-                valor={r.qtd}
-                decimal
-                aoMudar={(v) => mudar({ qtd: v })}
-                erro={erros.q}
-                estilo={{ maxWidth: 200 }}
-              />
-            )}
-            {!r.qtdOutro && <Erro id="e-q" texto={erros.q} />}
-          </>
-        }
-      />
-      <div className="hub-campos2">
-        <CampoTexto id="f-preco" rotulo={FUTUROS.preco} valor={r.preco} decimal aoMudar={(v) => mudar({ preco: v })} erro={erros.preco} />
-        <CampoTexto
-          id="f-hora"
-          rotulo={fechada ? FUTUROS.horaEntrada(sufixoCampo) : FUTUROS.hora(sufixoCampo)}
-          valor={m.horaCampo}
-          tipo="time"
-          aoMudar={(v) => mudar({ hora: v })}
-          erro={erros.hora}
-        />
-      </div>
-      {fechada && (
-        <div className="hub-campos2">
-          <CampoTexto id="f-spreco" rotulo={FUTUROS.precoSaida} valor={r.precoSaida} decimal aoMudar={(v) => mudar({ precoSaida: v })} erro={erros.spreco} />
-          <CampoTexto id="f-shora" rotulo={FUTUROS.horaSaida(sufixoCampo)} valor={m.horaSaidaCampo} tipo="time" aoMudar={(v) => mudar({ horaSaida: v })} erro={erros.shora} />
-        </div>
-      )}
-      <div className="hub-campo">
-        <span id="l-stop" className="hub-rot-campo">
-          {FUTUROS.stopAlvo} <span className="hub-opc">{FUTUROS.opcional}</span>
-        </span>
-        <div className="hub-campos2 hub-reg-sempre" role="group" aria-labelledby="l-stop">
-          <CampoTexto
-            id="f-stop"
-            rotulo={FUTUROS.stop}
-            valor={r.stop}
-            decimal
-            aoMudar={(v) => mudar({ stop: v })}
-            erro={erros.stop}
-            nota={descrito('n-risco', aviso && 'a-lim')}
-          />
-          <CampoTexto id="f-alvo" rotulo={FUTUROS.alvo} valor={r.alvo} decimal aoMudar={(v) => mudar({ alvo: v })} erro={erros.alvo} nota="n-risco" />
-        </div>
-        <span id="n-risco" className="hub-nota hub-num">
-          {m.linhaRisco}
-        </span>
-        {/* Always on the page, so a screen reader hears it when it appears and when it changes (v55) */}
-        <p id="a-lim" role="status" className={aviso ? 'hub-reg-aviso-lim' : 'sr-only'}>
-          {aviso ?? ''}
-        </p>
-      </div>
-    </>
-  )
 }
 
 /** «Par», «Direção», «Expiração», stake, payout, hour, «Como terminou?» (RO l.390–406) */
@@ -462,7 +366,10 @@ export type Registrado =
   | { tipo: 'aberta'; tradeId: string }
   | { tipo: 'fechada'; tradeId: string; aviso: AvisoDoLimite | null; exitAt: Date | null }
 
-/** Where the focus goes for a field's error (RO `alvoFoco`) */
+/**
+ * Where the focus goes for a field's error (RO `alvoFoco`): a group's first pill (`g-{campo}-0`), the
+ * chosen pill of «Dia» and «Vencimento», else the field (`f-{campo}`: f-strike, f-res, f-custos…)
+ */
 function alvoFoco(campo: CampoEntrada, r: Rascunho, m: ModeloEntrada): string {
   switch (campo) {
     case 'dia':
@@ -471,9 +378,15 @@ function alvoFoco(campo: CampoEntrada, r: Rascunho, m: ModeloEntrada): string {
     case 'dir':
     case 'exp':
     case 'fimB':
+    case 'opTipo':
       return `g-${campo}-0`
+    case 'venc': {
+      if (!r.vencimento) return 'g-venc-0'
+      const j = m.opcao?.chips.findIndex((c) => c.valor === r.vencimento) ?? -1
+      return j >= 0 ? `g-venc-${j}` : 'f-venc'
+    }
     case 'q':
-      return r.qtdOutro ? 'f-q' : 'g-q-0'
+      return (m.quantidade ? m.quantidade.outro : r.qtdOutro) ? 'f-q' : 'g-q-0'
     case 'par':
       return r.parOutro ? 'f-parOutro' : 'g-par-0'
     default:
@@ -481,8 +394,8 @@ function alvoFoco(campo: CampoEntrada, r: Rascunho, m: ModeloEntrada): string {
   }
 }
 
-/** A server refusal's field (its HINT) as the form's */
-function campoDoServidor(field: string | null, market: 'futures' | 'binary'): CampoEntrada | null {
+/** A server refusal's field (its HINT) as the form's (3-4: the units of every market, the option, the result, the costs) */
+function campoDoServidor(field: string | null, market: ContaReg['market']): CampoEntrada | null {
   switch (field) {
     case 'symbol':
       return market === 'binary' ? 'par' : null
@@ -500,10 +413,24 @@ function campoDoServidor(field: string | null, market: 'futures' | 'binary'): Ca
       return 'shora'
     case 'stop':
     case 'stop_pts':
+    case 'stop_pips':
+    case 'stop_price':
       return 'stop'
     case 'target':
     case 'target_pts':
+    case 'target_pips':
+    case 'target_price':
       return 'alvo'
+    case 'option.right':
+      return 'opTipo'
+    case 'option.strike':
+      return 'strike'
+    case 'option.expires_on':
+      return 'venc'
+    case 'pnl':
+      return 'res'
+    case 'costs':
+      return 'custos'
     case 'stake':
       return 'stake'
     case 'payout':
@@ -560,7 +487,7 @@ export default function PassoEntrada(props: PassoEntradaProps) {
   const entrada = useRegisterEntry()
   const depois = useRegisterAfter()
   const fechada = r.modo === 'fechada'
-  const m = modeloEntrada({ conta, r, now, hoje, tentou })
+  const m = modeloEntrada({ conta, r, now, hoje, tentou, padroes: defaults })
   useMexido(rascunhoMexido(r, inicial))
 
   // «Posso operar hoje?»: rules_now for the current minute, gate_at at a typed hour or another day.
@@ -668,14 +595,25 @@ export default function PassoEntrada(props: PassoEntradaProps) {
         if (campo) {
           const texto =
             err.code === 'before_rules' && conta.desdeDay
-              ? ERROS.antesRegras(formatDiaMes(conta.desdeDay))
+              ? (mercadoNovo(conta.market) ? ERROS_PRECOS.antesRegras : ERROS.antesRegras)(formatDiaMes(conta.desdeDay))
               : err.code === 'entry_in_future'
                 ? ERROS.entradaFutura(horaRel(conta, now))
                 : err.code === 'exit_in_future'
                   ? ERROS.saidaFutura(horaRel(conta, now))
-                  : ERRO_REGISTRAR[err.code]
+                  : textoDaRecusa(err.code, err.field, { forma: m.forma, lado: r.lado }) ?? ERRO_REGISTRAR[err.code]
+          // The server asks for the result where the form computed it: «Corrigir» opens its field, empty
+          if (campo === 'res' && !m.resultado?.campo && m.resultado?.corrigir) setR((x) => ({ ...x, corrigir: true, res: '' }))
           setErroServidor({ campo, texto })
-          requestAnimationFrame(() => document.getElementById(alvoFoco(campo, r, m))?.focus())
+          // A field this form does not show (never sent by it): the sheet's alert says it instead
+          const codigo = err.code
+          requestAnimationFrame(() => {
+            const alvo = document.getElementById(alvoFoco(campo, r, m))
+            if (alvo) alvo.focus()
+            else {
+              setErroServidor(null)
+              setErroGeral(codigo)
+            }
+          })
         } else setErroGeral(err.code)
       }
     } finally {
@@ -764,9 +702,7 @@ export default function PassoEntrada(props: PassoEntradaProps) {
         mostrarGate={!m.diaRecusado}
         info={conta.market === 'futures' ? GATE.infoFuturos : GATE.infoOutros}
       />
-      {conta.market === 'futures' ? (
-        <CamposFuturos {...camposProps} />
-      ) : (
+      {conta.market === 'binary' ? (
         <CamposEbinex
           {...camposProps}
           pares={defaults.pairs}
@@ -776,6 +712,8 @@ export default function PassoEntrada(props: PassoEntradaProps) {
               : mudar({ par, parOutro: false, payout: defaults.payoutBySymbol[par] ? formatDecimal(defaults.payoutBySymbol[par]) : '' })
           }
         />
+      ) : (
+        <CamposPrecos conta={conta} r={r} m={m} erros={erros} mudar={mudar} aviso={aviso2} padroes={defaults} aoRecomecar={() => setTentou(false)} />
       )}
       {plano && (
         <div className="hub-reg-plano-linha">
@@ -783,13 +721,24 @@ export default function PassoEntrada(props: PassoEntradaProps) {
           <span>{ENTRADA.fora}</span>
         </div>
       )}
-      {fechada && (
-        <div className="hub-linha-i">
-          <span className="hub-num" role="status">
-            {m.linhaResultado}
-          </span>
-        </div>
-      )}
+      {fechada &&
+        (conta.market === 'binary' ? (
+          <div className="hub-linha-i">
+            <span className="hub-num" role="status">
+              {m.linhaResultado}
+            </span>
+          </div>
+        ) : (
+          <BlocoResultado
+            linha={m.linhaResultado}
+            bloco={m.resultado}
+            erroRes={erros.res}
+            erroCustos={erros.custos}
+            aoCorrigir={() => mudar(alternarCorrigir(r, m.resultado?.calculado ?? null), r.corrigir ? undefined : 'f-res')}
+            aoMudarRes={(v) => mudar({ res: v })}
+            aoMudarCustos={(v) => mudar({ custos: v })}
+          />
+        ))}
       <MarcasEntrada r={r} m={m} mudar={mudar} />
 
       {similar !== null && (

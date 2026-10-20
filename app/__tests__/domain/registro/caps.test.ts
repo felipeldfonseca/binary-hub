@@ -2,14 +2,16 @@
  * @jest-environment node
  *
  * The Registrar's descriptors: TRADE_CAPS and INSTRUMENT_SPEC (TypeScript) and trade_caps_all() and
- * instrument_specs() (the database, migration 20261020000001_trade_cycle.sql) hold the same values.
- * The SQL literals are parsed out of the migration file, so a change on one side without the other
- * fails here, in CI, without a database. Until the database PR (fase-3/banco) is in this tree, the
- * descriptors the SQL answered when cases.json was recorded stand in for the file (cases.test.ts).
+ * instrument_specs() (the database) hold the same values. The SQL literals are parsed out of the
+ * newest migration that defines them (20261020000001_trade_cycle.sql first, 20261022000001_registrar_mercados.sql
+ * since 3-4), so a change on one side without the other fails here, in CI, without a database. The
+ * descriptors the SQL answered when cases.json was recorded must hold the same values too.
  */
 import fs from 'node:fs';
 import path from 'node:path';
 import {
+  ACOES_B3,
+  B3_FUTUROS,
   INSTRUMENT_SPEC,
   TRADE_CAPS,
   durationsOf,
@@ -25,28 +27,48 @@ import { ACCOUNT_MARKETS, MARKET_SPEC } from '@/lib/domain';
 import cases from './cases.json';
 
 const MIGRATIONS = path.join(__dirname, '../../../../supabase/migrations');
-const MIGRATION = path.join(MIGRATIONS, '20261020000001_trade_cycle.sql');
 
-/** The jsonb literal between the two `tag`s of the migration */
+/** The jsonb literal between the two `tag`s of a migration */
 function literal(text: string, tag: string): Record<string, unknown> {
   // Exactly two tags (comments included), so the text between them is the literal
   expect(text.split(tag).length).toBe(3);
   return JSON.parse(text.split(tag)[1]);
 }
 
-describe('TRADE_CAPS / INSTRUMENT_SPEC = the migration’s literals', () => {
-  const present = fs.existsSync(MIGRATION);
+/** The newest migration (by name) whose text holds `tag`: the one the database ends with */
+function newest(tag: string): { file: string; text: string } {
+  const files = fs.readdirSync(MIGRATIONS).filter((f) => f.endsWith('.sql')).sort();
+  for (const file of files.reverse()) {
+    const text = fs.readFileSync(path.join(MIGRATIONS, file), 'utf8');
+    if (text.includes(tag)) return { file, text };
+  }
+  throw new Error(`no migration defines ${tag}`);
+}
 
-  it('reads the literals from 20261020000001_trade_cycle.sql once the database PR is in the tree', () => {
-    if (!present) {
-      // Before fase-3/banco merges, no Phase 3 migration may exist without this file
-      const later = fs.readdirSync(MIGRATIONS).filter((f) => f.split('_')[0] >= '20261020000001');
-      expect(later).toEqual([]);
-      return;
-    }
-    const text = fs.readFileSync(MIGRATION, 'utf8');
-    expect(Object.fromEntries(ACCOUNT_MARKETS.map((m) => [m, tradeCapsJson(TRADE_CAPS[m])]))).toEqual(literal(text, '$tcaps$'));
-    expect(instrumentSpecsJson()).toEqual(literal(text, '$ispec$'));
+describe('TRADE_CAPS / INSTRUMENT_SPEC = the migration’s literals', () => {
+  it('reads both literals from the newest migration that defines them (3-4: 20261022000001)', () => {
+    const caps = newest('$tcaps$');
+    const specs = newest('$ispec$');
+    expect(caps.file).toBe(specs.file);
+    expect(caps.file >= '20261022000001').toBe(true);
+    expect(Object.fromEntries(ACCOUNT_MARKETS.map((m) => [m, tradeCapsJson(TRADE_CAPS[m])]))).toEqual(literal(caps.text, '$tcaps$'));
+    expect(instrumentSpecsJson()).toEqual(literal(specs.text, '$ispec$'));
+  });
+
+  it('changed only what 3-4 describes since 20261020000001 (futures stops, the B3 outside the catalog, the B3 catalog rows)', () => {
+    const old = fs.readFileSync(path.join(MIGRATIONS, '20261020000001_trade_cycle.sql'), 'utf8');
+    const caps0 = literal(old, '$tcaps$') as Record<string, Record<string, unknown>>;
+    const specs0 = literal(old, '$ispec$') as Record<string, Record<string, Record<string, unknown>>>;
+    const caps = Object.fromEntries(ACCOUNT_MARKETS.map((m) => [m, tradeCapsJson(TRADE_CAPS[m])]));
+    expect(caps).toEqual({
+      ...caps0,
+      futures: { ...caps0.futures, stops: 'price' },
+      b3: { ...caps0.b3, price_dp: 8, pnl: 'typed', mult: null },
+    });
+    const specs = instrumentSpecsJson();
+    expect(specs.forex).toEqual(specs0.forex);
+    expect(specs.futures).toEqual(Object.fromEntries(Object.entries(specs0.futures).map(([k, r]) => [k, { ...r, stops: 'pts' }])));
+    expect(Object.fromEntries(B3_FUTUROS.map((k) => [k, specs.b3[k]]))).toEqual(specs0.b3);
   });
 
   it('matches what the database answered when the shared cases were recorded', () => {
@@ -129,6 +151,24 @@ describe('the descriptors', () => {
     // btrim drops spaces only
     expect(expiryRuleOf('\tebinex')).toBe('entry');
     expect(expiryRuleOf('constructor')).toBe('entry');
+  });
+
+  it('computes the B3 catalog (56 stocks and ETFs, 1:1, up to 4 decimals) and types any other B3 code', () => {
+    expect(Object.keys(INSTRUMENT_SPEC.b3 ?? {}).sort()).toEqual([...B3_FUTUROS, ...ACOES_B3].sort());
+    for (const code of ACOES_B3) {
+      expect(tradeInstrument('b3', code)).toMatchObject({ key: code, pnl: 'prices', mult: '1', priceDp: 4, qtyDp: 0, stops: 'price', tick: null, known: true });
+    }
+    expect(tradeInstrument('b3', 'PETR4F')).toEqual(tradeInstrument('b3', 'PETR4'));
+    expect(tradeInstrument('b3', 'BGIX26')).toMatchObject({ key: 'BGIX26', pnl: 'typed', mult: null, priceDp: 8, assetType: 'b3', known: false });
+    expect(tradeInstrument('b3', 'XPTO3')).toMatchObject({ pnl: 'typed', priceDp: 8, known: false });
+    expect(tradeInstrument('b3', 'WINZ26')).toEqual(tradeInstrument('b3', 'WIN'));
+  });
+
+  it('takes stop and target as a price on a futures root outside the table (ZN, SR3), points on the table', () => {
+    expect(tradeInstrument('futures', 'ZNZ6')).toMatchObject({ key: 'ZN', stops: 'price', pnl: 'typed', priceDp: 8, known: false });
+    expect(tradeInstrument('futures', 'SR3')).toMatchObject({ stops: 'price', pnl: 'typed' });
+    expect(tradeInstrument('futures', 'MCLZ6')).toMatchObject({ key: 'MCL', stops: 'pts', tick: '0.01', mult: '100', pnl: 'prices' });
+    expect(tradeInstrument('futures', 'MESZ6')).toEqual(tradeInstrument('futures', 'MES'));
   });
 
   it('gives each market the asset type the accounts use', () => {

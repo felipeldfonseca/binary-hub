@@ -1,0 +1,587 @@
+{
+  "trades": [
+    {
+      "id": "3adbbb38-e32e-4a57-9c06-4cfdf1479557",
+      "pnl": 57.5,
+      "note": null,
+      "result": "win",
+      "source": "live",
+      "status": "closed",
+      "strike": null,
+      "symbol": "EUR/USD",
+      "quantity": 0.5,
+      "direction": "long",
+      "exit_time": "2026-10-15T13:01:05.011837+00:00",
+      "pnl_basis": "prices",
+      "timeframe": null,
+      "account_id": "3434de2d-2828-43b9-9b21-5c19a23fa22f",
+      "asset_type": "forex",
+      "commission": null,
+      "entry_time": "2026-10-15T12:40:04.913598+00:00",
+      "exit_price": 1.08635,
+      "expires_at": null,
+      "expires_on": null,
+      "multiplier": null,
+      "stop_price": 1.084,
+      "entry_price": 1.0852,
+      "trading_day": "2026-10-15",
+      "option_right": null,
+      "stake_amount": null,
+      "target_price": 1.0876,
+      "note_saved_at": null,
+      "registered_at": "2026-10-15T12:40:04.913598+00:00",
+      "payout_percent": null,
+      "rule_version_id": "458beaa9-e085-4e82-b4d4-d01314d639d7",
+      "duration_seconds": null,
+      "exit_registered_at": "2026-10-15T13:01:05.011837+00:00"
+    },
+    {
+      "id": "166c857d-a251-4cce-a71c-06903d07a77a",
+      "pnl": 51.66,
+      "note": null,
+      "result": "win",
+      "source": "live",
+      "status": "closed",
+      "strike": null,
+      "symbol": "USD/JPY",
+      "quantity": 0.3,
+      "direction": "short",
+      "exit_time": "2026-10-15T13:01:05.030675+00:00",
+      "pnl_basis": "estimate",
+      "timeframe": null,
+      "account_id": "3434de2d-2828-43b9-9b21-5c19a23fa22f",
+      "asset_type": "forex",
+      "commission": null,
+      "entry_time": "2026-10-15T12:40:04.939682+00:00",
+      "exit_price": 150.98,
+      "expires_at": null,
+      "expires_on": null,
+      "multiplier": null,
+      "stop_price": 151.44,
+      "entry_price": 151.24,
+      "trading_day": "2026-10-15",
+      "option_right": null,
+      "stake_amount": null,
+      "target_price": 150.84,
+      "note_saved_at": null,
+      "registered_at": "2026-10-15T12:40:04.939682+00:00",
+      "payout_percent": null,
+      "rule_version_id": "458beaa9-e085-4e82-b4d4-d01314d639d7",
+      "duration_seconds": null,
+      "exit_registered_at": "2026-10-15T13:01:05.030675+00:00"
+    },
+    {
+      "id": "c9e5b9fe-c79b-44f4-a140-e7231c6807de",
+      "pnl": 50.1,
+      "note": null,
+      "result": "win",
+      "source": "live",
+      "status": "closed",
+      "strike": null,
+      "symbol": "USD/JPY",
+      "quantity": 0.3,
+      "direction": "short",
+      "exit_time": "2026-10-15T13:01:05.049517+00:00",
+      "pnl_basis": "typed",
+      "timeframe": null,
+      "account_id": "3434de2d-2828-43b9-9b21-5c19a23fa22f",
+      "asset_type": "forex",
+      "commission": 2.1,
+      "entry_time": "2026-10-15T12:40:04.960558+00:00",
+      "exit_price": 150.98,
+      "expires_at": null,
+      "expires_on": null,
+      "multiplier": null,
+      "stop_price": 151.44,
+      "entry_price": 151.24,
+      "trading_day": "2026-10-15",
+      "option_right": null,
+      "stake_amount": null,
+      "target_price": 150.84,
+      "note_saved_at": null,
+      "registered_at": "2026-10-15T12:40:04.960558+00:00",
+      "payout_percent": null,
+      "rule_version_id": "458beaa9-e085-4e82-b4d4-d01314d639d7",
+      "duration_seconds": null,
+      "exit_registered_at": "2026-10-15T13:01:05.049517+00:00"
+    },
+    {
+      "id": "33cae85d-bebe-49d3-bfc3-f9e8dba8c950",
+      "pnl": null,
+      "note": null,
+      "result": "pending",
+      "source": "live",
+      "status": "open",
+      "strike": null,
+      "symbol": "EUR/GBP",
+      "quantity": 0.5,
+      "direction": "short",
+      "exit_time": null,
+      "pnl_basis": null,
+      "timeframe": null,
+      "account_id": "3434de2d-2828-43b9-9b21-5c19a23fa22f",
+      "asset_type": "forex",
+      "commission": null,
+      "entry_time": "2026-10-15T12:40:04.981089+00:00",
+      "exit_price": null,
+      "expires_at": null,
+      "expires_on": null,
+      "multiplier": null,
+      "stop_price": 0.8722,
+      "entry_price": 0.8712,
+      "trading_day": "2026-10-15",
+      "option_right": null,
+      "stake_amount": null,
+      "target_price": 0.8692,
+      "note_saved_at": null,
+      "registered_at": "2026-10-15T12:40:04.981089+00:00",
+      "payout_percent": null,
+      "rule_version_id": "458beaa9-e085-4e82-b4d4-d01314d639d7",
+      "duration_seconds": null,
+      "exit_registered_at": null
+    },
+    {
+      "id": "ea72cee7-2bff-44d5-b78f-f8af9fcdee86",
+      "pnl": 105,
+      "note": null,
+      "result": "win",
+      "source": "after",
+      "status": "closed",
+      "strike": null,
+      "symbol": "XAUUSD",
+      "quantity": 0.2,
+      "direction": "short",
+      "exit_time": "2026-10-15T12:58:00+00:00",
+      "pnl_basis": "typed",
+      "timeframe": null,
+      "account_id": "3434de2d-2828-43b9-9b21-5c19a23fa22f",
+      "asset_type": "forex",
+      "commission": 7,
+      "entry_time": "2026-10-15T12:45:00+00:00",
+      "exit_price": 4404.55,
+      "expires_at": null,
+      "expires_on": null,
+      "multiplier": null,
+      "stop_price": 4413.3,
+      "entry_price": 4409.8,
+      "trading_day": "2026-10-15",
+      "option_right": null,
+      "stake_amount": null,
+      "target_price": 4400.3,
+      "note_saved_at": null,
+      "registered_at": "2026-10-15T13:01:05.119226+00:00",
+      "payout_percent": null,
+      "rule_version_id": "458beaa9-e085-4e82-b4d4-d01314d639d7",
+      "duration_seconds": null,
+      "exit_registered_at": "2026-10-15T13:01:05.119226+00:00"
+    }
+  ],
+  "contexts": [
+    {
+      "gate": {
+        "at": "2026-10-15T12:40:04.913598+00:00",
+        "block": {
+          "state": "nao_avaliado",
+          "reason": "so_futuros"
+        },
+        "desde": "2026-10-13T13:00:05.70898+00:00",
+        "label": "FTMO",
+        "limit": {
+          "usd": 1000,
+          "mode": "conta",
+          "near": false,
+          "used": 0,
+          "state": "ok",
+          "hit_at": null,
+          "reason": null,
+          "trades": 0,
+          "net_usd": 0,
+          "at_limit": "encerrar",
+          "worst_usd": 0
+        },
+        "today": {
+          "trades": 0,
+          "net_usd": 0,
+          "worst_usd": 0
+        },
+        "market": "forex",
+        "status": "liberado",
+        "window": {
+          "next": {
+            "opens_at": "2026-10-16T12:00:00+00:00",
+            "closes_at": "2026-10-16T14:00:00+00:00",
+            "trading_day": "2026-10-16"
+          },
+          "state": "dentro",
+          "reason": null,
+          "current": {
+            "opens_at": "2026-10-15T12:00:00+00:00",
+            "closes_at": "2026-10-15T14:00:00+00:00"
+          },
+          "position": "dentro"
+        },
+        "version": {
+          "id": "458beaa9-e085-4e82-b4d4-d01314d639d7",
+          "origin": "criar",
+          "version_no": 1,
+          "effective_from": "2026-10-13T13:00:05.70898+00:00"
+        },
+        "warnings": [],
+        "desde_day": "2026-10-13",
+        "account_id": "3434de2d-2828-43b9-9b21-5c19a23fa22f",
+        "changes_at": "2026-10-15T14:00:00+00:00",
+        "state_rule": {
+          "state": "nao_avaliado",
+          "reason": "so_futuros"
+        },
+        "trading_day": "2026-10-15",
+        "checks_evaluated": [
+          "janela",
+          "limite"
+        ]
+      },
+      "origin": "live",
+      "rule_ok": null,
+      "in_block": null,
+      "trade_id": "3adbbb38-e32e-4a57-9c06-4cfdf1479557",
+      "warnings": [],
+      "in_window": true,
+      "after_limit": false,
+      "captured_at": "2026-10-15T12:40:04.913598+00:00",
+      "gate_status": "liberado",
+      "evaluated_at": "2026-10-15T12:40:04.913598+00:00",
+      "state_choice": null,
+      "checks_evaluated": [
+        "janela",
+        "limite"
+      ],
+      "day_pnl_at_entry": 0,
+      "day_worst_at_entry": 0
+    },
+    {
+      "gate": {
+        "at": "2026-10-15T12:40:04.939682+00:00",
+        "block": {
+          "state": "nao_avaliado",
+          "reason": "so_futuros"
+        },
+        "desde": "2026-10-13T13:00:05.70898+00:00",
+        "label": "FTMO",
+        "limit": {
+          "usd": 1000,
+          "mode": "conta",
+          "near": false,
+          "used": 0,
+          "state": "ok",
+          "hit_at": null,
+          "reason": null,
+          "trades": 0,
+          "net_usd": 0,
+          "at_limit": "encerrar",
+          "worst_usd": 0
+        },
+        "today": {
+          "trades": 0,
+          "net_usd": 0,
+          "worst_usd": 0
+        },
+        "market": "forex",
+        "status": "liberado",
+        "window": {
+          "next": {
+            "opens_at": "2026-10-16T12:00:00+00:00",
+            "closes_at": "2026-10-16T14:00:00+00:00",
+            "trading_day": "2026-10-16"
+          },
+          "state": "dentro",
+          "reason": null,
+          "current": {
+            "opens_at": "2026-10-15T12:00:00+00:00",
+            "closes_at": "2026-10-15T14:00:00+00:00"
+          },
+          "position": "dentro"
+        },
+        "version": {
+          "id": "458beaa9-e085-4e82-b4d4-d01314d639d7",
+          "origin": "criar",
+          "version_no": 1,
+          "effective_from": "2026-10-13T13:00:05.70898+00:00"
+        },
+        "warnings": [],
+        "desde_day": "2026-10-13",
+        "account_id": "3434de2d-2828-43b9-9b21-5c19a23fa22f",
+        "changes_at": "2026-10-15T14:00:00+00:00",
+        "state_rule": {
+          "state": "nao_avaliado",
+          "reason": "so_futuros"
+        },
+        "trading_day": "2026-10-15",
+        "checks_evaluated": [
+          "janela",
+          "limite"
+        ]
+      },
+      "origin": "live",
+      "rule_ok": null,
+      "in_block": null,
+      "trade_id": "166c857d-a251-4cce-a71c-06903d07a77a",
+      "warnings": [],
+      "in_window": true,
+      "after_limit": false,
+      "captured_at": "2026-10-15T12:40:04.939682+00:00",
+      "gate_status": "liberado",
+      "evaluated_at": "2026-10-15T12:40:04.939682+00:00",
+      "state_choice": null,
+      "checks_evaluated": [
+        "janela",
+        "limite"
+      ],
+      "day_pnl_at_entry": 0,
+      "day_worst_at_entry": 0
+    },
+    {
+      "gate": {
+        "at": "2026-10-15T12:40:04.960558+00:00",
+        "block": {
+          "state": "nao_avaliado",
+          "reason": "so_futuros"
+        },
+        "desde": "2026-10-13T13:00:05.70898+00:00",
+        "label": "FTMO",
+        "limit": {
+          "usd": 1000,
+          "mode": "conta",
+          "near": false,
+          "used": 0,
+          "state": "ok",
+          "hit_at": null,
+          "reason": null,
+          "trades": 0,
+          "net_usd": 0,
+          "at_limit": "encerrar",
+          "worst_usd": 0
+        },
+        "today": {
+          "trades": 0,
+          "net_usd": 0,
+          "worst_usd": 0
+        },
+        "market": "forex",
+        "status": "liberado",
+        "window": {
+          "next": {
+            "opens_at": "2026-10-16T12:00:00+00:00",
+            "closes_at": "2026-10-16T14:00:00+00:00",
+            "trading_day": "2026-10-16"
+          },
+          "state": "dentro",
+          "reason": null,
+          "current": {
+            "opens_at": "2026-10-15T12:00:00+00:00",
+            "closes_at": "2026-10-15T14:00:00+00:00"
+          },
+          "position": "dentro"
+        },
+        "version": {
+          "id": "458beaa9-e085-4e82-b4d4-d01314d639d7",
+          "origin": "criar",
+          "version_no": 1,
+          "effective_from": "2026-10-13T13:00:05.70898+00:00"
+        },
+        "warnings": [],
+        "desde_day": "2026-10-13",
+        "account_id": "3434de2d-2828-43b9-9b21-5c19a23fa22f",
+        "changes_at": "2026-10-15T14:00:00+00:00",
+        "state_rule": {
+          "state": "nao_avaliado",
+          "reason": "so_futuros"
+        },
+        "trading_day": "2026-10-15",
+        "checks_evaluated": [
+          "janela",
+          "limite"
+        ]
+      },
+      "origin": "live",
+      "rule_ok": null,
+      "in_block": null,
+      "trade_id": "c9e5b9fe-c79b-44f4-a140-e7231c6807de",
+      "warnings": [],
+      "in_window": true,
+      "after_limit": false,
+      "captured_at": "2026-10-15T12:40:04.960558+00:00",
+      "gate_status": "liberado",
+      "evaluated_at": "2026-10-15T12:40:04.960558+00:00",
+      "state_choice": null,
+      "checks_evaluated": [
+        "janela",
+        "limite"
+      ],
+      "day_pnl_at_entry": 0,
+      "day_worst_at_entry": 0
+    },
+    {
+      "gate": {
+        "at": "2026-10-15T12:40:04.981089+00:00",
+        "block": {
+          "state": "nao_avaliado",
+          "reason": "so_futuros"
+        },
+        "desde": "2026-10-13T13:00:05.70898+00:00",
+        "label": "FTMO",
+        "limit": {
+          "usd": 1000,
+          "mode": "conta",
+          "near": false,
+          "used": 0,
+          "state": "ok",
+          "hit_at": null,
+          "reason": null,
+          "trades": 0,
+          "net_usd": 0,
+          "at_limit": "encerrar",
+          "worst_usd": 0
+        },
+        "today": {
+          "trades": 0,
+          "net_usd": 0,
+          "worst_usd": 0
+        },
+        "market": "forex",
+        "status": "liberado",
+        "window": {
+          "next": {
+            "opens_at": "2026-10-16T12:00:00+00:00",
+            "closes_at": "2026-10-16T14:00:00+00:00",
+            "trading_day": "2026-10-16"
+          },
+          "state": "dentro",
+          "reason": null,
+          "current": {
+            "opens_at": "2026-10-15T12:00:00+00:00",
+            "closes_at": "2026-10-15T14:00:00+00:00"
+          },
+          "position": "dentro"
+        },
+        "version": {
+          "id": "458beaa9-e085-4e82-b4d4-d01314d639d7",
+          "origin": "criar",
+          "version_no": 1,
+          "effective_from": "2026-10-13T13:00:05.70898+00:00"
+        },
+        "warnings": [],
+        "desde_day": "2026-10-13",
+        "account_id": "3434de2d-2828-43b9-9b21-5c19a23fa22f",
+        "changes_at": "2026-10-15T14:00:00+00:00",
+        "state_rule": {
+          "state": "nao_avaliado",
+          "reason": "so_futuros"
+        },
+        "trading_day": "2026-10-15",
+        "checks_evaluated": [
+          "janela",
+          "limite"
+        ]
+      },
+      "origin": "live",
+      "rule_ok": null,
+      "in_block": null,
+      "trade_id": "33cae85d-bebe-49d3-bfc3-f9e8dba8c950",
+      "warnings": [],
+      "in_window": true,
+      "after_limit": false,
+      "captured_at": "2026-10-15T12:40:04.981089+00:00",
+      "gate_status": "liberado",
+      "evaluated_at": "2026-10-15T12:40:04.981089+00:00",
+      "state_choice": null,
+      "checks_evaluated": [
+        "janela",
+        "limite"
+      ],
+      "day_pnl_at_entry": 0,
+      "day_worst_at_entry": 0
+    },
+    {
+      "gate": {
+        "at": "2026-10-15T12:45:00+00:00",
+        "block": {
+          "state": "nao_avaliado",
+          "reason": "so_futuros"
+        },
+        "desde": "2026-10-13T13:00:05.70898+00:00",
+        "label": "FTMO",
+        "limit": {
+          "usd": 1000,
+          "mode": "conta",
+          "near": false,
+          "used": 0,
+          "state": "ok",
+          "hit_at": null,
+          "reason": null,
+          "trades": 0,
+          "net_usd": 0,
+          "at_limit": "encerrar",
+          "worst_usd": 0
+        },
+        "today": {
+          "trades": 0,
+          "net_usd": 0,
+          "worst_usd": 0
+        },
+        "market": "forex",
+        "status": "liberado",
+        "window": {
+          "next": {
+            "opens_at": "2026-10-16T12:00:00+00:00",
+            "closes_at": "2026-10-16T14:00:00+00:00",
+            "trading_day": "2026-10-16"
+          },
+          "state": "dentro",
+          "reason": null,
+          "current": {
+            "opens_at": "2026-10-15T12:00:00+00:00",
+            "closes_at": "2026-10-15T14:00:00+00:00"
+          },
+          "position": "dentro"
+        },
+        "version": {
+          "id": "458beaa9-e085-4e82-b4d4-d01314d639d7",
+          "origin": "criar",
+          "version_no": 1,
+          "effective_from": "2026-10-13T13:00:05.70898+00:00"
+        },
+        "warnings": [],
+        "desde_day": "2026-10-13",
+        "account_id": "3434de2d-2828-43b9-9b21-5c19a23fa22f",
+        "changes_at": "2026-10-15T14:00:00+00:00",
+        "state_rule": {
+          "state": "nao_avaliado",
+          "reason": "so_futuros"
+        },
+        "trading_day": "2026-10-15",
+        "checks_evaluated": [
+          "janela",
+          "limite"
+        ]
+      },
+      "origin": "reconstructed",
+      "rule_ok": null,
+      "in_block": null,
+      "trade_id": "ea72cee7-2bff-44d5-b78f-f8af9fcdee86",
+      "warnings": [],
+      "in_window": true,
+      "after_limit": false,
+      "captured_at": "2026-10-15T13:01:05.119226+00:00",
+      "gate_status": "liberado",
+      "evaluated_at": "2026-10-15T12:45:00+00:00",
+      "state_choice": null,
+      "checks_evaluated": [
+        "janela",
+        "limite"
+      ],
+      "day_pnl_at_entry": 0,
+      "day_worst_at_entry": 0
+    }
+  ],
+  "images": []
+}

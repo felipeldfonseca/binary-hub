@@ -9,6 +9,7 @@ import { conferidos } from '@/lib/hub/posso'
 import { avisoDoLimite, type AvisoDoLimite } from '@/lib/hub/registrar'
 import { RegistrarDataError, type RegistrarErrorCode, type TradeView } from '@/lib/hub/registrarDb'
 import {
+  ORDEM_SAIDA,
   avisoDesfeita,
   chipMarca,
   hora,
@@ -17,15 +18,22 @@ import {
   modeloSaida,
   podeDesfazer,
   resumoAberta,
+  textoDaRecusa,
   textoQuebras,
   type ContaReg,
   type MarcaKind,
   type SaidaCampos,
 } from '@/lib/hub/registrarForm'
 import { Disclosure, useToggle } from '@/components/hub/contas/ui'
+import BlocoResultado from './BlocoResultado'
 import { ABERTA, EBINEX, ERRO_REGISTRAR, ERROS, FUTUROS, MARCAS, RODAPE } from './copy'
 import { AvisosMarca, PillsMarca, useMarcar } from './Marcas'
 import { CampoTexto, Erro, GrupoPills, PlanoPill, Rodape, Tempo, descrito } from './ui'
+import VenceuSemValor from './VenceuSemValor'
+
+/** The exit's fields a server refusal can name (its HINT), in ORDEM_SAIDA's words */
+type CampoSaida = (typeof ORDEM_SAIDA)[number]
+const CAMPO_DO_SERVIDOR: Partial<Record<string, CampoSaida>> = { exit_price: 'spreco', exit: 'shora', pnl: 'res', costs: 'custos' }
 
 /** The plan pill of a registered trade: «No plano» / «● fora da janela» / «—» */
 export function PlanoDaOperacao({ view, nota }: { view: Pick<TradeView, 'plan'>; nota?: React.ReactNode }) {
@@ -63,9 +71,10 @@ export interface PassoAbertaProps {
 
 /**
  * Step 2 · «Operação aberta» / «Opção vencida» (RO l.437–482, 1225–1289): the summary, the plan,
- * the marks (one tap = one mark on the server's clock), the exit (futures) or the result (Ebinex,
- * after the expiry), «Desfazer entrada» within 15 minutes, and «Registrar saída» / «Registrar
- * resultado».
+ * the marks (one tap = one mark on the server's clock), the exit (every price market: «Venceu sem
+ * valor» of an option, the exit price and hour, the result block with «Corrigir», the typed result
+ * and «Custos») or the result (Ebinex, after the expiry), «Desfazer entrada» within 15 minutes, and
+ * «Registrar saída» / «Registrar resultado».
  */
 export default function PassoAberta({ conta, view, pref80, headingRef, aoNovaEntrada, aoFechar, aoFechadaFora, aoDesfeita, aoSumiu }: PassoAbertaProps) {
   const now = useServerNow(1000)
@@ -78,8 +87,8 @@ export default function PassoAberta({ conta, view, pref80, headingRef, aoNovaEnt
   const [tentou, setTentou] = useState(false)
   const [ocupado, setOcupado] = useState(false)
   const [erroGeral, setErroGeral] = useState<RegistrarErrorCode | null>(null)
-  /** A server refusal of a field the form let through: under that field («Preço de saída», «Hora da saída», «Como terminou?») */
-  const [erroCampo, setErroCampo] = useState<{ campo: 'spreco' | 'shora' | 'fim'; texto: string } | null>(null)
+  /** A server refusal of a field the form let through: under that field («Preço de saída», «Hora da saída», the result, the costs, «Como terminou?») */
+  const [erroCampo, setErroCampo] = useState<{ campo: CampoSaida | 'fim'; texto: string } | null>(null)
   const [confirmando, setConfirmando] = useState(false)
   const [mudarAberto, alternarMudar] = useToggle()
   const ocupadoRef = useRef(false)
@@ -122,8 +131,9 @@ export default function PassoAberta({ conta, view, pref80, headingRef, aoNovaEnt
     setTentou(true)
     setErroGeral(null)
     setErroCampo(null)
-    if (ms && (ms.erros.spreco || ms.erros.shora)) {
-      document.getElementById(ms.erros.spreco ? 'f-spreco' : 'f-shora')?.focus()
+    const primeiro = ms ? ORDEM_SAIDA.find((k) => ms.erros[k]) : undefined
+    if (primeiro) {
+      document.getElementById(`f-${primeiro}`)?.focus()
       return
     }
     if (mr && mr.erro) {
@@ -155,19 +165,28 @@ export default function PassoAberta({ conta, view, pref80, headingRef, aoNovaEnt
         aoFechadaFora()
       } else if (err.code === 'unknown_trade') aoSumiu()
       else if (err.code === 'not_expired' || err.code === 'bad_outcome') setErroCampo({ campo: 'fim', texto: ERRO_REGISTRAR[err.code] })
-      else if (err.field === 'exit_price') {
-        setErroCampo({ campo: 'spreco', texto: ERRO_REGISTRAR[err.code] })
-        requestAnimationFrame(() => document.getElementById('f-spreco')?.focus())
-      } else if (err.field === 'exit') {
+      else if (err.field && CAMPO_DO_SERVIDOR[err.field]) {
+        const campo = CAMPO_DO_SERVIDOR[err.field] as CampoSaida
         // The local check's wording, with its values, when the server's code is one of its own
         const texto =
           err.code === 'exit_in_future'
             ? ERROS.saidaFutura(horaRel(conta, now))
             : err.code === 'exit_before_entry'
               ? ERROS.saidaAntes(hora(conta, t.entryTime))
-              : ERRO_REGISTRAR[err.code]
-        setErroCampo({ campo: 'shora', texto })
-        requestAnimationFrame(() => document.getElementById('f-shora')?.focus())
+              : textoDaRecusa(err.code, err.field, { forma: null, lado: null }) ?? ERRO_REGISTRAR[err.code]
+        // The server asks for the result where the form computed it: «Corrigir» opens its field, empty
+        if (campo === 'res' && !ms?.bloco?.campo && ms?.bloco?.corrigir) setCampos((c) => ({ ...c, corrigir: true, resultado: '' }))
+        setErroCampo({ campo, texto })
+        // A field this exit does not show (never sent by it): the sheet's alert says it instead
+        const codigo = err.code
+        requestAnimationFrame(() => {
+          const alvo = document.getElementById(`f-${campo}`)
+          if (alvo) alvo.focus()
+          else {
+            setErroCampo(null)
+            setErroGeral(codigo)
+          }
+        })
       } else setErroGeral(err.code)
     } finally {
       ocupadoRef.current = false
@@ -212,6 +231,11 @@ export default function PassoAberta({ conta, view, pref80, headingRef, aoNovaEnt
   const atuais = (['setup', 'execucao'] as MarcaKind[]).filter((k) => marcar.valor(k) !== null)
   const conf = view.plan ? conferidos(view.plan.checksEvaluated) : null
   const erroSaida = ms ? (tentou ? ms.erros : {}) : {}
+  const doServidor = (campo: CampoSaida) => (erroCampo?.campo === campo ? erroCampo.texto : null)
+  const mudarCampos = (patch: Partial<SaidaCampos>) => {
+    setCampos((c) => ({ ...c, ...patch }))
+    setErroCampo(null)
+  }
 
   return (
     <div className="hub-passo">
@@ -273,30 +297,34 @@ export default function PassoAberta({ conta, view, pref80, headingRef, aoNovaEnt
       <AvisosMarca m={marcar} />
 
       {ms && (
-        <div className="hub-campos2">
-          <CampoTexto
-            id="f-spreco"
-            rotulo={FUTUROS.precoSaida}
-            valor={campos.preco}
-            decimal
-            aoMudar={(v) => {
-              setCampos((c) => ({ ...c, preco: v }))
-              setErroCampo(null)
-            }}
-            erro={erroSaida.spreco ?? (erroCampo?.campo === 'spreco' ? erroCampo.texto : null)}
-          />
-          <CampoTexto
-            id="f-shora"
-            rotulo={FUTUROS.horaSaida(conta.clock === 'America/Sao_Paulo' ? ' (Brasília)' : ' (ET)')}
-            valor={ms.horaCampo}
-            tipo="time"
-            aoMudar={(v) => {
-              setCampos((c) => ({ ...c, hora: v }))
-              setErroCampo(null)
-            }}
-            erro={erroSaida.shora ?? (erroCampo?.campo === 'shora' ? erroCampo.texto : null)}
-          />
-        </div>
+        <>
+          {ms.vsv && (
+            <VenceuSemValor
+              estado={ms.vsv}
+              aoAlternar={() => {
+                if (ms.vsv?.disponivel) mudarCampos({ vsv: !campos.vsv, preco: '', hora: null })
+              }}
+            />
+          )}
+          <div className="hub-campos2">
+            <CampoTexto
+              id="f-spreco"
+              rotulo={ms.rotulos?.precoSaida ?? FUTUROS.precoSaida}
+              valor={ms.precoCampo}
+              decimal
+              aoMudar={(v) => mudarCampos({ preco: v })}
+              erro={erroSaida.spreco ?? doServidor('spreco')}
+            />
+            <CampoTexto
+              id="f-shora"
+              rotulo={ms.rotulos?.horaSaida ?? FUTUROS.horaSaida(conta.clock === 'America/Sao_Paulo' ? ' (Brasília)' : ' (ET)')}
+              valor={ms.horaCampo}
+              tipo="time"
+              aoMudar={(v) => mudarCampos({ hora: v })}
+              erro={erroSaida.shora ?? doServidor('shora')}
+            />
+          </div>
+        </>
       )}
       {mr && (
         <GrupoPills
@@ -321,11 +349,27 @@ export default function PassoAberta({ conta, view, pref80, headingRef, aoNovaEnt
           }
         />
       )}
-      <div className="hub-linha-i">
-        <span className="hub-num" role="status">
-          {ms ? ms.previa : mr?.previa}
-        </span>
-      </div>
+      {ms ? (
+        <BlocoResultado
+          linha={ms.previa}
+          bloco={ms.bloco}
+          erroRes={erroSaida.res ?? doServidor('res')}
+          erroCustos={ms.erros.custos ?? doServidor('custos')}
+          aoCorrigir={() => {
+            const abrir = !campos.corrigir
+            mudarCampos(abrir ? { corrigir: true, resultado: ms.bloco?.calculado ?? '' } : { corrigir: false, resultado: '' })
+            if (abrir) requestAnimationFrame(() => document.getElementById('f-res')?.focus())
+          }}
+          aoMudarRes={(v) => mudarCampos({ resultado: v })}
+          aoMudarCustos={(v) => mudarCampos({ custos: v })}
+        />
+      ) : (
+        <div className="hub-linha-i">
+          <span className="hub-num" role="status">
+            {mr?.previa}
+          </span>
+        </div>
+      )}
 
       {desfazivel && t.registeredAt && (
         <div className="hub-reg-desfazer">

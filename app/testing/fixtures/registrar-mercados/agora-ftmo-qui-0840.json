@@ -1,0 +1,412 @@
+{
+  "accounts": [
+    {
+      "at": "2026-10-15T12:40:04.794042+00:00",
+      "block": {
+        "state": "nao_avaliado",
+        "reason": "fase5"
+      },
+      "desde": "2026-10-13T13:00:05.70898+00:00",
+      "label": "Top One #1",
+      "limit": {
+        "usd": 400,
+        "mode": "conta",
+        "near": false,
+        "used": 0,
+        "state": "ok",
+        "hit_at": null,
+        "reason": null,
+        "trades": 0,
+        "net_usd": 0,
+        "at_limit": "encerrar",
+        "worst_usd": 0
+      },
+      "rules": {
+        "v": 1,
+        "day": {
+          "tz": "America/New_York",
+          "start_min": 1080
+        },
+        "block": {
+          "on": true,
+          "after_min": 10,
+          "calendars": [
+            "us"
+          ],
+          "before_min": 5
+        },
+        "limit": {
+          "usd": 400,
+          "mode": "conta",
+          "at_limit": "encerrar"
+        },
+        "market": "futures",
+        "states": {
+          "alinhadas": null,
+          "so_tecnica": null,
+          "em_conflito": null,
+          "sem_direcao": null,
+          "so_fundamentos": null
+        },
+        "windows": [
+          {
+            "tz": "America/New_York",
+            "end_min": 660,
+            "weekdays": 31,
+            "start_min": 600
+          }
+        ],
+        "window_rule": {
+          "on": true,
+          "outside": "fora"
+        },
+        "windows_from": "account"
+      },
+      "today": {
+        "trades": 0,
+        "net_usd": 0,
+        "worst_usd": 0
+      },
+      "market": "futures",
+      "status": "fora_janela",
+      "window": {
+        "next": {
+          "opens_at": "2026-10-15T14:00:00+00:00",
+          "closes_at": "2026-10-15T15:00:00+00:00",
+          "trading_day": "2026-10-15"
+        },
+        "state": "fora",
+        "reason": null,
+        "current": null,
+        "position": "antes"
+      },
+      "version": {
+        "id": "8a5ab518-ff10-4204-8c23-4d88f890f1a4",
+        "origin": "criar",
+        "version_no": 1,
+        "effective_from": "2026-10-13T13:00:05.70898+00:00"
+      },
+      "warnings": [],
+      "desde_day": "2026-10-13",
+      "account_id": "300bee77-df10-4174-bc56-df61c0e50b0a",
+      "changes_at": "2026-10-15T14:00:00+00:00",
+      "state_rule": {
+        "state": "nao_avaliado",
+        "reason": "fase5"
+      },
+      "trading_day": "2026-10-15",
+      "checks_evaluated": [
+        "janela",
+        "limite"
+      ]
+    },
+    {
+      "at": "2026-10-15T12:40:04.794042+00:00",
+      "block": {
+        "state": "nao_avaliado",
+        "reason": "so_futuros"
+      },
+      "desde": "2026-10-13T13:00:05.70898+00:00",
+      "label": "FTMO",
+      "limit": {
+        "usd": 1000,
+        "mode": "conta",
+        "near": false,
+        "used": 0,
+        "state": "ok",
+        "hit_at": null,
+        "reason": null,
+        "trades": 0,
+        "net_usd": 0,
+        "at_limit": "encerrar",
+        "worst_usd": 0
+      },
+      "rules": {
+        "v": 1,
+        "day": {
+          "tz": "America/New_York",
+          "start_min": 1020
+        },
+        "block": null,
+        "limit": {
+          "usd": 1000,
+          "mode": "conta",
+          "at_limit": "encerrar"
+        },
+        "market": "forex",
+        "states": null,
+        "windows": [
+          {
+            "tz": "America/New_York",
+            "end_min": 600,
+            "weekdays": 31,
+            "start_min": 480
+          }
+        ],
+        "window_rule": {
+          "on": true,
+          "outside": "fora"
+        },
+        "windows_from": "account"
+      },
+      "today": {
+        "trades": 0,
+        "net_usd": 0,
+        "worst_usd": 0
+      },
+      "market": "forex",
+      "status": "liberado",
+      "window": {
+        "next": {
+          "opens_at": "2026-10-16T12:00:00+00:00",
+          "closes_at": "2026-10-16T14:00:00+00:00",
+          "trading_day": "2026-10-16"
+        },
+        "state": "dentro",
+        "reason": null,
+        "current": {
+          "opens_at": "2026-10-15T12:00:00+00:00",
+          "closes_at": "2026-10-15T14:00:00+00:00"
+        },
+        "position": "dentro"
+      },
+      "version": {
+        "id": "458beaa9-e085-4e82-b4d4-d01314d639d7",
+        "origin": "criar",
+        "version_no": 1,
+        "effective_from": "2026-10-13T13:00:05.70898+00:00"
+      },
+      "warnings": [],
+      "desde_day": "2026-10-13",
+      "account_id": "3434de2d-2828-43b9-9b21-5c19a23fa22f",
+      "changes_at": "2026-10-15T14:00:00+00:00",
+      "state_rule": {
+        "state": "nao_avaliado",
+        "reason": "so_futuros"
+      },
+      "trading_day": "2026-10-15",
+      "checks_evaluated": [
+        "janela",
+        "limite"
+      ]
+    },
+    {
+      "at": "2026-10-15T12:40:04.794042+00:00",
+      "block": {
+        "state": "nao_avaliado",
+        "reason": "so_futuros"
+      },
+      "desde": "2026-10-13T13:00:05.70898+00:00",
+      "label": "IBKR",
+      "limit": {
+        "state": "nao_avaliado",
+        "reason": "sem_limite"
+      },
+      "rules": {
+        "v": 1,
+        "day": {
+          "tz": "America/New_York",
+          "start_min": 1200
+        },
+        "block": null,
+        "limit": null,
+        "market": "stocks",
+        "states": null,
+        "windows": [],
+        "window_rule": {
+          "on": true,
+          "outside": "fora"
+        },
+        "windows_from": null
+      },
+      "today": {
+        "trades": 0,
+        "net_usd": 0,
+        "worst_usd": 0
+      },
+      "market": "stocks",
+      "status": null,
+      "window": {
+        "state": "nao_avaliado",
+        "reason": "sem_janela"
+      },
+      "version": {
+        "id": "f31a8f0f-784b-4af6-a5d2-b505f9c6943c",
+        "origin": "criar",
+        "version_no": 1,
+        "effective_from": "2026-10-13T13:00:05.70898+00:00"
+      },
+      "warnings": [],
+      "desde_day": "2026-10-13",
+      "account_id": "24916314-b68f-47e1-9055-dff69eae3936",
+      "changes_at": "2026-10-16T00:00:00+00:00",
+      "state_rule": {
+        "state": "nao_avaliado",
+        "reason": "so_futuros"
+      },
+      "trading_day": "2026-10-15",
+      "checks_evaluated": []
+    },
+    {
+      "at": "2026-10-15T12:40:04.794042+00:00",
+      "block": {
+        "state": "nao_avaliado",
+        "reason": "so_futuros"
+      },
+      "desde": "2026-10-13T13:00:05.70898+00:00",
+      "label": "Binance",
+      "limit": {
+        "state": "nao_avaliado",
+        "reason": "sem_limite"
+      },
+      "rules": {
+        "v": 1,
+        "day": {
+          "tz": "America/Sao_Paulo",
+          "start_min": 0
+        },
+        "block": null,
+        "limit": null,
+        "market": "crypto",
+        "states": null,
+        "windows": [
+          {
+            "tz": "America/Sao_Paulo",
+            "end_min": 1320,
+            "weekdays": 127,
+            "start_min": 1200
+          }
+        ],
+        "window_rule": {
+          "on": true,
+          "outside": "fora"
+        },
+        "windows_from": "account"
+      },
+      "today": {
+        "trades": 0,
+        "net_usd": 0,
+        "worst_usd": 0
+      },
+      "market": "crypto",
+      "status": "fora_janela",
+      "window": {
+        "next": {
+          "opens_at": "2026-10-15T23:00:00+00:00",
+          "closes_at": "2026-10-16T01:00:00+00:00",
+          "trading_day": "2026-10-15"
+        },
+        "state": "fora",
+        "reason": null,
+        "current": null,
+        "position": "antes"
+      },
+      "version": {
+        "id": "92c49dec-8777-431a-8de0-ef61ad130daa",
+        "origin": "criar",
+        "version_no": 1,
+        "effective_from": "2026-10-13T13:00:05.70898+00:00"
+      },
+      "warnings": [],
+      "desde_day": "2026-10-13",
+      "account_id": "8c0425ea-c799-4036-b4c0-bb489d054cc3",
+      "changes_at": "2026-10-15T23:00:00+00:00",
+      "state_rule": {
+        "state": "nao_avaliado",
+        "reason": "so_futuros"
+      },
+      "trading_day": "2026-10-15",
+      "checks_evaluated": [
+        "janela"
+      ]
+    },
+    {
+      "at": "2026-10-15T12:40:04.794042+00:00",
+      "block": {
+        "state": "nao_avaliado",
+        "reason": "so_futuros"
+      },
+      "desde": "2026-10-13T13:00:05.70898+00:00",
+      "label": "Clear",
+      "limit": {
+        "usd": 500,
+        "mode": "conta",
+        "near": false,
+        "used": 0,
+        "state": "ok",
+        "hit_at": null,
+        "reason": null,
+        "trades": 0,
+        "net_usd": 0,
+        "at_limit": "encerrar",
+        "worst_usd": 0
+      },
+      "rules": {
+        "v": 1,
+        "day": {
+          "tz": "America/Sao_Paulo",
+          "start_min": 0
+        },
+        "block": null,
+        "limit": {
+          "brl": 500,
+          "mode": "conta",
+          "at_limit": "encerrar"
+        },
+        "market": "b3",
+        "states": null,
+        "windows": [
+          {
+            "tz": "America/Sao_Paulo",
+            "end_min": 660,
+            "weekdays": 31,
+            "start_min": 600
+          }
+        ],
+        "window_rule": {
+          "on": true,
+          "outside": "fora"
+        },
+        "windows_from": "account"
+      },
+      "today": {
+        "trades": 0,
+        "net_usd": 0,
+        "worst_usd": 0
+      },
+      "market": "b3",
+      "status": "fora_janela",
+      "window": {
+        "next": {
+          "opens_at": "2026-10-15T13:00:00+00:00",
+          "closes_at": "2026-10-15T14:00:00+00:00",
+          "trading_day": "2026-10-15"
+        },
+        "state": "fora",
+        "reason": null,
+        "current": null,
+        "position": "antes"
+      },
+      "version": {
+        "id": "42913169-a1df-4e97-b071-e62c992b2a3f",
+        "origin": "criar",
+        "version_no": 1,
+        "effective_from": "2026-10-13T13:00:05.70898+00:00"
+      },
+      "warnings": [],
+      "desde_day": "2026-10-13",
+      "account_id": "1e9055ca-4837-489c-a2c9-1e08efe0b4c8",
+      "changes_at": "2026-10-15T13:00:00+00:00",
+      "state_rule": {
+        "state": "nao_avaliado",
+        "reason": "so_futuros"
+      },
+      "trading_day": "2026-10-15",
+      "checks_evaluated": [
+        "janela",
+        "limite"
+      ]
+    }
+  ],
+  "server_now": "2026-10-15T12:40:04.794042+00:00"
+}

@@ -10,6 +10,7 @@ import { toastDoLote } from '@/components/hub/importar/ImportSheet'
 import { PASSO_G } from '@/components/hub/contas/copy'
 import { changedOnlyHere } from '@/hooks/useRegras'
 import type { AccountConfig, RulesConfig, SaveRulesResult } from '@/lib/hub/regras'
+import type { AccountMarket } from '@/lib/domain/markets'
 import { csvFile, fixtureFile, makeAccount, makePreview, renderHub } from '@/testing/hubHarness'
 import { configAntes, configDepois, configMercados, contasMercados, idsDono, idsMercados } from '@/testing/regras'
 import { brt, et } from '@/testing/gate'
@@ -35,14 +36,6 @@ jest.mock('@/components/hub/registrar/RegistrarSheet', () => ({
     )
   },
 }))
-
-// The new markets get their Registrar in PR 3-4 (D36): a test can let every market register, as
-// 3-4 will by adding them to REGISTRAR_MARKETS, to see the texts that switch then
-const mockTodosMercados = { on: false }
-jest.mock('@/lib/hub/registrar', () => {
-  const actual = jest.requireActual('@/lib/hub/registrar')
-  return { ...actual, podeRegistrar: (m: string | null | undefined) => (mockTodosMercados.on ? !!m : actual.podeRegistrar(m)) }
-})
 
 jest.mock('@/hooks/useAuth', () => ({
   useAuth: () => ({ user: { id: 'user-1' }, session: { access_token: 'user-jwt' } }),
@@ -191,7 +184,6 @@ beforeEach(() => {
   saveRules.mockResolvedValue(savedV1('rev-1'))
   mockAgora.at = new Date('2026-10-19T16:00:00Z')
   mockRegistrarSheet.mockReset()
-  mockTodosMercados.on = false
 })
 
 describe('ImportSheet · import a file', () => {
@@ -2068,7 +2060,8 @@ describe('ImportSheet · Fase 2b · «Qual mercado?» (i1)', () => {
     ]
     for (const [pill, de] of notes) {
       await userEvent.click(within(group).getByRole('button', { name: pill }))
-      const note = `Ainda não lemos arquivos ${de}: as operações desta conta entram pelo “Registrar operação”, na Fase 3.`
+      // Since 3-4 every market registers (the end of D36): no «, na Fase 3»
+      const note = `Ainda não lemos arquivos ${de}: as operações desta conta entram pelo “Registrar operação”.`
       expect(within(live).getByText(note)).toHaveAttribute('id', 'nota-leitor')
       expect(group).toHaveAttribute('aria-describedby', 'nota-mercado nota-leitor')
       expect(group).toHaveAccessibleDescription(`Cada conta é de um mercado só. ${note}`)
@@ -2377,17 +2370,19 @@ describe('ImportSheet · Fase 2b · «Nova conta de …» (step b) and «{conta}
       window: null,
       version: 'force',
     })
-    // The end screen: where trades will come from, the MetaTrader 5 report, «Fechar»
-    expect(within(dialog).getByText('Nada ainda: as operações desta conta entram pelo “Registrar operação”, que chega na Fase 3.')).toBeInTheDocument()
+    // The end screen: «Registrar operação» as the primary (3-4 ended D36), the MetaTrader 5 report
+    expect(within(dialog).getByText('Nada ainda. Registre a primeira operação.')).toBeInTheDocument()
     expect(
       within(dialog).getByText(
         'Ainda não lemos arquivos de Forex. O relatório do MetaTrader 5 sai em HTML ou PDF e vai precisar de um leitor próprio, que vem depois.',
       ),
     ).toBeInTheDocument()
     expect(within(dialog).queryByRole('button', { name: 'Importar histórico' })).not.toBeInTheDocument()
-    expect(primaryOf(dialog)).toHaveTextContent('Fechar')
+    expect(primaryOf(dialog)).toHaveTextContent('Registrar operação')
     await userEvent.click(primaryOf(dialog))
-    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(mockRegistrarSheet).toHaveBeenLastCalledWith({ accountId: 'nova', tradeId: null })
+    expect(screen.getAllByRole('dialog')).toHaveLength(1)
+    expect(screen.getByRole('dialog', { name: 'Registrar operação' })).toBeInTheDocument()
   })
 
   it('the end screen names the MetaTrader 4 report, and the CSV mapping for other platforms', async () => {
@@ -2400,7 +2395,8 @@ describe('ImportSheet · Fase 2b · «Nova conta de …» (step b) and «{conta}
         'Ainda não lemos arquivos de Forex. O relatório do MetaTrader 4 sai em HTML e vai precisar de um leitor próprio, que vem depois.',
       ),
     ).toBeInTheDocument()
-    await userEvent.click(primaryOf(mt4))
+    // The primary is «Registrar operação» since 3-4: close with the ×
+    await userEvent.click(within(mt4).getByRole('button', { name: 'Fechar' }))
 
     createAccount.mockResolvedValue({ ...ftmo, platform: 'ctrader' })
     await userEvent.click(screen.getByRole('button', { name: 'Abrir' }))
@@ -2667,38 +2663,24 @@ describe('ImportSheet · Phase 3 · «Registrar operação» at the end of accou
     expect(mockRegistrarSheet).toHaveBeenLastCalledWith({ accountId: created.id, tradeId: null })
   })
 
-  it('a new market (Forex) keeps its interim end screen in 3-3: no «Registrar operação», «Fechar» (D36)', async () => {
-    createAccount.mockResolvedValue(makeAccount({ id: 'nova', label: 'FTMO 100k', market: 'forex', platform: 'mt5', firm: 'FTMO', phase: 'avaliacao' }))
-    const dialog = await toNewAccountStep('Forex e CFDs', 'MetaTrader 5', 'FTMO 100k', 'FTMO')
-    await userEvent.click(within(dialog).getByRole('button', { name: 'Avaliação' }))
-    await userEvent.click(within(dialog).getByRole('button', { name: 'Criar FTMO 100k' }))
-
-    expect(await within(dialog).findByRole('heading', { name: 'FTMO 100k criada.' })).toBeInTheDocument()
-    expect(within(dialog).getByText('Nada ainda: as operações desta conta entram pelo “Registrar operação”, que chega na Fase 3.')).toBeInTheDocument()
-    expect(footerNames(dialog)).toEqual([['Fechar', true]])
-  })
-
-  describe('once the new markets can register (PR 3-4 adds them to REGISTRAR_MARKETS)', () => {
-    beforeEach(() => {
-      mockTodosMercados.on = true
-    })
-    afterEach(() => {
-      mockTodosMercados.on = false
-    })
-
-    it('FIM_CONTA.semLeitor: «Nada ainda. Registre a primeira operação.» and the primary «Registrar operação»', async () => {
-      const created = makeAccount({ id: 'nova', label: 'FTMO 100k', market: 'forex', platform: 'mt5', firm: 'FTMO', phase: 'avaliacao' })
+  describe('every new market registers since 3-4 (the end of D36)', () => {
+    it.each([
+      ['Forex e CFDs', 'MetaTrader 5', 'forex', 'mt5', 'de Forex. O relatório do MetaTrader 5 sai em HTML ou PDF e vai precisar de um leitor próprio, que vem depois.'],
+      ['Ações e opções (EUA)', 'Interactive Brokers', 'stocks', 'ibkr', 'de Ações. Depois vem a importação de CSV em que você diz o que é cada coluna.'],
+      ['Cripto', 'Binance', 'crypto', 'binance', 'de Cripto. Depois vem a importação de CSV em que você diz o que é cada coluna.'],
+      ['B3', 'Profit (Nelogica)', 'b3', 'profit', 'da B3. Depois vem a importação de CSV em que você diz o que é cada coluna.'],
+    ])('%s: «Nada ainda. Registre a primeira operação.» and the primary «Registrar operação»', async (pill, platform, market, platformId, arquivo) => {
+      const created = makeAccount({ id: 'nova', label: 'Conta nova', market: market as AccountMarket, platform: platformId, phase: 'pessoal' })
       createAccount.mockResolvedValue(created)
-      const dialog = await toNewAccountStep('Forex e CFDs', 'MetaTrader 5', 'FTMO 100k', 'FTMO')
-      await userEvent.click(within(dialog).getByRole('button', { name: 'Avaliação' }))
-      await userEvent.click(within(dialog).getByRole('button', { name: 'Criar FTMO 100k' }))
+      const dialog = await toNewAccountStep(pill, platform, 'Conta nova')
+      const fase = within(dialog).queryByRole('group', { name: 'Fase' })
+      if (fase) await userEvent.click(within(fase).getByRole('button', { name: 'Pessoal' }))
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Criar Conta nova' }))
 
-      expect(await within(dialog).findByRole('heading', { name: 'FTMO 100k criada.' })).toBeInTheDocument()
+      expect(await within(dialog).findByRole('heading', { name: 'Conta nova criada.' })).toBeInTheDocument()
       expect(within(dialog).getByText('Nada ainda. Registre a primeira operação.')).toBeInTheDocument()
       // Where the files will come from stays
-      expect(
-        within(dialog).getByText('Ainda não lemos arquivos de Forex. O relatório do MetaTrader 5 sai em HTML ou PDF e vai precisar de um leitor próprio, que vem depois.'),
-      ).toBeInTheDocument()
+      expect(within(dialog).getByText(`Ainda não lemos arquivos ${arquivo}`)).toBeInTheDocument()
       expect(within(dialog).queryByText(/Fase 3/)).not.toBeInTheDocument()
       expect(footerNames(dialog)).toEqual([['Registrar operação', true]])
       await userEvent.click(primaryOf(dialog))
@@ -2709,6 +2691,7 @@ describe('ImportSheet · Phase 3 · «Registrar operação» at the end of accou
       const dialog = await openSheet({ mode: 'adicionar' })
       await userEvent.click(within(within(dialog).getByRole('group', { name: 'Qual mercado?' })).getByRole('button', { name: 'B3' }))
       expect(within(dialog).getByText('Ainda não lemos arquivos da B3: as operações desta conta entram pelo “Registrar operação”.')).toHaveAttribute('id', 'nota-leitor')
+      expect(within(dialog).queryByText(/Fase 3/)).not.toBeInTheDocument()
     })
   })
 })

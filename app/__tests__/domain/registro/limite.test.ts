@@ -96,8 +96,10 @@ describe('riskBeyondLimit: nothing to warn about', () => {
     expect(riskBeyondLimit(usd('400', '-300.00'), null)).toBeNull();
     expect(limitRoom(usd('400', '-300.00'), null)).toMatchObject({ left: '100.00', risk: null, above: false });
     expect(riskOf('futures', { symbol: 'MES', direction: 'long', quantity: '1', entry_price: '6650.25' })).toBeNull();
-    // RTY has no row: its result is typed, its stop risks nothing the app can compute
-    expect(riskOf('futures', { symbol: 'RTY', direction: 'long', quantity: '1', entry_price: '2250.1', stop_pts: '50' })).toBeNull();
+    // RTY has no row: its result is typed, its stop (a price level since 3-4) risks nothing the app can compute
+    expect(riskOf('futures', { symbol: 'RTY', direction: 'long', quantity: '1', entry_price: '2250.1', stop_price: '2200.1' })).toBeNull();
+    // A B3 code outside the catalog: the same
+    expect(riskOf('b3', { symbol: 'BGIX26', direction: 'long', quantity: '2', entry_price: '310.55', stop_price: '309.80' })).toBeNull();
   });
 
   it('without a limit (an account without one, or a limit the gate did not evaluate)', () => {

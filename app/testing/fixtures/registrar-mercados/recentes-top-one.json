@@ -1,0 +1,13 @@
+[
+  {
+    "source": "live",
+    "symbol": "ZNZ6",
+    "quantity": 1,
+    "direction": "long",
+    "asset_type": "futures",
+    "entry_time": "2026-10-15T14:05:05.07555+00:00",
+    "stake_amount": null,
+    "payout_percent": null,
+    "duration_seconds": null
+  }
+]

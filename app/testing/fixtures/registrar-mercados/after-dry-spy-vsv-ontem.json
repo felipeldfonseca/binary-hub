@@ -1,0 +1,101 @@
+{
+  "r": -2.4667,
+  "pnl": -370,
+  "gate": {
+    "at": "2026-10-14T13:35:00+00:00",
+    "block": {
+      "state": "nao_avaliado",
+      "reason": "so_futuros"
+    },
+    "desde": "2026-10-13T13:00:05.70898+00:00",
+    "label": "IBKR",
+    "limit": {
+      "state": "nao_avaliado",
+      "reason": "sem_limite"
+    },
+    "today": {
+      "trades": 0,
+      "net_usd": 0,
+      "worst_usd": 0
+    },
+    "market": "stocks",
+    "status": null,
+    "window": {
+      "state": "nao_avaliado",
+      "reason": "sem_janela"
+    },
+    "version": {
+      "id": "f31a8f0f-784b-4af6-a5d2-b505f9c6943c",
+      "origin": "criar",
+      "version_no": 1,
+      "effective_from": "2026-10-13T13:00:05.70898+00:00"
+    },
+    "warnings": [],
+    "desde_day": "2026-10-13",
+    "account_id": "24916314-b68f-47e1-9055-dff69eae3936",
+    "changes_at": "2026-10-15T00:00:00+00:00",
+    "state_rule": {
+      "state": "nao_avaliado",
+      "reason": "so_futuros"
+    },
+    "trading_day": "2026-10-14",
+    "checks_evaluated": []
+  },
+  "plan": {
+    "breaks": [],
+    "verdict": "nao_avaliado",
+    "checks_evaluated": []
+  },
+  "points": -1.85,
+  "result": "loss",
+  "context": {
+    "rule_ok": null,
+    "in_block": null,
+    "warnings": [],
+    "in_window": null,
+    "after_limit": null,
+    "gate_status": null,
+    "state_choice": null,
+    "checks_evaluated": [],
+    "day_pnl_at_entry": null,
+    "day_worst_at_entry": null
+  },
+  "dry_run": true,
+  "exit_at": "2026-10-14T20:00:00+00:00",
+  "preview": {
+    "risk": 150,
+    "reward": 270,
+    "stop_points": 0.75,
+    "target_points": 1.35
+  },
+  "similar": [],
+  "version": {
+    "id": "f31a8f0f-784b-4af6-a5d2-b505f9c6943c",
+    "version_no": 1
+  },
+  "entry_at": "2026-10-14T13:35:00+00:00",
+  "repeated": false,
+  "pnl_basis": "prices",
+  "commission": null,
+  "exit_price": 0,
+  "expires_at": null,
+  "instrument": {
+    "key": "SPY",
+    "pip": null,
+    "pnl": "prices",
+    "mult": "100",
+    "tick": null,
+    "costs": true,
+    "known": false,
+    "stops": "price",
+    "qty_dp": 0,
+    "correct": true,
+    "price_dp": 2,
+    "asset_type": "option"
+  },
+  "limit_room": null,
+  "server_now": "2026-10-15T13:52:04.7794+00:00",
+  "stop_price": 1.1,
+  "trading_day": "2026-10-14",
+  "target_price": 3.2
+}

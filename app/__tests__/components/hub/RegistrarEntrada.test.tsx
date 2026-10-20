@@ -267,7 +267,9 @@ describe('the futures fields', () => {
     expect(pill('Lado', 'Venda')).toHaveAttribute('aria-pressed', 'false')
     expect(screen.getByLabelText('Preço de entrada')).toHaveValue('')
     expect(screen.getByText('Sem stop e alvo, o R não é calculado.')).toBeInTheDocument()
-    expect(screen.queryByText('Buscar ativo')).not.toBeInTheDocument()
+    // 3-4: «Buscar ativo» under the six chips (board choice 13), empty; the chips stay 3-3's
+    expect(screen.getByRole('searchbox', { name: 'Buscar ativo' })).toHaveValue('')
+    expect(screen.queryByRole('group', { name: 'Resultados da busca' })).not.toBeInTheDocument()
   })
 
   it('refuse in the board’s order and put the focus on the first refused field', async () => {

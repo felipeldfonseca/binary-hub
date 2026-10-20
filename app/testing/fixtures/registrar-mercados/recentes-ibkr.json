@@ -1,0 +1,46 @@
+[
+  {
+    "source": "live",
+    "symbol": "SPY",
+    "quantity": 2,
+    "direction": "long",
+    "asset_type": "option",
+    "entry_time": "2026-10-15T13:52:04.845373+00:00",
+    "stake_amount": null,
+    "payout_percent": null,
+    "duration_seconds": null
+  },
+  {
+    "source": "live",
+    "symbol": "AAPL",
+    "quantity": 100,
+    "direction": "long",
+    "asset_type": "stock",
+    "entry_time": "2026-10-15T13:52:04.824234+00:00",
+    "stake_amount": null,
+    "payout_percent": null,
+    "duration_seconds": null
+  },
+  {
+    "source": "after",
+    "symbol": "SPY",
+    "quantity": 2,
+    "direction": "long",
+    "asset_type": "option",
+    "entry_time": "2026-10-15T13:35:00+00:00",
+    "stake_amount": null,
+    "payout_percent": null,
+    "duration_seconds": null
+  },
+  {
+    "source": "after",
+    "symbol": "SPY",
+    "quantity": 2,
+    "direction": "long",
+    "asset_type": "option",
+    "entry_time": "2026-10-14T13:35:00+00:00",
+    "stake_amount": null,
+    "payout_percent": null,
+    "duration_seconds": null
+  }
+]

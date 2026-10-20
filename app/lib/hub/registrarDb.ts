@@ -1008,7 +1008,7 @@ export async function fetchDayTrades(db: SupabaseClient, accountId: string, day:
 }
 
 /** The columns of the account's recent trades the form's starting values read */
-export const RECENT_COLUMNS = 'symbol, direction, quantity, stake_amount, payout_percent, duration_seconds, source, entry_time';
+export const RECENT_COLUMNS = 'symbol, asset_type, direction, quantity, stake_amount, payout_percent, duration_seconds, source, entry_time';
 
 /** fetchRecentTrades' rows (apart for the fixtures); bad_answer otherwise */
 export function recentTradesOfRows(rows: unknown): RecentTrade[] {
@@ -1018,6 +1018,8 @@ export function recentTradesOfRows(rows: unknown): RecentTrade[] {
         const r = obj(x);
         return {
           symbol: str(r.symbol),
+          // Absent in rows read before 3-4 (RECENT_COLUMNS gained it): null
+          assetType: strOrNull(r.asset_type),
           direction: oneOf(r.direction, DIRECTIONS),
           quantity: decOrNull(r.quantity, PRICE),
           stake: decOrNull(r.stake_amount, MONEY),

@@ -7,6 +7,10 @@
  *   ADAPTED  a board string changed for the app (the comment says what changed)
  * The board's prototype controls and their labels (the scenario picker, the demo buttons, the
  * prototype's clock) are never here (contract §4.10; a test checks it).
+ *
+ * 3-4 (the new markets: Forex, Ações e opções, Cripto, B3, and the futures «Buscar ativo») adds the
+ * sections from «3-4» on, with the same markers (B = the board's copy, A = ADAPTED, N = NEW); every
+ * 3-3 string above keeps its key and value.
  */
 import type { RegistrarErrorCode } from '@/lib/hub/registrarDb'
 import { BUSY, CANCEL, CLOSE, ERROR_TEXT, FOLHA, LOADING, NEVER_SUMMED, TRY_AGAIN } from '@/components/hub/contas/copy'
@@ -24,6 +28,8 @@ export const FOLHA_REG = {
   naoEnvia: 'O Binary Hub não envia ordens: registrar é anotar.', // RO l.556
   // NEW: no active Futures or binary account (the sheet opened from a page without one)
   semConta: 'Nenhuma conta de Futuros ou de binárias para registrar.',
+  // NEW (3-4): every market registers; the sheet opened without an active account
+  semContaAtiva: 'Nenhuma conta ativa para registrar.',
   // NEW: the open trades (or the trade) could not be read
   erroCarregar: 'Não foi possível carregar o Registrar.',
   // NEW (C10): the reads are paused offline
@@ -483,4 +489,234 @@ export const ERRO_REGISTRAR: Record<RegistrarErrorCode, string> = {
   offline: 'Sem conexão. Nada foi registrado: o horário vem do servidor. Tente de novo quando a conexão voltar.',
   bad_answer: ALGO,
   unknown: ALGO,
+}
+
+// ================================================================================================
+// 3-4 · the new markets (RegistrarOperacao v57, scenarios 6–9 and the futures «Buscar ativo»;
+// mercados34/contrato.md §5). B = board copy (RO l.N), A = ADAPTED, N = NEW.
+// ================================================================================================
+
+/** The instrument block: label, chips, search (RO l.334–344, 1079–1090, 1147–1152) */
+export const ATIVO = {
+  rotulo: { ativo: 'Ativo', par: 'Par', moeda: 'Moeda', objeto: 'Ativo-objeto' }, // B l.1147
+  busca: { ativo: 'Buscar ativo', par: 'Buscar par', moeda: 'Buscar moeda' }, // B l.1149
+  placeholder: {
+    futures: 'Ex.: MCL ou ZN',
+    forex: 'Ex.: USD/CHF ou XAUUSD',
+    crypto: 'Ex.: AVAX',
+    b3: 'Ex.: PETR4 ou DI1',
+    opcao: 'Ex.: SPX',
+    acao: 'Ex.: MSFT',
+  }, // B l.1150
+  resultadosAria: 'Resultados da busca', // B l.341
+  /** «Usar “XAUUSD”» */
+  usar: (codigo: string) => `Usar “${codigo}”`, // B l.1090
+  /** sr-only, polite: «1 resultado.» / «3 resultados.» */
+  status: (n: number) => (n === 1 ? '1 resultado.' : `${n} resultados.`), // N (results appear silently on the board)
+  nenhum: 'Nenhum ativo do catálogo com esse código.', // N
+}
+
+/** «O que você operou?» (Ações e opções) */
+export const TIPO_EUA = {
+  pergunta: 'O que você operou?', // B l.335
+  acao: 'Ação ou ETF', // B l.1146
+  opcao: 'Opção', // B l.1146
+}
+
+/** «Cotada em» (Cripto) */
+export const COTADA = {
+  rotulo: 'Cotada em', // B l.344
+  nota: 'USDT e USDC contam como dólar.', // B l.1152
+}
+
+/** Quantity (RO l.743–749, 1162–1167) */
+export const QTD = {
+  contratos: 'Contratos', // B l.743
+  lotes: 'Lotes', // B l.745
+  acoes: 'Ações', // B l.746
+  quantidade: 'Quantidade', // B l.749 (B3 outside the catalog)
+  /** «Quantidade, em BTC» */
+  emMoeda: (moeda: string) => `Quantidade, em ${moeda}`, // B l.748
+  quantosContratos: 'Quantos contratos?', // B l.743
+  quantosLotes: 'Quantos lotes?', // B l.745
+  /** «2 ct» «0,50 lote» «2,00 lotes» «1 ação» «300 ações» «100 un.» (RO `qTxt`) */
+  sufixo: { ct: 'ct', lote: 'lote', lotes: 'lotes', acao: 'ação', acoes: 'ações', un: 'un.' }, // B l.789
+  loteB3: 'Fora do lote de 100, a B3 negocia no fracionário (código com F).', // B l.988, 1167
+}
+
+/** Price fields' labels (RO l.1128, 1169–1172, 1267) */
+export const PRECOS = {
+  precoEntrada: 'Preço de entrada', // B
+  precoSaida: 'Preço de saída', // B
+  premioEntrada: 'Prêmio de entrada, US$ por ação', // B l.1128
+  premioSaida: 'Prêmio de saída, US$ por ação', // B l.1267
+  /** «Preço de entrada, USDT» / «Preço de saída, R$» */
+  precoEntradaEm: (cotacao: string) => `Preço de entrada, ${cotacao}`, // B l.1128
+  precoSaidaEm: (cotacao: string) => `Preço de saída, ${cotacao}`, // B l.1267
+  stopAlvo: {
+    pts: 'Stop e alvo, em pontos',
+    pips: 'Stop e alvo, em pips',
+    preco: 'Stop e alvo, em preço',
+    premio: 'Stop e alvo do prêmio',
+  }, // B l.1172
+  /** «Posição de US$ 28.100» */
+  posicao: (valor: string) => `Posição de ${valor}`, // B l.1177
+}
+
+/** The risk line under «Stop e alvo» (RO l.1092–1115) */
+export const RISCO = {
+  /** «risco ≈ US$ 39,62» */
+  risco: (valor: string) => `risco ${valor}`, // B
+  alvo: (valor: string) => `alvo ${valor}`, // B
+  estimativa: '≈ ', // B l.1103
+  riscoPips: (n: string) => `risco ${n} pips`, // B l.1106
+  alvoPips: (n: string) => `alvo ${n} pips`, // B l.1107
+  /** «Sem valor em dólar para este ativo.» (one side only) */
+  semValor: (moeda: string) => `Sem valor em ${moeda} para este ativo.`, // B l.1110
+  /** «1 : 2 · sem valor em dólar para este ativo» (both sides) */
+  semValorParte: (moeda: string) => `sem valor em ${moeda} para este ativo`, // B l.1110
+  semPreco: 'Sem preço de entrada, o risco não é calculado.', // B l.1112
+  /** «2 contratos × 100 = 200 opções» */
+  opcoes: (contratos: string, um: boolean, opcoes: string) => `${contratos} ${um ? 'contrato' : 'contratos'} × 100 = ${opcoes} opções`, // B l.1097
+  dolar: 'dólar', // B (RO `moedaPal`)
+  reais: 'reais', // B (RO `moedaPal`)
+}
+
+/** «Resultado» lines, «Corrigir», the typed result, «Custos» (RO l.929–966) */
+export const RESULTADO = {
+  /** «Resultado: +11,5 pips · ≈ +US$ 57,50» */
+  linha: (dif: string, valor: string) => `Resultado: ${dif} · ${valor}`, // B l.940
+  /** «Se sair a 1,08635: +11,5 pips · +US$ 57,50» */
+  seSair: (preco: string, dif: string, valor: string) => `Se sair a ${preco}: ${dif} · ${valor}`, // B l.940
+  /** «digite o valor em dólar» */
+  digite: (moeda: string) => `digite o valor em ${moeda}`, // B l.941
+  estimativa: '≈ ', // B l.940
+  escolhaLado: 'Resultado: escolha o lado.', // B l.934
+  preenchaPrecos: 'Resultado: preencha os dois preços.', // B l.937
+  preenchaPremios: 'Resultado: preencha os dois prêmios.', // B l.937
+  informePreco: 'Resultado: informe o preço de saída.', // B l.935
+  informePremio: 'Resultado: informe o prêmio de saída.', // B l.935
+  confiraPrecos: 'Resultado: confira os preços.', // B l.938
+  /** «Resultado: confira os preços (o WIN anda de 5 em 5).» */
+  confiraPrecosPasso: (passo: string) => `Resultado: confira os preços (${passo}).`, // B l.938
+  confiraSaida: 'Resultado: confira o preço de saída.', // B l.936
+  confiraSaidaPasso: (passo: string) => `Resultado: confira o preço de saída (${passo}).`, // B l.936
+  informeQuantidade: 'Resultado: informe a quantidade.', // B l.939
+  corrigir: 'Corrigir', // B l.410
+  usarCalculado: 'Usar o calculado', // B l.956
+  notaEstimativa:
+    'Em pares com o dólar na frente, o valor em dólar depende da cotação de fechamento da sua corretora. Confira e corrija se for diferente.', // B l.959
+  /** «Resultado, US$» (typed) */
+  campoDigitado: (moeda: string) => `Resultado, ${moeda}`, // B l.961
+  /** «Resultado na sua plataforma, US$» (a correction) */
+  campoCorrigido: (moeda: string) => `Resultado na sua plataforma, ${moeda}`, // B l.961
+  /** «Pelos preços não dá para saber o valor em dólar: digite o resultado da sua plataforma, antes da comissão, com swap ou funding, se houver.» */
+  notaDigitado: (moeda: string, swap: string) =>
+    `Pelos preços não dá para saber o valor em ${moeda}: digite o resultado da sua plataforma, antes da comissão${swap}.`, // B l.926, 962
+  /** «Antes da comissão, com swap ou funding, se houver.» */
+  notaCorrigido: (swap: string) => `Antes da comissão${swap}.`, // B l.962
+  swap: ', com swap ou funding, se houver', // B l.926 (forex and cripto)
+  /** «Custos, US$» */
+  custos: (moeda: string) => `Custos, ${moeda}`, // B l.413
+  notaCustos: {
+    forex: 'Comissão por lote da sua conta, ida e volta.',
+    stocks: 'Comissão e taxas da corretora (SEC, FINRA).',
+    options: 'Comissão e taxas da corretora (SEC, FINRA).',
+    crypto: 'Taxas da corretora, em dólar.',
+    b3: 'Corretagem, emolumentos e registro. O imposto não entra.',
+  } as Record<string, string>, // B l.925
+  /** «+11,5 pips» «+150 pts» «+0,75 por ação» «+0,55 no prêmio» «+450 por BTC» «+5,25 no preço» (RO `difTxt`) */
+  pips: (v: string) => `${v} pips`, // B l.795
+  pts: (v: string) => `${v} pts`, // B l.794
+  porAcao: (v: string) => `${v} por ação`, // B l.796
+  noPremio: (v: string) => `${v} no prêmio`, // B l.797
+  porMoeda: (v: string, moeda: string) => `${v} por ${moeda}`, // B l.799
+  noPreco: (v: string) => `${v} no preço`, // B l.800
+}
+
+/** The option block (Ações e opções, RO l.345–356, 1051–1053, 1126–1127, 1153–1159) */
+export const OPCAO = {
+  tipo: 'Tipo', // B l.346
+  call: 'Call', // B l.346
+  put: 'Put', // B l.346
+  strike: 'Strike, US$', // B l.347
+  vencimento: 'Vencimento', // B l.349
+  hoje: 'Hoje', // B l.350
+  /** «Sexta, 16 out» */
+  sexta: (dia: string) => `Sexta, ${dia}`, // B l.351
+  outraData: 'Outra data', // B l.352
+  /** «SPY Call 790» */
+  ativo: (objeto: string, tipo: string, strike: string) => `${objeto} ${tipo} ${strike}`, // B l.790
+  /** «vence 15 out» */
+  vence: (dia: string) => `vence ${dia}`, // B l.790
+}
+
+/** «Venceu sem valor» (RO l.372, 462, 968–973) */
+export const VSV = {
+  rotulo: 'Venceu sem valor', // B l.372
+  escolhaVencimento: 'Escolha o vencimento primeiro.', // B l.970
+  venceHoje: 'Vence hoje às 16:00 ET.', // B l.971
+  /** «Vence em 14 out, às 16:00 ET.» */
+  venceEm: (dia: string) => `Vence em ${dia}, às 16:00 ET.`, // B l.972
+  /**
+   * «Venceu em 15 out, às 16:00 ET: essa saída só pode ser registrada até as 04:00 ET do dia seguinte.»
+   * N (the board never reaches it): step 2 of an open option, too late for the exit hour to name the
+   * expiry's close (register_exit reads the hour as today's, or yesterday's while today's is more
+   * than 12 hours ahead)
+   */
+  tarde: (dia: string) => `Venceu em ${dia}, às 16:00 ET: essa saída só pode ser registrada até as 04:00 ET do dia seguinte.`,
+}
+
+/** The new markets' field errors (RO l.1022–1053); the side of a stop or target: N */
+export const ERROS_PRECOS = {
+  /** «Informe o prêmio de entrada.» */
+  vazio: (oque: 'preço' | 'prêmio', lado: 'entrada' | 'saída') => `Informe o ${oque} de ${lado}.`, // B l.1024
+  /** «Use só números, como 1,08520.» */
+  numero: (exemplo: string) => `Use só números, como ${exemplo}.`, // B l.1025
+  /** «O prêmio precisa ser maior que zero.» */
+  zero: (oque: 'preço' | 'prêmio') => `O ${oque} precisa ser maior que zero.`, // B l.1026
+  /** «Use até 4 casas decimais.» */
+  casas: (n: number) => `Use até ${n} casas decimais.`, // B l.1029 (A for the stop, strike, typed result and costs)
+  pipsZero: 'Use pips maiores que zero.', // B l.1034
+  precoStopZero: 'Use um preço maior que zero.', // B l.1034
+  /** «Numa compra, o stop fica abaixo do preço de entrada.» */
+  stopLado: (compra: boolean, oque: 'preço' | 'prêmio') =>
+    `Numa ${compra ? 'compra' : 'venda'}, o stop fica ${compra ? 'abaixo' : 'acima'} do ${oque} de entrada.`, // N (the board never checks the side; the server refuses it)
+  /** «Numa compra, o alvo fica acima do preço de entrada.» */
+  alvoLado: (compra: boolean, oque: 'preço' | 'prêmio') =>
+    `Numa ${compra ? 'compra' : 'venda'}, o alvo fica ${compra ? 'acima' : 'abaixo'} do ${oque} de entrada.`, // N
+  qtdInteiraAcoes: 'Use um número inteiro de ações.', // B l.1045
+  qtdInteira: 'Use um número inteiro.', // B l.1045
+  opTipo: 'Escolha Call ou Put.', // B l.1051
+  strikeVazio: 'Informe o strike.', // B l.1052
+  strikeNumero: 'Use só números, como 790.', // B l.1052
+  strikeZero: 'Use um strike maior que zero.', // B l.1052
+  vencVazio: 'Escolha o vencimento.', // B l.1053
+  vencAntes: 'O vencimento não pode ser antes do dia da entrada.', // B l.1053
+  resVazio: 'Informe o resultado.', // B l.951
+  resNumero: 'Use só números, como −57,50.', // B l.951
+  custosNumero: 'Use só números, como 7,00.', // B l.954
+  /** «Antes de 13 out esta conta não tinha regras: essas operações entram pela importação por colunas, logo depois da Fase 3.» */
+  antesRegras: (desde: string) =>
+    `Antes de ${desde} esta conta não tinha regras: essas operações entram pela importação por colunas, logo depois da Fase 3.`, // B l.1022–1023
+}
+
+/** Steps 2 and 3 of a price market (RO l.1247–1260, 1316–1338) */
+export const PASSOS_PRECOS = {
+  /** «prêmio 1,85» */
+  premio: (preco: string) => `prêmio ${preco}`, // B l.1256
+  /** «stop do prêmio 1,10» */
+  stopPremio: (v: string) => `stop do prêmio ${v}`, // B l.1259
+  pips: ' pips', // B l.1258
+  baseDigitado: 'Resultado digitado por você.', // B l.1333
+  baseEstimativa: 'Valor estimado pela cotação de saída; confira com a sua corretora.', // B l.1333
+  /** «Custos US$ 7,00 · líquido +US$ 50,50» */
+  custos: (custos: string, liquido: string) => `Custos ${custos} · líquido ${liquido}`, // B l.1334
+  /** «com stop de 12 pips» */
+  comStopPips: (v: string) => `com stop de ${v} pips`, // B l.1336
+  /** «com stop em 38,20» */
+  comStopEm: (v: string) => `com stop em ${v}`, // B l.1336
+  /** «com stop do prêmio em 1,10» */
+  comStopPremio: (v: string) => `com stop do prêmio em ${v}`, // B l.1336
+  semResultado: '—', // B l.1331
 }

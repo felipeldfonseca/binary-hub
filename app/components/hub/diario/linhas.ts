@@ -4,17 +4,21 @@
  *
  *   Hora       «10:12» (open) · «10:01–10:08» (closed) · another trading day: «ontem, 10:52»,
  *              «ontem, 10:52 → 10:42», «21 out, 10:24 → 10:42»; HH:MM on the account's clock
- *   Operação   «MES · Compra · 2 ct» · «EUR/USD · Baixa · 1 min», with the paperclip's label
- *   Resultado  «aberta», or the signed money in the account's currency («−US$ 245,00»)
+ *   Operação   «MES · Compra · 2 ct» · «EUR/USD · Baixa · 1 min», and since 3-4 «EUR/USD · Compra ·
+ *              0,50 lote», «SPY Call 790 · vence 15 out · Compra · 2 ct», «BTC/USDT · Venda · 0,25
+ *              BTC», «PETR4 · Compra · 300 ações», «BGIX26 · Compra · 2 un.», «WIN · Venda · 3 ct»
+ *              (the Registrar's opTexto), with the paperclip's label
+ *   Resultado  «aberta», or the signed money in the account's currency («−US$ 245,00», «−R$ 180,00»)
  *   Plano      «No plano» · «● fora da janela · depois do limite» · «—» (not evaluated)
- *   Ação       «Registrar saída» (futures, open) · «Registrar resultado» (binary, open) · «Abrir»
+ *   Ação       «Registrar saída» (a price market, open) · «Registrar resultado» (binary, open) · «Abrir»
+ *              (aria «Registrar saída: Compra de SPY Call 790 às 09:35», the instrument as ativoCurto)
  */
 import { addDays } from '@/lib/domain'
 import { currencyOf, type AccountMarket } from '@/lib/domain/markets'
 import { formatDiaMes, formatMoney } from '@/lib/hub/formato'
-import { formatDecimal } from '@/lib/hub/numero'
 import { horaNoRelogio } from '@/lib/hub/posso'
 import type { DayTrade } from '@/lib/hub/registrarDb'
+import { ativoCurto, opTexto } from '@/lib/hub/registrarForm'
 import { OPERACOES_DIA as T, QUEBRAS, acaoAria } from './copy'
 
 const NBSP = '\u00a0'
@@ -51,14 +55,15 @@ export function diaDaLinha(tradingDay: string | null, day: string): string {
 const lado = (t: DayTrade['trade']): string =>
   t.direction === 'long' ? T.compra : t.direction === 'short' ? T.venda : t.direction === 'call' ? T.alta : T.baixa
 
-/** «MES · Compra · 2 ct» / «EUR/USD · Baixa · 1 min» (the board's `opTxt`) */
+/**
+ * «MES · Compra · 2 ct» / «EUR/USD · Baixa · 1 min» / «SPY Call 790 · vence 15 out · Compra · 2 ct»
+ * (the board's `opTxt`: the Registrar's opTexto for the account's market), the amount kept with its
+ * unit by a no-break space («2 ct», «0,50 lote», «0,25 BTC», «1 min») as 3-3 did
+ */
 export function operacaoDaLinha(t: DayTrade['trade'], market: AccountMarket): string {
-  const partes = [t.symbol, lado(t)]
-  if (market === 'binary') {
-    if (t.durationSeconds !== null) partes.push(`${formatDecimal(String(t.durationSeconds / 60))}${NBSP}min`)
-  } else if (t.quantity !== null) {
-    partes.push(formatDecimal(t.quantity, { suffix: 'ct' }))
-  }
+  const partes = opTexto(t, market).split(' · ')
+  const ultima = partes.length - 1
+  if (ultima > 0) partes[ultima] = partes[ultima].replace(/ /g, NBSP)
   return partes.join(' · ')
 }
 
@@ -102,7 +107,7 @@ export function linhaDoDia(d: DayTrade, { market, day, tz }: ContextoDoDia): Lin
     resultado: fechada ? resultadoDaLinha(d, market) : null,
     plano: planoDaLinha(d),
     acao,
-    acaoAria: acaoAria(fechada ? T.abrirAria : acao, lado(t), t.symbol, dia, entrada),
+    acaoAria: acaoAria(fechada ? T.abrirAria : acao, lado(t), ativoCurto(t, market), dia, entrada),
   }
 }
 
