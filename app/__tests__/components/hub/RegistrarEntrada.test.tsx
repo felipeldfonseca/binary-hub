@@ -636,6 +636,60 @@ describe('«Posso operar hoje?» at a typed moment never shows another moment’
     expect(screen.queryByText('Limite do dia')).not.toBeInTheDocument()
   })
 
+  it('«Ontem» after the 22nd answered: during the 300 ms before the 21st is asked, never the 22nd’s answer under «em 21 out»', async () => {
+    jest.useFakeTimers({ now: new Date('2026-10-22T14:31:10.000Z'), doNotFake: ['queueMicrotask'] })
+    // Thursday 22 at 10:20 answers «Liberado» and «US$ 245 de US$ 400»; Wednesday 21 answers when the test says so
+    const quinta = agoraTelas('agora-qui-1031-et').accounts.find((a) => a.accountId === ids.accounts.topOne)!
+    const quarta = agoraTelas('agora-qua-1105-et').accounts.find((a) => a.accountId === ids.accounts.topOne)!
+    expect(quarta.gate.tradingDay).toBe('2026-10-21')
+    let responderQuarta: (a: typeof quarta) => void = () => undefined
+    db.fetchGateAt.mockImplementation((_db, _id, at) =>
+      at.toISOString() === '2026-10-22T14:20:00.000Z' ? Promise.resolve(quinta) : new Promise((resolve) => (responderQuarta = resolve)),
+    )
+    const perguntou = (iso: string) => db.fetchGateAt.mock.calls.some((c) => (c[2] as Date).toISOString() === iso)
+    const user = userEvent.setup({ advanceTimers: jest.advanceTimersByTime })
+    abrir()
+    await screen.findByRole('heading', { level: 3, name: 'Entrada' })
+    await user.click(pill('Como está a operação?', 'Já fechada'))
+    const hora = screen.getByLabelText('Hora da entrada (ET)')
+    await user.clear(hora)
+    await user.type(hora, '10:20')
+    await act(async () => {
+      jest.advanceTimersByTime(400)
+    })
+    await waitFor(() => expect(linhaDoGate()).toHaveTextContent('Posso operar hoje? Na entrada:Liberado'))
+    expect(screen.getByText('Limite do dia').parentElement).toHaveTextContent('Limite do diaUS$ 245de US$ 400')
+    // Another hour of the same day: during its 300 ms the 10:20 answer stays (no flicker per keystroke)
+    fireEvent.change(hora, { target: { value: '10:25' } })
+    await act(async () => {
+      jest.advanceTimersByTime(100)
+    })
+    expect(perguntou('2026-10-22T14:25:00.000Z')).toBe(false)
+    expect(linhaDoGate()).toHaveTextContent('Posso operar hoje? Na entrada:Liberado')
+    // «Ontem»: the 21st is not asked yet (300 ms of quiet), and nothing of the 22nd stands for it meanwhile
+    await user.click(pill('Dia', 'Ontem'))
+    for (const ms of [0, 150, 149]) {
+      await act(async () => {
+        jest.advanceTimersByTime(ms)
+      })
+      expect(perguntou('2026-10-21T14:25:00.000Z')).toBe(false)
+      expect(linhaDoGate()).toHaveTextContent('Posso operar hoje? Na entrada, em 21 out:')
+      expect(linhaDoGate()).not.toHaveTextContent('Liberado')
+      expect(screen.queryByText('Limite do dia')).not.toBeInTheDocument()
+    }
+    // Asked after the quiet: the question alone until the 21st answers, then the 21st's own answer
+    await act(async () => {
+      jest.advanceTimersByTime(1)
+    })
+    await waitFor(() => expect(perguntou('2026-10-21T14:25:00.000Z')).toBe(true))
+    expect(perguntou('2026-10-22T14:25:00.000Z')).toBe(false)
+    expect(linhaDoGate()).toHaveTextContent('Posso operar hoje? Na entrada, em 21 out:')
+    expect(linhaDoGate()).not.toHaveTextContent('Liberado')
+    expect(screen.queryByText('Limite do dia')).not.toBeInTheDocument()
+    await act(async () => responderQuarta(quarta))
+    await waitFor(() => expect(linhaDoGate()).toHaveTextContent('Posso operar hoje? Na entrada, em 21 out:Fora da sua janela'))
+  })
+
   it('the account line never says «Sem janela salva» when rules_now failed (not evaluated is not false)', async () => {
     fetchRulesNow.mockRejectedValue(new Error('network'))
     abrir()

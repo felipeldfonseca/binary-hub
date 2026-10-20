@@ -199,6 +199,9 @@ describe('the entry preview', () => {
       jest.advanceTimersByTime(299)
     })
     expect(db.previewEntry).toHaveBeenCalledTimes(1)
+    // Kept, but as a placeholder: it answers stop 10, not the stop on screen
+    expect(result.current.data?.limitRoom).toMatchObject({ left: '155' })
+    expect(result.current.isPlaceholderData).toBe(true)
     await act(async () => {
       jest.advanceTimersByTime(1)
     })

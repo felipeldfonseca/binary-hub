@@ -280,6 +280,10 @@ const PREVIA_TARGET = 5;
  * second) does not restart the wait and redraw every 300 ms. A null text (an incomplete form, the
  * hour back on the current minute) asks nothing and shows nothing at once: the last answer is kept
  * while the next one is asked only for the same account or trade, never for an incomplete form.
+ *
+ * The key is the text on screen at once; only the asking waits for the quiet. So `data` that is
+ * not a placeholder always answers the text on screen: while a new text waits its 300 ms, the last
+ * answer is a placeholder (another «Dia»'s gate is never this one's), and an error is the text's own.
  */
 function usePreview<T>(
   kind: 'entrada' | 'saida' | 'fechada' | 'gate',
@@ -290,12 +294,11 @@ function usePreview<T>(
 ) {
   const { db, userId } = useHubDb();
   const debounced = useDebounced(text, options.debounceMs);
-  const settled = text === null ? null : debounced;
   return useQuery<T, RegistrarDataError>({
-    queryKey: registrarKeys.previa(userId, kind, target ?? '', settled ?? ''),
-    queryFn: () => ask(db, target as string, settled as string),
-    enabled: !!userId && !!target && !!settled && (options.enabled ?? true),
-    placeholderData: settled ? (previous, previousQuery) => (previousQuery?.queryKey[PREVIA_TARGET] === target ? previous : undefined) : undefined,
+    queryKey: registrarKeys.previa(userId, kind, target ?? '', text ?? ''),
+    queryFn: () => ask(db, target as string, text as string),
+    enabled: !!userId && !!target && text !== null && text === debounced && (options.enabled ?? true),
+    placeholderData: text ? (previous, previousQuery) => (previousQuery?.queryKey[PREVIA_TARGET] === target ? previous : undefined) : undefined,
     retry: retryNetwork,
     staleTime: 15 * 1000,
   });

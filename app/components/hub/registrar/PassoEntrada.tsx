@@ -565,8 +565,10 @@ export default function PassoEntrada(props: PassoEntradaProps) {
 
   // «Posso operar hoje?»: rules_now for the current minute, gate_at at a typed hour or another day.
   // A typed moment is only ever answered by gate_at: never the current minute's answer, nor another
-  // day's, nor «Liberado» when it could not check (D8). While the next hour is asked, the last answer
-  // stays if it is of the same trading day (no flicker per keystroke).
+  // day's, nor «Liberado» when it could not check (D8). An answer shows when it is for the instant
+  // asked now (not a placeholder: useGateAt keys on that instant at once, so during its 300 ms wait
+  // the last answer is a placeholder too) or, while that instant waits or is asked, when it is of the
+  // same trading day (no flicker per keystroke); otherwise the question alone, without «Limite do dia».
   const noGateAt = !m.diaRecusado && !m.noMinutoAtual && m.entradaEm ? m.entradaEm : null
   const gateAt = useGateAt(conta.id, noGateAt)
   const respostaAt =
