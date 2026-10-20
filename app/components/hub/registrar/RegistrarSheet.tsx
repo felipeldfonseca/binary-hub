@@ -22,8 +22,9 @@ import { FolhaContext, type FolhaValue } from './ui'
 
 /**
  * The «Registrar operação» sheet (PR 3-3, lane A; approved board RegistrarOperacao.dc.html v57) for
- * Futures and Ebinex accounts. Its props are the contract with ImportSheetProvider (§2.5); keep
- * them.
+ * Futures and Ebinex accounts, and since 3-4 for every market podeRegistrar lets in (Forex, Ações e
+ * opções, Cripto, B3: their fields are CamposPrecos'). Its props are the contract with
+ * ImportSheetProvider (§2.5); keep them.
  */
 export interface RegistrarSheetProps {
   /** The account the sheet opens on; null when the hub has no account it can register on */
@@ -299,7 +300,7 @@ export default function RegistrarSheet({ accountId, tradeId, onClose }: Registra
   } else if (vista.passo === 'semConta') {
     corpo = (
       <div className="hub-passo">
-        <p>{FOLHA_REG.semConta}</p>
+        <p>{FOLHA_REG.semContaAtiva}</p>
         <div className="hub-acoes">
           <button type="button" className="hub-btn" onClick={() => onClose()}>
             {CLOSE}

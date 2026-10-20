@@ -175,6 +175,24 @@
   color: var(--red);
 }
 
+/* 3-4: «Buscar ativo / par / moeda» (RO l.340: 280 px, the whole width below that), the short fields
+   (RO: «Quantos …», «Quantidade», «Resultado, US$», «Custos, US$»: 200 px) and the estimate note
+   under the result line (RO l.411) */
+.hub .hub-reg .hub-reg-busca {
+  max-width: 280px;
+  -webkit-appearance: none;
+  appearance: none;
+}
+.hub .hub-reg .hub-reg-curto {
+  max-width: 200px;
+}
+.hub .hub-reg-busca-campo {
+  margin-top: 4px;
+}
+.hub .hub-reg-nota-est {
+  margin-top: -10px;
+}
+
 /* «Stop e alvo» and «Stake/Payout» keep two columns on narrow phones (RO `campos2 sempre`) */
 @media (max-width: 420px) {
   .hub .hub-reg-sempre {
