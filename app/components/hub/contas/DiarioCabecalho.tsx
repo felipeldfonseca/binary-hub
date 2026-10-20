@@ -2,12 +2,10 @@
 
 import { useEffect, useMemo, useRef } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { useQueryClient } from '@tanstack/react-query'
 import { MARKET_SPEC } from '@/lib/domain/markets'
-import { hubKeys, useContaAtual, useHubDb } from '@/hooks/useContas'
+import { useContaAtual } from '@/hooks/useContas'
 import { useRulesNow } from '@/hooks/useRegras'
 import type { TradingAccount } from '@/lib/hub/contas'
-import type { HubPreferences } from '@/lib/hub/contasDb'
 import { janelaLinha } from '@/lib/hub/posso'
 import { podeRegistrar } from '@/lib/hub/registrar'
 import { rulesNowFailed } from '@/components/hub/posso/rulesNowRead'
@@ -55,8 +53,6 @@ export default function DiarioCabecalho() {
   const registrar = useRegistrarSheet()
   const router = useRouter()
   const searchParams = useSearchParams()
-  const queryClient = useQueryClient()
-  const { userId } = useHubDb()
   const importRef = useRef<HTMLButtonElement>(null)
   const registrarRef = useRef<HTMLButtonElement>(null)
   const titleRef = useRef<HTMLHeadingElement>(null)
@@ -127,10 +123,20 @@ export default function DiarioCabecalho() {
   const openImport = (opener: HTMLElement | null) => sheet.open({ mode: 'importar', accountId: importId, opener })
   const openAdd = (opener: HTMLElement | null) => sheet.open({ mode: 'adicionar', opener })
 
-  // The choice reaches the page's other blocks («Operações do dia» reads the current account too)
-  // at once, not only when merge_preferences answers; choose() then saves it as before
+  // «Operações do dia» resolves the current account on its own (useContaAtual), and this header's
+  // choice lives in its own useContaAtual until merge_preferences saves it: when that save fails,
+  // the next read of the preferences (after an import, on reconnect) would put the old account back
+  // in the bridge only. So the choice goes into ?conta=, which both read first (useContaAtual
+  // already moves a ?conta= that is there); choose() saves it as before, for the next visit
   const choose = (id: string) => {
-    queryClient.setQueryData<HubPreferences>(hubKeys.preferencias(userId), (p) => ({ ...(p ?? {}), conta_atual: id }))
+    if (!searchParams?.get('conta')) {
+      const params = new URLSearchParams(searchParams?.toString() ?? '')
+      params.set('conta', id)
+      // Already handled once the selector is on screen (a reload must not open a sheet again)
+      params.delete('importar')
+      params.delete('registrar')
+      router.replace(`/diario?${params.toString()}`, { scroll: false })
+    }
     void conta.choose(id)
   }
 

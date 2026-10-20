@@ -15,8 +15,11 @@ export type EstadoDoDia =
 
 interface Props {
   estado: EstadoDoDia
-  /** A row's button: the Registrar sheet on that trade; `opener` gets the focus back */
-  onAbrir: (tradeId: string, opener: HTMLElement) => void
+  /**
+   * A row's button: the Registrar sheet on that trade; `opener` gets the focus back, `fallback`
+   * (the block's title) when the row is gone (an entry undone in the sheet)
+   */
+  onAbrir: (tradeId: string, opener: HTMLElement, fallback: HTMLElement | null) => void
   /** «Tentar de novo» */
   onTentar: () => void
 }
@@ -82,7 +85,7 @@ export default function OperacoesDoDiaVista({ estado, onAbrir, onTentar }: Props
           </span>
         </div>
         {estado.linhas.map((linha) => (
-          <Linha key={linha.tradeId} linha={linha} onAbrir={onAbrir} />
+          <Linha key={linha.tradeId} linha={linha} onAbrir={(tradeId, opener) => onAbrir(tradeId, opener, titleRef.current)} />
         ))}
       </div>
     )
@@ -125,7 +128,7 @@ function Plano({ plano }: { plano: PlanoDaLinha }) {
   )
 }
 
-function Linha({ linha, onAbrir }: { linha: LinhaDoDia; onAbrir: Props['onAbrir'] }) {
+function Linha({ linha, onAbrir }: { linha: LinhaDoDia; onAbrir: (tradeId: string, opener: HTMLElement) => void }) {
   return (
     <div role="row" className={linha.plano.tipo === 'fora' ? 'hub-ops-dia__linha hub-ops-dia__linha--fora' : 'hub-ops-dia__linha'}>
       <span role="cell" className="hub-ops-dia__hora">

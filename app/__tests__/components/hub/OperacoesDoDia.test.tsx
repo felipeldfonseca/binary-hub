@@ -14,7 +14,7 @@ import * as contasDb from '@/lib/hub/contasDb'
 import * as regrasDb from '@/lib/hub/regrasDb'
 import * as registrarDb from '@/lib/hub/registrarDb'
 import { RegistrarDataError, dayTradesOfRows, type DayTrade, type DayTradesRows } from '@/lib/hub/registrarDb'
-import OperacoesDoDia from '@/components/hub/diario/OperacoesDoDia'
+import OperacoesDoDia, { diaDaPonte } from '@/components/hub/diario/OperacoesDoDia'
 import OperacoesDoDiaVista from '@/components/hub/diario/OperacoesDoDiaVista'
 import { linhaDoDia, linhasDoDia } from '@/components/hub/diario/linhas'
 import DiarioCabecalho from '@/components/hub/contas/DiarioCabecalho'
@@ -22,6 +22,10 @@ import PossoOperarHojeDiario from '@/components/hub/posso/PossoOperarHojeDiario'
 import DiarioPage from '@/app/(hub)/diario/page'
 import { OPERACOES_DO_DIA_ID } from '@/components/hub/registrar/abrir'
 import { renderHub } from '@/testing/hubHarness'
+import { hubKeys } from '@/hooks/useContas'
+import { regrasKeys } from '@/hooks/useRegras'
+import { registrarKeys } from '@/hooks/useRegistrar'
+import type { RulesNow } from '@/lib/hub/regras'
 import { agoraTelas, contasTelas, diaRowsTelas, diaTelas, idsTelas } from '@/testing/registrarTelas'
 
 jest.mock('@/lib/supabase', () => ({ createDataClient: jest.fn(() => ({})) }))
@@ -30,13 +34,26 @@ jest.mock('@/hooks/useAuth', () => ({
   useAuth: () => ({ user: { id: 'user-1' }, session: { access_token: 'user-jwt' } }),
 }))
 
+// The URL as Next keeps it: router.replace changes it and every component reading it draws again
 let mockSearch = ''
+const mockUrlListeners = new Set<() => void>()
 const mockReplace = jest.fn()
-jest.mock('next/navigation', () => ({
-  useSearchParams: () => new URLSearchParams(mockSearch),
-  useRouter: () => ({ replace: mockReplace, push: jest.fn() }),
-  usePathname: () => '/diario',
-}))
+function mockNavigate(url: string) {
+  mockSearch = url.includes('?') ? url.slice(url.indexOf('?') + 1) : ''
+  mockUrlListeners.forEach((listener) => listener())
+}
+jest.mock('next/navigation', () => {
+  const { useSyncExternalStore } = jest.requireActual('react')
+  const subscribe = (listener: () => void) => {
+    mockUrlListeners.add(listener)
+    return () => mockUrlListeners.delete(listener)
+  }
+  return {
+    useSearchParams: () => new URLSearchParams(useSyncExternalStore(subscribe, () => mockSearch)),
+    useRouter: () => ({ replace: mockReplace, push: jest.fn() }),
+    usePathname: () => '/diario',
+  }
+})
 
 jest.mock('@/lib/hub/contasDb', () => ({
   ...jest.requireActual('@/lib/hub/contasDb'),
@@ -92,7 +109,7 @@ const ids = idsTelas()
 
 beforeEach(() => {
   mockSearch = ''
-  mockReplace.mockReset()
+  mockReplace.mockReset().mockImplementation(mockNavigate)
   mockSheet.mockReset()
   fetchAccounts.mockReset().mockResolvedValue(contasTelas())
   fetchPreferences.mockReset().mockResolvedValue({})
@@ -107,6 +124,20 @@ afterEach(() => {
 })
 
 const ponte = () => screen.findByRole('region', { name: 'Operações do dia' })
+
+/** rules_now at Thu 10:31 ET with Top One #1's answer changed (its trading day, changes_at, window clock) */
+function agoraTopOne(change: { tradingDay?: string; changesAt?: Date | null; tz?: string }): RulesNow {
+  const now = agoraTelas('agora-qui-1031-et')
+  return {
+    ...now,
+    accounts: now.accounts.map((a) => {
+      if (a.accountId !== ids.accounts.topOne) return a
+      const gate = { ...a.gate, ...(change.tradingDay ? { tradingDay: change.tradingDay } : {}), ...('changesAt' in change ? { changesAt: change.changesAt ?? null } : {}) }
+      const rules = a.rules && change.tz ? { ...a.rules, windows: a.rules.windows.map((w) => ({ ...w, tz: change.tz as typeof w.tz })) } : a.rules
+      return { ...a, gate, rules }
+    }),
+  }
+}
 
 /** The table's rows (the header row first) as their cells' text */
 function linhas(region: HTMLElement): string[][] {
@@ -249,6 +280,64 @@ describe('«Operações do dia» · states', () => {
     expect(fetchDayTrades.mock.calls[0][1]).toBe(ids.accounts.topOne)
   })
 
+  it('keeps rules_now’s trading day while a later read fails or waits offline, until its changes_at', async () => {
+    // An overnight window placed on the day it opened (21 Oct) while the day clock says 22 Oct;
+    // the answer holds until 11:00 ET (15:00Z)
+    fetchRulesNow.mockResolvedValue(agoraTopOne({ tradingDay: '2026-10-21', changesAt: new Date('2026-10-22T15:00:00Z') }))
+    const view = renderHub(<OperacoesDoDia />)
+    await rowsOf()
+    expect(fetchDayTrades).toHaveBeenCalledTimes(1)
+    expect(fetchDayTrades.mock.calls[0][2]).toBe('2026-10-21')
+
+    // The next read fails: the day stays
+    fetchRulesNow.mockRejectedValue(new regrasDb.RegrasDataError('network'))
+    await act(() => view.queryClient.refetchQueries({ queryKey: regrasKeys.agora('user-1') }))
+    await waitFor(() => expect(view.queryClient.getQueryState(regrasKeys.agora('user-1'))?.status).toBe('error'))
+    // Offline, the read waits (paused): the table stays instead of «Sem conexão»
+    act(() => onlineManager.setOnline(false))
+    void view.queryClient.refetchQueries({ queryKey: regrasKeys.agora('user-1') })
+    await waitFor(() => expect(view.queryClient.getQueryState(regrasKeys.agora('user-1'))?.fetchStatus).toBe('paused'))
+
+    const region = await ponte()
+    expect(within(region).getByRole('table')).toBeInTheDocument()
+    expect(within(region).queryByRole('alert')).not.toBeInTheDocument()
+    expect(fetchDayTrades).toHaveBeenCalledTimes(1)
+  })
+
+  it('a failed read after the answer’s changes_at: the day clock’s day', () => {
+    const topOne = { id: ids.accounts.topOne, market: 'futures' as const }
+    const now = agoraTopOne({ tradingDay: '2026-10-21', changesAt: new Date('2026-10-22T15:00:00Z') })
+    expect(diaDaPonte(now, false, topOne, new Date('2026-10-22T14:31:00Z'))).toBe('2026-10-21')
+    expect(diaDaPonte(now, true, topOne, new Date('2026-10-22T14:59:00Z'))).toBe('2026-10-21')
+    // Due: what it said may have changed, and the read that would say it failed
+    expect(diaDaPonte(now, true, topOne, new Date('2026-10-22T15:00:00Z'))).toBe('2026-10-22')
+    // No answer yet: wait, unless the read failed
+    expect(diaDaPonte(undefined, false, topOne, new Date('2026-10-22T14:31:00Z'))).toBeNull()
+    expect(diaDaPonte(undefined, true, topOne, new Date('2026-10-22T14:31:00Z'))).toBe('2026-10-22')
+    // An answer without this account (just created): the day clock's
+    expect(diaDaPonte({ ...now, accounts: [] }, true, topOne, new Date('2026-10-22T14:31:00Z'))).toBe('2026-10-22')
+  })
+
+  it('keeps the table when a later read of the day fails (the error copy only without rows)', async () => {
+    const view = renderHub(<OperacoesDoDia />)
+    await rowsOf()
+
+    fetchDayTrades.mockRejectedValue(new RegistrarDataError('network'))
+    await act(() => view.queryClient.refetchQueries({ queryKey: registrarKeys.all('user-1') }))
+    await waitFor(() => expect(fetchDayTrades).toHaveBeenCalledTimes(2))
+
+    const region = await ponte()
+    expect(within(region).getByRole('table')).toBeInTheDocument()
+    expect(within(region).queryByRole('alert')).not.toBeInTheDocument()
+  })
+
+  it('writes the hours on the clock of the account’s window: a Futuros window set on Brasília’s time', async () => {
+    fetchRulesNow.mockResolvedValue(agoraTopOne({ tz: 'America/Sao_Paulo' }))
+    renderHub(<OperacoesDoDia />)
+
+    expect((await rowsOf()).map((r) => r[0])).toEqual(['ontem, 11:52', '11:01–11:08', '11:12', '11:24'])
+  })
+
   it('a failed read: its own copy and «Tentar de novo», which reads again and gives the focus to the title', async () => {
     fetchDayTrades.mockRejectedValueOnce(new RegistrarDataError('network'))
     renderHub(<OperacoesDoDia />)
@@ -324,6 +413,22 @@ describe('«Operações do dia» · the row opens the Registrar sheet', () => {
     expect(exit).toHaveFocus()
   })
 
+  it('when the row is gone after the sheet (an entry undone), «Fechar» gives the focus to the block’s title, not the page’s start', async () => {
+    const view = renderHub(<OperacoesDoDia />)
+    const region = await ponte()
+    await userEvent.click(await within(region).findByRole('button', { name: 'Registrar saída: Compra de MES às 10:12' }))
+    expect(mockSheet).toHaveBeenLastCalledWith({ accountId: ids.accounts.topOne, tradeId: ids.trades.mes })
+
+    // «Desfazer entrada» in the sheet: the day is read again without MES
+    fetchDayTrades.mockResolvedValue(diaTelas('dia-qui-1031').filter((d) => d.trade.id !== ids.trades.mes))
+    await act(() => view.queryClient.invalidateQueries({ queryKey: registrarKeys.all('user-1') }))
+    await waitFor(() => expect(within(region).queryByRole('button', { name: 'Registrar saída: Compra de MES às 10:12' })).not.toBeInTheDocument())
+
+    await userEvent.click(screen.getByRole('button', { name: 'Fechar' }))
+
+    expect(within(region).getByRole('heading', { level: 2, name: 'Operações do dia' })).toHaveFocus()
+  })
+
   it('«Ver no Diário» puts the focus on the title of «Operações do dia»', async () => {
     renderHub(<OperacoesDoDia />)
     const region = await ponte()
@@ -347,7 +452,8 @@ describe('«Operações do dia» · presentational', () => {
     )
     const button = screen.getByRole('button', { name: 'Registrar saída: Venda de MGC às 10:24' })
     await userEvent.click(button)
-    expect(onAbrir).toHaveBeenCalledWith(ids.trades.mgc, button)
+    // The block's title is the focus's fallback (the row is gone after an entry undone)
+    expect(onAbrir).toHaveBeenCalledWith(ids.trades.mgc, button, screen.getByRole('heading', { level: 2, name: 'Operações do dia' }))
   })
 
   it('writes «21 out» for an older trading day and a dash for a closed trade with no result', () => {
@@ -356,6 +462,9 @@ describe('«Operações do dia» · presentational', () => {
       hora: '21 out, 10:52 → 10:42',
       acaoAria: 'Abrir no Registrar: Compra de MNQ de 21 out, às 10:52',
     })
+    // A zero result (an Ebinex refund) is neither a gain nor a loss: the text colour
+    const zero: DayTrade = { ...mnq, trade: { ...mnq.trade, pnl: '0.00' } }
+    expect(linhaDoDia(zero, { market: 'futures', day: '2026-10-22', tz: 'America/New_York' }).resultado).toEqual({ texto: 'US$\u00a00,00', tom: 'neutral' })
     const semResultado: DayTrade = { ...mnq, trade: { ...mnq.trade, pnl: null } }
     expect(linhaDoDia(semResultado, { market: 'futures', day: '2026-10-22', tz: 'America/New_York' }).resultado).toEqual({ texto: '—', tom: 'neutral' })
   })
@@ -399,6 +508,33 @@ describe('/diario with «Operações do dia»', () => {
     expect(await within(await ponte()).findByRole('table')).toBeInTheDocument()
     expect(fetchDayTrades).toHaveBeenLastCalledWith(expect.anything(), ids.accounts.ebinex, '2026-10-22', expect.any(Date))
     expect(screen.getByRole('button', { name: /^Conta: Ebinex/ })).toBeInTheDocument()
+  })
+
+  it('keeps the header and the bridge on the same account when the preferences are read again after a failed save', async () => {
+    mergePreferences.mockRejectedValue(new regrasDb.RegrasDataError('network'))
+    fetchRulesNow.mockResolvedValue(agoraTelas('agora-qui-2024-brt'))
+    fetchDayTrades.mockImplementation(async (_db, accountId) => (accountId === ids.accounts.ebinex ? diaTelas('dia-ebinex') : []))
+    const view = renderHub(
+      <>
+        <DiarioCabecalho />
+        <OperacoesDoDia />
+      </>,
+    )
+    await userEvent.click(await screen.findByRole('button', { name: /^Conta: Top One #1/ }))
+    await userEvent.click(screen.getByRole('button', { name: /^Ebinex/ }))
+    expect(await within(await ponte()).findByRole('table')).toBeInTheDocument()
+    await waitFor(() => expect(mergePreferences).toHaveBeenCalled())
+
+    // An import's refresh (or a reconnect) reads the preferences again: still without the choice
+    fetchDayTrades.mockClear()
+    await act(() => view.queryClient.invalidateQueries({ queryKey: hubKeys.preferencias('user-1') }))
+    await waitFor(() => expect(fetchPreferences).toHaveBeenCalledTimes(2))
+
+    expect(screen.getByRole('button', { name: /^Conta: Ebinex/ })).toBeInTheDocument()
+    expect(await within(await ponte()).findByRole('button', { name: 'Abrir no Registrar: Baixa de EUR/USD às 20:10' })).toBeInTheDocument()
+    expect(fetchDayTrades).not.toHaveBeenCalledWith(expect.anything(), ids.accounts.topOne, expect.anything(), expect.anything())
+    // The choice is in the URL, which both blocks read first
+    expect(mockReplace).toHaveBeenCalledWith(`/diario?conta=${ids.accounts.ebinex}`, { scroll: false })
   })
 })
 

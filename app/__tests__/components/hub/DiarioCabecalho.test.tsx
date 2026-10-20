@@ -181,7 +181,7 @@ describe('Diário header', () => {
     expect(within(list).queryByText('Velha')).not.toBeInTheDocument()
   })
 
-  it('saves the choice by merging conta_atual alone into the preferences', async () => {
+  it('saves the choice by merging conta_atual alone into the preferences, and puts it in ?conta= for the page’s other blocks', async () => {
     renderHub(<DiarioCabecalho />)
 
     await userEvent.click(await selectorButton())
@@ -189,7 +189,26 @@ describe('Diário header', () => {
 
     expect(await selectorButton()).toHaveTextContent('Conta: Top One')
     expect(mergePreferences).toHaveBeenCalledWith(expect.anything(), { conta_atual: topOne.id })
-    expect(mockReplace).not.toHaveBeenCalled()
+    // «Operações do dia» reads the current account too: the URL is the one source both read first
+    // (lane B review); no scroll to the top
+    expect(mockReplace).toHaveBeenCalledTimes(1)
+    expect(mockReplace).toHaveBeenCalledWith(`/diario?conta=${topOne.id}`, { scroll: false })
+  })
+
+  it('keeps the URL’s other parameters with the choice, and never a sheet’s that was already handled', async () => {
+    // ?registrar=1 opened the sheet; the URL here does not follow router.replace, so the header
+    // still sees it when the owner picks an account after closing the sheet
+    mockSearch = 'de=inicio&registrar=1'
+    renderHub(<DiarioCabecalho />)
+    await userEvent.click(await screen.findByRole('button', { name: 'Fechar' }))
+    expect(mockSheet).toHaveBeenCalledTimes(1)
+    mockReplace.mockClear()
+
+    await userEvent.click(await selectorButton())
+    await userEvent.click(screen.getByRole('button', { name: /Top One/ }))
+
+    expect(mockReplace).toHaveBeenCalledWith(`/diario?de=inicio&conta=${topOne.id}`, { scroll: false })
+    expect(mockSheet).toHaveBeenCalledTimes(1)
   })
 
   it('saves the choice even when the preferences could not be read: the merge never writes the other keys', async () => {
@@ -221,6 +240,8 @@ describe('Diário header', () => {
     await userEvent.click(await selectorButton())
     await userEvent.click(screen.getByRole('button', { name: /Top One/ }))
 
+    // useContaAtual moves it, as before (once)
+    expect(mockReplace).toHaveBeenCalledTimes(1)
     expect(mockReplace).toHaveBeenCalledWith(`/diario?conta=${topOne.id}`)
   })
 
@@ -810,6 +831,9 @@ describe('Diário header · «Registrar operação» (Phase 3)', () => {
     expect(contaParaRegistrar(ebx, contas)).toBe(ebx)
     expect(contaParaRegistrar(ftmo, contas)).toBe(topOne1)
     expect(contaParaRegistrar(ftmo, [ftmo, ebx, { ...topOne1, is_primary: false }])).toBe(ebx)
+    // The primary wins over list order
+    expect(contaParaRegistrar(ftmo, [ftmo, ebx, topOne1])).toBe(topOne1)
+    expect(contaParaRegistrar(null, [ebx, topOne1])).toBe(topOne1)
     expect(contaParaRegistrar(null, contas)).toBe(topOne1)
     expect(contaParaRegistrar(ftmo, [ftmo])).toBeNull()
   })
