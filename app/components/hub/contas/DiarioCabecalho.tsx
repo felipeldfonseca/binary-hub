@@ -2,12 +2,17 @@
 
 import { useEffect, useMemo, useRef } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
+import { useQueryClient } from '@tanstack/react-query'
 import { MARKET_SPEC } from '@/lib/domain/markets'
-import { useContaAtual } from '@/hooks/useContas'
+import { hubKeys, useContaAtual, useHubDb } from '@/hooks/useContas'
 import { useRulesNow } from '@/hooks/useRegras'
+import type { TradingAccount } from '@/lib/hub/contas'
+import type { HubPreferences } from '@/lib/hub/contasDb'
 import { janelaLinha } from '@/lib/hub/posso'
+import { podeRegistrar } from '@/lib/hub/registrar'
 import { rulesNowFailed } from '@/components/hub/posso/rulesNowRead'
 import { useImportSheet } from '@/components/hub/importar/ImportSheetProvider'
+import { useRegistrarSheet } from '@/components/hub/registrar/abrir'
 import SeletorConta from './SeletorConta'
 import { ADD_ACCOUNT, CONTAS, DIARIO, IMPORT_FILE, LOADING, TRY_AGAIN } from './copy'
 
@@ -23,25 +28,45 @@ export function DiarioTitulo() {
 }
 
 /**
- * The Diário header of the boards: H1, "Importar arquivo" and the account selector, with the
- * current account's window under it (from the rules in force, rules_now). Opening
- * /diario?importar=1 opens the import sheet for the current account.
+ * Where /diario?registrar=1 opens the Registrar sheet: the current account when it can register in
+ * 3-3, else the first active one that can (the primary first); null: none can, nothing opens
+ */
+export function contaParaRegistrar(current: TradingAccount | null, active: readonly TradingAccount[]): TradingAccount | null {
+  if (current && podeRegistrar(current.market)) return current
+  const can = active.filter((a) => podeRegistrar(a.market))
+  return can.find((a) => a.is_primary) ?? can[0] ?? null
+}
+
+/**
+ * The Diário header of the boards: H1, «Registrar operação» (Phase 3), «Importar arquivo» and the
+ * account selector, with the current account's window under it (from the rules in force,
+ * rules_now). Opening /diario?importar=1 opens the import sheet for the current account;
+ * /diario?registrar=1 (a home-screen shortcut, the old dashboard's button) opens the Registrar
+ * sheet, and wins when both are asked (one sheet at a time).
  *
  * Fase 2b: no file of the new markets is read yet (MARKET_SPEC[m].reader), so with such an account
  * in context the sheet opens without an account («Escolha o arquivo»), never on that account.
+ * Phase 3 (D36): «Registrar operação» only for an account that can register in 3-3 (Futuros,
+ * binárias); hidden while the accounts load, after a failed read and in the empty state.
  */
 export default function DiarioCabecalho() {
   const conta = useContaAtual()
   const sheet = useImportSheet()
+  const registrar = useRegistrarSheet()
   const router = useRouter()
   const searchParams = useSearchParams()
+  const queryClient = useQueryClient()
+  const { userId } = useHubDb()
   const importRef = useRef<HTMLButtonElement>(null)
+  const registrarRef = useRef<HTMLButtonElement>(null)
   const titleRef = useRef<HTMLHeadingElement>(null)
   const selectorRef = useRef<HTMLButtonElement>(null)
   const pressedRetry = useRef<HTMLButtonElement | null>(null)
   const handled = useRef(false)
   const wantsImport = searchParams?.get('importar') === '1'
+  const wantsRegistrar = searchParams?.get('registrar') === '1'
   const currentId = conta.current?.id ?? null
+  const canRegister = !conta.isLoading && !conta.isError && !!conta.current && podeRegistrar(conta.current.market)
   // The account the import starts on: the current one, when a reader exists for its market
   const importId = conta.current && MARKET_SPEC[conta.current.market].reader ? conta.current.id : null
   const rulesNow = useRulesNow()
@@ -57,7 +82,7 @@ export default function DiarioCabecalho() {
   }, [rulesFailed, rulesNow.data, currentId])
 
   useEffect(() => {
-    if (!wantsImport || handled.current || conta.isLoading) return
+    if (!wantsImport || wantsRegistrar || handled.current || conta.isLoading) return
     handled.current = true
     sheet.open({ mode: 'importar', accountId: importId, opener: importRef.current })
     // A reload must not open it again
@@ -65,7 +90,27 @@ export default function DiarioCabecalho() {
     params.delete('importar')
     const query = params.toString()
     router.replace(query ? `/diario?${query}` : '/diario')
-  }, [wantsImport, conta.isLoading, importId, sheet, router, searchParams])
+  }, [wantsImport, wantsRegistrar, conta.isLoading, importId, sheet, router, searchParams])
+
+  // ?registrar=1: once the accounts are known, the sheet on the account that can register (the
+  // current one, else the first that can); none can → nothing opens. The URL loses it (and
+  // ?importar=1, which it beats), keeping ?conta=
+  const registrarTarget = conta.isLoading ? null : contaParaRegistrar(conta.current, conta.active)
+  useEffect(() => {
+    if (!wantsRegistrar || handled.current || conta.isLoading) return
+    handled.current = true
+    if (registrarTarget) {
+      // Focus comes back to the header's button when it is on screen (the current account), else
+      // to the H1
+      const onCurrent = registrarTarget.id === currentId
+      registrar.open({ accountId: registrarTarget.id, opener: (onCurrent ? registrarRef.current : null) ?? titleRef.current, fallback: titleRef.current })
+    }
+    const params = new URLSearchParams(searchParams?.toString() ?? '')
+    params.delete('registrar')
+    params.delete('importar')
+    const query = params.toString()
+    router.replace(query ? `/diario?${query}` : '/diario')
+  }, [wantsRegistrar, conta.isLoading, registrarTarget, currentId, registrar, router, searchParams])
 
   // «Tentar de novo» stays, with its focus, while its read runs. When the accounts replace it, focus
   // would fall to the page's start; it goes to the account selector that took its place (the H1
@@ -81,6 +126,13 @@ export default function DiarioCabecalho() {
 
   const openImport = (opener: HTMLElement | null) => sheet.open({ mode: 'importar', accountId: importId, opener })
   const openAdd = (opener: HTMLElement | null) => sheet.open({ mode: 'adicionar', opener })
+
+  // The choice reaches the page's other blocks («Operações do dia» reads the current account too)
+  // at once, not only when merge_preferences answers; choose() then saves it as before
+  const choose = (id: string) => {
+    queryClient.setQueryData<HubPreferences>(hubKeys.preferencias(userId), (p) => ({ ...(p ?? {}), conta_atual: id }))
+    void conta.choose(id)
+  }
 
   let selector: React.ReactNode
   if (conta.isLoading && !conta.isRetrying) {
@@ -119,7 +171,7 @@ export default function DiarioCabecalho() {
       <SeletorConta
         accounts={conta.active}
         current={conta.current}
-        onChoose={(id) => void conta.choose(id)}
+        onChoose={choose}
         onAdd={openAdd}
         janela={janela}
         buttonRef={selectorRef}
@@ -152,6 +204,16 @@ export default function DiarioCabecalho() {
           </h1>
         </div>
         <div className="hub-acoes">
+          {canRegister && conta.current && (
+            <button
+              ref={registrarRef}
+              type="button"
+              className="hub-btn hub-btn--pri"
+              onClick={(event) => registrar.open({ accountId: (conta.current as TradingAccount).id, opener: event.currentTarget })}
+            >
+              {DIARIO.registrar}
+            </button>
+          )}
           <button ref={importRef} type="button" className="hub-btn" onClick={(event) => openImport(event.currentTarget)}>
             {DIARIO.importFile}
           </button>
