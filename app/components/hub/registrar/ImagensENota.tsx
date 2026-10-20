@@ -293,7 +293,7 @@ export function useAnexos(conta: ContaReg, view: TradeView) {
 export type Anexos = ReturnType<typeof useAnexos>
 
 /** A saved image's thumbnail: a signed URL (10 minutes, D33), read when shown */
-function MiniaturaSalva({ path, name }: { path: string; name: string }) {
+function MiniaturaSalva({ path, name, grande = false }: { path: string; name: string; grande?: boolean }) {
   const { db, userId } = useHubDb()
   const url = useQuery({
     queryKey: ['hub', userId, 'registrar', 'imagem', path],
@@ -303,10 +303,11 @@ function MiniaturaSalva({ path, name }: { path: string; name: string }) {
     gcTime: 10 * 60 * 1000,
     retry: false,
   })
+  const classe = grande ? 'hub-reg-mini-img' : 'hub-reg-mini-img hub-reg-mini-img--res'
   // eslint-disable-next-line @next/next/no-img-element -- a signed Storage URL (10 min): next/image cannot optimize it
-  if (url.data) return <img className="hub-reg-mini-img hub-reg-mini-img--res" src={url.data} alt={name} width={72} height={48} />
+  if (url.data) return <img className={classe} src={url.data} alt={name} width={grande ? 120 : 72} height={grande ? 80 : 48} />
   return (
-    <span className="hub-reg-mini-img hub-reg-mini-img--res hub-reg-mini-vazia" role="img" aria-label={name}>
+    <span className={`${classe} hub-reg-mini-vazia`} role="img" aria-label={name}>
       {ANEXOS.semPrevia}
     </span>
   )
@@ -457,7 +458,7 @@ export default function ImagensENota({ a }: { a: Anexos }) {
                     // eslint-disable-next-line @next/next/no-img-element -- a blob: preview of a file not sent yet
                     <img className="hub-reg-mini-img" src={i.url} alt={i.name} width={120} height={80} />
                   ) : i.kind === 'saved' ? (
-                    <MiniaturaSalva path={i.path} name={i.name} />
+                    <MiniaturaSalva path={i.path} name={i.name} grande />
                   ) : (
                     <span className="hub-reg-mini-img hub-reg-mini-vazia" role="img" aria-label={i.name}>
                       {ANEXOS.semPrevia}

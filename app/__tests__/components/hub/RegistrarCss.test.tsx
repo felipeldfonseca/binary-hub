@@ -41,7 +41,7 @@ describe('hub-registrar.css', () => {
   it('keeps the footer at the bottom on phones, above the safe area, on the sheet’s own background', () => {
     const r = regra('.hub .hub-reg .hub-reg-rodape', '(max-width: 640px)')
     expect(r.getPropertyValue('position')).toBe('sticky')
-    expect(r.getPropertyValue('bottom')).toMatch(/^0(px)?$/)
+    expect(r.getPropertyValue('bottom')).toBe('-28px')
     expect(r.getPropertyValue('padding')).toContain('env(safe-area-inset-bottom)')
     expect(r.getPropertyValue('background')).toBe('var(--bg)')
     expect(regra(".hub[data-tema='escuro'] .hub-reg .hub-reg-rodape", '(max-width: 640px)').getPropertyValue('background')).toBe('#1e2123')

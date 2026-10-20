@@ -223,6 +223,13 @@
   color: var(--text-2);
 }
 
+/* The ⓘ on the context block's inset and on the setup card's mint: full text colour (the muted one
+   is 4,2:1 on the mint card in claro) */
+.hub .hub-reg-contexto .hub-info:not([aria-expanded='true']),
+.hub .hub-reg-toque .hub-info:not([aria-expanded='true']) {
+  color: var(--text);
+}
+
 /* «Como está o setup?»: the card to tap (mint), neutral once the result is known */
 .hub .hub-reg-toque {
   display: flex;
@@ -236,6 +243,11 @@
 .hub .hub-reg-toque--depois {
   border-color: var(--neutral-border);
   background: var(--surface);
+}
+.hub .hub-reg-toque .hub-reg-cab--inicio {
+  flex-wrap: nowrap;
+  align-items: flex-start;
+  justify-content: space-between;
 }
 .hub .hub-reg-toque-tit {
   font-size: 15px;
@@ -533,7 +545,8 @@
 @media (max-width: 640px) {
   .hub .hub-reg .hub-reg-rodape {
     position: sticky;
-    bottom: 0;
+    /* Sticky offsets count from inside the sheet's 28px bottom padding: reach the screen's edge */
+    bottom: -28px;
     z-index: 1;
     margin: 0 -16px;
     padding: 0 16px calc(12px + env(safe-area-inset-bottom));

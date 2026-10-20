@@ -236,6 +236,44 @@ describe('the open futures trade', () => {
   })
 })
 
+describe('the whole futures flow', () => {
+  it('step 1 → 2 → 3: MES long 2 at 7.912,50 (stop 10, alvo 20, setup A), then out at 7.902,50 with the 80 % banner', async () => {
+    fetchPreferences.mockResolvedValue({ alerts: { limit_80: true } })
+    db.registerEntry.mockResolvedValue(entradaTelas('entry-mes'))
+    db.registerExit.mockResolvedValue(saidaTelas('exit-mes-oitenta'))
+    db.fetchTradeState.mockResolvedValue(entradaTelas('entry-mes').state)
+    const onClose = jest.fn()
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: Infinity } } })
+    render(
+      <QueryClientProvider client={queryClient}>
+        <RegistrarSheet accountId={ids.accounts.topOne} tradeId={null} onClose={onClose} />
+      </QueryClientProvider>,
+    )
+    await screen.findByRole('heading', { level: 3, name: 'Entrada' })
+    const grupo = (nome: string) => screen.getByRole('group', { name: nome })
+    await userEvent.click(within(grupo('Ativo')).getByRole('button', { name: 'MES' }))
+    await userEvent.click(within(grupo('Lado')).getByRole('button', { name: 'Compra' }))
+    await userEvent.click(within(grupo('Contratos')).getByRole('button', { name: '2' }))
+    await userEvent.type(screen.getByLabelText('Preço de entrada'), '7912,50')
+    await userEvent.type(screen.getByLabelText('Stop'), '10')
+    await userEvent.type(screen.getByLabelText('Alvo'), '20')
+    expect(screen.getByText('risco US$ 100,00 · alvo US$ 200,00 · 1 : 2')).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Setup A' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Execução da entrada' }))
+    await userEvent.click(within(grupo('Execução')).getByRole('button', { name: 'no ponto' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Registrar entrada' }))
+    expect(await screen.findByRole('heading', { level: 3, name: 'Operação aberta' })).toHaveFocus()
+    expect(db.registerEntry.mock.calls[0][2]).toMatchObject({ symbol: 'MES', direction: 'long', quantity: '2', entry_price: '7912.5', stop_pts: '10', target_pts: '20', marks: { setup: 'A', execucao: 'no_ponto' } })
+    expect(screen.getByText('Passo 2 de 3 · Aberta')).toBeInTheDocument()
+    expect(screen.getAllByText('às 10:12 · antes da saída')).toHaveLength(2)
+    await userEvent.type(screen.getByLabelText('Preço de saída'), '7902,5')
+    await userEvent.click(screen.getByRole('button', { name: 'Registrar saída' }))
+    expect(await screen.findByRole('heading', { level: 3, name: 'Operação fechada' })).toHaveFocus()
+    expect(screen.getByText('Passo 3 de 3 · Fechada')).toBeInTheDocument()
+    expect(screen.getByText('Você chegou a 80% do limite do dia: −US$ 345 de US$ 400.')).toBeInTheDocument()
+  })
+})
+
 describe('«Desfazer entrada» (Q3 a)', () => {
   it('within 15 minutes: the link, its confirmation, «Manter» and «Sim, desfazer»', async () => {
     fetchRulesNow.mockResolvedValue(agoraAs('agora-qui-1031-et', '2026-10-22T14:13:00.000Z'))
