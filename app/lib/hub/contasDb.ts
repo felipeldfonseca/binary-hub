@@ -297,6 +297,15 @@ export interface ImportPreviewResult {
    */
   linked?: number;
   linked_differs?: number;
+  /**
+   * Phase 3c (20261023000003; only when the file has partial exits: rows of one broker position,
+   * same symbol, side, open instant and open price): the trades it creates, the rows that are
+   * another row's trade's exits («{n} saída parcial juntada à sua operação»), and the rows that join
+   * a trade already in the account («{n} saída a mais de uma operação que já estava»)
+   */
+  trades_new?: number;
+  grouped?: number;
+  attached?: number;
   /** New trades whose trading day is not the date on the file's clock */
   day_changes: number;
   first_day: string | null;
@@ -317,6 +326,10 @@ export interface ImportCommitResult {
   other_account: number;
   /** Phase 3: app-registered trades this file completed (absent before migration 20261020000004) */
   linked?: number;
+  /** Phase 3c, only when the file had partial exits: trades created, rows grouped into them, rows attached */
+  trades?: number;
+  grouped?: number;
+  attached?: number;
   errors: RowError[];
 }
 

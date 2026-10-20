@@ -19,6 +19,10 @@
  *   validar    a whole register_* check in the database's order
  *   montar     the payloads from the form's values
  *   numeric    Postgres numeric arithmetic (scales, rounding, division)
+ *   parciais   Phase 3c: partial exits (which count, their sums and average, R on the initial
+ *              stop, the position, «Desfazer», «Registrar parcial», «Já fechada» in several exits)
+ *   breakeven  Phase 3c: «Mover stop» and the breakeven rule on a trade (points in favour, the
+ *              rule's price, the stop now, the suggestion after a partial)
  *
  * The pt-BR words and the number reader live outside lib/domain (lib/hub).
  */
@@ -75,6 +79,8 @@ export {
   jsonbTextBytes,
   parseEntry,
   tradeTryDate,
+  tradeQty,
+  type AfterExitPayload,
   type AfterPayload,
   type Checked,
   type Clock,
@@ -88,10 +94,13 @@ export {
   type MarkValue,
   type Marks,
   type MarksPayload,
+  type MovePayload,
   type Outcome,
   type ParsedEntry,
+  type PartialPayload,
   type PayloadMode,
   type RegistroCode,
+  type UndoEventPayload,
 } from './payload';
 export { stopDistance, stopLevel, stopLevels, type Side } from './stops';
 export {
@@ -122,6 +131,7 @@ export {
 export {
   ENTRY_TYPED_BACK_MS,
   UNDO_ENTRY_MS,
+  afterEntryAt,
   afterInstants,
   binaryExpiry,
   entryInstant,
@@ -167,7 +177,7 @@ export {
   type MatchRow,
   type MatchTrade,
 } from './match';
-export { validateAfter, validateEntry, validateExit, type AfterOptions, type EntryOptions, type OpenTrade } from './validar';
+export { validateAfter, validateEntry, validateExit, type AfterOptions, type EntryOptions, type ExitRest, type OpenTrade } from './validar';
 export {
   afterPayload,
   entryPayload,
@@ -176,8 +186,66 @@ export {
   imageName,
   imageSlotsRequest,
   marksPayload,
+  movePayload,
+  partialPayload,
+  undoEventPayload,
   type AfterFields,
   type EntryFields,
   type ExitFields,
+  type MoveFields,
+  type PartialFields,
 } from './montar';
-export { decimalFromJson, numericText, parseNumeric, plainText, tradeNum, type Numeric } from './numeric';
+export {
+  MAX_EXITS,
+  MAX_EXIT_ROWS,
+  MAX_PARTIALS,
+  UNDO_EVENT_MS,
+  afterExits,
+  averageExit,
+  canSplit,
+  countingExits,
+  exitCounts,
+  exitsSum,
+  firstExitCut,
+  halfOpen,
+  lastEvent,
+  lastExitPnl,
+  partialQuantityError,
+  positionOf,
+  rOfExits,
+  sortExitsByHour,
+  stopNowOf,
+  undoEventRefusal,
+  validatePartial,
+  type AfterExitResult,
+  type AfterExits,
+  type ExitBasis,
+  type ExitsSum,
+  type LastEvent,
+  type PartialResult,
+  type PartialTrade,
+  type Position,
+  type PositionTrade,
+  type StopMove,
+  type TradeExit,
+} from './parciais';
+export {
+  MAX_STOP_MOVES,
+  MAX_STOP_MOVE_ROWS,
+  afterBreakeven,
+  breakevenOf,
+  breakevenSuggestion,
+  favorOf,
+  favorUnitOf,
+  ifStopped,
+  riskAtStop,
+  stopAtBreakeven,
+  stopNowStatus,
+  validateMove,
+  type AfterBreakeven,
+  type MoveResult,
+  type MoveTrade,
+  type StopNowStatus,
+  type TradeBreakeven,
+} from './breakeven';
+export { decimalFromJson, numericText, parseNumeric, plainText, tradeNum, trimScale, type Numeric } from './numeric';
