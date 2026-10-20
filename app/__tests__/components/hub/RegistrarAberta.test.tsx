@@ -424,26 +424,35 @@ describe('«Nova entrada» after a registration (D5: the last used)', () => {
   })
 
   it('never replaces a form the owner already started', async () => {
-    const base = recentesTelas('recentes-top-one')
-    const mes2 = { ...base[0], symbol: 'MES', quantity: '2', direction: 'long' as const, source: 'live' as const, entryTime: new Date('2026-10-22T14:31:00Z') }
+    // On Ebinex the reload is visible: «Par» lists the account's pairs straight from its recent
+    // trades, so a new pair there means the new starting values reached the form
+    fetchRulesNow.mockResolvedValue(agoraAs('agora-qui-2024-brt', '2026-10-22T23:10:20.000Z'))
+    const base = recentesTelas('recentes-ebinex')
+    const gbp = { ...base[0], symbol: 'GBP/USD', payout: '86', source: 'live' as const, entryTime: new Date('2026-10-22T23:05:00Z') }
     let tarde = false
-    db.fetchRecentTrades.mockImplementation(async () => (tarde ? [mes2, ...base] : base))
+    // GBP/USD becomes the most used pair: an untouched form would start on it
+    db.fetchRecentTrades.mockImplementation(async () => (tarde ? [gbp, gbp, gbp, gbp, ...base] : base))
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: Infinity } } })
     render(
       <QueryClientProvider client={queryClient}>
-        <RegistrarSheet accountId={ids.accounts.topOne} tradeId={null} onClose={jest.fn()} />
+        <RegistrarSheet accountId={ids.accounts.ebinex} tradeId={null} onClose={jest.fn()} />
       </QueryClientProvider>,
     )
     await screen.findByRole('heading', { level: 3, name: 'Entrada' })
     const pill = (grupo: string, nome: string) => within(screen.getByRole('group', { name: grupo })).getByRole('button', { name: nome })
-    await userEvent.click(pill('Lado', 'Venda'))
+    expect(pill('Par', 'EUR/USD')).toHaveAttribute('aria-pressed', 'true')
+    await userEvent.click(pill('Par', 'BTC/USDT'))
+    await userEvent.click(pill('Direção', 'Baixa'))
     tarde = true
     await act(async () => {
       await queryClient.invalidateQueries({ queryKey: ['hub', 'user-1', 'registrar', 'recentes'] })
     })
-    expect(db.fetchRecentTrades).toHaveBeenCalledTimes(2)
-    expect(pill('Ativo', 'MGC')).toHaveAttribute('aria-pressed', 'true')
-    expect(pill('Lado', 'Venda')).toHaveAttribute('aria-pressed', 'true')
+    expect(await within(screen.getByRole('group', { name: 'Par' })).findByRole('button', { name: 'GBP/USD' })).toBeInTheDocument()
+    // The owner's choices stay
+    expect(pill('Par', 'BTC/USDT')).toHaveAttribute('aria-pressed', 'true')
+    expect(pill('Par', 'GBP/USD')).toHaveAttribute('aria-pressed', 'false')
+    expect(pill('Direção', 'Baixa')).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByLabelText('Payout, %')).toHaveValue('85')
   })
 })
 
