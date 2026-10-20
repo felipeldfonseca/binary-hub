@@ -12,6 +12,7 @@ import {
   avisoDesfeita,
   chipMarca,
   hora,
+  horaRel,
   modeloResultado,
   modeloSaida,
   podeDesfazer,
@@ -22,7 +23,7 @@ import {
   type SaidaCampos,
 } from '@/lib/hub/registrarForm'
 import { Disclosure, useToggle } from '@/components/hub/contas/ui'
-import { ABERTA, EBINEX, ERRO_REGISTRAR, FUTUROS, MARCAS, RODAPE } from './copy'
+import { ABERTA, EBINEX, ERRO_REGISTRAR, ERROS, FUTUROS, MARCAS, RODAPE } from './copy'
 import { AvisosMarca, PillsMarca, useMarcar } from './Marcas'
 import { CampoTexto, Erro, GrupoPills, PlanoPill, Rodape, Tempo, descrito } from './ui'
 
@@ -77,7 +78,8 @@ export default function PassoAberta({ conta, view, pref80, headingRef, aoNovaEnt
   const [tentou, setTentou] = useState(false)
   const [ocupado, setOcupado] = useState(false)
   const [erroGeral, setErroGeral] = useState<RegistrarErrorCode | null>(null)
-  const [erroCampo, setErroCampo] = useState<string | null>(null)
+  /** A server refusal of a field the form let through: under that field («Preço de saída», «Hora da saída», «Como terminou?») */
+  const [erroCampo, setErroCampo] = useState<{ campo: 'spreco' | 'shora' | 'fim'; texto: string } | null>(null)
   const [confirmando, setConfirmando] = useState(false)
   const [mudarAberto, alternarMudar] = useToggle()
   const ocupadoRef = useRef(false)
@@ -109,6 +111,11 @@ export default function PassoAberta({ conta, view, pref80, headingRef, aoNovaEnt
   useEffect(() => {
     if (confirmando) simRef.current?.focus()
   }, [confirmando])
+  // The alert appears above the footer, below the screen on a phone: scrolled into view (role="alert" reads it)
+  const alertaRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (erroGeral) alertaRef.current?.scrollIntoView?.({ block: 'nearest' })
+  }, [erroGeral])
 
   const registrar = async () => {
     if (ocupadoRef.current) return
@@ -147,9 +154,21 @@ export default function PassoAberta({ conta, view, pref80, headingRef, aoNovaEnt
         await queryClient.refetchQueries({ queryKey: registrarKeys.operacao(userId, t.id) })
         aoFechadaFora()
       } else if (err.code === 'unknown_trade') aoSumiu()
-      else if (err.code === 'not_expired' || err.code === 'bad_outcome') setErroCampo(ERRO_REGISTRAR[err.code])
-      else if (err.field === 'exit_price' || err.field === 'exit') setErroCampo(ERRO_REGISTRAR[err.code])
-      else setErroGeral(err.code)
+      else if (err.code === 'not_expired' || err.code === 'bad_outcome') setErroCampo({ campo: 'fim', texto: ERRO_REGISTRAR[err.code] })
+      else if (err.field === 'exit_price') {
+        setErroCampo({ campo: 'spreco', texto: ERRO_REGISTRAR[err.code] })
+        requestAnimationFrame(() => document.getElementById('f-spreco')?.focus())
+      } else if (err.field === 'exit') {
+        // The local check's wording, with its values, when the server's code is one of its own
+        const texto =
+          err.code === 'exit_in_future'
+            ? ERROS.saidaFutura(horaRel(conta, now))
+            : err.code === 'exit_before_entry'
+              ? ERROS.saidaAntes(hora(conta, t.entryTime))
+              : ERRO_REGISTRAR[err.code]
+        setErroCampo({ campo: 'shora', texto })
+        requestAnimationFrame(() => document.getElementById('f-shora')?.focus())
+      } else setErroGeral(err.code)
     } finally {
       ocupadoRef.current = false
       setOcupado(false)
@@ -264,15 +283,18 @@ export default function PassoAberta({ conta, view, pref80, headingRef, aoNovaEnt
               setCampos((c) => ({ ...c, preco: v }))
               setErroCampo(null)
             }}
-            erro={erroSaida.spreco ?? erroCampo}
+            erro={erroSaida.spreco ?? (erroCampo?.campo === 'spreco' ? erroCampo.texto : null)}
           />
           <CampoTexto
             id="f-shora"
             rotulo={FUTUROS.horaSaida(conta.clock === 'America/Sao_Paulo' ? ' (Brasília)' : ' (ET)')}
             valor={ms.horaCampo}
             tipo="time"
-            aoMudar={(v) => setCampos((c) => ({ ...c, hora: v }))}
-            erro={erroSaida.shora}
+            aoMudar={(v) => {
+              setCampos((c) => ({ ...c, hora: v }))
+              setErroCampo(null)
+            }}
+            erro={erroSaida.shora ?? (erroCampo?.campo === 'shora' ? erroCampo.texto : null)}
           />
         </div>
       )}
@@ -288,13 +310,13 @@ export default function PassoAberta({ conta, view, pref80, headingRef, aoNovaEnt
               setErroCampo(null)
             }
           }}
-          descricao={descrito('n-fim', tentou && (mr.erro || erroCampo) && 'e-fim')}
+          descricao={descrito('n-fim', tentou && (mr.erro || erroCampo?.campo === 'fim') && 'e-fim')}
           depois={
             <>
               <span id="n-fim" className="hub-nota">
                 {mr.vence}
               </span>
-              <Erro id="e-fim" texto={tentou ? mr.erro ?? erroCampo : null} />
+              <Erro id="e-fim" texto={tentou ? mr.erro ?? (erroCampo?.campo === 'fim' ? erroCampo.texto : null) : null} />
             </>
           }
         />
@@ -340,7 +362,7 @@ export default function PassoAberta({ conta, view, pref80, headingRef, aoNovaEnt
       )}
 
       {erroGeral && (
-        <div role="alert" className="hub-alerta">
+        <div ref={alertaRef} role="alert" className="hub-alerta">
           {ERRO_REGISTRAR[erroGeral]}
         </div>
       )}

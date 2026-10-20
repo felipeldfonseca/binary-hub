@@ -569,3 +569,283 @@ describe('Ebinex', () => {
     expect(screen.getByText('Resultado: +US$ 17,40')).toBeInTheDocument()
   })
 })
+
+// ------------------------------------------------------------------------------------------------
+// Review fixes (lane A reviews)
+// ------------------------------------------------------------------------------------------------
+
+describe('«Posso operar hoje?» at a typed moment never shows another moment’s answer (D8)', () => {
+  it('gate_at failing at a typed hour: «Não foi possível conferir agora.», never the current minute’s «Liberado»', async () => {
+    db.fetchGateAt.mockRejectedValue(new registrarDb.RegistrarDataError('unknown'))
+    abrir()
+    await screen.findByRole('heading', { level: 3, name: 'Entrada' })
+    expect(linhaDoGate()).toHaveTextContent('Liberado')
+    const hora = screen.getByLabelText('Hora (ET)')
+    await userEvent.clear(hora)
+    await userEvent.type(hora, '10:20')
+    await waitFor(() => expect(db.fetchGateAt).toHaveBeenCalled())
+    await waitFor(() => expect(linhaDoGate()).toHaveTextContent('Não foi possível conferir agora.'))
+    expect(linhaDoGate()).not.toHaveTextContent('Liberado')
+    expect(screen.queryByText('Limite do dia')).not.toBeInTheDocument()
+  })
+
+  it('«Ontem» while gate_at answers, and when it fails: never today’s «Encerrado por hoje» labelled as the 21st', async () => {
+    fetchRulesNow.mockResolvedValue(agoraTelas('agora-qui-1042-et'))
+    let falhar: (e: unknown) => void = () => undefined
+    db.fetchGateAt.mockImplementation(() => new Promise((_resolve, reject) => (falhar = reject)))
+    abrir()
+    await screen.findByRole('heading', { level: 3, name: 'Entrada' })
+    expect(linhaDoGate()).toHaveTextContent('Encerrado por hoje')
+    await userEvent.click(pill('Como está a operação?', 'Já fechada'))
+    await userEvent.click(pill('Dia', 'Ontem'))
+    await waitFor(() => expect(db.fetchGateAt).toHaveBeenCalled())
+    // Asking: the question alone, no answer and no «Limite do dia» of another day
+    expect(linhaDoGate()).toHaveTextContent('Posso operar hoje? Na entrada, em 21 out:')
+    expect(linhaDoGate()).not.toHaveTextContent('Encerrado por hoje')
+    expect(screen.queryByText('Limite do dia')).not.toBeInTheDocument()
+    expect(screen.queryByText('Fora do plano, conferido pelo hub. Você pode registrar.')).not.toBeInTheDocument()
+    await act(async () => falhar(new registrarDb.RegistrarDataError('unknown')))
+    await waitFor(() => expect(linhaDoGate()).toHaveTextContent('Não foi possível conferir agora.'))
+    expect(linhaDoGate()).not.toHaveTextContent('Encerrado por hoje')
+    expect(screen.queryByText('Limite do dia')).not.toBeInTheDocument()
+  })
+
+  it('the account line never says «Sem janela salva» when rules_now failed (not evaluated is not false)', async () => {
+    fetchRulesNow.mockRejectedValue(new Error('network'))
+    abrir()
+    await screen.findByRole('heading', { level: 3, name: 'Entrada' })
+    await screen.findByText('Não foi possível conferir agora.')
+    expect(screen.queryByText('Sem janela salva')).not.toBeInTheDocument()
+    expect(screen.getByText('Conta').parentElement).toHaveTextContent(/^ContaTop One #1/)
+  })
+})
+
+describe('the plan line on the current minute follows the clock (the owner’s 11:05 test, opened before 11:00)', () => {
+  it('filled at 10:59:40: at 11:00 the dry run is asked again for 11:00 and says «● fora da janela»', async () => {
+    jest.useFakeTimers({ now: new Date('2026-10-22T14:59:40.000Z'), doNotFake: ['queueMicrotask'] })
+    fetchRulesNow.mockImplementation(async () => agoraEditado('agora-qui-1031-et', (json) => (json.server_now = new Date().toISOString())))
+    db.previewEntry.mockImplementation(async (_db, _id, p) => previaTelas(p.entry === '11:00' ? 'entry-dry-fora-janela' : 'entry-dry-mes-digitada'))
+    const user = userEvent.setup({ advanceTimers: jest.advanceTimersByTime })
+    abrir()
+    await screen.findByRole('heading', { level: 3, name: 'Entrada' })
+    await user.click(pill('Ativo', 'MES'))
+    await user.click(pill('Lado', 'Compra'))
+    await user.click(pill('Contratos', '2'))
+    await user.type(screen.getByLabelText('Preço de entrada'), '7912,50')
+    await user.type(screen.getByLabelText('Stop'), '10')
+    await act(async () => {
+      jest.advanceTimersByTime(400)
+    })
+    await waitFor(() => expect(db.previewEntry).toHaveBeenCalled())
+    expect(db.previewEntry.mock.calls[db.previewEntry.mock.calls.length - 1][2]).toMatchObject({ entry: '10:59' })
+    expect(screen.queryByText('Fora do plano, conferido pelo hub. Você pode registrar.')).not.toBeInTheDocument()
+    await act(async () => {
+      jest.advanceTimersByTime(21_000)
+    })
+    expect(screen.getByLabelText('Hora (ET)')).toHaveValue('11:00')
+    await waitFor(() => expect(db.previewEntry.mock.calls.some((c) => c[2].entry === '11:00')).toBe(true))
+    expect(await screen.findByText('Fora do plano, conferido pelo hub. Você pode registrar.')).toBeInTheDocument()
+    expect(screen.getByText('fora da janela')).toBeInTheDocument()
+    // The registration itself still leaves the hour to the server's clock
+    db.registerEntry.mockResolvedValue(entradaTelas('entry-mes'))
+    await user.click(screen.getByRole('button', { name: 'Registrar entrada' }))
+    await waitFor(() => expect(db.registerEntry).toHaveBeenCalled())
+    expect(db.registerEntry.mock.calls[0][2]).not.toHaveProperty('entry')
+  })
+})
+
+describe('a lost answer, then the other mode with the same client_key (C5)', () => {
+  it('lost «Registrar entrada», then «Já fechada»: the repeated open trade goes to step 2, not «Carregando…» forever', async () => {
+    const aberta = entradaTelas('entry-mgc').state
+    db.registerEntry.mockRejectedValueOnce(new registrarDb.RegistrarDataError('network'))
+    db.registerAfter.mockResolvedValue({ state: aberta, repeated: true, similar: [], points: null, r: null, gateNow: null })
+    db.fetchTradeState.mockResolvedValue(aberta)
+    abrir()
+    await screen.findByRole('heading', { level: 3, name: 'Entrada' })
+    await userEvent.click(pill('Lado', 'Venda'))
+    await userEvent.type(screen.getByLabelText('Preço de entrada'), '4421,3')
+    await userEvent.click(screen.getByRole('button', { name: 'Registrar entrada' }))
+    await screen.findByText('Não foi possível falar com o servidor. Confira sua conexão e tente de novo.')
+    await userEvent.click(pill('Como está a operação?', 'Já fechada'))
+    await userEvent.type(screen.getByLabelText('Preço de saída'), '4420')
+    await userEvent.click(screen.getByRole('button', { name: 'Registrar operação' }))
+    await waitFor(() => expect(db.registerAfter).toHaveBeenCalled())
+    expect(db.registerAfter.mock.calls[0][2].client_key).toBe(db.registerEntry.mock.calls[0][2].client_key)
+    expect(await screen.findByRole('heading', { level: 3, name: 'Operação aberta' })).toHaveFocus()
+    expect(screen.queryByText('Carregando…')).not.toBeInTheDocument()
+    expect(screen.getByText('MGC · Venda · 1 ct')).toBeInTheDocument()
+  })
+
+  it('lost «Já fechada», then «Aberta»: the repeated closed trade is step 3, never «… fechada em outro lugar.»', async () => {
+    const fechada = saidaTelas('exit-mes-oitenta').state
+    db.previewAfter.mockResolvedValue(fechadaPreviaTelas('after-dry-ontem'))
+    db.registerAfter.mockRejectedValueOnce(new registrarDb.RegistrarDataError('network'))
+    db.registerEntry.mockResolvedValue({ state: fechada, repeated: true, similar: [] })
+    db.fetchTradeState.mockResolvedValue(fechada)
+    abrir()
+    await screen.findByRole('heading', { level: 3, name: 'Entrada' })
+    await userEvent.click(pill('Como está a operação?', 'Já fechada'))
+    await userEvent.click(pill('Lado', 'Compra'))
+    await userEvent.type(screen.getByLabelText('Preço de entrada'), '4421,3')
+    await userEvent.type(screen.getByLabelText('Preço de saída'), '4425')
+    await userEvent.click(screen.getByRole('button', { name: 'Registrar operação' }))
+    await screen.findByText('Não foi possível falar com o servidor. Confira sua conexão e tente de novo.')
+    await userEvent.click(pill('Como está a operação?', 'Aberta'))
+    await userEvent.click(screen.getByRole('button', { name: 'Registrar entrada' }))
+    await waitFor(() => expect(db.registerEntry).toHaveBeenCalled())
+    expect(db.registerEntry.mock.calls[0][2].client_key).toBe(db.registerAfter.mock.calls[0][2].client_key)
+    expect(await screen.findByRole('heading', { level: 3, name: 'Operação fechada' })).toBeInTheDocument()
+    expect(screen.queryByText('Esta operação já foi fechada em outro lugar.')).not.toBeInTheDocument()
+  })
+})
+
+describe('D30’s question and the sheet’s alert are seen where they appear', () => {
+  it('the question takes the focus; «Cancelar» gives it back to «Registrar entrada»', async () => {
+    db.registerEntry.mockRejectedValueOnce(new registrarDb.RegistrarDataError('similar_trade'))
+    abrir()
+    await screen.findByRole('heading', { level: 3, name: 'Entrada' })
+    await userEvent.click(pill('Lado', 'Venda'))
+    await userEvent.type(screen.getByLabelText('Preço de entrada'), '4421,3')
+    await userEvent.click(screen.getByRole('button', { name: 'Registrar entrada' }))
+    const pergunta = await screen.findByText('Esta operação parece já ter vindo do arquivo: Venda de MGC às 10:31. Registrar mesmo assim?')
+    await waitFor(() => expect(pergunta).toHaveFocus())
+    await userEvent.click(screen.getByRole('button', { name: 'Cancelar' }))
+    expect(screen.queryByText(/parece já ter vindo do arquivo/)).not.toBeInTheDocument()
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Registrar entrada' })).toHaveFocus())
+  })
+
+  it('the alert is scrolled into view (on a phone it appears below the screen, above the sticky footer)', async () => {
+    const scroll = jest.fn()
+    const original = Element.prototype.scrollIntoView
+    Element.prototype.scrollIntoView = scroll
+    try {
+      db.registerEntry.mockRejectedValueOnce(new registrarDb.RegistrarDataError('network'))
+      abrir()
+      await screen.findByRole('heading', { level: 3, name: 'Entrada' })
+      await userEvent.click(pill('Lado', 'Venda'))
+      await userEvent.type(screen.getByLabelText('Preço de entrada'), '4421,3')
+      await userEvent.click(screen.getByRole('button', { name: 'Registrar entrada' }))
+      const alerta = await screen.findByRole('alert')
+      await waitFor(() => expect(scroll).toHaveBeenCalledWith({ block: 'nearest' }))
+      expect(scroll.mock.contexts[0]).toBe(alerta)
+    } finally {
+      Element.prototype.scrollIntoView = original
+    }
+  })
+})
+
+describe('Ebinex «Expiração» and «Como terminou?» (board)', () => {
+  const ebinexAs = (iso: string) => agoraEditado('agora-qui-2024-brt', (json) => (json.server_now = iso))
+
+  it('the ⓘ panel sits between the label row and the pills (RO l.395–397)', async () => {
+    fetchRulesNow.mockResolvedValue(ebinexAs('2026-10-22T23:10:20.000Z'))
+    abrir(ids.accounts.ebinex)
+    await screen.findByRole('heading', { level: 3, name: 'Entrada' })
+    await userEvent.click(pill('Expiração', '1 min'))
+    await userEvent.click(screen.getByRole('button', { name: 'Como ler: expiração na Ebinex' }))
+    const painel = document.getElementById('info-exp') as HTMLElement
+    const pills = screen.getByRole('group', { name: 'Expiração' })
+    const vence = screen.getByText('Vence às 20:12 de Brasília.')
+    expect(painel.compareDocumentPosition(pills) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(pills.compareDocumentPosition(vence) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(painel.previousElementSibling).toHaveTextContent('Expiração')
+  })
+
+  it('«Ganho» chosen, then an entry hour that has not expired: stays pressed (and disabled), drawn by the pressed rule', async () => {
+    fetchRulesNow.mockResolvedValue(ebinexAs('2026-10-22T23:24:04.000Z'))
+    abrir(ids.accounts.ebinex)
+    await screen.findByRole('heading', { level: 3, name: 'Entrada' })
+    await userEvent.click(pill('Como está a operação?', 'Já fechada'))
+    await userEvent.click(pill('Expiração', '5 min'))
+    const hora = screen.getByLabelText('Hora da entrada (Brasília)')
+    await userEvent.clear(hora)
+    await userEvent.type(hora, '20:13')
+    await userEvent.click(pill('Como terminou?', 'Ganho'))
+    expect(pill('Como terminou?', 'Ganho')).toHaveAttribute('aria-pressed', 'true')
+    await userEvent.clear(hora)
+    await userEvent.type(hora, '20:23')
+    const ganho = pill('Como terminou?', 'Ganho')
+    expect(ganho).toHaveAttribute('aria-pressed', 'true')
+    expect(ganho).toHaveAttribute('aria-disabled', 'true')
+    // RegistrarCss.test.tsx checks that the pressed rule wins over the disabled one (#26301F on mint)
+  })
+})
+
+describe('step 1: double taps and the server’s answers (review gaps)', () => {
+  const preencher = async () => {
+    await screen.findByRole('heading', { level: 3, name: 'Entrada' })
+    await userEvent.click(pill('Lado', 'Venda'))
+    await userEvent.type(screen.getByLabelText('Preço de entrada'), '4421,3')
+  }
+
+  it('a double tap on «Registrar entrada» sends one entry (C11)', async () => {
+    let answer: (r: registrarDb.Registered) => void = () => undefined
+    db.registerEntry.mockImplementationOnce(() => new Promise((resolve) => (answer = resolve)))
+    abrir()
+    await preencher()
+    const botao = screen.getByRole('button', { name: 'Registrar entrada' })
+    await userEvent.dblClick(botao)
+    expect(db.registerEntry).toHaveBeenCalledTimes(1)
+    expect(botao).toHaveAttribute('aria-disabled', 'true')
+    expect(screen.getByText('Um momento…')).toBeInTheDocument()
+    await act(async () => answer(entradaTelas('entry-mgc')))
+    await screen.findByRole('heading', { level: 3, name: 'Operação aberta' })
+    expect(db.registerEntry).toHaveBeenCalledTimes(1)
+  })
+
+  it('a server refusal of a field the form let through goes under that field, with the focus', async () => {
+    db.registerEntry.mockRejectedValueOnce(new registrarDb.RegistrarDataError('off_tick', 'entry_price'))
+    abrir()
+    await preencher()
+    await userEvent.click(screen.getByRole('button', { name: 'Registrar entrada' }))
+    const preco = screen.getByLabelText('Preço de entrada')
+    expect(await screen.findByText('Confira o preço: ele não anda nesse passo.')).toBeInTheDocument()
+    expect(preco).toHaveAttribute('aria-invalid', 'true')
+    await waitFor(() => expect(preco).toHaveFocus())
+    expect(screen.queryByRole('alert', { name: /servidor/ })).not.toBeInTheDocument()
+    // Typing again clears it
+    await userEvent.type(preco, '0')
+    expect(screen.queryByText('Confira o preço: ele não anda nesse passo.')).not.toBeInTheDocument()
+  })
+
+  it('no_rules from the server: D18’s text and «Definir em Personalizar»', async () => {
+    db.registerEntry.mockRejectedValueOnce(new registrarDb.RegistrarDataError('no_rules'))
+    abrir()
+    await preencher()
+    await userEvent.click(screen.getByRole('button', { name: 'Registrar entrada' }))
+    expect(await screen.findByText('Esta conta ainda não tem regras salvas. Defina a janela antes de registrar.')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Definir em Personalizar' })).toBeInTheDocument()
+  })
+
+  it('D30 from the dry run: the question comes before anything is sent', async () => {
+    db.previewEntry.mockResolvedValue({ ...previaTelas('entry-dry-mes-digitada'), similar: ['b6c4e1a0-0000-4000-8000-000000000001'] })
+    abrir()
+    await preencher()
+    await waitFor(() => expect(db.previewEntry).toHaveBeenCalled())
+    await act(async () => undefined)
+    await userEvent.click(screen.getByRole('button', { name: 'Registrar entrada' }))
+    expect(await screen.findByText('Esta operação parece já ter vindo do arquivo: Venda de MGC às 10:31. Registrar mesmo assim?')).toBeInTheDocument()
+    expect(db.registerEntry).not.toHaveBeenCalled()
+  })
+
+  it('the last dry run’s answer is never used for the next form (placeholder): the limit warning follows the stop typed', async () => {
+    // The dry run of stop 4 answers «above» (risk US$ 200 of the US$ 155 left); the next one never answers
+    db.previewEntry.mockResolvedValueOnce(previaTelas('entry-dry-es-acima')).mockImplementation(() => new Promise(() => undefined))
+    abrir()
+    await screen.findByRole('heading', { level: 3, name: 'Entrada' })
+    await userEvent.click(pill('Ativo', 'ES'))
+    await userEvent.click(pill('Lado', 'Compra'))
+    await userEvent.type(screen.getByLabelText('Preço de entrada'), '7.912,25')
+    await userEvent.type(screen.getByLabelText('Stop'), '4')
+    await waitFor(() => expect(db.previewEntry).toHaveBeenCalledTimes(1))
+    expect(db.previewEntry.mock.calls[0][2]).toMatchObject({ stop_pts: '4' })
+    expect(await screen.findByText('Se o stop for atingido, o dia passa do limite: faltam US$ 155 e o stop arrisca US$ 200.')).toBeInTheDocument()
+    const stop = screen.getByLabelText('Stop')
+    await userEvent.clear(stop)
+    await userEvent.type(stop, '1')
+    await waitFor(() => expect(db.previewEntry.mock.calls[db.previewEntry.mock.calls.length - 1][2]).toMatchObject({ stop_pts: '1' }))
+    // Stop 1 risks US$ 50: the local rule says nothing; the «above» of stop 4 is not this form's
+    expect(screen.getByText('risco US$ 50,00')).toBeInTheDocument()
+    expect(screen.queryByText(/o dia passa do limite/)).not.toBeInTheDocument()
+  })
+})

@@ -3,7 +3,7 @@
  * §6.1), with the answers recorded from the real SQL (testing/registrarTelas; invented data).
  */
 import React from 'react'
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider, onlineManager } from '@tanstack/react-query'
 import * as contasDb from '@/lib/hub/contasDb'
@@ -318,5 +318,92 @@ describe('«Ver no Diário» focus target', () => {
     await screen.findByRole('heading', { level: 3, name: 'Operação fechada' })
     await userEvent.click(screen.getByRole('button', { name: 'Ver no Diário' }))
     await waitFor(() => expect(onClose).toHaveBeenCalledWith({ focusId: 'operacoes-do-dia' }))
+  })
+})
+
+// ------------------------------------------------------------------------------------------------
+// Review fixes (lane A reviews)
+// ------------------------------------------------------------------------------------------------
+
+/** A promise the test settles */
+function adiado<T>() {
+  let resolve: (v: T) => void = () => undefined
+  const promise = new Promise<T>((r) => (resolve = r))
+  return { promise, resolve }
+}
+
+describe('the step’s heading takes the focus when its trade arrives after the step change (§4.1)', () => {
+  it('the account’s only open trade, not read yet: «Operação aberta» gets the focus when it appears', async () => {
+    const mes = entradaTelas('entry-mes').state
+    db.fetchOpenTrades.mockResolvedValue([mes.trade])
+    const lido = adiado<ReturnType<typeof operacaoTelas>>()
+    db.fetchTradeState.mockReturnValue(lido.promise)
+    abrir()
+    await screen.findByText('Carregando…')
+    await waitFor(() => expect(db.fetchTradeState).toHaveBeenCalled())
+    await act(async () => lido.resolve(operacaoTelas('operacao-mes-aberta')))
+    expect(await screen.findByRole('heading', { level: 3, name: 'Operação aberta' })).toHaveFocus()
+  })
+
+  it('«Operações abertas» → «Registrar saída»: the focus stays in the dialog while the trade is read, then the heading', async () => {
+    db.fetchOpenTrades.mockResolvedValue(abertasTelas())
+    abrir()
+    await screen.findByRole('heading', { level: 3, name: 'Operações abertas' })
+    const lido = adiado<ReturnType<typeof operacaoTelas>>()
+    db.fetchTradeState.mockReturnValue(lido.promise)
+    await userEvent.click(screen.getByRole('button', { name: 'Registrar saída: MES · Compra · 2 ct · desde 10:12 ET' }))
+    await screen.findByText('Carregando…')
+    expect(document.activeElement).toBe(screen.getByRole('dialog'))
+    await act(async () => lido.resolve(operacaoTelas('operacao-mes-aberta')))
+    expect(await screen.findByRole('heading', { level: 3, name: 'Operação aberta' })).toHaveFocus()
+  })
+})
+
+describe('the phone footer leaves room for what the focus shows (WCAG 2.4.11)', () => {
+  it('keeps the footer’s height in the sheet’s --reg-rodape-h (the scroll-padding-bottom on phones)', async () => {
+    const original = HTMLElement.prototype.getBoundingClientRect
+    const spy = jest.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+      return this.classList.contains('hub-reg-rodape') ? ({ height: 72.4, width: 343, top: 0, left: 0, right: 343, bottom: 72.4, x: 0, y: 0 } as DOMRect) : original.call(this)
+    })
+    try {
+      abrir()
+      await screen.findByRole('heading', { level: 3, name: 'Entrada' })
+      expect(screen.getByRole('dialog').style.getPropertyValue('--reg-rodape-h')).toBe('73px')
+    } finally {
+      spy.mockRestore()
+    }
+  })
+})
+
+describe('the frame (review gaps)', () => {
+  it('does not close while a write runs (Escape, «Fechar», the veil)', async () => {
+    const pendente = adiado<registrarDb.Registered>()
+    db.registerEntry.mockReturnValue(pendente.promise)
+    const { onClose, container } = abrir()
+    await screen.findByRole('heading', { level: 3, name: 'Entrada' })
+    await userEvent.click(within(screen.getByRole('group', { name: 'Lado' })).getByRole('button', { name: 'Venda' }))
+    await userEvent.type(screen.getByLabelText('Preço de entrada'), '4421,3')
+    await userEvent.click(screen.getByRole('button', { name: 'Registrar entrada' }))
+    await waitFor(() => expect(db.registerEntry).toHaveBeenCalled())
+    const fechar = screen.getByRole('button', { name: 'Fechar' })
+    expect(fechar).toHaveAttribute('aria-disabled', 'true')
+    await userEvent.click(fechar)
+    await userEvent.keyboard('{Escape}')
+    await userEvent.click(container.querySelector('.hub-veu') as HTMLElement)
+    expect(onClose).not.toHaveBeenCalled()
+    expect(screen.queryByText('Fechar sem salvar?')).not.toBeInTheDocument()
+    await act(async () => pendente.resolve(entradaTelas('entry-mgc')))
+    expect(await screen.findByRole('heading', { level: 3, name: 'Operação aberta' })).toBeInTheDocument()
+  })
+
+  it('a trade of another account opens on that account (its market’s step 2)', async () => {
+    fetchRulesNow.mockResolvedValue(agoraTelas('agora-qui-2024-brt'))
+    const put = entradaTelas('entry-ebinex-put').state
+    db.fetchTradeState.mockResolvedValue(put)
+    abrir({ accountId: ids.accounts.topOne, tradeId: put.trade.id })
+    expect(await screen.findByRole('heading', { level: 3, name: /Operação aberta|Opção vencida/ })).toBeInTheDocument()
+    expect(screen.getByText('EUR/USD · Baixa · 1 min')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Registrar resultado' })).toBeInTheDocument()
+    expect(screen.queryByLabelText('Preço de saída')).not.toBeInTheDocument()
   })
 })

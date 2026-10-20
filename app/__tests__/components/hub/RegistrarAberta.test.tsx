@@ -356,3 +356,169 @@ describe('the Ebinex option', () => {
     expect(screen.queryByText(/Limite do dia atingido/)).not.toBeInTheDocument()
   })
 })
+
+// ------------------------------------------------------------------------------------------------
+// Review fixes (lane A reviews)
+// ------------------------------------------------------------------------------------------------
+
+describe('a server refusal of the exit goes under its own field', () => {
+  it('the hour (exit_in_future, exit_before_entry) under «Hora da saída», with its values; the price under «Preço de saída»', async () => {
+    db.fetchTradeState.mockResolvedValue(mesAberta())
+    db.registerExit
+      .mockRejectedValueOnce(new registrarDb.RegistrarDataError('exit_in_future', 'exit'))
+      .mockRejectedValueOnce(new registrarDb.RegistrarDataError('exit_before_entry', 'exit'))
+      .mockRejectedValueOnce(new registrarDb.RegistrarDataError('off_tick', 'exit_price'))
+    abrir(ids.trades.mes)
+    await screen.findByRole('heading', { level: 3, name: 'Operação aberta' })
+    const preco = screen.getByLabelText('Preço de saída')
+    const hora = screen.getByLabelText('Hora da saída (ET)')
+    await userEvent.type(preco, '7902,5')
+    await userEvent.click(screen.getByRole('button', { name: 'Registrar saída' }))
+    expect(await screen.findByText('A saída não pode ser depois de agora (10:31 ET).')).toBeInTheDocument()
+    expect(hora).toHaveAttribute('aria-invalid', 'true')
+    expect(hora).toHaveAccessibleDescription('A saída não pode ser depois de agora (10:31 ET).')
+    expect(preco).not.toHaveAttribute('aria-invalid')
+    await waitFor(() => expect(hora).toHaveFocus())
+    await userEvent.click(screen.getByRole('button', { name: 'Registrar saída' }))
+    expect(await screen.findByText('A saída não pode ser antes da entrada (10:12).')).toBeInTheDocument()
+    expect(hora).toHaveAttribute('aria-invalid', 'true')
+    await userEvent.click(screen.getByRole('button', { name: 'Registrar saída' }))
+    expect(await screen.findByText('Confira o preço: ele não anda nesse passo.')).toBeInTheDocument()
+    expect(preco).toHaveAttribute('aria-invalid', 'true')
+    expect(hora).not.toHaveAttribute('aria-invalid')
+    await waitFor(() => expect(preco).toHaveFocus())
+  })
+})
+
+describe('«Nova entrada» after a registration (D5: the last used)', () => {
+  it('starts from the trade just registered (MES, 2 contracts), not from the values before it', async () => {
+    const base = recentesTelas('recentes-top-one')
+    const mes2 = { ...base[0], symbol: 'MES', quantity: '2', direction: 'long' as const, source: 'live' as const, entryTime: new Date('2026-10-22T14:31:00Z') }
+    db.fetchRecentTrades.mockImplementation(async () => (db.registerEntry.mock.calls.length > 0 ? [mes2, ...base] : base))
+    db.registerEntry.mockResolvedValue(entradaTelas('entry-mes'))
+    db.fetchTradeState.mockResolvedValue(entradaTelas('entry-mes').state)
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: Infinity } } })
+    render(
+      <QueryClientProvider client={queryClient}>
+        <RegistrarSheet accountId={ids.accounts.topOne} tradeId={null} onClose={jest.fn()} />
+      </QueryClientProvider>,
+    )
+    await screen.findByRole('heading', { level: 3, name: 'Entrada' })
+    const pill = (grupo: string, nome: string) => within(screen.getByRole('group', { name: grupo })).getByRole('button', { name: nome })
+    expect(pill('Ativo', 'MGC')).toHaveAttribute('aria-pressed', 'true')
+    await userEvent.click(pill('Ativo', 'MES'))
+    await userEvent.click(pill('Lado', 'Compra'))
+    await userEvent.click(pill('Contratos', '2'))
+    await userEvent.type(screen.getByLabelText('Preço de entrada'), '7912,50')
+    await userEvent.click(screen.getByRole('button', { name: 'Registrar entrada' }))
+    await screen.findByRole('heading', { level: 3, name: 'Operação aberta' })
+    await waitFor(() => expect(db.fetchRecentTrades).toHaveBeenCalledTimes(2))
+    await userEvent.click(screen.getByRole('button', { name: 'Nova entrada' }))
+    expect(await screen.findByRole('heading', { level: 3, name: 'Entrada' })).toHaveFocus()
+    expect(pill('Ativo', 'MES')).toHaveAttribute('aria-pressed', 'true')
+    expect(pill('Contratos', '2')).toHaveAttribute('aria-pressed', 'true')
+    expect(pill('Lado', 'Compra')).toHaveAttribute('aria-pressed', 'false')
+    expect(screen.getByLabelText('Preço de entrada')).toHaveValue('')
+    // Nothing typed yet: closing asks nothing
+    expect(sessionStorage.getItem(`hub:registrar:rascunho:${ids.accounts.topOne}`)).toBeNull()
+  })
+
+  it('never replaces a form the owner already started', async () => {
+    const base = recentesTelas('recentes-top-one')
+    const mes2 = { ...base[0], symbol: 'MES', quantity: '2', direction: 'long' as const, source: 'live' as const, entryTime: new Date('2026-10-22T14:31:00Z') }
+    let tarde = false
+    db.fetchRecentTrades.mockImplementation(async () => (tarde ? [mes2, ...base] : base))
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: Infinity } } })
+    render(
+      <QueryClientProvider client={queryClient}>
+        <RegistrarSheet accountId={ids.accounts.topOne} tradeId={null} onClose={jest.fn()} />
+      </QueryClientProvider>,
+    )
+    await screen.findByRole('heading', { level: 3, name: 'Entrada' })
+    const pill = (grupo: string, nome: string) => within(screen.getByRole('group', { name: grupo })).getByRole('button', { name: nome })
+    await userEvent.click(pill('Lado', 'Venda'))
+    tarde = true
+    await act(async () => {
+      await queryClient.invalidateQueries({ queryKey: ['hub', 'user-1', 'registrar', 'recentes'] })
+    })
+    expect(db.fetchRecentTrades).toHaveBeenCalledTimes(2)
+    expect(pill('Ativo', 'MGC')).toHaveAttribute('aria-pressed', 'true')
+    expect(pill('Lado', 'Venda')).toHaveAttribute('aria-pressed', 'true')
+  })
+})
+
+describe('step 2: double taps and the server’s other answers (review gaps)', () => {
+  it('a double tap on «Registrar saída» sends one exit (C11)', async () => {
+    db.fetchTradeState.mockResolvedValue(mesAberta())
+    let answer: (s: registrarDb.ExitRegistered) => void = () => undefined
+    db.registerExit.mockImplementationOnce(() => new Promise((resolve) => (answer = resolve)))
+    abrir(ids.trades.mes)
+    await screen.findByRole('heading', { level: 3, name: 'Operação aberta' })
+    await userEvent.type(screen.getByLabelText('Preço de saída'), '7902,5')
+    const botao = screen.getByRole('button', { name: 'Registrar saída' })
+    await userEvent.dblClick(botao)
+    await userEvent.click(botao)
+    expect(db.registerExit).toHaveBeenCalledTimes(1)
+    await act(async () => answer(saidaTelas('exit-mes-oitenta')))
+    expect(await screen.findByRole('heading', { level: 3, name: 'Operação fechada' })).toBeInTheDocument()
+    expect(db.registerExit).toHaveBeenCalledTimes(1)
+  })
+
+  it('a double tap on a mark sends one mark, not a mark and its «desmarcar» (C11)', async () => {
+    db.fetchTradeState.mockResolvedValue(entradaTelas('entry-mes').state)
+    let answer: (s: registrarDb.TradeState) => void = () => undefined
+    db.addMarks.mockImplementationOnce(() => new Promise((resolve) => (answer = resolve)))
+    abrir(ids.trades.mes)
+    await screen.findByRole('heading', { level: 3, name: 'Operação aberta' })
+    const calmo = within(screen.getByRole('group', { name: 'Como você está?' })).getByRole('button', { name: 'Calmo' })
+    await userEvent.dblClick(calmo)
+    expect(db.addMarks).toHaveBeenCalledTimes(1)
+    expect(db.addMarks).toHaveBeenCalledWith(expect.anything(), ids.trades.mes, { v: 1, marks: { emocao: 'calmo' } })
+    await act(async () => answer(estadoTelas('marks-mes-aberta')))
+    expect(calmo).toHaveAttribute('aria-pressed', 'true')
+    expect(db.addMarks).toHaveBeenCalledTimes(1)
+  })
+
+  it('not_open: the trade is read again → step 3 with «Esta operação já foi fechada em outro lugar.»', async () => {
+    const fechada = saidaTelas('exit-mes-oitenta').state
+    db.fetchTradeState.mockResolvedValueOnce(mesAberta()).mockResolvedValue(fechada)
+    db.registerExit.mockRejectedValueOnce(new registrarDb.RegistrarDataError('not_open'))
+    abrir(ids.trades.mes)
+    await screen.findByRole('heading', { level: 3, name: 'Operação aberta' })
+    await userEvent.type(screen.getByLabelText('Preço de saída'), '7902,5')
+    await userEvent.click(screen.getByRole('button', { name: 'Registrar saída' }))
+    expect(await screen.findByRole('heading', { level: 3, name: 'Operação fechada' })).toHaveFocus()
+    expect(screen.getByText('Esta operação já foi fechada em outro lugar.')).toBeInTheDocument()
+  })
+
+  it('a lost exit: the alert is scrolled into view (it appears above the sticky footer, below the screen on a phone)', async () => {
+    const scroll = jest.fn()
+    const original = Element.prototype.scrollIntoView
+    Element.prototype.scrollIntoView = scroll
+    try {
+      db.fetchTradeState.mockResolvedValue(mesAberta())
+      db.registerExit.mockRejectedValueOnce(new registrarDb.RegistrarDataError('network'))
+      abrir(ids.trades.mes)
+      await screen.findByRole('heading', { level: 3, name: 'Operação aberta' })
+      await userEvent.type(screen.getByLabelText('Preço de saída'), '7902,5')
+      await userEvent.click(screen.getByRole('button', { name: 'Registrar saída' }))
+      const alerta = await screen.findByRole('alert')
+      expect(alerta).toHaveTextContent('Não foi possível falar com o servidor.')
+      await waitFor(() => expect(scroll).toHaveBeenCalledWith({ block: 'nearest' }))
+      expect(scroll.mock.contexts[0]).toBe(alerta)
+    } finally {
+      Element.prototype.scrollIntoView = original
+    }
+  })
+
+  it('unknown_trade on the exit: step 1 with «Esta operação não foi encontrada.»', async () => {
+    db.fetchTradeState.mockResolvedValue(mesAberta())
+    db.registerExit.mockRejectedValueOnce(new registrarDb.RegistrarDataError('unknown_trade'))
+    abrir(ids.trades.mes)
+    await screen.findByRole('heading', { level: 3, name: 'Operação aberta' })
+    await userEvent.type(screen.getByLabelText('Preço de saída'), '7902,5')
+    await userEvent.click(screen.getByRole('button', { name: 'Registrar saída' }))
+    expect(await screen.findByRole('heading', { level: 3, name: 'Entrada' })).toHaveFocus()
+    expect(screen.getByText('Esta operação não foi encontrada.')).toBeInTheDocument()
+  })
+})

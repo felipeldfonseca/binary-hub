@@ -72,6 +72,24 @@ describe('hub-registrar.css', () => {
     expect(regra('.hub .hub-reg-erro').getPropertyValue('color')).toBe('var(--red)')
   })
 
+  it('keeps what the focus shows above the sticky footer on phones: scroll-padding from the footer’s own height (WCAG 2.4.11)', () => {
+    const r = regra('.hub .hub-folha.hub-reg', '(max-width: 640px)')
+    expect(r.getPropertyValue('scroll-padding-bottom')).toBe('calc(var(--reg-rodape-h, 128px) + 12px)')
+    // Not on wider screens, where the footer is in the flow
+    expect(todas.some((x) => x.media === '' && x.rule.selectorText.includes('.hub-folha.hub-reg'))).toBe(false)
+  })
+
+  it('draws a pressed pill that is also disabled as pressed (#26301F on mint), not the disabled grey (RO: pressed wins)', () => {
+    const pressedDisabled = ".hub .hub-reg .hub-pill[aria-pressed='true'][aria-disabled='true']"
+    const r = regra(pressedDisabled)
+    expect(r.getPropertyValue('color')).toBe('#26301f')
+    expect(r.getPropertyValue('border-color')).toBe('var(--mint)')
+    expect(regra(`${pressedDisabled}:focus-visible`).getPropertyValue('color')).toBe('#26301f')
+    // It comes after the disabled rule and is more specific: [aria-pressed] adds one attribute
+    const idx = (sel: string) => todas.findIndex((x) => x.media === '' && x.rule.selectorText.split(',').map((t) => t.trim()).includes(sel))
+    expect(idx(pressedDisabled)).toBeGreaterThan(idx(".hub .hub-reg .hub-pill[aria-disabled='true']"))
+  })
+
   it('turns the disclosure’s chevron without motion when asked', () => {
     expect(regra('.hub .hub-reg .hub-seta', '(prefers-reduced-motion: reduce)').getPropertyValue('transition')).toBe('none')
   })

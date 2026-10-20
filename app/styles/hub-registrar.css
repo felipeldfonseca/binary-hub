@@ -69,6 +69,13 @@
   color: var(--text-2);
   cursor: not-allowed;
 }
+/* Pressed wins over disabled (RO: the pressed pill is `!important`): «Ganho» chosen, then an entry
+   hour that has not expired yet keeps it pressed and readable (#26301F on mint) */
+.hub .hub-reg .hub-pill[aria-pressed='true'][aria-disabled='true'],
+.hub .hub-reg .hub-pill[aria-pressed='true'][aria-disabled='true']:focus-visible {
+  border-color: var(--mint);
+  color: #26301f;
+}
 .hub .hub-reg .hub-btn[aria-disabled='true'],
 .hub .hub-reg .hub-btn[aria-disabled='true']:focus-visible {
   opacity: 1;
@@ -543,6 +550,11 @@
 
 /* Phones: the sheet is the whole screen (hub.css); the footer stays at the bottom (D13) */
 @media (max-width: 640px) {
+  /* What the focus or scrollIntoView shows stays above the sticky footer (WCAG 2.4.11): its height
+     comes from the footer itself (Rodape → --reg-rodape-h), with room for two rows of buttons before */
+  .hub .hub-folha.hub-reg {
+    scroll-padding-bottom: calc(var(--reg-rodape-h, 128px) + 12px);
+  }
   .hub .hub-reg .hub-reg-rodape {
     position: sticky;
     /* Sticky offsets count from inside the sheet's 28px bottom padding: reach the screen's edge */

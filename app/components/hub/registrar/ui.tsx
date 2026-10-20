@@ -236,6 +236,32 @@ export interface Acao {
   aoClicar: () => void
   /** aria-disabled (busy) */
   ocupado?: boolean
+  /** Where the focus goes back to (D30's «Não») */
+  id?: string
+}
+
+/** Step 1's primary button («Registrar entrada» / «Registrar operação») */
+export const PRIMARIA_ID = 'reg-primaria'
+
+/**
+ * Keeps the footer's height in the sheet's `--reg-rodape-h`: on phones the footer sticks to the bottom
+ * and the sheet's scroll-padding-bottom uses it, so a focused field (Tab, the first refused field, D30's
+ * question) is scrolled above the footer instead of under it (WCAG 2.4.11).
+ */
+function useAlturaRodape(ref: React.RefObject<HTMLElement>) {
+  useEffect(() => {
+    const el = ref.current
+    const folha = el?.closest<HTMLElement>('.hub-folha')
+    if (!el || !folha || typeof ResizeObserver === 'undefined') return
+    const medir = () => folha.style.setProperty('--reg-rodape-h', `${Math.ceil(el.getBoundingClientRect().height)}px`)
+    medir()
+    const observer = new ResizeObserver(medir)
+    observer.observe(el)
+    return () => {
+      observer.disconnect()
+      folha.style.removeProperty('--reg-rodape-h')
+    }
+  }, [ref])
 }
 
 /**
@@ -246,13 +272,15 @@ export interface Acao {
 export function Rodape({ esquerda, primaria, ocupado }: { esquerda?: Acao | null; primaria?: Acao | null; ocupado?: boolean }) {
   const { saindo, confirmarSaida, ficar } = useFolha()
   const simRef = useRef<HTMLButtonElement>(null)
+  const rodapeRef = useRef<HTMLDivElement>(null)
+  useAlturaRodape(rodapeRef)
   useEffect(() => {
     if (saindo) simRef.current?.focus()
   }, [saindo])
   return (
     <>
       {/* Sticky at the bottom on phones (D13); the note under it scrolls with the step */}
-      <div className="hub-reg-rodape">
+      <div ref={rodapeRef} className="hub-reg-rodape">
         {saindo ? (
           <div className="hub-bloco hub-bloco--atencao" role="group" aria-labelledby="t-sair">
             <span id="t-sair" style={{ fontWeight: 700 }}>
@@ -278,6 +306,7 @@ export function Rodape({ esquerda, primaria, ocupado }: { esquerda?: Acao | null
               {primaria && (
                 <div className="hub-rodape__dir">
                   <button
+                    id={primaria.id}
                     type="button"
                     className="hub-btn hub-btn--pri"
                     aria-disabled={primaria.ocupado || undefined}

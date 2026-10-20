@@ -16,6 +16,7 @@ import {
   DURACOES_EBINEX,
   avisoLimiteEntrada,
   descricaoSimilar,
+  diaDe,
   horaRel,
   linhaGate,
   linhaLimite,
@@ -34,7 +35,7 @@ import { MARKET_LABEL, PHASE_LABEL } from '@/components/hub/contas/copy'
 import { Disclosure, InfoButton, InfoPanel, useToggle } from '@/components/hub/contas/ui'
 import { EBINEX, ENTRADA, ERRO_REGISTRAR, ERROS, FUTUROS, GATE, MARCAS, NEVER_SUMMED, RODAPE, SIMILAR } from './copy'
 import { PillsMarca } from './Marcas'
-import { CampoTexto, Erro, GrupoPills, PlanoPill, Rodape, descrito, useMexido } from './ui'
+import { CampoTexto, Erro, GrupoPills, PRIMARIA_ID, PlanoPill, Rodape, descrito, useMexido } from './ui'
 
 // ------------------------------------------------------------------------------------------------
 // The context block: the account, «Posso operar hoje?», «Limite do dia» (RO l.325–332)
@@ -62,6 +63,7 @@ export function ContextoConta({
   /** The accounts the sheet can register on (the chip is a button when there are two or more) */
   contas: readonly TradingAccount[]
   aoTrocar: ((id: string) => void) | null
+  /** «Janela 10:00–11:00 ET»; empty when the rules are unknown (rules_now failed: not «Sem janela salva») */
   janela: string
   gate: GateMostrado
   /** false on a refused «Dia» (board choice 11) */
@@ -100,7 +102,7 @@ export function ContextoConta({
         ) : (
           <span className="hub-chip-dado">{conta.label}</span>
         )}
-        <span className="hub-nota">{janela}</span>
+        {janela && <span className="hub-nota">{janela}</span>}
       </div>
       {trocavel && lista && (
         <div
@@ -348,13 +350,13 @@ export function CamposEbinex({
         id="exp"
         titulo={EBINEX.expiracao}
         extra={<InfoButton panelId="info-exp" label={EBINEX.expInfoAria} open={infoExp} onToggle={alternarInfoExp} />}
+        painel={infoExp ? <InfoPanel id="info-exp">{EBINEX.expInfo}</InfoPanel> : null}
         opcoes={DURACOES_EBINEX.map((d) => ({ valor: d, rotulo: EBINEX.minutos(d / 60) }))}
         valor={r.duracao}
         aoEscolher={(d) => mudar({ duracao: d, resultado: null })}
         descricao={descrito(m.venceTxt && 'n-venc', erros.exp && 'e-exp')}
         depois={
           <>
-            {infoExp && <InfoPanel id="info-exp">{EBINEX.expInfo}</InfoPanel>}
             {m.venceTxt && (
               <span id="n-venc" className="hub-nota">
                 {m.venceTxt}
@@ -517,13 +519,6 @@ function campoDoServidor(field: string | null, market: 'futures' | 'binary'): Ca
   }
 }
 
-/** The last value that was there (the gate line keeps its answer while the next one is asked: no flicker per keystroke) */
-function useUltimo<T>(value: T | null | undefined): T | null {
-  const ref = useRef<T | null>(null)
-  if (value !== null && value !== undefined) ref.current = value
-  return value ?? ref.current
-}
-
 export interface PassoEntradaProps {
   conta: ContaReg
   contas: readonly TradingAccount[]
@@ -568,13 +563,17 @@ export default function PassoEntrada(props: PassoEntradaProps) {
   const m = modeloEntrada({ conta, r, now, hoje, tentou })
   useMexido(rascunhoMexido(r, inicial))
 
-  // «Posso operar hoje?»: rules_now for the current minute, gate_at at a typed hour or another day
+  // «Posso operar hoje?»: rules_now for the current minute, gate_at at a typed hour or another day.
+  // A typed moment is only ever answered by gate_at: never the current minute's answer, nor another
+  // day's, nor «Liberado» when it could not check (D8). While the next hour is asked, the last answer
+  // stays if it is of the same trading day (no flicker per keystroke).
   const noGateAt = !m.diaRecusado && !m.noMinutoAtual && m.entradaEm ? m.entradaEm : null
   const gateAt = useGateAt(conta.id, noGateAt)
-  const gateDoMomento: GateResult | null = noGateAt ? gateAt.data?.gate ?? null : agora?.gate ?? null
-  const gate = useUltimo(gateDoMomento)
-  const rulesDoGate = (noGateAt ? gateAt.data?.rules : null) ?? rules
-  const falhou = noGateAt ? gateAt.isError && !gate : rulesNowFalhou && !agora
+  const respostaAt =
+    noGateAt && gateAt.data && (!gateAt.isPlaceholderData || gateAt.data.gate.tradingDay === diaDe(conta, noGateAt)) ? gateAt.data : null
+  const gate: GateResult | null = noGateAt ? respostaAt?.gate ?? null : agora?.gate ?? null
+  const rulesDoGate = noGateAt ? respostaAt?.rules ?? null : rules
+  const falhou = noGateAt ? gateAt.isError : rulesNowFalhou && !agora
   const pergunta = perguntaGate(m, r.modo)
   const presente = !fechada && m.agora
   const outroDia = m.dia !== m.hoje
@@ -585,7 +584,7 @@ export default function PassoEntrada(props: PassoEntradaProps) {
   }
 
   // The dry run: the plan, the limit's room, `similar` (only a complete form is asked)
-  const dryAberta = useEntryPreview(conta.id, fechada ? null : m.payload)
+  const dryAberta = useEntryPreview(conta.id, fechada ? null : m.payloadPrevia)
   const dryFechada = useAfterPreview(conta.id, fechada ? m.payloadFechada : null)
   const dry = fechada ? dryFechada : dryAberta
   const dryAtual = dry.data && !dry.isPlaceholderData ? dry.data : null
@@ -607,6 +606,18 @@ export default function PassoEntrada(props: PassoEntradaProps) {
 
   const desc = descricaoSimilar(m, conta)
 
+  // D30's question and the sheet's alert appear at the end of the step, above the footer: the question
+  // takes the focus (it is read, and scrolled into view above the sticky footer on phones), the
+  // alert is scrolled into view (role="alert" reads it)
+  const similarRef = useRef<HTMLParagraphElement>(null)
+  const alertaRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (similar !== null) similarRef.current?.focus()
+  }, [similar])
+  useEffect(() => {
+    if (erroGeral) alertaRef.current?.scrollIntoView?.({ block: 'nearest' })
+  }, [erroGeral])
+
   const registrar = async (permitirSimilar: boolean) => {
     if (ocupadoRef.current) return
     setTentou(true)
@@ -622,11 +633,15 @@ export default function PassoEntrada(props: PassoEntradaProps) {
     ocupadoRef.current = true
     setOcupado(true)
     setSimilar(null)
+    // The step that follows is the trade's status, not the mode: the same client_key sent again in the
+    // other mode (a lost answer, then a switch of «Aberta» / «Já fechada») answers what it registered (C5)
+    const seguir = (t: { id: string; status: 'open' | 'closed'; exitTime: Date | null }, aviso: AvisoDoLimite | null) =>
+      aoRegistrar(t.status === 'open' ? { tipo: 'aberta', tradeId: t.id } : { tipo: 'fechada', tradeId: t.id, aviso, exitAt: t.exitTime })
     try {
       if (!fechada && m.payload) {
         const payload = permitirSimilar ? { ...m.payload, allow_similar: true } : m.payload
         const ans = await entrada.mutateAsync({ accountId: conta.id, payload })
-        aoRegistrar({ tipo: 'aberta', tradeId: ans.state.trade.id })
+        seguir(ans.state.trade, null)
       } else if (fechada && m.payloadFechada) {
         const payload = permitirSimilar ? { ...m.payloadFechada, allow_similar: true } : m.payloadFechada
         const ans = await depois.mutateAsync({ accountId: conta.id, payload })
@@ -640,7 +655,7 @@ export default function PassoEntrada(props: PassoEntradaProps) {
               exitAt: ans.state.trade.exitTime,
               pref80,
             })
-        aoRegistrar({ tipo: 'fechada', tradeId: ans.state.trade.id, aviso: banner, exitAt: ans.state.trade.exitTime })
+        seguir(ans.state.trade, banner)
       }
     } catch (e) {
       const err = e instanceof RegistrarDataError ? e : new RegistrarDataError('unknown')
@@ -742,7 +757,7 @@ export default function PassoEntrada(props: PassoEntradaProps) {
         conta={conta}
         contas={contas}
         aoTrocar={aoTrocarConta}
-        janela={janelaLinha(rules)}
+        janela={agora ? janelaLinha(rules) : ''}
         gate={gateMostrado}
         mostrarGate={!m.diaRecusado}
         info={conta.market === 'futures' ? GATE.infoFuturos : GATE.infoOutros}
@@ -777,26 +792,33 @@ export default function PassoEntrada(props: PassoEntradaProps) {
 
       {similar !== null && (
         <div className="hub-bloco hub-bloco--atencao hub-reg-similar" role="group" aria-labelledby="t-similar">
-          <p id="t-similar" className="hub-reg-amber">
+          <p id="t-similar" ref={similarRef} tabIndex={-1} className="hub-reg-amber">
             {SIMILAR.pergunta(similar)}
           </p>
           <div className="hub-acoes">
             <button type="button" className="hub-btn hub-btn--pri" onClick={() => void registrar(true)}>
               {SIMILAR.sim}
             </button>
-            <button type="button" className="hub-btn" onClick={() => setSimilar(null)}>
+            <button
+              type="button"
+              className="hub-btn"
+              onClick={() => {
+                setSimilar(null)
+                requestAnimationFrame(() => document.getElementById(PRIMARIA_ID)?.focus())
+              }}
+            >
               {SIMILAR.nao}
             </button>
           </div>
         </div>
       )}
       {erroGeral && (
-        <div role="alert" className="hub-alerta">
+        <div ref={alertaRef} role="alert" className="hub-alerta">
           {ERRO_REGISTRAR[erroGeral]}
         </div>
       )}
       <Rodape
-        primaria={{ rotulo: fechada ? RODAPE.registrarOperacao : RODAPE.registrarEntrada, aoClicar: () => void registrar(false), ocupado }}
+        primaria={{ id: PRIMARIA_ID, rotulo: fechada ? RODAPE.registrarOperacao : RODAPE.registrarEntrada, aoClicar: () => void registrar(false), ocupado }}
         ocupado={ocupado}
       />
     </div>

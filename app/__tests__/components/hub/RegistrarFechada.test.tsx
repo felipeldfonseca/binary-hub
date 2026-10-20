@@ -363,3 +363,55 @@ describe('leaving step 3', () => {
     expect(mockRouter.push).not.toHaveBeenCalled()
   })
 })
+
+describe('«Imagens e nota»: what counts as pending, the note sent, a double tap (review gaps)', () => {
+  it('the saved summary is not pending: «Registrar outra» saves nothing and closing asks nothing', async () => {
+    db.fetchTradeState.mockResolvedValue(operacaoTelas('operacao-mes-fechada'))
+    const { onClose } = abrir(ids.trades.mes)
+    await screen.findByRole('heading', { level: 3, name: 'Operação fechada' })
+    expect(screen.getByRole('button', { name: 'Editar imagens e nota' })).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Fechar' }))
+    expect(screen.queryByText('Fechar sem salvar?')).not.toBeInTheDocument()
+    expect(onClose).toHaveBeenCalled()
+  })
+
+  it('«Registrar outra» from the summary saves nothing', async () => {
+    db.fetchTradeState.mockResolvedValue(operacaoTelas('operacao-mes-fechada'))
+    abrir(ids.trades.mes)
+    await screen.findByRole('heading', { level: 3, name: 'Operação fechada' })
+    await userEvent.click(screen.getByRole('button', { name: 'Registrar outra' }))
+    expect(await screen.findByRole('heading', { level: 3, name: 'Entrada' })).toBeInTheDocument()
+    expect(save).not.toHaveBeenCalled()
+    expect(screen.queryByText(/Operação anterior/)).not.toBeInTheDocument()
+  })
+
+  it('an editor equal to the saved data is not pending', async () => {
+    db.fetchTradeState.mockResolvedValue(operacaoTelas('operacao-mes-fechada'))
+    abrir(ids.trades.mes)
+    await screen.findByRole('heading', { level: 3, name: 'Operação fechada' })
+    await userEvent.click(screen.getByRole('button', { name: 'Editar imagens e nota' }))
+    expect(screen.getByRole('button', { name: 'Remover imagem MES_10-12_entrada.webp' })).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Registrar outra' }))
+    expect(await screen.findByRole('heading', { level: 3, name: 'Entrada' })).toBeInTheDocument()
+    expect(save).not.toHaveBeenCalled()
+  })
+
+  it('the note goes trimmed; a double tap on «Salvar imagens e nota» saves once (C11)', async () => {
+    db.fetchTradeState.mockResolvedValue(mesFechadaSemAnexos())
+    const extras = estadoTelas('extras-mes')
+    let finish: () => void = () => undefined
+    save.mockImplementationOnce(async () => {
+      await new Promise<void>((resolve) => (finish = resolve))
+      return { state: extras, savedAt: extras.images[0].savedAt as Date, noteSavedAt: extras.trade.noteSavedAt, failed: [], savedIds: {} }
+    })
+    abrir(ids.trades.mes)
+    await screen.findByRole('heading', { level: 3, name: 'Operação fechada' })
+    await userEvent.type(screen.getByLabelText('Nota (opcional)'), '  Saí no stop.  ')
+    await userEvent.dblClick(screen.getByRole('button', { name: 'Salvar imagens e nota' }))
+    expect(save).toHaveBeenCalledTimes(1)
+    expect(save.mock.calls[0][2].note).toBe('Saí no stop.')
+    await act(async () => finish())
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Editar imagens e nota' })).toBeInTheDocument())
+    expect(save).toHaveBeenCalledTimes(1)
+  })
+})

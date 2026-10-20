@@ -358,6 +358,13 @@ export interface ModeloEntrada {
   jaFoi: boolean;
   /** «Aberta»: register_entry's payload, null until the form is complete */
   payload: EntryPayload | null;
+  /**
+   * «Aberta»: the payload of its dry run. On the current minute it names that minute (`entry`), which
+   * register_entry reads as now(), as when it is left out: the dry run's key changes as the clock
+   * passes a minute, so the plan, the limit's room and `similar` are asked again (at 11:00 the window
+   * of 10:00–11:00 is over). The registration itself leaves it out: the server's clock (C5).
+   */
+  payloadPrevia: EntryPayload | null;
   /** «Já fechada»: register_after's payload */
   payloadFechada: AfterPayload | null;
   /** What the entry risks (the loss at the stop, a binary's stake), decimal text; null when unknown */
@@ -430,6 +437,7 @@ export function modeloEntrada({ conta, r, now, hoje, tentou }: EntradaInput): Mo
   } else erros.hora = ERROS.hora;
 
   let payload: EntryPayload | null = null;
+  let payloadPrevia: EntryPayload | null = null;
   let payloadFechada: AfterPayload | null = null;
   let risco: string | null = null;
   let linhaRisco = '';
@@ -440,6 +448,7 @@ export function modeloEntrada({ conta, r, now, hoje, tentou }: EntradaInput): Mo
   let descricao: { lado: string; ativo: string } | null = null;
   const marks = marcasDoRascunho(r);
   const entry = fechada || hm === null || noMinutoAtual ? undefined : hm;
+  const entryPrevia = fechada || hm === null ? undefined : hm;
 
   if (futures) {
     const symbol = r.ativo ?? '';
@@ -535,7 +544,10 @@ export function modeloEntrada({ conta, r, now, hoje, tentou }: EntradaInput): Mo
       marks,
     };
     const completo = !erros.lado && !erros.q && !erros.preco && !erros.hora && !erros.stop && !erros.alvo && !!spec;
-    if (!fechada && completo) payload = entryPayload('futures', { ...base, entry });
+    if (!fechada && completo) {
+      payload = entryPayload('futures', { ...base, entry });
+      payloadPrevia = entryPayload('futures', { ...base, entry: entryPrevia });
+    }
     if (fechada && completo && !erros.dia && !erros.spreco && !erros.shora && hm !== null) {
       payloadFechada = afterPayload('futures', { ...base, day: dia, entry: hm, exit: horaSaidaCampo, exitPrice: saida.value ?? undefined });
     }
@@ -596,7 +608,10 @@ export function modeloEntrada({ conta, r, now, hoje, tentou }: EntradaInput): Mo
       marks,
     };
     const completo = !erros.par && !erros.dir && !erros.exp && !erros.stake && !erros.payout && !erros.hora;
-    if (!fechada && completo) payload = entryPayload('binary', { ...base, entry });
+    if (!fechada && completo) {
+      payload = entryPayload('binary', { ...base, entry });
+      payloadPrevia = entryPayload('binary', { ...base, entry: entryPrevia });
+    }
     if (fechada && completo && !erros.dia && !erros.fimB && hm !== null && r.resultado) {
       payloadFechada = afterPayload('binary', { ...base, day: dia, entry: hm, outcome: r.resultado });
     }
@@ -624,6 +639,7 @@ export function modeloEntrada({ conta, r, now, hoje, tentou }: EntradaInput): Mo
     vencido,
     jaFoi: fechada || vencido,
     payload,
+    payloadPrevia,
     payloadFechada,
     risco,
     linhaRisco,

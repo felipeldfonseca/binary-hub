@@ -374,3 +374,83 @@ describe('the marks split on step 3', () => {
     expect(linhaDepois(ebx, t, events, 'reconstructed')).toBe('Marcas feitas a partir de agora contam como depois do resultado.')
   })
 })
+
+// ------------------------------------------------------------------------------------------------
+// Review fixes and the review's surviving mutants (lane A reviews)
+// ------------------------------------------------------------------------------------------------
+
+describe('step 1 (review)', () => {
+  const now = at('2026-10-22T14:31:05Z')
+  const hoje = '2026-10-22'
+  const completo = { lado: 'short' as const, preco: '4421,3' }
+
+  it('the dry run names the current minute (its key changes with the clock); the registration leaves it to the server', () => {
+    const m = modeloEntrada({ conta: top, r: rascunhoTop(completo), now, hoje, tentou: false })
+    expect(m.payload).not.toHaveProperty('entry')
+    expect(m.payloadPrevia).toEqual({ ...m.payload, entry: '10:31' })
+    const m2 = modeloEntrada({ conta: top, r: rascunhoTop(completo), now: at('2026-10-22T14:32:00Z'), hoje, tentou: false })
+    expect(m2.payloadPrevia?.entry).toBe('10:32')
+    // A typed hour is in both
+    const typed = modeloEntrada({ conta: top, r: rascunhoTop({ ...completo, hora: '10:20' }), now, hoje, tentou: false })
+    expect(typed.payload?.entry).toBe('10:20')
+    expect(typed.payloadPrevia).toEqual(typed.payload)
+    // Ebinex too; «Já fechada» has its own payload
+    const ebxM = modeloEntrada({ conta: ebx, r: rascunhoEbx({ direcao: 'put', duracao: 60 }), now: at('2026-10-22T23:10:20Z'), hoje, tentou: false })
+    expect(ebxM.payload).not.toHaveProperty('entry')
+    expect(ebxM.payloadPrevia?.entry).toBe('20:10')
+    expect(modeloEntrada({ conta: top, r: rascunhoTop({ ...completo, modo: 'fechada', precoSaida: '4425' }), now, hoje, tentou: false }).payloadPrevia).toBeNull()
+  })
+
+  it('«Já fechada»: an entry after now is refused; an exit in the entry’s own minute is not', () => {
+    const futura = modeloEntrada({ conta: top, r: rascunhoTop({ ...completo, modo: 'fechada', hora: '10:40', precoSaida: '4425' }), now, hoje, tentou: true })
+    expect(futura.erros.hora).toBe('A entrada não pode ser depois de agora (10:31 ET).')
+    expect(futura.payloadFechada).toBeNull()
+    const mesmoMinuto = modeloEntrada({ conta: top, r: rascunhoTop({ ...completo, modo: 'fechada', hora: '10:20', horaSaida: '10:20', precoSaida: '4425' }), now, hoje, tentou: true })
+    expect(mesmoMinuto.erros).toEqual({})
+    expect(mesmoMinuto.payloadFechada).toMatchObject({ entry: '10:20', exit: '10:20' })
+  })
+
+  it('field checks: «Outro» with more than 6 digits, «Outro par» outside the pattern, a stake with 3 decimals, a payout under 1', () => {
+    const e = (r: Partial<Rascunho>, conta = top) => modeloEntrada({ conta, r: conta === top ? rascunhoTop(r) : rascunhoEbx(r), now, hoje, tentou: true }).erros
+    expect(e({ qtdOutro: true, qtd: '1234567' }).q).toBe('Use só números, como 4.')
+    expect(e({ qtdOutro: true, qtd: '123456' }).q).toBeUndefined()
+    expect(e({ parOutro: true, parTexto: 'EUR$USD' }, ebx).par).toBe('Use letras, números e /.')
+    expect(e({ parOutro: true, parTexto: 'aud/cad' }, ebx).par).toBeUndefined()
+    expect(e({ stake: '20,123' }, ebx).stake).toBe('Use um valor maior que zero.')
+    expect(e({ stake: '20,12' }, ebx).stake).toBeUndefined()
+    expect(e({ payout: '0,5' }, ebx).payout).toBe('O payout vai de 1 a 100%.')
+    expect(e({ payout: '1' }, ebx).payout).toBeUndefined()
+  })
+
+  it('Ebinex «Já fechada» «Perda»: «Resultado: −US$ 20,00», «Devolvida»: «Resultado: US$ 0,00»', () => {
+    const now2024 = at('2026-10-22T23:24:04Z')
+    const linha = (resultado: 'perda' | 'devolvida') =>
+      modeloEntrada({ conta: ebx, r: rascunhoEbx({ modo: 'fechada', direcao: 'call', duracao: 300, hora: '20:13', resultado }), now: now2024, hoje, tentou: false }).linhaResultado
+    expect(linha('perda')).toBe('Resultado: −US$\u00a020,00')
+    expect(linha('devolvida')).toBe('Resultado: US$\u00a00,00')
+  })
+})
+
+describe('the gate line, the limit line and step 3 (review)', () => {
+  it('«· hoje não é dia da janela» today, «· não é dia da janela» on another day', () => {
+    const gate = { ...top1031.gate, status: 'fora_janela' as const, window: { evaluated: true as const, state: 'fora' as const, position: 'nao_e_dia' as const } } as typeof top1031.gate
+    expect(linhaGate(top, gate, top1031.rules, { presente: true, outroDia: false }).sub).toBe('· hoje não é dia da janela')
+    expect(linhaGate(top, gate, top1031.rules, { presente: false, outroDia: true }).sub).toBe('· não é dia da janela')
+  })
+
+  it('«Limite do dia — de US$ 400» when the limit was not evaluated', () => {
+    const gate = { ...top1031.gate, limit: { evaluated: false as const, state: 'nao_avaliado' as const, reason: 'sem_dados' as const } } as unknown as typeof top1031.gate
+    expect(linhaLimite(top, gate, top1031.rules)).toEqual({ usado: '—', de: 'de US$\u00a0400' })
+  })
+
+  it('a zero result is neutral, not mint', () => {
+    const t = { ...saidaTelas('exit-ebinex-perda').state.trade, pnl: '0', result: 'breakeven' as const }
+    expect(cartaoFechada(ebx, t, at('2026-10-22T23:13:00Z')).tom).toBe('neutral')
+  })
+
+  it('A → B → A after the result: «antes da saída» keeps A, nothing after', () => {
+    const m = (id: number, value: string, iso: string, limpa: boolean): MarkEvent => ({ id, kind: 'setup', value, markedAt: at(iso), limpa })
+    const events = [m(1, 'A', '2026-10-22T23:10:20Z', true), m(2, 'B', '2026-10-22T23:12:10Z', false), m(3, 'A', '2026-10-22T23:12:40Z', false)]
+    expect(marcasDivididas(ebx, events, at('2026-10-22T23:13:00Z'))).toEqual({ antes: [{ texto: 'Setup A', quando: 'às 20:10', historico: null }], depois: [] })
+  })
+})

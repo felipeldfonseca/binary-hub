@@ -9,9 +9,9 @@ import { useRulesNow } from '@/hooks/useRegras'
 import { useImageTrashSweep, useOpenTrades, useRegistrarDefaults, useServerNow, useTradeView } from '@/hooks/useRegistrar'
 import { visibleAccounts, type TradingAccount } from '@/lib/hub/contas'
 import { fetchAccounts } from '@/lib/hub/contasDb'
-import { diaDeHoje, padroesDoRegistrar, podeRegistrar } from '@/lib/hub/registrar'
+import { diaDeHoje, padroesDoRegistrar, podeRegistrar, type RegistrarDefaults } from '@/lib/hub/registrar'
 import { newClientKey, type TradeView } from '@/lib/hub/registrarDb'
-import { chaveRascunho, contaReg, indicador, lerRascunho, rascunhoInicial, textoAviso, type Rascunho } from '@/lib/hub/registrarForm'
+import { chaveRascunho, contaReg, indicador, lerRascunho, rascunhoInicial, rascunhoMexido, textoAviso, type Rascunho } from '@/lib/hub/registrarForm'
 import { CLOSE, FOLHA_REG, LOADING, TRY_AGAIN } from './copy'
 import { OPERACOES_DO_DIA_ID, type CloseRegistrarOptions } from './abrir'
 import Escolha from './Escolha'
@@ -106,6 +106,8 @@ export default function RegistrarSheet({ accountId, tradeId, onClose }: Registra
 
   const [vista, setVista] = useState<Vista | null>(null)
   const [focoN, setFocoN] = useState(0)
+  /** The last step change (focoN) whose heading took the focus: a step may still be reading its trade */
+  const focoFeito = useRef(0)
   const ir = useCallback((v: Vista) => {
     setVista(v)
     setFocoN((n) => n + 1)
@@ -121,6 +123,13 @@ export default function RegistrarSheet({ accountId, tradeId, onClose }: Registra
   const ultimaVista = useRef<Record<string, TradeView>>({})
   if (trade.data) ultimaVista.current[trade.data.trade.id] = trade.data
   const vistaDe = (id: string): TradeView | null => (trade.data && trade.data.trade.id === id ? trade.data : ultimaVista.current[id] ?? null)
+
+  // Step 3 of a trade that is open (a repeated answer of the other mode: a lost «Registrar entrada»
+  // sent again as «Já fechada», C5) goes to its step 2, instead of waiting for a close that never comes
+  const fechadaDeAberta = vista?.passo === 'fechada' && vistaDe(vista.tradeId)?.trade.status === 'open' ? vista.tradeId : null
+  useEffect(() => {
+    if (fechadaDeAberta) ir({ passo: 'aberta', tradeId: fechadaDeAberta })
+  }, [fechadaDeAberta, ir])
 
   // Where the sheet starts
   const rulesNowPronto = !rulesNow.isPending || rulesNow.fetchStatus === 'paused'
@@ -153,13 +162,18 @@ export default function RegistrarSheet({ accountId, tradeId, onClose }: Registra
   }, [vista, contas.isLoading, contas.isError, account, rulesNowPronto, agora, tradeId, trade.isPending, trade.isError, trade.data, abertas.isPending, abertas.isError, abertas.data, lista, ir])
 
   // Step 1's draft per account: memory and sessionStorage (D14, C6)
-  const [rascunhos, setRascunhos] = useState<Record<string, { r: Rascunho; inicial: Rascunho }>>({})
+  const [rascunhos, setRascunhos] = useState<Record<string, { r: Rascunho; inicial: Rascunho; padroes: RegistrarDefaults }>>({})
   const defaultsProntos = !!account && (defaults.isSuccess || defaults.isError || defaults.fetchStatus === 'paused')
   const padroes = useMemo(() => (account ? defaults.data ?? padroesDoRegistrar(account.market, []) : null), [account, defaults.data])
   useEffect(() => {
-    if (!conta || !defaultsProntos || !padroes || rascunhos[conta.id]) return
-    const inicial = rascunhoInicial(conta, padroes, newClientKey())
-    setRascunhos((x) => ({ ...x, [conta.id]: { r: lerSessao(conta.id) ?? inicial, inicial } }))
+    if (!conta || !defaultsProntos || !padroes) return
+    const cur = rascunhos[conta.id]
+    if (cur && (cur.padroes === padroes || rascunhoMexido(cur.r, cur.inicial))) return
+    // A new form; or one with nothing typed yet whose starting values changed: after a registration the
+    // account's recent trades are read again, and «Nova entrada» starts from the last one (D5)
+    const inicial = rascunhoInicial(conta, padroes, cur?.r.clientKey ?? newClientKey())
+    const r = cur ? { ...inicial, maisAberto: cur.r.maisAberto } : lerSessao(conta.id) ?? inicial
+    setRascunhos((x) => ({ ...x, [conta.id]: { r, inicial, padroes } }))
   }, [conta, defaultsProntos, padroes, rascunhos])
   const setR = useCallback(
     (fn: (r: Rascunho) => Rascunho) => {
@@ -179,7 +193,7 @@ export default function RegistrarSheet({ accountId, tradeId, onClose }: Registra
     if (!conta || !padroes) return
     gravarSessao(null, conta.id)
     const inicial = rascunhoInicial(conta, padroes, newClientKey())
-    setRascunhos((x) => ({ ...x, [conta.id]: { r: inicial, inicial } }))
+    setRascunhos((x) => ({ ...x, [conta.id]: { r: inicial, inicial, padroes } }))
   }, [conta, padroes])
 
   // The frame: closing with unsaved input, Escape, the Tab trap
@@ -204,10 +218,19 @@ export default function RegistrarSheet({ accountId, tradeId, onClose }: Registra
   useEffect(() => {
     sectionRef.current?.focus()
   }, [])
-  const pronto = vista !== null
+  // Each step's heading takes the focus (contract §4.1), also when it appears after its trade is read
+  // (no deps: the step's data may arrive in a later render than the step change; focoN is the
+  // committed step, so another render in between never focuses the step that is leaving)
   useEffect(() => {
-    if (pronto) headingRef.current?.focus()
-  }, [focoN, pronto])
+    if (focoFeito.current === focoN) return
+    if (headingRef.current) {
+      focoFeito.current = focoN
+      headingRef.current.focus()
+    } else if (sectionRef.current && !sectionRef.current.contains(document.activeElement)) {
+      // Still reading: the button that led here is gone; the focus stays in the dialog meanwhile
+      sectionRef.current.focus()
+    }
+  })
 
   const onKeyDown = (event: React.KeyboardEvent<HTMLElement>) => {
     if (event.key === 'Escape') {
