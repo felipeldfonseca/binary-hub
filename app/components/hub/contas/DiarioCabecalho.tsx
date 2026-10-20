@@ -26,8 +26,9 @@ export function DiarioTitulo() {
 }
 
 /**
- * Where /diario?registrar=1 opens the Registrar sheet: the current account when it can register in
- * 3-3, else the first active one that can (the primary first); null: none can, nothing opens
+ * Where /diario?registrar=1 opens the Registrar sheet: the current account when it can register
+ * (every market since 3-4), else the first active one that can (the primary first); null: none can,
+ * nothing opens
  */
 export function contaParaRegistrar(current: TradingAccount | null, active: readonly TradingAccount[]): TradingAccount | null {
   if (current && podeRegistrar(current.market)) return current
@@ -44,8 +45,8 @@ export function contaParaRegistrar(current: TradingAccount | null, active: reado
  *
  * Fase 2b: no file of the new markets is read yet (MARKET_SPEC[m].reader), so with such an account
  * in context the sheet opens without an account («Escolha o arquivo»), never on that account.
- * Phase 3 (D36): «Registrar operação» only for an account that can register in 3-3 (Futuros,
- * binárias); hidden while the accounts load, after a failed read and in the empty state.
+ * Phase 3: «Registrar operação» for an account that can register (podeRegistrar: every market since
+ * 3-4, the end of D36); hidden while the accounts load, after a failed read and in the empty state.
  */
 export default function DiarioCabecalho() {
   const conta = useContaAtual()

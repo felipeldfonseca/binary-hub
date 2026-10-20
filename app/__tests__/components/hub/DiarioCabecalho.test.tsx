@@ -721,7 +721,7 @@ describe('Diário header · «Registrar operação» (Phase 3)', () => {
     expect(registrar).toHaveFocus()
   })
 
-  it('is not there while the accounts load, after a failed read, in the empty state, or on an account of a new market (FTMO)', async () => {
+  it('is not there while the accounts load, after a failed read, or in the empty state', async () => {
     let answer!: (accounts: TradingAccount[]) => void
     fetchAccounts.mockReturnValue(new Promise((r) => (answer = r)))
     const loading = renderHub(<DiarioCabecalho />)
@@ -742,14 +742,18 @@ describe('Diário header · «Registrar operação» (Phase 3)', () => {
     expect(await screen.findByText('Traga o histórico da sua corretora.')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Registrar operação' })).not.toBeInTheDocument()
     empty.unmount()
+  })
 
-    // D36: the new markets keep their interim state until 3-4 (no Registrar for them yet)
-    fetchAccounts.mockReset().mockResolvedValue(contasTelas())
+  it('is there on an account of a new market since 3-4 (the end of D36): FTMO (forex) registers on FTMO', async () => {
     fetchPreferences.mockResolvedValue({ conta_atual: tid.accounts.ftmo })
     renderHub(<DiarioCabecalho />)
     expect(await screen.findByRole('button', { name: /^Conta: FTMO/ })).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Registrar operação' })).not.toBeInTheDocument()
+
+    const registrar = await registrarButton()
     expect(screen.getByRole('button', { name: 'Importar arquivo' })).toBeInTheDocument()
+    await userEvent.click(registrar)
+    expect(mockRegistrarOpen).toHaveBeenCalledWith({ accountId: tid.accounts.ftmo, opener: registrar })
+    expect(mockSheet).toHaveBeenLastCalledWith({ accountId: tid.accounts.ftmo, tradeId: null })
   })
 
   it.each([false, true])('?registrar=1 opens it once on the current account and leaves the URL with ?conta= (strict mode: %s)', async (strict) => {
@@ -775,23 +779,31 @@ describe('Diário header · «Registrar operação» (Phase 3)', () => {
     await waitFor(() => expect(mockReplace).toHaveBeenCalledWith('/diario'))
   })
 
-  it('?registrar=1 with FTMO current opens on the first account that can register (the primary), focus back to the H1', async () => {
+  it('?registrar=1 with FTMO current opens on FTMO since 3-4 (the end of D36)', async () => {
     mockSearch = `registrar=1&conta=${tid.accounts.ftmo}`
     renderHub(<DiarioCabecalho />)
 
     expect(await screen.findByRole('dialog', { name: 'Registrar operação' })).toBeInTheDocument()
-    const h1 = screen.getByRole('heading', { level: 1, name: 'Diário', hidden: true })
-    expect(mockRegistrarOpen).toHaveBeenCalledWith({ accountId: tid.accounts.topOne, opener: h1, fallback: h1 })
+    expect(mockRegistrarOpen).toHaveBeenCalledWith({
+      accountId: tid.accounts.ftmo,
+      opener: screen.getByRole('button', { name: 'Registrar operação', hidden: true }),
+      fallback: screen.getByRole('heading', { level: 1, name: 'Diário', hidden: true }),
+    })
     expect(screen.getByRole('button', { name: /^Conta: FTMO/, hidden: true })).toBeInTheDocument()
     await waitFor(() => expect(mockReplace).toHaveBeenCalledWith(`/diario?conta=${tid.accounts.ftmo}`))
-
-    await userEvent.click(screen.getByRole('button', { name: 'Fechar' }))
-    expect(h1).toHaveFocus()
   })
 
-  it('?registrar=1 without any account that can register opens nothing, and still leaves the URL', async () => {
-    const ftmoOnly = contasTelas().filter((a) => a.id === tid.accounts.ftmo)
-    fetchAccounts.mockResolvedValue(ftmoOnly)
+  it('?registrar=1 with only an FTMO account opens on it', async () => {
+    fetchAccounts.mockResolvedValue(contasTelas().filter((a) => a.id === tid.accounts.ftmo))
+    mockSearch = 'registrar=1'
+    renderHub(<DiarioCabecalho />)
+
+    await waitFor(() => expect(mockRegistrarOpen).toHaveBeenCalledWith(expect.objectContaining({ accountId: tid.accounts.ftmo })))
+    await waitFor(() => expect(mockReplace).toHaveBeenCalledWith('/diario'))
+  })
+
+  it('?registrar=1 without any account (the empty state) opens nothing, and still leaves the URL', async () => {
+    fetchAccounts.mockResolvedValue([example])
     mockSearch = 'registrar=1'
     renderHub(<DiarioCabecalho />)
 
@@ -825,16 +837,16 @@ describe('Diário header · «Registrar operação» (Phase 3)', () => {
     await waitFor(() => expect(mockRegistrarOpen).toHaveBeenCalledTimes(1))
   })
 
-  it('contaParaRegistrar: the current account if it can, else the primary that can, else the first that can, else none', () => {
+  it('contaParaRegistrar: the current account (every market since 3-4), else the primary, else the first, else none', () => {
     const contas = contasTelas()
     const [topOne1, ebx, ftmo] = [tid.accounts.topOne, tid.accounts.ebinex, tid.accounts.ftmo].map((id) => contas.find((a) => a.id === id) as TradingAccount)
     expect(contaParaRegistrar(ebx, contas)).toBe(ebx)
-    expect(contaParaRegistrar(ftmo, contas)).toBe(topOne1)
-    expect(contaParaRegistrar(ftmo, [ftmo, ebx, { ...topOne1, is_primary: false }])).toBe(ebx)
+    expect(contaParaRegistrar(ftmo, contas)).toBe(ftmo)
+    expect(contaParaRegistrar(ftmo, [ftmo])).toBe(ftmo)
     // The primary wins over list order
-    expect(contaParaRegistrar(ftmo, [ftmo, ebx, topOne1])).toBe(topOne1)
-    expect(contaParaRegistrar(null, [ebx, topOne1])).toBe(topOne1)
+    expect(contaParaRegistrar(null, [ftmo, ebx, topOne1])).toBe(topOne1)
+    expect(contaParaRegistrar(null, [ftmo, ebx, { ...topOne1, is_primary: false }])).toBe(ftmo)
     expect(contaParaRegistrar(null, contas)).toBe(topOne1)
-    expect(contaParaRegistrar(ftmo, [ftmo])).toBeNull()
+    expect(contaParaRegistrar(null, [])).toBeNull()
   })
 })

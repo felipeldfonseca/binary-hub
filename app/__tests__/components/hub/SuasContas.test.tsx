@@ -41,17 +41,6 @@ jest.mock('@/lib/hub/regrasDb', () => ({
 const mockAgora = new Date('2026-10-19T16:00:00Z')
 jest.mock('@/hooks/useAgora', () => ({ useAgora: () => mockAgora }))
 
-// The new markets get their Registrar in PR 3-4 (D36): a test can let every market register, as
-// 3-4 will by adding them to REGISTRAR_MARKETS, to see the texts that switch then (contract §5.7)
-const mockTodosMercados = { on: false, alem: [] as string[] }
-jest.mock('@/lib/hub/registrar', () => {
-  const actual = jest.requireActual('@/lib/hub/registrar')
-  return {
-    ...actual,
-    podeRegistrar: (m: string | null | undefined) => (mockTodosMercados.on ? !!m : actual.podeRegistrar(m) || (!!m && mockTodosMercados.alem.includes(m))),
-  }
-})
-
 const fetchAccounts = data.fetchAccounts as jest.MockedFunction<typeof data.fetchAccounts>
 const fetchRulesConfig = regrasDb.fetchRulesConfig as jest.MockedFunction<typeof regrasDb.fetchRulesConfig>
 const fetchTradesSince = regrasDb.fetchTradesSince as jest.MockedFunction<typeof regrasDb.fetchTradesSince>
@@ -855,7 +844,8 @@ describe('Suas contas · the rules of each account (Phase 2)', () => {
 
 describe('Suas contas · Fase 2b markets', () => {
   const ids = idsMercados()
-  const NOTA = (de: string) => `Ainda não lemos arquivos ${de}: as operações entram pelo “Registrar operação”, na Fase 3.`
+  // Since 3-4 every market registers (the end of D36): no «, na Fase 3»
+  const NOTA = (de: string) => `Ainda não lemos arquivos ${de}: as operações entram pelo “Registrar operação”.`
   const personalizar = () =>
     renderHub(
       <HubRoot>
@@ -900,6 +890,7 @@ describe('Suas contas · Fase 2b markets', () => {
       expect(screen.getByRole('heading', { level: 3, name: group }).nextElementSibling?.tagName).toBe('UL')
     }
     expect(screen.queryAllByText(/^Ainda não lemos arquivos/)).toHaveLength(4)
+    expect(screen.queryByText(/Fase 3/)).not.toBeInTheDocument()
   })
 
   it('no «Importar» on the accounts of those markets; the Top One and the Ebinex keep theirs', async () => {
@@ -966,53 +957,14 @@ describe('Suas contas · Fase 2b markets', () => {
     renderHub(<SuasContas />)
     await userEvent.click(screen.getByRole('button', { name: 'Como ler: Suas contas' }))
     expect(document.getElementById('info-contas')).toHaveTextContent(
-      'Uma linha por conta. Cada conta é de um mercado só, com janela, limite e regras próprias. Arquivar vale na hora, guarda o histórico e pode ser desfeito. O Binary Hub não se conecta à sua corretora: as operações chegam por arquivo ou à mão. Por enquanto, lemos o CSV da Ebinex e o Trade History da Top One. Nas contas de Forex, de Ações, de Cripto e da B3, as operações entram pelo “Registrar operação”, que chega na Fase 3, e logo depois também por um CSV em que você diz o que é cada coluna. O relatório do MetaTrader sai em HTML ou PDF, não em CSV: vai precisar de um leitor próprio, que vem depois. O resultado fica na moeda da conta: R$ na B3; US$ nos outros mercados, com USDT e USDC contados como dólar.',
+      'Uma linha por conta. Cada conta é de um mercado só, com janela, limite e regras próprias. Arquivar vale na hora, guarda o histórico e pode ser desfeito. O Binary Hub não se conecta à sua corretora: as operações chegam por arquivo ou à mão. Por enquanto, lemos o CSV da Ebinex e o Trade History da Top One. Nas contas de Forex, de Ações, de Cripto e da B3, as operações entram pelo “Registrar operação” e, em breve, também por um CSV em que você diz o que é cada coluna. O relatório do MetaTrader sai em HTML ou PDF, não em CSV: vai precisar de um leitor próprio, que vem depois. O resultado fica na moeda da conta: R$ na B3; US$ nos outros mercados, com USDT e USDC contados como dólar.',
     )
     expect(screen.getByText('Contas de mercados diferentes nunca são somadas.')).toBeInTheDocument()
   })
 
-  it('CONTAS.info keeps «que chega na Fase 3» until all four markets can register', () => {
-    mockTodosMercados.alem = ['forex', 'stocks', 'crypto']
-    try {
-      expect(CONTAS.info).toContain('entram pelo “Registrar operação”, que chega na Fase 3, e logo depois também por um CSV')
-      mockTodosMercados.alem = ['forex', 'stocks', 'crypto', 'b3']
-      expect(CONTAS.info).toContain('entram pelo “Registrar operação” e, em breve, também por um CSV')
-    } finally {
-      mockTodosMercados.alem = []
-    }
-  })
-
-  describe('once the four markets can register (PR 3-4 adds them to REGISTRAR_MARKETS)', () => {
-    beforeEach(() => {
-      mockTodosMercados.on = true
-    })
-    afterEach(() => {
-      mockTodosMercados.on = false
-    })
-
-    it('CONTAS.semLeitor: «… entram pelo “Registrar operação”.» under each of their groups, without «na Fase 3»', async () => {
-      renderHub(<SuasContas />)
-
-      await row('Clear')
-      for (const [group, de] of [
-        ['Forex', 'de Forex'],
-        ['Ações', 'de Ações'],
-        ['Cripto', 'de Cripto'],
-        ['B3', 'da B3'],
-      ]) {
-        const note = screen.getByRole('heading', { level: 3, name: group }).nextElementSibling as HTMLElement
-        expect(note).toHaveTextContent(`Ainda não lemos arquivos ${de}: as operações entram pelo “Registrar operação”.`)
-      }
-      expect(screen.queryByText(/Fase 3/)).not.toBeInTheDocument()
-    })
-
-    it('CONTAS.info: «… entram pelo “Registrar operação” e, em breve, também por um CSV …»', async () => {
-      renderHub(<SuasContas />)
-      await userEvent.click(screen.getByRole('button', { name: 'Como ler: Suas contas' }))
-      expect(document.getElementById('info-contas')).toHaveTextContent(
-        'Uma linha por conta. Cada conta é de um mercado só, com janela, limite e regras próprias. Arquivar vale na hora, guarda o histórico e pode ser desfeito. O Binary Hub não se conecta à sua corretora: as operações chegam por arquivo ou à mão. Por enquanto, lemos o CSV da Ebinex e o Trade History da Top One. Nas contas de Forex, de Ações, de Cripto e da B3, as operações entram pelo “Registrar operação” e, em breve, também por um CSV em que você diz o que é cada coluna. O relatório do MetaTrader sai em HTML ou PDF, não em CSV: vai precisar de um leitor próprio, que vem depois. O resultado fica na moeda da conta: R$ na B3; US$ nos outros mercados, com USDT e USDC contados como dólar.',
-      )
-    })
+  it('no interim «… na Fase 3» text is left in the account screens’ copy (3-4 ended D36)', () => {
+    expect(CONTAS.info).toContain('entram pelo “Registrar operação” e, em breve, também por um CSV')
+    for (const m of ['forex', 'stocks', 'crypto', 'b3', 'options'] as const) expect(CONTAS.semLeitor(m)).not.toMatch(/Fase 3/)
   })
 })
 
