@@ -475,6 +475,10 @@ describe('step 2: double taps and the server’s other answers (review gaps)', (
     expect(db.addMarks).toHaveBeenCalledTimes(1)
     expect(db.addMarks).toHaveBeenCalledWith(expect.anything(), ids.trades.mes, { v: 1, marks: { emocao: 'calmo' } })
     await act(async () => answer(estadoTelas('marks-mes-aberta')))
+    // The answer reaches the sheet's view of the trade on the cache's own tick, after «salvando…» is
+    // gone: wait for the saved mark's time, which only that view has, before reading the pill
+    expect(await screen.findByText('às 10:31 · antes da saída')).toBeInTheDocument()
+    expect(screen.queryByText('salvando…')).not.toBeInTheDocument()
     expect(calmo).toHaveAttribute('aria-pressed', 'true')
     expect(db.addMarks).toHaveBeenCalledTimes(1)
   })
