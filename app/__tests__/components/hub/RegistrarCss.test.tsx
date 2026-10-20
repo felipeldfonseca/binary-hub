@@ -7,8 +7,12 @@
  */
 import fs from 'fs'
 import path from 'path'
+import React from 'react'
+import { render } from '@testing-library/react'
+import { GrupoPills } from '@/components/hub/registrar/ui'
 
-const css = fs.readFileSync(path.join(__dirname, '../../../styles/hub-registrar.css'), 'utf8')
+const lerCss = (nome: string) => fs.readFileSync(path.join(__dirname, '../../../styles', nome), 'utf8')
+const css = lerCss('hub-registrar.css')
 
 function rules(text: string): { media: string; rule: CSSStyleRule }[] {
   const style = document.createElement('style')
@@ -62,7 +66,6 @@ describe('hub-registrar.css', () => {
     expect(abc.getPropertyValue('min-height')).toBe('52px')
     expect(abc.getPropertyValue('font-size')).toBe('18px')
     expect(regra('.hub .hub-reg .hub-pill').getPropertyValue('min-width')).toBe('44px')
-    expect(regra('.hub .hub-reg-pill-q').getPropertyValue('min-width')).toBe('52px')
     expect(regra('.hub .hub-reg-link').getPropertyValue('min-height')).toBe('44px')
     expect(regra('.hub .hub-reg-chip-botao').getPropertyValue('min-height')).toBe('44px')
   })
@@ -92,5 +95,116 @@ describe('hub-registrar.css', () => {
 
   it('turns the disclosure’s chevron without motion when asked', () => {
     expect(regra('.hub .hub-reg .hub-seta', '(prefers-reduced-motion: reduce)').getPropertyValue('transition')).toBe('none')
+  })
+})
+
+// ------------------------------------------------------------------------------------------------
+// The cascade: which rule wins on the sheet's real markup. jsdom's getComputedStyle orders the
+// matching rules by source only (no specificity), so a rule that loses in a browser can win there;
+// the winner is computed here: !important, then specificity, then source order.
+// ------------------------------------------------------------------------------------------------
+
+/** Every hub stylesheet, in the order app/(hub)/layout.tsx imports them */
+const HUB_CSS = ['hub.css', 'hub-personalizar.css', 'hub-posso.css', 'hub-regras-conta.css', 'hub-registrar.css', 'hub-operacoes-dia.css']
+const cascata = HUB_CSS.flatMap((nome) => rules(lerCss(nome)))
+
+type Especificidade = [number, number, number]
+const comparar = (a: Especificidade, b: Especificidade) => a[0] - b[0] || a[1] - b[1] || a[2] - b[2]
+
+/** The selectors of a list, split on its top-level commas */
+function dividir(lista: string): string[] {
+  const out: string[] = []
+  let nivel = 0
+  let atual = ''
+  for (const ch of lista) {
+    if (ch === '(') nivel++
+    if (ch === ')') nivel--
+    if (ch === ',' && nivel === 0) {
+      out.push(atual.trim())
+      atual = ''
+    } else atual += ch
+  }
+  return out.concat(atual.trim()).filter(Boolean)
+}
+
+/** [ids, classes + attributes + pseudo-classes, types + pseudo-elements] of one selector */
+function especificidade(seletor: string): Especificidade {
+  const out: Especificidade = [0, 0, 0]
+  // :is(), :not(), :has() count as their most specific argument; :where() counts nothing
+  let s = seletor.replace(/:(is|not|has|where)\(((?:[^()]|\([^()]*\))*)\)/g, (_m, fn: string, args: string) => {
+    if (fn !== 'where') {
+      const maior = dividir(args).map(especificidade).sort(comparar).pop() ?? [0, 0, 0]
+      out[0] += maior[0]
+      out[1] += maior[1]
+      out[2] += maior[2]
+    }
+    return ''
+  })
+  s = s.replace(/\[[^\]]*\]/g, () => (out[1]++, ''))
+  s = s.replace(/::[\w-]+(\([^)]*\))?/g, () => (out[2]++, ''))
+  s = s.replace(/:[\w-]+(\([^)]*\))?/g, () => (out[1]++, ''))
+  s = s.replace(/#[\w-]+/g, () => (out[0]++, ''))
+  s = s.replace(/\.[\w-]+/g, () => (out[1]++, ''))
+  out[2] += (s.match(/(^|[\s>+~])[a-z][\w-]*/gi) ?? []).length
+  return out
+}
+
+const casa = (el: Element, seletor: string) => {
+  try {
+    return el.matches(seletor)
+  } catch {
+    return false // a pseudo-element: never the element itself
+  }
+}
+
+/** !important, then specificity, then source order */
+type Chave = [number, Especificidade, number]
+const antes = (a: Chave, b: Chave) => a[0] - b[0] || comparar(a[1], b[1]) || a[2] - b[2]
+
+/** The declaration of `prop` that wins on `el` (rules outside media queries, and those of `medias`) */
+function vencedora(el: Element, prop: string, medias: readonly string[] = []): { valor: string; seletor: string } | null {
+  let melhor: { valor: string; seletor: string; chave: Chave } | null = null
+  for (let ordem = 0; ordem < cascata.length; ordem++) {
+    const { media, rule } = cascata[ordem]
+    const valor = rule.style.getPropertyValue(prop)
+    if ((media !== '' && !medias.includes(media)) || !valor) continue
+    const importante = rule.style.getPropertyPriority(prop) === 'important' ? 1 : 0
+    for (const seletor of dividir(rule.selectorText)) {
+      const chave: Chave = [importante, especificidade(seletor), ordem]
+      if (casa(el, seletor) && (!melhor || antes(chave, melhor.chave) > 0)) melhor = { valor, seletor, chave }
+    }
+  }
+  return melhor
+}
+
+describe('the cascade on the sheet’s pills', () => {
+  it('computes specificity as browsers do', () => {
+    expect(especificidade('.hub .hub-reg .hub-pill')).toEqual([0, 3, 0])
+    expect(especificidade(".hub .hub-reg .hub-pill[aria-pressed='true']:focus-visible")).toEqual([0, 5, 0])
+    expect(especificidade('.hub .hub-reg-abc .hub-pill::after')).toEqual([0, 3, 1])
+    expect(especificidade(".hub:has(.hub[data-tema='escuro']) section:not(#x)")).toEqual([1, 3, 1])
+    expect(especificidade(':where(.hub) button')).toEqual([0, 0, 1])
+  })
+
+  it('«Contratos» pills are at least 52 px wide, setup pills 60 × 52, any other pill 44 (the board’s «Contratos» min-width 52 and `.abc .pill`)', () => {
+    const noop = () => undefined
+    const { container } = render(
+      <div className="hub" data-tema="escuro">
+        <section className="hub-folha hub-reg">
+          <GrupoPills id="q" titulo="Contratos" opcoes={[{ valor: '1', rotulo: '1' }]} valor="1" aoEscolher={noop} pillClasse="hub-reg-pill-q" />
+          <GrupoPills id="setup" titulo="Setup" opcoes={[{ valor: 'A', rotulo: 'A' }]} valor={null} aoEscolher={noop} classe="hub-pills hub-reg-abc" />
+          <GrupoPills id="lado" titulo="Lado" opcoes={[{ valor: 'long', rotulo: 'Compra' }]} valor={null} aoEscolher={noop} />
+        </section>
+      </div>,
+    )
+    const [contratos, setup, lado] = Array.from(container.querySelectorAll('button.hub-pill'))
+    expect(contratos).toHaveClass('hub-reg-pill-q')
+    for (const medias of [[], ['(max-width: 640px)', '(max-width: 420px)']]) {
+      expect(vencedora(contratos, 'min-width', medias)?.valor).toBe('52px')
+      expect(vencedora(setup, 'min-width', medias)?.valor).toBe('60px')
+      expect(vencedora(setup, 'min-height', medias)?.valor).toBe('52px')
+      expect(vencedora(lado, 'min-width', medias)?.valor).toBe('44px')
+      expect(vencedora(lado, 'min-height', medias)?.valor).toBe('44px')
+    }
   })
 })

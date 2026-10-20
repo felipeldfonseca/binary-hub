@@ -92,7 +92,8 @@
 .hub .hub-reg .hub-pill {
   min-width: 44px;
 }
-.hub .hub-reg-pill-q {
+/* «Contratos» (board: min-width 52): as specific as the rule above, and after it */
+.hub .hub-reg .hub-reg-pill-q {
   min-width: 52px;
 }
 .hub .hub-reg-auto {
