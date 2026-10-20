@@ -122,7 +122,7 @@ describe('the option block (BlocoOpcao; RO l.345–356, 1051–1053, 1126–1127
     expect(strike).toHaveAttribute('id', 'f-strike')
     expect(strike).toHaveAttribute('inputmode', 'decimal')
     expect(strike).toHaveAttribute('autocomplete', 'off')
-    expect(strike).toHaveStyle({ maxWidth: '200px' })
+    expect(strike).toHaveClass('hub-reg-curto')
     const venc = screen.getByRole('group', { name: 'Vencimento' })
     expect(within(venc).getAllByRole('button').map((b) => [b.id, b.textContent, b.getAttribute('aria-pressed')])).toEqual([
       ['g-venc-0', 'Hoje', 'false'],

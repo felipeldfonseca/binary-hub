@@ -14,8 +14,8 @@ import { CampoTexto, Erro, GrupoPills, descrito, type Pill } from './ui'
  * Ids (the focus order, ORDEM_PRECOS): the first «Tipo» pill `g-opTipo-0`, the strike field
  * `f-strike`, the first «Vencimento» pill `g-venc-0`, the date field `f-venc`; errors `e-opTipo`,
  * `e-strike`, `e-venc` (m.erros: the visible ones, after a «Registrar» tap), each `role="alert"` and
- * named by its group's or field's aria-describedby. «Strike» is at most 200 px wide and «Outra
- * data» 180 px (RO l.347, 352); the pills wrap.
+ * named by its group's or field's aria-describedby. «Strike» is at most 200 px wide (the sheet's
+ * short field, hub-reg-curto) and «Outra data» 180 px (RO l.347, 352); the pills wrap.
  */
 export interface BlocoOpcaoProps {
   m: ModeloOpcao
@@ -47,7 +47,7 @@ export default function BlocoOpcao({ m, aoMudar }: BlocoOpcaoProps): JSX.Element
         aoMudar={(strike) => aoMudar({ strike })}
         erro={erroStrike}
         decimal
-        estilo={{ maxWidth: 200 }}
+        classe="hub-reg-curto"
       />
       <div className="hub-reg-grupo">
         <span id="l-venc" className="hub-rot-campo">
