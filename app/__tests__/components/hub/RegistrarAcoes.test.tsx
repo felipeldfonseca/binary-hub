@@ -357,6 +357,42 @@ describe('step 2 of the open SPY call: «Venceu sem valor» after 16:00 ET', () 
     expect(screen.getByText('−US$ 370,00')).toBeInTheDocument()
   })
 
+  it('the next day at 00:30 ET «16:00» is still Thursday’s close: the pill writes it and the exit is sent', async () => {
+    db.fetchTradeState.mockResolvedValue(aberta().state)
+    db.fetchOpenTrades.mockResolvedValue([aberta().state.trade])
+    fetchRulesNow.mockResolvedValue(agoraAs('2026-10-16T04:30:05Z'))
+    db.registerExit.mockResolvedValue(saidaMercados('spy-vsv'))
+    abrir({ tradeId: aberta().state.trade.id })
+    const vsv = await screen.findByRole('button', { name: 'Venceu sem valor' })
+    expect(vsv).not.toHaveAttribute('aria-disabled')
+    await userEvent.click(vsv)
+    expect(campo('Hora da saída (ET)')).toHaveValue('16:00')
+    db.fetchTradeState.mockResolvedValue(saidaMercados('spy-vsv').state)
+    await userEvent.click(screen.getByRole('button', { name: 'Registrar saída' }))
+    await waitFor(() => expect(db.registerExit).toHaveBeenCalledTimes(1))
+    expect(db.registerExit.mock.calls[0][2]).toMatchObject({ exit_price: '0', exit: '16:00', clock: NY })
+  })
+
+  it.each([
+    ['Fri 10:00 ET («16:00» would be Friday’s, ahead of now)', '2026-10-16T14:00:05Z', '10:00'],
+    ['Fri 17:00 ET («16:00» would be Friday’s, a day after the expiry)', '2026-10-16T21:00:05Z', '17:00'],
+    ['Mon 17:00 ET', '2026-10-19T21:00:05Z', '17:00'],
+  ])('%s: the pill is aria-disabled with the late note, a press writes nothing and no exit at 16:00 is sent', async (_q, iso, agora) => {
+    db.fetchTradeState.mockResolvedValue(aberta().state)
+    db.fetchOpenTrades.mockResolvedValue([aberta().state.trade])
+    fetchRulesNow.mockResolvedValue(agoraAs(iso))
+    abrir({ tradeId: aberta().state.trade.id })
+    const vsv = await screen.findByRole('button', { name: 'Venceu sem valor' })
+    expect(vsv).toHaveAttribute('aria-disabled', 'true')
+    expect(vsv).toHaveAccessibleDescription('Venceu em 15 out, às 16:00 ET: essa saída só pode ser registrada até as 04:00 ET do dia seguinte.')
+    await userEvent.click(vsv)
+    expect(vsv).toHaveAttribute('aria-pressed', 'false')
+    expect(campo('Prêmio de saída, US$ por ação')).toHaveValue('')
+    expect(campo('Hora da saída (ET)')).toHaveValue(agora)
+    await userEvent.click(screen.getByRole('button', { name: 'Registrar saída' }))
+    expect(db.registerExit).not.toHaveBeenCalled()
+  })
+
   it('before 16:00 ET the pill is aria-disabled with its note, and a press does nothing', async () => {
     db.fetchTradeState.mockResolvedValue(aberta().state)
     db.fetchOpenTrades.mockResolvedValue([aberta().state.trade])
