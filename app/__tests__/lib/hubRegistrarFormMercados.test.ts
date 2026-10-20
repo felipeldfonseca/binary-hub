@@ -503,7 +503,7 @@ describe('scenario 7 · Ações e opções (IBKR, no window, Thu 15 Oct 09:52 ET
       expect(resolveLocalHm('16:00', NY, at(iso)).toISOString()).not.toBe(fim)
     }
     // A Brasília clock: 17:00 (October), the same instants
-    const sp = { ...ibkr, clock: SP }
+    const sp: ContaReg = { ...ibkr, clock: SP }
     expect(saida('2026-10-16T08:00:00Z', sp).vsv).toEqual({ ligado: true, disponivel: true, nota: '', hora: '17:00' })
     expect(saida('2026-10-16T08:00:00Z', sp).payload).toEqual({ v: 1, exit_price: '0', exit: '17:00', clock: SP })
     expect(saida('2026-10-16T08:00:01Z', sp).vsv).toMatchObject({ disponivel: false, nota: tarde })

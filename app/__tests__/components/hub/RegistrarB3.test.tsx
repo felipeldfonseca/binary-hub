@@ -114,10 +114,10 @@ const plano = () => document.querySelector('.hub-reg-plano-linha')
  * its last payload, after its answer was read. The recorded answers were asked with these payloads
  * (__tests__/lib/hubRegistrarMercados.pg.test.ts), so what the screen shows from them is the server's.
  */
-async function previaPedida(fn: jest.Mock) {
+async function previaPedida(fn: { mock: { calls: unknown[][]; results: { value: unknown }[] } }) {
   await waitFor(() => expect(fn).toHaveBeenCalled())
   const r = fn.mock.results[fn.mock.results.length - 1]
-  await r.value.catch(() => undefined)
+  await (r.value as Promise<unknown>).catch(() => undefined)
   return fn.mock.calls[fn.mock.calls.length - 1][2]
 }
 /** A registration this test does not follow (none was recorded for it): it never answers */
