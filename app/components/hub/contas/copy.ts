@@ -222,6 +222,11 @@ export const IMPORTACOES = {
   legacyNote: 'não dá para desfazer', // NEW
   noName: 'arquivo sem nome', // NEW
   inserted: (count: number) => `${formatInt(count)} novas`,
+  /**
+   * NEW (Fase 3, D29): trades registered in the app that the batch completed (import_batches
+   * .rows_linked); undoing gives them back
+   */
+  linked: (count: number) => (count === 1 ? '1 já registrada por você' : `${formatInt(count)} já registradas por você`),
   duplicate: (count: number) => `${formatInt(count)} já estavam`,
   completed: (count: number) => `${formatInt(count)} completadas`, // NEW
   other: (count: number) => `${formatInt(count)} em outra conta`, // NEW
@@ -229,14 +234,40 @@ export const IMPORTACOES = {
   undoneOn: (day: string) => `Desfeita em ${day}`, // NEW
   undo: UNDO,
   undoAria: (when: string) => `Desfazer a importação de ${when}`, // NEW
-  confirm: (count: number) =>
-    count === 1
-      ? 'Desfazer apaga a operação desta importação.' // NEW
-      : `Desfazer apaga as ${formatInt(count)} operações desta importação.`, // NEW
-  confirmYes: 'Desfazer e apagar', // NEW
+  /**
+   * NEW. Fase 3 (D29): a batch that completed trades registered in the app also says that undoing
+   * gives them back (import_undo reverts what it wrote, reopens what it closed, never deletes them)
+   */
+  confirm: (count: number, linked = 0) => {
+    if (linked === 0) {
+      return count === 1 ? 'Desfazer apaga a operação desta importação.' : `Desfazer apaga as ${formatInt(count)} operações desta importação.`
+    }
+    if (count === 0) {
+      return linked === 1
+        ? 'Desfazer não apaga nada: a operação registrada por você volta a ser como estava antes desta importação.'
+        : `Desfazer não apaga nada: as ${formatInt(linked)} operações registradas por você voltam a ser como estavam antes desta importação.`
+    }
+    const apaga = count === 1 ? 'Desfazer apaga a operação desta importação' : `Desfazer apaga as ${formatInt(count)} operações desta importação`
+    return linked === 1
+      ? `${apaga}, e a registrada por você volta a ser como estava antes dela.`
+      : `${apaga}, e as ${formatInt(linked)} registradas por você voltam a ser como estavam antes dela.`
+  },
+  /** NEW; «Desfazer» alone when nothing is deleted (a batch that only completed registered trades) */
+  confirmYes: (count: number) => (count === 0 ? UNDO : 'Desfazer e apagar'),
   confirmNo: 'Manter', // NEW
-  undone: (deleted: number) =>
-    deleted === 1 ? 'Importação desfeita: 1 operação apagada.' : `Importação desfeita: ${formatInt(deleted)} operações apagadas.`, // NEW
+  /** NEW; Fase 3 (D29): with the registered trades the batch had completed (`linked`) */
+  undone: (deleted: number, linked = 0) => {
+    const apagadas = deleted === 1 ? '1 operação apagada' : `${formatInt(deleted)} operações apagadas`
+    if (linked === 0) return `Importação desfeita: ${apagadas}.`
+    if (deleted === 0) {
+      return linked === 1
+        ? 'Importação desfeita: a operação registrada por você voltou a ser como estava.'
+        : `Importação desfeita: as ${formatInt(linked)} operações registradas por você voltaram a ser como estavam.`
+    }
+    return linked === 1
+      ? `Importação desfeita: ${apagadas}, e a registrada por você voltou a ser como estava.`
+      : `Importação desfeita: ${apagadas}, e as ${formatInt(linked)} registradas por você voltaram a ser como estavam.`
+  },
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -511,6 +542,9 @@ export const PASSO_D = {
     count === 1
       ? '1 que já estava ganha os campos que faltavam (comissão, stop, alvo, saída ou payout).' // NEW
       : `${formatInt(count)} que já estavam ganham os campos que faltavam (comissão, stop, alvo, saída ou payout).`, // NEW
+  // NEW (Fase 3, D29): in the count row, the rows that complete a trade registered in the app (the
+  // server counts them neither as «novas» nor as «já estavam»)
+  linkedCount: (count: number) => (count === 1 ? 'já registrada por você' : 'já registradas por você'),
   // NEW (Fase 3, D29): rows of the file that complete a trade registered in the app (never inserted again)
   linked: (count: number) =>
     count === 1 ? '1 já registrada por você: o arquivo completa a comissão.' : `${formatInt(count)} já registradas por você: o arquivo completa a comissão.`,

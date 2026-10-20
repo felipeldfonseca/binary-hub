@@ -130,6 +130,18 @@ interface Flow {
   rulesAtCreation: { regras: RegrasDaNovaConta; desde: string } | null
 }
 
+/**
+ * The end's toast, next to «Desfazer»: «{n} operações em {conta}.» for a batch that inserted
+ * trades. Phase 3 (D29): a batch kept only for what it completed on trades registered in the app
+ * (new links, or a trade an earlier file linked) says that instead of «0 operações em …».
+ */
+export function toastDoLote(commit: Pick<ImportCommitResult, 'inserted' | 'completed' | 'linked'>, label: string): string {
+  if (commit.inserted > 0) return FIM.toast(commit.inserted, label)
+  const linked = commit.linked ?? 0
+  const parts = [linked > 0 ? FIM.linked(linked) : '', commit.completed > 0 ? FIM.completed(commit.completed) : ''].filter(Boolean)
+  return parts.length ? parts.join(' ') : FIM.toast(0, label)
+}
+
 const initialFlow = (mode: SheetMode, accountId: string | null): Flow => ({
   passo: mode === 'adicionar' ? 'i1' : 'solte',
   history: [],
@@ -935,13 +947,7 @@ export default function ImportSheet({ mode, accountId, onClose }: { mode: SheetM
   })
   const showBack = !END_STEPS.includes(flow.passo) && flow.passo !== 'g' && backIndex >= 0
   const blocked = !!primary && (!!primary.blocked || !!primary.blockedBy)
-  // A batch that only completed app trades (Phase 3) says what it did instead of «0 operações em …»
-  const toastText =
-    flow.passo === 'fim' && flow.commit?.batch_id
-      ? flow.commit.inserted === 0 && (flow.commit.linked ?? 0) > 0
-        ? FIM.linked(flow.commit.linked ?? 0)
-        : FIM.toast(flow.commit.inserted, label)
-      : ''
+  const toastText = flow.passo === 'fim' && flow.commit?.batch_id ? toastDoLote(flow.commit, label) : ''
   // What the one live region says: the running request, else the latest result
   const rulesNotice = flow.rulesNotSaved ? REGRAS_CONTA.naoSalvas(flow.rulesNotSaved) : ''
   // Step b before the account exists: the rules could not be read, so it will be created without them

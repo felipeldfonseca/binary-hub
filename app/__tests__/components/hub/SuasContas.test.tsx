@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event'
 import * as data from '@/lib/hub/contasDb'
 import * as regrasDb from '@/lib/hub/regrasDb'
 import SuasContas from '@/components/hub/contas/SuasContas'
+import { IMPORTACOES } from '@/components/hub/contas/copy'
 import HubRoot from '@/components/hub/HubRoot'
 import PersonalizarPagina from '@/components/hub/personalizar/PersonalizarPagina'
 import type { RulesConfig } from '@/lib/hub/regras'
@@ -611,6 +612,66 @@ describe('Importações', () => {
 
     await userEvent.click(within(await openMenu('Apex A')).getByRole('button', { name: 'Importações' }))
     expect(await screen.findByText('Nenhuma importação nesta conta.')).toBeInTheDocument()
+  })
+
+  describe('Phase 3 · a batch that completed trades registered in the app (rows_linked, D29)', () => {
+    it('only completed them: says so, undoes without «apagar», and says they came back as they were', async () => {
+      // A file whose 3 rows were the owner's registered trades: nothing inserted, kept to be undone
+      fetchBatches.mockResolvedValue([makeBatch({ id: 'b-link', rows_total: 3, rows_inserted: 0, rows_duplicate: 0, rows_linked: 3 })])
+      importUndo.mockResolvedValue({ deleted: 0 })
+      renderHub(<SuasContas />)
+
+      await userEvent.click(within(await openMenu('Top One #1')).getByRole('button', { name: 'Importações' }))
+      const panel = screen.getByRole('group', { name: 'Importações de Top One #1' })
+      const [item] = await within(panel).findAllByRole('listitem')
+      expect(parts(item)).toBe('0 novas · 3 já registradas por você · 0 já estavam · 0 com erro')
+
+      await userEvent.click(within(item).getByRole('button', { name: /^Desfazer a importação/ }))
+      expect(within(item).getByRole('group', { name: 'Desfazer não apaga nada: as 3 operações registradas por você voltam a ser como estavam antes desta importação.' })).toBeInTheDocument()
+      expect(within(item).queryByRole('button', { name: 'Desfazer e apagar' })).not.toBeInTheDocument()
+      await userEvent.click(within(item).getByRole('button', { name: 'Desfazer' }))
+
+      expect(importUndo).toHaveBeenCalledWith(expect.anything(), 'b-link')
+      expect(await within(panel).findByText('Importação desfeita: as 3 operações registradas por você voltaram a ser como estavam.')).toBeInTheDocument()
+      expect(within(panel).queryByText(/0 operações apagadas/)).not.toBeInTheDocument()
+    })
+
+    it('inserted some and completed one: deletes the new ones and gives the registered one back', async () => {
+      fetchBatches.mockResolvedValue([makeBatch({ id: 'b-mix', rows_total: 7, rows_inserted: 4, rows_duplicate: 2, rows_linked: 1 })])
+      importUndo.mockResolvedValue({ deleted: 4 })
+      renderHub(<SuasContas />)
+
+      await userEvent.click(within(await openMenu('Top One #1')).getByRole('button', { name: 'Importações' }))
+      const panel = screen.getByRole('group', { name: 'Importações de Top One #1' })
+      const [item] = await within(panel).findAllByRole('listitem')
+      expect(parts(item)).toBe('4 novas · 1 já registrada por você · 2 já estavam · 0 com erro')
+
+      await userEvent.click(within(item).getByRole('button', { name: /^Desfazer a importação/ }))
+      expect(within(item).getByText('Desfazer apaga as 4 operações desta importação, e a registrada por você volta a ser como estava antes dela.')).toBeInTheDocument()
+      await userEvent.click(within(item).getByRole('button', { name: 'Desfazer e apagar' }))
+
+      expect(await within(panel).findByText('Importação desfeita: 4 operações apagadas, e a registrada por você voltou a ser como estava.')).toBeInTheDocument()
+    })
+
+    it('the other wordings: one registered trade alone, several with one deleted', () => {
+      expect(IMPORTACOES.confirm(0, 1)).toBe('Desfazer não apaga nada: a operação registrada por você volta a ser como estava antes desta importação.')
+      expect(IMPORTACOES.confirm(1, 2)).toBe('Desfazer apaga a operação desta importação, e as 2 registradas por você voltam a ser como estavam antes dela.')
+      expect(IMPORTACOES.undone(0, 1)).toBe('Importação desfeita: a operação registrada por você voltou a ser como estava.')
+      expect(IMPORTACOES.undone(1, 2)).toBe('Importação desfeita: 1 operação apagada, e as 2 registradas por você voltaram a ser como estavam.')
+      // Before the migration, or a batch with none: as before
+      expect(IMPORTACOES.confirm(5)).toBe('Desfazer apaga as 5 operações desta importação.')
+      expect(IMPORTACOES.undone(5)).toBe('Importação desfeita: 5 operações apagadas.')
+      expect(IMPORTACOES.confirmYes(5)).toBe('Desfazer e apagar')
+    })
+
+    it('reads rows_linked with the batches', async () => {
+      const { fetchBatches: realFetch } = jest.requireActual('@/lib/hub/contasDb') as typeof data
+      const select = jest.fn()
+      const chain = { select, eq: () => chain, order: () => chain, then: (ok: (r: unknown) => unknown) => Promise.resolve({ data: [], error: null }).then(ok) }
+      select.mockReturnValue(chain)
+      await realFetch({ from: () => chain } as never, 'acc-1')
+      expect(select.mock.calls[0][0].split(', ')).toContain('rows_linked')
+    })
   })
 
   it('maps a refused undo to its own copy', async () => {

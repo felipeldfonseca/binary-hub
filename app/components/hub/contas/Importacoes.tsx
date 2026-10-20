@@ -9,7 +9,8 @@ import { BUSY, CLOSE, CONTAS, ERROR_TEXT, IMPORTACOES, LOADING, TRY_AGAIN, ops }
 
 /**
  * "Importações" of an account (no board): its batches, newest first, each undoable once.
- * Undoing deletes the batch's trades, and the confirmation says how many.
+ * Undoing deletes the batch's trades and gives back the trades registered in the app that it
+ * completed (Phase 3, rows_linked); the confirmation says how many of each.
  */
 export default function Importacoes({ account, onClose }: { account: TradingAccount; onClose: () => void }) {
   const { db } = useHubDb()
@@ -46,7 +47,8 @@ export default function Importacoes({ account, onClose }: { account: TradingAcco
     try {
       const { deleted } = await importUndo(db, batch.id)
       setConfirming(null)
-      setDone(IMPORTACOES.undone(deleted))
+      // import_undo answers only the deleted count; the registered trades it gave back are the batch's
+      setDone(IMPORTACOES.undone(deleted, batch.rows_linked ?? 0))
       refresh()
       titleRef.current?.focus()
     } catch (e) {
@@ -99,7 +101,10 @@ export default function Importacoes({ account, onClose }: { account: TradingAcco
               </li>
             )
           }
-          const parts = [IMPORTACOES.inserted(batch.rows_inserted), IMPORTACOES.duplicate(batch.rows_duplicate)]
+          const linked = batch.rows_linked ?? 0
+          const parts = [IMPORTACOES.inserted(batch.rows_inserted)]
+          if (linked > 0) parts.push(IMPORTACOES.linked(linked))
+          parts.push(IMPORTACOES.duplicate(batch.rows_duplicate))
           if (batch.rows_completed > 0) parts.push(IMPORTACOES.completed(batch.rows_completed))
           if (batch.rows_other_account > 0) parts.push(IMPORTACOES.other(batch.rows_other_account))
           parts.push(IMPORTACOES.errors(batch.rows_error))
@@ -135,7 +140,7 @@ export default function Importacoes({ account, onClose }: { account: TradingAcco
               {confirming === batch.id && (
                 <div className="hub-bloco hub-bloco--atencao" role="group" aria-labelledby={`desfazer-${batch.id}`} style={{ flex: '1 1 100%' }}>
                   <span id={`desfazer-${batch.id}`} style={{ fontWeight: 700 }}>
-                    {IMPORTACOES.confirm(batch.rows_inserted)}
+                    {IMPORTACOES.confirm(batch.rows_inserted, linked)}
                   </span>
                   <div className="hub-acoes">
                     <button
@@ -146,7 +151,7 @@ export default function Importacoes({ account, onClose }: { account: TradingAcco
                         if (!busy) void undo(batch)
                       }}
                     >
-                      {IMPORTACOES.confirmYes}
+                      {IMPORTACOES.confirmYes(batch.rows_inserted)}
                     </button>
                     <button ref={keepRef} type="button" className="hub-btn" onClick={() => keep(batch.id)}>
                       {IMPORTACOES.confirmNo}

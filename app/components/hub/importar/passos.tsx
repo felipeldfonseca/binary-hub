@@ -884,10 +884,13 @@ export function PassoPrevia({
   const [commissionInfo, toggleCommission] = useToggle()
   const [beforeInfo, toggleBefore] = useToggle()
   const errors = preview.errors.length
+  const linked = preview.linked ?? 0
   const items: [number, string][] = [
     [preview.rows_total, PASSO_D.lines],
     [preview.new, PASSO_D.fresh],
   ]
+  // Phase 3 (D29): rows matched to a trade registered in the app are neither new nor already there
+  if (linked > 0) items.push([linked, PASSO_D.linkedCount(linked)])
   if (preview.other_account > 0) items.push([preview.other_account, PASSO_D.otherAccount])
   items.push([preview.duplicate, preview.duplicate > 0 ? PASSO_D.alreadyId : PASSO_D.already], [errors, PASSO_D.errors])
 
@@ -924,7 +927,7 @@ export function PassoPrevia({
       {preview.completable > 0 && <p className="hub-passo__txt">{PASSO_D.completable(preview.completable)}</p>}
       {/* Phase 3 (D29): trades registered in the app that this file completes instead of inserting
           them again, and those whose money the file corrects (absent before the migration: none) */}
-      {(preview.linked ?? 0) > 0 && <p className="hub-passo__txt">{PASSO_D.linked(preview.linked ?? 0)}</p>}
+      {linked > 0 && <p className="hub-passo__txt">{PASSO_D.linked(linked)}</p>}
       {(preview.linked_differs ?? 0) > 0 && <p className="hub-passo__txt">{PASSO_D.linkedDiffers(preview.linked_differs ?? 0)}</p>}
       {notices.map((text) => (
         <div key={text} className="hub-linha-i">

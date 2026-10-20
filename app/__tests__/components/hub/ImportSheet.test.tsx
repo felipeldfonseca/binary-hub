@@ -6,6 +6,7 @@ import * as regrasDb from '@/lib/hub/regrasDb'
 import { readImportFile } from '@/lib/domain/import'
 import { useImportSheet, type SheetMode } from '@/components/hub/importar/ImportSheetProvider'
 import { EMPTY_FORM, PassoNovaConta } from '@/components/hub/importar/passos'
+import { toastDoLote } from '@/components/hub/importar/ImportSheet'
 import { PASSO_G } from '@/components/hub/contas/copy'
 import { changedOnlyHere } from '@/hooks/useRegras'
 import type { AccountConfig, RulesConfig, SaveRulesResult } from '@/lib/hub/regras'
@@ -2713,6 +2714,55 @@ describe('ImportSheet · Phase 3 · «Registrar operação» at the end of accou
 })
 
 describe('ImportSheet · Phase 3 · a file with trades registered in the app (D29)', () => {
+  /** The preview's count row as read («7 linhas · 3 novas · …») */
+  const contagem = (dialog: HTMLElement) =>
+    (dialog.querySelector('.hub-contagem')?.textContent ?? '').replace(/\s+/g, ' ').replace(/\s*·\s*/g, ' · ').trim()
+
+  it('counts the rows that complete a registered trade in the count row, after «novas» (singular too)', async () => {
+    readFile.mockResolvedValue(fixtureFile('topone_ok'))
+    importPreview.mockResolvedValue(makePreview({ new: 3, duplicate: 1, linked: 2, other_account: 1, rows_total: 7 }))
+    const dialog = await openSheet({ accountId: topOne.id })
+    await chooseFile(dialog)
+    await within(dialog).findByRole('heading', { name: 'Prévia' })
+    expect(contagem(dialog)).toBe('7 linhas · 3 novas · 2 já registradas por você · 1 em outra conta · 1 já estavam (mesmo ID) · 0 com erro')
+  })
+
+  it('a single registered trade: «1 já registrada por você» in the count row', async () => {
+    readFile.mockResolvedValue(fixtureFile('topone_ok'))
+    importPreview.mockResolvedValue(makePreview({ new: 6, linked: 1, rows_total: 7 }))
+    const dialog = await openSheet({ accountId: topOne.id })
+    await chooseFile(dialog)
+    await within(dialog).findByRole('heading', { name: 'Prévia' })
+    expect(contagem(dialog)).toBe('7 linhas · 6 novas · 1 já registrada por você · 0 já estavam · 0 com erro')
+  })
+
+  it('a batch kept only because it completed a registered trade an earlier file linked: the toast says what it did, never «0 operações em …»', async () => {
+    readFile.mockResolvedValue(fixtureFile('topone_ok'))
+    importPreview.mockResolvedValue(makePreview({ new: 0, duplicate: 1, completable: 1, rows_total: 1 }))
+    // supabase/tests/50_phase3.test.sql: inserted 0, completed 1, linked 0, with a batch
+    importCommit.mockResolvedValue({ batch_id: 'batch-11', inserted: 0, duplicate: 1, completed: 1, other_account: 0, linked: 0, errors: [] })
+    const dialog = await openSheet({ accountId: topOne.id })
+    await chooseFile(dialog)
+    await within(dialog).findByRole('heading', { name: 'Prévia' })
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Completar 1 operação' }))
+
+    await within(dialog).findByRole('heading', { name: 'Importação feita' })
+    const toast = toastOf(dialog)
+    expect(toast).toHaveTextContent('1 que já estava ganhou os campos que faltavam.')
+    expect(toast).not.toHaveTextContent('0 operações')
+    expect(within(toast).getByRole('button', { name: 'Desfazer: 1 que já estava ganhou os campos que faltavam.' })).toBeInTheDocument()
+  })
+
+  it('toastDoLote: the inserted trades first; else what it completed and linked', () => {
+    expect(toastDoLote({ inserted: 4, completed: 1, linked: 2 }, 'Top One #1')).toBe('4 operações em Top One #1.')
+    expect(toastDoLote({ inserted: 0, completed: 0, linked: 3 }, 'Top One #1')).toBe('3 já registradas por você foram completadas.')
+    expect(toastDoLote({ inserted: 0, completed: 2, linked: 1 }, 'Top One #1')).toBe(
+      '1 já registrada por você foi completada. 2 que já estavam ganharam os campos que faltavam.',
+    )
+    // Before the migration (no «linked» key)
+    expect(toastDoLote({ inserted: 0, completed: 1 }, 'Top One #1')).toBe('1 que já estava ganhou os campos que faltavam.')
+  })
+
   it('says how many it completes and how many the file corrects, after the completed ones', async () => {
     readFile.mockResolvedValue(fixtureFile('topone_ok'))
     importPreview.mockResolvedValue(makePreview({ new: 3, duplicate: 1, completable: 1, linked: 2, linked_differs: 1, rows_total: 7 }))
@@ -2765,6 +2815,8 @@ describe('ImportSheet · Phase 3 · a file with trades registered in the app (D2
 
     expect(await within(dialog).findByRole('heading', { name: 'Prévia' })).toHaveFocus()
     expect(within(dialog).queryByText(/^Nada novo/)).not.toBeInTheDocument()
+    // The count row adds up: the matched rows are neither «novas» nor «já estavam» (lane B review)
+    expect(contagem(dialog)).toBe('3 linhas · 0 novas · 3 já registradas por você · 0 já estavam · 0 com erro')
     expect(within(dialog).getByText('3 já registradas por você: o arquivo completa a comissão.')).toBeInTheDocument()
 
     await userEvent.click(within(dialog).getByRole('button', { name: 'Completar 3 operações' }))
