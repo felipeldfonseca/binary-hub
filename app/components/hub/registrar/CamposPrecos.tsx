@@ -32,6 +32,11 @@ export interface CamposPrecosProps {
   aviso: string | null
   /** The account's starting values (the chips, the last quantity of each kind) */
   padroes: RegistrarDefaults
+  /**
+   * Another instrument, quote or kind replaced the draft (RO `limpar`: `tentou: {}`): the errors a tap
+   * of «Registrar» turned on go quiet again, so the fields just cleared are not announced as wrong
+   */
+  aoRecomecar: () => void
 }
 
 /** The «Outro» pill of a quantity with chips */
@@ -54,7 +59,7 @@ function errosDaOpcao(erros: Partial<Record<CampoEntrada, string>>): Partial<Rec
  * and the limit warning. Everything shown comes from registrarForm.modeloEntrada; the draft moves
  * through its transitions (escolherAtivo, mudarCotacao, mudarTipoEua, mudarVencimento, alternarVsv).
  */
-export default function CamposPrecos({ conta, r, m, erros, mudar, aviso, padroes }: CamposPrecosProps) {
+export default function CamposPrecos({ conta, r, m, erros, mudar, aviso, padroes, aoRecomecar }: CamposPrecosProps) {
   const market = conta.market
   const fechada = r.modo === 'fechada'
   const q = m.quantidade
@@ -63,8 +68,10 @@ export default function CamposPrecos({ conta, r, m, erros, mudar, aviso, padroes
   /** A chip, a search result or «Usar»: the same instrument only empties the search */
   const escolher = (codigo: string, daBusca: boolean) => {
     const novo = escolherAtivo(r, market, codigo, padroes)
-    if (novo.ativo !== r.ativo || novo.cotacao !== r.cotacao) mudar(novo)
-    else if (daBusca) mudar({ busca: '' })
+    if (novo.ativo !== r.ativo || novo.cotacao !== r.cotacao) {
+      aoRecomecar()
+      mudar(novo)
+    } else if (daBusca) mudar({ busca: '' })
     if (daBusca) focarAtivoEscolhido()
   }
 
@@ -74,7 +81,10 @@ export default function CamposPrecos({ conta, r, m, erros, mudar, aviso, padroes
         <OQueOperou
           valor={m.tipoEua.valor}
           aoMudar={(t) => {
-            if (t !== r.tipoEua) mudar(mudarTipoEua(r, t, padroes))
+            if (t !== r.tipoEua) {
+              aoRecomecar()
+              mudar(mudarTipoEua(r, t, padroes))
+            }
           }}
         />
       )}
@@ -83,7 +93,11 @@ export default function CamposPrecos({ conta, r, m, erros, mudar, aviso, padroes
         <CotadaEm
           m={m.cotacao}
           aoMudar={(c) => {
-            if (c !== r.cotacao) mudar(mudarCotacao(r, c))
+            // The pill pressed on screen (none on ETH/BTC, whose quote is none of them)
+            if (c !== m.cotacao?.valor) {
+              aoRecomecar()
+              mudar(mudarCotacao(r, c))
+            }
           }}
         />
       )}

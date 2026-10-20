@@ -3,7 +3,9 @@
  * answers recorded from the real SQL (testing/registrarMercados; invented data) on Sat 17 Oct 2026,
  * 20:35 de Brasília (a window of every day): «Moeda» and «Buscar moeda», «Cotada em» (USDT, USDC,
  * USD, R$) and its note, the coin's quantity, price stops, «Posição de …», R$ → BTC/BRL with a typed
- * result, step 2 with «Custos» and step 3's net.
+ * result, step 2 with «Custos» and step 3's net, and a pair whose quote is none of the pills (ETH/BTC).
+ * A registration whose answer was not recorded (BTC/BRL, ETH/BTC) is checked by what it sends, its
+ * answer left pending.
  */
 import React from 'react'
 import { render, screen, waitFor, within } from '@testing-library/react'
@@ -93,6 +95,15 @@ const pill = (g: string, nome: string) => within(grupo(g)).getByRole('button', {
 const rotulos = (g: string) => within(grupo(g)).getAllByRole('button').map((b) => b.textContent)
 const campo = (rotulo: string) => screen.getByLabelText(rotulo) as HTMLInputElement
 const linhaDoGate = () => screen.getByRole('button', { name: 'Como ler: Posso operar hoje?' }).parentElement as HTMLElement
+const alertas = () => screen.queryAllByRole('alert').map((a) => a.textContent)
+/** A registration whose answer was not recorded: what it sends is checked; no answer comes */
+const semResposta = () => new Promise<never>(() => {})
+/** After a search result: its chip takes the focus a frame later (wait, or the next keystrokes land on it) */
+async function escolherNaBusca(texto: string, resultado: string, chip: string) {
+  await userEvent.type(screen.getByRole('searchbox', { name: 'Buscar moeda' }), texto)
+  await userEvent.click(within(grupo('Resultados da busca')).getByRole('button', { name: resultado }))
+  await waitFor(() => expect(pill('Moeda', chip)).toHaveFocus())
+}
 
 async function entrada() {
   abrir()
@@ -158,8 +169,7 @@ describe('step 1 on Binance, Saturday 20:35 de Brasília', () => {
   })
 
   it('another quote clears the prices and keeps the quantity; «R$» registers BTC/BRL, the position in reais, no dollar value', async () => {
-    db.registerEntry.mockResolvedValue(entradaMercados('btc'))
-    db.fetchTradeState.mockResolvedValue(entradaMercados('btc').state)
+    db.registerEntry.mockReturnValue(semResposta())
     await entrada()
     await btcVenda()
     await userEvent.click(pill('Cotada em', 'USDC'))
@@ -210,11 +220,86 @@ describe('step 1 on Binance, Saturday 20:35 de Brasília', () => {
     expect(campo('Preço de entrada, R$')).toBeInTheDocument()
   })
 
+  it('the quote pressed, tapped again, changes nothing', async () => {
+    await entrada()
+    await btcVenda()
+    await userEvent.click(pill('Cotada em', 'USDT'))
+    expect(campo('Preço de entrada, USDT')).toHaveValue('112.400')
+    expect(campo('Stop')).toHaveValue('112.800')
+    expect(campo('Alvo')).toHaveValue('111.600')
+  })
+
+  it('another quote after a refused «Registrar entrada»: the errors it turned on go quiet (RO `limpar`)', async () => {
+    await entrada()
+    await userEvent.click(screen.getByRole('button', { name: 'Registrar entrada' }))
+    expect(alertas()).toEqual(['Escolha Compra ou Venda.', 'Informe a quantidade.', 'Informe o preço de entrada.'])
+    await userEvent.click(pill('Cotada em', 'USDC'))
+    expect(alertas()).toEqual([])
+    expect(campo('Preço de entrada, USDC')).not.toHaveAttribute('aria-invalid')
+    // The next tap turns them on again
+    await userEvent.click(screen.getByRole('button', { name: 'Registrar entrada' }))
+    expect(alertas()).toEqual(['Escolha Compra ou Venda.', 'Informe a quantidade.', 'Informe o preço de entrada.'])
+  })
+
+  it('«Usar “BTC/BRL”» with BTC in use switches only the quote: «R$» pressed, the prices cleared', async () => {
+    await entrada()
+    await userEvent.type(campo('Preço de entrada, USDT'), '112.400')
+    await escolherNaBusca('btc/brl', 'Usar “BTC/BRL”', 'BTC')
+    expect(pill('Cotada em', 'R$')).toHaveAttribute('aria-pressed', 'true')
+    expect(campo('Preço de entrada, R$')).toHaveValue('')
+    expect(screen.getByRole('searchbox', { name: 'Buscar moeda' })).toHaveValue('')
+  })
+
   it('the account’s history: its coins as chips, its last quote', async () => {
     db.fetchRecentTrades.mockResolvedValue(recentesMercados('binance'))
     await entrada()
     expect(rotulos('Moeda')).toEqual(['BTC'])
     expect(pill('Cotada em', 'USDT')).toHaveAttribute('aria-pressed', 'true')
+  })
+})
+
+describe('a pair whose quote is none of «Cotada em» (ETH/BTC, through «Usar»)', () => {
+  it('ETH quoted in BTC: no pill pressed, the labels in ETH and BTC, no position line, no dollar value; the pair is sent whole', async () => {
+    db.registerEntry.mockReturnValue(semResposta())
+    await entrada()
+    await escolherNaBusca('eth/btc', 'Usar “ETH/BTC”', 'ETH/BTC')
+    expect(within(grupo('Cotada em')).getAllByRole('button').map((b) => b.getAttribute('aria-pressed'))).toEqual(['false', 'false', 'false', 'false'])
+    expect(screen.queryByLabelText(/^Preço de entrada, USDT/)).not.toBeInTheDocument()
+    await userEvent.click(pill('Lado', 'Compra'))
+    await userEvent.type(campo('Quantidade, em ETH'), '2')
+    await userEvent.type(campo('Preço de entrada, BTC'), '0,0365')
+    expect(screen.queryByText(/^Posição de/)).not.toBeInTheDocument()
+    await userEvent.type(campo('Stop'), '0,0360')
+    expect(screen.getByText('Sem valor em dólar para este ativo.')).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Registrar entrada' }))
+    await waitFor(() => expect(db.registerEntry).toHaveBeenCalledTimes(1))
+    expect(db.registerEntry.mock.calls[0][2]).toMatchObject({ symbol: 'ETH/BTC', direction: 'long', quantity: '2', entry_price: '0.0365', stop_price: '0.036' })
+  })
+
+  it('in «Já fechada»: the difference per ETH, the result typed in dollars', async () => {
+    await entrada()
+    await userEvent.click(pill('Como está a operação?', 'Já fechada'))
+    await escolherNaBusca('eth/btc', 'Usar “ETH/BTC”', 'ETH/BTC')
+    await userEvent.click(pill('Lado', 'Compra'))
+    await userEvent.type(campo('Quantidade, em ETH'), '2')
+    await userEvent.type(campo('Preço de entrada, BTC'), '0,0365')
+    await userEvent.type(campo('Preço de saída, BTC'), '0,0371')
+    expect(screen.getByText('Resultado: +0,0006 por ETH · digite o valor em dólar')).toBeInTheDocument()
+    expect(campo('Resultado, US$')).toHaveValue('')
+  })
+
+  it('a pill quotes ETH in it instead (ETH/BTC + USDT → ETH/USDT): the quantity kept, the prices cleared', async () => {
+    await entrada()
+    await escolherNaBusca('eth/btc', 'Usar “ETH/BTC”', 'ETH/BTC')
+    await userEvent.type(campo('Quantidade, em ETH'), '2')
+    await userEvent.type(campo('Preço de entrada, BTC'), '0,0365')
+    await userEvent.click(pill('Cotada em', 'USDT'))
+    expect(pill('Cotada em', 'USDT')).toHaveAttribute('aria-pressed', 'true')
+    expect(pill('Moeda', 'ETH')).toHaveAttribute('aria-pressed', 'true')
+    expect(campo('Preço de entrada, USDT')).toHaveValue('')
+    expect(campo('Quantidade, em ETH')).toHaveValue('2')
+    await userEvent.type(campo('Preço de entrada, USDT'), '4.100')
+    expect(screen.getByText('Posição de US$ 8.200')).toBeInTheDocument()
   })
 })
 

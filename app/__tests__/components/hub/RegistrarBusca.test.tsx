@@ -89,10 +89,13 @@ async function entrada() {
   await screen.findByRole('heading', { level: 3, name: 'Entrada' })
 }
 
+/** A search result chosen: its chip takes the focus a frame later (wait, or the next keystrokes land on it) */
 async function escolher(texto: string, resultado: string) {
   await userEvent.type(busca(), texto)
   await userEvent.click(within(grupo('Resultados da busca')).getByRole('button', { name: resultado }))
+  await waitFor(() => expect(pill('Ativo', resultado.replace(/^Usar “(.*)”$/, '$1'))).toHaveFocus())
 }
+const alertas = () => screen.queryAllByRole('alert').map((a) => a.textContent)
 
 describe('«Buscar ativo» on Top One (10:05 ET)', () => {
   it('under the six chips of 3-3: «mcl» finds MCL, which joins the chips, chosen and focused; the search empties', async () => {
@@ -159,7 +162,6 @@ describe('«Buscar ativo» on Top One (10:05 ET)', () => {
     db.fetchTradeState.mockResolvedValue(entradaMercados('zn').state)
     await entrada()
     await escolher('znz6', 'Usar “ZNZ6”')
-    await waitFor(() => expect(pill('Ativo', 'ZNZ6')).toHaveFocus())
     expect(document.getElementById('l-stop')).toHaveTextContent('Stop e alvo, em preço · opcional')
     await userEvent.click(pill('Lado', 'Compra'))
     await userEvent.type(campo('Preço de entrada'), '112,5')
@@ -193,6 +195,37 @@ describe('«Buscar ativo» on Top One (10:05 ET)', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Registrar operação' }))
     expect(campo('Resultado, US$')).toHaveFocus()
     expect(screen.getByText('Informe o resultado.')).toBeInTheDocument()
+  })
+
+  it('another instrument in «Já fechada» keeps the exit hour typed (3-3 and RO `limpar`); the exit price clears', async () => {
+    await entrada()
+    await userEvent.click(screen.getByRole('button', { name: 'Já fechada' }))
+    await userEvent.click(pill('Lado', 'Compra'))
+    await userEvent.clear(campo('Hora da entrada (ET)'))
+    await userEvent.type(campo('Hora da entrada (ET)'), '10:00')
+    await userEvent.type(campo('Preço de saída'), '6652,25')
+    await userEvent.clear(campo('Hora da saída (ET)'))
+    await userEvent.type(campo('Hora da saída (ET)'), '10:04')
+    await userEvent.click(pill('Ativo', 'ES'))
+    expect(campo('Preço de saída')).toHaveValue('')
+    expect(campo('Hora da saída (ET)')).toHaveValue('10:04')
+    await escolher('mcl', 'MCL')
+    expect(campo('Hora da saída (ET)')).toHaveValue('10:04')
+    expect(campo('Hora da entrada (ET)')).toHaveValue('10:00')
+  })
+
+  it('another instrument after a refused «Registrar entrada»: the errors it turned on go quiet (RO `limpar`)', async () => {
+    await entrada()
+    await userEvent.click(pill('Lado', 'Compra'))
+    await userEvent.click(screen.getByRole('button', { name: 'Registrar entrada' }))
+    expect(alertas()).toEqual(['Informe o preço de entrada.'])
+    await userEvent.click(pill('Ativo', 'NQ'))
+    expect(alertas()).toEqual([])
+    await userEvent.click(screen.getByRole('button', { name: 'Registrar entrada' }))
+    expect(alertas()).toEqual(['Informe o preço de entrada.'])
+    await escolher('zn', 'ZN')
+    expect(alertas()).toEqual([])
+    expect(campo('Preço de entrada')).not.toHaveAttribute('aria-invalid')
   })
 
   it('«Usar “MESZ6”» registers the series code, computed as MES (points, its tick, the risk)', async () => {

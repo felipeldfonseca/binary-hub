@@ -3,7 +3,9 @@
  * recorded from the real SQL (testing/registrarMercados; invented data) on Thu 15 Oct 2026: the gate
  * and the limit at 08:40 ET, «Par» chips and «Buscar par», lots, pips and price stops, the computed
  * (EUR/USD), estimated (USD/JPY) and typed (EUR/GBP, XAUUSD) results with «Corrigir» and «Custos»,
- * steps 2 and 3, and the payloads sent.
+ * steps 2 and 3, and the payloads sent. A registration whose answer was not recorded (EUR/USD and
+ * EUR/GBP «Já fechada», the EUR/GBP exit) is checked by what it sends, its answer left pending: the
+ * sheet never shows a recorded answer of another trade.
  */
 import React from 'react'
 import { render, screen, waitFor, within } from '@testing-library/react'
@@ -101,6 +103,15 @@ async function digitar(rotulo: string, texto: string) {
   await userEvent.type(campo(rotulo), texto)
 }
 const linhaDoGate = () => screen.getByRole('button', { name: 'Como ler: Posso operar hoje?' }).parentElement as HTMLElement
+const alertas = () => screen.queryAllByRole('alert').map((a) => a.textContent)
+/** A registration whose answer was not recorded: what it sends is checked; no answer comes */
+const semResposta = () => new Promise<never>(() => {})
+/** After a search result: its chip takes the focus a frame later (wait, or the next keystrokes land on it) */
+async function escolherNaBusca(texto: string, resultado: string, chip = resultado.replace(/^Usar “(.*)”$/, '$1')) {
+  await userEvent.type(screen.getByRole('searchbox', { name: 'Buscar par' }), texto)
+  await userEvent.click(within(grupo('Resultados da busca')).getByRole('button', { name: resultado }))
+  await waitFor(() => expect(pill('Par', chip)).toHaveFocus())
+}
 
 async function entrada() {
   abrir()
@@ -232,6 +243,58 @@ describe('step 1 on FTMO at 08:40 ET', () => {
     expect(campo('Stop')).toHaveAttribute('aria-invalid', 'true')
   })
 
+  it('the pair in use chosen again from the search: the search empties, nothing else changes, its chip takes the focus', async () => {
+    await entrada()
+    await userEvent.click(pill('Lado', 'Compra'))
+    await userEvent.type(campo('Preço de entrada'), '1.08520')
+    await escolherNaBusca('eurusd', 'EUR/USD')
+    expect(screen.getByRole('searchbox', { name: 'Buscar par' })).toHaveValue('')
+    expect(screen.queryByRole('group', { name: 'Resultados da busca' })).not.toBeInTheDocument()
+    expect(campo('Preço de entrada')).toHaveValue('1.08520')
+    expect(pill('Lado', 'Compra')).toHaveAttribute('aria-pressed', 'true')
+  })
+
+  it('«Outro» from a chip starts empty; tapped again, it keeps the lots typed', async () => {
+    await entrada()
+    await userEvent.click(pill('Lotes', '0,50'))
+    await userEvent.click(pill('Lotes', 'Outro'))
+    await waitFor(() => expect(campo('Quantos lotes?')).toHaveFocus())
+    expect(campo('Quantos lotes?')).toHaveValue('')
+    await userEvent.type(campo('Quantos lotes?'), '0,30')
+    await userEvent.click(pill('Lotes', 'Outro'))
+    await waitFor(() => expect(campo('Quantos lotes?')).toHaveFocus())
+    expect(campo('Quantos lotes?')).toHaveValue('0,30')
+  })
+
+  it('should the server refuse the lots of a chip (it never has: the form checks them first), the error goes under «Lotes» and the focus to its first pill', async () => {
+    // bad_quantity on `quantity`, as trade_parse_entry raises it
+    db.registerEntry.mockRejectedValue(new registrarDb.RegistrarDataError('bad_quantity', 'quantity'))
+    await entrada()
+    await userEvent.click(pill('Lado', 'Compra'))
+    await userEvent.type(campo('Preço de entrada'), '1.08520')
+    await userEvent.click(screen.getByRole('button', { name: 'Registrar entrada' }))
+    await waitFor(() => expect(pill('Lotes', '0,01')).toHaveFocus())
+    expect(screen.getByText('Informe a quantidade.')).toHaveAttribute('id', 'e-q')
+    expect(grupo('Lotes').parentElement).toContainElement(screen.getByText('Informe a quantidade.'))
+  })
+
+  it('another pair after a refused «Registrar entrada» (a chip or a search result): the errors it turned on go quiet; the next tap turns them on', async () => {
+    await entrada()
+    await userEvent.click(screen.getByRole('button', { name: 'Registrar entrada' }))
+    expect(alertas()).toEqual(['Escolha Compra ou Venda.', 'Informe o preço de entrada.'])
+    await userEvent.click(pill('Par', 'GBP/USD'))
+    expect(alertas()).toEqual([])
+    await userEvent.click(screen.getByRole('button', { name: 'Registrar entrada' }))
+    expect(alertas()).toEqual(['Escolha Compra ou Venda.', 'Informe o preço de entrada.'])
+    await escolherNaBusca('xauusd', 'Usar “XAUUSD”')
+    expect(alertas()).toEqual([])
+    // The mode switch too (3-3)
+    await userEvent.click(screen.getByRole('button', { name: 'Registrar entrada' }))
+    expect(alertas()).toHaveLength(2)
+    await userEvent.click(pill('Como está a operação?', 'Já fechada'))
+    expect(alertas()).toEqual([])
+  })
+
   it('the search finds a pair without its slash, and a pair of the catalog is chosen as a chip', async () => {
     await entrada()
     await userEvent.type(screen.getByRole('searchbox', { name: 'Buscar par' }), 'usdchf')
@@ -258,9 +321,7 @@ describe('«Já fechada» on FTMO (09:01 ET)', () => {
   }
 
   it('EUR/USD: the computed result, «Corrigir» ↔ «Usar o calculado», «Custos» and the payload', async () => {
-    const after = fechadaMercados('xauusd')
-    db.registerAfter.mockResolvedValue(after)
-    db.fetchTradeState.mockResolvedValue(after.state)
+    db.registerAfter.mockReturnValue(semResposta())
     await fechada('EUR/USD', 'Compra')
     await userEvent.click(pill('Lotes', '0,50'))
     expect(screen.getByText('Resultado: preencha os dois preços.')).toBeInTheDocument()
@@ -298,11 +359,35 @@ describe('«Já fechada» on FTMO (09:01 ET)', () => {
     expect(db.registerAfter.mock.calls[0][2]).toMatchObject({
       symbol: 'EUR/USD', quantity: '0.5', entry_price: '1.0852', exit_price: '1.08635', entry: '08:40', exit: '09:01', day: '2026-10-15', pnl: '-55.1', costs: '3.5',
     })
-    expect(await screen.findByRole('heading', { level: 3, name: 'Operação fechada' })).toBeInTheDocument()
+  })
+
+  it('EUR/GBP refused for want of a result, then «Usar “XAUUSD”»: no error is announced on the fields that choice cleared', async () => {
+    await fechada('EUR/GBP', 'Venda')
+    await userEvent.type(campo('Preço de entrada'), '0.87120')
+    await userEvent.type(campo('Preço de saída'), '0.87030')
+    await userEvent.click(screen.getByRole('button', { name: 'Registrar operação' }))
+    expect(alertas()).toEqual(['Informe o resultado.'])
+    await escolherNaBusca('xauusd', 'Usar “XAUUSD”')
+    expect(alertas()).toEqual([])
+    for (const f of ['Preço de entrada', 'Preço de saída', 'Resultado, US$']) expect(campo(f)).not.toHaveAttribute('aria-invalid')
+    await userEvent.click(screen.getByRole('button', { name: 'Registrar operação' }))
+    expect(alertas()).toEqual(['Informe o preço de entrada.', 'Informe o preço de saída.', 'Informe o resultado.'])
+  })
+
+  it('another pair keeps the exit hour typed (3-3 and RO `limpar`); the exit price clears', async () => {
+    await fechada('EUR/USD', 'Compra')
+    await userEvent.type(campo('Preço de saída'), '1.08635')
+    await digitar('Hora da saída (ET)', '08:58')
+    await userEvent.click(pill('Par', 'USD/JPY'))
+    expect(campo('Preço de saída')).toHaveValue('')
+    expect(campo('Hora da saída (ET)')).toHaveValue('08:58')
+    await escolherNaBusca('xauusd', 'Usar “XAUUSD”')
+    expect(campo('Hora da saída (ET)')).toHaveValue('08:58')
+    expect(campo('Hora da entrada (ET)')).toHaveValue('08:40')
   })
 
   it('«Usar o calculado» discards the correction: nothing typed is sent', async () => {
-    db.registerAfter.mockResolvedValue(fechadaMercados('xauusd'))
+    db.registerAfter.mockReturnValue(semResposta())
     await fechada('EUR/USD', 'Compra')
     await userEvent.type(campo('Preço de entrada'), '1.08520')
     await userEvent.type(campo('Preço de saída'), '1.08635')
@@ -333,7 +418,7 @@ describe('«Já fechada» on FTMO (09:01 ET)', () => {
   })
 
   it('EUR/GBP: «digite o valor em dólar», the required «Resultado, US$» and its focus', async () => {
-    db.registerAfter.mockResolvedValue(fechadaMercados('xauusd'))
+    db.registerAfter.mockReturnValue(semResposta())
     await fechada('EUR/GBP', 'Venda')
     await userEvent.type(campo('Preço de entrada'), '0.87120')
     await userEvent.type(campo('Preço de saída'), '0.87030')
@@ -361,8 +446,7 @@ describe('«Já fechada» on FTMO (09:01 ET)', () => {
     db.fetchTradeState.mockResolvedValue(after.state)
     await entrada()
     await userEvent.click(pill('Como está a operação?', 'Já fechada'))
-    await userEvent.type(screen.getByRole('searchbox', { name: 'Buscar par' }), 'XAUUSD')
-    await userEvent.click(screen.getByRole('button', { name: 'Usar “XAUUSD”' }))
+    await escolherNaBusca('XAUUSD', 'Usar “XAUUSD”')
     await userEvent.click(pill('Lado', 'Venda'))
     await userEvent.click(pill('Lotes', 'Outro'))
     await userEvent.type(campo('Quantos lotes?'), '0,20')
@@ -457,7 +541,7 @@ describe('steps 2 and 3 on FTMO (09:01 ET)', () => {
 
   it('EUR/GBP open (typed): «Resultado, US$» is required on the exit, then sent', async () => {
     db.fetchTradeState.mockResolvedValue(entradaMercados('eurgbp').state)
-    db.registerExit.mockResolvedValue(saidaMercados('eurusd'))
+    db.registerExit.mockReturnValue(semResposta())
     abrir(ids.trades.eurgbp)
     await screen.findByRole('heading', { level: 3, name: 'Operação aberta' })
     expect(screen.getByText('EUR/GBP · Venda · 0,50 lote').parentElement).toHaveTextContent('stop 10 · alvo 20 pips')

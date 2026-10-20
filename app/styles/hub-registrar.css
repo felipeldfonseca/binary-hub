@@ -193,6 +193,13 @@
   margin-top: -10px;
 }
 
+/* The result line and «Corrigir» / «Usar o calculado» (RO `.linha-i`, l.99): the link drops under a
+   line it does not fit beside, never squeezing either (hub.css's .hub-linha-i is shared: not there) */
+.hub .hub-reg .hub-linha-i {
+  flex-wrap: wrap;
+  gap: 0 10px;
+}
+
 /* «Stop e alvo» and «Stake/Payout» keep two columns on narrow phones (RO `campos2 sempre`) */
 @media (max-width: 420px) {
   .hub .hub-reg-sempre {

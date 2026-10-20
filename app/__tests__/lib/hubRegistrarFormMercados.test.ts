@@ -696,3 +696,41 @@ describe('the futures «Buscar ativo» (Top One, Thu 15 Oct 10:05 ET)', () => {
     })
   })
 })
+
+describe('review fixes of 3-4 lane A (the engine’s part)', () => {
+  it('another instrument, quote or kind keeps the exit hour typed in «Já fechada» (3-3 and RO `limpar`, l.1081)', () => {
+    const fechada = rascunho(top, { modo: 'fechada', lado: 'long', preco: '6650,25', hora: '10:00', precoSaida: '6652,25', horaSaida: '10:04' })
+    expect(escolherAtivo(fechada, 'futures', 'MCL')).toMatchObject({ ativo: 'MCL', precoSaida: '', horaSaida: '10:04', hora: '10:00' })
+    const btc = rascunho(binance, { modo: 'fechada', precoSaida: '111.950', horaSaida: '21:02' })
+    expect(mudarCotacao(btc, 'USDC')).toMatchObject({ cotacao: 'USDC', precoSaida: '', horaSaida: '21:02' })
+    const acao = rascunho(ibkr, { modo: 'fechada', precoSaida: '232.15', horaSaida: '10:00' })
+    expect(mudarTipoEua(acao, 'opcao')).toMatchObject({ tipoEua: 'opcao', precoSaida: '', horaSaida: '10:00' })
+    // «Venceu sem valor» and «Vencimento» still clear the exit they wrote
+    expect(mudarVencimento({ ...acao, vsv: true }, '2026-10-16')).toMatchObject({ precoSaida: '', horaSaida: null, vsv: false })
+  })
+
+  it('ETH/BTC (a quote none of «Cotada em»): ETH quoted in BTC, no pill pressed, no position line; a pill quotes ETH instead', () => {
+    const n = at('2026-10-17T23:35:05Z')
+    const hoje = '2026-10-17'
+    const r = { ...escolherAtivo(rascunho(binance), 'crypto', 'ETH/BTC'), lado: 'long' as const, qtd: '2', preco: '0,0365', stop: '0,0360' }
+    expect(r).toMatchObject({ ativo: 'ETH/BTC', cotacao: 'USDT' })
+    const e = modeloEntrada({ conta: binance, r, now: n, hoje, tentou: false })
+    expect(e.cotacao?.valor).toBeNull()
+    expect(e.quantidade?.rotulo).toBe('Quantidade, em ETH')
+    expect(e.rotulos).toMatchObject({ preco: 'Preço de entrada, BTC', precoSaida: 'Preço de saída, BTC' })
+    expect(e.linhaPosicao).toBeNull()
+    expect(e.linhaRisco).toBe('Sem valor em dólar para este ativo.')
+    expect(e.payload).toMatchObject({ symbol: 'ETH/BTC', quantity: '2', entry_price: '0.0365', stop_price: '0.036' })
+    const f = modeloEntrada({ conta: binance, r: { ...r, modo: 'fechada', dia: hoje, hora: '20:30', precoSaida: '0,0371', horaSaida: '20:34' }, now: n, hoje, tentou: false })
+    expect(f.linhaResultado).toBe('Resultado: +0,0006 por ETH · digite o valor em dólar')
+    // «Cotada em» on the pair: the coin keeps its quantity, the pill is its quote
+    const usdt = mudarCotacao(r, 'USDT')
+    expect(usdt).toMatchObject({ ativo: 'ETH', cotacao: 'USDT', preco: '', qtd: '2' })
+    const g = modeloEntrada({ conta: binance, r: { ...usdt, preco: '4.100' }, now: n, hoje, tentou: false })
+    expect(g.cotacao?.valor).toBe('USDT')
+    expect(g.rotulos?.preco).toBe('Preço de entrada, USDT')
+    expect(g.linhaPosicao).toBe('Posição de US$ 8.200')
+    // A stored ETH/BTC on step 2 and in the op text: the coin and its quote
+    expect(opTexto({ symbol: 'ETH/BTC', direction: 'long', quantity: '2' } as Parameters<typeof opTexto>[0], 'crypto')).toBe('ETH/BTC · Compra · 2 ETH')
+  })
+})

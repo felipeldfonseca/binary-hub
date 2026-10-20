@@ -10,6 +10,7 @@ import path from 'path'
 import React from 'react'
 import { render } from '@testing-library/react'
 import { CampoTexto, GrupoPills } from '@/components/hub/registrar/ui'
+import BlocoResultado from '@/components/hub/registrar/BlocoResultado'
 
 const lerCss = (nome: string) => fs.readFileSync(path.join(__dirname, '../../../styles', nome), 'utf8')
 const css = lerCss('hub-registrar.css')
@@ -262,6 +263,36 @@ describe('the 3-4 fields of the price markets (contract 3-4 §5.11)', () => {
     expect(vencedora(precoHora, 'grid-template-columns')?.valor).toBe('repeat(2, minmax(0, 1fr))')
     expect(vencedora(precoHora, 'grid-template-columns', PHONE)?.valor).toBe('minmax(0, 1fr)')
     expect(vencedora(stopAlvo, 'grid-template-columns', PHONE)?.valor).toBe('repeat(2, minmax(0, 1fr))')
+  })
+
+  it('the result line wraps: «Corrigir» / «Usar o calculado» drops under a line it does not fit beside (RO `.linha-i`, l.99); outside the sheet, hub.css as it was', () => {
+    const bloco = {
+      linha: 'Resultado: +26,0 pips · ≈ +US$ 51,66',
+      corrigir: { rotulo: 'Usar o calculado', aberto: true },
+      notaEstimativa: null,
+      campo: null,
+      custos: null,
+      calculado: '51,66',
+    }
+    const { container } = render(
+      <div className="hub" data-tema="claro">
+        <section className="hub-folha hub-reg">
+          <BlocoResultado linha={bloco.linha} bloco={bloco} aoCorrigir={noop} aoMudarRes={noop} aoMudarCustos={noop} />
+        </section>
+        <div className="hub-linha-i" data-testid="fora">
+          <span>Importação</span>
+        </div>
+      </div>,
+    )
+    const linha = container.querySelector('.hub-reg .hub-linha-i') as HTMLElement
+    expect(linha).toContainElement(container.querySelector('button[aria-controls="caixa-res"]') as HTMLElement)
+    for (const medias of [[], PHONE]) {
+      expect(vencedora(linha, 'flex-wrap', medias)?.valor).toBe('wrap')
+      expect(vencedora(linha, 'gap', medias)?.valor).toMatch(/^0(px)? 10px$/)
+    }
+    const fora = container.querySelector('[data-testid="fora"]') as HTMLElement
+    expect(vencedora(fora, 'flex-wrap')).toBeNull()
+    expect(vencedora(fora, 'gap')?.valor).toBe('10px')
   })
 
   it('pills wrap (B3 contracts are six, «Cotada em» four)', () => {

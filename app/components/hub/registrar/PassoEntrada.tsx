@@ -713,7 +713,7 @@ export default function PassoEntrada(props: PassoEntradaProps) {
           }
         />
       ) : (
-        <CamposPrecos conta={conta} r={r} m={m} erros={erros} mudar={mudar} aviso={aviso2} padroes={defaults} />
+        <CamposPrecos conta={conta} r={r} m={m} erros={erros} mudar={mudar} aviso={aviso2} padroes={defaults} aoRecomecar={() => setTentou(false)} />
       )}
       {plano && (
         <div className="hub-reg-plano-linha">
