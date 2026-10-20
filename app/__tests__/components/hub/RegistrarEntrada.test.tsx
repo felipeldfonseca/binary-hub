@@ -610,6 +610,32 @@ describe('«Posso operar hoje?» at a typed moment never shows another moment’
     expect(screen.queryByText('Limite do dia')).not.toBeInTheDocument()
   })
 
+  it('while the next gate_at is asked, the last answer stays for another hour of its day, never for another «Dia»', async () => {
+    // Thursday 22 at 10:20 answers «Liberado» (the recorded answer of that day); every later moment is still being asked
+    const quinta = agoraTelas('agora-qui-1031-et').accounts.find((a) => a.accountId === ids.accounts.topOne)!
+    expect(quinta.gate.tradingDay).toBe('2026-10-22')
+    db.fetchGateAt.mockImplementation((_db, _id, at) => (at.toISOString() === '2026-10-22T14:20:00.000Z' ? Promise.resolve(quinta) : new Promise(() => undefined)))
+    const perguntou = (iso: string) => db.fetchGateAt.mock.calls.some((c) => (c[2] as Date).toISOString() === iso)
+    abrir()
+    await screen.findByRole('heading', { level: 3, name: 'Entrada' })
+    await userEvent.click(pill('Como está a operação?', 'Já fechada'))
+    const hora = screen.getByLabelText('Hora da entrada (ET)')
+    await userEvent.clear(hora)
+    await userEvent.type(hora, '10:20')
+    await waitFor(() => expect(linhaDoGate()).toHaveTextContent('Posso operar hoje? Na entrada:Liberado'))
+    // Another hour of the same day: the 10:20 answer stays while 10:25 is asked (no flicker per keystroke)
+    await userEvent.clear(hora)
+    await userEvent.type(hora, '10:25')
+    await waitFor(() => expect(perguntou('2026-10-22T14:25:00.000Z')).toBe(true))
+    expect(linhaDoGate()).toHaveTextContent('Posso operar hoje? Na entrada:Liberado')
+    // «Ontem»: Thursday's answer is not Wednesday's; the question alone while it is asked
+    await userEvent.click(pill('Dia', 'Ontem'))
+    await waitFor(() => expect(perguntou('2026-10-21T14:25:00.000Z')).toBe(true))
+    expect(linhaDoGate()).toHaveTextContent('Posso operar hoje? Na entrada, em 21 out:')
+    expect(linhaDoGate()).not.toHaveTextContent('Liberado')
+    expect(screen.queryByText('Limite do dia')).not.toBeInTheDocument()
+  })
+
   it('the account line never says «Sem janela salva» when rules_now failed (not evaluated is not false)', async () => {
     fetchRulesNow.mockRejectedValue(new Error('network'))
     abrir()
