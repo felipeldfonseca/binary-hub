@@ -105,6 +105,23 @@ async function digitar(rotulo: string, texto: string) {
 }
 const linhaDoGate = () => screen.getByRole('button', { name: 'Como ler: Posso operar hoje?' }).parentElement as HTMLElement
 const busca = () => screen.getByRole('searchbox', { name: 'Buscar ativo' })
+const AVISO_1006 = 'Se o stop for atingido, o dia passa do limite: faltam R$ 320 e o stop arrisca R$ 360.'
+/** The plan pill under the fields («● depois do limite»), from the dry run once it answers */
+const plano = () => document.querySelector('.hub-reg-plano-linha')
+
+/**
+ * The dry run the sheet asked once the form was quiet for 300 ms (useEntryPreview / useAfterPreview):
+ * its last payload, after its answer was read. The recorded answers were asked with these payloads
+ * (__tests__/lib/hubRegistrarMercados.pg.test.ts), so what the screen shows from them is the server's.
+ */
+async function previaPedida(fn: jest.Mock) {
+  await waitFor(() => expect(fn).toHaveBeenCalled())
+  const r = fn.mock.results[fn.mock.results.length - 1]
+  await r.value.catch(() => undefined)
+  return fn.mock.calls[fn.mock.calls.length - 1][2]
+}
+/** A registration this test does not follow (none was recorded for it): it never answers */
+const semResposta = () => new Promise<never>(() => undefined)
 
 async function entrada() {
   abrir()
@@ -150,6 +167,15 @@ describe('step 1 on Clear at 10:20 de Brasília (the limit reached at 10:16)', (
     await userEvent.type(campo('Stop'), '100')
     await userEvent.type(campo('Alvo'), '200')
     expect(screen.getByText('risco R$ 60,00 · alvo R$ 120,00 · 1 : 2')).toBeInTheDocument()
+    // The dry run of this form: the server's risk is the screen's; its plan «depois do limite» shows,
+    // and no warning (the limit is already reached: nothing left to pass)
+    expect(await previaPedida(db.previewEntry)).toMatchObject({
+      symbol: 'WIN', direction: 'short', quantity: '3', entry_price: '131250', stop_pts: '100', target_pts: '200', clock: SP,
+    })
+    expect(previaMercados('win').preview).toMatchObject({ risk: '60', reward: '120' })
+    expect(previaMercados('win').limitRoom).toMatchObject({ reached: true, above: false })
+    expect(plano()).toHaveTextContent('depois do limite')
+    expect(screen.queryByText(/o dia passa do limite/)).not.toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: 'Registrar entrada' }))
     await waitFor(() => expect(db.registerEntry).toHaveBeenCalledTimes(1))
     expect(db.registerEntry.mock.calls[0][2]).toMatchObject({
@@ -181,14 +207,33 @@ describe('step 1 on Clear at 10:20 de Brasília (the limit reached at 10:16)', (
     await digitar('Hora (Brasília)', '10:06')
     await userEvent.type(campo('Stop'), '600')
     expect(screen.getByText('risco R$ 360,00')).toBeInTheDocument()
-    const aviso = await screen.findByText('Se o stop for atingido, o dia passa do limite: faltam R$ 320 e o stop arrisca R$ 360.')
+    expect(await previaPedida(db.previewEntry)).toMatchObject({ symbol: 'WIN', direction: 'short', quantity: '3', stop_pts: '600', entry: '10:06', clock: SP })
+    expect(previaMercados('win-1006').limitRoom).toMatchObject({ left: '320', risk: '360', above: true })
+    const aviso = await screen.findByText(AVISO_1006)
     expect(aviso).toHaveAttribute('role', 'status')
+    // At 10:06 the plan had no break yet (in the window, the limit not reached)
+    expect(plano()).toBeNull()
     expect(screen.getByRole('button', { name: 'Registrar entrada' })).not.toHaveAttribute('aria-disabled')
   })
 
+  it('the 10:06 warning is the dry run’s `limit_room`: it shows even when the gate at 10:06 could not be read', async () => {
+    db.previewEntry.mockResolvedValue(previaMercados('win-1006'))
+    db.fetchGateAt.mockRejectedValue(new registrarDb.RegistrarDataError('network'))
+    await entrada()
+    await userEvent.click(pill('Lado', 'Venda'))
+    await userEvent.click(pill('Contratos', '3'))
+    await userEvent.type(campo('Preço de entrada'), '131.250')
+    await digitar('Hora (Brasília)', '10:06')
+    await userEvent.type(campo('Stop'), '600')
+    // Without the gate nothing local can say what is left of the limit
+    expect(screen.queryByText(AVISO_1006)).not.toBeInTheDocument()
+    expect(await previaPedida(db.previewEntry)).toMatchObject({ stop_pts: '600', entry: '10:06' })
+    expect(await screen.findByText(AVISO_1006)).toHaveAttribute('role', 'status')
+  })
+
   it('«Usar “WINZ26”»: computed as WIN (contracts, points, the tick named by its root), sent as typed', async () => {
-    db.registerEntry.mockResolvedValue(entradaMercados('win'))
-    db.fetchTradeState.mockResolvedValue(entradaMercados('win').state)
+    db.previewEntry.mockResolvedValue(previaMercados('winz26'))
+    db.registerEntry.mockImplementation(semResposta)
     await entrada()
     await userEvent.click(pill('Contratos', '3'))
     await buscar('winz26', 'Usar “WINZ26”', 'WINZ26')
@@ -202,6 +247,12 @@ describe('step 1 on Clear at 10:20 de Brasília (the limit reached at 10:16)', (
     await userEvent.click(screen.getByRole('button', { name: 'Registrar entrada' }))
     expect(screen.getByText('O WIN anda de 5 em 5; confira o preço.')).toBeInTheDocument()
     await digitar('Preço de entrada', '131.250')
+    // The server read WINZ26 as WIN too: its risk is the screen's
+    expect(await previaPedida(db.previewEntry)).toMatchObject({
+      symbol: 'WINZ26', direction: 'short', quantity: '3', entry_price: '131250', stop_pts: '100', target_pts: '200', clock: SP,
+    })
+    expect(previaMercados('winz26').instrument).toMatchObject({ key: 'WIN', stops: 'pts', tick: '5' })
+    expect(previaMercados('winz26').preview).toMatchObject({ risk: '60', reward: '120' })
     await userEvent.click(screen.getByRole('button', { name: 'Registrar entrada' }))
     await waitFor(() => expect(db.registerEntry).toHaveBeenCalledTimes(1))
     expect(db.registerEntry.mock.calls[0][2]).toMatchObject({ symbol: 'WINZ26', quantity: '3', stop_pts: '100', target_pts: '200' })
@@ -211,8 +262,7 @@ describe('step 1 on Clear at 10:20 de Brasília (the limit reached at 10:16)', (
 describe('B3 stocks of the catalog: PETR4', () => {
   it('whole shares, the odd-lot note under the field (a note, never an error), up to 4 decimals', async () => {
     db.previewEntry.mockResolvedValue(previaMercados('petr4-4dp'))
-    db.registerEntry.mockResolvedValue(entradaMercados('win'))
-    db.fetchTradeState.mockResolvedValue(entradaMercados('win').state)
+    db.registerEntry.mockImplementation(semResposta)
     await entrada()
     await buscar('petr', 'PETR4')
     expect(busca()).toHaveValue('')
@@ -229,6 +279,9 @@ describe('B3 stocks of the catalog: PETR4', () => {
     await userEvent.type(campo('Preço de entrada'), '38,4250')
     await userEvent.type(campo('Stop'), '38,20')
     expect(screen.getByText('risco R$ 67,50')).toBeInTheDocument()
+    expect(await previaPedida(db.previewEntry)).toMatchObject({ symbol: 'PETR4', direction: 'long', quantity: '300', entry_price: '38.425', stop_price: '38.2', clock: SP })
+    expect(previaMercados('petr4-4dp').preview).toMatchObject({ risk: '67.5' })
+    expect(plano()).toHaveTextContent('depois do limite')
     await userEvent.click(screen.getByRole('button', { name: 'Registrar entrada' }))
     await waitFor(() => expect(db.registerEntry).toHaveBeenCalledTimes(1))
     expect(db.registerEntry.mock.calls[0][2]).toMatchObject({ symbol: 'PETR4', direction: 'long', quantity: '300', entry_price: '38.425', stop_price: '38.2' })
@@ -311,6 +364,12 @@ describe('«Já fechada» on Clear: the typed «Resultado, R$»', () => {
     expect(db.registerAfter).not.toHaveBeenCalled()
     await userEvent.type(res, '150')
     await userEvent.type(campo('Custos, R$ · opcional'), '3,50')
+    // Only a complete form is asked: the dry run of this one, with the typed result and the costs
+    expect(await previaPedida(db.previewAfter)).toMatchObject({
+      symbol: 'BGIX26', direction: 'long', quantity: '2', entry_price: '310.55', exit_price: '311.3', entry: '10:17', exit: '10:19', day: '2026-10-15', pnl: '150', costs: '3.5',
+    })
+    expect(fechadaPreviaMercados('bgix26').exit).toMatchObject({ pnl: '150', pnlBasis: 'typed', commission: '3.5' })
+    expect(plano()).toHaveTextContent('depois do limite')
     await userEvent.click(screen.getByRole('button', { name: 'Registrar operação' }))
     await waitFor(() => expect(db.registerAfter).toHaveBeenCalledTimes(1))
     expect(db.registerAfter.mock.calls[0][2]).toMatchObject({
@@ -320,5 +379,25 @@ describe('«Já fechada» on Clear: the typed «Resultado, R$»', () => {
     expect(screen.getByText('+R$ 150,00')).toBeInTheDocument()
     expect(screen.getByText('Resultado digitado por você.')).toBeInTheDocument()
     expect(screen.getByText('Custos R$ 3,50 · líquido +R$ 146,50')).toBeInTheDocument()
+  })
+
+  it('the plan is the dry run’s: with the gate at 10:17 unread, «depois do limite» appears once the complete form is asked', async () => {
+    db.previewAfter.mockResolvedValue(fechadaPreviaMercados('bgix26'))
+    db.fetchGateAt.mockRejectedValue(new registrarDb.RegistrarDataError('network'))
+    await fechada()
+    await buscar('bgix26', 'Usar “BGIX26”', 'BGIX26')
+    await userEvent.click(pill('Lado', 'Compra'))
+    await userEvent.type(campo('Quantidade'), '2')
+    await userEvent.type(campo('Preço de entrada'), '310,55')
+    await digitar('Hora da entrada (Brasília)', '10:17')
+    await userEvent.type(campo('Preço de saída'), '311,30')
+    await digitar('Hora da saída (Brasília)', '10:19')
+    // Without the result the form is not complete: nothing is asked, and without the gate no plan shows
+    expect(plano()).toBeNull()
+    await userEvent.type(campo('Resultado, R$'), '150')
+    await userEvent.type(campo('Custos, R$ · opcional'), '3,50')
+    expect(await previaPedida(db.previewAfter)).toMatchObject({ symbol: 'BGIX26', pnl: '150', costs: '3.5', entry: '10:17', exit: '10:19' })
+    expect(fechadaPreviaMercados('bgix26').plan).toMatchObject({ breaks: ['depois_do_limite'] })
+    await waitFor(() => expect(plano()).toHaveTextContent('depois do limite'))
   })
 })

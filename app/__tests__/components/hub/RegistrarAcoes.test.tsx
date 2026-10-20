@@ -109,6 +109,20 @@ async function digitar(rotulo: string, texto: string) {
   await userEvent.type(campo(rotulo), texto)
 }
 const linhaDoGate = () => screen.getByRole('button', { name: 'Como ler: Posso operar hoje?' }).parentElement as HTMLElement
+/** The plan pill under the fields; IBKR has no window and no limit, so its dry runs never draw one */
+const plano = () => document.querySelector('.hub-reg-plano-linha')
+
+/**
+ * The dry run the sheet asked once the form was quiet for 300 ms (useEntryPreview / useAfterPreview):
+ * its last payload, after its answer was read. The recorded answers were asked with these payloads
+ * (__tests__/lib/hubRegistrarMercados.pg.test.ts), so what the screen shows from them is the server's.
+ */
+async function previaPedida(fn: jest.Mock) {
+  await waitFor(() => expect(fn).toHaveBeenCalled())
+  const r = fn.mock.results[fn.mock.results.length - 1]
+  await r.value.catch(() => undefined)
+  return fn.mock.calls[fn.mock.calls.length - 1][2]
+}
 
 async function entrada(accountId?: string) {
   abrir({ accountId })
@@ -159,6 +173,14 @@ describe('step 1 on IBKR at 09:52 ET (no window, no limit)', () => {
     await userEvent.type(campo('Stop'), '230.90')
     await userEvent.type(campo('Alvo'), '232.40')
     expect(screen.getByText('risco US$ 50,00 · alvo US$ 100,00 · 1 : 2')).toBeInTheDocument()
+    // The dry run of this form: the server's risk is the screen's; nothing evaluated, so no plan and no warning
+    expect(await previaPedida(db.previewEntry)).toMatchObject({
+      symbol: 'AAPL', direction: 'long', quantity: '100', entry_price: '231.4', stop_price: '230.9', target_price: '232.4', clock: NY,
+    })
+    expect(previaMercados('aapl').preview).toMatchObject({ risk: '50', reward: '100' })
+    expect(previaMercados('aapl').limitRoom).toBeNull()
+    expect(plano()).toBeNull()
+    expect(screen.queryByText(/o dia passa do limite/)).not.toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: 'Registrar entrada' }))
     await waitFor(() => expect(db.registerEntry).toHaveBeenCalledTimes(1))
     const [, accountId, payload] = db.registerEntry.mock.calls[0]
@@ -202,6 +224,13 @@ describe('step 1 on IBKR at 09:52 ET (no window, no limit)', () => {
     await userEvent.type(campo('Stop'), '1.10')
     await userEvent.type(campo('Alvo'), '3.20')
     expect(screen.getByText('2 contratos × 100 = 200 opções · risco US$ 150,00 · alvo US$ 270,00 · 1 : 1,8')).toBeInTheDocument()
+    expect(await previaPedida(db.previewEntry)).toMatchObject({
+      symbol: 'SPY', direction: 'long', quantity: '2', entry_price: '1.85', stop_price: '1.1', target_price: '3.2', clock: NY,
+      option: { right: 'call', strike: '790', expires_on: '2026-10-15' },
+    })
+    expect(previaMercados('spy-call').preview).toMatchObject({ risk: '150', reward: '270' })
+    expect(previaMercados('spy-call').instrument).toMatchObject({ assetType: 'option', mult: '100' })
+    expect(plano()).toBeNull()
     await userEvent.click(screen.getByRole('button', { name: 'Registrar entrada' }))
     await waitFor(() => expect(db.registerEntry).toHaveBeenCalledTimes(1))
     const payload = db.registerEntry.mock.calls[0][2]
@@ -276,6 +305,13 @@ describe('«Já fechada» on IBKR', () => {
     expect(screen.getByText('Resultado: +0,55 no prêmio · +US$ 110,00')).toHaveAttribute('role', 'status')
     expect(screen.getByRole('button', { name: 'Corrigir' })).toHaveAttribute('aria-expanded', 'false')
     expect(screen.getByText('Comissão e taxas da corretora (SEC, FINRA).')).toBeInTheDocument()
+    // The dry run of this form: the server's result is the screen's +110
+    expect(await previaPedida(db.previewAfter)).toMatchObject({
+      symbol: 'SPY', direction: 'long', quantity: '2', entry_price: '1.85', exit_price: '2.4', entry: '09:35', exit: '09:48', day: '2026-10-15',
+      option: { right: 'call', strike: '790', expires_on: '2026-10-15' },
+    })
+    expect(fechadaPreviaMercados('spy-call').exit).toMatchObject({ pnl: '110', pnlBasis: 'prices', points: '0.55' })
+    expect(plano()).toBeNull()
     await userEvent.click(screen.getByRole('button', { name: 'Registrar operação' }))
     await waitFor(() => expect(db.registerAfter).toHaveBeenCalledTimes(1))
     const payload = db.registerAfter.mock.calls[0][2]
@@ -309,6 +345,12 @@ describe('«Já fechada» on IBKR', () => {
     expect(campo('Prêmio de saída, US$ por ação')).toHaveValue('0')
     expect(campo('Hora da saída (ET)')).toHaveValue('16:00')
     expect(screen.getByText('Resultado: −1,85 no prêmio · −US$ 370,00')).toBeInTheDocument()
+    // The dry run of this form: premium 0 at 16:00 ET of 14 Oct, −370 on the server too
+    expect(await previaPedida(db.previewAfter)).toMatchObject({
+      day: '2026-10-14', entry: '09:35', exit: '16:00', exit_price: '0', clock: NY, option: { right: 'call', strike: '790', expires_on: '2026-10-14' },
+    })
+    expect(fechadaPreviaMercados('spy-vsv-ontem').exit).toMatchObject({ pnl: '-370', exitPrice: '0' })
+    expect(fechadaPreviaMercados('spy-vsv-ontem').exit.exitAt.toISOString()).toBe('2026-10-14T20:00:00.000Z')
     await userEvent.click(screen.getByRole('button', { name: 'Registrar operação' }))
     await waitFor(() => expect(db.registerAfter).toHaveBeenCalledTimes(1))
     expect(db.registerAfter.mock.calls[0][2]).toMatchObject({
