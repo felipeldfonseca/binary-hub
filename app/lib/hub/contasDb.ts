@@ -281,6 +281,14 @@ export interface ImportPreviewResult {
   /** Already in the account and missing fields the file has (commission, stop, target, exit, payout) */
   completable: number;
   other_account: number;
+  /**
+   * Phase 3 (migration 20261020000004; absent before it is pasted): rows that complete a trade
+   * registered in the app instead of inserting it again («{n} já registradas por você: o arquivo
+   * completa a comissão.»), and how many of those the file corrects on money («{n} com preço ou
+   * resultado diferente: vale o do arquivo.»)
+   */
+  linked?: number;
+  linked_differs?: number;
   /** New trades whose trading day is not the date on the file's clock */
   day_changes: number;
   first_day: string | null;
@@ -299,6 +307,8 @@ export interface ImportCommitResult {
   duplicate: number;
   completed: number;
   other_account: number;
+  /** Phase 3: app-registered trades this file completed (absent before migration 20261020000004) */
+  linked?: number;
   errors: RowError[];
 }
 

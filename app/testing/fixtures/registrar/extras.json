@@ -1,0 +1,155 @@
+{
+  "gate": {
+    "at": "2026-10-19T01:25:29.693684+00:00",
+    "block": {
+      "state": "nao_avaliado",
+      "reason": "fase5"
+    },
+    "desde": "2026-09-19T01:25:28.796512+00:00",
+    "label": "Registrar futures",
+    "limit": {
+      "usd": 400,
+      "mode": "conta",
+      "near": false,
+      "used": 0,
+      "state": "ok",
+      "hit_at": null,
+      "reason": null,
+      "trades": 2,
+      "net_usd": 170,
+      "at_limit": "encerrar",
+      "worst_usd": 0
+    },
+    "today": {
+      "trades": 2,
+      "net_usd": 170,
+      "worst_usd": 0
+    },
+    "market": "futures",
+    "status": "liberado",
+    "window": {
+      "next": {
+        "opens_at": "2026-10-19T23:55:00+00:00",
+        "closes_at": "2026-10-20T02:55:00+00:00",
+        "trading_day": "2026-10-20"
+      },
+      "state": "dentro",
+      "reason": null,
+      "current": {
+        "opens_at": "2026-10-18T23:55:00+00:00",
+        "closes_at": "2026-10-19T02:55:00+00:00"
+      },
+      "position": "dentro"
+    },
+    "version": {
+      "id": "46d328eb-0c29-4a26-a288-f1b5c3263d87",
+      "origin": "criar",
+      "version_no": 1,
+      "effective_from": "2026-09-19T01:25:28.796512+00:00"
+    },
+    "warnings": [],
+    "desde_day": "2026-09-19",
+    "account_id": "185b2da6-65fe-4ea6-a411-ab21fa3b9738",
+    "changes_at": "2026-10-19T02:55:00+00:00",
+    "state_rule": {
+      "state": "nao_avaliado",
+      "reason": "fase5"
+    },
+    "trading_day": "2026-10-19",
+    "checks_evaluated": [
+      "janela",
+      "limite"
+    ]
+  },
+  "plan": {
+    "breaks": [],
+    "verdict": "no_plano",
+    "checks_evaluated": [
+      "janela",
+      "limite"
+    ]
+  },
+  "marks": [],
+  "trade": {
+    "id": "d32a979d-b10b-454e-98bd-40e1da6049ad",
+    "pnl": null,
+    "note": "Entrei no rompimento.",
+    "option": null,
+    "result": "pending",
+    "source": "live",
+    "status": "open",
+    "symbol": "MGC",
+    "quantity": 1,
+    "direction": "long",
+    "exit_time": null,
+    "pnl_basis": null,
+    "timeframe": null,
+    "account_id": "185b2da6-65fe-4ea6-a411-ab21fa3b9738",
+    "asset_type": "futures",
+    "commission": null,
+    "entry_time": "2026-10-19T01:25:29.693684+00:00",
+    "exit_price": null,
+    "expires_at": null,
+    "stop_price": null,
+    "entry_price": 4409.8,
+    "trading_day": "2026-10-19",
+    "stake_amount": null,
+    "target_price": null,
+    "note_saved_at": "2026-10-19T01:25:29.775655+00:00",
+    "registered_at": "2026-10-19T01:25:29.693684+00:00",
+    "payout_percent": null,
+    "duration_seconds": null,
+    "exit_registered_at": null
+  },
+  "trash": [],
+  "images": [
+    {
+      "id": "6f90e378-200f-4796-b9c7-518e50e07b3f",
+      "mime": "image/png",
+      "name": "MGC_saida.png",
+      "path": "66625db4-2202-4579-8f9a-34c3535f905e/d32a979d-b10b-454e-98bd-40e1da6049ad/6f90e378-200f-4796-b9c7-518e50e07b3f.png",
+      "bytes": 1001,
+      "position": 1,
+      "saved_at": "2026-10-19T01:25:29.775655+00:00"
+    },
+    {
+      "id": "46732aa5-ef9d-4a0c-8c40-8f07e571bbe0",
+      "mime": "image/webp",
+      "name": "MGC_entrada.webp",
+      "path": "66625db4-2202-4579-8f9a-34c3535f905e/d32a979d-b10b-454e-98bd-40e1da6049ad/46732aa5-ef9d-4a0c-8c40-8f07e571bbe0.webp",
+      "bytes": 1000,
+      "position": 2,
+      "saved_at": "2026-10-19T01:25:29.775655+00:00"
+    }
+  ],
+  "context": {
+    "origin": "live",
+    "rule_ok": null,
+    "in_block": null,
+    "warnings": [],
+    "in_window": true,
+    "after_limit": false,
+    "captured_at": "2026-10-19T01:25:29.693684+00:00",
+    "gate_status": "liberado",
+    "evaluated_at": "2026-10-19T01:25:29.693684+00:00",
+    "state_choice": null,
+    "checks_evaluated": [
+      "janela",
+      "limite"
+    ],
+    "day_pnl_at_entry": 170,
+    "day_worst_at_entry": 0
+  },
+  "version": {
+    "id": "46d328eb-0c29-4a26-a288-f1b5c3263d87",
+    "version_no": 1
+  },
+  "entry_at": "2026-10-19T01:25:29.693684+00:00",
+  "saved_at": "2026-10-19T01:25:29.775655+00:00",
+  "trade_id": "d32a979d-b10b-454e-98bd-40e1da6049ad",
+  "marks_now": [],
+  "server_now": "2026-10-19T01:25:29.775655+00:00",
+  "trading_day": "2026-10-19",
+  "note_saved_at": "2026-10-19T01:25:29.775655+00:00",
+  "registered_at": "2026-10-19T01:25:29.693684+00:00"
+}
