@@ -215,3 +215,16 @@ describe('the chips and the starting values', () => {
     expect(recentesMercados('clear').map((t) => t.assetType)).toEqual(['futures', 'b3', 'futures', 'futures', 'futures'])
   })
 })
+
+describe('a crypto pair whose quote is none of «Cotada em» (review of 3-4 lane A)', () => {
+  it('ETH/BTC: the coin ETH, the quote BTC as the labels write it, no «Cotada em» value; the four quotes keep theirs', () => {
+    const f = formaDoAtivo('crypto', 'ETH/BTC', { cotacao: 'USDT' })!
+    expect([f.simbolo, f.moedaBase, f.cotacao, f.moedaCotacao, f.modo]).toEqual(['ETH/BTC', 'ETH', null, 'BTC', 'digitado'])
+    expect(f.quantidade.rotulo).toBe('Quantidade, em ETH')
+    expect(f.quantidade.sufixo('2')).toBe('2 ETH')
+    expect(formaDoAtivo('crypto', 'BTC', { cotacao: 'USDT' })!.moedaCotacao).toBe('USDT')
+    expect(formaDoAtivo('crypto', 'BTC', { cotacao: 'R$' })!.moedaCotacao).toBe('R$')
+    expect(formaDoAtivo('crypto', 'ETHBTC', { cotacao: 'USDC' })).toMatchObject({ simbolo: 'ETHBTC/USDC', moedaBase: 'ETHBTC', cotacao: 'USDC', moedaCotacao: 'USDC' })
+    expect(formaDoAtivo('forex', 'EUR/USD')!.moedaCotacao).toBeNull()
+  })
+})

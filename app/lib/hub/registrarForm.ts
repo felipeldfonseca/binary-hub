@@ -407,8 +407,11 @@ export function lerRascunho(json: unknown, accountId: string): Rascunho | null {
 // Draft transitions the price markets share (the board's `escolherIns`, `limpar`, toggles)
 // ---------------------------------------------------------------------------------------------
 
-/** What choosing another instrument, quote or kind clears (RO `limpar`) */
-const LIMPAR = { busca: '', preco: '', stop: '', alvo: '', precoSaida: '', horaSaida: null, res: '', corrigir: false, vsv: false } as const;
+/**
+ * What choosing another instrument, quote or kind clears (RO `limpar`, l.1081): never the exit hour
+ * typed in «Já fechada», which 3-3 and the board keep
+ */
+const LIMPAR = { busca: '', preco: '', stop: '', alvo: '', precoSaida: '', res: '', corrigir: false, vsv: false } as const;
 
 /** The quantity kind's starting value for a draft (the last one used, else the first chip, else empty) */
 function qtdDoTipo(forma: FormaAtivo | null, padroes: RegistrarDefaults | null | undefined, market: AccountMarket): { qtd: string; qtdOutro: boolean } {
@@ -420,9 +423,10 @@ function qtdDoTipo(forma: FormaAtivo | null, padroes: RegistrarDefaults | null |
 
 /**
  * A chip or a search result chosen (RO l.1081–1083): the search empties, the prices, stop, target,
- * exit, result, «Corrigir» and «Venceu sem valor» clear; the quantity stays when its label is the
- * same (contratos → contratos), else it starts over. Crypto «X/Y» from «Usar» sets the coin and its
- * quote (when the quote is one the form offers).
+ * exit price, result, «Corrigir» and «Venceu sem valor» clear (the exit hour stays); the quantity
+ * stays when its label is the same (contratos → contratos), else it starts over. Crypto «X/Y» from
+ * «Usar» sets the coin and its quote (when the quote is one the form offers; else the pair stays
+ * whole, ETH/BTC, and formaDoAtivo reads its two coins).
  */
 export function escolherAtivo(r: Rascunho, market: AccountMarket, simbolo: string, padroes?: RegistrarDefaults | null): Rascunho {
   let ativo = String(simbolo ?? '').trim().toUpperCase();
@@ -442,8 +446,15 @@ export function escolherAtivo(r: Rascunho, market: AccountMarket, simbolo: strin
   return { ...r, ...LIMPAR, ativo, cotacao, ...(mesmaQtd ? {} : qtdDoTipo(depois, padroes, market)) };
 }
 
-/** «Cotada em» changed: the prices clear (RO l.1152) */
-export const mudarCotacao = (r: Rascunho, cotacao: Cotacao): Rascunho => ({ ...r, ...LIMPAR, cotacao });
+/**
+ * «Cotada em» changed: the prices clear (RO l.1152). On a pair whose quote is none of the pills
+ * (ETH/BTC, kept whole by «Usar»), the pill quotes its coin instead: ETH/BTC + USDC → ETH/USDC (N)
+ */
+export function mudarCotacao(r: Rascunho, cotacao: Cotacao): Rascunho {
+  const slash = (r.ativo ?? '').indexOf('/');
+  const ativo = r.ativo && slash > 0 ? r.ativo.slice(0, slash).trim() : r.ativo;
+  return { ...r, ...LIMPAR, ativo, cotacao };
+}
 
 /** «O que você operou?» changed: the prices and the quantity start over; the chips are the other kind's */
 export function mudarTipoEua(r: Rascunho, tipoEua: TipoEua, padroes?: RegistrarDefaults | null): Rascunho {
@@ -928,8 +939,8 @@ export interface ModeloEntrada {
   ativo: ModeloAtivo | null;
   /** «O que você operou?» (stocks accounts only) */
   tipoEua: { valor: TipoEua; opcoes: { rotulo: string; valor: TipoEua }[] } | null;
-  /** «Cotada em» (crypto only) */
-  cotacao: { valor: Cotacao; opcoes: readonly Cotacao[]; nota: string } | null;
+  /** «Cotada em» (crypto only); `valor` null when the pair names a quote none of the pills (ETH/BTC) */
+  cotacao: { valor: Cotacao | null; opcoes: readonly Cotacao[]; nota: string } | null;
   /** The option block (an option only) */
   opcao: ModeloOpcao | null;
   quantidade: ModeloQuantidade | null;
@@ -1218,7 +1229,7 @@ function palavrasDoAtivo(market: AccountMarket, opcao: boolean): { rotulo: strin
 /** The price labels (RO l.1128, 1267): «Preço de entrada» / «Prêmio de entrada, US$ por ação» / «Preço de entrada, USDT» */
 function rotulosDePreco(forma: FormaAtivo | null, conta: Pick<ContaReg, 'clock'>, fechada: boolean): NonNullable<ModeloEntrada['rotulos']> {
   const opcao = forma?.tipo === 'opcao';
-  const cot = forma?.tipo === 'cri' ? forma.cotacao ?? 'USDT' : null;
+  const cot = forma?.tipo === 'cri' ? forma.moedaCotacao ?? 'USDT' : null;
   return {
     preco: opcao ? PRECOS.premioEntrada : cot ? PRECOS.precoEntradaEm(cot) : PRECOS.precoEntrada,
     precoSaida: opcao ? PRECOS.premioSaida : cot ? PRECOS.precoSaidaEm(cot) : PRECOS.precoSaida,
@@ -1249,7 +1260,7 @@ function entradaPrecos(out: ModeloEntrada, x: Contexto & { hoje: string; tentou:
   if (market === 'stocks') {
     out.tipoEua = { valor: r.tipoEua, opcoes: [{ rotulo: TIPO_EUA.acao, valor: 'acao' }, { rotulo: TIPO_EUA.opcao, valor: 'opcao' }] };
   }
-  if (market === 'crypto') out.cotacao = { valor: r.cotacao, opcoes: COTACOES, nota: COTADA.nota };
+  if (market === 'crypto') out.cotacao = { valor: forma ? forma.cotacao : r.cotacao, opcoes: COTACOES, nota: COTADA.nota };
   out.rotulos = rotulosDePreco(forma, conta, fechada);
 
   // The option block
@@ -1318,7 +1329,8 @@ function entradaPrecos(out: ModeloEntrada, x: Contexto & { hoje: string; tentou:
   const rl = linhaRiscoPrecos(forma, conta, { qtd, entrada: entrada.value, lado: r.lado, stop: stop.value, alvo: alvo.value, temNivel });
   out.linhaRisco = rl.linha;
   out.risco = rl.risco;
-  if (forma.tipo === 'cri' && qtd && entrada.value) {
+  // In dollars or reais only: ETH/BTC's position would be in bitcoin (no line, N)
+  if (forma.tipo === 'cri' && forma.cotacao && qtd && entrada.value) {
     const total = numericText(mul(numeric(qtd), numeric(entrada.value)));
     out.linhaPosicao = PRECOS.posicao(compacto(total, forma.cotacao === 'R$' ? 'BRL' : 'USD'));
   }

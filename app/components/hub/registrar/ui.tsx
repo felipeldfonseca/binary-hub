@@ -145,10 +145,13 @@ export function CampoTexto({
   aoMudar,
   erro,
   nota,
+  notaTexto,
   mono = true,
   tipo = 'text',
   decimal = false,
   estilo,
+  classe,
+  campoId,
   placeholder,
   max,
   aoSair,
@@ -160,23 +163,32 @@ export function CampoTexto({
   erro?: string | null
   /** The ids of notes that describe it (the risk line, the warning) */
   nota?: string
+  /** 3-4: a note of its own under the field (`n-{campo}`), before its error: the result's, the costs', the lot note */
+  notaTexto?: string | null
   mono?: boolean
-  tipo?: 'text' | 'time' | 'date'
+  tipo?: 'text' | 'time' | 'date' | 'search'
   decimal?: boolean
   estilo?: React.CSSProperties
+  /** 3-4: the field's width class (hub-reg-curto: 200 px; hub-reg-busca: 280 px) */
+  classe?: string
+  /** 3-4: the wrapper's id («caixa-res», what «Corrigir» controls) */
+  campoId?: string
   placeholder?: string
   max?: string
   aoSair?: () => void
 }) {
-  const erroId = `e-${id.replace(/^f-/, '')}`
+  const nome = id.replace(/^f-/, '')
+  const erroId = `e-${nome}`
+  const notaId = notaTexto ? `n-${nome}` : null
+  const base = mono ? 'hub-entrada hub-entrada--mono hub-reg-entrada' : 'hub-entrada hub-reg-entrada'
   return (
-    <div className="hub-campo">
+    <div id={campoId} className="hub-campo">
       <label htmlFor={id} className="hub-rot-campo">
         {rotulo}
       </label>
       <input
         id={id}
-        className={mono ? 'hub-entrada hub-entrada--mono hub-reg-entrada' : 'hub-entrada hub-reg-entrada'}
+        className={classe ? `${base} ${classe}` : base}
         type={tipo}
         inputMode={decimal ? 'decimal' : undefined}
         autoComplete="off"
@@ -184,12 +196,17 @@ export function CampoTexto({
         max={max}
         placeholder={placeholder}
         aria-invalid={erro ? true : undefined}
-        aria-describedby={descrito(nota, erro && erroId)}
+        aria-describedby={descrito(nota, notaId, erro && erroId)}
         value={valor}
         onChange={(event) => aoMudar(event.target.value)}
         onBlur={aoSair}
         style={estilo}
       />
+      {notaId && (
+        <span id={notaId} className="hub-nota">
+          {notaTexto}
+        </span>
+      )}
       <Erro id={erroId} texto={erro} />
     </div>
   )

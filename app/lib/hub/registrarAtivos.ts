@@ -95,10 +95,15 @@ export interface FormaAtivo {
   tickTexto: string | null;
   /** «O WIN anda de 5 em 5»: the name the tick texts use (the root: WINZ26 → WIN) */
   nomePasso: string;
-  /** Crypto: the coin («BTC»); null elsewhere */
+  /** Crypto: the coin («BTC»; «ETH» of a pair such as ETH/BTC); null elsewhere */
   moedaBase: string | null;
-  /** Crypto: the quote («USDT», «R$»); null elsewhere */
+  /** Crypto: the quote when it is one of «Cotada em» («USDT», «R$»); null elsewhere and for ETH/BTC */
   cotacao: Cotacao | null;
+  /**
+   * Crypto: the quote as the price labels write it («USDT», «R$», and «BTC» of ETH/BTC, a pair whose
+   * quote is none of «Cotada em»: typed, without a position line, N); null elsewhere
+   */
+  moedaCotacao: string | null;
 }
 
 
@@ -197,6 +202,18 @@ export function ativoDoSimbolo(market: AccountMarket, symbol: string): { ativo: 
 }
 
 /**
+ * A crypto symbol as its two coins: «BTC/USDT» → BTC quoted in USDT; «ETH/BTC» (a quote none of
+ * «Cotada em», kept whole by ativoDoSimbolo) → ETH quoted in BTC, `cotacao` null
+ */
+function moedasDoPar(registrado: string): { ativo: string; cotacao: Cotacao | null; moeda: string | null } {
+  const c = cotacaoDoSimbolo(registrado);
+  if (c.cotacao) return { ...c, moeda: c.cotacao };
+  const slash = c.ativo.indexOf('/');
+  if (slash > 0 && slash < c.ativo.length - 1) return { ativo: c.ativo.slice(0, slash).trim(), cotacao: null, moeda: c.ativo.slice(slash + 1).trim() };
+  return { ...c, moeda: null };
+}
+
+/**
  * What one instrument's form looks like (the board's `specDe`), from its descriptors. `simbolo` is
  * the code typed or chosen (crypto: the coin, with `o.cotacao`, or a whole pair); `o.opcao` turns a
  * stock into its listed option (always on an `options` account). Null for an empty symbol, a binary
@@ -213,7 +230,7 @@ export function formaDoAtivo(market: AccountMarket, simbolo: string, o: { opcao?
   const modo: ModoResultado = spec.pnl === 'prices' ? 'exato' : spec.pnl === 'prices_div_exit' ? 'estimativa' : 'digitado';
   const unidadeStop: UnidadeStop = opcao ? 'premio' : spec.stops === 'pts' ? 'pts' : spec.stops === 'pips' ? 'pips' : 'preco';
   const casasMax = spec.tick !== null ? null : spec.priceDp;
-  const coin = market === 'crypto' ? cotacaoDoSimbolo(registrado) : null;
+  const coin = market === 'crypto' ? moedasDoPar(registrado) : null;
   const base = {
     simbolo: registrado,
     raiz: key,
@@ -224,6 +241,7 @@ export function formaDoAtivo(market: AccountMarket, simbolo: string, o: { opcao?
     nomePasso: key,
     moedaBase: coin ? coin.ativo : null,
     cotacao: coin ? coin.cotacao : null,
+    moedaCotacao: coin ? coin.moeda : null,
   };
   const tick = spec.tick;
   switch (market) {
