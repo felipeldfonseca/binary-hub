@@ -40,6 +40,14 @@ jest.mock('@/lib/hub/regrasDb', () => ({
 const mockAgora = new Date('2026-10-19T16:00:00Z')
 jest.mock('@/hooks/useAgora', () => ({ useAgora: () => mockAgora }))
 
+// The new markets get their Registrar in PR 3-4 (D36): a test can let every market register, as
+// 3-4 will by adding them to REGISTRAR_MARKETS, to see the texts that switch then (contract §5.7)
+const mockTodosMercados = { on: false }
+jest.mock('@/lib/hub/registrar', () => {
+  const actual = jest.requireActual('@/lib/hub/registrar')
+  return { ...actual, podeRegistrar: (m: string | null | undefined) => (mockTodosMercados.on ? !!m : actual.podeRegistrar(m)) }
+})
+
 const fetchAccounts = data.fetchAccounts as jest.MockedFunction<typeof data.fetchAccounts>
 const fetchRulesConfig = regrasDb.fetchRulesConfig as jest.MockedFunction<typeof regrasDb.fetchRulesConfig>
 const fetchTradesSince = regrasDb.fetchTradesSince as jest.MockedFunction<typeof regrasDb.fetchTradesSince>
@@ -897,6 +905,39 @@ describe('Suas contas · Fase 2b markets', () => {
       'Uma linha por conta. Cada conta é de um mercado só, com janela, limite e regras próprias. Arquivar vale na hora, guarda o histórico e pode ser desfeito. O Binary Hub não se conecta à sua corretora: as operações chegam por arquivo ou à mão. Por enquanto, lemos o CSV da Ebinex e o Trade History da Top One. Nas contas de Forex, de Ações, de Cripto e da B3, as operações entram pelo “Registrar operação”, que chega na Fase 3, e logo depois também por um CSV em que você diz o que é cada coluna. O relatório do MetaTrader sai em HTML ou PDF, não em CSV: vai precisar de um leitor próprio, que vem depois. O resultado fica na moeda da conta: R$ na B3; US$ nos outros mercados, com USDT e USDC contados como dólar.',
     )
     expect(screen.getByText('Contas de mercados diferentes nunca são somadas.')).toBeInTheDocument()
+  })
+
+  describe('once the four markets can register (PR 3-4 adds them to REGISTRAR_MARKETS)', () => {
+    beforeEach(() => {
+      mockTodosMercados.on = true
+    })
+    afterEach(() => {
+      mockTodosMercados.on = false
+    })
+
+    it('CONTAS.semLeitor: «… entram pelo “Registrar operação”.» under each of their groups, without «na Fase 3»', async () => {
+      renderHub(<SuasContas />)
+
+      await row('Clear')
+      for (const [group, de] of [
+        ['Forex', 'de Forex'],
+        ['Ações', 'de Ações'],
+        ['Cripto', 'de Cripto'],
+        ['B3', 'da B3'],
+      ]) {
+        const note = screen.getByRole('heading', { level: 3, name: group }).nextElementSibling as HTMLElement
+        expect(note).toHaveTextContent(`Ainda não lemos arquivos ${de}: as operações entram pelo “Registrar operação”.`)
+      }
+      expect(screen.queryByText(/Fase 3/)).not.toBeInTheDocument()
+    })
+
+    it('CONTAS.info: «… entram pelo “Registrar operação” e, em breve, também por um CSV …»', async () => {
+      renderHub(<SuasContas />)
+      await userEvent.click(screen.getByRole('button', { name: 'Como ler: Suas contas' }))
+      expect(document.getElementById('info-contas')).toHaveTextContent(
+        'Uma linha por conta. Cada conta é de um mercado só, com janela, limite e regras próprias. Arquivar vale na hora, guarda o histórico e pode ser desfeito. O Binary Hub não se conecta à sua corretora: as operações chegam por arquivo ou à mão. Por enquanto, lemos o CSV da Ebinex e o Trade History da Top One. Nas contas de Forex, de Ações, de Cripto e da B3, as operações entram pelo “Registrar operação” e, em breve, também por um CSV em que você diz o que é cada coluna. O relatório do MetaTrader sai em HTML ou PDF, não em CSV: vai precisar de um leitor próprio, que vem depois. O resultado fica na moeda da conta: R$ na B3; US$ nos outros mercados, com USDT e USDC contados como dólar.',
+      )
+    })
   })
 })
 

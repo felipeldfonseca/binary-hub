@@ -36,6 +36,7 @@ import {
 } from '@/lib/hub/regrasConta'
 import { formatDiaMes } from '@/lib/hub/formato'
 import { firmOfFile, hasFirms } from '@/lib/hub/mesas'
+import { podeRegistrar } from '@/lib/hub/registrar'
 import {
   ARQUIVO,
   BUSY,
@@ -62,6 +63,7 @@ import {
 import { REGRAS_CONTA } from '@/components/hub/contas/copyRegras'
 import { InfoButton, InfoPanel, useToggle } from '@/components/hub/contas/ui'
 import { ERRO_JANELA, REGRAS } from '@/components/hub/personalizar/copy'
+import { useRegistrarSheet } from '@/components/hub/registrar/abrir'
 import { END_STEPS, emptyFileSummary, fileSummary, needsZoneStep, parsedOf, stepIndicator, type Passo } from './flow'
 import RegrasDaConta from './RegrasDaConta'
 import {
@@ -180,6 +182,7 @@ export default function ImportSheet({ mode, accountId, onClose }: { mode: SheetM
   // The saved rules: step b's copy sources and market windows, v1's base_rev, step d's «desde»
   const rulesConfig = useRulesConfig()
   const saveRules = useSaveRules()
+  const registrar = useRegistrarSheet()
   const now = useAgora()
   const [flow, setFlow] = useState<Flow>(() => initialFlow(mode, accountId))
   const [busy, setBusyState] = useState(false)
@@ -278,7 +281,8 @@ export default function ImportSheet({ mode, accountId, onClose }: { mode: SheetM
           fail(new HubDataError(result.tz_status === 'tz_mismatch' ? 'tz_mismatch' : 'invalid_tz'), { ...patch, accountId: target.id })
           return
         }
-        const nothing = result.new === 0 && result.completable === 0 && result.other_account === 0
+        // Phase 3: rows that only complete trades registered in the app (linked) are not «Nada novo»
+        const nothing = result.new === 0 && result.completable === 0 && result.other_account === 0 && (result.linked ?? 0) === 0
         move(nothing ? 'f' : 'd', { ...patch, accountId: target.id, preview: result, zoneUsed: tz }, push)
       } catch (e) {
         fail(e, { ...patch, accountId: target.id })
@@ -472,7 +476,7 @@ export default function ImportSheet({ mode, accountId, onClose }: { mode: SheetM
   const commit = async () => {
     const preview = flow.preview
     if (!preview || !account || !flow.file || !parsed || !flow.zoneUsed) return
-    if (preview.new === 0 && preview.completable === 0) {
+    if (preview.new === 0 && preview.completable === 0 && (preview.linked ?? 0) === 0) {
       // Everything is already in another account: nothing to write
       if (flow.created) move('fim', { nothingImported: true })
       else onClose()
@@ -601,6 +605,8 @@ export default function ImportSheet({ mode, accountId, onClose }: { mode: SheetM
 
   let body: React.ReactNode = null
   let primary: Primary | null = null
+  /** A secondary action right before the primary one (the end of account creation's «Registrar operação») */
+  let secondary: Primary | null = null
   const closeAction: Primary = { label: FOLHA.close, run: onClose }
 
   switch (flow.passo) {
@@ -788,7 +794,12 @@ export default function ImportSheet({ mode, accountId, onClose }: { mode: SheetM
         />
       )
       primary = {
-        label: preview.new > 0 ? PASSO_D.importN(preview.new) : preview.completable > 0 ? PASSO_D.completeN(preview.completable) : FOLHA.done,
+        label:
+          preview.new > 0
+            ? PASSO_D.importN(preview.new)
+            : preview.completable + (preview.linked ?? 0) > 0
+              ? PASSO_D.completeN(preview.completable + (preview.linked ?? 0))
+              : FOLHA.done,
         run: () => void commit(),
       }
       break
@@ -840,7 +851,7 @@ export default function ImportSheet({ mode, accountId, onClose }: { mode: SheetM
       if (flow.nothingImported) {
         title = FIM.created(label)
         lines = [FIM.nothingImported]
-      } else if (result && (result.inserted > 0 || result.completed > 0)) {
+      } else if (result && (result.inserted > 0 || result.completed > 0 || (result.linked ?? 0) > 0)) {
         if (result.inserted > 0) {
           // After the account's rules started, imported rows are judged by them (decisoes)
           const judged =
@@ -848,6 +859,8 @@ export default function ImportSheet({ mode, accountId, onClose }: { mode: SheetM
           lines.push(judged ?? FIM.inHistory(result.inserted))
         }
         if (result.completed > 0) lines.push(FIM.completed(result.completed))
+        // Phase 3: a batch that only completed app trades is kept, and can be undone
+        if ((result.linked ?? 0) > 0) lines.push(FIM.linked(result.linked ?? 0))
         if (result.batch_id) lines.push(FIM.undoLater)
       } else if (result) {
         title = PASSO_F.title(result.duplicate, label)
@@ -869,21 +882,34 @@ export default function ImportSheet({ mode, accountId, onClose }: { mode: SheetM
     case 'fimConta': {
       const created = flow.created
       const title = FIM_CONTA.title(created?.label ?? label)
+      // Phase 3: «Registrar operação» on the new account (it replaces this sheet; focus goes back to
+      // what opened it), for a market whose Registrar exists (D36: Futuros and binárias in 3-3)
+      const registrarNa = created && podeRegistrar(created.market) ? created : null
+      const registrarAction: Primary | null = registrarNa
+        ? { label: FIM_CONTA.registrar, run: () => registrar.open({ accountId: registrarNa.id }) }
+        : null
       if (created && !MARKET_SPEC[created.market].reader) {
         // No file reader for this market yet: no «Importar histórico»; where its trades will come from
         body = (
           <PassoFim
             headingRef={headingRef}
             title={title}
-            lines={[FIM_CONTA.semLeitor, FIM_CONTA.semLeitorArquivo(created.market, created.platform)]}
+            lines={[FIM_CONTA.semLeitor(created.market), FIM_CONTA.semLeitorArquivo(created.market, created.platform)]}
           />
         )
-        primary = closeAction
+        primary = registrarAction ?? closeAction
         break
       }
       const iq = created?.platform === 'iq'
       body = <PassoFim headingRef={headingRef} title={title} lines={[iq ? FIM_CONTA.textIq : FIM_CONTA.text]} />
-      primary = iq ? closeAction : { label: FIM_CONTA.importHistory, run: () => move('solte', { accountId: created?.id ?? flow.accountId }) }
+      if (iq) {
+        // IQ Option exports no history: «Registrar operação» is the only action (board `temLinkDepois`)
+        primary = registrarAction ?? closeAction
+      } else {
+        // Board `temLinkAntes`: «Registrar operação» (secondary) before «Importar histórico»
+        secondary = registrarAction
+        primary = { label: FIM_CONTA.importHistory, run: () => move('solte', { accountId: created?.id ?? flow.accountId }) }
+      }
       break
     }
   }
@@ -909,7 +935,13 @@ export default function ImportSheet({ mode, accountId, onClose }: { mode: SheetM
   })
   const showBack = !END_STEPS.includes(flow.passo) && flow.passo !== 'g' && backIndex >= 0
   const blocked = !!primary && (!!primary.blocked || !!primary.blockedBy)
-  const toastText = flow.passo === 'fim' && flow.commit?.batch_id ? FIM.toast(flow.commit.inserted, label) : ''
+  // A batch that only completed app trades (Phase 3) says what it did instead of «0 operações em …»
+  const toastText =
+    flow.passo === 'fim' && flow.commit?.batch_id
+      ? flow.commit.inserted === 0 && (flow.commit.linked ?? 0) > 0
+        ? FIM.linked(flow.commit.linked ?? 0)
+        : FIM.toast(flow.commit.inserted, label)
+      : ''
   // What the one live region says: the running request, else the latest result
   const rulesNotice = flow.rulesNotSaved ? REGRAS_CONTA.naoSalvas(flow.rulesNotSaved) : ''
   // Step b before the account exists: the rules could not be read, so it will be created without them
@@ -1010,6 +1042,18 @@ export default function ImportSheet({ mode, accountId, onClose }: { mode: SheetM
               )}
               {primary && (
                 <div className="hub-rodape__dir">
+                  {secondary && (
+                    <button
+                      type="button"
+                      className="hub-btn"
+                      aria-disabled={busy || undefined}
+                      onClick={() => {
+                        if (!busyRef.current) secondary?.run()
+                      }}
+                    >
+                      {secondary.label}
+                    </button>
+                  )}
                   <button
                     type="button"
                     className="hub-btn hub-btn--pri"

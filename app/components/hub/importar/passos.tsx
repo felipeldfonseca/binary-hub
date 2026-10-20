@@ -922,6 +922,10 @@ export function PassoPrevia({
       <Count items={items} />
       {preview.other_account > 0 && <p className="hub-passo__txt">{PASSO_D.otherNote(preview.other_account)}</p>}
       {preview.completable > 0 && <p className="hub-passo__txt">{PASSO_D.completable(preview.completable)}</p>}
+      {/* Phase 3 (D29): trades registered in the app that this file completes instead of inserting
+          them again, and those whose money the file corrects (absent before the migration: none) */}
+      {(preview.linked ?? 0) > 0 && <p className="hub-passo__txt">{PASSO_D.linked(preview.linked ?? 0)}</p>}
+      {(preview.linked_differs ?? 0) > 0 && <p className="hub-passo__txt">{PASSO_D.linkedDiffers(preview.linked_differs ?? 0)}</p>}
       {notices.map((text) => (
         <div key={text} className="hub-linha-i">
           <span>{text}</span>
