@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event'
 import * as data from '@/lib/hub/contasDb'
 import * as regrasDb from '@/lib/hub/regrasDb'
 import SuasContas from '@/components/hub/contas/SuasContas'
-import { IMPORTACOES } from '@/components/hub/contas/copy'
+import { CONTAS, IMPORTACOES } from '@/components/hub/contas/copy'
 import HubRoot from '@/components/hub/HubRoot'
 import PersonalizarPagina from '@/components/hub/personalizar/PersonalizarPagina'
 import type { RulesConfig } from '@/lib/hub/regras'
@@ -43,10 +43,13 @@ jest.mock('@/hooks/useAgora', () => ({ useAgora: () => mockAgora }))
 
 // The new markets get their Registrar in PR 3-4 (D36): a test can let every market register, as
 // 3-4 will by adding them to REGISTRAR_MARKETS, to see the texts that switch then (contract §5.7)
-const mockTodosMercados = { on: false }
+const mockTodosMercados = { on: false, alem: [] as string[] }
 jest.mock('@/lib/hub/registrar', () => {
   const actual = jest.requireActual('@/lib/hub/registrar')
-  return { ...actual, podeRegistrar: (m: string | null | undefined) => (mockTodosMercados.on ? !!m : actual.podeRegistrar(m)) }
+  return {
+    ...actual,
+    podeRegistrar: (m: string | null | undefined) => (mockTodosMercados.on ? !!m : actual.podeRegistrar(m) || (!!m && mockTodosMercados.alem.includes(m))),
+  }
 })
 
 const fetchAccounts = data.fetchAccounts as jest.MockedFunction<typeof data.fetchAccounts>
@@ -966,6 +969,17 @@ describe('Suas contas · Fase 2b markets', () => {
       'Uma linha por conta. Cada conta é de um mercado só, com janela, limite e regras próprias. Arquivar vale na hora, guarda o histórico e pode ser desfeito. O Binary Hub não se conecta à sua corretora: as operações chegam por arquivo ou à mão. Por enquanto, lemos o CSV da Ebinex e o Trade History da Top One. Nas contas de Forex, de Ações, de Cripto e da B3, as operações entram pelo “Registrar operação”, que chega na Fase 3, e logo depois também por um CSV em que você diz o que é cada coluna. O relatório do MetaTrader sai em HTML ou PDF, não em CSV: vai precisar de um leitor próprio, que vem depois. O resultado fica na moeda da conta: R$ na B3; US$ nos outros mercados, com USDT e USDC contados como dólar.',
     )
     expect(screen.getByText('Contas de mercados diferentes nunca são somadas.')).toBeInTheDocument()
+  })
+
+  it('CONTAS.info keeps «que chega na Fase 3» until all four markets can register', () => {
+    mockTodosMercados.alem = ['forex', 'stocks', 'crypto']
+    try {
+      expect(CONTAS.info).toContain('entram pelo “Registrar operação”, que chega na Fase 3, e logo depois também por um CSV')
+      mockTodosMercados.alem = ['forex', 'stocks', 'crypto', 'b3']
+      expect(CONTAS.info).toContain('entram pelo “Registrar operação” e, em breve, também por um CSV')
+    } finally {
+      mockTodosMercados.alem = []
+    }
   })
 
   describe('once the four markets can register (PR 3-4 adds them to REGISTRAR_MARKETS)', () => {

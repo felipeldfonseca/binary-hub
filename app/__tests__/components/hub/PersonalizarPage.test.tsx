@@ -1052,6 +1052,31 @@ describe('Preferências · «Avisar ao chegar em 80% do limite do dia» (Phase 3
     expect(sw).toHaveAttribute('aria-checked', 'false')
   })
 
+  it('names only the active accounts: never an archived or an example one', async () => {
+    const config = configMercados()
+    fetchRulesConfig.mockResolvedValue({
+      ...config,
+      accounts: config.accounts.map((a) =>
+        a.id === idsMercados().ftmo ? { ...a, archivedAt: '2026-10-01T00:00:00Z' } : a.id === idsMercados().clear ? { ...a, isExample: true } : a,
+      ),
+    })
+    renderPage()
+    await ready()
+    expect(await chave()).toHaveAccessibleDescription('Com os limites atuais: Top One #1 US$\u00a0320 de perda.')
+  })
+
+  it('follows the limits as «Suas regras» shows them, before they are saved', async () => {
+    renderPage()
+    await ready()
+    const sw = await chave()
+    expect(sw).toHaveAccessibleDescription(LIMITES)
+
+    await mudarLimite('500')
+
+    expect(sw).toHaveAccessibleDescription('Com os limites atuais: Top One #1 US$\u00a0400, FTMO US$\u00a0800 e Clear R$\u00a0400 de perda.')
+    expect(saveRules).not.toHaveBeenCalled()
+  })
+
   it('starts on when the profile has it on, and waits for the profile before it can be used', async () => {
     let answer!: (p: contasDb.HubPreferences) => void
     fetchPreferences.mockReturnValue(new Promise((r) => (answer = r)))
