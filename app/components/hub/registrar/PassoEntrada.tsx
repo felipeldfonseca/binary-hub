@@ -482,7 +482,7 @@ function alvoFoco(campo: CampoEntrada, r: Rascunho, m: ModeloEntrada): string {
 }
 
 /** A server refusal's field (its HINT) as the form's */
-function campoDoServidor(field: string | null, market: 'futures' | 'binary'): CampoEntrada | null {
+function campoDoServidor(field: string | null, market: ContaReg['market']): CampoEntrada | null {
   switch (field) {
     case 'symbol':
       return market === 'binary' ? 'par' : null
