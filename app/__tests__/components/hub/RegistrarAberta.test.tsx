@@ -504,6 +504,23 @@ describe('step 2: double taps and the server’s other answers (review gaps)', (
     expect(screen.getByText('Esta operação já foi fechada em outro lugar.')).toBeInTheDocument()
   })
 
+  it('not_open while the trade still reads open: back to step 2, never «Carregando…» waiting for a close', async () => {
+    db.fetchTradeState.mockResolvedValue(mesAberta())
+    db.registerExit.mockRejectedValueOnce(new registrarDb.RegistrarDataError('not_open'))
+    abrir(ids.trades.mes)
+    await screen.findByRole('heading', { level: 3, name: 'Operação aberta' })
+    await userEvent.type(screen.getByLabelText('Preço de saída'), '7902,5')
+    await userEvent.click(screen.getByRole('button', { name: 'Registrar saída' }))
+    // The trade was read again (still open) and the sheet went to step 3 with it…
+    await waitFor(() => expect(db.fetchTradeState.mock.calls.length).toBeGreaterThanOrEqual(2))
+    // …which sends a trade that is open to its step 2: a new step, whose heading takes the focus
+    await waitFor(() => expect(screen.getByRole('heading', { level: 3, name: 'Operação aberta' })).toHaveFocus())
+    expect(screen.getByText('Passo 2 de 3 · Aberta')).toBeInTheDocument()
+    expect(screen.queryByText('Carregando…')).not.toBeInTheDocument()
+    expect(screen.queryByText('Esta operação já foi fechada em outro lugar.')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Registrar saída' })).toBeInTheDocument()
+  })
+
   it('a lost exit: the alert is scrolled into view (it appears above the sticky footer, below the screen on a phone)', async () => {
     const scroll = jest.fn()
     const original = Element.prototype.scrollIntoView
