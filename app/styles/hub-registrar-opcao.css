@@ -1,5 +1,31 @@
 /*
  * Phase 3 · 3-4 lane B: «O que você operou?», the option block and «Venceu sem valor»
- * (components/hub/registrar/OQueOperou, BlocoOpcao, VenceuSemValor). Scoped to .hub; tokens of
- * styles/hub.css. Empty until lane B fills it (lane D created it so the import is in place).
+ * (components/hub/registrar/OQueOperou, BlocoOpcao, VenceuSemValor; RegistrarOperacao.dc.html v57,
+ * RO l.345–356, 372). Scoped to .hub; tokens of styles/hub.css. The pills, fields, notes and errors
+ * are hub.css's and hub-registrar.css's (16 px fields on phones, the dashed aria-disabled pill).
  */
+
+/* «Vencimento»: the pills and «Outra data» side by side, wrapping (RO l.350) */
+.hub .hub-reg-venc {
+  display: flex;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  min-width: 0;
+}
+
+/* «Outra data» is 180 px wide (RO l.352), never wider than the sheet */
+.hub .hub-reg-venc-data {
+  width: 180px;
+  max-width: 100%;
+}
+
+/* «Venceu sem valor» and its note on one row (RO l.372 `cab`, flex-start), the note wraps under it */
+.hub .hub-reg-vsv {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  min-width: 0;
+}
