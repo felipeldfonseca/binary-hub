@@ -1,5 +1,206 @@
 /*
  * Phase 3 · lane B: «Operações do dia» on /diario (until Phase 4), the Diário header's «Registrar
  * operação», the 80 % switch in Personalizar › Preferências and the import preview's new lines.
- * Every rule is scoped to .hub. Empty in the shared base; lane B owns this file.
+ * Every rule is scoped to .hub (tokens from styles/hub.css). Imported by app/(hub)/layout.tsx; only
+ * lane B edits this file. Measures from the approved board RegistrarOperacao.dc.html v57
+ * (`.ponte`, `.p-tab`, `.p-linha`, `.p-cab`, `.p-acao`, `.marca`, RO l.164–184) and the 2b board
+ * Personalizar.dc.html (`.chave`, l.22–25).
  */
+
+/* «Operações do dia» (board `.ponte`) */
+
+.hub .hub-ops-dia {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+  scroll-margin-top: 16px;
+}
+.hub .hub-ops-dia__titulo {
+  margin: 0;
+  font-family: 'Poly', Georgia, serif;
+  font-size: 24px;
+  font-weight: 400;
+  line-height: 1.25;
+}
+.hub .hub-ops-dia__titulo:focus {
+  outline: none;
+}
+.hub .hub-ops-dia__titulo:focus-visible {
+  outline: 2px dashed var(--mint-border);
+  outline-offset: 4px;
+  border-radius: 4px;
+}
+.hub .hub-ops-dia__vazio {
+  font-size: 13px;
+}
+
+/* The table (board `.p-tab`): one grid row per trade, the header row in small capitals */
+.hub .hub-ops-dia__tab {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.hub .hub-ops-dia__linha {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1.5fr) 120px minmax(0, 1fr) 170px;
+  gap: 6px 12px;
+  align-items: center;
+  padding: 8px 12px;
+  border-radius: 12px;
+  background: var(--inset);
+  font-size: 13px;
+}
+.hub .hub-ops-dia__linha > * {
+  min-width: 0;
+}
+/* A trade outside the plan: an amber outline, besides its «● fora da janela» */
+.hub .hub-ops-dia__linha--fora {
+  box-shadow: inset 0 0 0 1px var(--amber-border);
+}
+.hub .hub-ops-dia__cab {
+  padding: 0 12px;
+  background: transparent;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-2);
+}
+.hub .hub-ops-dia__hora {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 12px;
+  font-weight: 400;
+}
+.hub .hub-ops-dia__op {
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+/* Inline after the operation's text (Tailwind's preflight makes every svg a block) */
+.hub .hub-ops-dia__clipe {
+  display: inline-block;
+  vertical-align: -2px;
+  fill: none;
+  stroke: var(--text-2);
+  stroke-width: 2.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.hub .hub-ops-dia__valor {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  white-space: nowrap;
+}
+/* «No plano» (board `.marca.marca-ok`) and «● fora da janela» */
+.hub .hub-ops-dia__marca {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--mint-border);
+  color: var(--mint);
+  font-size: 12px;
+  font-weight: 700;
+}
+.hub .hub-ops-dia__fora {
+  font-size: 12px;
+  color: var(--amber);
+}
+.hub .hub-ops-dia__acao {
+  display: flex;
+  justify-content: flex-end;
+}
+
+/* ≤ 860 px: no header row on screen (still read), each row on two columns (board RO l.176–184) */
+@media (max-width: 860px) {
+  .hub .hub-ops-dia__cab {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+  .hub .hub-ops-dia__linha {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+  .hub .hub-ops-dia__linha > :nth-child(1) {
+    grid-column: 1;
+    grid-row: 1;
+  }
+  .hub .hub-ops-dia__linha > :nth-child(2) {
+    grid-column: 1;
+    grid-row: 2;
+  }
+  .hub .hub-ops-dia__linha > :nth-child(3) {
+    grid-column: 2;
+    grid-row: 1 / 3;
+    align-self: center;
+    text-align: right;
+  }
+  .hub .hub-ops-dia__linha > :nth-child(4) {
+    grid-column: 1;
+    grid-row: 3;
+  }
+  .hub .hub-ops-dia__linha > :nth-child(5) {
+    grid-column: 2;
+    grid-row: 3;
+  }
+}
+
+/* Personalizar › Preferências: «Avisar ao chegar em 80% do limite do dia» (2b board `.chave`, a
+   56 × 44 hit area with the 44 × 24 track at its right edge) */
+.hub .hub-pz-chave {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  width: 56px;
+  min-height: 44px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+.hub .hub-pz-chave[aria-disabled='true'] {
+  cursor: progress;
+}
+.hub .hub-pz-chave__tr {
+  position: relative;
+  display: block;
+  width: 44px;
+  height: 24px;
+  border-radius: 999px;
+  background: var(--track);
+  box-shadow: inset 0 0 0 1.5px var(--text-2);
+}
+.hub .hub-pz-chave__tr::after {
+  content: '';
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  background: var(--text-2);
+  transition: transform 0.15s ease-out;
+}
+.hub .hub-pz-chave[aria-checked='true'] .hub-pz-chave__tr {
+  background: var(--mint);
+  box-shadow: none;
+}
+.hub .hub-pz-chave[aria-checked='true'] .hub-pz-chave__tr::after {
+  transform: translateX(20px);
+  background: #26301f;
+}
+.hub .hub-pz-chave:focus-visible {
+  border-radius: 999px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .hub .hub-pz-chave__tr::after {
+    transition: none;
+  }
+}

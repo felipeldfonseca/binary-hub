@@ -4,11 +4,12 @@ import { focusManager, onlineManager } from '@tanstack/react-query'
 import userEvent from '@testing-library/user-event'
 import * as data from '@/lib/hub/contasDb'
 import * as regrasDb from '@/lib/hub/regrasDb'
-import DiarioCabecalho from '@/components/hub/contas/DiarioCabecalho'
+import DiarioCabecalho, { contaParaRegistrar } from '@/components/hub/contas/DiarioCabecalho'
 import ImportSheetProvider from '@/components/hub/importar/ImportSheetProvider'
 import { QueryProvider } from '@/lib/providers/QueryProvider'
 import { makeAccount, renderHub } from '@/testing/hubHarness'
 import { agora, agoraMercados, contasMercados, idsDono, idsMercados } from '@/testing/regras'
+import { contasTelas, idsTelas } from '@/testing/registrarTelas'
 import { regrasKeys } from '@/hooks/useRegras'
 import { hubKeys } from '@/hooks/useContas'
 import type { TradingAccount } from '@/lib/hub/contas'
@@ -50,6 +51,45 @@ jest.mock('@/components/hub/importar/ImportSheetProvider', () => {
   }
 })
 
+// Phase 3: «Registrar operação» opens the Registrar sheet through useRegistrarSheet().open; the
+// call is recorded, and the sheet is a stand-in (lane A's; contract §6.2, C9) showing its props
+const mockRegistrarOpen = jest.fn()
+jest.mock('@/components/hub/registrar/abrir', () => {
+  const { useMemo } = jest.requireActual('react')
+  const actual = jest.requireActual('@/components/hub/registrar/abrir')
+  return {
+    __esModule: true,
+    ...actual,
+    useRegistrarSheet: () => {
+      const sheet = actual.useRegistrarSheet()
+      return useMemo(
+        () => ({
+          ...sheet,
+          open: (options: unknown) => {
+            mockRegistrarOpen(options)
+            sheet.open(options)
+          },
+        }),
+        [sheet],
+      )
+    },
+  }
+})
+const mockSheet = jest.fn()
+jest.mock('@/components/hub/registrar/RegistrarSheet', () => ({
+  __esModule: true,
+  default: function RegistrarSheetStub(props: { accountId: string | null; tradeId: string | null; onClose: () => void }) {
+    mockSheet({ accountId: props.accountId, tradeId: props.tradeId })
+    return (
+      <section role="dialog" aria-label="Registrar operação">
+        <button type="button" onClick={() => props.onClose()}>
+          Fechar
+        </button>
+      </section>
+    )
+  },
+}))
+
 jest.mock('@/hooks/useAuth', () => ({
   useAuth: () => ({ user: { id: 'user-1' }, session: { access_token: 'user-jwt' } }),
 }))
@@ -87,6 +127,8 @@ beforeEach(() => {
   mockSearch = ''
   mockReplace.mockReset()
   mockOpen.mockReset()
+  mockRegistrarOpen.mockReset()
+  mockSheet.mockReset()
   fetchAccounts.mockReset().mockResolvedValue([topOne, ebinex, apex, example, closed])
   fetchPreferences.mockReset().mockResolvedValue({ tema: 'escuro' })
   mergePreferences.mockReset().mockImplementation(async (_db, patch) => ({ tema: 'escuro', ...patch }) as data.HubPreferences)
@@ -139,7 +181,7 @@ describe('Diário header', () => {
     expect(within(list).queryByText('Velha')).not.toBeInTheDocument()
   })
 
-  it('saves the choice by merging conta_atual alone into the preferences', async () => {
+  it('saves the choice by merging conta_atual alone into the preferences, and puts it in ?conta= for the page’s other blocks', async () => {
     renderHub(<DiarioCabecalho />)
 
     await userEvent.click(await selectorButton())
@@ -147,7 +189,26 @@ describe('Diário header', () => {
 
     expect(await selectorButton()).toHaveTextContent('Conta: Top One')
     expect(mergePreferences).toHaveBeenCalledWith(expect.anything(), { conta_atual: topOne.id })
-    expect(mockReplace).not.toHaveBeenCalled()
+    // «Operações do dia» reads the current account too: the URL is the one source both read first
+    // (lane B review); no scroll to the top
+    expect(mockReplace).toHaveBeenCalledTimes(1)
+    expect(mockReplace).toHaveBeenCalledWith(`/diario?conta=${topOne.id}`, { scroll: false })
+  })
+
+  it('keeps the URL’s other parameters with the choice, and never a sheet’s that was already handled', async () => {
+    // ?registrar=1 opened the sheet; the URL here does not follow router.replace, so the header
+    // still sees it when the owner picks an account after closing the sheet
+    mockSearch = 'de=inicio&registrar=1'
+    renderHub(<DiarioCabecalho />)
+    await userEvent.click(await screen.findByRole('button', { name: 'Fechar' }))
+    expect(mockSheet).toHaveBeenCalledTimes(1)
+    mockReplace.mockClear()
+
+    await userEvent.click(await selectorButton())
+    await userEvent.click(screen.getByRole('button', { name: /Top One/ }))
+
+    expect(mockReplace).toHaveBeenCalledWith(`/diario?de=inicio&conta=${topOne.id}`, { scroll: false })
+    expect(mockSheet).toHaveBeenCalledTimes(1)
   })
 
   it('saves the choice even when the preferences could not be read: the merge never writes the other keys', async () => {
@@ -179,6 +240,8 @@ describe('Diário header', () => {
     await userEvent.click(await selectorButton())
     await userEvent.click(screen.getByRole('button', { name: /Top One/ }))
 
+    // useContaAtual moves it, as before (once)
+    expect(mockReplace).toHaveBeenCalledTimes(1)
     expect(mockReplace).toHaveBeenCalledWith(`/diario?conta=${topOne.id}`)
   })
 
@@ -619,5 +682,159 @@ describe('Diário header in six markets (Fase 2b)', () => {
     mockSearch = `importar=1&conta=${im[key]}`
     renderHub(<DiarioCabecalho />)
     await waitFor(() => expect(mockOpen).toHaveBeenCalledWith(expect.objectContaining({ mode: 'importar', accountId: im[key] })))
+  })
+})
+
+describe('Diário header · «Registrar operação» (Phase 3)', () => {
+  // The recorded accounts of the Registrar fixtures: Top One #1 (futures, primary), Ebinex, FTMO (forex)
+  const tid = idsTelas()
+  const registrarButton = () => screen.findByRole('button', { name: 'Registrar operação' })
+
+  beforeEach(() => {
+    fetchAccounts.mockResolvedValue(contasTelas())
+    fetchPreferences.mockResolvedValue({})
+  })
+
+  it('is the primary action, first in the header, before «Importar arquivo»', async () => {
+    renderHub(<DiarioCabecalho />)
+
+    const registrar = await registrarButton()
+    expect(registrar).toHaveClass('hub-btn', 'hub-btn--pri')
+    const actions = registrar.closest('.hub-acoes') as HTMLElement
+    expect(within(actions).getAllByRole('button').map((b) => b.textContent)).toEqual(['Registrar operação', 'Importar arquivo'])
+    expect(screen.getByRole('button', { name: 'Importar arquivo' })).not.toHaveClass('hub-btn--pri')
+  })
+
+  it('opens the Registrar sheet on the current account; closing gives the focus back to it', async () => {
+    fetchPreferences.mockResolvedValue({ conta_atual: tid.accounts.ebinex })
+    renderHub(<DiarioCabecalho />)
+    await screen.findByRole('button', { name: /^Conta: Ebinex/ })
+
+    const registrar = await registrarButton()
+    await userEvent.click(registrar)
+
+    expect(mockRegistrarOpen).toHaveBeenCalledWith({ accountId: tid.accounts.ebinex, opener: registrar })
+    expect(mockSheet).toHaveBeenLastCalledWith({ accountId: tid.accounts.ebinex, tradeId: null })
+    expect(mockOpen).not.toHaveBeenCalled()
+    await userEvent.click(screen.getByRole('button', { name: 'Fechar' }))
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(registrar).toHaveFocus()
+  })
+
+  it('is not there while the accounts load, after a failed read, in the empty state, or on an account of a new market (FTMO)', async () => {
+    let answer!: (accounts: TradingAccount[]) => void
+    fetchAccounts.mockReturnValue(new Promise((r) => (answer = r)))
+    const loading = renderHub(<DiarioCabecalho />)
+    expect(screen.getByText('Carregando…')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Registrar operação' })).not.toBeInTheDocument()
+    await act(async () => answer(contasTelas()))
+    expect(await registrarButton()).toBeInTheDocument()
+    loading.unmount()
+
+    fetchAccounts.mockReset().mockRejectedValue(new data.HubDataError('network'))
+    const failed = renderHub(<DiarioCabecalho />)
+    expect(await screen.findByRole('alert')).toHaveTextContent('Não foi possível carregar as contas.')
+    expect(screen.queryByRole('button', { name: 'Registrar operação' })).not.toBeInTheDocument()
+    failed.unmount()
+
+    fetchAccounts.mockReset().mockResolvedValue([example])
+    const empty = renderHub(<DiarioCabecalho />)
+    expect(await screen.findByText('Traga o histórico da sua corretora.')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Registrar operação' })).not.toBeInTheDocument()
+    empty.unmount()
+
+    // D36: the new markets keep their interim state until 3-4 (no Registrar for them yet)
+    fetchAccounts.mockReset().mockResolvedValue(contasTelas())
+    fetchPreferences.mockResolvedValue({ conta_atual: tid.accounts.ftmo })
+    renderHub(<DiarioCabecalho />)
+    expect(await screen.findByRole('button', { name: /^Conta: FTMO/ })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Registrar operação' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Importar arquivo' })).toBeInTheDocument()
+  })
+
+  it.each([false, true])('?registrar=1 opens it once on the current account and leaves the URL with ?conta= (strict mode: %s)', async (strict) => {
+    mockSearch = `registrar=1&conta=${tid.accounts.ebinex}`
+    renderHub(<DiarioCabecalho />, { strict })
+
+    expect(await screen.findByRole('dialog', { name: 'Registrar operação' })).toBeInTheDocument()
+    expect(mockRegistrarOpen).toHaveBeenCalledTimes(1)
+    expect(mockRegistrarOpen).toHaveBeenCalledWith({
+      accountId: tid.accounts.ebinex,
+      opener: screen.getByRole('button', { name: 'Registrar operação', hidden: true }),
+      fallback: screen.getByRole('heading', { level: 1, name: 'Diário', hidden: true }),
+    })
+    await waitFor(() => expect(mockReplace).toHaveBeenCalledWith(`/diario?conta=${tid.accounts.ebinex}`))
+    expect(mockOpen).not.toHaveBeenCalled()
+  })
+
+  it('?registrar=1 alone drops to /diario', async () => {
+    mockSearch = 'registrar=1'
+    renderHub(<DiarioCabecalho />)
+
+    await waitFor(() => expect(mockRegistrarOpen).toHaveBeenCalledWith(expect.objectContaining({ accountId: tid.accounts.topOne })))
+    await waitFor(() => expect(mockReplace).toHaveBeenCalledWith('/diario'))
+  })
+
+  it('?registrar=1 with FTMO current opens on the first account that can register (the primary), focus back to the H1', async () => {
+    mockSearch = `registrar=1&conta=${tid.accounts.ftmo}`
+    renderHub(<DiarioCabecalho />)
+
+    expect(await screen.findByRole('dialog', { name: 'Registrar operação' })).toBeInTheDocument()
+    const h1 = screen.getByRole('heading', { level: 1, name: 'Diário', hidden: true })
+    expect(mockRegistrarOpen).toHaveBeenCalledWith({ accountId: tid.accounts.topOne, opener: h1, fallback: h1 })
+    expect(screen.getByRole('button', { name: /^Conta: FTMO/, hidden: true })).toBeInTheDocument()
+    await waitFor(() => expect(mockReplace).toHaveBeenCalledWith(`/diario?conta=${tid.accounts.ftmo}`))
+
+    await userEvent.click(screen.getByRole('button', { name: 'Fechar' }))
+    expect(h1).toHaveFocus()
+  })
+
+  it('?registrar=1 without any account that can register opens nothing, and still leaves the URL', async () => {
+    const ftmoOnly = contasTelas().filter((a) => a.id === tid.accounts.ftmo)
+    fetchAccounts.mockResolvedValue(ftmoOnly)
+    mockSearch = 'registrar=1'
+    renderHub(<DiarioCabecalho />)
+
+    await waitFor(() => expect(mockReplace).toHaveBeenCalledWith('/diario'))
+    expect(mockRegistrarOpen).not.toHaveBeenCalled()
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
+
+  it('?registrar=1 wins over ?importar=1: one sheet, and both leave the URL', async () => {
+    mockSearch = `importar=1&registrar=1&conta=${tid.accounts.topOne}`
+    renderHub(<DiarioCabecalho />)
+
+    expect(await screen.findByRole('dialog', { name: 'Registrar operação' })).toBeInTheDocument()
+    await waitFor(() => expect(mockReplace).toHaveBeenCalledWith(`/diario?conta=${tid.accounts.topOne}`))
+    expect(mockRegistrarOpen).toHaveBeenCalledTimes(1)
+    expect(mockOpen).not.toHaveBeenCalled()
+    expect(screen.getAllByRole('dialog')).toHaveLength(1)
+  })
+
+  it('waits for the accounts before it opens', async () => {
+    let answer!: (accounts: TradingAccount[]) => void
+    fetchAccounts.mockReturnValue(new Promise((r) => (answer = r)))
+    mockSearch = 'registrar=1'
+    renderHub(<DiarioCabecalho />)
+    await act(async () => {})
+    expect(mockRegistrarOpen).not.toHaveBeenCalled()
+    expect(mockReplace).not.toHaveBeenCalled()
+
+    await act(async () => answer(contasTelas()))
+
+    await waitFor(() => expect(mockRegistrarOpen).toHaveBeenCalledTimes(1))
+  })
+
+  it('contaParaRegistrar: the current account if it can, else the primary that can, else the first that can, else none', () => {
+    const contas = contasTelas()
+    const [topOne1, ebx, ftmo] = [tid.accounts.topOne, tid.accounts.ebinex, tid.accounts.ftmo].map((id) => contas.find((a) => a.id === id) as TradingAccount)
+    expect(contaParaRegistrar(ebx, contas)).toBe(ebx)
+    expect(contaParaRegistrar(ftmo, contas)).toBe(topOne1)
+    expect(contaParaRegistrar(ftmo, [ftmo, ebx, { ...topOne1, is_primary: false }])).toBe(ebx)
+    // The primary wins over list order
+    expect(contaParaRegistrar(ftmo, [ftmo, ebx, topOne1])).toBe(topOne1)
+    expect(contaParaRegistrar(null, [ebx, topOne1])).toBe(topOne1)
+    expect(contaParaRegistrar(null, contas)).toBe(topOne1)
+    expect(contaParaRegistrar(ftmo, [ftmo])).toBeNull()
   })
 })
