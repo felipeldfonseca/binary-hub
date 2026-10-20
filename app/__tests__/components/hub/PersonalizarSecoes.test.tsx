@@ -5,7 +5,8 @@ import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import QuandoVoceOpera from '@/components/hub/personalizar/QuandoVoceOpera'
 import SuasRegras from '@/components/hub/personalizar/SuasRegras'
-import Preferencias from '@/components/hub/personalizar/Preferencias'
+import Preferencias, { type Aviso80 } from '@/components/hub/personalizar/Preferencias'
+import { notaAviso80 } from '@/components/hub/personalizar/PersonalizarPagina'
 import { BarraSalvar } from '@/components/hub/personalizar/BarraSalvar'
 import type { FormLimite } from '@/components/hub/personalizar/PersonalizarProvider'
 import { entidadesRegrasDe, lerLimite } from '@/lib/hub/personalizarRegras'
@@ -835,7 +836,10 @@ describe('SuasRegras in six markets (Fase 2b)', () => {
     expect(limiteValor()).toHaveTextContent('Sem limite')
     expect(hojeLinhas()).toEqual(['O dia todoSem janela salva'])
     expect(screen.getByText('Nenhuma versão salva')).toBeInTheDocument()
-    expect(screen.getByText('Até salvar, as operações ficam em “Histórico importado · só resultado”.')).toBeInTheDocument()
+    // Phase 3 (D18): the Registrar asks for the rules first
+    expect(
+      screen.getByText('Até salvar, as operações importadas ficam em “Histórico importado · só resultado”, e o “Registrar operação” pede as regras antes.'),
+    ).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Começar as regras hoje' })).toBeInTheDocument()
   })
 
@@ -851,10 +855,15 @@ describe('SuasRegras in six markets (Fase 2b)', () => {
   })
 })
 
+/** The 80 % switch's props (Phase 3): off, with no note, unless a test says otherwise */
+const aviso = (over: Partial<Aviso80> = {}): Aviso80 => ({ ligado: false, esperando: false, nota: null, erro: false, onAlternar: () => {}, ...over })
+
 describe('Preferencias and the bar', () => {
   it('Tema is instant and «Horários na tela» waits for the rules', async () => {
     const onTema = jest.fn()
-    const { rerender } = render(<Preferencias tema="claro" onTema={onTema} carga="carregando" onTentar={() => {}} horarios={null} onHorarios={() => {}} />)
+    const { rerender } = render(
+      <Preferencias tema="claro" onTema={onTema} carga="carregando" onTentar={() => {}} horarios={null} onHorarios={() => {}} aviso80={aviso()} />,
+    )
     const tema = screen.getByRole('group', { name: 'Tema' })
     expect(within(tema).getByRole('button', { name: 'Claro' })).toHaveAttribute('aria-pressed', 'true')
     await userEvent.click(within(tema).getByRole('button', { name: 'Escuro' }))
@@ -862,7 +871,7 @@ describe('Preferencias and the bar', () => {
     expect(screen.getByText('Carregando…')).toBeInTheDocument()
 
     const onHorarios = jest.fn()
-    rerender(<Preferencias tema="escuro" onTema={onTema} carga="pronto" onTentar={() => {}} horarios="et" onHorarios={onHorarios} />)
+    rerender(<Preferencias tema="escuro" onTema={onTema} carga="pronto" onTentar={() => {}} horarios="et" onHorarios={onHorarios} aviso80={aviso()} />)
     const horarios = screen.getByRole('group', { name: 'Horários na tela' })
     expect(within(horarios).getAllByRole('button').map((b) => [b.textContent, b.getAttribute('aria-pressed')])).toEqual([
       ['Nova York (ET)', 'true'],
@@ -871,6 +880,57 @@ describe('Preferencias and the bar', () => {
     ])
     await userEvent.click(within(horarios).getByRole('button', { name: 'Brasília' }))
     expect(onHorarios).toHaveBeenCalledWith('br')
+  })
+
+  it('«Avisar ao chegar em 80% do limite do dia»: a switch named by its title, described by the limits, after «Horários na tela»', async () => {
+    const onAlternar = jest.fn()
+    const nota = 'Com os limites atuais: Top One #1 US$ 320 de perda.'
+    const { rerender } = render(
+      <Preferencias tema="claro" onTema={() => {}} carga="pronto" onTentar={() => {}} horarios="et" onHorarios={() => {}} aviso80={aviso({ nota, onAlternar })} />,
+    )
+    const chave = screen.getByRole('switch', { name: 'Avisar ao chegar em 80% do limite do dia' })
+    expect(chave).toHaveAttribute('aria-checked', 'false')
+    expect(chave).toHaveAccessibleDescription(nota)
+    expect(chave).toHaveClass('hub-pz-chave')
+    // The board's order: Tema, Horários na tela, then the switch (the Phase 5 siblings stay out)
+    const rows = screen.getAllByRole('listitem').map((li) => li.querySelector('.hub-pz-pref__nome')?.textContent)
+    expect(rows).toEqual(['Tema', 'Horários na tela', 'Avisar ao chegar em 80% do limite do dia'])
+    expect(screen.queryByText('Avisar quando um ativo mudar de estado')).not.toBeInTheDocument()
+    expect(screen.queryByText('Avisar 10 minutos antes de um bloqueio')).not.toBeInTheDocument()
+
+    await userEvent.click(chave)
+    expect(onAlternar).toHaveBeenCalledTimes(1)
+
+    // While the preferences are read the switch waits, focusable, and a tap does nothing
+    rerender(
+      <Preferencias tema="claro" onTema={() => {}} carga="pronto" onTentar={() => {}} horarios="et" onHorarios={() => {}} aviso80={aviso({ nota, onAlternar, esperando: true })} />,
+    )
+    expect(chave).toHaveAttribute('aria-disabled', 'true')
+    await userEvent.click(chave)
+    expect(onAlternar).toHaveBeenCalledTimes(1)
+
+    rerender(
+      <Preferencias tema="claro" onTema={() => {}} carga="pronto" onTentar={() => {}} horarios="et" onHorarios={() => {}} aviso80={aviso({ ligado: true, erro: true })} />,
+    )
+    expect(chave).toHaveAttribute('aria-checked', 'true')
+    expect(chave).not.toHaveAccessibleDescription()
+    expect(screen.getByRole('alert')).toHaveTextContent('Não foi possível salvar. Tente de novo.')
+  })
+
+  it('the 80 % note lists each active account’s limit at 80 %, in its currency and list order, from the page’s rules', () => {
+    const c = configMercados()
+    expect(notaAviso80(activeAccounts(c), c.settings)).toBe('Com os limites atuais: Top One #1 US$\u00a0320, FTMO US$\u00a0800 e Clear R$\u00a0400 de perda.')
+    // The draft, as «Suas regras» shows it: a limit typed on the page counts before it is saved
+    const draft = comLimite(c.settings, im.ebinex, 2550)
+    expect(notaAviso80(activeAccounts(c), draft)).toBe(
+      'Com os limites atuais: Top One #1 US$\u00a0320, Ebinex US$\u00a020,40, FTMO US$\u00a0800 e Clear R$\u00a0400 de perda.',
+    )
+    const semLimites: RulesSettings = {
+      ...c.settings,
+      accounts: Object.fromEntries(Object.entries(c.settings.accounts).map(([id, a]) => [id, { ...a, limit: null }])),
+    }
+    expect(notaAviso80(activeAccounts(c), semLimites)).toBe('Nenhuma conta tem limite do dia.')
+    expect(notaAviso80(activeAccounts(c), null)).toBeNull()
   })
 
   it('the bar’s disabled buttons stay focusable and do nothing', async () => {

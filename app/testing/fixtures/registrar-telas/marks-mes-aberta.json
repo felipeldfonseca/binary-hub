@@ -1,0 +1,183 @@
+{
+  "gate": {
+    "at": "2026-10-22T14:12:04.826542+00:00",
+    "block": {
+      "state": "nao_avaliado",
+      "reason": "fase5"
+    },
+    "desde": "2026-10-14T13:00:05.519097+00:00",
+    "label": "Top One #1",
+    "limit": {
+      "usd": 400,
+      "mode": "conta",
+      "near": false,
+      "used": 0.6125,
+      "state": "ok",
+      "hit_at": null,
+      "reason": null,
+      "trades": 1,
+      "net_usd": -245,
+      "at_limit": "encerrar",
+      "worst_usd": -245
+    },
+    "today": {
+      "trades": 1,
+      "net_usd": -245,
+      "worst_usd": -245
+    },
+    "market": "futures",
+    "status": "liberado",
+    "window": {
+      "next": {
+        "opens_at": "2026-10-23T14:00:00+00:00",
+        "closes_at": "2026-10-23T15:00:00+00:00",
+        "trading_day": "2026-10-23"
+      },
+      "state": "dentro",
+      "reason": null,
+      "current": {
+        "opens_at": "2026-10-22T14:00:00+00:00",
+        "closes_at": "2026-10-22T15:00:00+00:00"
+      },
+      "position": "dentro"
+    },
+    "version": {
+      "id": "9301fb9a-76dc-46b7-88a6-0068c502d531",
+      "origin": "criar",
+      "version_no": 1,
+      "effective_from": "2026-10-14T13:00:05.519097+00:00"
+    },
+    "warnings": [],
+    "desde_day": "2026-10-14",
+    "account_id": "1dc03d72-29c1-4ff3-ad8a-94f63027f4f8",
+    "changes_at": "2026-10-22T15:00:00+00:00",
+    "state_rule": {
+      "state": "nao_avaliado",
+      "reason": "fase5"
+    },
+    "trading_day": "2026-10-22",
+    "checks_evaluated": [
+      "janela",
+      "limite"
+    ]
+  },
+  "plan": {
+    "breaks": [],
+    "verdict": "no_plano",
+    "checks_evaluated": [
+      "janela",
+      "limite"
+    ]
+  },
+  "marks": [
+    {
+      "id": 11,
+      "kind": "setup",
+      "limpa": true,
+      "value": "A",
+      "marked_at": "2026-10-22T14:12:04.826542+00:00"
+    },
+    {
+      "id": 12,
+      "kind": "execucao",
+      "limpa": true,
+      "value": "no_ponto",
+      "marked_at": "2026-10-22T14:12:04.826542+00:00"
+    },
+    {
+      "id": 14,
+      "kind": "emocao",
+      "limpa": true,
+      "value": "calmo",
+      "marked_at": "2026-10-22T14:31:04.885696+00:00"
+    }
+  ],
+  "trade": {
+    "id": "47927139-8758-482a-b169-f6cf7bd74750",
+    "pnl": null,
+    "note": null,
+    "option": null,
+    "result": "pending",
+    "source": "live",
+    "status": "open",
+    "symbol": "MES",
+    "quantity": 2,
+    "direction": "long",
+    "exit_time": null,
+    "pnl_basis": null,
+    "timeframe": null,
+    "account_id": "1dc03d72-29c1-4ff3-ad8a-94f63027f4f8",
+    "asset_type": "futures",
+    "commission": null,
+    "entry_time": "2026-10-22T14:12:04.826542+00:00",
+    "exit_price": null,
+    "expires_at": null,
+    "stop_price": 7902.5,
+    "entry_price": 7912.5,
+    "trading_day": "2026-10-22",
+    "stake_amount": null,
+    "target_price": 7932.5,
+    "note_saved_at": null,
+    "registered_at": "2026-10-22T14:12:04.826542+00:00",
+    "payout_percent": null,
+    "duration_seconds": null,
+    "exit_registered_at": null
+  },
+  "images": [],
+  "context": {
+    "origin": "live",
+    "rule_ok": null,
+    "in_block": null,
+    "warnings": [],
+    "in_window": true,
+    "after_limit": false,
+    "captured_at": "2026-10-22T14:12:04.826542+00:00",
+    "gate_status": "liberado",
+    "evaluated_at": "2026-10-22T14:12:04.826542+00:00",
+    "state_choice": null,
+    "checks_evaluated": [
+      "janela",
+      "limite"
+    ],
+    "day_pnl_at_entry": -245,
+    "day_worst_at_entry": -245
+  },
+  "version": {
+    "id": "9301fb9a-76dc-46b7-88a6-0068c502d531",
+    "version_no": 1
+  },
+  "entry_at": "2026-10-22T14:12:04.826542+00:00",
+  "trade_id": "47927139-8758-482a-b169-f6cf7bd74750",
+  "marks_now": [
+    {
+      "kind": "emocao",
+      "clean_at": "2026-10-22T14:31:04.885696+00:00",
+      "current_at": "2026-10-22T14:31:04.885696+00:00",
+      "clean_value": "calmo",
+      "changed_after": false,
+      "current_limpa": true,
+      "current_value": "calmo"
+    },
+    {
+      "kind": "execucao",
+      "clean_at": "2026-10-22T14:12:04.826542+00:00",
+      "current_at": "2026-10-22T14:12:04.826542+00:00",
+      "clean_value": "no_ponto",
+      "changed_after": false,
+      "current_limpa": true,
+      "current_value": "no_ponto"
+    },
+    {
+      "kind": "setup",
+      "clean_at": "2026-10-22T14:12:04.826542+00:00",
+      "current_at": "2026-10-22T14:12:04.826542+00:00",
+      "clean_value": "A",
+      "changed_after": false,
+      "current_limpa": true,
+      "current_value": "A"
+    }
+  ],
+  "server_now": "2026-10-22T14:31:04.885696+00:00",
+  "trading_day": "2026-10-22",
+  "registered_at": "2026-10-22T14:12:04.826542+00:00"
+}

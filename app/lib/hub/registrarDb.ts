@@ -42,6 +42,8 @@ import {
   type TradeResult,
 } from '@/lib/domain/registro';
 import { HubDataError, toHubError } from './contasDb';
+import type { RecentTrade } from './registrar';
+import { parseRulesNow, type AccountNow } from './regras';
 
 // ---------------------------------------------------------------------------------------------
 // Errors
@@ -54,6 +56,11 @@ export const REGISTRAR_ERROR_CODES = [
   ...REGISTRO_CODES,
   /** The request never got an answer */
   'network',
+  /**
+   * The device said it was offline, so nothing was sent (hooks/useRegistrar checks before every
+   * write: registering needs the server's clock, nothing is queued; D14). Never from the database.
+   */
+  'offline',
   /** The answer did not have the as-built shape */
   'bad_answer',
   'unknown',
@@ -693,6 +700,23 @@ function parsed<T>(parse: (json: unknown) => T, json: unknown): T {
   }
 }
 
+/**
+ * gate_at(account, at) (Phase 2, granted to the API): «Posso operar hoje?» and the «Limite do dia»
+ * of one account at an instant, as rules_now gives each account. The Registrar's gate line and
+ * limit line when the hour is typed («Posso operar hoje? Na entrada:») or the «Dia» is another one
+ * («Na entrada, em 13 out:»), before the form is complete enough for register_entry's dry run.
+ */
+export async function fetchGateAt(db: SupabaseClient, accountId: string, at: Date): Promise<AccountNow> {
+  const answer = await rpc(db, 'gate_at', { p_account: accountId, p_at: at.toISOString() });
+  return parsed((json) => {
+    try {
+      return parseRulesNow({ server_now: at.toISOString(), accounts: [json] }).accounts[0];
+    } catch {
+      return bad();
+    }
+  }, answer);
+}
+
 /** «Registrar entrada», dry run: the preview the form shows (gate, plan, instrument, risk, the limit's room, expiry, similar) */
 export async function previewEntry(db: SupabaseClient, accountId: string, payload: EntryPayload): Promise<EntryDryRun> {
   return parsed(parseEntryDryRun, await rpc(db, 'register_entry', { p_account: accountId, p_entry: payload, p_dry_run: true }));
@@ -838,8 +862,46 @@ function tradeOfRow(row: unknown): RegisteredTrade {
   });
 }
 
-/** One trade of the caller, with its context, plan, marks and images; null when there is none */
-export async function fetchTradeState(db: SupabaseClient, tradeId: string): Promise<TradeView | null> {
+/** A trade_entry_context row (CONTEXT_COLUMNS) as StoredContext */
+function contextOfRow(ctx: Obj): StoredContext {
+  return {
+    ...parseContext(ctx),
+    origin: oneOf(ctx.origin, ['live', 'reconstructed'] as const),
+    capturedAt: date(ctx.captured_at),
+    evaluatedAt: date(ctx.evaluated_at),
+  };
+}
+
+/** The rows fetchTradeState reads, as the API returns them (the fixtures record these) */
+export interface TradeViewRows {
+  trade: unknown;
+  context: unknown;
+  marks: unknown;
+  marksNow: unknown;
+  images: unknown;
+  version: unknown;
+}
+
+/** One trade's rows into a TradeView (fetchTradeState's reading, apart for the fixtures); bad_answer otherwise */
+export function tradeViewOfRows(rows: TradeViewRows): TradeView {
+  return parsed(() => {
+    const ctx = rows.context === null || rows.context === undefined ? null : obj(rows.context);
+    const context = ctx ? contextOfRow(ctx) : null;
+    return {
+      trade: tradeOfRow(rows.trade),
+      version: parseVersion(rows.version),
+      context,
+      gate: ctx ? parseGate(ctx.gate) : null,
+      plan: context ? entryPlanOf(context) : null,
+      marks: list(rows.marks ?? [], parseMark),
+      marksNow: list(rows.marksNow ?? [], parseMarkNow),
+      images: list(rows.images ?? [], parseImage),
+    };
+  }, null);
+}
+
+/** The rows of one trade of the caller as the API returns them (fetchTradeState reads these); null when there is none */
+export async function readTradeViewRows(db: SupabaseClient, tradeId: string): Promise<TradeViewRows | null> {
   const row = await read(db.from('trades').select(TRADE_COLUMNS).eq('id', tradeId).maybeSingle() as unknown as Rows<Obj>);
   if (!row) return null;
   const versionId = typeof row.rule_version_id === 'string' ? row.rule_version_id : null;
@@ -852,26 +914,13 @@ export async function fetchTradeState(db: SupabaseClient, tradeId: string): Prom
       ? read(db.from('account_rule_versions').select('id, version_no').eq('id', versionId).maybeSingle() as unknown as Rows<Obj>)
       : Promise.resolve(null),
   ]);
-  return parsed(() => {
-    const context = ctx
-      ? {
-          ...parseContext(ctx),
-          origin: oneOf(ctx.origin, ['live', 'reconstructed'] as const),
-          capturedAt: date(ctx.captured_at),
-          evaluatedAt: date(ctx.evaluated_at),
-        }
-      : null;
-    return {
-      trade: tradeOfRow(row),
-      version: parseVersion(version),
-      context,
-      gate: ctx ? parseGate(ctx.gate) : null,
-      plan: context ? entryPlanOf(context) : null,
-      marks: list(marks ?? [], parseMark),
-      marksNow: list(now ?? [], parseMarkNow),
-      images: list(images ?? [], parseImage),
-    };
-  }, null);
+  return { trade: row, context: ctx, marks: marks ?? [], marksNow: now ?? [], images: images ?? [], version };
+}
+
+/** One trade of the caller, with its context, plan, marks and images; null when there is none */
+export async function fetchTradeState(db: SupabaseClient, tradeId: string): Promise<TradeView | null> {
+  const rows = await readTradeViewRows(db, tradeId);
+  return rows ? tradeViewOfRows(rows) : null;
 }
 
 /** The caller's open trades (of one account, or all), oldest entry first: «Operações abertas» */
@@ -879,7 +928,119 @@ export async function fetchOpenTrades(db: SupabaseClient, accountId?: string): P
   let query = db.from('trades').select(TRADE_COLUMNS).eq('status', 'open');
   if (accountId) query = query.eq('account_id', accountId);
   const rows = await read(query.order('entry_time') as unknown as Rows<unknown[]>);
-  return parsed(() => list(rows ?? [], tradeOfRow), null);
+  return openTradesOfRows(rows ?? []);
+}
+
+/** fetchOpenTrades' rows into trades (apart for the fixtures); bad_answer otherwise */
+export function openTradesOfRows(rows: unknown): RegisteredTrade[] {
+  return parsed(() => list(rows, tradeOfRow), null);
+}
+
+/** One row of «Operações do dia» (the /diario bridge until Phase 4; D16, registrar.md §17.2) */
+export interface DayTrade {
+  trade: RegisteredTrade;
+  /** live = registered while open; reconstructed = «Já fechada» */
+  origin: 'live' | 'reconstructed' | null;
+  /** «No plano» / «● fora da janela» / «—» (never «No plano» when nothing was checked) */
+  plan: EntryPlanAnswer | null;
+  /** Saved images (the paperclip, with the note: «tem imagens e nota» / «tem imagens» / «tem nota») */
+  images: number;
+}
+
+/** The rows fetchDayTrades reads, as the API returns them (the fixtures record these) */
+export interface DayTradesRows {
+  trades: unknown;
+  contexts: unknown;
+  images: unknown;
+}
+
+/** fetchDayTrades' rows into the bridge's list, in entry order (apart for the fixtures); bad_answer otherwise */
+export function dayTradesOfRows(rows: DayTradesRows): DayTrade[] {
+  return parsed(() => {
+    const trades = list(rows.trades, tradeOfRow).sort((a, b) => a.entryTime.getTime() - b.entryTime.getTime() || (a.id < b.id ? -1 : 1));
+    const contexts = new Map<string, StoredContext>();
+    for (const c of list(rows.contexts, obj)) contexts.set(str(c.trade_id), contextOfRow(c));
+    const images = new Map<string, number>();
+    for (const i of list(rows.images, obj)) {
+      const id = str(i.trade_id);
+      images.set(id, (images.get(id) ?? 0) + 1);
+    }
+    return trades.map((trade) => {
+      const context = contexts.get(trade.id) ?? null;
+      return { trade, origin: context ? context.origin : null, plan: context ? entryPlanOf(context) : null, images: images.get(trade.id) ?? 0 };
+    });
+  }, null);
+}
+
+/** A PostgREST filter value in double quotes (an instant holds «:» and «.», reserved inside or()) */
+const quoted = (s: string) => `"${s.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
+
+/**
+ * «Operações do dia» of one account, as the API returns the rows (fetchDayTrades reads these): the
+ * trades registered in the app (source live or after) of the trading day `day`, plus those of an
+ * earlier day still open (they ask for the exit) or that closed at or after `since` (the start of
+ * `day`: «ontem, 10:52 → 10:42»), with their entry contexts and saved images. Imported trades stay
+ * out (Phase 4 shows the whole day).
+ */
+export async function readDayTradesRows(db: SupabaseClient, accountId: string, day: string, since: Date): Promise<DayTradesRows> {
+  const trades =
+    (await read(
+      db
+        .from('trades')
+        .select(TRADE_COLUMNS)
+        .eq('account_id', accountId)
+        .in('source', ['live', 'after'])
+        .or(`trading_day.eq.${day},status.eq.open,exit_time.gte.${quoted(since.toISOString())}`)
+        .order('entry_time') as unknown as Rows<unknown[]>,
+    )) ?? [];
+  const ids = trades.map((r) => (isObj(r) && typeof r.id === 'string' ? r.id : null)).filter((x): x is string => x !== null);
+  if (ids.length === 0) return { trades, contexts: [], images: [] };
+  const [contexts, images] = await Promise.all([
+    read(db.from('trade_entry_context').select(`trade_id, ${CONTEXT_COLUMNS}`).in('trade_id', ids) as unknown as Rows<unknown[]>),
+    read(db.from('trade_attachments').select('trade_id').in('trade_id', ids).eq('status', 'ok') as unknown as Rows<unknown[]>),
+  ]);
+  return { trades, contexts: contexts ?? [], images: images ?? [] };
+}
+
+/** «Operações do dia» of one account (readDayTradesRows), in entry order */
+export async function fetchDayTrades(db: SupabaseClient, accountId: string, day: string, since: Date): Promise<DayTrade[]> {
+  return dayTradesOfRows(await readDayTradesRows(db, accountId, day, since));
+}
+
+/** The columns of the account's recent trades the form's starting values read */
+export const RECENT_COLUMNS = 'symbol, direction, quantity, stake_amount, payout_percent, duration_seconds, source, entry_time';
+
+/** fetchRecentTrades' rows (apart for the fixtures); bad_answer otherwise */
+export function recentTradesOfRows(rows: unknown): RecentTrade[] {
+  return parsed(
+    () =>
+      list(rows, (x) => {
+        const r = obj(x);
+        return {
+          symbol: str(r.symbol),
+          direction: oneOf(r.direction, DIRECTIONS),
+          quantity: decOrNull(r.quantity, PRICE),
+          stake: decOrNull(r.stake_amount, MONEY),
+          payout: decOrNull(r.payout_percent, PAYOUT),
+          durationS: intOrNull(r.duration_seconds),
+          source: oneOfOrNull(r.source, ['live', 'after', 'import'] as const),
+          entryTime: date(r.entry_time),
+        };
+      }),
+    null,
+  );
+}
+
+/**
+ * The account's latest trades, newest first (imported ones included): the form's starting values
+ * (lib/hub/registrar.padroesDoRegistrar: the futures root and contracts, the Ebinex pairs, payout
+ * and stake). 200 rows cover months of the owner's sessions.
+ */
+export async function fetchRecentTrades(db: SupabaseClient, accountId: string, limit = 200): Promise<RecentTrade[]> {
+  const rows = await read(
+    db.from('trades').select(RECENT_COLUMNS).eq('account_id', accountId).order('entry_time', { ascending: false }).limit(limit) as unknown as Rows<unknown[]>,
+  );
+  return recentTradesOfRows(rows ?? []);
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -905,9 +1066,15 @@ async function storageCall<T>(fn: () => Promise<StorageResult<T>> | PromiseLike<
   return r.data;
 }
 
-/** Uploads one reserved file (never overwrites: the bucket has no update policy) */
+/**
+ * Uploads one reserved file (never overwrites: the bucket has no update policy). The Storage client
+ * sends a Blob as a form part typed by the Blob itself (its `contentType` option only applies to
+ * other bodies), and save_extras refuses a file whose recorded type is not the reserved one
+ * (upload_mismatch): the bytes always go typed as reserved.
+ */
 export async function uploadImage(db: SupabaseClient, slot: Pick<ImageSlot, 'path' | 'mime'>, file: Blob): Promise<void> {
-  await storageCall(() => db.storage.from(IMAGE_BUCKET).upload(slot.path, file, { contentType: slot.mime, upsert: false }));
+  const typed = file.type === slot.mime ? file : new Blob([file], { type: slot.mime });
+  await storageCall(() => db.storage.from(IMAGE_BUCKET).upload(slot.path, typed, { contentType: slot.mime, upsert: false }));
 }
 
 /** A thumbnail's URL, valid for 10 minutes */

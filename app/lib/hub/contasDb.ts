@@ -225,6 +225,14 @@ export interface ImportBatch {
   rows_completed: number;
   rows_other_account: number;
   rows_error: number;
+  /**
+   * Phase 3 (migration 20261020000004, which the select needs, as every Phase 3 read): trades
+   * registered in the app that the batch completed (linked, or completed again); undoing gives them
+   * back and never deletes them. Optional for batches made before it (test fixtures): missing is 0.
+   * Since 20261021000001 such a row is in no other count: inserted, linked, duplicate, other account
+   * and error are disjoint parts of the file (completed is a part of duplicate).
+   */
+  rows_linked?: number;
   is_legacy: boolean;
   status: 'done' | 'undone';
   created_at: string;
@@ -232,7 +240,7 @@ export interface ImportBatch {
 }
 
 export const BATCH_COLUMNS =
-  'id, platform, file_name, rows_total, rows_inserted, rows_duplicate, rows_completed, rows_other_account, rows_error, is_legacy, status, created_at, undone_at';
+  'id, platform, file_name, rows_total, rows_inserted, rows_duplicate, rows_completed, rows_other_account, rows_error, rows_linked, is_legacy, status, created_at, undone_at';
 
 export async function fetchBatches(db: SupabaseClient, accountId: string): Promise<ImportBatch[]> {
   const rows = await run<ImportBatch[]>(

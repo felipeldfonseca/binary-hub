@@ -5,6 +5,12 @@ import { useRouter } from 'next/navigation'
 import { useAuth } from '@/hooks/useAuth'
 import { AuthUser, formatUser } from '@/lib/auth'
 
+/**
+ * Trades are registered in the hub now (Phase 3): the old dashboard's call to action opens the
+ * Diário with the «Registrar operação» sheet, as the import buttons lead to its import sheet.
+ */
+export const REGISTRAR_HREF = '/diario?registrar=1'
+
 export default function HeroSection() {
   const router = useRouter()
   const { user } = useAuth()
@@ -41,7 +47,7 @@ export default function HeroSection() {
         
         {/* CTA Button - Add new trades */}
         <button 
-          onClick={() => router.push('/trades')}
+          onClick={() => router.push(REGISTRAR_HREF)}
           className="btn-primary font-comfortaa font-bold transition-all duration-300 hover:scale-105 text-lg px-8 py-4 max-xl:text-base max-xl:px-6 max-xl:py-3 max-md:text-sm max-md:px-4 max-md:py-2"
         >
           Add new trades

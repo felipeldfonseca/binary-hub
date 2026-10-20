@@ -2,6 +2,7 @@ import React from 'react'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import HeroSection from '@/components/dashboard/HeroSection'
+import HeroSectionPT from '@/components/dashboard/HeroSectionPT'
 
 // Mock the hooks
 const mockPush = jest.fn()
@@ -99,14 +100,27 @@ describe('HeroSection', () => {
     expect(screen.getByText('Hey, Jane.doe!')).toBeInTheDocument()
   })
 
-  it('navigates to trades page when button is clicked', async () => {
+  // Phase 3 (D1, legado Q6 a): trades are registered in the hub; the button opens the Diário with
+  // the «Registrar operação» sheet, as the import buttons open its import sheet
+  it('opens the Diário’s «Registrar operação» when the button is clicked', async () => {
     const user = userEvent.setup()
     render(<HeroSection />)
 
     const addTradesButton = screen.getByRole('button', { name: 'Add new trades' })
     await user.click(addTradesButton)
 
-    expect(mockPush).toHaveBeenCalledWith('/trades')
+    expect(mockPush).toHaveBeenCalledWith('/diario?registrar=1')
+    expect(mockPush).not.toHaveBeenCalledWith('/trades')
+  })
+
+  it('does the same in Portuguese: «Adicionar novas operações»', async () => {
+    const user = userEvent.setup()
+    render(<HeroSectionPT />)
+
+    expect(screen.getByText('Olá, John!')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Adicionar novas operações' }))
+
+    expect(mockPush).toHaveBeenCalledWith('/diario?registrar=1')
   })
 
   it('has proper button styling and hover effects', () => {

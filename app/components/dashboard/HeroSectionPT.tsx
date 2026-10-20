@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/hooks/useAuth'
 import { AuthUser, formatUser } from '@/lib/auth'
+import { REGISTRAR_HREF } from './HeroSection'
 
 export default function HeroSectionPT() {
   const router = useRouter()
@@ -41,7 +42,7 @@ export default function HeroSectionPT() {
         
         {/* CTA Button - Add new trades */}
         <button 
-          onClick={() => router.push('/trades')}
+          onClick={() => router.push(REGISTRAR_HREF)}
           className="btn-primary font-comfortaa font-bold transition-all duration-300 hover:scale-105 text-lg px-8 py-4 max-xl:text-base max-xl:px-6 max-xl:py-3 max-md:text-sm max-md:px-4 max-md:py-2"
         >
           Adicionar novas operações

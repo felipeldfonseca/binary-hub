@@ -1,0 +1,178 @@
+{
+  "r": null,
+  "gate": {
+    "at": "2026-10-22T23:13:00+00:00",
+    "block": {
+      "state": "nao_avaliado",
+      "reason": "so_futuros"
+    },
+    "desde": "2026-10-14T13:00:05.519097+00:00",
+    "label": "Ebinex",
+    "limit": {
+      "state": "nao_avaliado",
+      "reason": "sem_limite"
+    },
+    "today": {
+      "trades": 1,
+      "net_usd": -20,
+      "worst_usd": -20
+    },
+    "market": "binary",
+    "status": "liberado",
+    "window": {
+      "next": {
+        "opens_at": "2026-10-23T23:00:00+00:00",
+        "closes_at": "2026-10-24T00:00:00+00:00",
+        "trading_day": "2026-10-23"
+      },
+      "state": "dentro",
+      "reason": null,
+      "current": {
+        "opens_at": "2026-10-22T23:00:00+00:00",
+        "closes_at": "2026-10-23T00:00:00+00:00"
+      },
+      "position": "dentro"
+    },
+    "version": {
+      "id": "9e08751e-1ebd-4a9b-93a1-298e4bafd4c7",
+      "origin": "criar",
+      "version_no": 1,
+      "effective_from": "2026-10-14T13:00:05.519097+00:00"
+    },
+    "warnings": [],
+    "desde_day": "2026-10-14",
+    "account_id": "a99b3430-1b77-43ca-a895-bd88067e6994",
+    "changes_at": "2026-10-23T00:00:00+00:00",
+    "state_rule": {
+      "state": "nao_avaliado",
+      "reason": "so_futuros"
+    },
+    "trading_day": "2026-10-22",
+    "checks_evaluated": [
+      "janela"
+    ]
+  },
+  "plan": {
+    "breaks": [],
+    "verdict": "no_plano",
+    "checks_evaluated": [
+      "janela"
+    ]
+  },
+  "marks": [],
+  "trade": {
+    "id": "7720ec0f-05e8-490e-94c4-cb1d9c309a60",
+    "pnl": 17.4,
+    "note": null,
+    "option": null,
+    "result": "win",
+    "source": "after",
+    "status": "closed",
+    "symbol": "GBP/USD",
+    "quantity": 1,
+    "direction": "call",
+    "exit_time": "2026-10-22T23:20:00+00:00",
+    "pnl_basis": "outcome",
+    "timeframe": "M5",
+    "account_id": "a99b3430-1b77-43ca-a895-bd88067e6994",
+    "asset_type": "binary_option",
+    "commission": 0,
+    "entry_time": "2026-10-22T23:13:00+00:00",
+    "exit_price": null,
+    "expires_at": "2026-10-22T23:20:00+00:00",
+    "stop_price": null,
+    "entry_price": null,
+    "trading_day": "2026-10-22",
+    "stake_amount": 20,
+    "target_price": null,
+    "note_saved_at": null,
+    "registered_at": "2026-10-22T23:24:04.81004+00:00",
+    "payout_percent": 87,
+    "duration_seconds": 300,
+    "exit_registered_at": "2026-10-22T23:24:04.81004+00:00"
+  },
+  "images": [],
+  "points": null,
+  "context": {
+    "origin": "reconstructed",
+    "rule_ok": null,
+    "in_block": null,
+    "warnings": [],
+    "in_window": true,
+    "after_limit": null,
+    "captured_at": "2026-10-22T23:24:04.81004+00:00",
+    "gate_status": "liberado",
+    "evaluated_at": "2026-10-22T23:13:00+00:00",
+    "state_choice": null,
+    "checks_evaluated": [
+      "janela"
+    ],
+    "day_pnl_at_entry": null,
+    "day_worst_at_entry": null
+  },
+  "dry_run": false,
+  "similar": [],
+  "version": {
+    "id": "9e08751e-1ebd-4a9b-93a1-298e4bafd4c7",
+    "version_no": 1
+  },
+  "entry_at": "2026-10-22T23:13:00+00:00",
+  "gate_now": {
+    "at": "2026-10-22T23:24:04.81004+00:00",
+    "block": {
+      "state": "nao_avaliado",
+      "reason": "so_futuros"
+    },
+    "desde": "2026-10-14T13:00:05.519097+00:00",
+    "label": "Ebinex",
+    "limit": {
+      "state": "nao_avaliado",
+      "reason": "sem_limite"
+    },
+    "today": {
+      "trades": 2,
+      "net_usd": -2.6,
+      "worst_usd": -20
+    },
+    "market": "binary",
+    "status": "liberado",
+    "window": {
+      "next": {
+        "opens_at": "2026-10-23T23:00:00+00:00",
+        "closes_at": "2026-10-24T00:00:00+00:00",
+        "trading_day": "2026-10-23"
+      },
+      "state": "dentro",
+      "reason": null,
+      "current": {
+        "opens_at": "2026-10-22T23:00:00+00:00",
+        "closes_at": "2026-10-23T00:00:00+00:00"
+      },
+      "position": "dentro"
+    },
+    "version": {
+      "id": "9e08751e-1ebd-4a9b-93a1-298e4bafd4c7",
+      "origin": "criar",
+      "version_no": 1,
+      "effective_from": "2026-10-14T13:00:05.519097+00:00"
+    },
+    "warnings": [],
+    "desde_day": "2026-10-14",
+    "account_id": "a99b3430-1b77-43ca-a895-bd88067e6994",
+    "changes_at": "2026-10-23T00:00:00+00:00",
+    "state_rule": {
+      "state": "nao_avaliado",
+      "reason": "so_futuros"
+    },
+    "trading_day": "2026-10-22",
+    "checks_evaluated": [
+      "janela"
+    ]
+  },
+  "repeated": false,
+  "trade_id": "7720ec0f-05e8-490e-94c4-cb1d9c309a60",
+  "marks_now": [],
+  "server_now": "2026-10-22T23:24:04.81004+00:00",
+  "trading_day": "2026-10-22",
+  "registered_at": "2026-10-22T23:24:04.81004+00:00"
+}

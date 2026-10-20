@@ -1,0 +1,42 @@
+[
+  {
+    "source": "import",
+    "symbol": "EUR/USD",
+    "quantity": 1,
+    "direction": "call",
+    "entry_time": "2026-10-15T23:30:58+00:00",
+    "stake_amount": 20,
+    "payout_percent": 87,
+    "duration_seconds": 60
+  },
+  {
+    "source": "import",
+    "symbol": "BTC/USDT",
+    "quantity": 1,
+    "direction": "call",
+    "entry_time": "2026-10-15T23:20:50+00:00",
+    "stake_amount": 25,
+    "payout_percent": 85,
+    "duration_seconds": 60
+  },
+  {
+    "source": "import",
+    "symbol": "EUR/USD",
+    "quantity": 1,
+    "direction": "put",
+    "entry_time": "2026-10-15T23:10:55+00:00",
+    "stake_amount": 20,
+    "payout_percent": null,
+    "duration_seconds": 60
+  },
+  {
+    "source": "import",
+    "symbol": "EUR/USD",
+    "quantity": 1,
+    "direction": "call",
+    "entry_time": "2026-10-15T23:04:52+00:00",
+    "stake_amount": 20,
+    "payout_percent": 88,
+    "duration_seconds": 60
+  }
+]

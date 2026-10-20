@@ -62,6 +62,17 @@ const NBSP = ' ';
 
 const describePg = URL ? describe : describe.skip;
 
+/**
+ * The first Monday after the database's today (UTC), as YYYY-MM-DD: the suites save their versions
+ * at the server's now(), so an instant asked of gate_at must come after that, whatever the date
+ */
+function segundaDepois(): string {
+  const agora = new Date(JSON.parse(psql('select to_jsonb(now())::text;').trim()) as string);
+  const d = new Date(Date.UTC(agora.getUTCFullYear(), agora.getUTCMonth(), agora.getUTCDate() + 1));
+  while (d.getUTCDay() !== 1) d.setUTCDate(d.getUTCDate() + 1);
+  return d.toISOString().slice(0, 10);
+}
+
 describePg('rules data layer × the real SQL', () => {
   const uid = randomUUID();
   const ids: Record<string, string> = {};
@@ -550,12 +561,15 @@ insert into public.trading_accounts (id, user_id, market, label, day_tz, day_sta
   });
 
   it('answers «Posso operar hoje?» for every account, the B3 limit in reais', () => {
-    // Two invented Clear losses on Mon 19 Oct, in reais: −R$ 300 out at 10:20 and −R$ 500 out at 10:40 de Brasília
+    // A Monday after this run (the versions above start when they were saved): two invented Clear
+    // losses in reais, −R$ 300 out at 10:20 and −R$ 500 out at 10:40 de Brasília, asked at 10:45
+    // (13:45 UTC is 09:45 or 08:45 ET, inside FTMO's 08:00–10:00 window either side of DST)
+    const dia = segundaDepois();
     psql(`insert into public.trades (user_id, account_id, symbol, asset_type, direction, entry_time, exit_time,
   entry_price, exit_price, quantity, result, pnl, commission, source) values
-  ('${uid}', '${ids.b3}', 'WINZ26', 'futures', 'long', '2026-10-19 13:05:00+00', '2026-10-19 13:20:00+00', 130000, 129850, 1, 'loss', -300, null, 'after'),
-  ('${uid}', '${ids.b3}', 'WINZ26', 'futures', 'short', '2026-10-19 13:25:00+00', '2026-10-19 13:40:00+00', 129800, 130050, 1, 'loss', -500, null, 'after');`);
-    const at = '2026-10-19T13:45:00Z';
+  ('${uid}', '${ids.b3}', 'WINZ26', 'futures', 'long', '${dia} 13:05:00+00', '${dia} 13:20:00+00', 130000, 129850, 1, 'loss', -300, null, 'after'),
+  ('${uid}', '${ids.b3}', 'WINZ26', 'futures', 'short', '${dia} 13:25:00+00', '${dia} 13:40:00+00', 129800, 130050, 1, 'loss', -500, null, 'after');`);
+    const at = `${dia}T13:45:00Z`;
     const now = parseRulesNow(
       asUser(uid, `jsonb_build_object('server_now', '${at}'::timestamptz, 'accounts', jsonb_build_array(${['top', 'ebx', 'fx', 'us', 'cr', 'b3'].map((k) => `public.gate_at('${ids[k]}', '${at}')`).join(', ')}))`),
     );
@@ -563,7 +577,7 @@ insert into public.trading_accounts (id, user_id, market, label, day_tz, day_sta
     const clear = now.accounts.find((a) => a.accountId === ids.b3)!;
     // v2 (R$ 750,50, «Só avisar»): the worst point −R$ 800 is past it, reached at the second exit
     expect(clear.today).toEqual({ trades: 2, netCents: -80000, worstCents: -80000 });
-    expect(clear.gate.limit).toMatchObject({ evaluated: true, state: 'atingido', cents: 75050, worstCents: -80000, hitAt: new Date('2026-10-19T13:40:00Z') });
+    expect(clear.gate.limit).toMatchObject({ evaluated: true, state: 'atingido', cents: 75050, worstCents: -80000, hitAt: new Date(`${dia}T13:40:00Z`) });
     expect(possoLinha('Clear', clear.gate, clear.rules).limite).toEqual({
       usado: 'R$ 800',
       de: 'de R$ 750,50',
