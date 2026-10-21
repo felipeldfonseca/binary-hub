@@ -26,18 +26,43 @@ import { checkRules, type AccountMarket as GateAccountMarket } from '@/lib/domai
 import { PLATFORM_MARKET, type ImportMarket } from '@/lib/domain/import';
 import { windowError } from '@/lib/hub/regras';
 
-const MIGRATION = path.join(__dirname, '../../../supabase/migrations/20261019000001_markets.sql');
+const MIGRATIONS = path.join(__dirname, '../../../supabase/migrations');
+
+/** The newest migration (by name) that defines market_caps_all(): the one the database ends with */
+function newestCaps(): { file: string; text: string } {
+  const files = fs.readdirSync(MIGRATIONS).filter((f) => f.endsWith('.sql')).sort().reverse();
+  for (const file of files) {
+    const text = fs.readFileSync(path.join(MIGRATIONS, file), 'utf8');
+    if (text.includes('$caps$')) return { file, text };
+  }
+  throw new Error('no migration defines market_caps_all');
+}
 
 /** The jsonb literal of market_caps_all(), between its two $caps$ tags */
-function sqlCaps(): Record<string, unknown> {
-  const text = fs.readFileSync(MIGRATION, 'utf8');
+function sqlCaps(text = newestCaps().text): Record<string, unknown> {
   // Exactly two tags (comments included), so the text between them is the literal
   expect(text.match(/\$caps\$/g)?.length).toBe(2);
   const [, literal] = text.split('$caps$');
   return JSON.parse(literal);
 }
 
-describe('MARKET_SPEC = market_caps_all() (20261019000001_markets.sql)', () => {
+describe('MARKET_SPEC = market_caps_all() (the newest migration that defines it)', () => {
+  it('reads the literal of Phase 3c (20261023000001: + rules.breakeven)', () => {
+    expect(newestCaps().file >= '20261023000001').toBe(true);
+  });
+
+  it('changed only rules.breakeven since 20261019000001 (every price market, never binaries)', () => {
+    const old = sqlCaps(fs.readFileSync(path.join(MIGRATIONS, '20261019000001_markets.sql'), 'utf8')) as Record<
+      string,
+      { rules: Record<string, boolean> }
+    >;
+    expect(sqlCaps()).toEqual(
+      Object.fromEntries(
+        Object.entries(old).map(([m, c]) => [m, { ...c, rules: { ...c.rules, breakeven: m !== 'binary' } }]),
+      ),
+    );
+  });
+
   it('holds the same seven markets with the same values', () => {
     const caps = sqlCaps();
     expect(Object.keys(caps).sort()).toEqual([...ACCOUNT_MARKETS].sort());
@@ -50,7 +75,7 @@ describe('MARKET_SPEC = market_caps_all() (20261019000001_markets.sql)', () => {
       reader: false,
       currency: 'USD',
       day: { tz: 'America/New_York', start_min: 1020 },
-      rules: { block: false, states: false, soma: false, padrao: false },
+      rules: { block: false, states: false, soma: false, padrao: false, breakeven: true },
       window_tzs: ['America/New_York', 'America/Sao_Paulo'],
       window_tz: 'America/New_York',
       window: { start_min: 480, end_min: 600, weekdays: MON_TO_FRI },
