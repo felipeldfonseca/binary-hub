@@ -6,6 +6,10 @@
 -- The register functions stamp the server's now(): instants are built relative to it, each step that
 -- needs a later server time in its own transaction. Where a test needs time to pass (the undo window),
 -- it moves the stored instant back with the table's guard off.
+--
+-- Every import of section 8 goes through tests.imp81: the preview, then the commit, and the preview's
+-- counts must be the commit's, key by key. Sections 8.14–8.18 pin how a position whose exits the app
+-- registered as separate trades is linked (row by row, every row once, the day equal to the file).
 
 set timezone to 'UTC';
 
@@ -37,6 +41,34 @@ $$;
 create or replace function tests.day81(p_account uuid) returns date language sql stable as $$
   select public.compute_trading_day(p_account, now())
 $$;
+-- An import as the sheet makes it: the preview, then the commit, in one transaction. The preview counts
+-- every key as the commit does (new = inserted, completable = completed, trades_new = trades, the rest
+-- by name; linked_differs = the registered trades the batch records with other money). Returns the
+-- commit's answer.
+create or replace function tests.imp81(p_acc uuid, p_platform text, p_name text, p_rows jsonb, p_tz text default 'UTC')
+returns jsonb language plpgsql volatile as $$
+declare
+  pv jsonb;
+  c jsonb;
+  ld bigint;
+begin
+  pv := public.import_preview(p_acc, p_platform, null, p_tz, p_rows);
+  c := public.import_commit(p_acc, p_platform, p_name, null, p_tz, p_rows);
+  select count(*) into ld from public.trade_import_links l
+  where l.batch_id = (c->>'batch_id')::uuid and cardinality(l.differs) > 0
+    and exists (select 1 from public.trade_entry_context x where x.trade_id = l.trade_id);
+  perform tests.eq(
+    jsonb_build_object('new', pv->'new', 'duplicate', pv->'duplicate', 'completed', pv->'completable',
+                       'other_account', pv->'other_account', 'linked', pv->'linked', 'linked_differs', pv->'linked_differs',
+                       'trades', pv->'trades_new', 'grouped', pv->'grouped', 'attached', pv->'attached', 'errors', pv->'errors'),
+    jsonb_build_object('new', c->'inserted', 'duplicate', c->'duplicate', 'completed', c->'completed',
+                       'other_account', c->'other_account', 'linked', c->'linked', 'linked_differs', to_jsonb(ld),
+                       'trades', c->'trades', 'grouped', c->'grouped', 'attached', c->'attached', 'errors', c->'errors'),
+    'the preview counts as the commit: ' || p_name);
+  return c;
+end;
+$$;
+
 grant execute on all functions in schema tests to anon, authenticated;
 
 -- =============================================================================================
@@ -50,7 +82,10 @@ insert into public.trading_accounts (user_id, market, label, platform) values
   (:V, 'futures', 'Parciais V', 'topone'), (:V, 'futures', 'Regra V', 'topone'), (:V, 'binary', 'Ebinex V', 'ebinex'),
   (:V, 'forex', 'Forex V', 'mt5'), (:V, 'futures', 'Arquivo V', 'topone'), (:V, 'futures', 'Relogio V', 'topone'),
   (:V, 'futures', 'Par V', 'topone'), (:V, 'futures', 'Outra V', 'topone'), (:V, 'futures', 'Soma V', 'topone'),
-  (:V, 'futures', 'Limite V', 'topone');
+  (:V, 'futures', 'Limite V', 'topone'), (:V, 'futures', 'Curto V', 'topone'), (:V, 'stocks', 'Opcoes V', 'ibkr'),
+  (:V, 'futures', 'Hora V', 'topone'), (:V, 'futures', 'Grupo V', 'topone'), (:V, 'futures', 'Parede V', 'topone'),
+  (:V, 'futures', 'Par1 V', 'topone'), (:V, 'futures', 'Par2 V', 'topone'), (:V, 'futures', 'Par3 V', 'topone'),
+  (:V, 'futures', 'Par4 V', 'topone'), (:V, 'futures', 'Par5 V', 'topone');
 commit;
 select id as par from public.trading_accounts where user_id = :V and label = 'Parciais V' \gset
 select id as reg from public.trading_accounts where user_id = :V and label = 'Regra V' \gset
@@ -62,6 +97,16 @@ select id as pair from public.trading_accounts where user_id = :V and label = 'P
 select id as outra from public.trading_accounts where user_id = :V and label = 'Outra V' \gset
 select id as soma from public.trading_accounts where user_id = :V and label = 'Soma V' \gset
 select id as lim from public.trading_accounts where user_id = :V and label = 'Limite V' \gset
+select id as cur from public.trading_accounts where user_id = :V and label = 'Curto V' \gset
+select id as opc from public.trading_accounts where user_id = :V and label = 'Opcoes V' \gset
+select id as hora from public.trading_accounts where user_id = :V and label = 'Hora V' \gset
+select id as grp from public.trading_accounts where user_id = :V and label = 'Grupo V' \gset
+select id as wal from public.trading_accounts where user_id = :V and label = 'Parede V' \gset
+select id as sa1 from public.trading_accounts where user_id = :V and label = 'Par1 V' \gset
+select id as sa2 from public.trading_accounts where user_id = :V and label = 'Par2 V' \gset
+select id as sa3 from public.trading_accounts where user_id = :V and label = 'Par3 V' \gset
+select id as sa4 from public.trading_accounts where user_id = :V and label = 'Par4 V' \gset
+select id as sa5 from public.trading_accounts where user_id = :V and label = 'Par5 V' \gset
 
 begin;
 select set_config('request.jwt.claim.sub', :V, true);
@@ -78,8 +123,12 @@ select tests.eq(jsonb_array_length(public.save_rules(jsonb_build_object('v', 1, 
   :'soma', jsonb_build_object('rules', '{"v": 1, "limit": {"usd": 50, "mode": "soma", "at_limit": "avisar"}}'::jsonb,
                               'window', tests.win(:NY, -90, 90), 'version', 'force'),
   :'lim', jsonb_build_object('rules', '{"v": 1, "limit": {"usd": 50, "mode": "conta", "at_limit": "avisar"}}'::jsonb,
-                             'window', tests.win(:NY, -90, 90), 'version', 'force'))))->'versions'),
-  7, 'seven accounts with rules');
+                             'window', tests.win(:NY, -90, 90), 'version', 'force'))
+  || (select jsonb_object_agg(a.id::text, jsonb_build_object('rules', '{"v": 1}'::jsonb, 'window', tests.win(:NY, -90, 90), 'version', 'force'))
+      from public.trading_accounts a
+      where a.user_id = :V and a.label in ('Curto V', 'Opcoes V', 'Hora V', 'Grupo V', 'Parede V', 'Par1 V', 'Par2 V', 'Par3 V', 'Par4 V',
+                                           'Par5 V'))))->'versions'),
+  17, 'seventeen accounts with rules');
 commit;
 alter table public.account_rule_versions disable trigger account_rule_versions_guard;
 update public.account_rule_versions v set effective_from = v.effective_from - interval '30 days' where v.user_id = :V;
@@ -135,6 +184,7 @@ select tests.eq((:'p1'::jsonb)#>>'{position,undo,kind}', 'parcial', '«Desfazer�
 select tests.ok((:'p1'::jsonb)->>'repeated' = 'false' and (:'p1'::jsonb) ? 'gate_now' and (:'p1'::jsonb)#>>'{trade,status}' = 'open'
                 and (:'p1'::jsonb)#>>'{trade,pnl}' is null, 'the trade stays open, without a result (the old pages see «pending»)');
 select tests.eq(jsonb_array_length((:'p1'::jsonb)->'exits'), 1, 'one exit row');
+select tests.eq((:'p1'::jsonb)->>'dry_run', 'false', 'the answer of a write says it was written');
 commit;
 select v as ck1 from tests.p81 where k = 'ck1' \gset
 
@@ -262,6 +312,8 @@ select set_config('request.jwt.claim.sub', :V, true);
 set local role authenticated;
 select tests.eq(public.undo_event(:'t1', jsonb_build_object('v', 1, 'kind', 'stop', 'id', :'m2id'::bigint))->>'repeated', 'true',
                 'undone already: a retried tap succeeds and writes nothing');
+select tests.eq(public.register_partial(:'t1', '{"v": 1, "quantity": "1", "exit_price": "7918.50"}', true)->'open_after', '1'::jsonb,
+                'a dry run after a partial: what stays open counts it (3 − 1 − 1)');
 select public.register_partial(:'t1', jsonb_build_object('v', 1, 'client_key', tests.ck(), 'quantity', '1', 'exit_price', '7918.50')) as p2 \gset
 select tests.eq(((:'p2'::jsonb)#>>'{position,open}')::numeric, 1::numeric, 'a second partial: one left');
 select tests.fails(format('select public.register_partial(%L, %L)', :'t1', jsonb_build_object('v', 1, 'client_key', tests.ck(), 'quantity', '1',
@@ -384,6 +436,15 @@ select tests.eq((:'m'::jsonb)#>'{stop_moves,0,favor}', '10'::jsonb, 'short: +10 
 select tests.eq(public.move_stop(:'t2', tests.mv81('ajuste', '20995.00', '20985.00'))#>>'{stop_moves,1,kind}', 'ajuste', 'a short''s trailing stop');
 select tests.eq(public.move_stop(:'t2', tests.mv81('ajuste', '21000.00', '20985.00'))#>>'{stop_moves,2,kind}', 'breakeven',
                 'an «Outro preço» exactly at the entry is a breakeven');
+select tests.eq(public.move_stop(:'t2', tests.mv81('ajuste', '20995.00', null))#>>'{stop_moves,3,kind}', 'ajuste',
+                'another level without «Preço agora»: an «ajuste» with no points');
+select public.move_stop(:'t2', tests.mv81('ajuste', '21000.00', null)) as mq \gset
+select tests.eq(((:'mq'::jsonb)#>'{stop_moves,4}') - 'id' - 'moved_at',
+                '{"origin": "live", "kind": "ajuste", "stop_price": 21000.00, "prev_stop": 20995.00, "price_now": null, "favor": null,
+                  "unit": "pts", "voided_at": null, "ao_vivo": true}'::jsonb,
+                '«Outro preço» exactly at the entry without «Preço agora»: an «ajuste» (a breakeven always carries its points)');
+select tests.ok(((:'mq'::jsonb)#>>'{position,stop_now}')::numeric = 21000 and (:'mq'::jsonb)#>>'{position,stop_kind}' = 'ajuste',
+                'the stop is at the entry, kept as an «ajuste»');
 select tests.eq(public.undo_entry(:'t2')->>'deleted', 'true', '«Desfazer entrada» with a partial and moves, within 15 minutes');
 commit;
 select tests.eq((select via from public.trade_deletions where trade_id = :'t2'), 'desfazer_entrada', 'logged as undone');
@@ -496,6 +557,163 @@ select tests.fails(format('select public.move_stop(%L, %L)', (select v from test
 select tests.fails(format('select public.register_partial(%L, %L)', (select v from tests.p81 where k = 't7'),
                           jsonb_build_object('v', 1, 'client_key', tests.ck(), 'quantity', '1', 'exit_price', '7901.00')),
                    'partial_too_large', 'quantity', '1 contract: no partial');
+commit;
+
+-- =============================================================================================
+-- 5b. R on a short, the stop after an undo, an undone partial then the exit, the undo window to the
+--     microsecond, typed and estimated exits, an option's multiplier
+-- =============================================================================================
+
+-- A short in two exits: R on the initial stop stays positive
+begin;
+select set_config('request.jwt.claim.sub', :V, true);
+set local role authenticated;
+insert into tests.p81 values ('s1', public.register_entry(:'cur', tests.entry81('NQZ6', 'short', '2', '21000.00', -5, '{"stop_pts": "20"}'))->>'trade_id');
+commit;
+select v as s1 from tests.p81 where k = 's1' \gset
+begin;
+select set_config('request.jwt.claim.sub', :V, true);
+set local role authenticated;
+select public.register_partial(:'s1', jsonb_build_object('v', 1, 'client_key', tests.ck(), 'quantity', '1', 'exit_price', '20990.00'))->>'pnl';
+commit;
+begin;
+select set_config('request.jwt.claim.sub', :V, true);
+set local role authenticated;
+select tests.eq(public.register_exit(:'s1', '{"v": 1, "exit_price": "20980.00"}', true)->>'r', '0.7500', 'a short''s dry run: R on the initial stop');
+select public.register_exit(:'s1', '{"v": 1, "exit_price": "20980.00"}') as sx \gset
+select tests.eq(jsonb_build_object('r', (:'sx'::jsonb)->'r', 'pos', (:'sx'::jsonb)#>'{position,r}', 'pnl', (:'sx'::jsonb)#>'{trade,pnl}'),
+                '{"r": 0.7500, "pos": 0.7500, "pnl": 600.00}'::jsonb,
+                'a short in two exits: R = (1×10 + 1×20) ÷ (2×20), positive; US$ 200 + US$ 400');
+commit;
+
+-- The stop now and the level before read only the moves not undone
+begin;
+select set_config('request.jwt.claim.sub', :V, true);
+set local role authenticated;
+insert into tests.p81 values ('s2', public.register_entry(:'cur', tests.entry81('MESZ6', 'long', '2', '7900.00', -4, '{"stop_pts": "10"}'))->>'trade_id');
+commit;
+select v as s2 from tests.p81 where k = 's2' \gset
+begin;
+select set_config('request.jwt.claim.sub', :V, true);
+set local role authenticated;
+select public.move_stop(:'s2', tests.mv81('ajuste', '7895.00', null))#>>'{position,stop_now}';
+select public.move_stop(:'s2', tests.mv81('ajuste', '7898.00', null))#>>'{position,undo,id}' as m2b \gset
+select tests.eq(public.undo_event(:'s2', jsonb_build_object('v', 1, 'kind', 'stop', 'id', :'m2b'::bigint))#>'{position,stop_now}',
+                '7895.00'::jsonb, 'the newest move undone: the stop is the one before');
+select tests.fails(format('select public.move_stop(%L, %L)', :'s2', tests.mv81('ajuste', '7895.00', null)), 'same_stop', 'stop_price',
+                   'the stop is the move before the undone one');
+select tests.eq(public.move_stop(:'s2', tests.mv81('ajuste', '7898.00', null))#>'{stop_moves,2,prev_stop}', '7895.00'::jsonb,
+                'the undone level again: allowed, and the level before it is the move not undone');
+commit;
+
+-- Its only partial undone, the exit closes the trade as one exit (the as-built path: no exit counts)
+begin;
+select set_config('request.jwt.claim.sub', :V, true);
+set local role authenticated;
+insert into tests.p81 values ('s3', public.register_entry(:'cur', tests.entry81('MGCZ6', 'long', '2', '2400.0', -4, '{"stop_pts": "5"}'))->>'trade_id');
+commit;
+select v as s3 from tests.p81 where k = 's3' \gset
+begin;
+select set_config('request.jwt.claim.sub', :V, true);
+set local role authenticated;
+select public.register_partial(:'s3', jsonb_build_object('v', 1, 'client_key', tests.ck(), 'quantity', '1', 'exit_price', '2402.0'))#>>'{position,undo,id}' as p3 \gset
+select public.undo_event(:'s3', jsonb_build_object('v', 1, 'kind', 'parcial', 'id', :'p3'::bigint))->>'repeated';
+select public.register_exit(:'s3', '{"v": 1, "exit_price": "2403.0"}') as x3 \gset
+select tests.eq(jsonb_build_object('q', (:'x3'::jsonb)#>'{trade,quantity}', 'pnl', (:'x3'::jsonb)#>'{trade,pnl}', 'r', (:'x3'::jsonb)->'r',
+                                   'exits', (:'x3'::jsonb)#>'{position,exits}', 'total', (:'x3'::jsonb)->'total_pnl',
+                                   'rows', (select jsonb_agg(jsonb_build_array(e->>'kind', e->'counts', e->>'voided_at' is not null))
+                                            from jsonb_array_elements((:'x3'::jsonb)->'exits') e)),
+                '{"q": 2, "pnl": 60.00, "r": 0.6000, "exits": 0, "total": null, "rows": [["parcial", false, true]]}'::jsonb,
+                'its only partial undone: the exit is the whole trade''s, as before 3c (no final row, R of one exit)');
+commit;
+
+-- «Desfazer» up to exactly 15 minutes after the registration (one transaction: one now())
+begin;
+select set_config('request.jwt.claim.sub', :V, true);
+set local role authenticated;
+insert into tests.p81 values ('s4', public.register_entry(:'cur', tests.entry81('MNQZ6', 'long', '3', '21500.00', -3, '{"stop_pts": "20"}'))->>'trade_id');
+insert into tests.p81 values ('s5', public.register_entry(:'cur', tests.entry81('ESZ6', 'long', '1', '6000.00', -3, '{"stop_pts": "10"}'))->>'trade_id');
+commit;
+select v as s4 from tests.p81 where k = 's4' \gset
+select v as s5 from tests.p81 where k = 's5' \gset
+begin;
+select set_config('request.jwt.claim.sub', :V, true);
+set local role authenticated;
+select public.register_partial(:'s4', jsonb_build_object('v', 1, 'client_key', tests.ck(), 'quantity', '1', 'exit_price', '21505.00'))#>>'{position,undo,id}' as p4 \gset
+select public.move_stop(:'s5', tests.mv81('ajuste', '5995.00', null))#>>'{position,undo,id}' as m5x \gset
+commit;
+begin;
+-- (the commit-time check runs at each statement, so no event is pending when the guard is switched back on)
+set constraints all immediate;
+alter table public.trade_exits disable trigger trade_exits_guard;
+update public.trade_exits set registered_at = now() - interval '15 minutes 1 microsecond' where id = :'p4'::bigint;
+alter table public.trade_exits enable trigger trade_exits_guard;
+alter table public.trade_stop_moves disable trigger trade_stop_moves_guard;
+update public.trade_stop_moves set moved_at = now() - interval '15 minutes 1 microsecond' where id = :'m5x'::bigint;
+alter table public.trade_stop_moves enable trigger trade_stop_moves_guard;
+select tests.ok(public.trade_state(:'s4')#>'{position,undo}' = 'null'::jsonb and public.trade_state(:'s5')#>'{position,undo}' = 'null'::jsonb,
+                '15 minutes and 1 µs after: «Desfazer» no longer offered');
+select set_config('request.jwt.claim.sub', :V, true);
+set local role authenticated;
+select tests.fails(format('select public.undo_event(%L, %L)', :'s4', jsonb_build_object('v', 1, 'kind', 'parcial', 'id', :'p4'::bigint)),
+                   'undo_too_late', null, 'a partial 15 minutes and 1 µs old: too late');
+select tests.fails(format('select public.undo_event(%L, %L)', :'s5', jsonb_build_object('v', 1, 'kind', 'stop', 'id', :'m5x'::bigint)),
+                   'undo_too_late', null, 'a move 15 minutes and 1 µs old: too late');
+reset role;
+alter table public.trade_exits disable trigger trade_exits_guard;
+update public.trade_exits set registered_at = now() - interval '15 minutes' where id = :'p4'::bigint;
+alter table public.trade_exits enable trigger trade_exits_guard;
+alter table public.trade_stop_moves disable trigger trade_stop_moves_guard;
+update public.trade_stop_moves set moved_at = now() - interval '15 minutes' where id = :'m5x'::bigint;
+alter table public.trade_stop_moves enable trigger trade_stop_moves_guard;
+select tests.ok((public.trade_state(:'s4')#>>'{position,undo,until}')::timestamptz = now()
+                and (public.trade_state(:'s5')#>>'{position,undo,until}')::timestamptz = now(),
+                'exactly 15 minutes after: still offered, until now');
+set local role authenticated;
+select tests.eq(public.undo_event(:'s4', jsonb_build_object('v', 1, 'kind', 'parcial', 'id', :'p4'::bigint))#>'{position,open}', '3'::jsonb,
+                'a partial exactly 15 minutes old: undone');
+select tests.eq(public.undo_event(:'s5', jsonb_build_object('v', 1, 'kind', 'stop', 'id', :'m5x'::bigint))#>'{position,stop_now}',
+                '5990.00'::jsonb, 'a move exactly 15 minutes old: undone, the initial stop again');
+commit;
+
+-- One exit typed («Corrigir»), the other estimated (a pair with the dollar as base): the trade is typed
+begin;
+select set_config('request.jwt.claim.sub', :V, true);
+set local role authenticated;
+insert into tests.p81 values ('f3', public.register_entry(:'fx', tests.entry81('USD/JPY', 'long', '1.00', '150.000', -2))->>'trade_id');
+commit;
+select v as f3 from tests.p81 where k = 'f3' \gset
+begin;
+select set_config('request.jwt.claim.sub', :V, true);
+set local role authenticated;
+select tests.eq(public.register_partial(:'f3', jsonb_build_object('v', 1, 'client_key', tests.ck(), 'quantity', '0.50', 'exit_price', '150.100',
+                                        'pnl', '33.00'))#>>'{exits,0,pnl_basis}', 'typed', '«Corrigir» on the partial');
+select public.register_exit(:'f3', '{"v": 1, "exit_price": "150.200"}') as x4 \gset
+select tests.eq(jsonb_build_object('last', (:'x4'::jsonb)->>'pnl_basis', 'trade', (:'x4'::jsonb)#>>'{trade,pnl_basis}'),
+                '{"last": "estimate", "trade": "typed"}'::jsonb, 'a typed exit and an estimated one: the trade is typed');
+select tests.eq(public.register_after(:'fx', jsonb_build_object('v', 1, 'client_key', tests.ck(), 'symbol', 'USD/JPY', 'direction', 'long',
+                  'quantity', '1.00', 'entry_price', '150.000', 'clock', :NY, 'allow_similar', true,
+                  'day', public.compute_trading_day(:'fx', now())::text, 'entry', tests.hm(:NY, -60),
+                  'exits', jsonb_build_array(jsonb_build_object('quantity', '0.50', 'exit_price', '150.100', 'exit', tests.hm(:NY, -50)),
+                                             jsonb_build_object('quantity', '0.50', 'exit_price', '150.200', 'exit', tests.hm(:NY, -40),
+                                                                'pnl', '66.00'))))#>>'{trade,pnl_basis}',
+                'typed', '«Já fechada»: an estimated exit and a typed one, typed');
+commit;
+
+-- A partial of an option: the premium × the contract's multiplier
+begin;
+select set_config('request.jwt.claim.sub', :V, true);
+set local role authenticated;
+insert into tests.p81 values ('o1', public.register_entry(:'opc', jsonb_build_object('v', 1, 'client_key', tests.ck(), 'symbol', 'SPY',
+  'direction', 'long', 'quantity', '2', 'entry_price', '1.85', 'allow_similar', true,
+  'option', jsonb_build_object('right', 'call', 'strike', '600', 'expires_on', '2099-01-16')))->>'trade_id');
+commit;
+select v as o1 from tests.p81 where k = 'o1' \gset
+begin;
+select set_config('request.jwt.claim.sub', :V, true);
+set local role authenticated;
+select tests.eq(public.register_partial(:'o1', jsonb_build_object('v', 1, 'client_key', tests.ck(), 'quantity', '1', 'exit_price', '2.10'))->>'pnl',
+                '25.00', 'an option: 1 contract × US$ 0,25 × 100');
 commit;
 
 -- =============================================================================================
@@ -632,6 +850,13 @@ select tests.fails(format('select public.register_after(%L, %L)', :'arq', tests.
 select tests.fails(format('select public.register_after(%L, %L)', :'arq', tests.after81(:'arq', jsonb_build_object(
                      'breakeven', jsonb_build_object('price_then', '7916.50', 'favor', '4'), 'exit', tests.hm(:NY, -30), 'exit_price', '7920.50'))),
                    'bad_payload', 'breakeven', 'only the price then');
+select tests.fails(format('select public.register_after(%L, %L)', :'arq', tests.after81(:'arq', jsonb_build_object(
+                     'breakeven', jsonb_build_object('price_then', '7912.50'), 'exit', tests.hm(:NY, -30), 'exit_price', '7920.50'))),
+                   'bad_stop', 'breakeven', 'the price then at the entry is not in favour');
+select tests.fails(format('select public.register_after(%L, %L)', :'arq', tests.after81(:'arq', jsonb_build_object('exits',
+                     jsonb_build_array(jsonb_build_object('quantity', '1', 'exit_price', '7916.50', 'exit', tests.hm(:NY, -50), 'costs', '1.00'),
+                                       jsonb_build_object('quantity', '2', 'exit_price', '7920.50', 'exit', tests.hm(:NY, -30)))))),
+                   'not_for_market', 'exits', '«Custos» in an exit where the market has none');
 select tests.eq(jsonb_array_length(public.register_after(:'arq', tests.after81(:'arq', jsonb_build_object('exits',
                   tests.exits81('1', '7916.50', -50, '2', '7920.50', -30))), true)->'exits'), 2, 'the dry run lists the exits');
 select public.register_after(:'arq', tests.after81(:'arq', jsonb_build_object('breakeven', jsonb_build_object('price_then', '7916.50'),
@@ -653,6 +878,10 @@ set local role authenticated;
 select tests.fails(format('select public.register_after(%L, %L)', :'ebx', jsonb_build_object('v', 1, 'client_key', tests.ck(), 'symbol', 'EUR/USD',
   'direction', 'call', 'stake', '20', 'payout', '88', 'duration_s', 60, 'clock', 'America/Sao_Paulo', 'day', public.compute_trading_day(:'ebx', now())::text,
   'entry', tests.hm('America/Sao_Paulo', -60), 'outcome', 'ganho', 'exits', '[]'::jsonb)), 'not_for_market', 'exits', 'no exits on a binary');
+select tests.fails(format('select public.register_after(%L, %L)', :'ebx', jsonb_build_object('v', 1, 'client_key', tests.ck(), 'symbol', 'EUR/USD',
+  'direction', 'call', 'stake', '20', 'payout', '88', 'duration_s', 60, 'clock', 'America/Sao_Paulo', 'day', public.compute_trading_day(:'ebx', now())::text,
+  'entry', tests.hm('America/Sao_Paulo', -60), 'outcome', 'ganho', 'breakeven', jsonb_build_object('price_then', '1.1'))),
+  'not_for_market', 'breakeven', 'no breakeven on a binary');
 commit;
 
 -- =============================================================================================
@@ -677,7 +906,7 @@ select tests.eq(public.import_preview(:'arq', 'topone', null, 'UTC', :'f1'::json
                 '{"new": 3, "duplicate": 0, "completable": 0, "other_account": 0, "linked": 0, "linked_differs": 0,
                   "trades_new": 2, "grouped": 1, "attached": 0, "rows_total": 3, "errors": []}'::jsonb,
                 'preview: three rows, two trades, one row is a partial exit of another''s trade');
-select public.import_commit(:'arq', 'topone', 'f1.csv', null, 'UTC', :'f1'::jsonb) as c1 \gset
+select tests.imp81(:'arq', 'topone', 'f1.csv', :'f1'::jsonb) as c1 \gset
 select tests.eq((:'c1'::jsonb) - 'batch_id' - 'errors',
                 '{"inserted": 3, "duplicate": 0, "completed": 0, "other_account": 0, "linked": 0, "trades": 2, "grouped": 1, "attached": 0}'::jsonb,
                 'commit: three rows, two trades');
@@ -703,7 +932,7 @@ select tests.fp81(:'g1') as fp_g1 \gset
 begin;
 select set_config('request.jwt.claim.sub', :V, true);
 set local role authenticated;
-select tests.eq(public.import_commit(:'arq', 'topone', 'f1.csv', null, 'UTC', :'f1'::jsonb) - 'errors',
+select tests.eq(tests.imp81(:'arq', 'topone', 'f1.csv', :'f1'::jsonb) - 'errors',
                 '{"batch_id": null, "inserted": 0, "duplicate": 3, "completed": 0, "other_account": 0, "linked": 0}'::jsonb,
                 'the same file again: three duplicates, the answer of before, no batch');
 select tests.eq(public.import_preview(:'outra', 'topone', null, 'UTC', jsonb_build_array(:'f1'::jsonb->1))->>'other_account', '1',
@@ -722,7 +951,7 @@ select tests.eq((select count(*) from public.trade_exits where account_id = :'ar
 begin;
 select set_config('request.jwt.claim.sub', :V, true);
 set local role authenticated;
-select tests.eq(public.import_commit(:'ebx', 'ebinex', 'b.csv', null, 'UTC', jsonb_build_array(
+select tests.eq(tests.imp81(:'ebx', 'ebinex', 'b.csv', jsonb_build_array(
   tests.row(2, 'EBX/1', 'EUR/USD', 'binary_option', 'call', now() - interval '2 days', now() - interval '2 days' + interval '1 minute',
             '1.0850', '1.0860', '1', '10', '88', 'win', '8.80', null),
   tests.row(3, 'EBX/2', 'EUR/USD', 'binary_option', 'call', now() - interval '2 days', now() - interval '2 days' + interval '1 minute',
@@ -763,7 +992,7 @@ select set_config('request.jwt.claim.sub', :V, true);
 set local role authenticated;
 select tests.eq((public.import_preview(:'arq', 'topone', null, 'UTC', :'f2'::jsonb)->>'linked')::int, 1,
                 'preview: one registered trade (a position of two rows)');
-select public.import_commit(:'arq', 'topone', 'f2.csv', null, 'UTC', :'f2'::jsonb) as c2 \gset
+select tests.imp81(:'arq', 'topone', 'f2.csv', :'f2'::jsonb) as c2 \gset
 select tests.eq((:'c2'::jsonb) - 'batch_id' - 'errors',
                 '{"inserted": 0, "duplicate": 0, "completed": 0, "other_account": 0, "linked": 1, "trades": 0, "grouped": 1, "attached": 0}'::jsonb,
                 'one registered trade linked, one of the rows a partial exit of it');
@@ -813,7 +1042,7 @@ select rows as f3 from f83 \gset
 begin;
 select set_config('request.jwt.claim.sub', :V, true);
 set local role authenticated;
-select public.import_commit(:'arq', 'topone', 'f3.csv', null, 'UTC', :'f3'::jsonb) as c3 \gset
+select tests.imp81(:'arq', 'topone', 'f3.csv', :'f3'::jsonb) as c3 \gset
 commit;
 select tests.eq((select array_agg(e.exit_time order by e.exit_time) from public.trade_exits e where e.trade_id = :'a2'),
                 array[(:'f3'::jsonb#>>'{0,local_exit}')::timestamp at time zone 'UTC', :'a2_exit'::timestamptz],
@@ -844,7 +1073,7 @@ select rows as f4 from f84 \gset
 begin;
 select set_config('request.jwt.claim.sub', :V, true);
 set local role authenticated;
-select public.import_commit(:'arq', 'topone', 'f4.csv', null, 'UTC', :'f4'::jsonb) as c4 \gset
+select tests.imp81(:'arq', 'topone', 'f4.csv', :'f4'::jsonb) as c4 \gset
 commit;
 select tests.eq((select jsonb_build_object('st', status, 'pnl', pnl, 'reg', exit_registered_at is null) from public.trades where id = :'a3'),
                 '{"st": "closed", "pnl": 30.00, "reg": true}'::jsonb, 'closed by the file (the app did not register an exit)');
@@ -881,7 +1110,7 @@ select rows as f8 from f88 \gset
 begin;
 select set_config('request.jwt.claim.sub', :V, true);
 set local role authenticated;
-select public.import_commit(:'arq', 'topone', 'f8.csv', null, 'UTC', :'f8'::jsonb) as c8 \gset
+select tests.imp81(:'arq', 'topone', 'f8.csv', :'f8'::jsonb) as c8 \gset
 commit;
 select tests.eq((select array_agg(e.exit_time order by e.exit_time) from public.trade_exits e where e.trade_id = :'a8' and e.origin = 'file'),
                 array[:'a8_partial'::timestamptz, (:'f8'::jsonb#>>'{1,local_exit}')::timestamp at time zone 'UTC'],
@@ -905,7 +1134,7 @@ select x as x5, y as y5 from f85 \gset
 begin;
 select set_config('request.jwt.claim.sub', :V, true);
 set local role authenticated;
-select public.import_commit(:'arq', 'topone', 'f5a.csv', null, 'UTC', jsonb_build_array(:'x5'::jsonb));
+select tests.imp81(:'arq', 'topone', 'f5a.csv', jsonb_build_array(:'x5'::jsonb));
 commit;
 select id as i5 from public.trades where account_id = :'arq' and external_id = 'MESZ6/5001' \gset
 select tests.fp81(:'i5') as fpi5 \gset
@@ -914,7 +1143,7 @@ select set_config('request.jwt.claim.sub', :V, true);
 set local role authenticated;
 select tests.eq(public.import_preview(:'arq', 'topone', null, 'UTC', jsonb_build_array(:'x5'::jsonb, :'y5'::jsonb))->>'attached', '1',
                 'preview: one exit joins a trade that is already there');
-select public.import_commit(:'arq', 'topone', 'f5b.csv', null, 'UTC', jsonb_build_array(:'x5'::jsonb, :'y5'::jsonb)) as c5 \gset
+select tests.imp81(:'arq', 'topone', 'f5b.csv', jsonb_build_array(:'x5'::jsonb, :'y5'::jsonb)) as c5 \gset
 select tests.eq((:'c5'::jsonb) - 'batch_id' - 'errors',
                 '{"inserted": 1, "duplicate": 1, "completed": 0, "other_account": 0, "linked": 0, "trades": 0, "grouped": 0, "attached": 1}'::jsonb,
                 'commit: one attached, one duplicate');
@@ -939,7 +1168,7 @@ select md5(string_agg((to_jsonb(t) - 'updated_at')::text, ',' order by t.id)) as
 begin;
 select set_config('request.jwt.claim.sub', :V, true);
 set local role authenticated;
-select tests.eq(public.import_commit(:'pair', 'topone', 'par.csv', null, 'UTC', jsonb_build_array(
+select tests.eq(tests.imp81(:'pair', 'topone', 'par.csv', jsonb_build_array(
   tests.row(2, 'MESM6/7001', 'MESM6', 'futures', 'long', now() - interval '20 days', now() - interval '20 days' + interval '4 minutes',
             '7000.00', '7002.00', '2', null, null, 'win', '20.00', '1.24'),
   tests.row(3, 'MESM6/7002', 'MESM6', 'futures', 'long', now() - interval '20 days', now() - interval '20 days' + interval '8 minutes',
@@ -953,7 +1182,7 @@ select tests.eq((select md5(string_agg((to_jsonb(t) - 'updated_at')::text, ',' o
 begin;
 select set_config('request.jwt.claim.sub', :V, true);
 set local role authenticated;
-select public.import_commit(:'rel', 'topone', 'rel.csv', null, 'UTC', jsonb_build_array(
+select tests.imp81(:'rel', 'topone', 'rel.csv', jsonb_build_array(
   (tests.row(2, 'MESZ6/8001', 'MESZ6', 'futures', 'long', now() - interval '5 days', now() - interval '5 days' + interval '4 minutes',
              '7000.00', '7001.00', '1', null, null, 'win', '5.00', '0.62') - 'utc_offset'),
   (tests.row(3, 'MESZ6/8002', 'MESZ6', 'futures', 'long', now() - interval '5 days', now() - interval '5 days' + interval '9 minutes',
@@ -965,6 +1194,9 @@ select tests.eq((select array_agg(e.exit_time - t.exit_time order by e.exit_time
 select tests.eq((select count(*) from public.trade_exits e join public.trades t on t.id = e.trade_id
                  where t.account_id = :'rel' and e.exit_time <> e.source_local_exit at time zone 'America/Sao_Paulo'), 0::bigint,
                 'each exit on its own wall clock');
+select tests.eq((select count(*) from public.trade_exits e join public.trades t on t.id = e.trade_id
+                 where t.account_id = :'rel' and e.file_exit_at is distinct from e.exit_time), 0::bigint,
+                'the file''s own instant moved with it');
 
 -- 8.10 An app trade a first file linked by one row; a later file brings the rest: the trade gets both
 --      exits; undone in either order, what was registered comes back
@@ -990,14 +1222,14 @@ select x as x9, y as y9 from f89 \gset
 begin;
 select set_config('request.jwt.claim.sub', :V, true);
 set local role authenticated;
-select public.import_commit(:'arq', 'topone', 'f9a.csv', null, 'UTC', jsonb_build_array(:'x9'::jsonb)) as c9a \gset
+select tests.imp81(:'arq', 'topone', 'f9a.csv', jsonb_build_array(:'x9'::jsonb)) as c9a \gset
 commit;
 select tests.eq((select pnl from public.trades where id = :'a9'), 50.00, 'the first file: one row, the row path');
 select tests.fp81(:'a9') as fpa9a \gset
 begin;
 select set_config('request.jwt.claim.sub', :V, true);
 set local role authenticated;
-select public.import_commit(:'arq', 'topone', 'f9b.csv', null, 'UTC', jsonb_build_array(:'x9'::jsonb, :'y9'::jsonb)) as c9b \gset
+select tests.imp81(:'arq', 'topone', 'f9b.csv', jsonb_build_array(:'x9'::jsonb, :'y9'::jsonb)) as c9b \gset
 commit;
 select tests.eq((select jsonb_build_object('q', quantity, 'pnl', pnl, 'n', (select count(*) from public.trade_exits e where e.trade_id = :'a9'))
                  from public.trades where id = :'a9'), '{"q": 2, "pnl": 150.00, "n": 2}'::jsonb, 'the second file: both exits');
@@ -1017,12 +1249,12 @@ select tests.eq(tests.fp81(:'a9'), :'fpa9', 'undone oldest first: as registered'
 begin;
 select set_config('request.jwt.claim.sub', :V, true);
 set local role authenticated;
-select public.import_commit(:'arq', 'topone', 'f9a.csv', null, 'UTC', jsonb_build_array(:'x9'::jsonb)) as c9a \gset
+select tests.imp81(:'arq', 'topone', 'f9a.csv', jsonb_build_array(:'x9'::jsonb)) as c9a \gset
 commit;
 begin;
 select set_config('request.jwt.claim.sub', :V, true);
 set local role authenticated;
-select public.import_commit(:'arq', 'topone', 'f9b.csv', null, 'UTC', jsonb_build_array(:'x9'::jsonb, :'y9'::jsonb)) as c9b \gset
+select tests.imp81(:'arq', 'topone', 'f9b.csv', jsonb_build_array(:'x9'::jsonb, :'y9'::jsonb)) as c9b \gset
 commit;
 begin;
 select set_config('request.jwt.claim.sub', :V, true);
@@ -1036,6 +1268,29 @@ set local role authenticated;
 select public.import_undo((:'c9a'::jsonb->>'batch_id')::uuid);
 commit;
 select tests.eq(tests.fp81(:'a9'), :'fpa9', 'undo the first: as registered');
+-- The broker corrects the first exit's money in the later file that brings the second: one link, the
+-- corrected money; undone in either order, as registered
+begin;
+select set_config('request.jwt.claim.sub', :V, true);
+set local role authenticated;
+select tests.imp81(:'arq', 'topone', 'f9a.csv', jsonb_build_array(:'x9'::jsonb)) as c9a \gset
+commit;
+begin;
+select set_config('request.jwt.claim.sub', :V, true);
+set local role authenticated;
+select tests.imp81(:'arq', 'topone', 'f9c.csv', jsonb_build_array(
+  (:'x9'::jsonb) || '{"exit_price": "2499.4", "pnl": "60.00"}'::jsonb, :'y9'::jsonb)) as c9c \gset
+commit;
+select tests.eq((select jsonb_build_object('pnl', t.pnl, 'q', t.quantity, 'links', (select count(*) from public.trade_import_links l
+                                                                                 where l.trade_id = t.id and l.batch_id = (:'c9c'::jsonb->>'batch_id')::uuid))
+                 from public.trades t where t.id = :'a9'),
+                '{"pnl": 160.00, "q": 2, "links": 1}'::jsonb, 'the corrected money and the new exit, through one link');
+begin;
+select set_config('request.jwt.claim.sub', :V, true);
+set local role authenticated;
+select public.import_undo((:'c9c'::jsonb->>'batch_id')::uuid)->>'deleted', public.import_undo((:'c9a'::jsonb->>'batch_id')::uuid)->>'deleted';
+commit;
+select tests.eq(tests.fp81(:'a9'), :'fpa9', 'undone: as registered');
 
 -- 8.11 An OPEN app trade a first file closed with one row, a later file brings the rest: undone in
 --      either order, the trade is open again as registered
@@ -1056,14 +1311,14 @@ select x as x10, y as y10 from f810 \gset
 begin;
 select set_config('request.jwt.claim.sub', :V, true);
 set local role authenticated;
-select public.import_commit(:'arq', 'topone', 'f10a.csv', null, 'UTC', jsonb_build_array(:'x10'::jsonb)) as c10a \gset
+select tests.imp81(:'arq', 'topone', 'f10a.csv', jsonb_build_array(:'x10'::jsonb)) as c10a \gset
 commit;
 select tests.eq((select status || ' ' || quantity::int || ' ' || pnl from public.trades where id = :'a10'), 'closed 1 10.00',
                 'the first file closed it with its one row (the file says 1 ct)');
 begin;
 select set_config('request.jwt.claim.sub', :V, true);
 set local role authenticated;
-select public.import_commit(:'arq', 'topone', 'f10b.csv', null, 'UTC', jsonb_build_array(:'x10'::jsonb, :'y10'::jsonb)) as c10b \gset
+select tests.imp81(:'arq', 'topone', 'f10b.csv', jsonb_build_array(:'x10'::jsonb, :'y10'::jsonb)) as c10b \gset
 commit;
 select tests.eq((select status || ' ' || quantity::int || ' ' || pnl from public.trades where id = :'a10'), 'closed 2 30.00',
                 'the second file: both exits');
@@ -1074,6 +1329,19 @@ select public.import_undo((:'c10a'::jsonb->>'batch_id')::uuid);
 commit;
 select tests.eq((select status || ' ' || quantity::int || ' ' || pnl from public.trades where id = :'a10'), 'closed 2 30.00',
                 'undo the first: still closed by the second file''s exits');
+-- A registered trade that holds another file's exits (its key went with the undone batch) is never
+-- matched again: a new row at its entry is a trade of its own
+select tests.eq((select external_id from public.trades where id = :'a10'), null::text, 'the undone file''s key went with it');
+begin;
+select set_config('request.jwt.claim.sub', :V, true);
+set local role authenticated;
+select tests.imp81(:'arq', 'topone', 'f10c.csv', jsonb_build_array(
+  tests.row(2, 'MNQZ6/1199', 'MNQZ6', 'futures', 'long', :'a10_entry'::timestamptz, now() - interval '1 minute',
+            '21500.00', '21502.00', '1', null, null, 'win', '4.00', '0.62'))) as c10c \gset
+select tests.eq((:'c10c'::jsonb) - 'batch_id' - 'errors', '{"inserted": 1, "duplicate": 0, "completed": 0, "other_account": 0, "linked": 0}'::jsonb,
+                'a trade with a file''s exits is not matched again');
+select public.import_undo((:'c10c'::jsonb->>'batch_id')::uuid)->>'deleted';
+commit;
 begin;
 select set_config('request.jwt.claim.sub', :V, true);
 set local role authenticated;
@@ -1083,13 +1351,13 @@ select tests.eq(tests.fp81(:'a10'), :'fpa10', 'undo the second: open, as registe
 begin;
 select set_config('request.jwt.claim.sub', :V, true);
 set local role authenticated;
-select public.import_commit(:'arq', 'topone', 'f10a.csv', null, 'UTC', jsonb_build_array(:'x10'::jsonb)) as c10a \gset
+select tests.imp81(:'arq', 'topone', 'f10a.csv', jsonb_build_array(:'x10'::jsonb)) as c10a \gset
 commit;
 select tests.fp81(:'a10') as fpa10a \gset
 begin;
 select set_config('request.jwt.claim.sub', :V, true);
 set local role authenticated;
-select public.import_commit(:'arq', 'topone', 'f10b.csv', null, 'UTC', jsonb_build_array(:'x10'::jsonb, :'y10'::jsonb)) as c10b \gset
+select tests.imp81(:'arq', 'topone', 'f10b.csv', jsonb_build_array(:'x10'::jsonb, :'y10'::jsonb)) as c10b \gset
 commit;
 begin;
 select set_config('request.jwt.claim.sub', :V, true);
@@ -1130,13 +1398,16 @@ select x as x11, y as y11, z as z11 from f811 \gset
 begin;
 select set_config('request.jwt.claim.sub', :V, true);
 set local role authenticated;
-select public.import_commit(:'arq', 'topone', 'f11a.csv', null, 'UTC', jsonb_build_array(:'x11'::jsonb, :'y11'::jsonb)) as c11a \gset
+select tests.imp81(:'arq', 'topone', 'f11a.csv', jsonb_build_array(:'x11'::jsonb, :'y11'::jsonb)) as c11a \gset
 commit;
 select tests.fp81(:'a11') as fpa11a \gset
+select tests.ok((select 'quantity' = any (differs) from public.trade_import_links where trade_id = :'a11'
+                 and batch_id = (:'c11a'::jsonb->>'batch_id')::uuid),
+                'the file''s 2 ct against the 3 registered: recorded as different');
 begin;
 select set_config('request.jwt.claim.sub', :V, true);
 set local role authenticated;
-select public.import_commit(:'arq', 'topone', 'f11b.csv', null, 'UTC', jsonb_build_array(:'x11'::jsonb, :'y11'::jsonb, :'z11'::jsonb)) as c11b \gset
+select tests.imp81(:'arq', 'topone', 'f11b.csv', jsonb_build_array(:'x11'::jsonb, :'y11'::jsonb, :'z11'::jsonb)) as c11b \gset
 commit;
 select tests.eq((select jsonb_build_object('q', quantity, 'pnl', pnl, 'exit', exit_time = :'a11_exit'::timestamptz) from public.trades where id = :'a11'),
                 '{"q": 3, "pnl": 450.00, "exit": true}'::jsonb, 'three exits, the registered exit hour last');
@@ -1156,13 +1427,13 @@ select tests.eq(tests.fp81(:'a11'), :'fpa11', 'undo the second: as registered');
 begin;
 select set_config('request.jwt.claim.sub', :V, true);
 set local role authenticated;
-select public.import_commit(:'arq', 'topone', 'f11a.csv', null, 'UTC', jsonb_build_array(:'x11'::jsonb, :'y11'::jsonb)) as c11a \gset
+select tests.imp81(:'arq', 'topone', 'f11a.csv', jsonb_build_array(:'x11'::jsonb, :'y11'::jsonb)) as c11a \gset
 commit;
 select tests.fp81(:'a11') as fpa11a \gset
 begin;
 select set_config('request.jwt.claim.sub', :V, true);
 set local role authenticated;
-select public.import_commit(:'arq', 'topone', 'f11b.csv', null, 'UTC', jsonb_build_array(:'x11'::jsonb, :'y11'::jsonb, :'z11'::jsonb)) as c11b \gset
+select tests.imp81(:'arq', 'topone', 'f11b.csv', jsonb_build_array(:'x11'::jsonb, :'y11'::jsonb, :'z11'::jsonb)) as c11b \gset
 commit;
 begin;
 select set_config('request.jwt.claim.sub', :V, true);
@@ -1195,14 +1466,14 @@ select entry_time as a12_entry from public.trades where id = :'a12' \gset
 begin;
 select set_config('request.jwt.claim.sub', :V, true);
 set local role authenticated;
-select public.import_commit(:'arq', 'topone', 'u_a.csv', null, 'UTC', jsonb_build_array(
+select tests.imp81(:'arq', 'topone', 'u_a.csv', jsonb_build_array(
   tests.row(2, 'MES/X1', 'MES', 'futures', 'long', :'a12_entry'::timestamptz, now() - interval '1 minute',
             '7000.00', '7016.00', '1', null, null, 'win', '80.00', '0.62'))) as ua \gset
 commit;
 begin;
 select set_config('request.jwt.claim.sub', :V, true);
 set local role authenticated;
-select public.import_commit(:'arq', 'topone', 'u_b.csv', null, 'UTC', jsonb_build_array(
+select tests.imp81(:'arq', 'topone', 'u_b.csv', jsonb_build_array(
   tests.row(2, 'MES/X1', 'MES', 'futures', 'long', :'a12_entry'::timestamptz, now() - interval '1 minute',
             '7000.00', '7020.00', '1', null, null, 'win', '100.00', '0.62'))) as ub \gset
 commit;
@@ -1213,6 +1484,629 @@ select public.import_undo((:'ub'::jsonb->>'batch_id')::uuid);
 select public.import_undo((:'ua'::jsonb->>'batch_id')::uuid);
 commit;
 select tests.eq(tests.fp81(:'a12'), :'fpa12', 'undone newest first: the registered pnl (20261020000004 left 80.00)');
+
+-- 8.14 Two exits of one position the app registered as two trades (before Phase 3c the only way to
+--      register two exits): the file's rows link one to one, as 20261020000004 did, never folded into one
+--      of them, and the day is the file's money. The same file again changes nothing; a later third row of
+--      that position joins neither trade (a trade of its own); undone, both trades are as registered.
+begin;
+select set_config('request.jwt.claim.sub', :V, true);
+set local role authenticated;
+insert into tests.p81 select 'sp' || i, public.register_entry(:'sa1', tests.entry81('MCLZ6', 'long', '1', '70.00', -10))->>'trade_id'
+from generate_series(1, 2) i;
+commit;
+select v as sp1 from tests.p81 where k = 'sp1' \gset
+select v as sp2 from tests.p81 where k = 'sp2' \gset
+begin;
+select set_config('request.jwt.claim.sub', :V, true);
+set local role authenticated;
+select public.register_exit(:'sp1', '{"v": 1, "exit_price": "70.10"}')->>'pnl', public.register_exit(:'sp2', '{"v": 1, "exit_price": "70.20"}')->>'pnl';
+commit;
+select tests.fp81(:'sp1') || tests.fp81(:'sp2') as fpsp \gset
+select entry_time as sp_entry, trading_day as sp_day from public.trades where id = :'sp1' \gset
+select tests.eq(public.limit_usage(:'sa1', :'sp_day', false, null, 'infinity')->>'net_usd', '30.00', 'the app registered US$ 10 and US$ 20');
+create temp table f814 as select jsonb_build_array(
+  tests.row(2, 'MCLZ6/14001', 'MCLZ6', 'futures', 'long', :'sp_entry'::timestamptz, now() - interval '6 minutes',
+            '70.00', '70.05', '1', null, null, 'win', '5.00', '0.62'),
+  tests.row(3, 'MCLZ6/14002', 'MCLZ6', 'futures', 'long', :'sp_entry'::timestamptz, now() - interval '2 minutes',
+            '70.00', '70.15', '1', null, null, 'win', '15.00', '0.62')) as rows;
+select rows as f14 from f814 \gset
+begin;
+select set_config('request.jwt.claim.sub', :V, true);
+set local role authenticated;
+select tests.imp81(:'sa1', 'topone', 'f14.csv', :'f14'::jsonb) as c14 \gset
+select tests.eq((:'c14'::jsonb) - 'batch_id' - 'errors', '{"inserted": 0, "duplicate": 0, "completed": 0, "other_account": 0, "linked": 2}'::jsonb,
+                'two registered trades, one row each (as 20261020000004): no position folded into one of them');
+commit;
+select tests.eq((select jsonb_agg(jsonb_build_array(t.external_id, t.pnl, t.pnl_basis) order by t.external_id)
+                 from public.trades t where t.account_id = :'sa1'),
+                '[["MCLZ6/14001", 5.00, "file"], ["MCLZ6/14002", 15.00, "file"]]'::jsonb, 'each trade holds its own row''s money');
+select tests.eq((select count(*) from public.trade_exits e where e.account_id = :'sa1'), 0::bigint, 'the row path: no exit rows');
+select tests.eq(public.limit_usage(:'sa1', :'sp_day', false, null, 'infinity') - 'hit_at',
+                '{"trades": 2, "net_usd": 18.76, "worst_usd": 0}'::jsonb,
+                'the day is the file''s: US$ 20 gross, US$ 18,76 net (US$ 40 if the rows were folded into one trade)');
+begin;
+select set_config('request.jwt.claim.sub', :V, true);
+set local role authenticated;
+select tests.eq(tests.imp81(:'sa1', 'topone', 'f14.csv', :'f14'::jsonb) - 'errors',
+                '{"batch_id": null, "inserted": 0, "duplicate": 2, "completed": 0, "other_account": 0, "linked": 0}'::jsonb,
+                'the same file again: two duplicates, nothing written');
+select tests.imp81(:'sa1', 'topone', 'f14b.csv', :'f14'::jsonb || jsonb_build_array(
+  tests.row(4, 'MCLZ6/14003', 'MCLZ6', 'futures', 'long', :'sp_entry'::timestamptz, now() - interval '1 minute',
+            '70.00', '69.95', '1', null, null, 'loss', '-5.00', '0.62'))) as c14b \gset
+select tests.eq((:'c14b'::jsonb) - 'batch_id' - 'errors', '{"inserted": 1, "duplicate": 2, "completed": 0, "other_account": 0, "linked": 0}'::jsonb,
+                'a third exit of that position: its other rows are in two trades, so it joins neither (a trade of its own)');
+commit;
+select tests.eq(public.limit_usage(:'sa1', :'sp_day', false, null, 'infinity')->>'net_usd', '13.14',
+                'the day is still the file''s: US$ 15 gross, three commissions');
+begin;
+select set_config('request.jwt.claim.sub', :V, true);
+set local role authenticated;
+select public.import_undo((:'c14b'::jsonb->>'batch_id')::uuid)->>'deleted', public.import_undo((:'c14'::jsonb->>'batch_id')::uuid)->>'deleted';
+commit;
+select tests.eq(tests.fp81(:'sp1') || tests.fp81(:'sp2'), :'fpsp', 'undone: both trades as registered');
+
+-- 8.15 More rows than registered trades: two trades of one entry, three rows of the position: two linked
+--      one to one, the third a trade of its own; the day is the file's; undo gives both back
+begin;
+select set_config('request.jwt.claim.sub', :V, true);
+set local role authenticated;
+insert into tests.p81 select 'sq' || i, public.register_entry(:'sa2', tests.entry81('MGCZ6', 'long', '1', '2400.0', -10))->>'trade_id'
+from generate_series(1, 2) i;
+commit;
+select v as sq1 from tests.p81 where k = 'sq1' \gset
+select v as sq2 from tests.p81 where k = 'sq2' \gset
+begin;
+select set_config('request.jwt.claim.sub', :V, true);
+set local role authenticated;
+select public.register_exit(:'sq1', '{"v": 1, "exit_price": "2401.0"}')->>'pnl', public.register_exit(:'sq2', '{"v": 1, "exit_price": "2402.0"}')->>'pnl';
+commit;
+select tests.fp81(:'sq1') || tests.fp81(:'sq2') as fpsq \gset
+select entry_time as sq_entry, trading_day as sq_day from public.trades where id = :'sq1' \gset
+-- (another position of this account already holds file exits: no reason not to split this one)
+begin;
+select set_config('request.jwt.claim.sub', :V, true);
+set local role authenticated;
+select tests.imp81(:'sa2', 'topone', 'f15o.csv', jsonb_build_array(
+  tests.row(2, 'MCLZ6/15901', 'MCLZ6', 'futures', 'short', now() - interval '20 days', now() - interval '20 days' + interval '5 minutes',
+            '70.00', '69.90', '1', null, null, 'win', '10.00', '0.62'),
+  tests.row(3, 'MCLZ6/15902', 'MCLZ6', 'futures', 'short', now() - interval '20 days', now() - interval '20 days' + interval '9 minutes',
+            '70.00', '69.80', '1', null, null, 'win', '20.00', '0.62')))->>'grouped';
+commit;
+begin;
+select set_config('request.jwt.claim.sub', :V, true);
+set local role authenticated;
+select tests.imp81(:'sa2', 'topone', 'f15.csv', jsonb_build_array(
+  tests.row(2, 'MGCZ6/15001', 'MGCZ6', 'futures', 'long', :'sq_entry'::timestamptz, now() - interval '7 minutes',
+            '2400.0', '2400.4', '1', null, null, 'win', '4.00', '0.62'),
+  tests.row(3, 'MGCZ6/15002', 'MGCZ6', 'futures', 'long', :'sq_entry'::timestamptz, now() - interval '5 minutes',
+            '2400.0', '2400.8', '1', null, null, 'win', '8.00', '0.62'),
+  tests.row(4, 'MGCZ6/15003', 'MGCZ6', 'futures', 'long', :'sq_entry'::timestamptz, now() - interval '3 minutes',
+            '2400.0', '2401.2', '1', null, null, 'win', '12.00', '0.62'))) as c15 \gset
+select tests.eq((:'c15'::jsonb) - 'batch_id' - 'errors', '{"inserted": 1, "duplicate": 0, "completed": 0, "other_account": 0, "linked": 2}'::jsonb,
+                'two rows linked one to one, the third a trade of its own');
+commit;
+select tests.eq(public.limit_usage(:'sa2', :'sq_day', false, null, 'infinity') - 'hit_at',
+                '{"trades": 3, "net_usd": 22.14, "worst_usd": 0}'::jsonb, 'the day is the file''s: US$ 24 gross, three commissions');
+begin;
+select set_config('request.jwt.claim.sub', :V, true);
+set local role authenticated;
+select public.import_undo((:'c15'::jsonb->>'batch_id')::uuid)->>'deleted';
+commit;
+select tests.eq(tests.fp81(:'sq1') || tests.fp81(:'sq2'), :'fpsq', 'undone: both as registered, the third trade gone');
+
+-- 8.16 One of the position's registered trades has partials of its own (2 ct: a partial and the exit),
+--      the other is 1 ct: three rows of 1 ct link one to one (the 1 ct trade first, the same size), the
+--      trade with partials takes its row through the exits path (the app's exits kept, not counted), the
+--      third row is a trade of its own; undo gives back the partial, the exit and the other trade
+begin;
+select set_config('request.jwt.claim.sub', :V, true);
+set local role authenticated;
+insert into tests.p81 values ('sr1', public.register_entry(:'sa3', tests.entry81('MESZ6', 'long', '2', '7000.00', -10))->>'trade_id'),
+                             ('sr2', public.register_entry(:'sa3', tests.entry81('MESZ6', 'long', '1', '7000.00', -10))->>'trade_id');
+commit;
+select v as sr1 from tests.p81 where k = 'sr1' \gset
+select v as sr2 from tests.p81 where k = 'sr2' \gset
+begin;
+select set_config('request.jwt.claim.sub', :V, true);
+set local role authenticated;
+select public.register_partial(:'sr1', jsonb_build_object('v', 1, 'client_key', tests.ck(), 'quantity', '1', 'exit_price', '7002.00',
+                                                         'clock', :NY, 'exit', tests.hm(:NY, -8)))->>'pnl';
+commit;
+begin;
+select set_config('request.jwt.claim.sub', :V, true);
+set local role authenticated;
+select public.register_exit(:'sr1', '{"v": 1, "exit_price": "7004.00"}')->>'pnl', public.register_exit(:'sr2', '{"v": 1, "exit_price": "7003.00"}')->>'pnl';
+commit;
+select tests.fp81(:'sr1') || tests.fp81(:'sr2') as fpsr \gset
+select entry_time as sr_entry, exit_time as sr1_exit, trading_day as sr_day from public.trades where id = :'sr1' \gset
+begin;
+select set_config('request.jwt.claim.sub', :V, true);
+set local role authenticated;
+select tests.imp81(:'sa3', 'topone', 'f16.csv', jsonb_build_array(
+  tests.row(2, 'MESZ6/16001', 'MESZ6', 'futures', 'long', :'sr_entry'::timestamptz, now() - interval '7 minutes',
+            '7000.00', '7001.00', '1', null, null, 'win', '5.00', '0.62'),
+  tests.row(3, 'MESZ6/16002', 'MESZ6', 'futures', 'long', :'sr_entry'::timestamptz, now() - interval '4 minutes',
+            '7000.00', '7001.50', '1', null, null, 'win', '7.50', '0.62'),
+  tests.row(4, 'MESZ6/16003', 'MESZ6', 'futures', 'long', :'sr_entry'::timestamptz, now() - interval '2 minutes',
+            '7000.00', '7002.50', '1', null, null, 'win', '12.50', '0.62'))) as c16 \gset
+select tests.eq((:'c16'::jsonb) - 'batch_id' - 'errors', '{"inserted": 1, "duplicate": 0, "completed": 0, "other_account": 0, "linked": 2}'::jsonb,
+                'two registered trades linked one row each, the third row a trade of its own');
+commit;
+select tests.eq((select jsonb_build_object('one', (select external_id || ' ' || pnl from public.trades where id = :'sr2'),
+                                           'two', (select external_id || ' ' || quantity::int || ' ' || pnl || ' ' || (exit_time = :'sr1_exit'::timestamptz)
+                                                   from public.trades where id = :'sr1'),
+                                           'rows', (select jsonb_agg(jsonb_build_array(e.origin, e.counts, e.exit_time = :'sr1_exit'::timestamptz)
+                                                                     order by e.origin, e.exit_time)
+                                                    from public.trade_exits_v e where e.trade_id = :'sr1'))),
+                '{"one": "MESZ6/16001 5.00", "two": "MESZ6/16002 1 7.50 true",
+                  "rows": [["app", false, false], ["app", false, true], ["file", true, true]]}'::jsonb,
+                'the 1 ct trade takes the first row; the trade with partials takes the next as one file exit at its registered exit');
+select tests.eq(public.limit_usage(:'sa3', :'sr_day', false, null, 'infinity') - 'hit_at',
+                '{"trades": 3, "net_usd": 23.14, "worst_usd": 0}'::jsonb, 'the day is the file''s: US$ 25 gross, three commissions');
+begin;
+select set_config('request.jwt.claim.sub', :V, true);
+set local role authenticated;
+select public.import_undo((:'c16'::jsonb->>'batch_id')::uuid)->>'deleted';
+commit;
+select tests.eq(tests.fp81(:'sr1') || tests.fp81(:'sr2'), :'fpsr', 'undone: the partial, the exit and the other trade as registered');
+
+-- 8.17 No split when the other registered trade is another entry (another price) or another position of
+--      the file takes it: the position goes whole to the trade it matched
+begin;
+select set_config('request.jwt.claim.sub', :V, true);
+set local role authenticated;
+insert into tests.p81 values ('st1', public.register_entry(:'sa4', tests.entry81('MNQZ6', 'long', '3', '21000.00', -10))->>'trade_id'),
+                             ('st3', public.register_entry(:'sa4', tests.entry81('NQZ6', 'long', '3', '21000.00', -10))->>'trade_id');
+commit;
+begin;
+select set_config('request.jwt.claim.sub', :V, true);
+set local role authenticated;
+insert into tests.p81 values ('st2', public.register_entry(:'sa4', tests.entry81('MNQZ6', 'long', '1', '21005.00', -8))->>'trade_id'),
+                             ('st4', public.register_entry(:'sa4', tests.entry81('NQZ6', 'long', '1', '21000.00', -9))->>'trade_id');
+commit;
+select max(v) filter (where k = 'st1') as st1, max(v) filter (where k = 'st2') as st2, max(v) filter (where k = 'st3') as st3,
+       max(v) filter (where k = 'st4') as st4 from tests.p81 \gset
+begin;
+select set_config('request.jwt.claim.sub', :V, true);
+set local role authenticated;
+select public.register_exit(:'st1', '{"v": 1, "exit_price": "21004.00"}')->>'pnl', public.register_exit(:'st3', '{"v": 1, "exit_price": "21004.00"}')->>'pnl',
+       public.register_exit(:'st4', '{"v": 1, "exit_price": "21002.00"}')->>'pnl';
+commit;
+select tests.fp81(:'st2') as fpst2 \gset
+select entry_time as st1_entry from public.trades where id = :'st1' \gset
+select entry_time as st3_entry from public.trades where id = :'st3' \gset
+select entry_time as st4_entry from public.trades where id = :'st4' \gset
+-- (an old page's trade at the same entry and price is not registered in the app: never a reason to split)
+insert into public.trades (user_id, account_id, symbol, asset_type, direction, entry_time, quantity, entry_price, result, pnl)
+select :V, :'sa4', 'MNQZ6', 'futures', 'long', t.entry_time, 1, 21000.00, 'win', 2 from public.trades t where t.id = :'st1';
+begin;
+select set_config('request.jwt.claim.sub', :V, true);
+set local role authenticated;
+select tests.eq(tests.imp81(:'sa4', 'topone', 'f17a.csv', jsonb_build_array(
+  tests.row(2, 'MNQZ6/17001', 'MNQZ6', 'futures', 'long', :'st1_entry'::timestamptz, now() - interval '5 minutes',
+            '21000.00', '21002.00', '1', null, null, 'win', '4.00', '0.62'),
+  tests.row(3, 'MNQZ6/17002', 'MNQZ6', 'futures', 'long', :'st1_entry'::timestamptz, now() - interval '2 minutes',
+            '21000.00', '21003.00', '1', null, null, 'win', '6.00', '0.62'))) - 'batch_id' - 'errors',
+  '{"inserted": 0, "duplicate": 0, "completed": 0, "other_account": 0, "linked": 1, "trades": 0, "grouped": 1, "attached": 0}'::jsonb,
+  'the other trade has another entry price: the position goes whole to the trade it matched');
+select tests.eq(tests.imp81(:'sa4', 'topone', 'f17b.csv', jsonb_build_array(
+  tests.row(2, 'NQZ6/17101', 'NQZ6', 'futures', 'long', :'st3_entry'::timestamptz, now() - interval '5 minutes',
+            '21000.00', '21002.00', '1', null, null, 'win', '40.00', '2.00'),
+  tests.row(3, 'NQZ6/17102', 'NQZ6', 'futures', 'long', :'st3_entry'::timestamptz, now() - interval '2 minutes',
+            '21000.00', '21003.00', '1', null, null, 'win', '60.00', '2.00'),
+  tests.row(4, 'NQZ6/17103', 'NQZ6', 'futures', 'long', :'st4_entry'::timestamptz, now() - interval '3 minutes',
+            '21000.00', '21001.00', '1', null, null, 'win', '20.00', '2.00'))) - 'batch_id' - 'errors',
+  '{"inserted": 0, "duplicate": 0, "completed": 0, "other_account": 0, "linked": 2, "trades": 0, "grouped": 1, "attached": 0}'::jsonb,
+  'the other trade of the same entry price is another position of the file''s: no split, two links');
+commit;
+select tests.eq(jsonb_build_object(
+  'mnq', (select quantity::int || ' ' || pnl || ' ' || external_id from public.trades where id = :'st1'),
+  'nq', (select quantity::int || ' ' || pnl || ' ' || external_id from public.trades where id = :'st3'),
+  'nq1', (select quantity::int || ' ' || pnl || ' ' || external_id from public.trades where id = :'st4')),
+  '{"mnq": "2 10.00 MNQZ6/17001", "nq": "2 100.00 NQZ6/17101", "nq1": "1 20.00 NQZ6/17103"}'::jsonb, 'each position whole, on its own trade');
+select tests.eq(tests.fp81(:'st2'), :'fpst2', 'the trade of the other entry is untouched (still open)');
+
+-- 8.18 The registered trade the position matched already has its whole size: the position is that trade
+--      (no split). Another registered trade of the same entry that the file does not bring keeps what was
+--      registered (as any registered trade no row reaches)
+begin;
+select set_config('request.jwt.claim.sub', :V, true);
+set local role authenticated;
+insert into tests.p81 values ('su1', public.register_entry(:'sa5', tests.entry81('ESZ6', 'long', '2', '6000.00', -10))->>'trade_id'),
+                             ('su2', public.register_entry(:'sa5', tests.entry81('ESZ6', 'long', '1', '6000.00', -10))->>'trade_id');
+commit;
+select max(v) filter (where k = 'su1') as su1, max(v) filter (where k = 'su2') as su2 from tests.p81 \gset
+begin;
+select set_config('request.jwt.claim.sub', :V, true);
+set local role authenticated;
+select public.register_exit(:'su1', '{"v": 1, "exit_price": "6002.00"}')->>'pnl', public.register_exit(:'su2', '{"v": 1, "exit_price": "6001.00"}')->>'pnl';
+commit;
+select tests.fp81(:'su2') as fpsu2 \gset
+select entry_time as su_entry, trading_day as su_day from public.trades where id = :'su1' \gset
+-- A trade the old pages wrote at the same entry is not registered in the app: never a reason to split
+insert into public.trades (user_id, account_id, symbol, asset_type, direction, entry_time, quantity, entry_price, result, pnl)
+select :V, :'sa5', 'ESZ6', 'futures', 'long', t.entry_time, 1, 6000.00, 'win', 25 from public.trades t where t.id = :'su1';
+begin;
+select set_config('request.jwt.claim.sub', :V, true);
+set local role authenticated;
+select tests.eq(tests.imp81(:'sa5', 'topone', 'f18.csv', jsonb_build_array(
+  tests.row(2, 'ESZ6/18001', 'ESZ6', 'futures', 'long', :'su_entry'::timestamptz, now() - interval '5 minutes',
+            '6000.00', '6000.50', '1', null, null, 'win', '25.00', '2.50'),
+  tests.row(3, 'ESZ6/18002', 'ESZ6', 'futures', 'long', :'su_entry'::timestamptz, now() - interval '2 minutes',
+            '6000.00', '6001.00', '1', null, null, 'win', '50.00', '2.50'))) - 'batch_id' - 'errors',
+  '{"inserted": 0, "duplicate": 0, "completed": 0, "other_account": 0, "linked": 1, "trades": 0, "grouped": 1, "attached": 0}'::jsonb,
+  'the trade of the position''s size takes it whole');
+commit;
+select tests.eq((select quantity::int || ' ' || pnl || ' ' || external_id from public.trades where id = :'su1'), '2 75.00 ESZ6/18001',
+                'the file''s money on it');
+select tests.eq(tests.fp81(:'su2'), :'fpsu2', 'the other trade, which the file does not bring, as registered');
+select tests.eq(public.limit_usage(:'sa5', :'su_day', false, null, 'infinity')->>'net_usd', '145.00',
+                'the day: the file''s position (US$ 70 net), the registered trade the file does not bring (US$ 50) and the old page''s (US$ 25)');
+
+-- 8.19 Hours on a registered trade: a middle row past the registered exit stays at it; an open trade
+--      with as many partials as rows closes at the file's last exit; an exit after now writes no exits;
+--      the file's entry price wins and is recorded as different
+begin;
+select set_config('request.jwt.claim.sub', :V, true);
+set local role authenticated;
+insert into tests.p81 values ('h1', public.register_entry(:'hora', tests.entry81('MESZ6', 'long', '3', '7000.00', -12))->>'trade_id'),
+                             ('h2', public.register_entry(:'hora', tests.entry81('MCLZ6', 'long', '3', '70.00', -13))->>'trade_id'),
+                             ('h3', public.register_entry(:'hora', tests.entry81('MGCZ6', 'long', '3', '2400.0', -11))->>'trade_id'),
+                             ('h4', public.register_entry(:'hora', tests.entry81('ESZ6', 'long', '2', '6000.00', -10))->>'trade_id');
+commit;
+select max(v) filter (where k = 'h1') as h1, max(v) filter (where k = 'h2') as h2, max(v) filter (where k = 'h3') as h3,
+       max(v) filter (where k = 'h4') as h4 from tests.p81 \gset
+begin;
+select set_config('request.jwt.claim.sub', :V, true);
+set local role authenticated;
+select public.register_partial(:'h2', jsonb_build_object('v', 1, 'client_key', tests.ck(), 'quantity', '1', 'exit_price', '70.10',
+                                                        'clock', :NY, 'exit', tests.hm(:NY, -9)))->>'pnl',
+       public.register_partial(:'h2', jsonb_build_object('v', 1, 'client_key', tests.ck(), 'quantity', '1', 'exit_price', '70.20',
+                                                        'clock', :NY, 'exit', tests.hm(:NY, -6)))->>'pnl',
+       public.register_partial(:'h3', jsonb_build_object('v', 1, 'client_key', tests.ck(), 'quantity', '1', 'exit_price', '2401.0',
+                                                        'clock', :NY, 'exit', tests.hm(:NY, -7)))->>'pnl';
+commit;
+begin;
+select set_config('request.jwt.claim.sub', :V, true);
+set local role authenticated;
+select public.register_exit(:'h1', '{"v": 1, "exit_price": "7002.00"}')->>'pnl', public.register_exit(:'h4', '{"v": 1, "exit_price": "6002.00"}')->>'pnl';
+commit;
+select tests.fp81(:'h1') as fph1 \gset
+select tests.fp81(:'h2') as fph2 \gset
+select tests.fp81(:'h3') as fph3 \gset
+select tests.fp81(:'h4') as fph4 \gset
+select max(t.entry_time) filter (where t.id = :'h1') as h1_entry, max(t.exit_time) filter (where t.id = :'h1') as h1_exit,
+       max(t.entry_time) filter (where t.id = :'h2') as h2_entry, max(t.entry_time) filter (where t.id = :'h3') as h3_entry,
+       max(t.entry_time) filter (where t.id = :'h4') as h4_entry
+from public.trades t where t.account_id = :'hora' \gset
+select array_agg(exit_time order by exit_time)::text as h2_partials from public.trade_exits where trade_id = :'h2' \gset
+create temp table f819 as select
+  jsonb_build_array(
+    tests.row(2, 'MESZ6/19001', 'MESZ6', 'futures', 'long', :'h1_entry'::timestamptz, now() - interval '9 minutes',
+              '7000.00', '7001.00', '1', null, null, 'win', '5.00', '0.62'),
+    tests.row(3, 'MESZ6/19002', 'MESZ6', 'futures', 'long', :'h1_entry'::timestamptz, now() + interval '1 minute',
+              '7000.00', '7002.00', '1', null, null, 'win', '10.00', '0.62'),
+    tests.row(4, 'MESZ6/19003', 'MESZ6', 'futures', 'long', :'h1_entry'::timestamptz, now() + interval '2 minutes',
+              '7000.00', '7003.00', '1', null, null, 'win', '15.00', '0.62')) as a,
+  jsonb_build_array(
+    tests.row(2, 'MCLZ6/19101', 'MCLZ6', 'futures', 'long', :'h2_entry'::timestamptz, now() - interval '8 minutes',
+              '70.00', '70.10', '1', null, null, 'win', '10.00', '0.62'),
+    tests.row(3, 'MCLZ6/19102', 'MCLZ6', 'futures', 'long', :'h2_entry'::timestamptz, now() - interval '3 minutes',
+              '70.00', '70.20', '1', null, null, 'win', '20.00', '0.62')) as b,
+  jsonb_build_array(
+    tests.row(2, 'MGCZ6/19201', 'MGCZ6', 'futures', 'long', :'h3_entry'::timestamptz, now() - interval '5 minutes',
+              '2400.0', '2401.0', '1', null, null, 'win', '10.00', '0.62'),
+    tests.row(3, 'MGCZ6/19202', 'MGCZ6', 'futures', 'long', :'h3_entry'::timestamptz, now() + interval '30 days',
+              '2400.0', '2402.0', '1', null, null, 'win', '20.00', '0.62')) as c,
+  jsonb_build_array(
+    tests.row(2, 'ESZ6/19301', 'ESZ6', 'futures', 'long', :'h4_entry'::timestamptz, now() - interval '6 minutes',
+              '6000.25', '6001.00', '1', null, null, 'win', '37.50', '2.50'),
+    tests.row(3, 'ESZ6/19302', 'ESZ6', 'futures', 'long', :'h4_entry'::timestamptz, now() - interval '3 minutes',
+              '6000.25', '6002.00', '1', null, null, 'win', '87.50', '2.50')) as d;
+select a as f19a, b as f19b, c as f19c, d as f19d from f819 \gset
+begin;
+select set_config('request.jwt.claim.sub', :V, true);
+set local role authenticated;
+select tests.imp81(:'hora', 'topone', 'f19a.csv', :'f19a'::jsonb) as c19a \gset
+select tests.imp81(:'hora', 'topone', 'f19b.csv', :'f19b'::jsonb) as c19b \gset
+select tests.imp81(:'hora', 'topone', 'f19c.csv', :'f19c'::jsonb) as c19c \gset
+select tests.imp81(:'hora', 'topone', 'f19d.csv', :'f19d'::jsonb) as c19d \gset
+commit;
+select tests.eq((select array_agg(e.exit_time order by e.line) from public.trade_exits e where e.trade_id = :'h1' and e.origin = 'file'),
+                array[(:'f19a'::jsonb#>>'{0,local_exit}')::timestamp at time zone 'UTC', :'h1_exit'::timestamptz, :'h1_exit'::timestamptz],
+                'a middle row past the registered exit stays at it; the last is the registered exit');
+select tests.eq((select array_agg(e.exit_time order by e.line) from public.trade_exits e where e.trade_id = :'h2' and e.origin = 'file'),
+                array[(:'h2_partials'::timestamptz[])[1], (:'f19b'::jsonb#>>'{1,local_exit}')::timestamp at time zone 'UTC'],
+                'as many partials as rows on an open trade: the first takes the partial''s hour, the last the file''s (the app never closed it)');
+select tests.eq((select status || ' ' || quantity::int || ' ' || pnl from public.trades where id = :'h2'), 'closed 2 30.00', 'closed by the file');
+select tests.eq((select jsonb_build_object('st', t.status, 'key', t.external_id, 'file', (select count(*) from public.trade_exits e where e.trade_id = t.id and e.origin = 'file'))
+                 from public.trades t where t.id = :'h3'),
+                '{"st": "open", "key": "MGCZ6/19201", "file": 0}'::jsonb, 'an exit after now: the key only, no exits, still open');
+select tests.eq((select jsonb_build_object('px', t.entry_price, 'pnl', t.pnl, 'differs', l.differs)
+                 from public.trades t join public.trade_import_links l on l.trade_id = t.id where t.id = :'h4'),
+                '{"px": 6000.25, "pnl": 125.00, "differs": ["entry_price", "pnl", "exit_price"]}'::jsonb,
+                'the file''s entry price on the exits path, recorded as different with the money');
+select tests.eq((:'c19d'::jsonb)->>'linked', '1', 'one registered trade');
+begin;
+select set_config('request.jwt.claim.sub', :V, true);
+set local role authenticated;
+select public.import_undo((:'c19a'::jsonb->>'batch_id')::uuid)->>'deleted', public.import_undo((:'c19b'::jsonb->>'batch_id')::uuid)->>'deleted',
+       public.import_undo((:'c19c'::jsonb->>'batch_id')::uuid)->>'deleted', public.import_undo((:'c19d'::jsonb->>'batch_id')::uuid)->>'deleted';
+commit;
+select tests.eq(tests.fp81(:'h1') || tests.fp81(:'h2') || tests.fp81(:'h3') || tests.fp81(:'h4'), :'fph1' || :'fph2' || :'fph3' || :'fph4',
+                'undone: the four trades as registered');
+
+-- A row without an exit price: the registered trade's average exit and R become unknown (never R from
+-- the rows that have one)
+begin;
+select set_config('request.jwt.claim.sub', :V, true);
+set local role authenticated;
+insert into tests.p81 values ('h5', public.register_entry(:'hora', tests.entry81('GCZ6', 'long', '2', '2500.0', -10, '{"stop_pts": "5"}'))->>'trade_id');
+commit;
+select v as h5 from tests.p81 where k = 'h5' \gset
+begin;
+select set_config('request.jwt.claim.sub', :V, true);
+set local role authenticated;
+select public.register_exit(:'h5', '{"v": 1, "exit_price": "2502.0"}')->>'r';
+commit;
+select tests.fp81(:'h5') as fph5 \gset
+select entry_time as h5_entry from public.trades where id = :'h5' \gset
+begin;
+select set_config('request.jwt.claim.sub', :V, true);
+set local role authenticated;
+select tests.imp81(:'hora', 'topone', 'f19e.csv', jsonb_build_array(
+  tests.row(2, 'GCZ6/19401', 'GCZ6', 'futures', 'long', :'h5_entry'::timestamptz, now() - interval '6 minutes',
+            '2500.0', '2501.0', '1', null, null, 'win', '100.00', '2.00'),
+  tests.row(3, 'GCZ6/19402', 'GCZ6', 'futures', 'long', :'h5_entry'::timestamptz, now() - interval '3 minutes',
+            '2500.0', null, '1', null, null, 'win', '150.00', '2.00'))) as c19e \gset
+commit;
+select tests.eq((public.trade_state(:'h5')->'position') - array['undo', 'stop_now', 'stop_kind', 'stop_initial', 'exits', 'partials'],
+                '{"quantity": 2, "closed": 2, "open": 0, "realized_pnl": 250.00, "r": null}'::jsonb,
+                'an exit price the file does not give: R unknown');
+select tests.eq((select exit_price from public.trades where id = :'h5'), null::numeric, 'and no average exit');
+begin;
+select set_config('request.jwt.claim.sub', :V, true);
+set local role authenticated;
+select public.import_undo((:'c19e'::jsonb->>'batch_id')::uuid)->>'deleted';
+commit;
+select tests.eq(tests.fp81(:'h5'), :'fph5', 'undone: as registered');
+
+-- 8.20 Positions in a file: an exit before the entry and another open price never group; rows without
+--      commission make a trade without commission; a position that turns the day counts once; the order
+--      of exits at one instant (a trade's own by id, two trades' by their entries); the whole size first
+create temp table f820 as select (date_trunc('day', now() - interval '40 days') + interval '14 hours') as d0,
+                                 (date_trunc('day', now() - interval '41 days') + interval '23 hours 30 minutes') as d1,
+                                 (date_trunc('day', now() - interval '42 days') + interval '14 hours') as d2;
+select d0, d1, d2 from f820 \gset
+begin;
+select set_config('request.jwt.claim.sub', :V, true);
+set local role authenticated;
+select tests.eq(tests.imp81(:'grp', 'topone', 'g1.csv', jsonb_build_array(
+  tests.row(2, 'MESZ6/20001', 'MESZ6', 'futures', 'long', :'d0'::timestamptz, :'d0'::timestamptz + interval '5 minutes',
+            '7000.00', '7001.00', '1', null, null, 'win', '5.00', '0.62'),
+  tests.row(3, 'MESZ6/20002', 'MESZ6', 'futures', 'long', :'d0'::timestamptz, :'d0'::timestamptz - interval '5 minutes',
+            '7000.00', '7002.00', '1', null, null, 'win', '10.00', '0.62'),
+  tests.row(4, 'MNQZ6/20101', 'MNQZ6', 'futures', 'long', :'d0'::timestamptz, :'d0'::timestamptz + interval '5 minutes',
+            '21000.00', '21001.00', '1', null, null, 'win', '2.00', '0.62'),
+  tests.row(5, 'MNQZ6/20102', 'MNQZ6', 'futures', 'long', :'d0'::timestamptz, :'d0'::timestamptz + interval '6 minutes',
+            '21000.25', '21001.25', '1', null, null, 'win', '2.00', '0.62'))) - 'batch_id' - 'errors',
+  '{"inserted": 4, "duplicate": 0, "completed": 0, "other_account": 0, "linked": 0}'::jsonb,
+  'an exit before the entry, and another open price, never group: four trades, the answer of before');
+select tests.imp81(:'grp', 'topone', 'g2.csv', jsonb_build_array(
+  tests.row(2, 'MGCZ6/20201', 'MGCZ6', 'futures', 'long', :'d0'::timestamptz + interval '1 hour', :'d0'::timestamptz + interval '65 minutes',
+            '2400.0', '2401.0', '1', null, null, 'win', '10.00', null),
+  tests.row(3, 'MGCZ6/20202', 'MGCZ6', 'futures', 'long', :'d0'::timestamptz + interval '1 hour', :'d0'::timestamptz + interval '70 minutes',
+            '2400.0', '2402.0', '1', null, null, 'win', '20.00', null)))->>'grouped';
+commit;
+select tests.eq((select jsonb_build_object('com', t.commission, 'q', t.quantity, 'exits', (select jsonb_agg(e.commission) from public.trade_exits e where e.trade_id = t.id))
+                 from public.trades t where t.account_id = :'grp' and t.external_id = 'MGCZ6/20201'),
+                '{"com": null, "q": 2, "exits": [null, null]}'::jsonb, 'rows without commission: a position without commission (unknown, not zero)');
+begin;
+select set_config('request.jwt.claim.sub', :V, true);
+set local role authenticated;
+select tests.eq(public.import_preview(:'grp', 'topone', null, 'UTC', jsonb_build_array(
+  tests.row(2, 'ESZ6/20301', 'ESZ6', 'futures', 'long', :'d1'::timestamptz, :'d1'::timestamptz + interval '5 minutes',
+            '6000.00', '6001.00', '1', null, null, 'win', '50.00', '2.50'),
+  tests.row(3, 'ESZ6/20302', 'ESZ6', 'futures', 'long', :'d1'::timestamptz, :'d1'::timestamptz + interval '9 minutes',
+            '6000.00', '6002.00', '1', null, null, 'win', '100.00', '2.50'),
+  tests.row(4, 'ESZ6/20303', 'ESZ6', 'futures', 'short', :'d1'::timestamptz, :'d1'::timestamptz + interval '9 minutes',
+            '6000.00', '5999.00', '1', null, null, 'win', '50.00', '2.50')))->>'day_changes', '2',
+                'after 18:00 in New York: the day turns for two trades (a position of two rows counts once)');
+select tests.imp81(:'grp', 'topone', 'g3.csv', jsonb_build_array(
+  tests.row(2, 'MCLZ6/20401', 'MCLZ6', 'futures', 'long', :'d2'::timestamptz + interval '2 hours', :'d2'::timestamptz + interval '130 minutes',
+            '70.00', '71.00', '1', null, null, 'win', '100.00', null),
+  tests.row(3, 'MCLZ6/20402', 'MCLZ6', 'futures', 'long', :'d2'::timestamptz + interval '2 hours', :'d2'::timestamptz + interval '130 minutes',
+            '70.00', '68.50', '1', null, null, 'loss', '-150.00', null),
+  tests.row(4, 'MESZ6/20501', 'MESZ6', 'futures', 'short', :'d2'::timestamptz + interval '3 hours', :'d2'::timestamptz + interval '190 minutes',
+            '7000.00', '7016.00', '1', null, null, 'loss', '-80.00', null),
+  tests.row(5, 'MNQZ6/20502', 'MNQZ6', 'futures', 'long', :'d2'::timestamptz + interval '185 minutes', :'d2'::timestamptz + interval '190 minutes',
+            '21000.00', '21050.00', '1', null, null, 'win', '100.00', null)))->>'grouped';
+commit;
+select tests.eq((select jsonb_build_object(
+                   'at_once', public.limit_usage(:'grp', t.trading_day, false, null, :'d2'::timestamptz + interval '130 minutes') - 'hit_at',
+                   'later', public.limit_usage(:'grp', t.trading_day, false, null, 'infinity') - 'hit_at')
+                 from public.trades t where t.external_id = 'MCLZ6/20401' and t.account_id = :'grp'),
+                '{"at_once": {"trades": 1, "net_usd": -50.00, "worst_usd": -50.00},
+                  "later": {"trades": 3, "net_usd": -30.00, "worst_usd": -130.00}}'::jsonb,
+                'exits at one instant: a trade''s own in order (+100 then −150: −50 at worst), two trades'' by their entries (−80 before +100)');
+
+-- The whole size first: a position of 2 ct matches the 2 ct trade five minutes away before the 1 ct one
+-- at its minute (another entry price, so not a split)
+begin;
+select set_config('request.jwt.claim.sub', :V, true);
+set local role authenticated;
+insert into tests.p81 values ('g6a', public.register_entry(:'grp', tests.entry81('MNQZ6', 'long', '2', '21000.00', -5))->>'trade_id'),
+                             ('g6b', public.register_entry(:'grp', tests.entry81('MNQZ6', 'long', '1', '21000.25', -10))->>'trade_id');
+commit;
+select max(v) filter (where k = 'g6a') as g6a, max(v) filter (where k = 'g6b') as g6b from tests.p81 \gset
+select tests.fp81(:'g6b') as fpg6b \gset
+select entry_time as g6_entry from public.trades where id = :'g6b' \gset
+begin;
+select set_config('request.jwt.claim.sub', :V, true);
+set local role authenticated;
+select tests.eq(tests.imp81(:'grp', 'topone', 'g6.csv', jsonb_build_array(
+  tests.row(2, 'MNQZ6/20601', 'MNQZ6', 'futures', 'long', :'g6_entry'::timestamptz, now() - interval '3 minutes',
+            '21000.00', '21001.00', '1', null, null, 'win', '2.00', '0.62'),
+  tests.row(3, 'MNQZ6/20602', 'MNQZ6', 'futures', 'long', :'g6_entry'::timestamptz, now() - interval '2 minutes',
+            '21000.00', '21002.00', '1', null, null, 'win', '4.00', '0.62'))) - 'batch_id' - 'errors',
+  '{"inserted": 0, "duplicate": 0, "completed": 0, "other_account": 0, "linked": 1, "trades": 0, "grouped": 1, "attached": 0}'::jsonb,
+  'the position, linked whole');
+commit;
+select tests.eq((select external_id || ' ' || status || ' ' || quantity::int || ' ' || pnl from public.trades where id = :'g6a'),
+                'MNQZ6/20601 closed 2 6.00', 'to the trade of its whole size');
+select tests.eq(tests.fp81(:'g6b'), :'fpg6b', 'the 1 ct trade at its minute is untouched');
+
+-- Two positions in one file are two trades, each with its own sums; a row without an exit price
+-- leaves the position without an average exit price (unknown, as the exits)
+begin;
+select set_config('request.jwt.claim.sub', :V, true);
+set local role authenticated;
+select tests.eq(tests.imp81(:'grp', 'topone', 'g4.csv', jsonb_build_array(
+  tests.row(2, 'MESZ6/20601', 'MESZ6', 'futures', 'long', :'d0'::timestamptz + interval '4 hours', :'d0'::timestamptz + interval '245 minutes',
+            '7000.00', '7001.00', '1', null, null, 'win', '5.00', '0.62'),
+  tests.row(3, 'MESZ6/20602', 'MESZ6', 'futures', 'long', :'d0'::timestamptz + interval '4 hours', :'d0'::timestamptz + interval '250 minutes',
+            '7000.00', '7002.00', '2', null, null, 'win', '20.00', '1.24'),
+  tests.row(4, 'MNQZ6/20701', 'MNQZ6', 'futures', 'short', :'d0'::timestamptz + interval '4 hours', :'d0'::timestamptz + interval '246 minutes',
+            '21000.00', '20999.00', '1', null, null, 'win', '2.00', '0.62'),
+  tests.row(5, 'MNQZ6/20702', 'MNQZ6', 'futures', 'short', :'d0'::timestamptz + interval '4 hours', :'d0'::timestamptz + interval '251 minutes',
+            '21000.00', null, '1', null, null, 'win', '4.00', '0.62'))) - 'batch_id' - 'errors',
+  '{"inserted": 4, "duplicate": 0, "completed": 0, "other_account": 0, "linked": 0, "trades": 2, "grouped": 2, "attached": 0}'::jsonb,
+  'two positions of two rows: two trades');
+commit;
+select tests.eq((select jsonb_agg(jsonb_build_array(t.external_id, t.quantity, t.pnl, t.commission, t.exit_price) order by t.external_id)
+                 from public.trades t where t.account_id = :'grp' and t.external_id in ('MESZ6/20601', 'MNQZ6/20701')),
+                '[["MESZ6/20601", 3, 25.00, 1.86, 7001.66666667], ["MNQZ6/20701", 2, 6.00, 1.24, null]]'::jsonb,
+                'each position its own sums; a row without an exit price: no average');
+
+-- 8.21 An exit that joins an imported trade on the file's wall clock: undone, the trade is as the first
+--      file left it, its wall clock too
+create temp table f821 as select
+  (date_trunc('day', now() - interval '43 days') + interval '14 hours') as d3;
+select d3 from f821 \gset
+begin;
+select set_config('request.jwt.claim.sub', :V, true);
+set local role authenticated;
+select tests.imp81(:'wal', 'topone', 'w1.csv', jsonb_build_array(
+  tests.row(2, 'MESZ6/21001', 'MESZ6', 'futures', 'long', :'d3'::timestamptz, :'d3'::timestamptz + interval '5 minutes',
+            '7000.00', '7001.00', '1', null, null, 'win', '5.00', '0.62') - 'utc_offset',
+  tests.row(3, 'MESZ6/21002', 'MESZ6', 'futures', 'long', :'d3'::timestamptz, :'d3'::timestamptz + interval '9 minutes',
+            '7000.00', '7002.00', '1', null, null, 'win', '10.00', '0.62') - 'utc_offset'))->>'grouped';
+commit;
+select id as wt from public.trades where account_id = :'wal' and external_id = 'MESZ6/21001' \gset
+select tests.fp81(:'wt') as fpwt \gset
+begin;
+select set_config('request.jwt.claim.sub', :V, true);
+set local role authenticated;
+select tests.imp81(:'wal', 'topone', 'w2.csv', jsonb_build_array(
+  tests.row(2, 'MESZ6/21001', 'MESZ6', 'futures', 'long', :'d3'::timestamptz, :'d3'::timestamptz + interval '5 minutes',
+            '7000.00', '7001.00', '1', null, null, 'win', '5.00', '0.62') - 'utc_offset',
+  tests.row(3, 'MESZ6/21002', 'MESZ6', 'futures', 'long', :'d3'::timestamptz, :'d3'::timestamptz + interval '9 minutes',
+            '7000.00', '7002.00', '1', null, null, 'win', '10.00', '0.62') - 'utc_offset',
+  tests.row(4, 'MESZ6/21003', 'MESZ6', 'futures', 'long', :'d3'::timestamptz, :'d3'::timestamptz + interval '15 minutes',
+            '7000.00', '7003.00', '1', null, null, 'win', '15.00', '0.62') - 'utc_offset')) as cw \gset
+commit;
+select tests.eq((select source_local_exit = (:'d3'::timestamptz + interval '15 minutes') at time zone 'UTC' and quantity = 3 and pnl = 30
+                 from public.trades where id = :'wt'), true, 'the attached exit is the last: the trade''s wall clock is its');
+begin;
+select set_config('request.jwt.claim.sub', :V, true);
+set local role authenticated;
+select public.import_undo((:'cw'::jsonb->>'batch_id')::uuid)->>'deleted';
+commit;
+select tests.eq(tests.fp81(:'wt'), :'fpwt', 'undone: as the first file left it, its wall clock too');
+
+-- 8.21b A trade imported from one row on the file's wall clock, then two later files each bring one more
+--      exit of it: undone in either order, the trade is as the first file left it, its wall clock too
+create temp table f821b as select
+  tests.row(2, 'MESZ6/21101', 'MESZ6', 'futures', 'long', :'d3'::timestamptz + interval '2 hours', :'d3'::timestamptz + interval '125 minutes',
+            '7000.00', '7001.00', '1', null, null, 'win', '5.00', '0.62') - 'utc_offset' as x,
+  tests.row(3, 'MESZ6/21102', 'MESZ6', 'futures', 'long', :'d3'::timestamptz + interval '2 hours', :'d3'::timestamptz + interval '130 minutes',
+            '7000.00', '7002.00', '1', null, null, 'win', '10.00', '0.62') - 'utc_offset' as y,
+  tests.row(4, 'MESZ6/21103', 'MESZ6', 'futures', 'long', :'d3'::timestamptz + interval '2 hours', :'d3'::timestamptz + interval '135 minutes',
+            '7000.00', '7003.00', '1', null, null, 'win', '15.00', '0.62') - 'utc_offset' as z;
+select x as x21, y as y21, z as z21 from f821b \gset
+begin;
+select set_config('request.jwt.claim.sub', :V, true);
+set local role authenticated;
+select tests.imp81(:'wal', 'topone', 'w3.csv', jsonb_build_array(:'x21'::jsonb))->>'inserted';
+commit;
+select id as wt2 from public.trades where account_id = :'wal' and external_id = 'MESZ6/21101' \gset
+select tests.fp81(:'wt2') as fpwt2 \gset
+begin;
+select set_config('request.jwt.claim.sub', :V, true);
+set local role authenticated;
+select tests.imp81(:'wal', 'topone', 'w4.csv', jsonb_build_array(:'x21'::jsonb, :'y21'::jsonb)) as cw4 \gset
+commit;
+begin;
+select set_config('request.jwt.claim.sub', :V, true);
+set local role authenticated;
+select tests.imp81(:'wal', 'topone', 'w5.csv', jsonb_build_array(:'x21'::jsonb, :'y21'::jsonb, :'z21'::jsonb)) as cw5 \gset
+commit;
+select tests.eq((select quantity::int || ' ' || pnl || ' ' || (source_local_exit = ((:'d3'::timestamptz + interval '135 minutes') at time zone 'UTC'))
+                 from public.trades where id = :'wt2'), '3 30.00 true', 'three exits, the wall clock of the last');
+begin;
+select set_config('request.jwt.claim.sub', :V, true);
+set local role authenticated;
+select public.import_undo((:'cw4'::jsonb->>'batch_id')::uuid)->>'deleted', public.import_undo((:'cw5'::jsonb->>'batch_id')::uuid)->>'deleted';
+commit;
+select tests.eq(tests.fp81(:'wt2'), :'fpwt2', 'the middle file undone first, then the last: as the first file left it');
+begin;
+select set_config('request.jwt.claim.sub', :V, true);
+set local role authenticated;
+select tests.imp81(:'wal', 'topone', 'w4.csv', jsonb_build_array(:'x21'::jsonb, :'y21'::jsonb)) as cw4 \gset
+commit;
+begin;
+select set_config('request.jwt.claim.sub', :V, true);
+set local role authenticated;
+select tests.imp81(:'wal', 'topone', 'w5.csv', jsonb_build_array(:'x21'::jsonb, :'y21'::jsonb, :'z21'::jsonb)) as cw5 \gset
+commit;
+begin;
+select set_config('request.jwt.claim.sub', :V, true);
+set local role authenticated;
+select public.import_undo((:'cw5'::jsonb->>'batch_id')::uuid)->>'deleted', public.import_undo((:'cw4'::jsonb->>'batch_id')::uuid)->>'deleted';
+commit;
+select tests.eq(tests.fp81(:'wt2'), :'fpwt2', 'the last undone first, then the middle: as the first file left it');
+
+-- 8.22 Completions, as the preview counts them and the commit does them; exits at one instant
+create temp table f822 as select (date_trunc('day', now() - interval '44 days') + interval '14 hours') as d4;
+select d4 from f822 \gset
+begin;
+select set_config('request.jwt.claim.sub', :V, true);
+set local role authenticated;
+select tests.imp81(:'grp', 'topone', 'c1.csv', jsonb_build_array(
+  tests.row(2, 'ESZ6/22001', 'ESZ6', 'futures', 'long', :'d4'::timestamptz, :'d4'::timestamptz + interval '5 minutes',
+            '6000.00', '6001.00', '1', null, null, 'win', '50.00', null),
+  (tests.row(3, 'ESZ6/22002', 'ESZ6', 'futures', 'short', :'d4'::timestamptz + interval '1 hour', null,
+             '6000.00', null, '1', null, null, 'breakeven', '0.00', '2.50')) - 'local_exit',
+  tests.row(4, 'MESZ6/22003', 'MESZ6', 'futures', 'long', :'d4'::timestamptz + interval '2 hours', :'d4'::timestamptz + interval '125 minutes',
+            '7000.00', '7001.00', '1', null, null, 'win', '5.00', '0.62'),
+  tests.row(5, 'MESZ6/22004', 'MESZ6', 'futures', 'short', :'d4'::timestamptz + interval '150 minutes', :'d4'::timestamptz + interval '155 minutes',
+            '7000.00', '6999.00', '1', null, null, 'win', '5.00', '0.62')))->>'inserted';
+select tests.eq(tests.imp81(:'grp', 'topone', 'c2.csv', jsonb_build_array(
+  tests.row(2, 'ESZ6/22001', 'ESZ6', 'futures', 'long', :'d4'::timestamptz, :'d4'::timestamptz + interval '5 minutes',
+            '6000.00', '6001.00', '1', null, null, 'win', '50.00', '2.50') || '{"stop_price": "5990.00", "target_price": "6010.00"}'::jsonb,
+  tests.row(3, 'ESZ6/22002', 'ESZ6', 'futures', 'short', :'d4'::timestamptz + interval '1 hour', :'d4'::timestamptz + interval '70 minutes',
+            '6000.00', '6000.00', '1', null, null, 'breakeven', '0.00', '2.50'),
+  tests.row(4, 'MESZ6/22003', 'MESZ6', 'futures', 'long', :'d4'::timestamptz + interval '2 hours', :'d4'::timestamptz + interval '125 minutes',
+            '7000.00', '7001.00', '1', null, null, 'win', '5.00', '0.62') || '{"stop_price": "6990.00"}'::jsonb,
+  tests.row(5, 'MESZ6/22004', 'MESZ6', 'futures', 'short', :'d4'::timestamptz + interval '150 minutes', :'d4'::timestamptz + interval '155 minutes',
+            '7000.00', '6999.00', '1', null, null, 'win', '5.00', '0.62') || '{"target_price": "6990.00"}'::jsonb)) - 'batch_id' - 'errors',
+  '{"inserted": 0, "duplicate": 4, "completed": 4, "other_account": 0, "linked": 0}'::jsonb,
+  'the commission, stop and target, an exit the first file did not have, a stop alone, a target alone: four completed, counted alike');
+commit;
+select tests.eq((select jsonb_agg(jsonb_build_array(t.external_id, t.commission, t.stop_price, t.target_price, t.exit_time is not null) order by t.external_id)
+                 from public.trades t where t.account_id = :'grp' and t.external_id like 'ESZ6/2200%'),
+                '[["ESZ6/22001", 2.50, 5990.00, 6010.00, true], ["ESZ6/22002", 2.50, null, null, true]]'::jsonb, 'completed');
+-- Exits at one instant on two trades: the earlier entry first, whatever their ids
+insert into public.trades (id, user_id, account_id, symbol, asset_type, direction, entry_time, exit_time, entry_price, exit_price, quantity,
+                           result, pnl)
+values ('ffffffff-0000-0000-0000-000000000081', :V, :'grp', 'ES', 'futures', 'long', :'d4'::timestamptz + interval '3 hours',
+        :'d4'::timestamptz + interval '200 minutes', 6000, 5998.40, 1, 'loss', -80),
+       ('00000000-0000-0000-0000-000000000081', :V, :'grp', 'NQ', 'futures', 'long', :'d4'::timestamptz + interval '190 minutes',
+        :'d4'::timestamptz + interval '200 minutes', 21000, 21005, 1, 'win', 100);
+select tests.eq((public.limit_usage(:'grp', (select trading_day from public.trades where id = 'ffffffff-0000-0000-0000-000000000081'),
+                                    false, null, :'d4'::timestamptz + interval '200 minutes')->>'worst_usd')::numeric,
+                -26.24, 'the trade entered first counts first (53,76 − 80 = −26,24 before the +100), though its id sorts last');
 
 -- =============================================================================================
 -- 9. The tables are as specified
@@ -1228,5 +2122,228 @@ select tests.eq((select jsonb_agg(tgname::text order by tgname) from pg_trigger
                 '["trade_exits_guard", "trade_exits_sums", "trade_stop_moves_guard"]'::jsonb, 'the guards and the deferred check');
 select tests.ok((select bool_and(c.relrowsecurity) from pg_class c where c.oid in ('public.trade_exits'::regclass, 'public.trade_stop_moves'::regclass)),
                 'RLS on both tables');
+
+
+-- =============================================================================================
+-- 10. Defence in depth: the guards and the commit-time check refuse what no API call writes
+--     (a superuser here; every statement rolled back)
+-- =============================================================================================
+
+-- An exit's registration time is the server's, it is never born undone, and it is on the trade's account
+begin;
+insert into public.trade_exits (user_id, trade_id, account_id, origin, kind, quantity, exit_price, exit_time, pnl, pnl_basis,
+                                registered_at, voided_at)
+values (:V, :'s4', :'par', 'app', 'parcial', 1, 21505.00, now(), 10.00, 'prices', '2020-01-01', now())
+returning (registered_at = now() and voided_at is null and account_id = :'cur') as g1 \gset
+rollback;
+select tests.ok(:'g1', 'the guard stamps the server''s time, clears voided_at and takes the trade''s account');
+select tests.fails(format('insert into public.trade_exits (user_id, trade_id, account_id, origin, kind, quantity, exit_price, exit_time, pnl, pnl_basis)
+                           values (%L, %L, %L, ''app'', ''parcial'', 1, 1, now(), 1, ''prices'')', :V, :'b1', :'ebx'),
+                   'not_for_market', null, 'never an exit on a binary');
+select tests.fails(format('insert into public.trade_stop_moves (user_id, trade_id, origin, kind, stop_price, unit)
+                           values (%L, %L, ''live'', ''ajuste'', 1, ''price'')', :V, :'b1'),
+                   'not_for_market', null, 'never a stop move on a binary');
+select tests.fails(format('insert into public.trade_exits (user_id, trade_id, account_id, origin, kind, quantity, exit_price, exit_time, pnl, pnl_basis)
+                           values (%L, %L, %L, ''app'', ''parcial'', 1, 7000, now(), 1, ''prices'')', :V, :'i5', :'arq'),
+                   'not_app_trade', null, 'an app exit only on a trade registered in the app');
+select tests.fails(format('insert into public.trade_stop_moves (user_id, trade_id, origin, kind, stop_price, unit)
+                           values (%L, %L, ''live'', ''ajuste'', 7000, ''pts'')', :V, :'i5'),
+                   'not_app_trade', null, 'a stop move only on a trade registered in the app');
+
+-- The undo and time-zone flags open exactly one door each
+begin;
+select set_config('binary_hub.exits', 'void:' || :'p5', true);
+select tests.fails(format('update public.trade_exits set voided_at = now() where id = %s', :'p5'), 'append_only', null,
+                   'undone once: a second undo is refused');
+select set_config('binary_hub.exits', 'void:' || :'p6', true);
+select tests.fails(format('update public.trade_exits set voided_at = now(), pnl = 1 where id = %s', :'p6'), 'append_only', null,
+                   'an undo changes voided_at and nothing else');
+select tests.eq((select count(*) from tests.err(format('update public.trade_exits set voided_at = now() where id = %s', :'p6')) e where e is null),
+                1::bigint, 'with the flag, voided_at alone passes');
+insert into public.trade_exits (user_id, trade_id, account_id, origin, quantity, exit_price, exit_time, pnl, pnl_basis, batch_id, line,
+                                source_platform, external_id, file_exit_at, source_local_exit)
+values (:V, :'s4', :'cur', 'file', 1, 21505.00, now(), 10.00, 'file', (:'c1'::jsonb->>'batch_id')::uuid, 9, 'topone', 'MNQZ6/X9',
+        now(), now() at time zone 'UTC');
+select set_config('binary_hub.exits', 'fix_tz', true);
+select tests.fails(format('update public.trade_exits set exit_time = exit_time - interval ''1 hour'', file_exit_at = file_exit_at - interval ''1 hour''
+                           where trade_id = %L and origin = ''file''', :'s4'),
+                   'append_only', null, 'the time-zone fix never moves an exit of a trade registered in the app');
+select set_config('binary_hub.moves', 'void:' || (select id from public.trade_stop_moves where origin = 'reconstructed' limit 1), true);
+select tests.fails(format('update public.trade_stop_moves set voided_at = now() where id = %s',
+                          (select id from public.trade_stop_moves where origin = 'reconstructed' limit 1)),
+                   'append_only', null, 'a move told in «Já fechada» is never undone');
+rollback;
+
+-- The commit-time check: each way a writer could break the sums has its hint
+begin;
+set constraints all immediate;
+select tests.fails(format('insert into public.trade_exits (user_id, trade_id, account_id, origin, kind, quantity, exit_price, exit_time, pnl, pnl_basis)
+                           values (%L, %L, %L, ''app'', ''parcial'', 1, 21505.00, now() - interval ''1 hour'', 10.00, ''prices'')', :V, :'s4', :'cur'),
+                   'exits_mismatch', 'exit_time', 'an exit before the entry');
+select tests.fails(format('insert into public.trade_exits (user_id, trade_id, account_id, origin, kind, quantity, exit_price, exit_time, pnl, pnl_basis)
+                           values (%L, %L, %L, ''app'', ''parcial'', 3, 21505.00, now(), 30.00, ''prices'')', :V, :'s4', :'cur'),
+                   'exits_mismatch', 'quantity', 'partials that leave nothing open (3 of 3)');
+select tests.eq((select count(*) from tests.err(format('insert into public.trade_exits (user_id, trade_id, account_id, origin, kind, quantity, exit_price,
+                           exit_time, pnl, pnl_basis) values (%L, %L, %L, ''app'', ''parcial'', 2, 21505.00, now(), 20.00, ''prices'')', :V, :'s4', :'cur')) e
+                 where e is null), 1::bigint, 'partials that leave one open (2 of 3) pass');
+select tests.fails(format('update public.trades set result = ''loss'' where id = %L', :'a1'), 'exits_mismatch', 'sums',
+                   'a result that is not the sign of the sum');
+rollback;
+begin;
+insert into public.trade_exits (user_id, trade_id, account_id, origin, kind, quantity, exit_price, exit_time, pnl, pnl_basis)
+values (:V, :'s4', :'cur', 'app', 'parcial', 3, 21510.00, now(), 30.00, 'prices');
+update public.trades set status = 'closed', exit_time = now(), exit_price = 21510.00, pnl = 30.00, commission = null, result = 'win',
+                         pnl_basis = 'prices'
+where id = :'s4';
+select tests.fails('set constraints all immediate', 'exits_mismatch', 'final', 'an app trade closed without its final exit');
+rollback;
+
+
+-- The table's own checks: an app exit has a kind and no file columns; a file exit has all of them
+begin;
+select tests.eq((select e->>'state' from tests.err(format('insert into public.trade_exits (user_id, trade_id, account_id, origin, kind, quantity,
+                   exit_price, exit_time, pnl, pnl_basis) values (%L, %L, %L, ''app'', ''outra'', 1, 21505.00, now(), 10.00, ''prices'')',
+                   :V, :'s4', :'cur')) e), '23514', 'an app exit''s kind is parcial or final');
+select tests.eq((select e->>'state' from tests.err(format('insert into public.trade_exits (user_id, trade_id, account_id, origin, kind, quantity,
+                   exit_price, exit_time, pnl, pnl_basis, line) values (%L, %L, %L, ''app'', ''parcial'', 1, 21505.00, now(), 10.00, ''prices'', 2)',
+                   :V, :'s4', :'cur')) e), '23514', 'an app exit has no file line');
+select tests.eq((select e->>'state' from tests.err(format('insert into public.trade_exits (user_id, trade_id, account_id, origin, quantity, exit_price,
+                   exit_time, pnl, pnl_basis, batch_id, line, source_platform, external_id, file_exit_at)
+                   values (%L, %L, %L, ''file'', 1, 21505.00, now(), 10.00, ''file'', %L, 2, null, ''MNQZ6/X1'', now())',
+                   :V, :'s4', :'cur', (:'c1'::jsonb->>'batch_id'))) e), '23514', 'a file exit names its platform');
+select tests.eq((select e->>'state' from tests.err(format('insert into public.trade_exits (user_id, trade_id, account_id, origin, quantity, exit_price,
+                   exit_time, pnl, pnl_basis, batch_id, line, source_platform, external_id, file_exit_at)
+                   values (%L, %L, %L, ''file'', 1, 21505.00, now(), 10.00, ''file'', %L, null, ''topone'', ''MNQZ6/X2'', now())',
+                   :V, :'s4', :'cur', (:'c1'::jsonb->>'batch_id'))) e), '23514', 'a file exit names its line');
+rollback;
+
+-- =============================================================================================
+-- 11. Every refusal of the new and replaced calls, in its own words
+-- =============================================================================================
+
+select (:'ra'::jsonb)->>'trade_id' as ra_id \gset
+begin;
+select set_config('request.jwt.claim.sub', '', true);
+set local role authenticated;
+select tests.fails(format('select public.register_partial(%L, %L)', :'s4', '{"v": 1, "quantity": "1", "exit_price": "21505.00"}'),
+                   'not_authenticated', null, 'register_partial: signed in');
+select tests.fails(format('select public.move_stop(%L, %L)', :'s4', tests.mv81('ajuste', '21490.00', null)), 'not_authenticated', null,
+                   'move_stop: signed in');
+select tests.fails(format('select public.undo_event(%L, %L)', :'s4', '{"v": 1, "kind": "stop", "id": 1}'), 'not_authenticated', null,
+                   'undo_event: signed in');
+rollback;
+begin;
+select set_config('request.jwt.claim.sub', :V, true);
+set local role authenticated;
+select tests.fails(format('select public.register_partial(%L, %L)', gen_random_uuid(), jsonb_build_object('v', 1, 'client_key', tests.ck(),
+                     'quantity', '1', 'exit_price', '21505.00')), 'unknown_trade', null, 'register_partial: a trade that is not the caller''s');
+select tests.fails(format('select public.register_partial(%L, %L)', :'i5', jsonb_build_object('v', 1, 'client_key', tests.ck(),
+                     'quantity', '1', 'exit_price', '7000.00')), 'not_app_trade', null, 'register_partial: only a trade registered in the app');
+select tests.fails(format('select public.register_exit(%L, %L)', :'i5', '{"v": 1, "exit_price": "7000.00"}'), 'not_app_trade', null,
+                   'register_exit: only a trade registered in the app');
+select tests.fails(format('select public.move_stop(%L, %L)', :'i5', tests.mv81('ajuste', '6990.00', null)), 'not_app_trade', null,
+                   'move_stop: only a trade registered in the app');
+select tests.fails(format('select public.move_stop(%L, %L)', :'ra_id', tests.mv81('ajuste', '7905.00', null)), 'not_app_trade', null,
+                   'move_stop: never on a trade told in «Já fechada»');
+select tests.fails(format('select public.undo_event(%L, %L)', :'i5', '{"v": 1, "kind": "stop", "id": 1}'), 'not_app_trade', null,
+                   'undo_event: only a trade registered in the app');
+select tests.fails(format('select public.undo_event(%L, %L)', :'ra_id', '{"v": 1, "kind": "stop", "id": 1}'), 'not_app_trade', null,
+                   'undo_event: never on a trade told in «Já fechada»');
+select tests.fails(format('select public.move_stop(%L, %L)', :'s4', '[]'), 'bad_payload', null, 'move_stop: an object');
+select tests.fails(format('select public.undo_event(%L, %L)', :'s4', '[]'), 'bad_payload', null, 'undo_event: an object');
+select tests.fails(format('select public.move_stop(%L, %L)', :'s4', tests.mv81('ajuste', '21490.00', null) - 'v'), 'bad_rules_version', 'v',
+                   'move_stop: version 1');
+select tests.fails(format('select public.undo_event(%L, %L)', :'s4', '{"kind": "stop", "id": 1}'), 'bad_rules_version', 'v',
+                   'undo_event: version 1');
+select tests.fails(format('select public.move_stop(%L, %L)', :'s4', jsonb_build_object('v', 1, 'pad', repeat('x', 9000))), 'payload_too_large', null,
+                   'move_stop: at most 8 KB');
+select tests.fails(format('select public.move_stop(%L, %L)', :'s4', tests.mv81('ajuste', null, '21510.00') || '{"stop_price": 21490}'),
+                   'bad_stop', 'stop_price', 'move_stop: the level as a string');
+select tests.fails(format('select public.move_stop(%L, %L)', :'s4', tests.mv81('ajuste', '21490.00', null) || '{"price_now": 21510}'),
+                   'bad_price', 'price_now', 'move_stop: the price now as a string');
+select tests.fails(format('select public.move_stop(%L, %L)', :'s4', tests.mv81('ajuste', '21490.00', '0')), 'bad_price', 'price_now',
+                   'move_stop: a price now above zero');
+-- 50 rows at most, undone ones too (a runaway client): 50 moves, each undone
+do $$
+declare
+  t uuid := (select v::uuid from tests.p81 where k = 's4');
+  m jsonb;
+begin
+  for i in 1 .. 50 loop
+    m := public.move_stop(t, jsonb_build_object('v', 1, 'client_key', gen_random_uuid()::text, 'kind', 'ajuste', 'stop_price', '21490.00'));
+    perform public.undo_event(t, jsonb_build_object('v', 1, 'kind', 'stop', 'id', m#>'{position,undo,id}'));
+  end loop;
+end;
+$$;
+select tests.fails(format('select public.move_stop(%L, %L)', :'s4', tests.mv81('ajuste', '21490.00', null)), 'too_many_moves', null,
+                   'move_stop: 50 rows at most, undone ones included');
+rollback;
+
+-- «Já fechada»: each exit's quantity and hour, the price then, R of one exit, the same client_key again
+begin;
+select set_config('request.jwt.claim.sub', :V, true);
+set local role authenticated;
+select tests.fails(format('select public.register_after(%L, %L)', :'cur', tests.after81(:'cur', jsonb_build_object('exits',
+                     tests.exits81('0', '7916.50', -50, '3', '7920.50', -30)))), 'bad_quantity', 'exits', 'an exit of zero contracts');
+select tests.fails(format('select public.register_after(%L, %L)', :'cur', tests.after81(:'cur', jsonb_build_object('exits',
+                     tests.exits81('1', '7916.50', -50, '2', '7920.50', 5)))), 'exit_in_future', 'exits', 'an exit after now');
+select tests.fails(format('select public.register_after(%L, %L)', :'cur', tests.after81(:'cur', jsonb_build_object(
+                     'breakeven', jsonb_build_object('price_then', '0'), 'exit', tests.hm(:NY, -30), 'exit_price', '7920.50'))),
+                   'bad_price', 'breakeven', 'a price then above zero');
+select tests.eq(public.register_after(:'cur', tests.after81(:'cur', jsonb_build_object('exit', tests.hm(:NY, -30), 'exit_price', '7920.50')), true)->>'r',
+                '0.8000', 'one exit: R = 8 pts ÷ 10 pts');
+insert into tests.p81 values ('ra2', tests.after81(:'cur', jsonb_build_object('exit', tests.hm(:NY, -30), 'exit_price', '7920.50')));
+select public.register_after(:'cur', (select v::jsonb from tests.p81 where k = 'ra2'))->>'trade_id' as ra2_id \gset
+select tests.eq(public.register_after(:'cur', (select v::jsonb from tests.p81 where k = 'ra2'))->>'trade_id', :'ra2_id',
+                'the same client_key again: the trade registered');
+rollback;
+
+-- The replaced imports and «Já fechada» keep every refusal of before
+select client_key as ra_ck from public.trades where id = :'ra_id' \gset
+begin;
+select set_config('request.jwt.claim.sub', '', true);
+set local role authenticated;
+select tests.fails(format('select public.register_after(%L, %L)', :'cur', tests.after81(:'cur', jsonb_build_object('exit', tests.hm(:NY, -30),
+                     'exit_price', '7920.50'))), 'not_authenticated', null, 'register_after: signed in');
+select tests.fails(format('select public.register_exit(%L, %L)', :'s5', '{"v": 1, "exit_price": "6001.00"}'), 'not_authenticated', null,
+                   'register_exit: signed in');
+select tests.fails(format('select public.import_undo(%L)', (:'c1'::jsonb->>'batch_id')), 'not_authenticated', null, 'import_undo: signed in');
+rollback;
+begin;
+select set_config('request.jwt.claim.sub', :V, true);
+set local role authenticated;
+select tests.fails(format('select public.import_commit(%L, ''topone'', ''x.csv'', null, ''Mars/Base'', %L)', :'grp', '[]'), 'invalid_tz', null,
+                   'import_commit: a zone that exists');
+select tests.fails(format('select public.import_commit(%L, ''topone'', %L, null, ''UTC'', %L)', :'grp', repeat('x', 256), '[]'), 'bad_file_name', null,
+                   'import_commit: a file name of 255 characters at most');
+select tests.fails(format('select public.import_commit(%L, ''topone'', ''x.csv'', ''abc'', ''UTC'', %L)', :'grp', '[]'), 'bad_sha256', null,
+                   'import_commit: a SHA-256 in hex');
+select tests.fails(format('select public.import_fix_tz(%L, ''Mars/Base'')', :'grp'), 'invalid_tz', null, 'import_fix_tz: a zone that exists');
+select tests.fails(format('select public.register_after(%L, %L)', :'outra', tests.after81(:'outra', jsonb_build_object('exit', tests.hm(:NY, -30),
+                     'exit_price', '7920.50'))), 'no_rules', null, 'register_after: an account with rules');
+update public.trading_accounts set archived_at = now() where id = :'outra';
+select tests.fails(format('select public.register_after(%L, %L)', :'outra', tests.after81(:'outra', jsonb_build_object('exit', tests.hm(:NY, -30),
+                     'exit_price', '7920.50'))), 'archived_account', null, 'register_after: not on an archived account');
+select tests.fails(format('select public.register_after(%L, %L)', :'cur', tests.after81(:'cur', jsonb_build_object('entry', tests.hm(:NY, 5),
+                     'exit', tests.hm(:NY, 6), 'exit_price', '7920.50'))), 'entry_in_future', 'entry', 'register_after: an entry not after now');
+select tests.fails(format('select public.register_after(%L, %L)', :'cur', tests.after81(:'cur', jsonb_build_object('exit', tests.hm(:NY, -30),
+                     'exit_price', '7920.50', 'client_key', :'ra_ck'))), 'bad_client_key', 'client_key',
+                   'register_after: a client_key of a trade in another account');
+select tests.fails(format('select public.register_after(%L, %L)', :'opc', jsonb_build_object('v', 1, 'client_key', tests.ck(), 'symbol', 'SPY',
+                     'direction', 'long', 'quantity', '1', 'entry_price', '1.85', 'clock', :NY, 'allow_similar', true,
+                     'day', public.compute_trading_day(:'opc', now())::text, 'entry', tests.hm(:NY, -60), 'exit', tests.hm(:NY, -30),
+                     'exit_price', '2.00', 'option', jsonb_build_object('right', 'call', 'strike', '600', 'expires_on', '2020-01-17'))),
+                   'bad_option', 'option.expires_on', 'register_after: an option that had not expired at the entry');
+select tests.fails(format('select public.register_after(%L, %L, true)', :'fx', jsonb_build_object('v', 1, 'symbol', 'EUR/USD', 'direction', 'long',
+                     'quantity', '1.00', 'entry_price', '1.08520', 'clock', :NY, 'day', public.compute_trading_day(:'fx', now())::text,
+                     'entry', tests.hm(:NY, -60), 'exit', tests.hm(:NY, -30), 'exit_price', '1.08600', 'costs', '12345678901234567')),
+                   'bad_costs', 'costs', '«Custos» with 16 digits at most');
+select tests.fails(format('select public.register_entry(%L, %L, true)', :'ebx', jsonb_build_object('v', 1, 'symbol', 'EUR/USD', 'direction', 'call',
+                     'stake', '12345678901234567', 'payout', '88', 'duration_s', 60)), 'bad_stake', 'stake', 'a stake with 16 digits at most');
+select tests.eq(public.register_entry(:'opc', '{"v": 1, "symbol": "F", "direction": "long", "quantity": "10", "entry_price": "12.00"}', true)->>'dry_run',
+                'true', 'a one-letter ticker (Ford) is a symbol');
+select tests.eq(public.register_exit(:'s5', '{"v": 1, "exit_price": "6001.00"}', null)->>'dry_run', 'false',
+                'register_exit: a null dry-run flag writes (only true is a dry run)');
+rollback;
 
 select 'parciais: all tests passed' as result;

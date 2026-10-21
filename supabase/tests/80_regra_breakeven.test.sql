@@ -106,6 +106,20 @@ select tests.eq(public.rules_check_resolved('{"v": 1, "market": "binary", "windo
   "window_rule": {"on": true, "outside": "fora"}, "block": null, "limit": null, "states": null,
   "day": {"tz": "America/Sao_Paulo", "start_min": 0}, "breakeven": {"by": {"EURUSD": {"n": 5, "un": "pips"}}}}'),
   'not_for_market', 'a binary version never carries it');
+-- Resolved: 1..20 assets exactly; a window rule complete (as stored, never partial); AccountRules check
+-- the breakeven after a window rule that passes
+select tests.eq((select string_agg(coalesce(public.rules_check_resolved(r80.base || x.extra), 'ok'), ',' order by x.ord)
+                 from r80, (values
+                   (1, (select jsonb_build_object('breakeven', jsonb_build_object('by', jsonb_object_agg('K' || i, '{"n": 1, "un": "pts"}'::jsonb)))
+                        from generate_series(1, 20) i)),
+                   (2, (select jsonb_build_object('breakeven', jsonb_build_object('by', jsonb_object_agg('K' || i, '{"n": 1, "un": "pts"}'::jsonb)))
+                        from generate_series(1, 21) i)),
+                   (3, '{"window_rule": {"on": true}}'::jsonb)) as x(ord, extra)),
+                'ok,bad_breakeven,bad_rules', 'Resolved: 20 assets, not 21; the window rule whole');
+select tests.eq(public.rules_check_account('futures', '{"v": 1, "window_rule": {"on": true, "outside": "fora"}, "breakeven": {"on": true, "by": {"MES": "8"}}}'),
+                'bad_breakeven', 'AccountRules: a window rule that passes, then the breakeven checked');
+select tests.eq(public.rules_check_market('futures', '[]') || ',' || public.rules_check_resolved('[]'), 'bad_rules,bad_rules',
+                'not an object: bad_rules (MarketRules, Resolved)');
 
 -- rules_resolve: absent, off or empty → no key; on → n trim-scaled, the unit of the asset; the
 -- account's own replaces the market's whole

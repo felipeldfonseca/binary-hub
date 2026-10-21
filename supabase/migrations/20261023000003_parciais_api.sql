@@ -24,7 +24,8 @@
 --     "price_now" (the price on the chart, on the tick) is required with "breakeven": the server
 --     stores it and the points in favour it implies, (price_now − entry) × side in the asset's unit of
 --     stops. The stop must stay on the safe side of it (long: below). An «ajuste» exactly at the entry
---     is stored as a breakeven. At most 20 moves. Answer: trade_state + {repeated, move_id}.
+--     with "price_now" is stored as a breakeven; without "price_now" it stays an «ajuste» (no points in
+--     favour: a breakeven always has them). At most 20 moves. Answer: trade_state + {repeated, move_id}.
 --   undo_event(p_trade uuid, p_event jsonb) returns jsonb
 --     «Desfazer» the newest partial or stop move of an open live trade (by registration time), within
 --     15 minutes of its registration; the row stays, marked undone (voided_at), and never counts.
@@ -48,9 +49,13 @@
 --   import_preview, import_commit, import_undo, import_fix_tz: a broker position in several rows (same
 --                    symbol, side, open instant and open price; with an exit) is one trade with one file
 --                    exit per row, linked whole to an app trade (the app's hours, the file's money), or
---                    attached to the trade its other rows are already in. A file of one row per position
---                    answers exactly as before; with partial exits the answers gain "trades_new",
---                    "grouped", "attached" (preview) and "trades", "grouped", "attached" (commit).
+--                    attached to the trade its other rows are already in. A position the app registered
+--                    as several trades of the same entry (one per exit, before Phase 3c) is linked row
+--                    by row, as 20261020000004 did: every row counts once. A file of one row per
+--                    position answers as before; with partial exits the answers gain "trades_new",
+--                    "grouped", "attached" (preview) and "trades", "grouped", "attached" (commit). The
+--                    preview counts every key as the commit does (linked_differs: the money the commit
+--                    records as different, the exits path's too).
 --                    import_undo gives back what was registered in any order (and fixes 20261020000004:
 --                    a later batch only gives back to LATER batches).
 --
@@ -934,9 +939,12 @@ begin
     perform public.trade_fail('too_many_moves');
   end if;
 
+  -- «Outro preço» exactly at the entry is a breakeven when «Preço agora» says how far in favour it
+  -- was (every breakeven carries its points); without it, it stays an «ajuste» with no points
   insert into public.trade_stop_moves (user_id, trade_id, origin, kind, stop_price, prev_stop, price_now, favor, unit,
                                        client_key)
-  values (uid, t.id, 'live', case when be or lvl = t.entry_price then 'breakeven' else 'ajuste' end, lvl, prev, px,
+  values (uid, t.id, 'live', case when be or (lvl = t.entry_price and px is not null) then 'breakeven' else 'ajuste' end,
+          lvl, prev, px,
           case when px is not null then public.trade_favor(spec, sgn, t.entry_price, px) end,
           coalesce(spec->>'stops', 'price'), ck)
   returning id into mid;
@@ -1314,6 +1322,9 @@ $$;
 --              (new, alone: 20261020000004's row)
 --   attach_id  the trade an 'attach' row joins
 -- A file of one row per position classifies every row as 20261020000004 did ('row' or 'dup').
+-- Links: a position is linked whole to at most one app trade; a position the app registered as several
+-- trades of the same entry (its matched trade is not its size, another such trade is free) goes back to
+-- rows, linked one to one as 20261020000004 linked them. Every valid row ends in exactly one trade.
 create or replace function public.import_stage(p_account public.trading_accounts, p_platform text, p_file_tz text,
                                                p_rows jsonb)
 returns void
@@ -1373,33 +1384,67 @@ begin
   -- One-to-one: the best remaining (position, app trade) pair first (20261020000004's order for one
   -- row: a binary's expiry, then the same size, then the gap; a position speaks through its first
   -- exit and its whole size). Each key is true or false, never null: a null would sort first under
-  -- desc (a refunded row, with no exit, ahead of the row that ended at the trade's expiry)
-  for c in
-    select r.grp, t.id as tid
-    from (select x.*, sum(x.quantity) over (partition by x.grp) as g_qty,
-                 row_number() over (partition by x.grp order by x.exit_time, x.line, x.rn) as g_ord
-          from pg_temp.import_rows x where x.path in ('row', 'group')) r
-    join public.trades t on t.account_id = p_account.id and t.user_id = p_account.user_id
-                         and t.external_id is null and t.direction = r.direction
-    join public.trade_entry_context x on x.trade_id = t.id
-    where r.g_ord = 1
-      and t.entry_time between r.entry_time - case when x.origin = 'reconstructed' then interval '16 minutes'
-                                                   else interval '2 minutes' end
-                           and r.entry_time + interval '16 minutes'
-      and public.trade_match_key(p_account.market, t.symbol) = public.trade_match_key(p_account.market, r.symbol)
-      -- A binary of another stake only when its expiry is the file's exit (a burst of one pair has
-      -- several orders a few minutes apart; the expiry pins the order's minute)
-      and (p_account.market <> 'binary' or t.stake_amount = r.stake_amount
-           or (t.expires_at is not null and t.expires_at = r.exit_time))
-      and not exists (select 1 from public.trade_exits e where e.trade_id = t.id and e.origin = 'file')
-    order by (t.expires_at = r.exit_time) is true desc,
-             (case when p_account.market = 'binary' then t.stake_amount = r.stake_amount
-                   else t.quantity = r.g_qty end) is true desc,
-             abs(extract(epoch from (t.entry_time - r.entry_time))), r.entry_time, t.entry_time, t.id, r.line, r.rn
-  loop
-    update pg_temp.import_rows u set link_id = c.tid
-    where u.grp = c.grp and u.path in ('row', 'group') and u.link_id is null
-      and not exists (select 1 from pg_temp.import_rows w where w.link_id = c.tid);
+  -- desc (a refunded row, with no exit, ahead of the row that ended at the trade's expiry).
+  -- Pass 2 runs only after a position was split back into rows (below): the rows, and any position
+  -- still without a trade, take the best pairs that remain.
+  for pass in 1 .. 2 loop
+    for c in
+      select r.grp, t.id as tid
+      from (select x.*, sum(x.quantity) over (partition by x.grp) as g_qty,
+                   row_number() over (partition by x.grp order by x.exit_time, x.line, x.rn) as g_ord
+            from pg_temp.import_rows x where x.path in ('row', 'group')) r
+      join public.trades t on t.account_id = p_account.id and t.user_id = p_account.user_id
+                           and t.external_id is null and t.direction = r.direction
+      join public.trade_entry_context x on x.trade_id = t.id
+      where r.g_ord = 1
+        and t.entry_time between r.entry_time - case when x.origin = 'reconstructed' then interval '16 minutes'
+                                                     else interval '2 minutes' end
+                             and r.entry_time + interval '16 minutes'
+        and public.trade_match_key(p_account.market, t.symbol) = public.trade_match_key(p_account.market, r.symbol)
+        -- A binary of another stake only when its expiry is the file's exit (a burst of one pair has
+        -- several orders a few minutes apart; the expiry pins the order's minute)
+        and (p_account.market <> 'binary' or t.stake_amount = r.stake_amount
+             or (t.expires_at is not null and t.expires_at = r.exit_time))
+        and not exists (select 1 from public.trade_exits e where e.trade_id = t.id and e.origin = 'file')
+      order by (t.expires_at = r.exit_time) is true desc,
+               (case when p_account.market = 'binary' then t.stake_amount = r.stake_amount
+                     else t.quantity = r.g_qty end) is true desc,
+               abs(extract(epoch from (t.entry_time - r.entry_time))), r.entry_time, t.entry_time, t.id, r.line, r.rn
+    loop
+      update pg_temp.import_rows u set link_id = c.tid
+      where u.grp = c.grp and u.path in ('row', 'group') and u.link_id is null
+        and not exists (select 1 from pg_temp.import_rows w where w.link_id = c.tid);
+    end loop;
+    exit when pass = 2;
+
+    -- A position the app registered as several trades (before Phase 3c, one trade per exit was the
+    -- only way to register two exits): the trade the whole position matched is not the position's
+    -- size, and another app trade of the same entry is free (no ID, no file exit, the same side,
+    -- instrument and entry price as that trade, inside the position's window, matched by no other
+    -- position of this file). Folding the rows into one of them would leave the others with the
+    -- app's money beside the file's, so the position goes back to rows, each matched on its own
+    -- (20261020000004's rule) and each left alone if no trade takes it: every row counts once.
+    update pg_temp.import_rows u set link_id = null, path = 'row', grp = -u.rn
+    where u.path = 'group' and u.grp in (
+      select p.grp
+      from (select x.grp, min(x.link_id::text)::uuid as tid, sum(x.quantity) as g_qty, min(x.entry_time) as entry_time,
+                   min(x.direction) as direction, min(x.symbol) as symbol
+            from pg_temp.import_rows x where x.path = 'group' and x.link_id is not null group by x.grp) p
+      join public.trades t on t.id = p.tid
+      where t.quantity <> p.g_qty
+        and exists (
+          select 1
+          from public.trades o
+          join public.trade_entry_context ox on ox.trade_id = o.id
+          where o.account_id = p_account.id and o.user_id = p_account.user_id and o.id <> t.id
+            and o.external_id is null and o.direction = p.direction and o.entry_price = t.entry_price
+            and o.entry_time between p.entry_time - case when ox.origin = 'reconstructed' then interval '16 minutes'
+                                                         else interval '2 minutes' end
+                                 and p.entry_time + interval '16 minutes'
+            and public.trade_match_key(p_account.market, o.symbol) = public.trade_match_key(p_account.market, p.symbol)
+            and not exists (select 1 from public.trade_exits e where e.trade_id = o.id and e.origin = 'file')
+            and not exists (select 1 from pg_temp.import_rows w where w.link_id = o.id)));
+    exit when not found;
   end loop;
 
   -- The row path (20261020000004's link patch): one row onto an app trade without counting exits, or
@@ -1425,8 +1470,13 @@ $$;
 -- the trade, with the app's final hour last); an open app trade closes at the file's last exit (never
 -- after now); an imported trade takes the file's instants. An open trade whose file exit is after now
 -- (a file read on the wrong clock), or a row without an exit, gets the key and the entry price only.
--- Returns {rows: file exits written, new_rows: this file's new lines for the trade, app} or null.
-create or replace function public.import_exits_link(p_trade uuid, p_batch uuid, p_platform text, p_grp bigint)
+-- "differs" (the money the trade had otherwise) is computed before anything is written, from what the
+-- exits that count will add up to (the trade's file exits and this file's rows), so p_dry (the
+-- preview: no batch, no lock, nothing written) answers what the commit records.
+-- Returns {rows: file exits written, new_rows: this file's new lines for the trade, app, differs} or
+-- null (nothing of this file for the trade).
+create or replace function public.import_exits_link(p_trade uuid, p_batch uuid, p_platform text, p_grp bigint,
+                                                    p_dry boolean default false)
 returns jsonb
 language plpgsql
 set search_path = ''
@@ -1441,7 +1491,7 @@ declare
   f_rows jsonb[];
   n_f int;
   n_new int;
-  any_open_end boolean;
+  writes boolean;
   a_times timestamptz[];
   n_a int;
   i int;
@@ -1453,12 +1503,18 @@ declare
   sm jsonb;
   differs text[] := '{}';
   closes boolean := false;
-  wrote boolean := false;
   first_line int;
   last_file timestamptz;
   entry_px numeric;
+  pq numeric;
+  ppnl numeric;
+  ppx numeric;
 begin
-  select t.* into tr from public.trades t where t.id = p_trade for update;
+  if p_dry then
+    select t.* into tr from public.trades t where t.id = p_trade;
+  else
+    select t.* into tr from public.trades t where t.id = p_trade for update;
+  end if;
   app := exists (select 1 from public.trade_entry_context c where c.trade_id = tr.id);
   registered := tr.exit_registered_at is not null;
   had_file := exists (select 1 from public.trade_exits e where e.trade_id = tr.id and e.origin = 'file');
@@ -1468,8 +1524,8 @@ begin
   -- This file's rows of the position that are not exits of the trade yet: the new ones, and the row of
   -- the trade's own key the first time the trade gets exits
   select array_agg(to_jsonb(x) order by x.exit_time, x.line, x.rn), min(x.line), max(x.exit_time),
-         min(x.entry_price), bool_or(x.exit_time is null)
-    into f_rows, first_line, last_file, entry_px, any_open_end
+         min(x.entry_price), not bool_or(x.exit_time is null)
+    into f_rows, first_line, last_file, entry_px, writes
   from pg_temp.import_rows x
   where x.grp = p_grp and x.code is null and not x.elsewhere
     and (x.link_id = tr.id or x.attach_id = tr.id or (x.path = 'dup' and x.existing_id = tr.id))
@@ -1479,6 +1535,7 @@ begin
   if n_f = 0 then
     return null;
   end if;
+  writes := writes and not (tr.status = 'open' and last_file > now());
 
   if tr.external_id is null then
     s := jsonb_build_object('source_platform', p_platform, 'external_id', f_rows[1]->>'external_id',
@@ -1490,8 +1547,31 @@ begin
       differs := differs || 'entry_price'::text;
     end if;
   end if;
+  if writes then
+    -- What the exits that count will add up to: the trade's file exits (a file exit always counts)
+    -- and this file's rows
+    select sum(z.q), sum(z.pnl), case when count(z.px) = count(*) then round(sum(z.q * z.px) / sum(z.q), 8) end
+      into pq, ppnl, ppx
+    from (select e.quantity as q, e.pnl, e.exit_price as px from public.trade_exits e
+          where e.trade_id = tr.id and e.origin = 'file'
+          union all
+          select (r->>'quantity')::numeric, (r->>'pnl')::numeric, (r->>'exit_price')::numeric from unnest(f_rows) r) z;
+    if tr.quantity is not null and tr.quantity <> pq then
+      differs := differs || 'quantity'::text;
+    end if;
+    if tr.pnl is not null and tr.pnl <> ppnl then
+      differs := differs || 'pnl'::text;
+    end if;
+    if tr.exit_price is not null and tr.exit_price is distinct from ppx then
+      differs := differs || 'exit_price'::text;
+    end if;
+  end if;
+  if p_dry then
+    return jsonb_build_object('rows', case when writes then n_f else 0 end, 'new_rows', n_new, 'app', app,
+                              'differs', to_jsonb(differs));
+  end if;
 
-  if not (any_open_end or (tr.status = 'open' and last_file > now())) then
+  if writes then
     -- The instants: the app's registered hours where they pair with the file's rows
     select array_agg(e.exit_time order by e.exit_time, e.id) into a_times
     from public.trade_exits_v e where e.trade_id = tr.id and e.counts and e.origin = 'app';
@@ -1526,7 +1606,6 @@ begin
               (f_rows[i]->>'commission')::numeric, p_batch, (f_rows[i]->>'line')::int, p_platform,
               f_rows[i]->>'external_id', fx, case when not app then (f_rows[i]->>'local_exit')::timestamp end);
     end loop;
-    wrote := true;
 
     sm := public.trade_exits_sum(tr.id);
     closes := tr.status = 'open';
@@ -1540,15 +1619,6 @@ begin
       s := s || jsonb_build_object('source_local_exit',
                                    (select e.source_local_exit from public.trade_exits_v e where e.trade_id = tr.id and e.counts
                                     order by e.exit_time desc, e.id desc limit 1));
-    end if;
-    if tr.quantity is not null and tr.quantity <> (sm->>'quantity')::numeric then
-      differs := differs || 'quantity'::text;
-    end if;
-    if tr.pnl is not null and tr.pnl <> (sm->>'pnl')::numeric then
-      differs := differs || 'pnl'::text;
-    end if;
-    if tr.exit_price is not null and tr.exit_price is distinct from (sm->>'exit_price')::numeric then
-      differs := differs || 'exit_price'::text;
     end if;
   end if;
 
@@ -1567,14 +1637,20 @@ begin
      (select coalesce(jsonb_object_agg(k, to_jsonb(tr)->k), '{}'::jsonb) from jsonb_object_keys(s) k),
      (select coalesce(jsonb_object_agg(k, to_jsonb(tr2)->k), '{}'::jsonb) from jsonb_object_keys(s) k),
      differs, (f_rows[1]->>'entry_time')::timestamptz, last_file);
-  return jsonb_build_object('rows', case when wrote then n_f else 0 end, 'new_rows', n_new, 'app', app);
+  return jsonb_build_object('rows', case when writes then n_f else 0 end, 'new_rows', n_new, 'app', app,
+                            'differs', to_jsonb(differs));
 end;
 $$;
 
--- What importing this file would do. Writes nothing. 20261020000004's keys and formulas (a row whose
--- ticket is a file exit in the account is a duplicate, one in another account is left out there),
--- plus, only when the file has partial exits: "trades_new" (trades it creates), "grouped" (rows that
--- are another row's trade's exits), "attached" (rows that join a trade already in the account)
+-- What importing this file would do. Writes nothing. 20261020000004's keys, each counted as
+-- import_commit counts it (new = inserted, duplicate, completable = completed, other_account, linked,
+-- trades_new = trades, grouped, attached; linked_differs = the registered trades the commit records with
+-- other money: the row path's patch, or the exits path's differs, from import_exits_link without
+-- writing); a row whose ticket is a file exit in the account is a duplicate, one in another account is
+-- left out there. Only when the file has partial exits: "trades_new" (trades it creates), "grouped"
+-- (rows that are another row's trade's exits), "attached" (rows that join a trade already in the
+-- account: new lines of an imported trade, written lines of a registered one). "day_changes" counts the
+-- new trades whose day is not the file's date.
 create or replace function public.import_preview(
   p_account uuid,
   p_platform text,
@@ -1594,6 +1670,8 @@ declare
   tz_status text;
   summary jsonb;
   client_errors jsonb := public.import_clean_errors(p_errors);
+  n_exits_differs int;
+  n_exits_inserted int;
 begin
   acc := public.import_own_account(p_account);
   perform public.import_check_platform(acc, p_platform);
@@ -1607,14 +1685,28 @@ begin
 
   perform public.import_stage(acc, p_platform, case when tz_status = 'invalid_tz' then 'UTC' else p_file_tz end, p_rows);
 
+  -- The exits path as import_commit takes it (the same positions, the same function, nothing written):
+  -- the registered trades it would record with other money, and the lines it would add to imported trades
+  select count(*) filter (where (x.res->>'app')::boolean and jsonb_array_length(x.res->'differs') > 0),
+         coalesce(sum((x.res->>'new_rows')::int) filter (where not (x.res->>'app')::boolean), 0)
+    into n_exits_differs, n_exits_inserted
+  from (select public.import_exits_link(g.tid, null, p_platform, g.grp, true) as res
+        from (select distinct on (r.grp) r.grp, coalesce(r.link_id, r.attach_id) as tid
+              from pg_temp.import_rows r
+              where r.code is null and not r.elsewhere and r.patch is null
+                and (r.link_id is not null or r.attach_id is not null)
+              order by r.grp, r.rn) g) x
+  where x.res is not null;
+
   select jsonb_build_object(
-    'new', count(*) filter (where r.path in ('row', 'group', 'attach') and r.link_id is null),
-    'duplicate', count(*) filter (where r.code is null and (r.existing_id is not null or (r.exit_of is not null and not r.elsewhere))),
-    'completable', count(*) filter (where r.code is null and r.existing_id is not null and (
+    'new', count(*) filter (where r.path in ('row', 'group') and r.link_id is null) + n_exits_inserted,
+    'duplicate', count(*) filter (where r.path = 'dup'),
+    'completable', count(*) filter (where r.path = 'dup' and r.existing_id is not null and (
         (r.existing_app and coalesce(r.patch->'set', '{}'::jsonb) <> '{}'::jsonb)
-        or (not r.existing_app and not exists (select 1 from public.trade_exits e where e.trade_id = r.existing_id) and exists (
+        or (not r.existing_app and r.exit_of is null
+            and not exists (select 1 from public.trade_exits e where e.trade_id = r.existing_id) and exists (
           select 1 from public.trades t
-          where t.id = r.existing_id
+          where t.id = r.existing_id and t.source = 'import'
             and ((t.commission is null and r.commission is not null)
               or (t.stop_price is null and r.stop_price is not null)
               or (t.target_price is null and r.target_price is not null)
@@ -1622,12 +1714,16 @@ begin
                   and (r.local_exit is not null or t.source_local_entry is null))
               or (t.payout_percent is null and r.payout_percent is not null)
               or (t.duration_seconds is null and r.duration_seconds is not null)))))),
-    'other_account', count(*) filter (where r.code is null and r.existing_id is null and r.elsewhere),
+    'other_account', count(*) filter (where r.code is null and r.elsewhere),
     -- «{n} já registradas por você»: registered trades the file links (a position counts once)
     'linked', count(distinct r.grp) filter (where r.link_id is not null),
+    -- «{n} com preço ou resultado diferente: vale o do arquivo.»
     'linked_differs', count(*) filter (where r.code is null and (r.link_id is not null or r.existing_app)
-                                         and jsonb_array_length(coalesce(r.patch->'differs', '[]'::jsonb)) > 0),
-    'day_changes', count(*) filter (where r.path in ('row', 'group') and r.link_id is null and r.trading_day <> r.file_day),
+                                         and jsonb_array_length(coalesce(r.patch->'differs', '[]'::jsonb)) > 0)
+                      + n_exits_differs,
+    -- «{n} operações ficam em outro dia que o do arquivo» (a position counts once)
+    'day_changes', count(distinct r.grp) filter (where r.path in ('row', 'group') and r.link_id is null
+                                                   and r.trading_day <> r.file_day),
     'first_day', min(r.trading_day) filter (where r.code is null),
     'last_day', max(r.trading_day) filter (where r.code is null),
     'trades_new', count(distinct r.grp) filter (where r.path in ('row', 'group') and r.link_id is null),
@@ -2142,7 +2238,7 @@ revoke all on function public.trade_check_payload(text, text, jsonb, boolean, te
 revoke all on function public.trade_state(uuid) from public, anon, authenticated;
 revoke all on function public.import_col_equal(text, jsonb, jsonb) from public, anon, authenticated;
 revoke all on function public.import_stage(public.trading_accounts, text, text, jsonb) from public, anon, authenticated;
-revoke all on function public.import_exits_link(uuid, uuid, text, bigint) from public, anon, authenticated;
+revoke all on function public.import_exits_link(uuid, uuid, text, bigint, boolean) from public, anon, authenticated;
 
 -- =============================================================================================
 -- 11. Nothing that existed moved, every state answers as before, the privileges hold
