@@ -9,20 +9,24 @@
 import fs from 'fs'
 import path from 'path'
 import React from 'react'
-import { act, render, screen, waitFor, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import * as contasDb from '@/lib/hub/contasDb'
 import * as regrasDb from '@/lib/hub/regrasDb'
 import * as registrarDb from '@/lib/hub/registrarDb'
 import RegistrarSheet from '@/components/hub/registrar/RegistrarSheet'
+import LinhaDoTempo from '@/components/hub/registrar/LinhaDoTempo'
 import { idsParciais } from '@/testing/parciais'
 import {
   agoraParciais,
+  comMovimento,
+  comParcial,
   contasParciais,
   desfeitaParciais,
   estadoJson,
   etEm,
+  eurAntesDaParcial,
   mesAntesDaParcial,
   parcialParciais,
   saidaMesComBe,
@@ -478,5 +482,211 @@ describe('copy', () => {
         expect([nome, texto.includes(proibido)]).toEqual([nome, false])
       }
     }
+  })
+})
+
+// ------------------------------------------------------------------------------------------------
+// The review's fixes and guards: a new client_key after each success, the fields cleared, one
+// write per tap, refusals another device caused (the trade read again), the focus after a refused
+// undo, the quantity's focus moves and its group's description
+// ------------------------------------------------------------------------------------------------
+
+/** The MES of scenario 14 with a partial of `q` ct registered elsewhere at `hm` (another device) */
+const comParcialDeFora = (q: string, hm: string) =>
+  vistaDe(comParcial(estadoJson('entry-mes'), 'futures', { id: 7, quantity: q, exitPrice: '7920.5', at: etEm(hm) }).state)
+const chaveDe = (call: unknown[]) => (call[2] as { client_key: string }).client_key
+
+describe('the review’s fixes', () => {
+  it('two partials in a row send two client_keys; two moves in a row too', async () => {
+    const segunda = comParcial(estadoJson('partial-mes'), 'futures', { id: 2, quantity: '1', exitPrice: '7922', at: etEm('10:20', 4) })
+    db.registerPartial.mockResolvedValueOnce(parcialParciais('partial-mes')).mockResolvedValueOnce(segunda)
+    abrir()
+    await passo2()
+    await registrarParcial()
+    await userEvent.click(pill('O que registrar agora?', 'Parcial'))
+    await userEvent.type(screen.getByLabelText('Preço da parcial'), '7922')
+    await userEvent.click(screen.getByRole('button', { name: 'Registrar parcial' }))
+    await screen.findByText('Parcial registrada: 1 ct a 7.922,00 às 10:20 ET. Fica 1 ct em aberto.')
+    const [p1, p2] = db.registerPartial.mock.calls.map(chaveDe)
+    expect(p2).not.toBe(p1)
+
+    const depois = comMovimento(estadoJson('stop-mes-breakeven'), 'futures', {
+      id: 9,
+      at: etEm('10:30', 4),
+      payload: { v: 1, client_key: '00000000-0000-4000-8000-000000000021', kind: 'ajuste', stop_price: '7915', price_now: '7923.5' },
+    })
+    db.moveStop.mockReset().mockResolvedValueOnce(stopParciais('stop-mes-breakeven')).mockResolvedValueOnce(depois)
+    await userEvent.click(pill('O que registrar agora?', 'Mover stop'))
+    await userEvent.type(screen.getByLabelText('Preço agora'), '7920,5')
+    await userEvent.click(screen.getByRole('button', { name: 'Registrar stop' }))
+    await screen.findByText('Stop no breakeven (7.912,50) às 10:19 ET, com +8,00 pts a favor.')
+    await userEvent.click(pill('O que registrar agora?', 'Mover stop'))
+    expect(pill('Para onde?', 'Outro preço')).toHaveAttribute('aria-pressed', 'true')
+    await userEvent.type(screen.getByLabelText('Novo stop'), '7915')
+    await userEvent.type(screen.getByLabelText(/^Preço agora/), '7923,5')
+    await userEvent.click(screen.getByRole('button', { name: 'Registrar stop' }))
+    await screen.findByText('Stop movido para 7.915,00 às 10:30 ET, com +11,00 pts a favor.')
+    const [m1, m2] = db.moveStop.mock.calls.map(chaveDe)
+    expect(m2).not.toBe(m1)
+  })
+
+  it('after a partial, «Parcial» opens empty again; a second tap while the answer is on its way sends nothing', async () => {
+    let responder: (v: registrarDb.PartialRegistered) => void = () => undefined
+    db.registerPartial.mockReturnValueOnce(new Promise((r) => (responder = r)))
+    abrir()
+    await passo2()
+    await userEvent.click(pill('O que registrar agora?', 'Parcial'))
+    await userEvent.click(pill('Contratos', '2'))
+    await userEvent.type(screen.getByLabelText('Preço da parcial'), '7920,50')
+    const botao = screen.getByRole('button', { name: 'Registrar parcial' })
+    fireEvent.click(botao)
+    fireEvent.click(botao)
+    await waitFor(() => expect(db.registerPartial).toHaveBeenCalledTimes(1))
+    await act(async () => responder(parcialParciais('partial-mes')))
+    await screen.findByText('Parcial registrada: 1 ct a 7.920,50 às 10:18 ET. Ficam 2 ct em aberto.')
+    expect(db.registerPartial).toHaveBeenCalledTimes(1)
+    await userEvent.click(pill('O que registrar agora?', 'Parcial'))
+    expect(screen.getByLabelText('Preço da parcial')).toHaveValue('')
+    expect(pill('Contratos', '1')).toHaveAttribute('aria-pressed', 'true')
+  })
+
+  it('partial_too_large after a partial made elsewhere: the trade read again, «Use menos que os 2 ct …», chip 1 focused, the group described by the error', async () => {
+    db.fetchTradeState.mockResolvedValueOnce(vistaDe(mesAntesDaParcial())).mockResolvedValue(comParcialDeFora('1', '10:16'))
+    db.registerPartial.mockRejectedValueOnce(new registrarDb.RegistrarDataError('partial_too_large', 'quantity'))
+    abrir()
+    await passo2()
+    await userEvent.click(pill('O que registrar agora?', 'Parcial'))
+    const grupo = () => screen.getByRole('group', { name: 'Contratos' })
+    expect(grupo()).toHaveAttribute('aria-describedby', 'n-pq')
+    await userEvent.click(pill('Contratos', '2'))
+    await userEvent.type(screen.getByLabelText('Preço da parcial'), '7920,50')
+    await userEvent.click(screen.getByRole('button', { name: 'Registrar parcial' }))
+    expect(await screen.findByText('Use menos que os 2 ct em aberto; para sair com tudo, use “Saída”.')).toHaveAttribute('id', 'e-pq')
+    expect(db.fetchTradeState).toHaveBeenCalledTimes(2)
+    // The fresh view: 2 open, one chip; «Agora» and the timeline show the other device's partial
+    expect(within(grupo()).getAllByRole('button').map((b) => b.textContent)).toEqual(['1'])
+    expect(grupo()).toHaveAttribute('aria-describedby', 'n-pq e-pq')
+    await waitFor(() => expect(pill('Contratos', '1')).toHaveFocus())
+    expect(screen.getByRole('group', { name: 'Agora' })).toHaveTextContent('Em aberto2 ctde 3')
+  })
+
+  it('partial_too_large when what is left can no longer be split: no «Parcial», the sheet’s alert', async () => {
+    db.fetchTradeState.mockResolvedValueOnce(vistaDe(mesAntesDaParcial())).mockResolvedValue(comParcialDeFora('2', '10:16'))
+    db.registerPartial.mockRejectedValueOnce(new registrarDb.RegistrarDataError('partial_too_large', 'quantity'))
+    abrir()
+    await passo2()
+    await userEvent.click(pill('O que registrar agora?', 'Parcial'))
+    await userEvent.click(pill('Contratos', '2'))
+    await userEvent.type(screen.getByLabelText('Preço da parcial'), '7920,50')
+    await userEvent.click(screen.getByRole('button', { name: 'Registrar parcial' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('Use menos que o que está em aberto; para sair com tudo, use “Saída”.')
+    const grupo = screen.getByRole('group', { name: 'O que registrar agora?' })
+    expect(within(grupo).getAllByRole('button').map((b) => b.textContent)).toEqual(['Saída', 'Mover stop'])
+    expect(screen.getByText('Sai com o 1 ct em aberto.')).toBeInTheDocument()
+  })
+
+  it('exit_before_partial on the exit after a partial made elsewhere: the trade read again names its hour', async () => {
+    db.fetchTradeState.mockResolvedValueOnce(vistaDe(mesAntesDaParcial())).mockResolvedValue(comParcialDeFora('1', '10:17'))
+    db.registerExit.mockReset().mockRejectedValueOnce(new registrarDb.RegistrarDataError('exit_before_partial', 'exit'))
+    abrir()
+    await passo2()
+    await userEvent.type(screen.getByLabelText('Preço de saída'), '7926')
+    await userEvent.clear(screen.getByLabelText('Hora da saída (ET)'))
+    await userEvent.type(screen.getByLabelText('Hora da saída (ET)'), '10:15')
+    await userEvent.click(screen.getByRole('button', { name: 'Registrar saída' }))
+    expect(await screen.findByText('A saída não pode ser antes da última parcial (10:17).')).toBeInTheDocument()
+    expect(db.fetchTradeState).toHaveBeenCalledTimes(2)
+    await waitFor(() => expect(screen.getByLabelText('Hora da saída (ET)')).toHaveFocus())
+    expect(screen.getByText('Sai com os 2 ct em aberto.')).toBeInTheDocument()
+  })
+
+  it('«Sim, desfazer» refused: offline gives the focus back to the link, too late to the alert (never the page’s body)', async () => {
+    db.fetchTradeState.mockResolvedValue(vistaDe(parcialParciais('partial-mes').state))
+    db.undoEvent.mockRejectedValueOnce(new registrarDb.RegistrarDataError('undo_too_late'))
+    abrir()
+    await passo2()
+    await userEvent.click(screen.getByRole('button', { name: 'Desfazer a parcial das 10:18' }))
+    online = false
+    await userEvent.click(screen.getByRole('button', { name: 'Sim, desfazer' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('Sem conexão.')
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Desfazer a parcial das 10:18' })).toHaveFocus())
+    online = true
+    await userEvent.click(screen.getByRole('button', { name: 'Desfazer a parcial das 10:18' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Sim, desfazer' }))
+    const alerta = await screen.findByText('Passaram 15 minutos: não dá mais para desfazer.')
+    await waitFor(() => expect(alerta).toHaveFocus())
+    expect(alerta).toHaveAttribute('tabindex', '-1')
+    expect(screen.queryByRole('button', { name: /Desfazer a parcial/ })).not.toBeInTheDocument()
+  })
+
+  it('«Desfazer entrada» refused: offline back to «Desfazer entrada», anything else to the alert', async () => {
+    fetchRulesNow.mockResolvedValue(agoraParciais('dia-top-1018', { iso: etEm('10:20') }))
+    db.fetchTradeState.mockResolvedValue(vistaDe(parcialParciais('partial-mes').state))
+    db.undoEntry.mockRejectedValueOnce(new registrarDb.RegistrarDataError('undo_too_late'))
+    abrir()
+    await passo2()
+    await userEvent.click(screen.getByRole('button', { name: 'Desfazer entrada' }))
+    online = false
+    await userEvent.click(screen.getByRole('button', { name: 'Sim, desfazer' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('Sem conexão.')
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Desfazer entrada' })).toHaveFocus())
+    online = true
+    await userEvent.click(screen.getByRole('button', { name: 'Desfazer entrada' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Sim, desfazer' }))
+    const alerta = await screen.findByText('Passaram 15 minutos: a entrada não pode mais ser desfeita.')
+    await waitFor(() => expect(alerta).toHaveFocus())
+  })
+
+  it('«Metade» puts half in its field and focuses it; «Outro» focuses «Quantos contratos?»', async () => {
+    db.fetchTradeState.mockResolvedValue(vistaDe(eurAntesDaParcial()))
+    fetchRulesNow.mockResolvedValue(agoraParciais('dia-top-1018', { iso: etEm('11:17') }))
+    const primeira = abrir(ids.trades.eur, ids.accounts.ftmo)
+    await passo2()
+    await userEvent.click(pill('O que registrar agora?', 'Parcial'))
+    await userEvent.click(screen.getByRole('button', { name: 'Metade' }))
+    expect(screen.getByLabelText('Lotes')).toHaveValue('0,25')
+    expect(screen.getByLabelText('Lotes')).toHaveFocus()
+    primeira.unmount()
+
+    const json = estadoJson('entry-mes')
+    json.trade.quantity = 6
+    delete json.position
+    json.server_now = etEm('10:18')
+    db.fetchTradeState.mockResolvedValue(vistaDe(registrarDb.parseRegistered(json).state))
+    fetchRulesNow.mockResolvedValue(agoraParciais('dia-top-1018', { iso: etEm('10:18') }))
+    abrir()
+    await passo2()
+    await userEvent.click(pill('O que registrar agora?', 'Parcial'))
+    await userEvent.click(pill('Contratos', 'Outro'))
+    await waitFor(() => expect(screen.getByLabelText('Quantos contratos?')).toHaveFocus())
+  })
+})
+
+describe('«Linha do tempo» on its own', () => {
+  const itens = [
+    { chave: 'entrada', hora: '10:12', instante: null, texto: 'Entrada · 3 ct a 7.912,50 · stop 10 pts', sub: null, evento: null },
+    { chave: 'x-1', hora: '10:18', instante: null, texto: 'Parcial · 1 ct a 7.920,50', sub: null, evento: { kind: 'parcial' as const, id: 1 } },
+  ]
+  const undo = (aberto = false) => ({
+    evento: { kind: 'parcial' as const, id: 1 },
+    aria: 'Desfazer a parcial das 10:18',
+    ate: 'Até 10:33, 15 minutos depois do registro.',
+    pergunta: 'Desfazer a parcial das 10:18?',
+    aberto,
+    ocupado: false,
+    aoAbrir: () => undefined,
+    aoConfirmar: () => undefined,
+    aoManter: () => undefined,
+  })
+
+  it('mounting with a «Manter» count never takes the focus; a new count gives it to the link', () => {
+    const fora = document.createElement('button')
+    document.body.appendChild(fora)
+    fora.focus()
+    const { rerender } = render(<LinhaDoTempo itens={itens} undo={undo()} focoLink={3} />)
+    expect(fora).toHaveFocus()
+    rerender(<LinhaDoTempo itens={itens} undo={undo()} focoLink={4} />)
+    expect(screen.getByRole('button', { name: 'Desfazer a parcial das 10:18' })).toHaveFocus()
+    fora.remove()
   })
 })

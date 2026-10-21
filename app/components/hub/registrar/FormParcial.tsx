@@ -87,7 +87,7 @@ export default function FormParcial({
           <span id="l-pq" className="hub-rot-campo">
             {m.rotuloQtd}
           </span>
-          <div role="group" aria-labelledby="l-pq" aria-describedby="n-pq" className="hub-pills">
+          <div role="group" aria-labelledby="l-pq" aria-describedby={descrito('n-pq', erroQtd && 'e-pq')} className="hub-pills">
             {m.chips.valores.map((v, j) => (
               <button
                 key={v}

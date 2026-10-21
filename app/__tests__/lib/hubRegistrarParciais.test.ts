@@ -9,7 +9,7 @@
  */
 import { MAX_STOP_MOVES, movePayload, partialPayload, validateMove, validatePartial, type MovePayload } from '@/lib/domain/registro'
 import { parseRulesNow, type AccountNow } from '@/lib/hub/regras'
-import { contaReg, modeloSaida, type ContaReg } from '@/lib/hub/registrarForm'
+import { contaReg, modeloEntrada, modeloSaida, rascunhoInicial, type ContaReg } from '@/lib/hub/registrarForm'
 import {
   CAMPOS_PARCIAL,
   CAMPOS_STOP,
@@ -38,7 +38,7 @@ import {
   type CamposStop,
 } from '@/lib/hub/registrarParciais'
 import { formaDoAtivo } from '@/lib/hub/registrarAtivos'
-import type { TradeState, TradeView } from '@/lib/hub/registrarDb'
+import { parseAfterRegistered, parseMoveRegistered, parseTradeState, type TradeState, type TradeView } from '@/lib/hub/registrarDb'
 import { idsParciais } from '@/testing/parciais'
 import {
   agoraParciais,
@@ -53,6 +53,7 @@ import {
   estadoJson,
   etEm,
   fechadaParciais,
+  jsonComMovimento,
   mesAntesDaParcial,
   mesBeUmaSaida,
   mgcUmaSaida,
@@ -759,5 +760,152 @@ describe('the chooser and the bridge', () => {
 describe('E28 caps', () => {
   it('a 21st move is refused by the domain (too_many_moves): the sheet alert says «Até 20 movimentos de stop por operação.»', () => {
     expect(MAX_STOP_MOVES).toBe(20)
+  })
+})
+
+// ------------------------------------------------------------------------------------------------
+// The review's guards: behaviour the contract names that no case pinned (each fails with the one
+// edit the review's mutants made)
+// ------------------------------------------------------------------------------------------------
+
+describe('the review’s guards', () => {
+  const chave = (n: number) => `00000000-0000-4000-8000-0000000001${String(n).padStart(2, '0')}`
+  const ajuste = (id: number, hm: string, stop: string) => ({
+    id,
+    at: etEm(hm, 4),
+    payload: { v: 1 as const, client_key: chave(id), kind: 'ajuste' as const, stop_price: stop },
+  })
+
+  it('undoing a move after two earlier ones: «O stop volta a …» names the newest of them, not the oldest', () => {
+    const j1 = jsonComMovimento(estadoJson('partial-mes'), 'futures', ajuste(11, '10:19', '7905'))
+    const j2 = jsonComMovimento(j1, 'futures', ajuste(12, '10:20', '7908'))
+    const s = parseMoveRegistered(jsonComMovimento(j2, 'futures', ajuste(13, '10:21', '7912.5'))).state
+    const u = desfazerEvento(top, v(s), at('10:21', 30))!
+    expect(u).toMatchObject({ kind: 'stop', id: 13 })
+    expect(u.pergunta).toBe(
+      'Desfazer o movimento do stop das 10:21 (para 7.912,50)? O stop volta a 7.908,00. O app guarda só que um movimento foi desfeito, com a data e a hora.',
+    )
+  })
+
+  it('the exit at exactly the last partial’s instant is not «antes da última parcial» (the server accepts it)', () => {
+    const p = comParcial(estadoJson('entry-mes'), 'futures', { id: 1, quantity: '1', exitPrice: '7920.5', at: etEm('10:20') })
+    const igual = saidaComParciais(top, v(p.state), { preco: '7.926,00', hora: '10:20' }, at('10:31'), true)
+    expect(igual.erros.shora).toBeUndefined()
+    expect(igual.payload).toEqual({ v: 1, exit_price: '7926', exit: '10:20', clock: 'America/New_York' })
+    expect(saidaComParciais(top, v(p.state), { preco: '7.926,00', hora: '10:19' }, at('10:31'), true).erros.shora).toBe(
+      'A saída não pode ser antes da última parcial (10:20).',
+    )
+  })
+
+  it('5 contracts open: chips 1 2 3 4 and no «Outro» (above 5 only)', () => {
+    const json = estadoJson('entry-mes')
+    json.trade.quantity = 5
+    const m = modeloParcial(top, v(parseTrade(json)), CP(), at('10:18'), false)!
+    expect(m.chips).toMatchObject({ valores: ['1', '2', '3', '4'], outro: false, escolhido: '1' })
+  })
+
+  it('B3: the lot note when the partial OR the rest is off the lot of 100', () => {
+    const json = entradaMercadoJson('petr4')
+    json.trade.quantity = 250
+    const petr = v(parseTradeState(json))
+    const now = new Date('2026-10-15T13:31:00Z')
+    const nota = 'Fora do lote de 100, a B3 negocia no fracionário (código com F).'
+    // 50 off the lot, 200 left on it; 200 on it, 50 left off it
+    expect(modeloParcial(clear, petr, CP({ qtd: '50', preco: '38,71' }), now, false)!.lote).toBe(nota)
+    expect(modeloParcial(clear, petr, CP({ qtd: '200', preco: '38,71' }), now, false)!.lote).toBe(nota)
+  })
+
+  it('a new stop exactly at «Preço agora» is on the wrong side (validateMove: bad_stop), with «Breakeven» and with «Outro preço»', () => {
+    const view = v(parcialParciais('partial-mes').state)
+    const lado = 'Numa compra, o stop fica abaixo do preço de agora.'
+    expect(modeloMoverStop(top, view, CS({ modo: 'outro', novo: '7.920,50', agora: '7.920,50' }), null, true)!.erros).toEqual({ sNovo: lado })
+    expect(modeloMoverStop(top, view, CS({ agora: '7.912,50' }), null, true)!.erros).toEqual({ sAgora: lado })
+    const t = view.trade
+    const trade = { market: 'futures', symbol: 'MES', direction: t.direction, entryPrice: t.entryPrice, stopPrice: t.stopPrice, status: 'open' as const, option: null, origin: 'live' as const }
+    const code = (p: MovePayload) => {
+      const r = validateMove(trade, view.stopMoves, p)
+      return r.ok ? 'ok' : `${r.code} ${r.field}`
+    }
+    expect(code(movePayload({ clientKey: chave(1), kind: 'ajuste', stopPrice: '7920.5', priceNow: '7920.5' }))).toBe('bad_stop stop_price')
+    expect(code(movePayload({ clientKey: chave(2), kind: 'breakeven', priceNow: '7912.5' }))).toBe('bad_stop price_now')
+  })
+
+  it('«Mover stop»’s limit warning only for a trade of the account’s trading day now', () => {
+    const antes = v(mnqAntesDaParcial())
+    const agora1055 = agoraParciais('dia-apex-1055', { min: -28 }).accounts.find((a) => a.accountId === ids.accounts.apex)!
+    expect(modeloMoverStop(apex, antes, CS({ modo: 'outro', novo: '30.820,00' }), agora1055, true)!.avisoLimite).not.toBeNull()
+    const ontem = { ...antes, trade: { ...antes.trade, tradingDay: '2026-10-22' } }
+    expect(modeloMoverStop(apex, ontem, CS({ modo: 'outro', novo: '30.820,00' }), agora1055, true)!.avisoLimite).toBeNull()
+  })
+
+  it('the undo of a partial: no «o limite do dia volta …» while the fresh limit is still reached', () => {
+    const p = parcialMnq()
+    const d = desfeitaMnq()
+    const atingido = { tradingDay: '2026-10-23', limit: p.gateNow!.limit }
+    expect(atingido.limit.evaluated && atingido.limit.state).toBe('atingido')
+    const voided = d.state.exits.find((x) => x.id === d.undone.id)!.voidedAt!
+    expect(textoDepoisDoUndo(apex, { kind: 'parcial', hora: '10:25' }, voided, { market: 'futures', tradeDay: '2026-10-23', before: atingido, after: atingido, pref80: false })).toBe(
+      'Parcial das 10:25 desfeita às 10:27.',
+    )
+  })
+
+  it('a «Já fechada» trade without the pill has no breakeven line (E33: «não foi movido» is a live trade’s)', () => {
+    const json = estadoJson('after-mgc')
+    json.stop_moves = []
+    delete json.position
+    const s = parseAfterRegistered(json).state
+    expect(s.trade.source).toBe('after')
+    expect(cartaoComParciais(top, v(s), at('10:45')).breakeven).toBeNull()
+  })
+
+  it('«Desfazer entrada» with stop moves and no partial names the moves', () => {
+    const m = comMovimento(estadoJson('entry-mes'), 'futures', ajuste(1, '10:19', '7905'))
+    expect(perguntaDesfazerEntrada(top, v(m.state))).toBe(
+      'Desfazer a entrada das 10:12 (MES · Compra · 3 ct)? A operação, os movimentos do stop e as marcas dela saem do diário. O app guarda só que uma operação registrada foi apagada, com a data e a hora.',
+    )
+  })
+
+  it(nb('the exit after a partial on an estimated pair: « · no total ≈ …» and «Custos» «… Da operação toda.»'), () => {
+    const p = comParcial(entradaMercadoJson('usdjpy'), 'forex', { id: 1, quantity: '0.15', exitPrice: '151.02', at: '2026-10-15T13:01:00.000Z' })
+    const m = saidaComParciais(fx, v(p.state), { preco: '151,020', hora: null }, new Date('2026-10-15T13:05:00Z'), false)
+    expect(m.nota).toBe('Sai com os 0,15 lote em aberto.')
+    expect(m.previa).toBe(nb('Se sair a 151,020: +22,0 pips · ≈ +US$ 21,85 · no total ≈ +US$ 43,70'))
+    expect(m.bloco!.custos!.nota).toMatch(/ Da operação toda\.$/)
+  })
+
+  it('an option’s partial at premium 0 is not refused here (the server accepts it)', () => {
+    const spy = v(entradaMercado('spy-call-aberta'))
+    const z = modeloParcial(ibkr, spy, CP({ preco: '0' }), new Date('2026-10-15T13:58:00Z'), true)!
+    expect(z.erros.ppreco).toBeUndefined()
+    expect(z.campos).toMatchObject({ quantity: '1', exitPrice: '0' })
+  })
+
+  it('no breakeven suggestion when the stop is already at the entry', () => {
+    const be = stopParciais('stop-mes-breakeven').state
+    expect(be.position.stopNow).toBe(be.trade.entryPrice)
+    expect(sugestaoBreakeven(top, be, '7920.5')).toBeNull()
+  })
+
+  it('the quantity and money readers give the as-built readers’ words (modeloEntrada’s field, modeloSaida’s typed result)', () => {
+    const now = at('10:18')
+    const r0 = rascunhoInicial(top, { symbol: 'MES', quantity: '5', pairs: [], payoutBySymbol: {}, stake: null }, chave(9))
+    const mes = formaDoAtivo('futures', 'MES')!
+    for (const text of ['', 'x', '0', '2,5', '123456', '1234567', '-3']) {
+      const asBuilt = modeloEntrada({ conta: top, r: { ...r0, qtdOutro: true, qtd: text }, now, hoje: '2026-10-23', tentou: true }).erros.q
+      expect([text, lerQuantidadeTexto(mes, text).erro]).toEqual([text, asBuilt])
+    }
+    const bin = contaMercado('binance-sab-2035', idsM.accounts.binance)
+    const rb = { ...rascunhoInicial(bin.conta, null, chave(10)), ativo: 'BTC', cotacao: 'USDT' as const, qtdOutro: true }
+    const btc = formaDoAtivo('crypto', 'BTC', { cotacao: 'USDT' })!
+    for (const text of ['0,123456789', '1234567890', '12345678901', '0,25']) {
+      const asBuilt = modeloEntrada({ conta: bin.conta, r: { ...rb, qtd: text }, now: new Date('2026-10-17T23:35:00Z'), hoje: '2026-10-17', tentou: true }).erros.q
+      expect([text, lerQuantidadeTexto(btc, text).erro]).toEqual([text, asBuilt])
+    }
+    const gbp = v(entradaMercado('eurgbp'))
+    const quando = new Date('2026-10-15T13:01:00Z')
+    for (const text of ['abc', '1,234', '−57,50', '1234567890123456', '12345678901234567']) {
+      const asBuilt = modeloSaida(fx, gbp.trade, { preco: '0,87070', hora: null, resultado: text }, quando, true).erros.res
+      expect([text, lerDinheiroSinal(text).erro]).toEqual([text, asBuilt])
+    }
   })
 })

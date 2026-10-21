@@ -205,13 +205,32 @@ describe('the server’s refusals (§3.3)', () => {
     await waitFor(() => expect(screen.getByLabelText('Preço agora')).toHaveFocus())
     await userEvent.click(pill('Para onde?', 'Outro preço'))
     await userEvent.type(screen.getByLabelText('Novo stop'), '7905')
+    const lidas = db.fetchTradeState.mock.calls.length
     await userEvent.click(screen.getByRole('button', { name: 'Registrar stop' }))
-    expect(await screen.findByText('O stop já está em 7.902,50.')).toHaveAttribute('id', 'e-sNovo')
+    // same_stop: the stop is already where it was sent (moved there elsewhere): that level, and the trade read again
+    expect(await screen.findByText('O stop já está em 7.905,00.')).toHaveAttribute('id', 'e-sNovo')
+    expect(db.fetchTradeState.mock.calls.length).toBe(lidas + 1)
     await userEvent.clear(screen.getByLabelText('Novo stop'))
     await userEvent.type(screen.getByLabelText('Novo stop'), '7904')
     await userEvent.click(screen.getByRole('button', { name: 'Registrar stop' }))
     expect(await screen.findByText('Confira o preço: ele não anda nesse passo.')).toHaveAttribute('id', 'e-sNovo')
     expect(db.moveStop).toHaveBeenCalledTimes(3)
+  })
+
+  it('same_stop on «Breakeven» (moved to the entry elsewhere): under «Para onde?», «Breakeven» still pressed, the fresh «Agora»', async () => {
+    db.fetchTradeState.mockResolvedValueOnce(vistaDe(parcialParciais('partial-mes').state)).mockResolvedValue(vistaDe(stopParciais('stop-mes-breakeven').state))
+    db.moveStop.mockRejectedValueOnce(new registrarDb.RegistrarDataError('same_stop', 'stop_price'))
+    abrir()
+    await moverStop()
+    expect(pill('Para onde?', 'Breakeven · 7.912,50')).toHaveAttribute('aria-pressed', 'true')
+    await userEvent.type(screen.getByLabelText('Preço agora'), '7920,5')
+    await userEvent.click(screen.getByRole('button', { name: 'Registrar stop' }))
+    expect(await screen.findByText('O stop já está em 7.912,50.')).toHaveAttribute('id', 'e-sModo')
+    expect(screen.getByRole('group', { name: 'Para onde?' })).toHaveAttribute('aria-describedby', 'e-sModo')
+    expect(pill('Para onde?', 'Breakeven · 7.912,50')).toHaveAttribute('aria-pressed', 'true')
+    await waitFor(() => expect(pill('Para onde?', 'Breakeven · 7.912,50')).toHaveFocus())
+    expect(screen.getByRole('group', { name: 'Agora' })).toHaveTextContent('Stop7.912,50· no breakeven, desde 10:19')
+    expect(db.fetchTradeState).toHaveBeenCalledTimes(2)
   })
 
   it('not_app_trade and the like: the sheet’s alert', async () => {

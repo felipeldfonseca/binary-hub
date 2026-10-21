@@ -168,6 +168,8 @@ export default function PassoAberta({ conta, view, pref80, headingRef, aoNovaEnt
   const [undoNegado, setUndoNegado] = useState<string | null>(null)
   const [focoLink, setFocoLink] = useState(0)
   const [focoAcao, setFocoAcao] = useState(0)
+  /** A refused undo closed its confirmation (the focus was on «Sim»): the sheet's alert takes it */
+  const [focoAlerta, setFocoAlerta] = useState(0)
   const [confirmando, setConfirmando] = useState(false)
   const [mudarAberto, alternarMudar] = useToggle()
   const ocupadoRef = useRef(false)
@@ -231,8 +233,24 @@ export default function PassoAberta({ conta, view, pref80, headingRef, aoNovaEnt
   useEffect(() => {
     if (erroGeral) alertaRef.current?.scrollIntoView?.({ block: 'nearest' })
   }, [erroGeral])
+  useEffect(() => {
+    if (focoAlerta) alertaRef.current?.focus()
+  }, [focoAlerta])
 
   const focar = (id: string) => document.getElementById(id)?.focus()
+  /**
+   * The trade read again after a refusal another device caused (a partial or a move made there):
+   * the fresh view, which the step shows from now on, or the one on screen when the read fails
+   */
+  const lerDeNovo = async (): Promise<TradeView> => {
+    await queryClient.refetchQueries({ queryKey: registrarKeys.operacao(userId, t.id) })
+    return queryClient.getQueryData<TradeView | null>(registrarKeys.operacao(userId, t.id)) ?? view
+  }
+  /** After a refused undo the confirmation is gone: a retry (offline, network) goes back to the link, else to the alert */
+  const focoDepoisDaRecusa = (code: RegistrarErrorCode, aoLink: () => void) => {
+    if (code === 'offline' || code === 'network') aoLink()
+    else setFocoAlerta((n) => n + 1)
+  }
   /** After a partial, a move or an undo: back to «Saída», every form's errors gone, the status focused */
   const depoisDaEscrita = (st: AcaoSt) => {
     setAcaoSt(st)
@@ -303,7 +321,9 @@ export default function PassoAberta({ conta, view, pref80, headingRef, aoNovaEnt
       else if (err.code === 'not_expired' || err.code === 'bad_outcome') setErroCampo({ campo: 'fim', texto: ERRO_REGISTRAR[err.code] })
       else if (err.field && CAMPO_DO_SERVIDOR[err.field]) {
         const campo = CAMPO_DO_SERVIDOR[err.field] as CampoSaida
-        const ultima = countingExits(view.exits).reduce<Date | null>((m, x) => (m === null || x.exitTime > m ? x.exitTime : m), null)
+        // A partial this screen does not show (made on another device): the trade read again names it
+        const exits = err.code === 'exit_before_partial' ? (await lerDeNovo()).exits : view.exits
+        const ultima = countingExits(exits).reduce<Date | null>((m, x) => (m === null || x.exitTime > m ? x.exitTime : m), null)
         // The local check's wording, with its values, when the server's code is one of its own
         const texto =
           err.code === 'exit_in_future'
@@ -373,9 +393,16 @@ export default function PassoAberta({ conta, view, pref80, headingRef, aoNovaEnt
       const campo = err.field ? CAMPO_PARCIAL[err.field] : undefined
       const forma = formaDaOperacao(conta.market, t)
       if (campo && err.code !== 'not_open' && err.code !== 'unknown_trade') {
+        // Too large for what is open now: another device took part of it; the trade read again says how much is left
+        const fresca = err.code === 'partial_too_large' ? await lerDeNovo() : view
+        if (!modosDaAberta(conta, fresca).includes('parcial')) {
+          // What is left cannot be split any more: no «Parcial» to show the text under
+          setErroGeral({ code: err.code, de: '3c' })
+          return
+        }
         const texto =
           err.code === 'partial_too_large' && forma
-            ? PARCIAL.demais(forma.quantidade.sufixo(view.position.open ?? '0'))
+            ? PARCIAL.demais(forma.quantidade.sufixo(fresca.position.open ?? '0'))
             : err.code === 'exit_in_future'
               ? PARCIAL.futura(horaRel(conta, now))
               : err.code === 'exit_before_entry'
@@ -389,12 +416,15 @@ export default function PassoAberta({ conta, view, pref80, headingRef, aoNovaEnt
                       : err.code === 'bad_time'
                         ? ERROS.hora
                         : mp.erros[campo] ?? ERRO_REGISTRAR[err.code]
-        const alvo = campo === 'pq' ? (mp.chips && !mp.chips.outroAberto ? 'g-pq-0' : 'f-pq') : campo === 'pres' ? 'f-pres' : `f-${campo}`
+        // The quantity's place on the fresh view (its chips follow what is open now)
+        const mf = fresca === view ? mp : modeloParcial(conta, fresca, cp, now, true) ?? mp
+        const qtdEm = mf.chips && !mf.chips.outroAberto ? 'g-pq-0' : 'f-pq'
+        const alvo = campo === 'pq' ? qtdEm : campo === 'pres' ? 'f-pres' : `f-${campo}`
         if (campo === 'pres' && !mp.bloco.campo && mp.bloco.corrigir) setCp((c) => ({ ...c, corrigir: true, resultado: '' }))
         setErroParcial({ [campo]: texto })
         const codigo = err.code
         requestAnimationFrame(() => {
-          const el = document.getElementById(alvo)
+          const el = document.getElementById(alvo) ?? (campo === 'pq' ? document.getElementById(qtdEm === 'f-pq' ? 'g-pq-0' : 'f-pq') : null)
           if (el) el.focus()
           else {
             setErroParcial({})
@@ -418,11 +448,12 @@ export default function PassoAberta({ conta, view, pref80, headingRef, aoNovaEnt
       focar(primeiro === 'sModo' ? 'g-sModo-0' : `f-${primeiro}`)
       return
     }
-    if (!mst.campos) return
+    const enviado = mst.campos
+    if (!enviado) return
     ocupadoRef.current = true
     setOcupado(true)
     try {
-      const ans = await mover.mutateAsync({ tradeId: t.id, payload: movePayload({ clientKey: chaves.current.stop, ...mst.campos }) })
+      const ans = await mover.mutateAsync({ tradeId: t.id, payload: movePayload({ clientKey: chaves.current.stop, ...enviado }) })
       chaves.current.stop = newClientKey()
       setCs(CAMPOS_STOP)
       depoisDaEscrita({ texto: textoStopRegistrado(conta, ans.state, ans.moveId) ?? '', sugestao: null, aviso: null })
@@ -432,6 +463,12 @@ export default function PassoAberta({ conta, view, pref80, headingRef, aoNovaEnt
       const campo: CampoStop | null =
         err.field === 'stop_price' ? (err.code === 'same_stop' && mst.modo === 'be' ? 'sModo' : 'sNovo') : err.field === 'price_now' ? 'sAgora' : null
       if (campo && forma && err.code !== 'not_open' && err.code !== 'unknown_trade') {
+        if (err.code === 'same_stop') {
+          // The stop is already where it was sent (another device moved it there): the trade read
+          // again shows it, and the mode sent stays pressed (the default could turn to «Outro preço»)
+          await lerDeNovo()
+          setCs((c) => ({ ...c, modo: mst.modo }))
+        }
         const lado = t.direction === 'short' ? STOP.ladoVenda : STOP.ladoCompra
         const opcao = forma.tipo === 'opcao'
         const temAgora = cs.agora.trim() !== ''
@@ -442,7 +479,7 @@ export default function PassoAberta({ conta, view, pref80, headingRef, aoNovaEnt
             : false
         const texto =
           err.code === 'same_stop'
-            ? STOP.jaEsta(precoDe(forma, view.position.stopNow ?? t.entryPrice ?? '0'))
+            ? STOP.jaEsta(precoDe(forma, (enviado.kind === 'ajuste' ? enviado.stopPrice : null) ?? t.entryPrice ?? '0'))
             : err.code === 'bad_stop'
               ? campo === 'sAgora' || temAgora
                 ? lado
@@ -502,6 +539,8 @@ export default function PassoAberta({ conta, view, pref80, headingRef, aoNovaEnt
       setUndoAberto(false)
       if (err.code === 'undo_too_late') setUndoNegado(`${ev.kind}-${ev.id}`)
       await recusa3c(err, true)
+      // «Sim, desfazer» had the focus and is gone: never left on the page's body
+      if (err.code !== 'not_open' && err.code !== 'unknown_trade') focoDepoisDaRecusa(err.code, () => setFocoLink((n) => n + 1))
     } finally {
       ocupadoRef.current = false
       setOcupado(false)
@@ -523,6 +562,7 @@ export default function PassoAberta({ conta, view, pref80, headingRef, aoNovaEnt
       else {
         setConfirmando(false)
         setErroGeral({ code: err.code, de: 'antes' })
+        focoDepoisDaRecusa(err.code, () => requestAnimationFrame(() => desfazerRef.current?.focus()))
       }
     } finally {
       ocupadoRef.current = false
@@ -819,7 +859,7 @@ export default function PassoAberta({ conta, view, pref80, headingRef, aoNovaEnt
       )}
 
       {textoAlerta && (
-        <div ref={alertaRef} role="alert" className="hub-alerta">
+        <div ref={alertaRef} role="alert" className="hub-alerta" tabIndex={-1}>
           {textoAlerta}
         </div>
       )}

@@ -419,6 +419,15 @@ export function comParcial(
   market: 'forex' | 'stocks' | 'options' | 'crypto' | 'b3' | 'futures',
   p: { id: number; quantity: string; exitPrice: string; at: string; pnl?: string },
 ): PartialRegistered {
+  return parsePartialRegistered(jsonComParcial(stateJson, market, p));
+}
+
+/** comParcial's answer as JSON (no position: the parser derives it), to compose a move or another partial on it */
+export function jsonComParcial(
+  stateJson: Json,
+  market: 'forex' | 'stocks' | 'options' | 'crypto' | 'b3' | 'futures',
+  p: { id: number; quantity: string; exitPrice: string; at: string; pnl?: string },
+): Json {
   const json = clone(stateJson);
   const t = json.trade;
   const spec = tradeInstrument(market, t.symbol, t.option ? { right: t.option.right, strike: String(t.option.strike), expires_on: t.option.expires_on } : null)!;
@@ -451,11 +460,16 @@ export function comParcial(
   json.pnl = Number(pnl);
   json.points = null;
   json.gate_now = json.gate;
-  return parsePartialRegistered(semPosicao(json));
+  return semPosicao(json);
 }
 
 /** A live move on a state, as move_stop stores it (validateMove) */
 export function comMovimento(stateJson: Json, market: 'forex' | 'stocks' | 'options' | 'crypto' | 'b3' | 'futures', m: { id: number; at: string; payload: MovePayload }): MoveRegistered {
+  return parseMoveRegistered(jsonComMovimento(stateJson, market, m));
+}
+
+/** comMovimento's answer as JSON (no position: the parser derives it), to compose another move on it */
+export function jsonComMovimento(stateJson: Json, market: 'forex' | 'stocks' | 'options' | 'crypto' | 'b3' | 'futures', m: { id: number; at: string; payload: MovePayload }): Json {
   const json = clone(stateJson);
   const t = parseTradeState(json).trade;
   const prev = (json.stop_moves ?? []) as Json[];
@@ -485,7 +499,7 @@ export function comMovimento(stateJson: Json, market: 'forex' | 'stocks' | 'opti
   json.server_now = m.at;
   json.move_id = m.id;
   json.repeated = false;
-  return parseMoveRegistered(semPosicao(json));
+  return semPosicao(json);
 }
 
 /** A JSON state of a parsed answer kept for composing (the recorded one, or one composed above) */
