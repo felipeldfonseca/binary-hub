@@ -71,7 +71,7 @@ export default function SaidasJaFechada({ m, rotulos, aoOutra, aoRemover, aoMuda
           <button
             type="button"
             id="b-outra"
-            className="hub-reg-link"
+            className="hub-reg-link hub-rs-outra"
             aria-disabled={cheio || undefined}
             aria-describedby={cheio ? 'n-max' : undefined}
             onClick={() => {

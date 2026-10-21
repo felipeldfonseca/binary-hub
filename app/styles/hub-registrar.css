@@ -632,3 +632,20 @@
   margin-top: -6px;
   font-weight: 700;
 }
+/*
+ * «+ Outra saída» at 20 rows: aria-disabled (still focusable, «Até 20 saídas por operação.» beside
+ * it) and drawn muted, as the board draws every aria-disabled button (RO l.20: opacity .4, .75 with
+ * the focus ring), the sheet's .hub-btn as built.
+ */
+.hub .hub-reg .hub-rs-outra[aria-disabled='true'] {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.hub .hub-reg .hub-rs-outra[aria-disabled='true']:focus-visible {
+  opacity: 0.75;
+}
+/* «Movi o stop para o breakeven»: the pill row sits 6 px from «Preço quando moveu» (the board's
+   `.grupo-chips` gap), without the 4 px the «Expiração» header keeps under its ⓘ */
+.hub .hub-reg-grupo.hub-rs-be > .hub-reg-cab {
+  margin-bottom: 0;
+}

@@ -13,6 +13,7 @@ import * as contasDb from '@/lib/hub/contasDb'
 import * as regrasDb from '@/lib/hub/regrasDb'
 import * as registrarDb from '@/lib/hub/registrarDb'
 import RegistrarSheet from '@/components/hub/registrar/RegistrarSheet'
+import type { Rules } from '@/lib/domain/gate'
 import { idsParciais } from '@/testing/parciais'
 import { agoraEs12, agoraParciais, contasParciais, fechadaEs12, fechadaMgc, gateAtParciais, previaMgc } from '@/testing/saidasTelas'
 import { agoraMercados, contasMercados, idsMercados } from '@/testing/registrarMercados'
@@ -213,6 +214,36 @@ describe('scenario 15 · «Já fechada» em duas saídas (MGC, 10:45 ET)', () =>
     await userEvent.click(screen.getByRole('button', { name: 'Registrar operação' }))
     expect(screen.getByText('As saídas somam 3 ct; a entrada tem 2 ct.')).toBeInTheDocument()
     expect(within(linha(1)).getByLabelText('Contratos')).toHaveFocus()
+  })
+
+  it('«Sua regra» in the pill’s status is the rule of the version in force at the typed entry (gate_at’s answer), not today’s rules_now: at 10:24, at the current minute, on «Ontem»', async () => {
+    // Rules since Mon 19 Oct (so «Ontem» is open); the version at a typed instant has MGC +3, today's (rules_now) +5
+    fetchRulesNow.mockResolvedValue(
+      agoraParciais('2026-10-23T14:45:05.000Z', (json) => {
+        for (const a of json.accounts) {
+          a.desde = '2026-10-19T13:00:04+00:00'
+          a.desde_day = '2026-10-19'
+        }
+      }),
+    )
+    db.fetchGateAt.mockImplementation(async (_db, id, at) => {
+      const g = gateAtParciais(id, at.toISOString())
+      return { ...g, rules: { ...(g.rules as Rules), breakeven: { by: { MGC: { n: '3', un: 'pts' } } } } }
+    })
+    await entradaMgc()
+    await userEvent.click(screen.getByRole('button', { name: 'Movi o stop para o breakeven' }))
+    await userEvent.type(screen.getByLabelText('Preço quando moveu'), '4.409,30')
+    // «Hoje» 10:24 (not the current minute): gate_at's version
+    await waitFor(() => expect(screen.getByText('com +12,00 pts a favor · Sua regra: com +3 pts.')).toBeInTheDocument())
+    expect(db.fetchGateAt).toHaveBeenCalled()
+    // The current minute (10:45): rules_now's version
+    await digitar(screen.getByLabelText('Hora da entrada (ET)'), '10:45')
+    await waitFor(() => expect(screen.getByText('com +12,00 pts a favor · Sua regra: com +5 pts.')).toBeInTheDocument())
+    // «Ontem» at 10:24: gate_at's again
+    await userEvent.click(pill('Dia', 'Ontem'))
+    await digitar(screen.getByLabelText('Hora da entrada (ET)'), '10:24')
+    await waitFor(() => expect(screen.getByText('com +12,00 pts a favor · Sua regra: com +3 pts.')).toBeInTheDocument())
+    expect(db.fetchGateAt.mock.calls.some(([, , at]) => at.toISOString() === '2026-10-22T14:24:00.000Z')).toBe(true)
   })
 
   it('the pill’s field: the error as soon as something is typed (side, tick), «Informe o preço quando moveu.» only after a tap', async () => {

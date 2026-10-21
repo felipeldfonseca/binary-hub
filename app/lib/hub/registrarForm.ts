@@ -187,12 +187,14 @@ export type TipoEua = 'acao' | 'opcao';
 /**
  * 3c: one row of «Já fechada» in several exits («+ Outra saída»), as typed. `id` names the row's
  * fields (`f-s{id}q`…) and never changes while the row lives; `hora` null follows the server's
- * clock (the last row follows «Venceu sem valor»'s 16:00 ET while it is on).
+ * clock (the last row follows «Venceu sem valor»'s 16:00 ET while it is on); `preco` null = never
+ * typed (the last row then shows «Venceu sem valor»'s 0 while it is on), '' = typed and cleared,
+ * which stays empty (board `s0.p !== undefined`, RO js l.1216).
  */
 export interface SaidaRascunho {
   id: number;
   qtd: string;
-  preco: string;
+  preco: string | null;
   hora: string | null;
   /** «Resultado desta saída» (instruments whose result is typed), as typed (signed) */
   res: string;
@@ -392,7 +394,7 @@ function lerSaidas(x: unknown): SaidaRascunho[] | null {
     if (!s || typeof s !== 'object') return null;
     const o = s as Record<string, unknown>;
     if (typeof o.id !== 'number' || !Number.isInteger(o.id) || o.id < 1 || ids.has(o.id)) return null;
-    if (!str(o.qtd) || !str(o.preco) || !strOrNull(o.hora) || !str(o.res)) return null;
+    if (!str(o.qtd) || !strOrNull(o.preco) || !strOrNull(o.hora) || !str(o.res)) return null;
     ids.add(o.id);
     out.push({ id: o.id, qtd: o.qtd, preco: o.preco, hora: o.hora, res: o.res });
   }
@@ -529,14 +531,15 @@ export const mudarVencimento = (r: Rascunho, vencimento: string | null): Rascunh
 
 /**
  * «Venceu sem valor» on or off: the exit premium and hour follow it (0 at 16:00 ET) until typed
- * over. 3c: with rows, it applies to the last one (RO js l.1257), whose premium and hour start over.
+ * over. 3c: with rows, it applies to the last one (RO js l.1257), whose premium and hour start over
+ * (never typed: `preco` and `hora` null, the board's `p: undefined, h: undefined`).
  */
 export const alternarVsv = (r: Rascunho): Rascunho => ({
   ...r,
   vsv: !r.vsv,
   precoSaida: '',
   horaSaida: null,
-  ...(r.saidas ? { saidas: r.saidas.map((s, k, l) => (k === l.length - 1 ? { ...s, preco: '', hora: null } : s)) } : {}),
+  ...(r.saidas ? { saidas: r.saidas.map((s, k, l) => (k === l.length - 1 ? { ...s, preco: null, hora: null } : s)) } : {}),
 });
 
 /**

@@ -95,7 +95,17 @@ export default function RegraBreakeven({ entidade, draft, salvo, onEditar, futur
     }
   }, [salvo])
 
-  // The setting changed from outside this row («Descartar», another tab's rules): start over too
+  // «Descartar»: the provider starts the draft again from what is saved (rascunho.iniciarRascunho:
+  // the saved settings object itself), and every entity's pending lines and refused texts go, as the
+  // board's descartar resets them with the rest (P js l.2500–2503), even when only another rule was
+  // changed. An edit that only brings the draft back to what is saved is a new object: it keeps them.
+  const draftRef = useRef(draft)
+  useEffect(() => {
+    if (draftRef.current !== draft && draft === salvo) setPorEntidade({})
+    draftRef.current = draft
+  }, [draft, salvo])
+
+  // The setting changed from outside this row (another tab's rules taken in): start over too
   const canon = canonDe(draft, entidade)
   const vistoRef = useRef({ id, canon })
   const esperadoRef = useRef<string | null>(null)
@@ -111,14 +121,20 @@ export default function RegraBreakeven({ entidade, draft, salvo, onEditar, futur
     onEditar(fn)
   }
 
-  const { setting, propria } = breakevenEfetivo(draft, entidade)
+  const { setting, propria: propriaNoDraft } = breakevenEfetivo(draft, entidade)
   const on = setting.on
   const linhas = linhasBreakeven(setting.by, local.sessao)
   const texto = (k: string) => local.textos[k] ?? (setting.by[k] !== undefined ? formatDecimal(setting.by[k]) : '')
   const valida = (t: string) => readBreakevenN(t).ok
-  const naoSalvo = breakevenMudou(salvo, draft, entidade) || linhas.some((k) => !valida(texto(k)))
-  const livres = raizesLivres(linhas)
+  /** A pending line, or a field whose text is refused (empty included): what the draft cannot hold */
+  const soAqui = linhas.some((k) => !valida(texto(k)))
+  const naoSalvo = breakevenMudou(salvo, draft, entidade) || soAqui
   const conta = entidade.tipo === 'conta' ? entidade.conta : null
+  // An account's lines that differ from the default only by a pending line or a refused text are
+  // already its own copy on the board (setBe keeps `be` whenever it differs from the default's,
+  // P js l.1763–1766, 2295): «só nesta conta» and «Voltar ao padrão» at once
+  const propria = propriaNoDraft || (!!conta && soAqui)
+  const livres = raizesLivres(linhas)
   const ids = conta ? [conta.id] : futuros.map((a) => a.id)
 
   const alternar = () => {
@@ -173,7 +189,7 @@ export default function RegraBreakeven({ entidade, draft, salvo, onEditar, futur
 
   const voltar = () => {
     setLocal(() => VAZIO)
-    editar((d) => comBreakeven(d, entidade, null))
+    if (propriaNoDraft) editar((d) => comBreakeven(d, entidade, null))
     pedirFoco('be-sw')
   }
 

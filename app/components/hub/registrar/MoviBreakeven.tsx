@@ -21,7 +21,7 @@ export interface MoviBreakevenProps {
  */
 export default function MoviBreakeven({ be, aoAlternar, aoMudar }: MoviBreakevenProps) {
   return (
-    <div className="hub-reg-grupo">
+    <div className="hub-reg-grupo hub-rs-be">
       <div className="hub-reg-cab hub-reg-cab--inicio">
         <button id="g-be" type="button" className="hub-pill" aria-pressed={be.ligado} onClick={aoAlternar}>
           {BE_FECHADA.pill}

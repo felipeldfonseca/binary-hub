@@ -483,6 +483,9 @@ describe('3c · the draft v3', () => {
     expect(lerRascunho({ ...v1, v: 1 }, ids.accounts.topOne)).toEqual(r)
     const v3 = { ...r, modo: 'fechada' as const, saidas: linhas, be: true, bePreco: '4.409,30' }
     expect(lerRascunho(JSON.parse(JSON.stringify(v3)), ids.accounts.topOne)).toEqual(v3)
+    // A row's price never typed (null) and one typed and cleared ('') read back as they were
+    const precos = { ...v3, saidas: [{ ...linhas[0], preco: '' }, { ...linhas[1], preco: null }] }
+    expect(lerRascunho(JSON.parse(JSON.stringify(precos)), ids.accounts.topOne)?.saidas).toEqual(precos.saidas)
   })
 
   it('a bad row set goes back to one exit, the rest of the draft kept', () => {
@@ -491,6 +494,7 @@ describe('3c · the draft v3', () => {
     expect(um([linhas[0]])).toMatchObject({ saidas: null, be: true, bePreco: '1', modo: 'fechada' })
     expect(um([linhas[0], { ...linhas[1], id: 1 }])?.saidas).toBeNull()
     expect(um([linhas[0], { ...linhas[1], qtd: 2 }])?.saidas).toBeNull()
+    expect(um([linhas[0], { ...linhas[1], preco: 4421.3 }])?.saidas).toBeNull()
     expect(um([linhas[0], { ...linhas[1], id: 0 }])?.saidas).toBeNull()
     expect(um(Array.from({ length: 21 }, (_, k) => ({ ...linhas[1], id: k + 1 })))?.saidas).toBeNull()
     expect(um('x')?.saidas).toBeNull()
@@ -504,8 +508,8 @@ describe('3c · the draft v3', () => {
     expect(mudarCotacao(r, 'USDC')).toMatchObject({ saidas: null, be: false, bePreco: '' })
     expect(mudarTipoEua(r, 'opcao')).toMatchObject({ saidas: null, be: false, bePreco: '' })
     expect({ ...r, modo: 'aberta' }).toMatchObject({ saidas: linhas, be: true })
-    // «Venceu sem valor» with rows: the last row's premium and hour start over
-    expect(alternarVsv(r).saidas).toEqual([linhas[0], { ...linhas[1], preco: '', hora: null }])
+    // «Venceu sem valor» with rows: the last row's premium and hour start over (never typed: null)
+    expect(alternarVsv(r).saidas).toEqual([linhas[0], { ...linhas[1], preco: null, hora: null }])
     expect(alternarVsv({ ...r, saidas: null }).saidas).toBeNull()
   })
 

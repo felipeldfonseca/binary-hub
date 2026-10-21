@@ -224,7 +224,9 @@ export function comSaidas(m0: ModeloEntrada, r: Rascunho, { conta, now, tentou, 
     const opcao = forma.tipo === 'opcao';
     const lidas = rows.map((s, k) => {
       const ult = k === rows.length - 1;
-      const preco = s.preco !== '' ? s.preco : ult && vsvLigado ? '0' : '';
+      // A price never typed on the last row is «Venceu sem valor»'s 0 while it is on; one typed and
+      // cleared stays empty (and «Registrar operação» asks for it), as on the board (RO js l.1216)
+      const preco = s.preco !== null ? s.preco : ult && vsvLigado ? '0' : '';
       const hora = s.hora ?? (ult && vsvLigado && m0.vsv?.hora ? m0.vsv.hora : atual);
       const q = lerQuantidade(forma, { qtd: s.qtd, qtdOutro: true });
       const p = lerPrecoDe(forma, preco, 'saída', opcao);
@@ -309,7 +311,9 @@ export function comSaidas(m0: ModeloEntrada, r: Rascunho, { conta, now, tentou, 
       linha,
       corrigir: podeC && (total !== null || corrAb) ? { rotulo: corrAb ? RESULTADO.usarCalculado : RESULTADO.corrigir, aberto: corrAb } : null,
       calculado: total === null ? null : formatDecimal(total, { minDecimals: 2 }),
-      notaEstimativa: forma.modo === 'estimativa' && !corrAb ? RESULTADO.notaEstimativa : null,
+      // The estimate's note goes with a «≈» total (board `temEst: rowsEst && !corrAbR`, RO js l.1252):
+      // not while the line asks for the rows' prices or quantities
+      notaEstimativa: forma.modo === 'estimativa' && total !== null && !corrAb ? RESULTADO.notaEstimativa : null,
       campo: corrAb ? { rotulo: RESULTADO.campoCorrigido(M), nota: RESULTADO.notaCorrigido(swap), valor: r.res, erro: tentou ? erros.res ?? null : null } : null,
       custos: novo
         ? { rotulo: RESULTADO.custos(M), nota: `${RESULTADO.notaCustos[conta.market] ?? ''}${SAIDAS.daOperacao}`, valor: r.custos, erro: erros.custos ?? null }
@@ -429,9 +433,9 @@ export function comSaidas(m0: ModeloEntrada, r: Rascunho, { conta, now, tentou, 
  * nothing happens (null).
  */
 export function outraSaida(r: Rascunho): { r: Rascunho; foco: string } | null {
-  const vazia = (id: number): SaidaRascunho => ({ id, qtd: '', preco: '', hora: null, res: '' });
+  const vazia = (id: number): SaidaRascunho => ({ id, qtd: '', preco: null, hora: null, res: '' });
   if (!r.saidas) {
-    return { r: { ...r, saidas: [{ id: 1, qtd: '', preco: r.precoSaida, hora: r.horaSaida, res: '' }, vazia(2)] }, foco: 'f-s1q' };
+    return { r: { ...r, saidas: [{ id: 1, qtd: '', preco: r.precoSaida !== '' ? r.precoSaida : null, hora: r.horaSaida, res: '' }, vazia(2)] }, foco: 'f-s1q' };
   }
   if (r.saidas.length >= MAX_SAIDAS) return null;
   const id = Math.max(...r.saidas.map((s) => s.id)) + 1;

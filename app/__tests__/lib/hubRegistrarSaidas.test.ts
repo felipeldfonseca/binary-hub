@@ -9,7 +9,7 @@ import path from 'path'
 import { afterBreakeven, afterPayload, canSplit, lastExitPnl, pnlFromPrices, tradeInstrument, validateAfter } from '@/lib/domain/registro'
 import type { Rules } from '@/lib/domain/gate'
 import { padroesDoRegistrar } from '@/lib/hub/registrar'
-import { contaReg, diaDe, modeloEntrada, rascunhoInicial, type ContaReg, type Rascunho, type SaidaRascunho } from '@/lib/hub/registrarForm'
+import { alternarVsv, contaReg, diaDe, modeloEntrada, rascunhoInicial, type ContaReg, type Rascunho, type SaidaRascunho } from '@/lib/hub/registrarForm'
 import { formaDoAtivo } from '@/lib/hub/registrarAtivos'
 import {
   comSaidas,
@@ -43,7 +43,8 @@ const contaParciais = (id: string): { conta: ContaReg; rules: Rules } => {
 }
 const { conta: top, rules: topRules } = contaParciais(ids.accounts.topOne)
 
-const saida = (id: number, qtd: string, preco: string, hora: string | null, res = ''): SaidaRascunho => ({ id, qtd, preco, hora, res })
+/** A row as typed; `preco` null = never typed (VSV's 0 on the last row), '' = typed and cleared */
+const saida = (id: number, qtd: string, preco: string | null, hora: string | null, res = ''): SaidaRascunho => ({ id, qtd, preco, hora, res })
 
 function rascunho(conta: ContaReg, patch: Partial<Rascunho> = {}): Rascunho {
   return { ...rascunhoInicial(conta, padroesDoRegistrar(conta.market, []), KEY), modo: 'fechada', ...patch }
@@ -76,7 +77,9 @@ describe('the rows’ transitions («+ Outra saída», «Remover»)', () => {
     const r = rascunho(top, { precoSaida: '4.409,30', horaSaida: '10:31' })
     const a = outraSaida(r)!
     expect(a.foco).toBe('f-s1q')
-    expect(a.r.saidas).toEqual([saida(1, '', '4.409,30', '10:31'), saida(2, '', '', null)])
+    expect(a.r.saidas).toEqual([saida(1, '', '4.409,30', '10:31'), saida(2, '', null, null)])
+    // A single exit never typed: row 1's price is not typed either
+    expect(outraSaida(rascunho(top))!.r.saidas).toEqual([saida(1, '', null, null), saida(2, '', null, null)])
     const b = outraSaida(a.r)!
     expect(b.foco).toBe('f-s3q')
     expect(b.r.saidas?.map((s) => s.id)).toEqual([1, 2, 3])
@@ -197,6 +200,29 @@ describe('scenario 15 · MGC Venda 2 ct in two exits, «Movi o stop para o break
     ])
     expect(m.linhaResultado).toBe('Resultado: preencha os preços das saídas.')
     expect(modelo(top, mgc({ lado: null })).linhaResultado).toBe('Resultado: escolha o lado.')
+  })
+
+  it('a row at the entry’s minute is no error and is sent (register_after takes it); one minute before is refused', () => {
+    const igual = modelo(top, mgc({ saidas: [saida(1, '1', '4.409,30', '10:24'), saida(2, '1', '4.421,30', '10:38')] }), { tentou: true })
+    expect(igual.saidas?.linhas[0].erros).toEqual({})
+    expect(igual.primeiro).toBeNull()
+    expect(igual.payloadFechada?.exits?.map((x) => x.exit)).toEqual(['10:24', '10:38'])
+    const antes = modelo(top, mgc({ saidas: [saida(1, '1', '4.409,30', '10:23'), saida(2, '1', '4.421,30', '10:38')] }), { tentou: true })
+    expect(antes.saidas?.linhas[0].erros).toEqual({ h: 'A saída não pode ser antes da entrada (10:24).' })
+  })
+
+  it('«em média» in futures points keeps two decimals (contract §3.4.3): MES 3 ct at 7.913 / 7.920,50 / 7.926 against 7.912,50', () => {
+    const r = rascunho(top, {
+      ativo: 'MES',
+      lado: 'long',
+      qtd: '3',
+      qtdOutro: false,
+      preco: '7.912,50',
+      hora: '10:12',
+      saidas: [saida(1, '1', '7.913', '10:20'), saida(2, '1', '7.920,50', '10:25'), saida(3, '1', '7.926', '10:31')],
+    })
+    // (7.913 + 7.920,50 + 7.926) / 3 − 7.912,50 = 7,3333…; 0,5 + 8 + 13,5 pts × US$ 5
+    expect(modelo(top, r).linhaResultado).toBe(`Resultado: +7,33 pts em média · +US$${NB}110,00`)
   })
 })
 
@@ -393,7 +419,7 @@ describe('the new markets: units, typed rows, «Corrigir» on the total, «Custo
       preco: '1.85',
       hora: '09:35',
       vsv: true,
-      saidas: [saida(1, '1', '2.40', '10:10'), saida(2, '1', '', null)],
+      saidas: [saida(1, '1', '2.40', '10:10'), saida(2, '1', null, null)],
     })
     const m = modelo(ibkr, spy, { now: NOW_TARDE, hoje: '2026-10-15', rules: null })
     expect(m.vsv).toMatchObject({ ligado: true, nota: 'Vale para a última saída.' })
@@ -401,6 +427,52 @@ describe('the new markets: units, typed rows, «Corrigir» on the total, «Custo
     expect(m.payloadFechada?.exits?.[1]).toEqual({ quantity: '1', exit_price: '0', exit: '16:00' })
     const antes = modelo(ibkr, { ...spy, vsv: false }, { now: at('2026-10-15T13:52:05Z'), hoje: '2026-10-15', rules: null })
     expect(antes.vsv?.nota).toBe('Vence hoje às 16:00 ET. Vale para a última saída.')
+  })
+
+  it('«Venceu sem valor» never fills an earlier row; a last row typed and cleared stays empty (asked on the tap), until «Venceu sem valor» is pressed again (RO js l.1216, 1257)', () => {
+    const ibkr = contaM(im.accounts.ibkr, 'ibkr-qui-0952').conta
+    const NOW_TARDE = at('2026-10-15T20:30:05Z')
+    const spy = (saidas: SaidaRascunho[], vsv = true) =>
+      rascunho(ibkr, { tipoEua: 'opcao', ativo: 'SPY', opTipo: 'call', strike: '790', vencimento: '2026-10-15', lado: 'long', qtd: '3', qtdOutro: true, preco: '1.85', hora: '09:35', vsv, saidas })
+    const m = (r: Rascunho, tentou = false) => modelo(ibkr, r, { now: NOW_TARDE, hoje: '2026-10-15', rules: null, tentou })
+    // Rows 1 and 2 never typed: empty, at the clock's minute (16:30); only the last one is 0 at 16:00
+    const tres = m(spy([saida(1, '1', null, null), saida(2, '1', null, null), saida(3, '1', null, null)]))
+    expect(tres.saidas?.linhas.map((l) => [l.preco, l.hora])).toEqual([
+      ['', '16:30'],
+      ['', '16:30'],
+      ['0', '16:00'],
+    ])
+    // The last row's premium typed and cleared: empty, and «Registrar operação» asks for it
+    const limpo = spy([saida(1, '1', '2.40', '10:10'), saida(2, '2', '', null)])
+    expect(m(limpo).saidas?.linhas[1]).toMatchObject({ preco: '', hora: '16:00' })
+    expect(m(limpo, true).saidas?.linhas[1].erros).toEqual({ p: 'Informe o prêmio de saída.' })
+    expect(m(limpo).payloadFechada).toBeNull()
+    // «Venceu sem valor» off and on again: the last row starts over (0 at 16:00 ET)
+    const denovo = alternarVsv(alternarVsv(limpo))
+    expect(denovo.saidas?.[1]).toEqual(saida(2, '2', null, null))
+    expect(m(denovo).saidas?.linhas[1]).toMatchObject({ preco: '0', hora: '16:00' })
+    expect(denovo.saidas?.[0]).toEqual(saida(1, '1', '2.40', '10:10'))
+  })
+
+  it('«Corrigir» shows once the rows’ total is computed (board `temCorrigir`), or while open; the estimate note only beside a «≈» total (`temEst`)', () => {
+    const eur = (saidas: SaidaRascunho[], patch: Partial<Rascunho> = {}) => fx('EUR/USD', { saidas, ...patch })
+    const semPreco = mfx(eur([saida(1, '0,50', '1,08650', '08:20'), saida(2, '0,50', null, '08:30')]))
+    expect(semPreco.linhaResultado).toBe('Resultado: preencha os preços das saídas.')
+    expect(semPreco.resultado?.corrigir).toBeNull()
+    expect(semPreco.resultado?.custos).not.toBeNull()
+    const semSoma = mfx(eur([saida(1, '0,50', '1,08650', '08:20'), saida(2, '0,25', '1,08580', '08:30')]))
+    expect(semSoma.linhaResultado).toBe('Resultado: confira as quantidades das saídas.')
+    expect(semSoma.resultado?.corrigir).toBeNull()
+    // Open («Usar o calculado») while a price is missing: it stays, with its field
+    const aberto = mfx(eur([saida(1, '0,50', '1,08650', '08:20'), saida(2, '0,50', null, '08:30')], { corrigir: true, res: '90' }))
+    expect(aberto.resultado?.corrigir).toEqual({ rotulo: 'Usar o calculado', aberto: true })
+    // USD/JPY (an estimate): no note while the line asks for prices or quantities
+    const jpy = (saidas: SaidaRascunho[]) => rascunho(ftmo, { ativo: 'USD/JPY', lado: 'long', qtd: '0.3', qtdOutro: true, preco: '150.800', hora: '08:10', saidas })
+    const jpySem = mfx(jpy([saida(1, '0,15', '151,020', '08:20'), saida(2, '0,15', null, '08:30')]))
+    expect(jpySem.linhaResultado).toBe('Resultado: preencha os preços das saídas.')
+    expect(jpySem.resultado?.notaEstimativa).toBeNull()
+    expect(mfx(jpy([saida(1, '0,15', '151,020', '08:20'), saida(2, '0,10', '151,100', '08:30')])).resultado?.notaEstimativa).toBeNull()
+    expect(mfx(jpy([saida(1, '0,15', '151,020', '08:20'), saida(2, '0,15', '151,100', '08:30')])).resultado?.notaEstimativa).not.toBeNull()
   })
 })
 
