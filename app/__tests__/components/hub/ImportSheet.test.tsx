@@ -6,7 +6,7 @@ import * as regrasDb from '@/lib/hub/regrasDb'
 import { readImportFile } from '@/lib/domain/import'
 import { useImportSheet, type SheetMode } from '@/components/hub/importar/ImportSheetProvider'
 import { EMPTY_FORM, PassoNovaConta } from '@/components/hub/importar/passos'
-import { toastDoLote } from '@/components/hub/importar/ImportSheet'
+import { arquivoComParciais, operacoesDoArquivo, operacoesDoLote, toastDoLote } from '@/components/hub/importar/ImportSheet'
 import { PASSO_G } from '@/components/hub/contas/copy'
 import { changedOnlyHere } from '@/hooks/useRegras'
 import type { AccountConfig, RulesConfig, SaveRulesResult } from '@/lib/hub/regras'
@@ -2829,5 +2829,185 @@ describe('ImportSheet · Phase 3 · a file with trades registered in the app (D2
     await within(dialog).findByRole('heading', { name: 'Importação feita' })
     expect(within(dialog).getByText('2 que já estavam ganharam os campos que faltavam.')).toBeInTheDocument()
     expect(within(dialog).getByText('1 já registrada por você foi completada.', { selector: '.hub-passo__txt' })).toBeInTheDocument()
+  })
+})
+
+describe('ImportSheet · Phase 3c · a file with partial exits (§5.12, on the final keys)', () => {
+  const contagem = (dialog: HTMLElement) =>
+    (dialog.querySelector('.hub-contagem')?.textContent ?? '').replace(/\s+/g, ' ').replace(/\s*·\s*/g, ' · ').trim()
+
+  it('17 rows with one position of 2: «1 saída parcial juntada à sua operação.», «Importar 16 operações»; the end and the toast count 16 trades', async () => {
+    readFile.mockResolvedValue(fixtureFile('topone_ok'))
+    importPreview.mockResolvedValue(makePreview({ new: 17, rows_total: 17, trades_new: 16, grouped: 1 }))
+    importCommit.mockResolvedValue({ batch_id: 'batch-3c', inserted: 17, duplicate: 0, completed: 0, other_account: 0, linked: 0, trades: 16, grouped: 1, attached: 0, errors: [] })
+    const dialog = await openSheet({ accountId: topOne.id })
+    await chooseFile(dialog)
+    await within(dialog).findByRole('heading', { name: 'Prévia' })
+    // The count row counts lines, as before
+    expect(contagem(dialog)).toBe('17 linhas · 17 novas · 0 já estavam · 0 com erro')
+    expect(within(dialog).getByText('1 saída parcial juntada à sua operação.')).toHaveClass('hub-passo__txt')
+    expect(primaryOf(dialog)).toHaveTextContent('Importar 16 operações')
+    await userEvent.click(primaryOf(dialog))
+    await within(dialog).findByRole('heading', { name: 'Importação feita' })
+    expect(within(dialog).getByText(/^16 operações em Histórico importado/)).toBeInTheDocument()
+    expect(within(dialog).getByText('1 saída parcial foi juntada à sua operação.')).toHaveClass('hub-passo__txt')
+    expect(toastOf(dialog)).toHaveTextContent('16 operações em Top One.')
+  })
+
+  it('a position linked whole to an app trade: «1 já registrada por você …», the grouped line, «Importar 15 operações»', async () => {
+    readFile.mockResolvedValue(fixtureFile('topone_ok'))
+    importPreview.mockResolvedValue(makePreview({ new: 15, rows_total: 17, trades_new: 15, grouped: 1, linked: 1 }))
+    const dialog = await openSheet({ accountId: topOne.id })
+    await chooseFile(dialog)
+    await within(dialog).findByRole('heading', { name: 'Prévia' })
+    expect(within(dialog).getByText('1 já registrada por você: o arquivo completa a comissão.')).toBeInTheDocument()
+    expect(within(dialog).getByText('1 saída parcial juntada à sua operação.')).toBeInTheDocument()
+    expect(primaryOf(dialog)).toHaveTextContent('Importar 15 operações')
+  })
+
+  it('rows that only join an app trade (attached): not «Nada novo»; «Juntar 2 saídas»; the end and the toast say it', async () => {
+    readFile.mockResolvedValue(fixtureFile('topone_ok'))
+    importPreview.mockResolvedValue(makePreview({ new: 0, rows_total: 2, trades_new: 0, grouped: 0, attached: 2 }))
+    importCommit.mockResolvedValue({ batch_id: 'batch-3c2', inserted: 0, duplicate: 0, completed: 0, other_account: 0, linked: 0, trades: 0, grouped: 0, attached: 2, errors: [] })
+    const dialog = await openSheet({ accountId: topOne.id })
+    await chooseFile(dialog)
+    expect(await within(dialog).findByRole('heading', { name: 'Prévia' })).toBeInTheDocument()
+    expect(within(dialog).queryByText(/^Nada novo/)).not.toBeInTheDocument()
+    expect(within(dialog).getByText('2 saídas a mais de operações que já estavam.')).toBeInTheDocument()
+    expect(primaryOf(dialog)).toHaveTextContent('Juntar 2 saídas')
+    await userEvent.click(primaryOf(dialog))
+    expect(importCommit).toHaveBeenCalledTimes(1)
+    await within(dialog).findByRole('heading', { name: 'Importação feita' })
+    expect(within(dialog).getByText('2 saídas a mais entraram em operações que já estavam.', { selector: '.hub-passo__txt' })).toBeInTheDocument()
+    expect(within(dialog).queryByText(/0 operações/)).not.toBeInTheDocument()
+    expect(toastOf(dialog)).toHaveTextContent('2 saídas a mais entraram em operações que já estavam.')
+  })
+
+  it('rows that join an imported trade (new lines, no new trade): «Juntar 2 saídas», never «Importar 0 operações»', async () => {
+    readFile.mockResolvedValue(fixtureFile('topone_ok'))
+    importPreview.mockResolvedValue(makePreview({ new: 2, rows_total: 2, trades_new: 0, attached: 2 }))
+    const dialog = await openSheet({ accountId: topOne.id })
+    await chooseFile(dialog)
+    await within(dialog).findByRole('heading', { name: 'Prévia' })
+    expect(primaryOf(dialog)).toHaveTextContent('Juntar 2 saídas')
+    expect(within(dialog).getByText('2 saídas a mais de operações que já estavam.')).toBeInTheDocument()
+  })
+
+  it('one more row of a position imported earlier: the singular lines', async () => {
+    readFile.mockResolvedValue(fixtureFile('topone_ok'))
+    importPreview.mockResolvedValue(makePreview({ new: 1, rows_total: 1, trades_new: 0, attached: 1 }))
+    importCommit.mockResolvedValue({ batch_id: 'batch-3c3', inserted: 1, duplicate: 0, completed: 0, other_account: 0, linked: 0, trades: 0, grouped: 0, attached: 1, errors: [] })
+    const dialog = await openSheet({ accountId: topOne.id })
+    await chooseFile(dialog)
+    await within(dialog).findByRole('heading', { name: 'Prévia' })
+    expect(within(dialog).getByText('1 saída a mais de uma operação que já estava.')).toBeInTheDocument()
+    expect(primaryOf(dialog)).toHaveTextContent('Juntar 1 saída')
+    await userEvent.click(primaryOf(dialog))
+    await within(dialog).findByRole('heading', { name: 'Importação feita' })
+    expect(within(dialog).getByText('1 saída a mais entrou numa operação que já estava.', { selector: '.hub-passo__txt' })).toBeInTheDocument()
+    expect(toastOf(dialog)).toHaveTextContent('1 saída a mais entrou numa operação que já estava.')
+  })
+
+  it('a file without the keys (one row per trade): every as-built line and label', async () => {
+    readFile.mockResolvedValue(fixtureFile('topone_ok'))
+    importPreview.mockResolvedValue(makePreview({ new: 7, rows_total: 7 }))
+    const dialog = await openSheet({ accountId: topOne.id })
+    await chooseFile(dialog)
+    await within(dialog).findByRole('heading', { name: 'Prévia' })
+    expect(primaryOf(dialog)).toHaveTextContent('Importar 7 operações')
+    expect(within(dialog).queryByText(/saída parcial|saídas a mais|saída a mais/)).not.toBeInTheDocument()
+  })
+
+  it('operacoesDoArquivo / operacoesDoLote and toastDoLote on the final keys', () => {
+    expect(operacoesDoArquivo({ new: 17, trades_new: 16 })).toBe(16)
+    expect(operacoesDoArquivo({ new: 7 })).toBe(7)
+    expect(operacoesDoArquivo({ new: 2, trades_new: 0 })).toBe(0)
+    expect(operacoesDoLote({ inserted: 17, trades: 16 })).toBe(16)
+    expect(operacoesDoLote({ inserted: 4 })).toBe(4)
+    expect(toastDoLote({ inserted: 17, completed: 0, linked: 0, trades: 16, attached: 0 }, 'Top One #1')).toBe('16 operações em Top One #1.')
+    expect(toastDoLote({ inserted: 1, completed: 0, linked: 0, trades: 0, attached: 1 }, 'Top One #1')).toBe('1 saída a mais entrou numa operação que já estava.')
+    expect(toastDoLote({ inserted: 0, completed: 0, linked: 1, trades: 0, attached: 2 }, 'Top One #1')).toBe(
+      '1 já registrada por você foi completada. 2 saídas a mais entraram em operações que já estavam.',
+    )
+  })
+})
+
+/** topone_ok with its 09/03 BUY of 2 lots as two rows of one broker position (the same open instant and price, two exits) */
+function topOneComPosicao() {
+  const file = fixtureFile('topone_ok')
+  if (!file.outcome.ok) throw new Error('fixture')
+  const rows = file.outcome.rows
+  const r = rows[1]
+  const a = { ...r, quantity: '1', pnl: '-100' }
+  const b = { ...r, line: 9, external_id: 'MNQM6/900000000008', quantity: '1', local_exit: '2026-03-09T14:05:00', exit_price: '21471.75', pnl: '-77.5' }
+  return { ...file, outcome: { ...file.outcome, rows: [rows[0], a, b, ...rows.slice(2)], records: file.outcome.records + 1 } }
+}
+
+describe('ImportSheet · Phase 3c · the file card and the rules lines count trades, not rows', () => {
+  const cartao = (dialog: HTMLElement) => dialog.querySelector('.hub-arq__txt')?.textContent ?? ''
+
+  it('a file with a position in two rows: the card says «8 linhas» (never «8 operações») on the preview and at the end', async () => {
+    readFile.mockResolvedValue(topOneComPosicao())
+    importPreview.mockResolvedValue(makePreview({ new: 8, rows_total: 8, trades_new: 7, grouped: 1 }))
+    importCommit.mockResolvedValue({ batch_id: 'batch-3c4', inserted: 8, duplicate: 0, completed: 0, other_account: 0, linked: 0, trades: 7, grouped: 1, attached: 0, errors: [] })
+    const dialog = await openSheet({ accountId: topOne.id })
+    await chooseFile(dialog)
+    await within(dialog).findByRole('heading', { name: 'Prévia' })
+    expect(cartao(dialog)).toMatch(/^Top One Futures · Trade History · 8 linhas · .+ · o arquivo não diz a conta$/)
+    expect(primaryOf(dialog)).toHaveTextContent('Importar 7 operações')
+    await userEvent.click(primaryOf(dialog))
+    await within(dialog).findByRole('heading', { name: 'Importação feita' })
+    expect(cartao(dialog)).toContain('· 8 linhas ·')
+  })
+
+  it('a file of one row per position keeps «7 operações»', async () => {
+    readFile.mockResolvedValue(fixtureFile('topone_ok'))
+    importPreview.mockResolvedValue(makePreview({ new: 7, rows_total: 7 }))
+    const dialog = await openSheet({ accountId: topOne.id })
+    await chooseFile(dialog)
+    await within(dialog).findByRole('heading', { name: 'Prévia' })
+    expect(cartao(dialog)).toMatch(/^Top One Futures · Trade History · 7 operações · /)
+  })
+
+  it('arquivoComParciais: the database’s position key (symbol, side, open instant and price, rows with an exit)', () => {
+    const file = topOneComPosicao()
+    if (!file.outcome.ok) throw new Error('fixture')
+    const parsed = file.outcome
+    expect(arquivoComParciais(parsed)).toBe(true)
+    const [, a, b] = parsed.rows
+    // The same price written with another number of zeros is the same price
+    expect(arquivoComParciais({ market: 'futures', rows: [a, { ...b, entry_price: `${b.entry_price}0` }] })).toBe(true)
+    expect(arquivoComParciais({ market: 'futures', rows: [a, { ...b, direction: 'short' }] })).toBe(false)
+    expect(arquivoComParciais({ market: 'futures', rows: [a, { ...b, local_entry: '2026-03-09T13:35:03' }] })).toBe(false)
+    expect(arquivoComParciais({ market: 'futures', rows: [a, { ...b, entry_price: '21510.25' }] })).toBe(false)
+    expect(arquivoComParciais({ market: 'futures', rows: [a, { ...b, local_exit: null }] })).toBe(false)
+    expect(arquivoComParciais({ market: 'futures', rows: [a, { ...b, local_exit: '2026-03-09T13:00:00' }] })).toBe(false)
+    expect(arquivoComParciais({ market: 'binary', rows: [a, b] })).toBe(false)
+    const um = fixtureFile('topone_ok')
+    expect(um.outcome.ok && arquivoComParciais(um.outcome)).toBe(false)
+  })
+
+  describe('the rules lines (the owner’s accounts, rules from 17 out)', () => {
+    beforeEach(comRegrasDoDono)
+
+    it('every row before the rules: «Antes de 17 out …: 6 vão …» counts the trades (6), not the rows (7)', async () => {
+      readFile.mockResolvedValue(fixtureFile('topone_ok'))
+      importPreview.mockResolvedValue(makePreview({ new: 7, rows_total: 7, trades_new: 6, grouped: 1 }))
+      const { dialog } = await openRules({ accountId: ids.topOne })
+      await chooseFile(dialog)
+      await within(dialog).findByRole('heading', { name: 'Prévia' })
+      expect(within(dialog).getByText('Antes de 17 out (início das regras): 6 vão para Histórico importado · só resultado.')).toBeInTheDocument()
+    })
+
+    it('every row after the rules: «6 operações importadas.» counts the batch’s trades, not its rows', async () => {
+      readFile.mockResolvedValue(topOneFile(7))
+      importPreview.mockResolvedValue(makePreview({ new: 7, rows_total: 7, trades_new: 6, grouped: 1 }))
+      importCommit.mockResolvedValue({ batch_id: 'batch-3c5', inserted: 7, duplicate: 0, completed: 0, other_account: 0, linked: 0, trades: 6, grouped: 1, attached: 0, errors: [] })
+      const { dialog } = await openRules({ accountId: ids.topOne })
+      await chooseFile(dialog)
+      await within(dialog).findByRole('heading', { name: 'Prévia' })
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Importar 6 operações' }))
+      expect(await within(dialog).findByText('6 operações importadas.')).toBeInTheDocument()
+    })
   })
 })

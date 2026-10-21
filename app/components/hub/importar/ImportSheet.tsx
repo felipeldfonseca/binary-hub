@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { FileText } from 'lucide-react'
-import { buildImportArgs, previewArgs, readImportFile, type ReadImportFileResult } from '@/lib/domain/import'
+import { buildImportArgs, previewArgs, readImportFile, type ParsedFile, type ReadImportFileResult } from '@/lib/domain/import'
 import { MARKET_SPEC, currencyOf } from '@/lib/domain/markets'
 import { FIRM_MAX, LABEL_MAX, PLATFORM_UNKNOWN, labelTaken, parseSize, zoneKeyOf, type TradingAccount } from '@/lib/hub/contas'
 import {
@@ -57,6 +57,7 @@ import {
   SOLTE,
   UNDO,
   firmAndPlatform,
+  ops as operacoesTexto,
   undoAria,
   zoneName,
 } from '@/components/hub/contas/copy'
@@ -130,16 +131,64 @@ interface Flow {
   rulesAtCreation: { regras: RegrasDaNovaConta; desde: string } | null
 }
 
+/** Phase 3c: trades the file creates — trades_new when the file has partial exits, else new (one row = one trade) */
+export const operacoesDoArquivo = (p: Pick<ImportPreviewResult, 'new' | 'trades_new'>): number => p.trades_new ?? p.new
+
+/** Phase 3c: trades the batch created — trades when the file had partial exits, else inserted */
+export const operacoesDoLote = (c: Pick<ImportCommitResult, 'inserted' | 'trades'>): number => c.trades ?? c.inserted
+
 /**
- * The end's toast, next to «Desfazer»: «{n} operações em {conta}.» for a batch that inserted
- * trades. Phase 3 (D29): a batch kept only for what it completed on trades registered in the app
- * (new links, or a trade an earlier file linked) says that instead of «0 operações em …».
+ * The end's toast, next to «Desfazer»: «{n} operações em {conta}.» for a batch that created trades.
+ * Phase 3 (D29): a batch kept only for what it completed on trades registered in the app (new
+ * links, or a trade an earlier file linked) says that instead of «0 operações em …»; Phase 3c: and
+ * one that only added exits to trades already there says «{n} saídas a mais entraram …».
  */
-export function toastDoLote(commit: Pick<ImportCommitResult, 'inserted' | 'completed' | 'linked'>, label: string): string {
-  if (commit.inserted > 0) return FIM.toast(commit.inserted, label)
+export function toastDoLote(commit: Pick<ImportCommitResult, 'inserted' | 'completed' | 'linked' | 'trades' | 'attached'>, label: string): string {
+  const ops = operacoesDoLote(commit)
+  if (ops > 0) return FIM.toast(ops, label)
   const linked = commit.linked ?? 0
-  const parts = [linked > 0 ? FIM.linked(linked) : '', commit.completed > 0 ? FIM.completed(commit.completed) : ''].filter(Boolean)
+  const attached = commit.attached ?? 0
+  const parts = [
+    linked > 0 ? FIM.linked(linked) : '',
+    commit.completed > 0 ? FIM.completed(commit.completed) : '',
+    attached > 0 ? FIM.anexadas(attached) : '',
+  ].filter(Boolean)
   return parts.length ? parts.join(' ') : FIM.toast(0, label)
+}
+
+/** A decimal without its trailing zeros («21510.50» = «21510.5»), to compare prices as the database does */
+const semZeros = (x: string) => (x.includes('.') ? x.replace(/0+$/, '').replace(/\.$/, '') : x)
+
+/**
+ * Phase 3c (§5.12): a price-market file with partial exits, two or more rows of one broker position
+ * on the database's key (import_stage: the symbol as written, the side, the open instant and the
+ * open price, each row with an exit not before its entry). Its rows are no longer its trades.
+ */
+export function arquivoComParciais(parsed: Pick<ParsedFile, 'market' | 'rows'>): boolean {
+  if (parsed.market === 'binary') return false
+  const vistos = new Set<string>()
+  for (const r of parsed.rows) {
+    if (r.local_exit === null || r.entry_price === null || r.local_exit < r.local_entry) continue
+    const chave = [r.symbol, r.direction, r.local_entry, r.utc_offset ?? '', semZeros(r.entry_price)].join('\u0000')
+    if (vistos.has(chave)) return true
+    vistos.add(chave)
+  }
+  return false
+}
+
+/**
+ * The file's card (flow's fileSummary). Phase 3c: a file with partial exits counts «{n} linhas», the
+ * card's own words for a file with errors, never «{n} operações» (the preview and the end count its
+ * trades: «Importar 16 operações» for 17 rows)
+ */
+export function linhaDoArquivo(parsed: ParsedFile, currentYear: number): string {
+  const linha = fileSummary(parsed, currentYear)
+  if (parsed.errors.length > 0 || !arquivoComParciais(parsed)) return linha
+  const comoOperacoes = operacoesTexto(parsed.rows.length)
+  return linha
+    .split(' · ')
+    .map((parte) => (parte === comoOperacoes ? ARQUIVO.rows(parsed.records) : parte))
+    .join(' · ')
 }
 
 const initialFlow = (mode: SheetMode, accountId: string | null): Flow => ({
@@ -293,8 +342,10 @@ export default function ImportSheet({ mode, accountId, onClose }: { mode: SheetM
           fail(new HubDataError(result.tz_status === 'tz_mismatch' ? 'tz_mismatch' : 'invalid_tz'), { ...patch, accountId: target.id })
           return
         }
-        // Phase 3: rows that only complete trades registered in the app (linked) are not «Nada novo»
-        const nothing = result.new === 0 && result.completable === 0 && result.other_account === 0 && (result.linked ?? 0) === 0
+        // Phase 3: rows that only complete trades registered in the app (linked) are not «Nada novo»;
+        // Phase 3c: nor rows that only join trades already there (attached)
+        const nothing =
+          result.new === 0 && result.completable === 0 && result.other_account === 0 && (result.linked ?? 0) === 0 && (result.attached ?? 0) === 0
         move(nothing ? 'f' : 'd', { ...patch, accountId: target.id, preview: result, zoneUsed: tz }, push)
       } catch (e) {
         fail(e, { ...patch, accountId: target.id })
@@ -488,7 +539,7 @@ export default function ImportSheet({ mode, accountId, onClose }: { mode: SheetM
   const commit = async () => {
     const preview = flow.preview
     if (!preview || !account || !flow.file || !parsed || !flow.zoneUsed) return
-    if (preview.new === 0 && preview.completable === 0 && (preview.linked ?? 0) === 0) {
+    if (preview.new === 0 && preview.completable === 0 && (preview.linked ?? 0) === 0 && (preview.attached ?? 0) === 0) {
       // Everything is already in another account: nothing to write
       if (flow.created) move('fim', { nothingImported: true })
       else onClose()
@@ -802,16 +853,19 @@ export default function ImportSheet({ mode, accountId, onClose }: { mode: SheetM
           zoneUsed={flow.zoneUsed}
           zoneChosen={flow.zoneChosen}
           undone={flow.undone}
-          antesDasRegras={account ? linhaAntesDasRegras(config, account.id, parsed.rows, flow.zoneUsed, preview.new) : null}
+          antesDasRegras={account ? linhaAntesDasRegras(config, account.id, parsed.rows, flow.zoneUsed, operacoesDoArquivo(preview)) : null}
         />
       )
+      const opsArquivo = operacoesDoArquivo(preview)
       primary = {
         label:
-          preview.new > 0
-            ? PASSO_D.importN(preview.new)
+          opsArquivo > 0
+            ? PASSO_D.importN(opsArquivo)
             : preview.completable + (preview.linked ?? 0) > 0
               ? PASSO_D.completeN(preview.completable + (preview.linked ?? 0))
-              : FOLHA.done,
+              : (preview.attached ?? 0) > 0
+                ? PASSO_D.juntarN(preview.attached ?? 0)
+                : FOLHA.done,
         run: () => void commit(),
       }
       break
@@ -863,16 +917,19 @@ export default function ImportSheet({ mode, accountId, onClose }: { mode: SheetM
       if (flow.nothingImported) {
         title = FIM.created(label)
         lines = [FIM.nothingImported]
-      } else if (result && (result.inserted > 0 || result.completed > 0 || (result.linked ?? 0) > 0)) {
-        if (result.inserted > 0) {
+      } else if (result && (result.inserted > 0 || result.completed > 0 || (result.linked ?? 0) > 0 || (result.attached ?? 0) > 0)) {
+        const opsLote = operacoesDoLote(result)
+        if (opsLote > 0) {
           // After the account's rules started, imported rows are judged by them (decisoes)
-          const judged =
-            account && parsed && flow.zoneUsed ? linhaImportadas(config, account.id, parsed.rows, flow.zoneUsed, result.inserted) : null
-          lines.push(judged ?? FIM.inHistory(result.inserted))
+          const judged = account && parsed && flow.zoneUsed ? linhaImportadas(config, account.id, parsed.rows, flow.zoneUsed, opsLote) : null
+          lines.push(judged ?? FIM.inHistory(opsLote))
         }
         if (result.completed > 0) lines.push(FIM.completed(result.completed))
         // Phase 3: a batch that only completed app trades is kept, and can be undone
         if ((result.linked ?? 0) > 0) lines.push(FIM.linked(result.linked ?? 0))
+        // Phase 3c (§5.12): exits grouped into a trade, and exits added to trades already there
+        if ((result.grouped ?? 0) > 0) lines.push(FIM.agrupadas(result.grouped ?? 0))
+        if ((result.attached ?? 0) > 0) lines.push(FIM.anexadas(result.attached ?? 0))
         if (result.batch_id) lines.push(FIM.undoLater)
       } else if (result) {
         title = PASSO_F.title(result.duplicate, label)
@@ -932,7 +989,7 @@ export default function ImportSheet({ mode, accountId, onClose }: { mode: SheetM
     flow.passo === 'solte'
       ? null
       : parsed
-        ? fileSummary(parsed, new Date().getFullYear())
+        ? linhaDoArquivo(parsed, new Date().getFullYear())
         : flow.passo === 'erro'
           ? emptyFileSummary(flow.file)
           : null

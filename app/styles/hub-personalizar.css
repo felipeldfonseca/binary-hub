@@ -751,3 +751,49 @@ html:has(.hub-pz-barra) {
     transition: none;
   }
 }
+
+/*
+ * Fase 3c · «Durante a operação» › «Mover para o breakeven» (Personalizar approved 21 Oct, board
+ * .grupo-op, .be-lista, .be-item; telas contract §6.5): the group under the rules, a line above it;
+ * its rule row without that line; each asset's line wraps (asset, «+ [field] pts», «Remover»; the
+ * error on a line of its own). Every rule scoped .hub; text on --bg / --inset as the other rules.
+ */
+.hub .hub-pz-grupo-op {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 4px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+.hub .hub-pz-grupo-op h4 {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.4;
+  font-weight: 700;
+}
+.hub .hub-pz-grupo-op .hub-pz-regra {
+  border-top: 0;
+  padding-top: 8px;
+}
+.hub .hub-pz-be-lista {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.hub .hub-pz-be-item {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+}
+.hub .hub-pz-be-ativo {
+  min-width: 44px;
+  font-size: 13px;
+}
+.hub .hub-pz-be-item .hub-erro {
+  flex: 1 0 100%;
+}

@@ -1445,3 +1445,53 @@ export function newClientKey(random: (bytes: Uint8Array) => Uint8Array = (b) => 
   const hex = Array.from(b, (x) => x.toString(16).padStart(2, '0')).join('');
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
 }
+
+// ---------------------------------------------------------------------------------------------
+// Phase 3c: the exits and stop moves of several trades («Operações abertas», «Operações do dia»)
+// ---------------------------------------------------------------------------------------------
+
+/** One trade's exits and stop moves, as trade_state lists them */
+export interface TradeEvents {
+  exits: TradeExit[];
+  stopMoves: StopMove[];
+}
+
+/** The rows readTradeEventsRows reads, as the API returns them (each row carries its trade_id) */
+export interface TradeEventsRows {
+  exits: unknown;
+  stopMoves: unknown;
+}
+
+/** readTradeEventsRows' rows by trade, each list in trade_state's order (bad_answer on another shape) */
+export function tradeEventsOfRows(rows: TradeEventsRows): Record<string, TradeEvents> {
+  return parsed(() => {
+    const out: Record<string, TradeEvents> = {};
+    const of = (id: string) => (out[id] ??= { exits: [], stopMoves: [] });
+    for (const r of list(rows.exits, obj)) of(str(r.trade_id)).exits.push(parseExitRow(r));
+    for (const r of list(rows.stopMoves, obj)) of(str(r.trade_id)).stopMoves.push(parseStopMove(r));
+    for (const ev of Object.values(out)) {
+      ev.exits.sort((a, b) => a.exitTime.getTime() - b.exitTime.getTime() || a.id - b.id);
+      ev.stopMoves.sort((a, b) => a.movedAt.getTime() - b.movedAt.getTime() || a.id - b.id);
+    }
+    return out;
+  }, null);
+}
+
+/**
+ * The exits and stop moves of the caller's trades `tradeIds` (trade_exits_v and trade_stop_moves_v,
+ * under row-level security), as the API returns them; none asked for: nothing read
+ */
+export async function readTradeEventsRows(db: SupabaseClient, tradeIds: readonly string[]): Promise<TradeEventsRows> {
+  if (tradeIds.length === 0) return { exits: [], stopMoves: [] };
+  const ids = [...tradeIds];
+  const [exits, stopMoves] = await Promise.all([
+    read(db.from('trade_exits_v').select(`trade_id, ${EXIT_COLUMNS}`).in('trade_id', ids).order('exit_time').order('id') as unknown as Rows<unknown[]>),
+    read(db.from('trade_stop_moves_v').select(`trade_id, ${MOVE_COLUMNS}`).in('trade_id', ids).order('moved_at').order('id') as unknown as Rows<unknown[]>),
+  ]);
+  return { exits: exits ?? [], stopMoves: stopMoves ?? [] };
+}
+
+/** The exits and stop moves of those trades, by trade id (a trade with none is absent) */
+export async function fetchTradeEvents(db: SupabaseClient, tradeIds: readonly string[]): Promise<Record<string, TradeEvents>> {
+  return tradeEventsOfRows(await readTradeEventsRows(db, tradeIds));
+}

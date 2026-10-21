@@ -12,13 +12,18 @@
  *   Plano      «No plano» · «● fora da janela · depois do limite» · «—» (not evaluated)
  *   Ação       «Registrar saída» (a price market, open) · «Registrar resultado» (binary, open) · «Abrir»
  *              (aria «Registrar saída: Compra de SPY Call 790 às 09:35», the instrument as ativoCurto)
+ *
+ * Phase 3c (board approved 21 Oct, RO l.282, js l.2193–2199): the «Operação» cell's second line from
+ * the trade's exits and stop moves (read apart: useTradeEvents) — open «1 parcial, +US$ 40,00 ·
+ * stop no breakeven», closed «em 2 saídas»; none while they are read or when the read fails.
  */
 import { addDays } from '@/lib/domain'
 import { currencyOf, type AccountMarket } from '@/lib/domain/markets'
 import { formatDiaMes, formatMoney } from '@/lib/hub/formato'
 import { horaNoRelogio } from '@/lib/hub/posso'
-import type { DayTrade } from '@/lib/hub/registrarDb'
+import type { DayTrade, TradeEvents } from '@/lib/hub/registrarDb'
 import { ativoCurto, opTexto } from '@/lib/hub/registrarForm'
+import { subDaPonte } from '@/lib/hub/registrarParciais'
 import { OPERACOES_DIA as T, QUEBRAS, acaoAria } from './copy'
 
 const NBSP = '\u00a0'
@@ -31,6 +36,8 @@ export interface LinhaDoDia {
   operacao: string
   /** The paperclip's label («tem imagens e nota»); null: no paperclip */
   clip: string | null
+  /** Phase 3c: the second line («1 parcial, +US$ 40,00 · stop no breakeven», «em 2 saídas»); null: none */
+  sub: string | null
   /** null while the trade is open («aberta») */
   resultado: { texto: string; tom: 'mint' | 'red' | 'neutral' } | null
   plano: PlanoDaLinha
@@ -90,8 +97,8 @@ function resultadoDaLinha(d: DayTrade, market: AccountMarket): LinhaDoDia['resul
   return { texto: formatMoney(pnl, { signed: true, currency: currencyOf(market) }), tom: n > 0 ? 'mint' : n < 0 ? 'red' : 'neutral' }
 }
 
-/** One row of the bridge */
-export function linhaDoDia(d: DayTrade, { market, day, tz }: ContextoDoDia): LinhaDoDia {
+/** One row of the bridge (`eventos`: the trade's exits and stop moves, when read) */
+export function linhaDoDia(d: DayTrade, { market, day, tz }: ContextoDoDia, eventos: TradeEvents | null = null): LinhaDoDia {
   const t = d.trade
   const fechada = t.status === 'closed'
   const dia = diaDaLinha(t.tradingDay, day)
@@ -104,6 +111,7 @@ export function linhaDoDia(d: DayTrade, { market, day, tz }: ContextoDoDia): Lin
     hora,
     operacao: operacaoDaLinha(t, market),
     clip: clipDaLinha(d),
+    sub: subDaPonte(market, t, eventos),
     resultado: fechada ? resultadoDaLinha(d, market) : null,
     plano: planoDaLinha(d),
     acao,
@@ -111,7 +119,7 @@ export function linhaDoDia(d: DayTrade, { market, day, tz }: ContextoDoDia): Lin
   }
 }
 
-/** The bridge's rows, in the order fetchDayTrades gives them (entry order) */
-export function linhasDoDia(trades: readonly DayTrade[], contexto: ContextoDoDia): LinhaDoDia[] {
-  return trades.map((d) => linhaDoDia(d, contexto))
+/** The bridge's rows, in the order fetchDayTrades gives them (entry order); `eventos` by trade id */
+export function linhasDoDia(trades: readonly DayTrade[], contexto: ContextoDoDia, eventos: Readonly<Record<string, TradeEvents>> | null = null): LinhaDoDia[] {
+  return trades.map((d) => linhaDoDia(d, contexto, eventos?.[d.trade.id] ?? null))
 }

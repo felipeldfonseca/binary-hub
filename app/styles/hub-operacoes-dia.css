@@ -204,3 +204,14 @@
     transition: none;
   }
 }
+
+/* Phase 3c: the «Operação» cell's second line (board `.sub-op`, RO l.165, 282): «1 parcial,
+   +US$ 40,00 · stop no breakeven» / «em 2 saídas»; regular weight under the bold operation, inside
+   the cell at every width (≤ 860 px the cell is row 2, column 1) */
+.hub .hub-ops-dia__sub {
+  display: block;
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--text-2);
+  text-wrap: pretty;
+}
