@@ -1,0 +1,7840 @@
+{
+ "about": "Shared cases for Phase 3c (the breakeven rule, partial exits, stop moves) and the SQL. Inputs are invented; every \"expected\" was computed by the SQL named in each group (migrations 20261023000001..3 of fase-3c/banco), so the TypeScript test (cases3c.test.ts) checks that both sides give the same answer. Amounts are trimmed of trailing zeros (trim_scale) as the data layer reads them.",
+ "generatedWith": "15.13 (Homebrew)",
+ "builtin": {
+  "b3": {
+   "v": 1,
+   "window_rule": {
+    "on": true,
+    "outside": "fora"
+   }
+  },
+  "forex": {
+   "v": 1,
+   "window_rule": {
+    "on": true,
+    "outside": "fora"
+   }
+  },
+  "binary": {
+   "v": 1,
+   "window_rule": {
+    "on": true,
+    "outside": "fora"
+   }
+  },
+  "crypto": {
+   "v": 1,
+   "window_rule": {
+    "on": true,
+    "outside": "fora"
+   }
+  },
+  "stocks": {
+   "v": 1,
+   "window_rule": {
+    "on": true,
+    "outside": "fora"
+   }
+  },
+  "futures": {
+   "v": 1,
+   "block": {
+    "on": true,
+    "after_min": 10,
+    "before_min": 5
+   },
+   "states": {},
+   "window_rule": {
+    "on": true,
+    "outside": "fora"
+   }
+  },
+  "options": {
+   "v": 1,
+   "window_rule": {
+    "on": true,
+    "outside": "fora"
+   }
+  }
+ },
+ "dist": {
+  "about": "rules_is_dist(x): «+N» of the breakeven rule (a JSON number > 0, ≤ 1 000 000, at most 8 decimals)",
+  "cases": [
+   {
+    "x": 8,
+    "expected": true
+   },
+   {
+    "x": 7.5,
+    "expected": true
+   },
+   {
+    "x": 0.25,
+    "expected": true
+   },
+   {
+    "x": 30,
+    "expected": true
+   },
+   {
+    "x": 0,
+    "expected": false
+   },
+   {
+    "x": -1,
+    "expected": false
+   },
+   {
+    "x": -0.5,
+    "expected": false
+   },
+   {
+    "x": 1e-8,
+    "expected": true
+   },
+   {
+    "x": 1e-9,
+    "expected": false
+   },
+   {
+    "x": 2.5e-7,
+    "expected": true
+   },
+   {
+    "x": 1000000,
+    "expected": true
+   },
+   {
+    "x": 999999.99999999,
+    "expected": true
+   },
+   {
+    "x": 1000000.5,
+    "expected": false
+   },
+   {
+    "x": 1000001,
+    "expected": false
+   },
+   {
+    "x": 0.123456789,
+    "expected": false
+   },
+   {
+    "x": 0.12345678,
+    "expected": true
+   },
+   {
+    "x": 0.30000000000000004,
+    "expected": false
+   },
+   {
+    "x": 1e+21,
+    "expected": false
+   },
+   {
+    "x": "8",
+    "expected": false
+   },
+   {
+    "x": null,
+    "expected": false
+   },
+   {
+    "x": true,
+    "expected": false
+   },
+   {
+    "x": [],
+    "expected": false
+   },
+   {
+    "x": {},
+    "expected": false
+   }
+  ]
+ },
+ "resolved": {
+  "about": "rules_check_resolved(json): a version with the optional tenth key \"breakeven\"",
+  "cases": [
+   {
+    "label": "futures: MES +8, MNQ +30, MGC +5",
+    "json": {
+     "v": 1,
+     "market": "futures",
+     "windows": [
+      {
+       "tz": "America/New_York",
+       "start_min": 600,
+       "end_min": 660,
+       "weekdays": 31
+      }
+     ],
+     "windows_from": "market",
+     "window_rule": {
+      "on": true,
+      "outside": "fora"
+     },
+     "block": {
+      "on": true,
+      "before_min": 5,
+      "after_min": 10,
+      "calendars": [
+       "us"
+      ]
+     },
+     "limit": {
+      "usd": 400,
+      "mode": "conta",
+      "at_limit": "encerrar"
+     },
+     "states": {
+      "alinhadas": null,
+      "so_tecnica": null,
+      "so_fundamentos": null,
+      "em_conflito": null,
+      "sem_direcao": null
+     },
+     "day": {
+      "tz": "America/New_York",
+      "start_min": 1080
+     },
+     "breakeven": {
+      "by": {
+       "MES": {
+        "n": 8,
+        "un": "pts"
+       },
+       "MNQ": {
+        "n": 30,
+        "un": "pts"
+       },
+       "MGC": {
+        "n": 5,
+        "un": "pts"
+       }
+      }
+     }
+    },
+    "expected": null
+   },
+   {
+    "label": "futures: one asset, decimals",
+    "json": {
+     "v": 1,
+     "market": "futures",
+     "windows": [
+      {
+       "tz": "America/New_York",
+       "start_min": 600,
+       "end_min": 660,
+       "weekdays": 31
+      }
+     ],
+     "windows_from": "market",
+     "window_rule": {
+      "on": true,
+      "outside": "fora"
+     },
+     "block": {
+      "on": true,
+      "before_min": 5,
+      "after_min": 10,
+      "calendars": [
+       "us"
+      ]
+     },
+     "limit": {
+      "usd": 400,
+      "mode": "conta",
+      "at_limit": "encerrar"
+     },
+     "states": {
+      "alinhadas": null,
+      "so_tecnica": null,
+      "so_fundamentos": null,
+      "em_conflito": null,
+      "sem_direcao": null
+     },
+     "day": {
+      "tz": "America/New_York",
+      "start_min": 1080
+     },
+     "breakeven": {
+      "by": {
+       "MES": {
+        "n": 7.5,
+        "un": "pts"
+       }
+      }
+     }
+    },
+    "expected": null
+   },
+   {
+    "label": "futures: 8 decimals",
+    "json": {
+     "v": 1,
+     "market": "futures",
+     "windows": [
+      {
+       "tz": "America/New_York",
+       "start_min": 600,
+       "end_min": 660,
+       "weekdays": 31
+      }
+     ],
+     "windows_from": "market",
+     "window_rule": {
+      "on": true,
+      "outside": "fora"
+     },
+     "block": {
+      "on": true,
+      "before_min": 5,
+      "after_min": 10,
+      "calendars": [
+       "us"
+      ]
+     },
+     "limit": {
+      "usd": 400,
+      "mode": "conta",
+      "at_limit": "encerrar"
+     },
+     "states": {
+      "alinhadas": null,
+      "so_tecnica": null,
+      "so_fundamentos": null,
+      "em_conflito": null,
+      "sem_direcao": null
+     },
+     "day": {
+      "tz": "America/New_York",
+      "start_min": 1080
+     },
+     "breakeven": {
+      "by": {
+       "MES": {
+        "n": 0.12345678,
+        "un": "pts"
+       }
+      }
+     }
+    },
+    "expected": null
+   },
+   {
+    "label": "futures: 9 decimals",
+    "json": {
+     "v": 1,
+     "market": "futures",
+     "windows": [
+      {
+       "tz": "America/New_York",
+       "start_min": 600,
+       "end_min": 660,
+       "weekdays": 31
+      }
+     ],
+     "windows_from": "market",
+     "window_rule": {
+      "on": true,
+      "outside": "fora"
+     },
+     "block": {
+      "on": true,
+      "before_min": 5,
+      "after_min": 10,
+      "calendars": [
+       "us"
+      ]
+     },
+     "limit": {
+      "usd": 400,
+      "mode": "conta",
+      "at_limit": "encerrar"
+     },
+     "states": {
+      "alinhadas": null,
+      "so_tecnica": null,
+      "so_fundamentos": null,
+      "em_conflito": null,
+      "sem_direcao": null
+     },
+     "day": {
+      "tz": "America/New_York",
+      "start_min": 1080
+     },
+     "breakeven": {
+      "by": {
+       "MES": {
+        "n": 0.123456789,
+        "un": "pts"
+       }
+      }
+     }
+    },
+    "expected": "bad_breakeven"
+   },
+   {
+    "label": "futures: 1 000 000",
+    "json": {
+     "v": 1,
+     "market": "futures",
+     "windows": [
+      {
+       "tz": "America/New_York",
+       "start_min": 600,
+       "end_min": 660,
+       "weekdays": 31
+      }
+     ],
+     "windows_from": "market",
+     "window_rule": {
+      "on": true,
+      "outside": "fora"
+     },
+     "block": {
+      "on": true,
+      "before_min": 5,
+      "after_min": 10,
+      "calendars": [
+       "us"
+      ]
+     },
+     "limit": {
+      "usd": 400,
+      "mode": "conta",
+      "at_limit": "encerrar"
+     },
+     "states": {
+      "alinhadas": null,
+      "so_tecnica": null,
+      "so_fundamentos": null,
+      "em_conflito": null,
+      "sem_direcao": null
+     },
+     "day": {
+      "tz": "America/New_York",
+      "start_min": 1080
+     },
+     "breakeven": {
+      "by": {
+       "MES": {
+        "n": 1000000,
+        "un": "pts"
+       }
+      }
+     }
+    },
+    "expected": null
+   },
+   {
+    "label": "futures: above 1 000 000",
+    "json": {
+     "v": 1,
+     "market": "futures",
+     "windows": [
+      {
+       "tz": "America/New_York",
+       "start_min": 600,
+       "end_min": 660,
+       "weekdays": 31
+      }
+     ],
+     "windows_from": "market",
+     "window_rule": {
+      "on": true,
+      "outside": "fora"
+     },
+     "block": {
+      "on": true,
+      "before_min": 5,
+      "after_min": 10,
+      "calendars": [
+       "us"
+      ]
+     },
+     "limit": {
+      "usd": 400,
+      "mode": "conta",
+      "at_limit": "encerrar"
+     },
+     "states": {
+      "alinhadas": null,
+      "so_tecnica": null,
+      "so_fundamentos": null,
+      "em_conflito": null,
+      "sem_direcao": null
+     },
+     "day": {
+      "tz": "America/New_York",
+      "start_min": 1080
+     },
+     "breakeven": {
+      "by": {
+       "MES": {
+        "n": 1000000.5,
+        "un": "pts"
+       }
+      }
+     }
+    },
+    "expected": "bad_breakeven"
+   },
+   {
+    "label": "futures: zero",
+    "json": {
+     "v": 1,
+     "market": "futures",
+     "windows": [
+      {
+       "tz": "America/New_York",
+       "start_min": 600,
+       "end_min": 660,
+       "weekdays": 31
+      }
+     ],
+     "windows_from": "market",
+     "window_rule": {
+      "on": true,
+      "outside": "fora"
+     },
+     "block": {
+      "on": true,
+      "before_min": 5,
+      "after_min": 10,
+      "calendars": [
+       "us"
+      ]
+     },
+     "limit": {
+      "usd": 400,
+      "mode": "conta",
+      "at_limit": "encerrar"
+     },
+     "states": {
+      "alinhadas": null,
+      "so_tecnica": null,
+      "so_fundamentos": null,
+      "em_conflito": null,
+      "sem_direcao": null
+     },
+     "day": {
+      "tz": "America/New_York",
+      "start_min": 1080
+     },
+     "breakeven": {
+      "by": {
+       "MES": {
+        "n": 0,
+        "un": "pts"
+       }
+      }
+     }
+    },
+    "expected": "bad_breakeven"
+   },
+   {
+    "label": "futures: negative",
+    "json": {
+     "v": 1,
+     "market": "futures",
+     "windows": [
+      {
+       "tz": "America/New_York",
+       "start_min": 600,
+       "end_min": 660,
+       "weekdays": 31
+      }
+     ],
+     "windows_from": "market",
+     "window_rule": {
+      "on": true,
+      "outside": "fora"
+     },
+     "block": {
+      "on": true,
+      "before_min": 5,
+      "after_min": 10,
+      "calendars": [
+       "us"
+      ]
+     },
+     "limit": {
+      "usd": 400,
+      "mode": "conta",
+      "at_limit": "encerrar"
+     },
+     "states": {
+      "alinhadas": null,
+      "so_tecnica": null,
+      "so_fundamentos": null,
+      "em_conflito": null,
+      "sem_direcao": null
+     },
+     "day": {
+      "tz": "America/New_York",
+      "start_min": 1080
+     },
+     "breakeven": {
+      "by": {
+       "MES": {
+        "n": -8,
+        "un": "pts"
+       }
+      }
+     }
+    },
+    "expected": "bad_breakeven"
+   },
+   {
+    "label": "futures: n as a string",
+    "json": {
+     "v": 1,
+     "market": "futures",
+     "windows": [
+      {
+       "tz": "America/New_York",
+       "start_min": 600,
+       "end_min": 660,
+       "weekdays": 31
+      }
+     ],
+     "windows_from": "market",
+     "window_rule": {
+      "on": true,
+      "outside": "fora"
+     },
+     "block": {
+      "on": true,
+      "before_min": 5,
+      "after_min": 10,
+      "calendars": [
+       "us"
+      ]
+     },
+     "limit": {
+      "usd": 400,
+      "mode": "conta",
+      "at_limit": "encerrar"
+     },
+     "states": {
+      "alinhadas": null,
+      "so_tecnica": null,
+      "so_fundamentos": null,
+      "em_conflito": null,
+      "sem_direcao": null
+     },
+     "day": {
+      "tz": "America/New_York",
+      "start_min": 1080
+     },
+     "breakeven": {
+      "by": {
+       "MES": {
+        "n": "8",
+        "un": "pts"
+       }
+      }
+     }
+    },
+    "expected": "bad_breakeven"
+   },
+   {
+    "label": "futures: no n",
+    "json": {
+     "v": 1,
+     "market": "futures",
+     "windows": [
+      {
+       "tz": "America/New_York",
+       "start_min": 600,
+       "end_min": 660,
+       "weekdays": 31
+      }
+     ],
+     "windows_from": "market",
+     "window_rule": {
+      "on": true,
+      "outside": "fora"
+     },
+     "block": {
+      "on": true,
+      "before_min": 5,
+      "after_min": 10,
+      "calendars": [
+       "us"
+      ]
+     },
+     "limit": {
+      "usd": 400,
+      "mode": "conta",
+      "at_limit": "encerrar"
+     },
+     "states": {
+      "alinhadas": null,
+      "so_tecnica": null,
+      "so_fundamentos": null,
+      "em_conflito": null,
+      "sem_direcao": null
+     },
+     "day": {
+      "tz": "America/New_York",
+      "start_min": 1080
+     },
+     "breakeven": {
+      "by": {
+       "MES": {
+        "un": "pts"
+       }
+      }
+     }
+    },
+    "expected": "bad_breakeven"
+   },
+   {
+    "label": "futures: no unit",
+    "json": {
+     "v": 1,
+     "market": "futures",
+     "windows": [
+      {
+       "tz": "America/New_York",
+       "start_min": 600,
+       "end_min": 660,
+       "weekdays": 31
+      }
+     ],
+     "windows_from": "market",
+     "window_rule": {
+      "on": true,
+      "outside": "fora"
+     },
+     "block": {
+      "on": true,
+      "before_min": 5,
+      "after_min": 10,
+      "calendars": [
+       "us"
+      ]
+     },
+     "limit": {
+      "usd": 400,
+      "mode": "conta",
+      "at_limit": "encerrar"
+     },
+     "states": {
+      "alinhadas": null,
+      "so_tecnica": null,
+      "so_fundamentos": null,
+      "em_conflito": null,
+      "sem_direcao": null
+     },
+     "day": {
+      "tz": "America/New_York",
+      "start_min": 1080
+     },
+     "breakeven": {
+      "by": {
+       "MES": {
+        "n": 8
+       }
+      }
+     }
+    },
+    "expected": "bad_breakeven"
+   },
+   {
+    "label": "futures: unknown unit",
+    "json": {
+     "v": 1,
+     "market": "futures",
+     "windows": [
+      {
+       "tz": "America/New_York",
+       "start_min": 600,
+       "end_min": 660,
+       "weekdays": 31
+      }
+     ],
+     "windows_from": "market",
+     "window_rule": {
+      "on": true,
+      "outside": "fora"
+     },
+     "block": {
+      "on": true,
+      "before_min": 5,
+      "after_min": 10,
+      "calendars": [
+       "us"
+      ]
+     },
+     "limit": {
+      "usd": 400,
+      "mode": "conta",
+      "at_limit": "encerrar"
+     },
+     "states": {
+      "alinhadas": null,
+      "so_tecnica": null,
+      "so_fundamentos": null,
+      "em_conflito": null,
+      "sem_direcao": null
+     },
+     "day": {
+      "tz": "America/New_York",
+      "start_min": 1080
+     },
+     "breakeven": {
+      "by": {
+       "MES": {
+        "n": 8,
+        "un": "ticks"
+       }
+      }
+     }
+    },
+    "expected": "bad_breakeven"
+   },
+   {
+    "label": "futures: unit not rechecked (pips on MES)",
+    "json": {
+     "v": 1,
+     "market": "futures",
+     "windows": [
+      {
+       "tz": "America/New_York",
+       "start_min": 600,
+       "end_min": 660,
+       "weekdays": 31
+      }
+     ],
+     "windows_from": "market",
+     "window_rule": {
+      "on": true,
+      "outside": "fora"
+     },
+     "block": {
+      "on": true,
+      "before_min": 5,
+      "after_min": 10,
+      "calendars": [
+       "us"
+      ]
+     },
+     "limit": {
+      "usd": 400,
+      "mode": "conta",
+      "at_limit": "encerrar"
+     },
+     "states": {
+      "alinhadas": null,
+      "so_tecnica": null,
+      "so_fundamentos": null,
+      "em_conflito": null,
+      "sem_direcao": null
+     },
+     "day": {
+      "tz": "America/New_York",
+      "start_min": 1080
+     },
+     "breakeven": {
+      "by": {
+       "MES": {
+        "n": 8,
+        "un": "pips"
+       }
+      }
+     }
+    },
+    "expected": null
+   },
+   {
+    "label": "futures: an extra key in an asset",
+    "json": {
+     "v": 1,
+     "market": "futures",
+     "windows": [
+      {
+       "tz": "America/New_York",
+       "start_min": 600,
+       "end_min": 660,
+       "weekdays": 31
+      }
+     ],
+     "windows_from": "market",
+     "window_rule": {
+      "on": true,
+      "outside": "fora"
+     },
+     "block": {
+      "on": true,
+      "before_min": 5,
+      "after_min": 10,
+      "calendars": [
+       "us"
+      ]
+     },
+     "limit": {
+      "usd": 400,
+      "mode": "conta",
+      "at_limit": "encerrar"
+     },
+     "states": {
+      "alinhadas": null,
+      "so_tecnica": null,
+      "so_fundamentos": null,
+      "em_conflito": null,
+      "sem_direcao": null
+     },
+     "day": {
+      "tz": "America/New_York",
+      "start_min": 1080
+     },
+     "breakeven": {
+      "by": {
+       "MES": {
+        "n": 8,
+        "un": "pts",
+        "at": 1
+       }
+      }
+     }
+    },
+    "expected": "bad_breakeven"
+   },
+   {
+    "label": "futures: asset not an object",
+    "json": {
+     "v": 1,
+     "market": "futures",
+     "windows": [
+      {
+       "tz": "America/New_York",
+       "start_min": 600,
+       "end_min": 660,
+       "weekdays": 31
+      }
+     ],
+     "windows_from": "market",
+     "window_rule": {
+      "on": true,
+      "outside": "fora"
+     },
+     "block": {
+      "on": true,
+      "before_min": 5,
+      "after_min": 10,
+      "calendars": [
+       "us"
+      ]
+     },
+     "limit": {
+      "usd": 400,
+      "mode": "conta",
+      "at_limit": "encerrar"
+     },
+     "states": {
+      "alinhadas": null,
+      "so_tecnica": null,
+      "so_fundamentos": null,
+      "em_conflito": null,
+      "sem_direcao": null
+     },
+     "day": {
+      "tz": "America/New_York",
+      "start_min": 1080
+     },
+     "breakeven": {
+      "by": {
+       "MES": 8
+      }
+     }
+    },
+    "expected": "bad_breakeven"
+   },
+   {
+    "label": "futures: contract month in the key",
+    "json": {
+     "v": 1,
+     "market": "futures",
+     "windows": [
+      {
+       "tz": "America/New_York",
+       "start_min": 600,
+       "end_min": 660,
+       "weekdays": 31
+      }
+     ],
+     "windows_from": "market",
+     "window_rule": {
+      "on": true,
+      "outside": "fora"
+     },
+     "block": {
+      "on": true,
+      "before_min": 5,
+      "after_min": 10,
+      "calendars": [
+       "us"
+      ]
+     },
+     "limit": {
+      "usd": 400,
+      "mode": "conta",
+      "at_limit": "encerrar"
+     },
+     "states": {
+      "alinhadas": null,
+      "so_tecnica": null,
+      "so_fundamentos": null,
+      "em_conflito": null,
+      "sem_direcao": null
+     },
+     "day": {
+      "tz": "America/New_York",
+      "start_min": 1080
+     },
+     "breakeven": {
+      "by": {
+       "MESZ5": {
+        "n": 8,
+        "un": "pts"
+       }
+      }
+     }
+    },
+    "expected": "bad_breakeven"
+   },
+   {
+    "label": "futures: lower-case key",
+    "json": {
+     "v": 1,
+     "market": "futures",
+     "windows": [
+      {
+       "tz": "America/New_York",
+       "start_min": 600,
+       "end_min": 660,
+       "weekdays": 31
+      }
+     ],
+     "windows_from": "market",
+     "window_rule": {
+      "on": true,
+      "outside": "fora"
+     },
+     "block": {
+      "on": true,
+      "before_min": 5,
+      "after_min": 10,
+      "calendars": [
+       "us"
+      ]
+     },
+     "limit": {
+      "usd": 400,
+      "mode": "conta",
+      "at_limit": "encerrar"
+     },
+     "states": {
+      "alinhadas": null,
+      "so_tecnica": null,
+      "so_fundamentos": null,
+      "em_conflito": null,
+      "sem_direcao": null
+     },
+     "day": {
+      "tz": "America/New_York",
+      "start_min": 1080
+     },
+     "breakeven": {
+      "by": {
+       "mes": {
+        "n": 8,
+        "un": "pts"
+       }
+      }
+     }
+    },
+    "expected": "bad_breakeven"
+   },
+   {
+    "label": "futures: key with a slash",
+    "json": {
+     "v": 1,
+     "market": "futures",
+     "windows": [
+      {
+       "tz": "America/New_York",
+       "start_min": 600,
+       "end_min": 660,
+       "weekdays": 31
+      }
+     ],
+     "windows_from": "market",
+     "window_rule": {
+      "on": true,
+      "outside": "fora"
+     },
+     "block": {
+      "on": true,
+      "before_min": 5,
+      "after_min": 10,
+      "calendars": [
+       "us"
+      ]
+     },
+     "limit": {
+      "usd": 400,
+      "mode": "conta",
+      "at_limit": "encerrar"
+     },
+     "states": {
+      "alinhadas": null,
+      "so_tecnica": null,
+      "so_fundamentos": null,
+      "em_conflito": null,
+      "sem_direcao": null
+     },
+     "day": {
+      "tz": "America/New_York",
+      "start_min": 1080
+     },
+     "breakeven": {
+      "by": {
+       "M/ES": {
+        "n": 8,
+        "un": "pts"
+       }
+      }
+     }
+    },
+    "expected": "bad_breakeven"
+   },
+   {
+    "label": "futures: key of 21 characters",
+    "json": {
+     "v": 1,
+     "market": "futures",
+     "windows": [
+      {
+       "tz": "America/New_York",
+       "start_min": 600,
+       "end_min": 660,
+       "weekdays": 31
+      }
+     ],
+     "windows_from": "market",
+     "window_rule": {
+      "on": true,
+      "outside": "fora"
+     },
+     "block": {
+      "on": true,
+      "before_min": 5,
+      "after_min": 10,
+      "calendars": [
+       "us"
+      ]
+     },
+     "limit": {
+      "usd": 400,
+      "mode": "conta",
+      "at_limit": "encerrar"
+     },
+     "states": {
+      "alinhadas": null,
+      "so_tecnica": null,
+      "so_fundamentos": null,
+      "em_conflito": null,
+      "sem_direcao": null
+     },
+     "day": {
+      "tz": "America/New_York",
+      "start_min": 1080
+     },
+     "breakeven": {
+      "by": {
+       "ABCDEFGHIJKLMNOPQRSTU": {
+        "n": 1,
+        "un": "price"
+       }
+      }
+     }
+    },
+    "expected": "bad_breakeven"
+   },
+   {
+    "label": "futures: a root outside the table (ZN, price)",
+    "json": {
+     "v": 1,
+     "market": "futures",
+     "windows": [
+      {
+       "tz": "America/New_York",
+       "start_min": 600,
+       "end_min": 660,
+       "weekdays": 31
+      }
+     ],
+     "windows_from": "market",
+     "window_rule": {
+      "on": true,
+      "outside": "fora"
+     },
+     "block": {
+      "on": true,
+      "before_min": 5,
+      "after_min": 10,
+      "calendars": [
+       "us"
+      ]
+     },
+     "limit": {
+      "usd": 400,
+      "mode": "conta",
+      "at_limit": "encerrar"
+     },
+     "states": {
+      "alinhadas": null,
+      "so_tecnica": null,
+      "so_fundamentos": null,
+      "em_conflito": null,
+      "sem_direcao": null
+     },
+     "day": {
+      "tz": "America/New_York",
+      "start_min": 1080
+     },
+     "breakeven": {
+      "by": {
+       "ZN": {
+        "n": 0.5,
+        "un": "price"
+       }
+      }
+     }
+    },
+    "expected": null
+   },
+   {
+    "label": "futures: no asset",
+    "json": {
+     "v": 1,
+     "market": "futures",
+     "windows": [
+      {
+       "tz": "America/New_York",
+       "start_min": 600,
+       "end_min": 660,
+       "weekdays": 31
+      }
+     ],
+     "windows_from": "market",
+     "window_rule": {
+      "on": true,
+      "outside": "fora"
+     },
+     "block": {
+      "on": true,
+      "before_min": 5,
+      "after_min": 10,
+      "calendars": [
+       "us"
+      ]
+     },
+     "limit": {
+      "usd": 400,
+      "mode": "conta",
+      "at_limit": "encerrar"
+     },
+     "states": {
+      "alinhadas": null,
+      "so_tecnica": null,
+      "so_fundamentos": null,
+      "em_conflito": null,
+      "sem_direcao": null
+     },
+     "day": {
+      "tz": "America/New_York",
+      "start_min": 1080
+     },
+     "breakeven": {
+      "by": {}
+     }
+    },
+    "expected": "bad_breakeven"
+   },
+   {
+    "label": "futures: by null",
+    "json": {
+     "v": 1,
+     "market": "futures",
+     "windows": [
+      {
+       "tz": "America/New_York",
+       "start_min": 600,
+       "end_min": 660,
+       "weekdays": 31
+      }
+     ],
+     "windows_from": "market",
+     "window_rule": {
+      "on": true,
+      "outside": "fora"
+     },
+     "block": {
+      "on": true,
+      "before_min": 5,
+      "after_min": 10,
+      "calendars": [
+       "us"
+      ]
+     },
+     "limit": {
+      "usd": 400,
+      "mode": "conta",
+      "at_limit": "encerrar"
+     },
+     "states": {
+      "alinhadas": null,
+      "so_tecnica": null,
+      "so_fundamentos": null,
+      "em_conflito": null,
+      "sem_direcao": null
+     },
+     "day": {
+      "tz": "America/New_York",
+      "start_min": 1080
+     },
+     "breakeven": {
+      "by": null
+     }
+    },
+    "expected": "bad_breakeven"
+   },
+   {
+    "label": "futures: by an array",
+    "json": {
+     "v": 1,
+     "market": "futures",
+     "windows": [
+      {
+       "tz": "America/New_York",
+       "start_min": 600,
+       "end_min": 660,
+       "weekdays": 31
+      }
+     ],
+     "windows_from": "market",
+     "window_rule": {
+      "on": true,
+      "outside": "fora"
+     },
+     "block": {
+      "on": true,
+      "before_min": 5,
+      "after_min": 10,
+      "calendars": [
+       "us"
+      ]
+     },
+     "limit": {
+      "usd": 400,
+      "mode": "conta",
+      "at_limit": "encerrar"
+     },
+     "states": {
+      "alinhadas": null,
+      "so_tecnica": null,
+      "so_fundamentos": null,
+      "em_conflito": null,
+      "sem_direcao": null
+     },
+     "day": {
+      "tz": "America/New_York",
+      "start_min": 1080
+     },
+     "breakeven": {
+      "by": []
+     }
+    },
+    "expected": "bad_breakeven"
+   },
+   {
+    "label": "futures: empty object",
+    "json": {
+     "v": 1,
+     "market": "futures",
+     "windows": [
+      {
+       "tz": "America/New_York",
+       "start_min": 600,
+       "end_min": 660,
+       "weekdays": 31
+      }
+     ],
+     "windows_from": "market",
+     "window_rule": {
+      "on": true,
+      "outside": "fora"
+     },
+     "block": {
+      "on": true,
+      "before_min": 5,
+      "after_min": 10,
+      "calendars": [
+       "us"
+      ]
+     },
+     "limit": {
+      "usd": 400,
+      "mode": "conta",
+      "at_limit": "encerrar"
+     },
+     "states": {
+      "alinhadas": null,
+      "so_tecnica": null,
+      "so_fundamentos": null,
+      "em_conflito": null,
+      "sem_direcao": null
+     },
+     "day": {
+      "tz": "America/New_York",
+      "start_min": 1080
+     },
+     "breakeven": {}
+    },
+    "expected": "bad_breakeven"
+   },
+   {
+    "label": "futures: an extra key beside by",
+    "json": {
+     "v": 1,
+     "market": "futures",
+     "windows": [
+      {
+       "tz": "America/New_York",
+       "start_min": 600,
+       "end_min": 660,
+       "weekdays": 31
+      }
+     ],
+     "windows_from": "market",
+     "window_rule": {
+      "on": true,
+      "outside": "fora"
+     },
+     "block": {
+      "on": true,
+      "before_min": 5,
+      "after_min": 10,
+      "calendars": [
+       "us"
+      ]
+     },
+     "limit": {
+      "usd": 400,
+      "mode": "conta",
+      "at_limit": "encerrar"
+     },
+     "states": {
+      "alinhadas": null,
+      "so_tecnica": null,
+      "so_fundamentos": null,
+      "em_conflito": null,
+      "sem_direcao": null
+     },
+     "day": {
+      "tz": "America/New_York",
+      "start_min": 1080
+     },
+     "breakeven": {
+      "by": {
+       "MES": {
+        "n": 8,
+        "un": "pts"
+       }
+      },
+      "on": true
+     }
+    },
+    "expected": "bad_breakeven"
+   },
+   {
+    "label": "futures: null",
+    "json": {
+     "v": 1,
+     "market": "futures",
+     "windows": [
+      {
+       "tz": "America/New_York",
+       "start_min": 600,
+       "end_min": 660,
+       "weekdays": 31
+      }
+     ],
+     "windows_from": "market",
+     "window_rule": {
+      "on": true,
+      "outside": "fora"
+     },
+     "block": {
+      "on": true,
+      "before_min": 5,
+      "after_min": 10,
+      "calendars": [
+       "us"
+      ]
+     },
+     "limit": {
+      "usd": 400,
+      "mode": "conta",
+      "at_limit": "encerrar"
+     },
+     "states": {
+      "alinhadas": null,
+      "so_tecnica": null,
+      "so_fundamentos": null,
+      "em_conflito": null,
+      "sem_direcao": null
+     },
+     "day": {
+      "tz": "America/New_York",
+      "start_min": 1080
+     },
+     "breakeven": null
+    },
+    "expected": "bad_breakeven"
+   },
+   {
+    "label": "futures: a string",
+    "json": {
+     "v": 1,
+     "market": "futures",
+     "windows": [
+      {
+       "tz": "America/New_York",
+       "start_min": 600,
+       "end_min": 660,
+       "weekdays": 31
+      }
+     ],
+     "windows_from": "market",
+     "window_rule": {
+      "on": true,
+      "outside": "fora"
+     },
+     "block": {
+      "on": true,
+      "before_min": 5,
+      "after_min": 10,
+      "calendars": [
+       "us"
+      ]
+     },
+     "limit": {
+      "usd": 400,
+      "mode": "conta",
+      "at_limit": "encerrar"
+     },
+     "states": {
+      "alinhadas": null,
+      "so_tecnica": null,
+      "so_fundamentos": null,
+      "em_conflito": null,
+      "sem_direcao": null
+     },
+     "day": {
+      "tz": "America/New_York",
+      "start_min": 1080
+     },
+     "breakeven": "MES +8"
+    },
+    "expected": "bad_breakeven"
+   },
+   {
+    "label": "forex: 20 assets",
+    "json": {
+     "v": 1,
+     "market": "forex",
+     "windows": [],
+     "windows_from": null,
+     "window_rule": {
+      "on": true,
+      "outside": "fora"
+     },
+     "block": null,
+     "limit": null,
+     "states": null,
+     "day": {
+      "tz": "America/New_York",
+      "start_min": 1020
+     },
+     "breakeven": {
+      "by": {
+       "AAA": {
+        "n": 1,
+        "un": "price"
+       },
+       "AAB": {
+        "n": 1,
+        "un": "price"
+       },
+       "AAC": {
+        "n": 1,
+        "un": "price"
+       },
+       "AAD": {
+        "n": 1,
+        "un": "price"
+       },
+       "AAE": {
+        "n": 1,
+        "un": "price"
+       },
+       "AAF": {
+        "n": 1,
+        "un": "price"
+       },
+       "AAG": {
+        "n": 1,
+        "un": "price"
+       },
+       "AAH": {
+        "n": 1,
+        "un": "price"
+       },
+       "AAI": {
+        "n": 1,
+        "un": "price"
+       },
+       "AAJ": {
+        "n": 1,
+        "un": "price"
+       },
+       "AAK": {
+        "n": 1,
+        "un": "price"
+       },
+       "AAL": {
+        "n": 1,
+        "un": "price"
+       },
+       "AAM": {
+        "n": 1,
+        "un": "price"
+       },
+       "AAN": {
+        "n": 1,
+        "un": "price"
+       },
+       "AAO": {
+        "n": 1,
+        "un": "price"
+       },
+       "AAP": {
+        "n": 1,
+        "un": "price"
+       },
+       "AAQ": {
+        "n": 1,
+        "un": "price"
+       },
+       "AAR": {
+        "n": 1,
+        "un": "price"
+       },
+       "AAS": {
+        "n": 1,
+        "un": "price"
+       },
+       "AAT": {
+        "n": 1,
+        "un": "price"
+       }
+      }
+     }
+    },
+    "expected": null
+   },
+   {
+    "label": "forex: 21 assets",
+    "json": {
+     "v": 1,
+     "market": "forex",
+     "windows": [],
+     "windows_from": null,
+     "window_rule": {
+      "on": true,
+      "outside": "fora"
+     },
+     "block": null,
+     "limit": null,
+     "states": null,
+     "day": {
+      "tz": "America/New_York",
+      "start_min": 1020
+     },
+     "breakeven": {
+      "by": {
+       "AAA": {
+        "n": 1,
+        "un": "price"
+       },
+       "AAB": {
+        "n": 1,
+        "un": "price"
+       },
+       "AAC": {
+        "n": 1,
+        "un": "price"
+       },
+       "AAD": {
+        "n": 1,
+        "un": "price"
+       },
+       "AAE": {
+        "n": 1,
+        "un": "price"
+       },
+       "AAF": {
+        "n": 1,
+        "un": "price"
+       },
+       "AAG": {
+        "n": 1,
+        "un": "price"
+       },
+       "AAH": {
+        "n": 1,
+        "un": "price"
+       },
+       "AAI": {
+        "n": 1,
+        "un": "price"
+       },
+       "AAJ": {
+        "n": 1,
+        "un": "price"
+       },
+       "AAK": {
+        "n": 1,
+        "un": "price"
+       },
+       "AAL": {
+        "n": 1,
+        "un": "price"
+       },
+       "AAM": {
+        "n": 1,
+        "un": "price"
+       },
+       "AAN": {
+        "n": 1,
+        "un": "price"
+       },
+       "AAO": {
+        "n": 1,
+        "un": "price"
+       },
+       "AAP": {
+        "n": 1,
+        "un": "price"
+       },
+       "AAQ": {
+        "n": 1,
+        "un": "price"
+       },
+       "AAR": {
+        "n": 1,
+        "un": "price"
+       },
+       "AAS": {
+        "n": 1,
+        "un": "price"
+       },
+       "AAT": {
+        "n": 1,
+        "un": "price"
+       },
+       "AAU": {
+        "n": 1,
+        "un": "price"
+       }
+      }
+     }
+    },
+    "expected": "bad_breakeven"
+   },
+   {
+    "label": "forex: EURUSD pips, XAUUSD price",
+    "json": {
+     "v": 1,
+     "market": "forex",
+     "windows": [],
+     "windows_from": null,
+     "window_rule": {
+      "on": true,
+      "outside": "fora"
+     },
+     "block": null,
+     "limit": null,
+     "states": null,
+     "day": {
+      "tz": "America/New_York",
+      "start_min": 1020
+     },
+     "breakeven": {
+      "by": {
+       "EURUSD": {
+        "n": 7.5,
+        "un": "pips"
+       },
+       "XAUUSD": {
+        "n": 1.2,
+        "un": "price"
+       }
+      }
+     }
+    },
+    "expected": null
+   },
+   {
+    "label": "forex: EUR/USD as written",
+    "json": {
+     "v": 1,
+     "market": "forex",
+     "windows": [],
+     "windows_from": null,
+     "window_rule": {
+      "on": true,
+      "outside": "fora"
+     },
+     "block": null,
+     "limit": null,
+     "states": null,
+     "day": {
+      "tz": "America/New_York",
+      "start_min": 1020
+     },
+     "breakeven": {
+      "by": {
+       "EUR/USD": {
+        "n": 7.5,
+        "un": "pips"
+       }
+      }
+     }
+    },
+    "expected": "bad_breakeven"
+   },
+   {
+    "label": "stocks: AAPL price",
+    "json": {
+     "v": 1,
+     "market": "stocks",
+     "windows": [],
+     "windows_from": null,
+     "window_rule": {
+      "on": true,
+      "outside": "aviso"
+     },
+     "block": null,
+     "limit": null,
+     "states": null,
+     "day": {
+      "tz": "America/New_York",
+      "start_min": 1200
+     },
+     "breakeven": {
+      "by": {
+       "AAPL": {
+        "n": 0.5,
+        "un": "price"
+       }
+      }
+     }
+    },
+    "expected": null
+   },
+   {
+    "label": "options: SPX price",
+    "json": {
+     "v": 1,
+     "market": "options",
+     "windows": [],
+     "windows_from": null,
+     "window_rule": {
+      "on": false,
+      "outside": "fora"
+     },
+     "block": null,
+     "limit": null,
+     "states": null,
+     "day": {
+      "tz": "America/New_York",
+      "start_min": 1200
+     },
+     "breakeven": {
+      "by": {
+       "SPX": {
+        "n": 0.25,
+        "un": "price"
+       }
+      }
+     }
+    },
+    "expected": null
+   },
+   {
+    "label": "crypto: BTCUSDT price",
+    "json": {
+     "v": 1,
+     "market": "crypto",
+     "windows": [],
+     "windows_from": null,
+     "window_rule": {
+      "on": true,
+      "outside": "fora"
+     },
+     "block": null,
+     "limit": {
+      "usd": 50,
+      "mode": "conta",
+      "at_limit": "avisar"
+     },
+     "states": null,
+     "day": {
+      "tz": "America/Sao_Paulo",
+      "start_min": 0
+     },
+     "breakeven": {
+      "by": {
+       "BTCUSDT": {
+        "n": 150,
+        "un": "price"
+       }
+      }
+     }
+    },
+    "expected": null
+   },
+   {
+    "label": "b3: WIN pts, PETR4 price",
+    "json": {
+     "v": 1,
+     "market": "b3",
+     "windows": [],
+     "windows_from": null,
+     "window_rule": {
+      "on": true,
+      "outside": "fora"
+     },
+     "block": null,
+     "limit": {
+      "brl": 300,
+      "mode": "conta",
+      "at_limit": "encerrar"
+     },
+     "states": null,
+     "day": {
+      "tz": "America/Sao_Paulo",
+      "start_min": 0
+     },
+     "breakeven": {
+      "by": {
+       "WIN": {
+        "n": 150,
+        "un": "pts"
+       },
+       "PETR4": {
+        "n": 0.3,
+        "un": "price"
+       }
+      }
+     }
+    },
+    "expected": null
+   },
+   {
+    "label": "b3: PETR4F (fractional) as the key",
+    "json": {
+     "v": 1,
+     "market": "b3",
+     "windows": [],
+     "windows_from": null,
+     "window_rule": {
+      "on": true,
+      "outside": "fora"
+     },
+     "block": null,
+     "limit": {
+      "brl": 300,
+      "mode": "conta",
+      "at_limit": "encerrar"
+     },
+     "states": null,
+     "day": {
+      "tz": "America/Sao_Paulo",
+      "start_min": 0
+     },
+     "breakeven": {
+      "by": {
+       "PETR4F": {
+        "n": 0.3,
+        "un": "price"
+       }
+      }
+     }
+    },
+    "expected": "bad_breakeven"
+   },
+   {
+    "label": "b3: WINZ26 as the key",
+    "json": {
+     "v": 1,
+     "market": "b3",
+     "windows": [],
+     "windows_from": null,
+     "window_rule": {
+      "on": true,
+      "outside": "fora"
+     },
+     "block": null,
+     "limit": {
+      "brl": 300,
+      "mode": "conta",
+      "at_limit": "encerrar"
+     },
+     "states": null,
+     "day": {
+      "tz": "America/Sao_Paulo",
+      "start_min": 0
+     },
+     "breakeven": {
+      "by": {
+       "WINZ26": {
+        "n": 150,
+        "un": "pts"
+       }
+      }
+     }
+    },
+    "expected": "bad_breakeven"
+   },
+   {
+    "label": "binary: never",
+    "json": {
+     "v": 1,
+     "market": "binary",
+     "windows": [],
+     "windows_from": null,
+     "window_rule": {
+      "on": true,
+      "outside": "fora"
+     },
+     "block": null,
+     "limit": null,
+     "states": null,
+     "day": {
+      "tz": "America/Sao_Paulo",
+      "start_min": 0
+     },
+     "breakeven": {
+      "by": {
+       "EURUSD": {
+        "n": 5,
+        "un": "pips"
+       }
+      }
+     }
+    },
+    "expected": "not_for_market"
+   },
+   {
+    "label": "futures: without the key (nine keys)",
+    "json": {
+     "v": 1,
+     "market": "futures",
+     "windows": [
+      {
+       "tz": "America/New_York",
+       "start_min": 600,
+       "end_min": 660,
+       "weekdays": 31
+      }
+     ],
+     "windows_from": "market",
+     "window_rule": {
+      "on": true,
+      "outside": "fora"
+     },
+     "block": {
+      "on": true,
+      "before_min": 5,
+      "after_min": 10,
+      "calendars": [
+       "us"
+      ]
+     },
+     "limit": {
+      "usd": 400,
+      "mode": "conta",
+      "at_limit": "encerrar"
+     },
+     "states": {
+      "alinhadas": null,
+      "so_tecnica": null,
+      "so_fundamentos": null,
+      "em_conflito": null,
+      "sem_direcao": null
+     },
+     "day": {
+      "tz": "America/New_York",
+      "start_min": 1080
+     }
+    },
+    "expected": null
+   },
+   {
+    "label": "binary: without the key",
+    "json": {
+     "v": 1,
+     "market": "binary",
+     "windows": [],
+     "windows_from": null,
+     "window_rule": {
+      "on": true,
+      "outside": "fora"
+     },
+     "block": null,
+     "limit": null,
+     "states": null,
+     "day": {
+      "tz": "America/Sao_Paulo",
+      "start_min": 0
+     }
+    },
+    "expected": null
+   },
+   {
+    "label": "futures: an eleventh key",
+    "json": {
+     "v": 1,
+     "market": "futures",
+     "windows": [
+      {
+       "tz": "America/New_York",
+       "start_min": 600,
+       "end_min": 660,
+       "weekdays": 31
+      }
+     ],
+     "windows_from": "market",
+     "window_rule": {
+      "on": true,
+      "outside": "fora"
+     },
+     "block": {
+      "on": true,
+      "before_min": 5,
+      "after_min": 10,
+      "calendars": [
+       "us"
+      ]
+     },
+     "limit": {
+      "usd": 400,
+      "mode": "conta",
+      "at_limit": "encerrar"
+     },
+     "states": {
+      "alinhadas": null,
+      "so_tecnica": null,
+      "so_fundamentos": null,
+      "em_conflito": null,
+      "sem_direcao": null
+     },
+     "day": {
+      "tz": "America/New_York",
+      "start_min": 1080
+     },
+     "breakeven": {
+      "by": {
+       "MES": {
+        "n": 8,
+        "un": "pts"
+       }
+      }
+     },
+     "extra": 1
+    },
+    "expected": "bad_rules"
+   },
+   {
+    "label": "futures: the tenth key under another name",
+    "json": {
+     "v": 1,
+     "market": "futures",
+     "windows": [
+      {
+       "tz": "America/New_York",
+       "start_min": 600,
+       "end_min": 660,
+       "weekdays": 31
+      }
+     ],
+     "windows_from": "market",
+     "window_rule": {
+      "on": true,
+      "outside": "fora"
+     },
+     "block": {
+      "on": true,
+      "before_min": 5,
+      "after_min": 10,
+      "calendars": [
+       "us"
+      ]
+     },
+     "limit": {
+      "usd": 400,
+      "mode": "conta",
+      "at_limit": "encerrar"
+     },
+     "states": {
+      "alinhadas": null,
+      "so_tecnica": null,
+      "so_fundamentos": null,
+      "em_conflito": null,
+      "sem_direcao": null
+     },
+     "day": {
+      "tz": "America/New_York",
+      "start_min": 1080
+     },
+     "be": {
+      "by": {
+       "MES": {
+        "n": 8,
+        "un": "pts"
+       }
+      }
+     }
+    },
+    "expected": "bad_rules"
+   },
+   {
+    "label": "futures: a unit that is a number",
+    "json": {
+     "v": 1,
+     "market": "futures",
+     "windows": [
+      {
+       "tz": "America/New_York",
+       "start_min": 600,
+       "end_min": 660,
+       "weekdays": 31
+      }
+     ],
+     "windows_from": "market",
+     "window_rule": {
+      "on": true,
+      "outside": "fora"
+     },
+     "block": {
+      "on": true,
+      "before_min": 5,
+      "after_min": 10,
+      "calendars": [
+       "us"
+      ]
+     },
+     "limit": {
+      "usd": 400,
+      "mode": "conta",
+      "at_limit": "encerrar"
+     },
+     "states": {
+      "alinhadas": null,
+      "so_tecnica": null,
+      "so_fundamentos": null,
+      "em_conflito": null,
+      "sem_direcao": null
+     },
+     "day": {
+      "tz": "America/New_York",
+      "start_min": 1080
+     },
+     "breakeven": {
+      "by": {
+       "MES": {
+        "n": 8,
+        "un": 8
+       }
+      }
+     }
+    },
+    "expected": "bad_breakeven"
+   },
+   {
+    "label": "futures: the smallest «+N»",
+    "json": {
+     "v": 1,
+     "market": "futures",
+     "windows": [
+      {
+       "tz": "America/New_York",
+       "start_min": 600,
+       "end_min": 660,
+       "weekdays": 31
+      }
+     ],
+     "windows_from": "market",
+     "window_rule": {
+      "on": true,
+      "outside": "fora"
+     },
+     "block": {
+      "on": true,
+      "before_min": 5,
+      "after_min": 10,
+      "calendars": [
+       "us"
+      ]
+     },
+     "limit": {
+      "usd": 400,
+      "mode": "conta",
+      "at_limit": "encerrar"
+     },
+     "states": {
+      "alinhadas": null,
+      "so_tecnica": null,
+      "so_fundamentos": null,
+      "em_conflito": null,
+      "sem_direcao": null
+     },
+     "day": {
+      "tz": "America/New_York",
+      "start_min": 1080
+     },
+     "breakeven": {
+      "by": {
+       "MES": {
+        "n": 1e-8,
+        "un": "pts"
+       }
+      }
+     }
+    },
+    "expected": null
+   },
+   {
+    "label": "futures: «+N» in exponent form",
+    "json": {
+     "v": 1,
+     "market": "futures",
+     "windows": [
+      {
+       "tz": "America/New_York",
+       "start_min": 600,
+       "end_min": 660,
+       "weekdays": 31
+      }
+     ],
+     "windows_from": "market",
+     "window_rule": {
+      "on": true,
+      "outside": "fora"
+     },
+     "block": {
+      "on": true,
+      "before_min": 5,
+      "after_min": 10,
+      "calendars": [
+       "us"
+      ]
+     },
+     "limit": {
+      "usd": 400,
+      "mode": "conta",
+      "at_limit": "encerrar"
+     },
+     "states": {
+      "alinhadas": null,
+      "so_tecnica": null,
+      "so_fundamentos": null,
+      "em_conflito": null,
+      "sem_direcao": null
+     },
+     "day": {
+      "tz": "America/New_York",
+      "start_min": 1080
+     },
+     "breakeven": {
+      "by": {
+       "MES": {
+        "n": 2.5e-7,
+        "un": "pts"
+       }
+      }
+     }
+    },
+    "expected": null
+   },
+   {
+    "label": "futures: twenty assets",
+    "json": {
+     "v": 1,
+     "market": "futures",
+     "windows": [
+      {
+       "tz": "America/New_York",
+       "start_min": 600,
+       "end_min": 660,
+       "weekdays": 31
+      }
+     ],
+     "windows_from": "market",
+     "window_rule": {
+      "on": true,
+      "outside": "fora"
+     },
+     "block": {
+      "on": true,
+      "before_min": 5,
+      "after_min": 10,
+      "calendars": [
+       "us"
+      ]
+     },
+     "limit": {
+      "usd": 400,
+      "mode": "conta",
+      "at_limit": "encerrar"
+     },
+     "states": {
+      "alinhadas": null,
+      "so_tecnica": null,
+      "so_fundamentos": null,
+      "em_conflito": null,
+      "sem_direcao": null
+     },
+     "day": {
+      "tz": "America/New_York",
+      "start_min": 1080
+     },
+     "breakeven": {
+      "by": {
+       "AAA": {
+        "n": 1,
+        "un": "price"
+       },
+       "AAB": {
+        "n": 1,
+        "un": "price"
+       },
+       "AAC": {
+        "n": 1,
+        "un": "price"
+       },
+       "AAD": {
+        "n": 1,
+        "un": "price"
+       },
+       "AAE": {
+        "n": 1,
+        "un": "price"
+       },
+       "AAF": {
+        "n": 1,
+        "un": "price"
+       },
+       "AAG": {
+        "n": 1,
+        "un": "price"
+       },
+       "AAH": {
+        "n": 1,
+        "un": "price"
+       },
+       "AAI": {
+        "n": 1,
+        "un": "price"
+       },
+       "AAJ": {
+        "n": 1,
+        "un": "price"
+       },
+       "AAK": {
+        "n": 1,
+        "un": "price"
+       },
+       "AAL": {
+        "n": 1,
+        "un": "price"
+       },
+       "AAM": {
+        "n": 1,
+        "un": "price"
+       },
+       "AAN": {
+        "n": 1,
+        "un": "price"
+       },
+       "AAO": {
+        "n": 1,
+        "un": "price"
+       },
+       "AAP": {
+        "n": 1,
+        "un": "price"
+       },
+       "AAQ": {
+        "n": 1,
+        "un": "price"
+       },
+       "AAR": {
+        "n": 1,
+        "un": "price"
+       },
+       "AAS": {
+        "n": 1,
+        "un": "price"
+       },
+       "AAT": {
+        "n": 1,
+        "un": "price"
+       }
+      }
+     }
+    },
+    "expected": null
+   },
+   {
+    "label": "crypto: BTCUSDT and ETHBTC",
+    "json": {
+     "v": 1,
+     "market": "crypto",
+     "windows": [],
+     "windows_from": null,
+     "window_rule": {
+      "on": true,
+      "outside": "fora"
+     },
+     "block": null,
+     "limit": {
+      "usd": 50,
+      "mode": "conta",
+      "at_limit": "avisar"
+     },
+     "states": null,
+     "day": {
+      "tz": "America/Sao_Paulo",
+      "start_min": 0
+     },
+     "breakeven": {
+      "by": {
+       "BTCUSDT": {
+        "n": 100,
+        "un": "price"
+       },
+       "ETHBTC": {
+        "n": 0.0001,
+        "un": "price"
+       }
+      }
+     }
+    },
+    "expected": null
+   },
+   {
+    "label": "crypto: BTC/USDT as written",
+    "json": {
+     "v": 1,
+     "market": "crypto",
+     "windows": [],
+     "windows_from": null,
+     "window_rule": {
+      "on": true,
+      "outside": "fora"
+     },
+     "block": null,
+     "limit": {
+      "usd": 50,
+      "mode": "conta",
+      "at_limit": "avisar"
+     },
+     "states": null,
+     "day": {
+      "tz": "America/Sao_Paulo",
+      "start_min": 0
+     },
+     "breakeven": {
+      "by": {
+       "BTC/USDT": {
+        "n": 100,
+        "un": "price"
+       }
+      }
+     }
+    },
+    "expected": "bad_breakeven"
+   }
+  ]
+ },
+ "setting": {
+  "about": "rules_check_breakeven(market, p): the stored setting {on, by} of MarketRules and AccountRules",
+  "cases": [
+   {
+    "market": "futures",
+    "p": {
+     "on": true,
+     "by": {
+      "MES": 8,
+      "MNQ": 30
+     }
+    },
+    "expected": null
+   },
+   {
+    "market": "futures",
+    "p": {
+     "on": false,
+     "by": {
+      "MES": 8
+     }
+    },
+    "expected": null
+   },
+   {
+    "market": "futures",
+    "p": {
+     "on": true,
+     "by": {}
+    },
+    "expected": null
+   },
+   {
+    "market": "futures",
+    "p": {
+     "on": true,
+     "by": {
+      "MES": 7.5
+     }
+    },
+    "expected": null
+   },
+   {
+    "market": "futures",
+    "p": {
+     "on": true,
+     "by": {
+      "MES": 0
+     }
+    },
+    "expected": "bad_breakeven"
+   },
+   {
+    "market": "futures",
+    "p": {
+     "on": true,
+     "by": {
+      "MES": -1
+     }
+    },
+    "expected": "bad_breakeven"
+   },
+   {
+    "market": "futures",
+    "p": {
+     "on": true,
+     "by": {
+      "MES": "8"
+     }
+    },
+    "expected": "bad_breakeven"
+   },
+   {
+    "market": "futures",
+    "p": {
+     "on": true,
+     "by": {
+      "MES": 0.123456789
+     }
+    },
+    "expected": "bad_breakeven"
+   },
+   {
+    "market": "futures",
+    "p": {
+     "on": true,
+     "by": {
+      "MES": 1000001
+     }
+    },
+    "expected": "bad_breakeven"
+   },
+   {
+    "market": "futures",
+    "p": {
+     "on": true,
+     "by": {
+      "MESZ5": 8
+     }
+    },
+    "expected": "bad_breakeven"
+   },
+   {
+    "market": "futures",
+    "p": {
+     "on": true,
+     "by": {
+      "mes": 8
+     }
+    },
+    "expected": "bad_breakeven"
+   },
+   {
+    "market": "futures",
+    "p": {
+     "on": true,
+     "by": {
+      "ZN": 0.5
+     }
+    },
+    "expected": null
+   },
+   {
+    "market": "futures",
+    "p": {
+     "on": "sim",
+     "by": {}
+    },
+    "expected": "bad_breakeven"
+   },
+   {
+    "market": "futures",
+    "p": {
+     "on": true
+    },
+    "expected": "bad_breakeven"
+   },
+   {
+    "market": "futures",
+    "p": {
+     "by": {}
+    },
+    "expected": "bad_breakeven"
+   },
+   {
+    "market": "futures",
+    "p": {
+     "on": true,
+     "by": []
+    },
+    "expected": "bad_breakeven"
+   },
+   {
+    "market": "futures",
+    "p": {
+     "on": true,
+     "by": {},
+     "favor": 8
+    },
+    "expected": "unknown_key"
+   },
+   {
+    "market": "futures",
+    "p": null,
+    "expected": "bad_breakeven"
+   },
+   {
+    "market": "futures",
+    "p": 8,
+    "expected": "bad_breakeven"
+   },
+   {
+    "market": "futures",
+    "p": {
+     "on": true,
+     "by": {
+      "ZA": 1,
+      "ZB": 1,
+      "ZC": 1,
+      "ZD": 1,
+      "ZE": 1,
+      "ZF": 1,
+      "ZG": 1,
+      "ZH": 1,
+      "ZI": 1,
+      "ZJ": 1,
+      "ZK": 1,
+      "ZL": 1,
+      "ZM": 1,
+      "ZN": 1,
+      "ZO": 1,
+      "ZP": 1,
+      "ZQ": 1,
+      "ZR": 1,
+      "ZS": 1,
+      "ZT": 1
+     }
+    },
+    "expected": null
+   },
+   {
+    "market": "futures",
+    "p": {
+     "on": true,
+     "by": {
+      "ZA": 1,
+      "ZB": 1,
+      "ZC": 1,
+      "ZD": 1,
+      "ZE": 1,
+      "ZF": 1,
+      "ZG": 1,
+      "ZH": 1,
+      "ZI": 1,
+      "ZJ": 1,
+      "ZK": 1,
+      "ZL": 1,
+      "ZM": 1,
+      "ZN": 1,
+      "ZO": 1,
+      "ZP": 1,
+      "ZQ": 1,
+      "ZR": 1,
+      "ZS": 1,
+      "ZT": 1,
+      "ZU": 1
+     }
+    },
+    "expected": "bad_breakeven"
+   },
+   {
+    "market": "forex",
+    "p": {
+     "on": true,
+     "by": {
+      "EURUSD": 7.5,
+      "USDJPY": 10
+     }
+    },
+    "expected": null
+   },
+   {
+    "market": "forex",
+    "p": {
+     "on": true,
+     "by": {
+      "EUR/USD": 7.5
+     }
+    },
+    "expected": "bad_breakeven"
+   },
+   {
+    "market": "b3",
+    "p": {
+     "on": true,
+     "by": {
+      "WIN": 150,
+      "PETR4": 0.3
+     }
+    },
+    "expected": null
+   },
+   {
+    "market": "b3",
+    "p": {
+     "on": true,
+     "by": {
+      "WINZ26": 150
+     }
+    },
+    "expected": "bad_breakeven"
+   },
+   {
+    "market": "b3",
+    "p": {
+     "on": true,
+     "by": {
+      "PETR4F": 0.3
+     }
+    },
+    "expected": "bad_breakeven"
+   },
+   {
+    "market": "crypto",
+    "p": {
+     "on": true,
+     "by": {
+      "BTCUSDT": 150
+     }
+    },
+    "expected": null
+   },
+   {
+    "market": "stocks",
+    "p": {
+     "on": true,
+     "by": {
+      "AAPL": 0.5
+     }
+    },
+    "expected": null
+   },
+   {
+    "market": "options",
+    "p": {
+     "on": true,
+     "by": {
+      "SPX": 0.5
+     }
+    },
+    "expected": null
+   },
+   {
+    "market": "binary",
+    "p": {
+     "on": true,
+     "by": {
+      "EURUSD": 5
+     }
+    },
+    "expected": "not_for_market"
+   },
+   {
+    "market": "binary",
+    "p": null,
+    "expected": "not_for_market"
+   },
+   {
+    "market": "xyz",
+    "p": {
+     "on": true,
+     "by": {}
+    },
+    "expected": "not_for_market"
+   },
+   {
+    "market": "futures",
+    "p": {
+     "on": true,
+     "by": {
+      "M ES": 1
+     }
+    },
+    "expected": "bad_breakeven"
+   },
+   {
+    "market": "futures",
+    "p": {
+     "on": true,
+     "by": {
+      "AAAAAAAAAAAAAAAAAAAAA": 1
+     }
+    },
+    "expected": "bad_breakeven"
+   },
+   {
+    "market": "futures",
+    "p": {
+     "on": true,
+     "by": {
+      "MES": null
+     }
+    },
+    "expected": "bad_breakeven"
+   },
+   {
+    "market": "futures",
+    "p": {
+     "on": true,
+     "by": {
+      "MES": 1e-8
+     }
+    },
+    "expected": null
+   },
+   {
+    "market": "futures",
+    "p": {
+     "on": true,
+     "by": {
+      "MES": 1e-9
+     }
+    },
+    "expected": "bad_breakeven"
+   },
+   {
+    "market": "futures",
+    "p": {
+     "on": true,
+     "by": {
+      "MES": 2.5e-7
+     }
+    },
+    "expected": null
+   },
+   {
+    "market": "futures",
+    "p": {
+     "on": true,
+     "by": {
+      "MES": 1000000
+     }
+    },
+    "expected": null
+   },
+   {
+    "market": "futures",
+    "p": {
+     "on": true,
+     "by": {
+      "MES": 1000000.01
+     }
+    },
+    "expected": "bad_breakeven"
+   },
+   {
+    "market": "futures",
+    "p": {
+     "on": true,
+     "by": {
+      "MES": 0.30000000000000004
+     }
+    },
+    "expected": "bad_breakeven"
+   },
+   {
+    "market": "futures",
+    "p": {
+     "on": true,
+     "by": {
+      "ES": 2.5,
+      "GC": 1,
+      "CL": 0.1,
+      "ZN": 0.015625
+     }
+    },
+    "expected": null
+   },
+   {
+    "market": "futures",
+    "p": {
+     "on": true,
+     "by": {
+      "ZZZ": 1
+     }
+    },
+    "expected": null
+   },
+   {
+    "market": "futures",
+    "p": "x",
+    "expected": "bad_breakeven"
+   },
+   {
+    "market": "futures",
+    "p": [],
+    "expected": "bad_breakeven"
+   },
+   {
+    "market": "b3",
+    "p": {
+     "on": true,
+     "by": {
+      "WIN": 150,
+      "WDO": 3,
+      "PETR4": 0.3,
+      "BOVA11": 0.05
+     }
+    },
+    "expected": null
+   },
+   {
+    "market": "forex",
+    "p": {
+     "on": true,
+     "by": {
+      "EURUSD": 7.5,
+      "USDJPY": 10,
+      "XAUUSD": 1.2
+     }
+    },
+    "expected": null
+   },
+   {
+    "market": "crypto",
+    "p": {
+     "on": true,
+     "by": {
+      "BTCUSDT": 100,
+      "ETHBTC": 0.0001
+     }
+    },
+    "expected": null
+   },
+   {
+    "market": "crypto",
+    "p": {
+     "on": true,
+     "by": {
+      "BTC/USDT": 100
+     }
+    },
+    "expected": "bad_breakeven"
+   },
+   {
+    "market": "stocks",
+    "p": {
+     "on": true,
+     "by": {
+      "BRK.B": 1
+     }
+    },
+    "expected": "bad_breakeven"
+   },
+   {
+    "market": "options",
+    "p": {
+     "on": true,
+     "by": {
+      "SPX": 1,
+      "AAPL": 0.5
+     }
+    },
+    "expected": null
+   },
+   {
+    "market": "binary",
+    "p": "x",
+    "expected": "not_for_market"
+   }
+  ]
+ },
+ "resolve": {
+  "about": "rules_resolve(market, day tz, day start, market rules (null = builtin), '[]', own, null, '[\"us\"]'): the whole resolved value",
+  "cases": [
+   {
+    "label": "Padrão Futuros MES +10, MNQ +40; the account inherits",
+    "market": "futures",
+    "day": {
+     "tz": "America/New_York",
+     "start_min": 1080
+    },
+    "market_rules": {
+     "v": 1,
+     "window_rule": {
+      "on": true,
+      "outside": "fora"
+     },
+     "block": {
+      "on": true,
+      "before_min": 5,
+      "after_min": 10
+     },
+     "states": {},
+     "breakeven": {
+      "on": true,
+      "by": {
+       "MES": 10,
+       "MNQ": 40
+      }
+     }
+    },
+    "own": null,
+    "expected": {
+     "v": 1,
+     "day": {
+      "tz": "America/New_York",
+      "start_min": 1080
+     },
+     "block": {
+      "on": true,
+      "after_min": 10,
+      "calendars": [
+       "us"
+      ],
+      "before_min": 5
+     },
+     "limit": null,
+     "market": "futures",
+     "states": {
+      "alinhadas": null,
+      "so_tecnica": null,
+      "em_conflito": null,
+      "sem_direcao": null,
+      "so_fundamentos": null
+     },
+     "windows": [],
+     "breakeven": {
+      "by": {
+       "MES": {
+        "n": 10,
+        "un": "pts"
+       },
+       "MNQ": {
+        "n": 40,
+        "un": "pts"
+       }
+      }
+     },
+     "window_rule": {
+      "on": true,
+      "outside": "fora"
+     },
+     "windows_from": null
+    }
+   },
+   {
+    "label": "Padrão Futuros on; the account: its own MNQ +30",
+    "market": "futures",
+    "day": {
+     "tz": "America/New_York",
+     "start_min": 1080
+    },
+    "market_rules": {
+     "v": 1,
+     "window_rule": {
+      "on": true,
+      "outside": "fora"
+     },
+     "block": {
+      "on": true,
+      "before_min": 5,
+      "after_min": 10
+     },
+     "states": {},
+     "breakeven": {
+      "on": true,
+      "by": {
+       "MES": 10,
+       "MNQ": 40
+      }
+     }
+    },
+    "own": {
+     "v": 1,
+     "breakeven": {
+      "on": true,
+      "by": {
+       "MNQ": 30
+      }
+     }
+    },
+    "expected": {
+     "v": 1,
+     "day": {
+      "tz": "America/New_York",
+      "start_min": 1080
+     },
+     "block": {
+      "on": true,
+      "after_min": 10,
+      "calendars": [
+       "us"
+      ],
+      "before_min": 5
+     },
+     "limit": null,
+     "market": "futures",
+     "states": {
+      "alinhadas": null,
+      "so_tecnica": null,
+      "em_conflito": null,
+      "sem_direcao": null,
+      "so_fundamentos": null
+     },
+     "windows": [],
+     "breakeven": {
+      "by": {
+       "MNQ": {
+        "n": 30,
+        "un": "pts"
+       }
+      }
+     },
+     "window_rule": {
+      "on": true,
+      "outside": "fora"
+     },
+     "windows_from": null
+    }
+   },
+   {
+    "label": "Padrão Futuros on; the account: its own, off",
+    "market": "futures",
+    "day": {
+     "tz": "America/New_York",
+     "start_min": 1080
+    },
+    "market_rules": {
+     "v": 1,
+     "window_rule": {
+      "on": true,
+      "outside": "fora"
+     },
+     "block": {
+      "on": true,
+      "before_min": 5,
+      "after_min": 10
+     },
+     "states": {},
+     "breakeven": {
+      "on": true,
+      "by": {
+       "MES": 10
+      }
+     }
+    },
+    "own": {
+     "v": 1,
+     "breakeven": {
+      "on": false,
+      "by": {
+       "MES": 10
+      }
+     }
+    },
+    "expected": {
+     "v": 1,
+     "day": {
+      "tz": "America/New_York",
+      "start_min": 1080
+     },
+     "block": {
+      "on": true,
+      "after_min": 10,
+      "calendars": [
+       "us"
+      ],
+      "before_min": 5
+     },
+     "limit": null,
+     "market": "futures",
+     "states": {
+      "alinhadas": null,
+      "so_tecnica": null,
+      "em_conflito": null,
+      "sem_direcao": null,
+      "so_fundamentos": null
+     },
+     "windows": [],
+     "window_rule": {
+      "on": true,
+      "outside": "fora"
+     },
+     "windows_from": null
+    }
+   },
+   {
+    "label": "Padrão Futuros off, with values",
+    "market": "futures",
+    "day": {
+     "tz": "America/New_York",
+     "start_min": 1080
+    },
+    "market_rules": {
+     "v": 1,
+     "window_rule": {
+      "on": true,
+      "outside": "fora"
+     },
+     "block": {
+      "on": true,
+      "before_min": 5,
+      "after_min": 10
+     },
+     "states": {},
+     "breakeven": {
+      "on": false,
+      "by": {
+       "MES": 10
+      }
+     }
+    },
+    "own": null,
+    "expected": {
+     "v": 1,
+     "day": {
+      "tz": "America/New_York",
+      "start_min": 1080
+     },
+     "block": {
+      "on": true,
+      "after_min": 10,
+      "calendars": [
+       "us"
+      ],
+      "before_min": 5
+     },
+     "limit": null,
+     "market": "futures",
+     "states": {
+      "alinhadas": null,
+      "so_tecnica": null,
+      "em_conflito": null,
+      "sem_direcao": null,
+      "so_fundamentos": null
+     },
+     "windows": [],
+     "window_rule": {
+      "on": true,
+      "outside": "fora"
+     },
+     "windows_from": null
+    }
+   },
+   {
+    "label": "Padrão Futuros on with no asset",
+    "market": "futures",
+    "day": {
+     "tz": "America/New_York",
+     "start_min": 1080
+    },
+    "market_rules": {
+     "v": 1,
+     "window_rule": {
+      "on": true,
+      "outside": "fora"
+     },
+     "block": {
+      "on": true,
+      "before_min": 5,
+      "after_min": 10
+     },
+     "states": {},
+     "breakeven": {
+      "on": true,
+      "by": {}
+     }
+    },
+    "own": null,
+    "expected": {
+     "v": 1,
+     "day": {
+      "tz": "America/New_York",
+      "start_min": 1080
+     },
+     "block": {
+      "on": true,
+      "after_min": 10,
+      "calendars": [
+       "us"
+      ],
+      "before_min": 5
+     },
+     "limit": null,
+     "market": "futures",
+     "states": {
+      "alinhadas": null,
+      "so_tecnica": null,
+      "em_conflito": null,
+      "sem_direcao": null,
+      "so_fundamentos": null
+     },
+     "windows": [],
+     "window_rule": {
+      "on": true,
+      "outside": "fora"
+     },
+     "windows_from": null
+    }
+   },
+   {
+    "label": "Padrão Futuros never set; the account on",
+    "market": "futures",
+    "day": {
+     "tz": "America/New_York",
+     "start_min": 1080
+    },
+    "market_rules": {
+     "v": 1,
+     "window_rule": {
+      "on": true,
+      "outside": "fora"
+     },
+     "block": {
+      "on": true,
+      "before_min": 5,
+      "after_min": 10
+     },
+     "states": {}
+    },
+    "own": {
+     "v": 1,
+     "breakeven": {
+      "on": true,
+      "by": {
+       "MES": 8,
+       "ZN": 0.5
+      }
+     }
+    },
+    "expected": {
+     "v": 1,
+     "day": {
+      "tz": "America/New_York",
+      "start_min": 1080
+     },
+     "block": {
+      "on": true,
+      "after_min": 10,
+      "calendars": [
+       "us"
+      ],
+      "before_min": 5
+     },
+     "limit": null,
+     "market": "futures",
+     "states": {
+      "alinhadas": null,
+      "so_tecnica": null,
+      "em_conflito": null,
+      "sem_direcao": null,
+      "so_fundamentos": null
+     },
+     "windows": [],
+     "breakeven": {
+      "by": {
+       "ZN": {
+        "n": 0.5,
+        "un": "price"
+       },
+       "MES": {
+        "n": 8,
+        "un": "pts"
+       }
+      }
+     },
+     "window_rule": {
+      "on": true,
+      "outside": "fora"
+     },
+     "windows_from": null
+    }
+   },
+   {
+    "label": "no market row (builtin); the account on, decimals",
+    "market": "futures",
+    "day": {
+     "tz": "America/New_York",
+     "start_min": 1080
+    },
+    "market_rules": null,
+    "own": {
+     "v": 1,
+     "limit": {
+      "usd": 400,
+      "mode": "conta",
+      "at_limit": "encerrar"
+     },
+     "breakeven": {
+      "on": true,
+      "by": {
+       "MGC": 7.5
+      }
+     }
+    },
+    "expected": {
+     "v": 1,
+     "day": {
+      "tz": "America/New_York",
+      "start_min": 1080
+     },
+     "block": {
+      "on": true,
+      "after_min": 10,
+      "calendars": [
+       "us"
+      ],
+      "before_min": 5
+     },
+     "limit": {
+      "usd": 400,
+      "mode": "conta",
+      "at_limit": "encerrar"
+     },
+     "market": "futures",
+     "states": {
+      "alinhadas": null,
+      "so_tecnica": null,
+      "em_conflito": null,
+      "sem_direcao": null,
+      "so_fundamentos": null
+     },
+     "windows": [],
+     "breakeven": {
+      "by": {
+       "MGC": {
+        "n": 7.5,
+        "un": "pts"
+       }
+      }
+     },
+     "window_rule": {
+      "on": true,
+      "outside": "fora"
+     },
+     "windows_from": null
+    }
+   },
+   {
+    "label": "no setting anywhere",
+    "market": "futures",
+    "day": {
+     "tz": "America/New_York",
+     "start_min": 1080
+    },
+    "market_rules": null,
+    "own": null,
+    "expected": {
+     "v": 1,
+     "day": {
+      "tz": "America/New_York",
+      "start_min": 1080
+     },
+     "block": {
+      "on": true,
+      "after_min": 10,
+      "calendars": [
+       "us"
+      ],
+      "before_min": 5
+     },
+     "limit": null,
+     "market": "futures",
+     "states": {
+      "alinhadas": null,
+      "so_tecnica": null,
+      "em_conflito": null,
+      "sem_direcao": null,
+      "so_fundamentos": null
+     },
+     "windows": [],
+     "window_rule": {
+      "on": true,
+      "outside": "fora"
+     },
+     "windows_from": null
+    }
+   },
+   {
+    "label": "forex: EURUSD pips, USDJPY pips, XAUUSD price",
+    "market": "forex",
+    "day": {
+     "tz": "America/New_York",
+     "start_min": 1020
+    },
+    "market_rules": null,
+    "own": {
+     "v": 1,
+     "breakeven": {
+      "on": true,
+      "by": {
+       "EURUSD": 7.5,
+       "USDJPY": 10,
+       "XAUUSD": 1.2
+      }
+     }
+    },
+    "expected": {
+     "v": 1,
+     "day": {
+      "tz": "America/New_York",
+      "start_min": 1020
+     },
+     "block": null,
+     "limit": null,
+     "market": "forex",
+     "states": null,
+     "windows": [],
+     "breakeven": {
+      "by": {
+       "EURUSD": {
+        "n": 7.5,
+        "un": "pips"
+       },
+       "USDJPY": {
+        "n": 10,
+        "un": "pips"
+       },
+       "XAUUSD": {
+        "n": 1.2,
+        "un": "price"
+       }
+      }
+     },
+     "window_rule": {
+      "on": true,
+      "outside": "fora"
+     },
+     "windows_from": null
+    }
+   },
+   {
+    "label": "forex: the hidden market default on",
+    "market": "forex",
+    "day": {
+     "tz": "America/New_York",
+     "start_min": 1020
+    },
+    "market_rules": {
+     "v": 1,
+     "window_rule": {
+      "on": true,
+      "outside": "fora"
+     },
+     "breakeven": {
+      "on": true,
+      "by": {
+       "GBPUSD": 5
+      }
+     }
+    },
+    "own": null,
+    "expected": {
+     "v": 1,
+     "day": {
+      "tz": "America/New_York",
+      "start_min": 1020
+     },
+     "block": null,
+     "limit": null,
+     "market": "forex",
+     "states": null,
+     "windows": [],
+     "breakeven": {
+      "by": {
+       "GBPUSD": {
+        "n": 5,
+        "un": "pips"
+       }
+      }
+     },
+     "window_rule": {
+      "on": true,
+      "outside": "fora"
+     },
+     "windows_from": null
+    }
+   },
+   {
+    "label": "stocks: AAPL",
+    "market": "stocks",
+    "day": {
+     "tz": "America/New_York",
+     "start_min": 1200
+    },
+    "market_rules": null,
+    "own": {
+     "v": 1,
+     "breakeven": {
+      "on": true,
+      "by": {
+       "AAPL": 0.5
+      }
+     }
+    },
+    "expected": {
+     "v": 1,
+     "day": {
+      "tz": "America/New_York",
+      "start_min": 1200
+     },
+     "block": null,
+     "limit": null,
+     "market": "stocks",
+     "states": null,
+     "windows": [],
+     "breakeven": {
+      "by": {
+       "AAPL": {
+        "n": 0.5,
+        "un": "price"
+       }
+      }
+     },
+     "window_rule": {
+      "on": true,
+      "outside": "fora"
+     },
+     "windows_from": null
+    }
+   },
+   {
+    "label": "options: SPX",
+    "market": "options",
+    "day": {
+     "tz": "America/New_York",
+     "start_min": 1200
+    },
+    "market_rules": null,
+    "own": {
+     "v": 1,
+     "breakeven": {
+      "on": true,
+      "by": {
+       "SPX": 0.25
+      }
+     }
+    },
+    "expected": {
+     "v": 1,
+     "day": {
+      "tz": "America/New_York",
+      "start_min": 1200
+     },
+     "block": null,
+     "limit": null,
+     "market": "options",
+     "states": null,
+     "windows": [],
+     "breakeven": {
+      "by": {
+       "SPX": {
+        "n": 0.25,
+        "un": "price"
+       }
+      }
+     },
+     "window_rule": {
+      "on": true,
+      "outside": "fora"
+     },
+     "windows_from": null
+    }
+   },
+   {
+    "label": "crypto: BTCUSDT and BTCBRL",
+    "market": "crypto",
+    "day": {
+     "tz": "America/Sao_Paulo",
+     "start_min": 0
+    },
+    "market_rules": null,
+    "own": {
+     "v": 1,
+     "breakeven": {
+      "on": true,
+      "by": {
+       "BTCUSDT": 150,
+       "BTCBRL": 800
+      }
+     }
+    },
+    "expected": {
+     "v": 1,
+     "day": {
+      "tz": "America/Sao_Paulo",
+      "start_min": 0
+     },
+     "block": null,
+     "limit": null,
+     "market": "crypto",
+     "states": null,
+     "windows": [],
+     "breakeven": {
+      "by": {
+       "BTCBRL": {
+        "n": 800,
+        "un": "price"
+       },
+       "BTCUSDT": {
+        "n": 150,
+        "un": "price"
+       }
+      }
+     },
+     "window_rule": {
+      "on": true,
+      "outside": "fora"
+     },
+     "windows_from": null
+    }
+   },
+   {
+    "label": "b3: WIN, DI1, PETR4",
+    "market": "b3",
+    "day": {
+     "tz": "America/Sao_Paulo",
+     "start_min": 0
+    },
+    "market_rules": null,
+    "own": {
+     "v": 1,
+     "limit": {
+      "brl": 300,
+      "mode": "conta",
+      "at_limit": "encerrar"
+     },
+     "breakeven": {
+      "on": true,
+      "by": {
+       "WIN": 150,
+       "DI1": 0.05,
+       "PETR4": 0.3
+      }
+     }
+    },
+    "expected": {
+     "v": 1,
+     "day": {
+      "tz": "America/Sao_Paulo",
+      "start_min": 0
+     },
+     "block": null,
+     "limit": {
+      "brl": 300,
+      "mode": "conta",
+      "at_limit": "encerrar"
+     },
+     "market": "b3",
+     "states": null,
+     "windows": [],
+     "breakeven": {
+      "by": {
+       "DI1": {
+        "n": 0.05,
+        "un": "price"
+       },
+       "WIN": {
+        "n": 150,
+        "un": "pts"
+       },
+       "PETR4": {
+        "n": 0.3,
+        "un": "price"
+       }
+      }
+     },
+     "window_rule": {
+      "on": true,
+      "outside": "fora"
+     },
+     "windows_from": null
+    }
+   },
+   {
+    "label": "binary: a setting never acts",
+    "market": "binary",
+    "day": {
+     "tz": "America/Sao_Paulo",
+     "start_min": 0
+    },
+    "market_rules": {
+     "v": 1,
+     "window_rule": {
+      "on": true,
+      "outside": "fora"
+     },
+     "breakeven": {
+      "on": true,
+      "by": {
+       "EURUSD": 5
+      }
+     }
+    },
+    "own": {
+     "v": 1,
+     "breakeven": {
+      "on": true,
+      "by": {
+       "EURUSD": 5
+      }
+     }
+    },
+    "expected": {
+     "v": 1,
+     "day": {
+      "tz": "America/Sao_Paulo",
+      "start_min": 0
+     },
+     "block": null,
+     "limit": null,
+     "market": "binary",
+     "states": null,
+     "windows": [],
+     "window_rule": {
+      "on": true,
+      "outside": "fora"
+     },
+     "windows_from": null
+    }
+   }
+  ]
+ },
+ "favor": {
+  "about": "trade_favor(trade_instrument(market, symbol, option), sgn, entry, price), trimmed",
+  "cases": [
+   {
+    "market": "futures",
+    "symbol": "MES",
+    "option": null,
+    "sgn": 1,
+    "entry": "7912.25",
+    "price": "7920.5",
+    "expected": "8.25"
+   },
+   {
+    "market": "futures",
+    "symbol": "MES",
+    "option": null,
+    "sgn": -1,
+    "entry": "7912.25",
+    "price": "7920.5",
+    "expected": "-8.25"
+   },
+   {
+    "market": "futures",
+    "symbol": "MNQZ5",
+    "option": null,
+    "sgn": -1,
+    "entry": "30950",
+    "price": "30930",
+    "expected": "20"
+   },
+   {
+    "market": "futures",
+    "symbol": "ZN",
+    "option": null,
+    "sgn": 1,
+    "entry": "112.515625",
+    "price": "112.75",
+    "expected": "0.234375"
+   },
+   {
+    "market": "forex",
+    "symbol": "EUR/USD",
+    "option": null,
+    "sgn": 1,
+    "entry": "1.0852",
+    "price": "1.08595",
+    "expected": "7.5"
+   },
+   {
+    "market": "forex",
+    "symbol": "USD/JPY",
+    "option": null,
+    "sgn": -1,
+    "entry": "151.24",
+    "price": "151.02",
+    "expected": "22"
+   },
+   {
+    "market": "forex",
+    "symbol": "XAUUSD",
+    "option": null,
+    "sgn": 1,
+    "entry": "2650.5",
+    "price": "2655.75",
+    "expected": "5.25"
+   },
+   {
+    "market": "forex",
+    "symbol": "EUR/GBP",
+    "option": null,
+    "sgn": -1,
+    "entry": "0.8712",
+    "price": "0.8707",
+    "expected": "5"
+   },
+   {
+    "market": "stocks",
+    "symbol": "AAPL",
+    "option": null,
+    "sgn": 1,
+    "entry": "231.4",
+    "price": "232.15",
+    "expected": "0.75"
+   },
+   {
+    "market": "stocks",
+    "symbol": "SPY",
+    "option": {
+     "right": "call",
+     "strike": "790",
+     "expires_on": "2026-11-20"
+    },
+    "sgn": 1,
+    "entry": "1.85",
+    "price": "2.4",
+    "expected": "0.55"
+   },
+   {
+    "market": "crypto",
+    "symbol": "BTC/USDT",
+    "option": null,
+    "sgn": -1,
+    "entry": "112400",
+    "price": "111950",
+    "expected": "450"
+   },
+   {
+    "market": "b3",
+    "symbol": "WINZ26",
+    "option": null,
+    "sgn": -1,
+    "entry": "131250",
+    "price": "131100",
+    "expected": "150"
+   },
+   {
+    "market": "b3",
+    "symbol": "PETR4",
+    "option": null,
+    "sgn": 1,
+    "entry": "38.42",
+    "price": "38.71",
+    "expected": "0.29"
+   },
+   {
+    "market": "b3",
+    "symbol": "DI1F27",
+    "option": null,
+    "sgn": 1,
+    "entry": "14.205",
+    "price": "14.255",
+    "expected": "0.05"
+   },
+   {
+    "market": "futures",
+    "symbol": "MES",
+    "option": null,
+    "sgn": 1,
+    "entry": "7912.25",
+    "price": "7912.25",
+    "expected": "0"
+   },
+   {
+    "market": "forex",
+    "symbol": "EUR/USD",
+    "option": null,
+    "sgn": 1,
+    "entry": "1.0852",
+    "price": "1.08513",
+    "expected": "-0.7"
+   },
+   {
+    "market": "futures",
+    "symbol": "MES",
+    "option": null,
+    "sgn": -1,
+    "entry": "7900",
+    "price": "7890",
+    "expected": "10"
+   },
+   {
+    "market": "futures",
+    "symbol": "MNQ",
+    "option": null,
+    "sgn": 1,
+    "entry": "20100.5",
+    "price": "20130.5",
+    "expected": "30"
+   },
+   {
+    "market": "futures",
+    "symbol": "ZN",
+    "option": null,
+    "sgn": 1,
+    "entry": "110.5",
+    "price": "110.515625",
+    "expected": "0.015625"
+   },
+   {
+    "market": "futures",
+    "symbol": "ZZZ",
+    "option": null,
+    "sgn": -1,
+    "entry": "50",
+    "price": "49.5",
+    "expected": "0.5"
+   },
+   {
+    "market": "forex",
+    "symbol": "EUR/USD",
+    "option": null,
+    "sgn": -1,
+    "entry": "1.085",
+    "price": "1.08575",
+    "expected": "-7.5"
+   },
+   {
+    "market": "forex",
+    "symbol": "USD/JPY",
+    "option": null,
+    "sgn": -1,
+    "entry": "150.25",
+    "price": "150.15",
+    "expected": "10"
+   },
+   {
+    "market": "forex",
+    "symbol": "XAU/USD",
+    "option": null,
+    "sgn": 1,
+    "entry": "2400.5",
+    "price": "2401.7",
+    "expected": "1.2"
+   },
+   {
+    "market": "crypto",
+    "symbol": "BTC/USDT",
+    "option": null,
+    "sgn": 1,
+    "entry": "60000",
+    "price": "60123.45",
+    "expected": "123.45"
+   },
+   {
+    "market": "stocks",
+    "symbol": "AAPL",
+    "option": null,
+    "sgn": -1,
+    "entry": "200",
+    "price": "199.5",
+    "expected": "0.5"
+   },
+   {
+    "market": "options",
+    "symbol": "SPX",
+    "option": {
+     "right": "call",
+     "strike": "200",
+     "expires_on": "2026-11-20"
+    },
+    "sgn": 1,
+    "entry": "2.1",
+    "price": "2.35",
+    "expected": "0.25"
+   }
+  ]
+ },
+ "tradeBreakeven": {
+  "about": "trade_breakeven(resolved, market, symbol, option?, direction, entry)",
+  "cases": [
+   {
+    "resolved": {
+     "v": 1,
+     "market": "futures",
+     "windows": [
+      {
+       "tz": "America/New_York",
+       "start_min": 600,
+       "end_min": 660,
+       "weekdays": 31
+      }
+     ],
+     "windows_from": "market",
+     "window_rule": {
+      "on": true,
+      "outside": "fora"
+     },
+     "block": {
+      "on": true,
+      "before_min": 5,
+      "after_min": 10,
+      "calendars": [
+       "us"
+      ]
+     },
+     "limit": {
+      "usd": 400,
+      "mode": "conta",
+      "at_limit": "encerrar"
+     },
+     "states": {
+      "alinhadas": null,
+      "so_tecnica": null,
+      "so_fundamentos": null,
+      "em_conflito": null,
+      "sem_direcao": null
+     },
+     "day": {
+      "tz": "America/New_York",
+      "start_min": 1080
+     },
+     "breakeven": {
+      "by": {
+       "MES": {
+        "n": 8,
+        "un": "pts"
+       },
+       "MNQ": {
+        "n": 30,
+        "un": "pts"
+       },
+       "MGC": {
+        "n": 7.5,
+        "un": "pts"
+       }
+      }
+     }
+    },
+    "market": "futures",
+    "symbol": "MES",
+    "option": false,
+    "direction": "long",
+    "entry": "7912.5",
+    "expected": {
+     "n": 8,
+     "un": "pts",
+     "key": "MES",
+     "level": 7920.5
+    }
+   },
+   {
+    "resolved": {
+     "v": 1,
+     "market": "futures",
+     "windows": [
+      {
+       "tz": "America/New_York",
+       "start_min": 600,
+       "end_min": 660,
+       "weekdays": 31
+      }
+     ],
+     "windows_from": "market",
+     "window_rule": {
+      "on": true,
+      "outside": "fora"
+     },
+     "block": {
+      "on": true,
+      "before_min": 5,
+      "after_min": 10,
+      "calendars": [
+       "us"
+      ]
+     },
+     "limit": {
+      "usd": 400,
+      "mode": "conta",
+      "at_limit": "encerrar"
+     },
+     "states": {
+      "alinhadas": null,
+      "so_tecnica": null,
+      "so_fundamentos": null,
+      "em_conflito": null,
+      "sem_direcao": null
+     },
+     "day": {
+      "tz": "America/New_York",
+      "start_min": 1080
+     },
+     "breakeven": {
+      "by": {
+       "MES": {
+        "n": 8,
+        "un": "pts"
+       },
+       "MNQ": {
+        "n": 30,
+        "un": "pts"
+       },
+       "MGC": {
+        "n": 7.5,
+        "un": "pts"
+       }
+      }
+     }
+    },
+    "market": "futures",
+    "symbol": "MESZ5",
+    "option": false,
+    "direction": "short",
+    "entry": "7912.5",
+    "expected": {
+     "n": 8,
+     "un": "pts",
+     "key": "MES",
+     "level": 7904.5
+    }
+   },
+   {
+    "resolved": {
+     "v": 1,
+     "market": "futures",
+     "windows": [
+      {
+       "tz": "America/New_York",
+       "start_min": 600,
+       "end_min": 660,
+       "weekdays": 31
+      }
+     ],
+     "windows_from": "market",
+     "window_rule": {
+      "on": true,
+      "outside": "fora"
+     },
+     "block": {
+      "on": true,
+      "before_min": 5,
+      "after_min": 10,
+      "calendars": [
+       "us"
+      ]
+     },
+     "limit": {
+      "usd": 400,
+      "mode": "conta",
+      "at_limit": "encerrar"
+     },
+     "states": {
+      "alinhadas": null,
+      "so_tecnica": null,
+      "so_fundamentos": null,
+      "em_conflito": null,
+      "sem_direcao": null
+     },
+     "day": {
+      "tz": "America/New_York",
+      "start_min": 1080
+     },
+     "breakeven": {
+      "by": {
+       "MES": {
+        "n": 8,
+        "un": "pts"
+       },
+       "MNQ": {
+        "n": 30,
+        "un": "pts"
+       },
+       "MGC": {
+        "n": 7.5,
+        "un": "pts"
+       }
+      }
+     }
+    },
+    "market": "futures",
+    "symbol": "MNQ",
+    "option": false,
+    "direction": "long",
+    "entry": "30880",
+    "expected": {
+     "n": 30,
+     "un": "pts",
+     "key": "MNQ",
+     "level": 30910
+    }
+   },
+   {
+    "resolved": {
+     "v": 1,
+     "market": "futures",
+     "windows": [
+      {
+       "tz": "America/New_York",
+       "start_min": 600,
+       "end_min": 660,
+       "weekdays": 31
+      }
+     ],
+     "windows_from": "market",
+     "window_rule": {
+      "on": true,
+      "outside": "fora"
+     },
+     "block": {
+      "on": true,
+      "before_min": 5,
+      "after_min": 10,
+      "calendars": [
+       "us"
+      ]
+     },
+     "limit": {
+      "usd": 400,
+      "mode": "conta",
+      "at_limit": "encerrar"
+     },
+     "states": {
+      "alinhadas": null,
+      "so_tecnica": null,
+      "so_fundamentos": null,
+      "em_conflito": null,
+      "sem_direcao": null
+     },
+     "day": {
+      "tz": "America/New_York",
+      "start_min": 1080
+     },
+     "breakeven": {
+      "by": {
+       "MES": {
+        "n": 8,
+        "un": "pts"
+       },
+       "MNQ": {
+        "n": 30,
+        "un": "pts"
+       },
+       "MGC": {
+        "n": 7.5,
+        "un": "pts"
+       }
+      }
+     }
+    },
+    "market": "futures",
+    "symbol": "MGC",
+    "option": false,
+    "direction": "short",
+    "entry": "4421.3",
+    "expected": {
+     "n": 7.5,
+     "un": "pts",
+     "key": "MGC",
+     "level": 4413.8
+    }
+   },
+   {
+    "resolved": {
+     "v": 1,
+     "market": "futures",
+     "windows": [
+      {
+       "tz": "America/New_York",
+       "start_min": 600,
+       "end_min": 660,
+       "weekdays": 31
+      }
+     ],
+     "windows_from": "market",
+     "window_rule": {
+      "on": true,
+      "outside": "fora"
+     },
+     "block": {
+      "on": true,
+      "before_min": 5,
+      "after_min": 10,
+      "calendars": [
+       "us"
+      ]
+     },
+     "limit": {
+      "usd": 400,
+      "mode": "conta",
+      "at_limit": "encerrar"
+     },
+     "states": {
+      "alinhadas": null,
+      "so_tecnica": null,
+      "so_fundamentos": null,
+      "em_conflito": null,
+      "sem_direcao": null
+     },
+     "day": {
+      "tz": "America/New_York",
+      "start_min": 1080
+     },
+     "breakeven": {
+      "by": {
+       "MES": {
+        "n": 8,
+        "un": "pts"
+       },
+       "MNQ": {
+        "n": 30,
+        "un": "pts"
+       },
+       "MGC": {
+        "n": 7.5,
+        "un": "pts"
+       }
+      }
+     }
+    },
+    "market": "futures",
+    "symbol": "ES",
+    "option": false,
+    "direction": "long",
+    "entry": "7900",
+    "expected": null
+   },
+   {
+    "resolved": {
+     "v": 1,
+     "market": "futures",
+     "windows": [
+      {
+       "tz": "America/New_York",
+       "start_min": 600,
+       "end_min": 660,
+       "weekdays": 31
+      }
+     ],
+     "windows_from": "market",
+     "window_rule": {
+      "on": true,
+      "outside": "fora"
+     },
+     "block": {
+      "on": true,
+      "before_min": 5,
+      "after_min": 10,
+      "calendars": [
+       "us"
+      ]
+     },
+     "limit": {
+      "usd": 400,
+      "mode": "conta",
+      "at_limit": "encerrar"
+     },
+     "states": {
+      "alinhadas": null,
+      "so_tecnica": null,
+      "so_fundamentos": null,
+      "em_conflito": null,
+      "sem_direcao": null
+     },
+     "day": {
+      "tz": "America/New_York",
+      "start_min": 1080
+     },
+     "breakeven": {
+      "by": {
+       "MES": {
+        "n": 8,
+        "un": "pts"
+       },
+       "MNQ": {
+        "n": 30,
+        "un": "pts"
+       },
+       "MGC": {
+        "n": 7.5,
+        "un": "pts"
+       }
+      }
+     }
+    },
+    "market": "futures",
+    "symbol": "MES",
+    "option": false,
+    "direction": "call",
+    "entry": "7912.5",
+    "expected": null
+   },
+   {
+    "resolved": {
+     "v": 1,
+     "market": "futures",
+     "windows": [
+      {
+       "tz": "America/New_York",
+       "start_min": 600,
+       "end_min": 660,
+       "weekdays": 31
+      }
+     ],
+     "windows_from": "market",
+     "window_rule": {
+      "on": true,
+      "outside": "fora"
+     },
+     "block": {
+      "on": true,
+      "before_min": 5,
+      "after_min": 10,
+      "calendars": [
+       "us"
+      ]
+     },
+     "limit": {
+      "usd": 400,
+      "mode": "conta",
+      "at_limit": "encerrar"
+     },
+     "states": {
+      "alinhadas": null,
+      "so_tecnica": null,
+      "so_fundamentos": null,
+      "em_conflito": null,
+      "sem_direcao": null
+     },
+     "day": {
+      "tz": "America/New_York",
+      "start_min": 1080
+     },
+     "breakeven": {
+      "by": {
+       "MES": {
+        "n": 8,
+        "un": "pts"
+       },
+       "MNQ": {
+        "n": 30,
+        "un": "pts"
+       },
+       "MGC": {
+        "n": 7.5,
+        "un": "pts"
+       }
+      }
+     }
+    },
+    "market": "futures",
+    "symbol": "MES",
+    "option": false,
+    "direction": "long",
+    "entry": null,
+    "expected": null
+   },
+   {
+    "resolved": {
+     "v": 1,
+     "market": "futures",
+     "windows": [
+      {
+       "tz": "America/New_York",
+       "start_min": 600,
+       "end_min": 660,
+       "weekdays": 31
+      }
+     ],
+     "windows_from": "market",
+     "window_rule": {
+      "on": true,
+      "outside": "fora"
+     },
+     "block": {
+      "on": true,
+      "before_min": 5,
+      "after_min": 10,
+      "calendars": [
+       "us"
+      ]
+     },
+     "limit": {
+      "usd": 400,
+      "mode": "conta",
+      "at_limit": "encerrar"
+     },
+     "states": {
+      "alinhadas": null,
+      "so_tecnica": null,
+      "so_fundamentos": null,
+      "em_conflito": null,
+      "sem_direcao": null
+     },
+     "day": {
+      "tz": "America/New_York",
+      "start_min": 1080
+     }
+    },
+    "market": "futures",
+    "symbol": "MES",
+    "option": false,
+    "direction": "long",
+    "entry": "7912.5",
+    "expected": null
+   },
+   {
+    "resolved": {
+     "v": 1,
+     "market": "forex",
+     "windows": [],
+     "windows_from": null,
+     "window_rule": {
+      "on": true,
+      "outside": "fora"
+     },
+     "block": null,
+     "limit": null,
+     "states": null,
+     "day": {
+      "tz": "America/New_York",
+      "start_min": 1020
+     },
+     "breakeven": {
+      "by": {
+       "EURUSD": {
+        "n": 7.5,
+        "un": "pips"
+       },
+       "USDJPY": {
+        "n": 10,
+        "un": "pips"
+       },
+       "XAUUSD": {
+        "n": 1.2,
+        "un": "price"
+       },
+       "USDINR": {
+        "n": 3,
+        "un": "pips"
+       }
+      }
+     }
+    },
+    "market": "forex",
+    "symbol": "EUR/USD",
+    "option": false,
+    "direction": "long",
+    "entry": "1.0852",
+    "expected": {
+     "n": 7.5,
+     "un": "pips",
+     "key": "EURUSD",
+     "level": 1.08595
+    }
+   },
+   {
+    "resolved": {
+     "v": 1,
+     "market": "forex",
+     "windows": [],
+     "windows_from": null,
+     "window_rule": {
+      "on": true,
+      "outside": "fora"
+     },
+     "block": null,
+     "limit": null,
+     "states": null,
+     "day": {
+      "tz": "America/New_York",
+      "start_min": 1020
+     },
+     "breakeven": {
+      "by": {
+       "EURUSD": {
+        "n": 7.5,
+        "un": "pips"
+       },
+       "USDJPY": {
+        "n": 10,
+        "un": "pips"
+       },
+       "XAUUSD": {
+        "n": 1.2,
+        "un": "price"
+       },
+       "USDINR": {
+        "n": 3,
+        "un": "pips"
+       }
+      }
+     }
+    },
+    "market": "forex",
+    "symbol": "USD/JPY",
+    "option": false,
+    "direction": "short",
+    "entry": "151.24",
+    "expected": {
+     "n": 10,
+     "un": "pips",
+     "key": "USDJPY",
+     "level": 151.14
+    }
+   },
+   {
+    "resolved": {
+     "v": 1,
+     "market": "forex",
+     "windows": [],
+     "windows_from": null,
+     "window_rule": {
+      "on": true,
+      "outside": "fora"
+     },
+     "block": null,
+     "limit": null,
+     "states": null,
+     "day": {
+      "tz": "America/New_York",
+      "start_min": 1020
+     },
+     "breakeven": {
+      "by": {
+       "EURUSD": {
+        "n": 7.5,
+        "un": "pips"
+       },
+       "USDJPY": {
+        "n": 10,
+        "un": "pips"
+       },
+       "XAUUSD": {
+        "n": 1.2,
+        "un": "price"
+       },
+       "USDINR": {
+        "n": 3,
+        "un": "pips"
+       }
+      }
+     }
+    },
+    "market": "forex",
+    "symbol": "XAUUSD",
+    "option": false,
+    "direction": "long",
+    "entry": "2650.5",
+    "expected": {
+     "n": 1.2,
+     "un": "price",
+     "key": "XAUUSD",
+     "level": 2651.7
+    }
+   },
+   {
+    "resolved": {
+     "v": 1,
+     "market": "forex",
+     "windows": [],
+     "windows_from": null,
+     "window_rule": {
+      "on": true,
+      "outside": "fora"
+     },
+     "block": null,
+     "limit": null,
+     "states": null,
+     "day": {
+      "tz": "America/New_York",
+      "start_min": 1020
+     },
+     "breakeven": {
+      "by": {
+       "EURUSD": {
+        "n": 7.5,
+        "un": "pips"
+       },
+       "USDJPY": {
+        "n": 10,
+        "un": "pips"
+       },
+       "XAUUSD": {
+        "n": 1.2,
+        "un": "price"
+       },
+       "USDINR": {
+        "n": 3,
+        "un": "pips"
+       }
+      }
+     }
+    },
+    "market": "forex",
+    "symbol": "USD/INR",
+    "option": false,
+    "direction": "long",
+    "entry": "84.1",
+    "expected": {
+     "n": 3,
+     "un": "pips",
+     "key": "USDINR",
+     "level": null
+    }
+   },
+   {
+    "resolved": {
+     "v": 1,
+     "market": "b3",
+     "windows": [],
+     "windows_from": null,
+     "window_rule": {
+      "on": true,
+      "outside": "fora"
+     },
+     "block": null,
+     "limit": {
+      "brl": 300,
+      "mode": "conta",
+      "at_limit": "encerrar"
+     },
+     "states": null,
+     "day": {
+      "tz": "America/Sao_Paulo",
+      "start_min": 0
+     },
+     "breakeven": {
+      "by": {
+       "WIN": {
+        "n": 150,
+        "un": "pts"
+       },
+       "PETR4": {
+        "n": 0.3,
+        "un": "price"
+       }
+      }
+     }
+    },
+    "market": "b3",
+    "symbol": "WINZ26",
+    "option": false,
+    "direction": "short",
+    "entry": "131250",
+    "expected": {
+     "n": 150,
+     "un": "pts",
+     "key": "WIN",
+     "level": 131100
+    }
+   },
+   {
+    "resolved": {
+     "v": 1,
+     "market": "b3",
+     "windows": [],
+     "windows_from": null,
+     "window_rule": {
+      "on": true,
+      "outside": "fora"
+     },
+     "block": null,
+     "limit": {
+      "brl": 300,
+      "mode": "conta",
+      "at_limit": "encerrar"
+     },
+     "states": null,
+     "day": {
+      "tz": "America/Sao_Paulo",
+      "start_min": 0
+     },
+     "breakeven": {
+      "by": {
+       "WIN": {
+        "n": 150,
+        "un": "pts"
+       },
+       "PETR4": {
+        "n": 0.3,
+        "un": "price"
+       }
+      }
+     }
+    },
+    "market": "b3",
+    "symbol": "PETR4F",
+    "option": false,
+    "direction": "long",
+    "entry": "38.42",
+    "expected": {
+     "n": 0.3,
+     "un": "price",
+     "key": "PETR4",
+     "level": 38.72
+    }
+   },
+   {
+    "resolved": {
+     "v": 1,
+     "market": "stocks",
+     "windows": [],
+     "windows_from": null,
+     "window_rule": {
+      "on": true,
+      "outside": "aviso"
+     },
+     "block": null,
+     "limit": null,
+     "states": null,
+     "day": {
+      "tz": "America/New_York",
+      "start_min": 1200
+     },
+     "breakeven": {
+      "by": {
+       "AAPL": {
+        "n": 0.5,
+        "un": "price"
+       },
+       "SPY": {
+        "n": 0.2,
+        "un": "price"
+       }
+      }
+     }
+    },
+    "market": "stocks",
+    "symbol": "AAPL",
+    "option": false,
+    "direction": "long",
+    "entry": "231.4",
+    "expected": {
+     "n": 0.5,
+     "un": "price",
+     "key": "AAPL",
+     "level": 231.9
+    }
+   },
+   {
+    "resolved": {
+     "v": 1,
+     "market": "stocks",
+     "windows": [],
+     "windows_from": null,
+     "window_rule": {
+      "on": true,
+      "outside": "aviso"
+     },
+     "block": null,
+     "limit": null,
+     "states": null,
+     "day": {
+      "tz": "America/New_York",
+      "start_min": 1200
+     },
+     "breakeven": {
+      "by": {
+       "AAPL": {
+        "n": 0.5,
+        "un": "price"
+       },
+       "SPY": {
+        "n": 0.2,
+        "un": "price"
+       }
+      }
+     }
+    },
+    "market": "stocks",
+    "symbol": "SPY",
+    "option": true,
+    "direction": "long",
+    "entry": "1.85",
+    "expected": null
+   },
+   {
+    "resolved": {
+     "v": 1,
+     "market": "crypto",
+     "windows": [],
+     "windows_from": null,
+     "window_rule": {
+      "on": true,
+      "outside": "fora"
+     },
+     "block": null,
+     "limit": {
+      "usd": 50,
+      "mode": "conta",
+      "at_limit": "avisar"
+     },
+     "states": null,
+     "day": {
+      "tz": "America/Sao_Paulo",
+      "start_min": 0
+     },
+     "breakeven": {
+      "by": {
+       "BTCUSDT": {
+        "n": 150,
+        "un": "price"
+       }
+      }
+     }
+    },
+    "market": "crypto",
+    "symbol": "BTC/USDT",
+    "option": false,
+    "direction": "short",
+    "entry": "112400",
+    "expected": {
+     "n": 150,
+     "un": "price",
+     "key": "BTCUSDT",
+     "level": 112250
+    }
+   },
+   {
+    "resolved": {
+     "v": 1,
+     "market": "forex",
+     "windows": [],
+     "windows_from": null,
+     "window_rule": {
+      "on": true,
+      "outside": "fora"
+     },
+     "block": null,
+     "limit": null,
+     "states": null,
+     "day": {
+      "tz": "America/New_York",
+      "start_min": 1020
+     },
+     "breakeven": {
+      "by": {
+       "EURUSD": {
+        "n": 7.5,
+        "un": "pips"
+       },
+       "USDJPY": {
+        "n": 10,
+        "un": "pips"
+       },
+       "XAUUSD": {
+        "n": 1.2,
+        "un": "price"
+       },
+       "USDINR": {
+        "n": 3,
+        "un": "pips"
+       }
+      }
+     }
+    },
+    "market": "binary",
+    "symbol": "EUR/USD",
+    "option": false,
+    "direction": "long",
+    "entry": "1.0852",
+    "expected": null
+   },
+   {
+    "resolved": {
+     "v": 1,
+     "market": "futures",
+     "windows": [
+      {
+       "tz": "America/New_York",
+       "start_min": 600,
+       "end_min": 660,
+       "weekdays": 31
+      }
+     ],
+     "windows_from": "market",
+     "window_rule": {
+      "on": true,
+      "outside": "fora"
+     },
+     "block": {
+      "on": true,
+      "before_min": 5,
+      "after_min": 10,
+      "calendars": [
+       "us"
+      ]
+     },
+     "limit": {
+      "usd": 400,
+      "mode": "conta",
+      "at_limit": "encerrar"
+     },
+     "states": {
+      "alinhadas": null,
+      "so_tecnica": null,
+      "so_fundamentos": null,
+      "em_conflito": null,
+      "sem_direcao": null
+     },
+     "day": {
+      "tz": "America/New_York",
+      "start_min": 1080
+     },
+     "breakeven": {
+      "by": {
+       "MES": {
+        "n": 8,
+        "un": "pts"
+       },
+       "MNQ": {
+        "n": 30,
+        "un": "pts"
+       },
+       "MGC": {
+        "n": 7.5,
+        "un": "pts"
+       }
+      }
+     }
+    },
+    "market": null,
+    "symbol": "MES",
+    "option": false,
+    "direction": "long",
+    "entry": "7912.5",
+    "expected": null
+   },
+   {
+    "resolved": {
+     "v": 1,
+     "market": "forex",
+     "windows": [],
+     "windows_from": null,
+     "window_rule": {
+      "on": true,
+      "outside": "fora"
+     },
+     "block": null,
+     "limit": null,
+     "states": null,
+     "day": {
+      "tz": "America/New_York",
+      "start_min": 1020
+     },
+     "breakeven": {
+      "by": {
+       "GBPUSD": {
+        "n": 5,
+        "un": "price"
+       }
+      }
+     }
+    },
+    "market": "forex",
+    "symbol": "GBP/USD",
+    "option": false,
+    "direction": "long",
+    "entry": "1.3",
+    "expected": {
+     "n": 5,
+     "un": "price",
+     "key": "GBPUSD",
+     "level": 6.3
+    }
+   },
+   {
+    "resolved": {
+     "v": 1,
+     "market": "futures",
+     "windows": [
+      {
+       "tz": "America/New_York",
+       "start_min": 600,
+       "end_min": 660,
+       "weekdays": 31
+      }
+     ],
+     "windows_from": "market",
+     "window_rule": {
+      "on": true,
+      "outside": "fora"
+     },
+     "block": {
+      "on": true,
+      "before_min": 5,
+      "after_min": 10,
+      "calendars": [
+       "us"
+      ]
+     },
+     "limit": {
+      "usd": 400,
+      "mode": "conta",
+      "at_limit": "encerrar"
+     },
+     "states": {
+      "alinhadas": null,
+      "so_tecnica": null,
+      "so_fundamentos": null,
+      "em_conflito": null,
+      "sem_direcao": null
+     },
+     "day": {
+      "tz": "America/New_York",
+      "start_min": 1080
+     },
+     "breakeven": {
+      "by": {
+       "MES": {
+        "n": 8,
+        "un": "pips"
+       }
+      }
+     }
+    },
+    "market": "futures",
+    "symbol": "MES",
+    "option": false,
+    "direction": "long",
+    "entry": "7900",
+    "expected": {
+     "n": 8,
+     "un": "pips",
+     "key": "MES",
+     "level": null
+    }
+   },
+   {
+    "resolved": {
+     "v": 1,
+     "market": "crypto",
+     "windows": [],
+     "windows_from": null,
+     "window_rule": {
+      "on": true,
+      "outside": "fora"
+     },
+     "block": null,
+     "limit": {
+      "usd": 50,
+      "mode": "conta",
+      "at_limit": "avisar"
+     },
+     "states": null,
+     "day": {
+      "tz": "America/Sao_Paulo",
+      "start_min": 0
+     },
+     "breakeven": {
+      "by": {
+       "BTCUSDT": {
+        "n": 1e-8,
+        "un": "price"
+       }
+      }
+     }
+    },
+    "market": "crypto",
+    "symbol": "BTC/USDT",
+    "option": false,
+    "direction": "long",
+    "entry": "60000",
+    "expected": {
+     "n": 1e-8,
+     "un": "price",
+     "key": "BTCUSDT",
+     "level": 60000.00000001
+    }
+   },
+   {
+    "resolved": {
+     "v": 1,
+     "market": "futures",
+     "windows": [
+      {
+       "tz": "America/New_York",
+       "start_min": 600,
+       "end_min": 660,
+       "weekdays": 31
+      }
+     ],
+     "windows_from": "market",
+     "window_rule": {
+      "on": true,
+      "outside": "fora"
+     },
+     "block": {
+      "on": true,
+      "before_min": 5,
+      "after_min": 10,
+      "calendars": [
+       "us"
+      ]
+     },
+     "limit": {
+      "usd": 400,
+      "mode": "conta",
+      "at_limit": "encerrar"
+     },
+     "states": {
+      "alinhadas": null,
+      "so_tecnica": null,
+      "so_fundamentos": null,
+      "em_conflito": null,
+      "sem_direcao": null
+     },
+     "day": {
+      "tz": "America/New_York",
+      "start_min": 1080
+     },
+     "breakeven": {
+      "by": {
+       "MES": {
+        "n": 8,
+        "un": "pts"
+       },
+       "MNQ": {
+        "n": 30,
+        "un": "pts"
+       },
+       "MGC": {
+        "n": 7.5,
+        "un": "pts"
+       }
+      }
+     }
+    },
+    "market": "futures",
+    "symbol": "MGCZ6",
+    "option": false,
+    "direction": "long",
+    "entry": "2400.1",
+    "expected": {
+     "n": 7.5,
+     "un": "pts",
+     "key": "MGC",
+     "level": 2407.6
+    }
+   },
+   {
+    "resolved": {
+     "v": 1,
+     "market": "b3",
+     "windows": [],
+     "windows_from": null,
+     "window_rule": {
+      "on": true,
+      "outside": "fora"
+     },
+     "block": null,
+     "limit": {
+      "brl": 300,
+      "mode": "conta",
+      "at_limit": "encerrar"
+     },
+     "states": null,
+     "day": {
+      "tz": "America/Sao_Paulo",
+      "start_min": 0
+     },
+     "breakeven": {
+      "by": {
+       "WIN": {
+        "n": 150,
+        "un": "pts"
+       },
+       "PETR4": {
+        "n": 0.3,
+        "un": "price"
+       }
+      }
+     }
+    },
+    "market": "b3",
+    "symbol": "PETR4",
+    "option": false,
+    "direction": "short",
+    "entry": "30.5",
+    "expected": {
+     "n": 0.3,
+     "un": "price",
+     "key": "PETR4",
+     "level": 30.2
+    }
+   },
+   {
+    "resolved": {
+     "v": 1,
+     "market": "futures",
+     "windows": [
+      {
+       "tz": "America/New_York",
+       "start_min": 600,
+       "end_min": 660,
+       "weekdays": 31
+      }
+     ],
+     "windows_from": "market",
+     "window_rule": {
+      "on": true,
+      "outside": "fora"
+     },
+     "block": {
+      "on": true,
+      "before_min": 5,
+      "after_min": 10,
+      "calendars": [
+       "us"
+      ]
+     },
+     "limit": {
+      "usd": 400,
+      "mode": "conta",
+      "at_limit": "encerrar"
+     },
+     "states": {
+      "alinhadas": null,
+      "so_tecnica": null,
+      "so_fundamentos": null,
+      "em_conflito": null,
+      "sem_direcao": null
+     },
+     "day": {
+      "tz": "America/New_York",
+      "start_min": 1080
+     },
+     "breakeven": {
+      "by": {
+       "MES": {
+        "n": 8,
+        "un": "pts"
+       },
+       "MNQ": {
+        "n": 30,
+        "un": "pts"
+       },
+       "MGC": {
+        "n": 7.5,
+        "un": "pts"
+       }
+      }
+     }
+    },
+    "market": "futures",
+    "symbol": "MES",
+    "option": false,
+    "direction": null,
+    "entry": "7912.5",
+    "expected": null
+   }
+  ]
+ },
+ "rOf": {
+  "about": "trade_r_of(entry, stop, sgn, position, exits), trimmed",
+  "cases": [
+   {
+    "label": "3 MES long in two exits",
+    "entry": "7912.5",
+    "stop": "7902.5",
+    "sgn": 1,
+    "position": "3",
+    "exits": [
+     {
+      "quantity": "1",
+      "exit_price": "7916.5"
+     },
+     {
+      "quantity": "2",
+      "exit_price": "7920.5"
+     }
+    ],
+    "expected": "0.6667"
+   },
+   {
+    "label": "one exit = Phase 3 R",
+    "entry": "7912.5",
+    "stop": "7902.5",
+    "sgn": 1,
+    "position": "3",
+    "exits": [
+     {
+      "quantity": "3",
+      "exit_price": "7920.5"
+     }
+    ],
+    "expected": "0.8"
+   },
+   {
+    "label": "MGC short, «Já fechada» in two",
+    "entry": "4421.3",
+    "stop": "4436.3",
+    "sgn": -1,
+    "position": "2",
+    "exits": [
+     {
+      "quantity": "1",
+      "exit_price": "4409.3"
+     },
+     {
+      "quantity": "1",
+      "exit_price": "4421.3"
+     }
+    ],
+    "expected": "0.4"
+   },
+   {
+    "label": "a loss",
+    "entry": "30880",
+    "stop": "30840",
+    "sgn": 1,
+    "position": "3",
+    "exits": [
+     {
+      "quantity": "2",
+      "exit_price": "30855"
+     },
+     {
+      "quantity": "1",
+      "exit_price": "30840"
+     }
+    ],
+    "expected": "-0.75"
+   },
+   {
+    "label": "forex lots",
+    "entry": "1.0852",
+    "stop": "1.0840",
+    "sgn": 1,
+    "position": "1",
+    "exits": [
+     {
+      "quantity": "0.5",
+      "exit_price": "1.0865"
+     },
+     {
+      "quantity": "0.5",
+      "exit_price": "1.087"
+     }
+    ],
+    "expected": "1.2917"
+   },
+   {
+    "label": "no stop",
+    "entry": "7912.5",
+    "stop": null,
+    "sgn": 1,
+    "position": "3",
+    "exits": [
+     {
+      "quantity": "3",
+      "exit_price": "7920.5"
+     }
+    ],
+    "expected": null
+   },
+   {
+    "label": "stop at the entry",
+    "entry": "7912.5",
+    "stop": "7912.5",
+    "sgn": 1,
+    "position": "3",
+    "exits": [
+     {
+      "quantity": "3",
+      "exit_price": "7920.5"
+     }
+    ],
+    "expected": null
+   },
+   {
+    "label": "an exit without a price",
+    "entry": "7912.5",
+    "stop": "7902.5",
+    "sgn": 1,
+    "position": "3",
+    "exits": [
+     {
+      "quantity": "1",
+      "exit_price": null
+     },
+     {
+      "quantity": "2",
+      "exit_price": "7920.5"
+     }
+    ],
+    "expected": null
+   },
+   {
+    "label": "no exit",
+    "entry": "7912.5",
+    "stop": "7902.5",
+    "sgn": 1,
+    "position": "3",
+    "exits": [],
+    "expected": null
+   },
+   {
+    "label": "position zero",
+    "entry": "7912.5",
+    "stop": "7902.5",
+    "sgn": 1,
+    "position": "0",
+    "exits": [
+     {
+      "quantity": "1",
+      "exit_price": "7920.5"
+     }
+    ],
+    "expected": null
+   },
+   {
+    "label": "a repeating quotient",
+    "entry": "100",
+    "stop": "97",
+    "sgn": 1,
+    "position": "3",
+    "exits": [
+     {
+      "quantity": "1",
+      "exit_price": "101"
+     },
+     {
+      "quantity": "1",
+      "exit_price": "102"
+     },
+     {
+      "quantity": "1",
+      "exit_price": "100"
+     }
+    ],
+    "expected": "0.3333"
+   },
+   {
+    "label": "a short in three",
+    "entry": "20100",
+    "stop": "20120",
+    "sgn": -1,
+    "position": "3",
+    "exits": [
+     {
+      "quantity": "1",
+      "exit_price": "20080"
+     },
+     {
+      "quantity": "1",
+      "exit_price": "20090"
+     },
+     {
+      "quantity": "1",
+      "exit_price": "20125"
+     }
+    ],
+    "expected": "0.0833"
+   },
+   {
+    "label": "a loss to the stop",
+    "entry": "7900",
+    "stop": "7890",
+    "sgn": 1,
+    "position": "2",
+    "exits": [
+     {
+      "quantity": "1",
+      "exit_price": "7895"
+     },
+     {
+      "quantity": "1",
+      "exit_price": "7890"
+     }
+    ],
+    "expected": "-0.75"
+   },
+   {
+    "label": "forex lots in thirds",
+    "entry": "1.085",
+    "stop": "1.084",
+    "sgn": 1,
+    "position": "1",
+    "exits": [
+     {
+      "quantity": "0.33",
+      "exit_price": "1.0865"
+     },
+     {
+      "quantity": "0.67",
+      "exit_price": "1.08575"
+     }
+    ],
+    "expected": "0.9975"
+   },
+   {
+    "label": "no entry",
+    "entry": null,
+    "stop": "7890",
+    "sgn": 1,
+    "position": "3",
+    "exits": [
+     {
+      "quantity": "3",
+      "exit_price": "7920"
+     }
+    ],
+    "expected": null
+   }
+  ]
+ },
+ "shape": {
+  "about": "trade_check_payload(mode, market, p, dry, platform): mode 'partial'; «Já fechada» with exits and breakeven",
+  "cases": [
+   {
+    "label": "partial: the plain one",
+    "mode": "partial",
+    "market": "futures",
+    "dry": false,
+    "payload": {
+     "v": 1,
+     "client_key": "9b2d7c1e-4f3a-4c5b-8d6e-7f8091a2b3c4",
+     "quantity": "1",
+     "exit_price": "7920.5"
+    },
+    "platform": null,
+    "expected": null
+   },
+   {
+    "label": "partial: with hour and clock",
+    "mode": "partial",
+    "market": "futures",
+    "dry": false,
+    "payload": {
+     "v": 1,
+     "client_key": "9b2d7c1e-4f3a-4c5b-8d6e-7f8091a2b3c4",
+     "quantity": "1",
+     "exit_price": "7920.5",
+     "exit": "10:18",
+     "clock": "America/New_York"
+    },
+    "platform": null,
+    "expected": null
+   },
+   {
+    "label": "partial: an hour without a clock",
+    "mode": "partial",
+    "market": "futures",
+    "dry": false,
+    "payload": {
+     "v": 1,
+     "client_key": "9b2d7c1e-4f3a-4c5b-8d6e-7f8091a2b3c4",
+     "quantity": "1",
+     "exit_price": "7920.5",
+     "exit": "10:18"
+    },
+    "platform": null,
+    "expected": {
+     "code": "bad_clock",
+     "field": "clock"
+    }
+   },
+   {
+    "label": "partial: a typed result",
+    "mode": "partial",
+    "market": "forex",
+    "dry": false,
+    "payload": {
+     "v": 1,
+     "client_key": "9b2d7c1e-4f3a-4c5b-8d6e-7f8091a2b3c4",
+     "quantity": "1",
+     "exit_price": "7920.5",
+     "pnl": "-12.5"
+    },
+    "platform": null,
+    "expected": null
+   },
+   {
+    "label": "partial: a bad typed result",
+    "mode": "partial",
+    "market": "forex",
+    "dry": false,
+    "payload": {
+     "v": 1,
+     "client_key": "9b2d7c1e-4f3a-4c5b-8d6e-7f8091a2b3c4",
+     "quantity": "1",
+     "exit_price": "7920.5",
+     "pnl": "12,5"
+    },
+    "platform": null,
+    "expected": {
+     "code": "bad_pnl",
+     "field": "pnl"
+    }
+   },
+   {
+    "label": "partial: «Custos» never",
+    "mode": "partial",
+    "market": "forex",
+    "dry": false,
+    "payload": {
+     "v": 1,
+     "client_key": "9b2d7c1e-4f3a-4c5b-8d6e-7f8091a2b3c4",
+     "quantity": "1",
+     "exit_price": "7920.5",
+     "costs": "1.2"
+    },
+    "platform": null,
+    "expected": {
+     "code": "unknown_key",
+     "field": null
+    }
+   },
+   {
+    "label": "partial: no client_key",
+    "mode": "partial",
+    "market": "futures",
+    "dry": false,
+    "payload": {
+     "v": 1,
+     "quantity": "1",
+     "exit_price": "7920.5"
+    },
+    "platform": null,
+    "expected": {
+     "code": "bad_client_key",
+     "field": "client_key"
+    }
+   },
+   {
+    "label": "partial: no client_key, dry run",
+    "mode": "partial",
+    "market": "futures",
+    "dry": true,
+    "payload": {
+     "v": 1,
+     "quantity": "1",
+     "exit_price": "7920.5"
+    },
+    "platform": null,
+    "expected": null
+   },
+   {
+    "label": "partial: a bad client_key",
+    "mode": "partial",
+    "market": "futures",
+    "dry": false,
+    "payload": {
+     "v": 1,
+     "client_key": "abc",
+     "quantity": "1",
+     "exit_price": "7920.5"
+    },
+    "platform": null,
+    "expected": {
+     "code": "bad_client_key",
+     "field": "client_key"
+    }
+   },
+   {
+    "label": "partial: quantity as a number",
+    "mode": "partial",
+    "market": "futures",
+    "dry": false,
+    "payload": {
+     "v": 1,
+     "client_key": "9b2d7c1e-4f3a-4c5b-8d6e-7f8091a2b3c4",
+     "quantity": 1,
+     "exit_price": "7920.5"
+    },
+    "platform": null,
+    "expected": {
+     "code": "bad_quantity",
+     "field": "quantity"
+    }
+   },
+   {
+    "label": "partial: no quantity",
+    "mode": "partial",
+    "market": "futures",
+    "dry": false,
+    "payload": {
+     "v": 1,
+     "client_key": "9b2d7c1e-4f3a-4c5b-8d6e-7f8091a2b3c4",
+     "exit_price": "7920.5"
+    },
+    "platform": null,
+    "expected": {
+     "code": "bad_quantity",
+     "field": "quantity"
+    }
+   },
+   {
+    "label": "partial: no price",
+    "mode": "partial",
+    "market": "futures",
+    "dry": false,
+    "payload": {
+     "v": 1,
+     "client_key": "9b2d7c1e-4f3a-4c5b-8d6e-7f8091a2b3c4",
+     "quantity": "1"
+    },
+    "platform": null,
+    "expected": {
+     "code": "bad_price",
+     "field": "exit_price"
+    }
+   },
+   {
+    "label": "partial: price as a number",
+    "mode": "partial",
+    "market": "futures",
+    "dry": false,
+    "payload": {
+     "v": 1,
+     "client_key": "9b2d7c1e-4f3a-4c5b-8d6e-7f8091a2b3c4",
+     "quantity": "1",
+     "exit_price": 7920.5
+    },
+    "platform": null,
+    "expected": {
+     "code": "bad_price",
+     "field": "exit_price"
+    }
+   },
+   {
+    "label": "partial: an unknown key",
+    "mode": "partial",
+    "market": "futures",
+    "dry": false,
+    "payload": {
+     "v": 1,
+     "client_key": "9b2d7c1e-4f3a-4c5b-8d6e-7f8091a2b3c4",
+     "quantity": "1",
+     "exit_price": "7920.5",
+     "symbol": "MES"
+    },
+    "platform": null,
+    "expected": {
+     "code": "unknown_key",
+     "field": null
+    }
+   },
+   {
+    "label": "partial: v 2",
+    "mode": "partial",
+    "market": "futures",
+    "dry": false,
+    "payload": {
+     "v": 2,
+     "client_key": "9b2d7c1e-4f3a-4c5b-8d6e-7f8091a2b3c4",
+     "quantity": "1",
+     "exit_price": "7920.5"
+    },
+    "platform": null,
+    "expected": {
+     "code": "bad_rules_version",
+     "field": "v"
+    }
+   },
+   {
+    "label": "partial: a bad hour",
+    "mode": "partial",
+    "market": "futures",
+    "dry": false,
+    "payload": {
+     "v": 1,
+     "client_key": "9b2d7c1e-4f3a-4c5b-8d6e-7f8091a2b3c4",
+     "quantity": "1",
+     "exit_price": "7920.5",
+     "exit": "25:00",
+     "clock": "America/New_York"
+    },
+    "platform": null,
+    "expected": {
+     "code": "bad_time",
+     "field": "exit"
+    }
+   },
+   {
+    "label": "partial: binaries refuse its keys",
+    "mode": "partial",
+    "market": "binary",
+    "dry": false,
+    "payload": {
+     "v": 1,
+     "client_key": "9b2d7c1e-4f3a-4c5b-8d6e-7f8091a2b3c4",
+     "quantity": "1",
+     "exit_price": "7920.5"
+    },
+    "platform": "ebinex",
+    "expected": {
+     "code": "not_for_market",
+     "field": "exit_price"
+    }
+   },
+   {
+    "label": "partial: an outcome on a price market",
+    "mode": "partial",
+    "market": "futures",
+    "dry": false,
+    "payload": {
+     "v": 1,
+     "client_key": "9b2d7c1e-4f3a-4c5b-8d6e-7f8091a2b3c4",
+     "quantity": "1",
+     "exit_price": "7920.5",
+     "outcome": "ganho"
+    },
+    "platform": null,
+    "expected": {
+     "code": "unknown_key",
+     "field": null
+    }
+   },
+   {
+    "label": "exit: \"exits\" is not an exit key",
+    "mode": "exit",
+    "market": "futures",
+    "dry": false,
+    "payload": {
+     "v": 1,
+     "exit_price": "7920.5",
+     "exits": [
+      {
+       "quantity": "1",
+       "exit_price": "4409.3",
+       "exit": "10:31"
+      },
+      {
+       "quantity": "1",
+       "exit_price": "4421.3",
+       "exit": "10:38"
+      }
+     ]
+    },
+    "platform": null,
+    "expected": {
+     "code": "unknown_key",
+     "field": null
+    }
+   },
+   {
+    "label": "exit: \"breakeven\" is not an exit key",
+    "mode": "exit",
+    "market": "futures",
+    "dry": false,
+    "payload": {
+     "v": 1,
+     "exit_price": "7920.5",
+     "breakeven": {
+      "price_then": "1"
+     }
+    },
+    "platform": null,
+    "expected": {
+     "code": "unknown_key",
+     "field": null
+    }
+   },
+   {
+    "label": "after: two exits",
+    "mode": "after",
+    "market": "futures",
+    "dry": false,
+    "payload": {
+     "v": 1,
+     "client_key": "9b2d7c1e-4f3a-4c5b-8d6e-7f8091a2b3c4",
+     "symbol": "MGC",
+     "direction": "short",
+     "quantity": "2",
+     "entry_price": "4421.3",
+     "clock": "America/New_York",
+     "day": "2026-10-23",
+     "entry": "10:24",
+     "exits": [
+      {
+       "quantity": "1",
+       "exit_price": "4409.3",
+       "exit": "10:31"
+      },
+      {
+       "quantity": "1",
+       "exit_price": "4421.3",
+       "exit": "10:38"
+      }
+     ]
+    },
+    "platform": null,
+    "expected": null
+   },
+   {
+    "label": "after: two exits and the breakeven",
+    "mode": "after",
+    "market": "futures",
+    "dry": false,
+    "payload": {
+     "v": 1,
+     "client_key": "9b2d7c1e-4f3a-4c5b-8d6e-7f8091a2b3c4",
+     "symbol": "MGC",
+     "direction": "short",
+     "quantity": "2",
+     "entry_price": "4421.3",
+     "clock": "America/New_York",
+     "day": "2026-10-23",
+     "entry": "10:24",
+     "exits": [
+      {
+       "quantity": "1",
+       "exit_price": "4409.3",
+       "exit": "10:31"
+      },
+      {
+       "quantity": "1",
+       "exit_price": "4421.3",
+       "exit": "10:38"
+      }
+     ],
+     "breakeven": {
+      "price_then": "4409.3"
+     }
+    },
+    "platform": null,
+    "expected": null
+   },
+   {
+    "label": "after: one exit and the breakeven",
+    "mode": "after",
+    "market": "futures",
+    "dry": false,
+    "payload": {
+     "v": 1,
+     "client_key": "9b2d7c1e-4f3a-4c5b-8d6e-7f8091a2b3c4",
+     "symbol": "MGC",
+     "direction": "short",
+     "quantity": "2",
+     "entry_price": "4421.3",
+     "clock": "America/New_York",
+     "day": "2026-10-23",
+     "entry": "10:24",
+     "exit": "10:38",
+     "exit_price": "4415.3",
+     "breakeven": {
+      "price_then": "4409.3"
+     }
+    },
+    "platform": null,
+    "expected": null
+   },
+   {
+    "label": "after: exits and exit_price",
+    "mode": "after",
+    "market": "futures",
+    "dry": false,
+    "payload": {
+     "v": 1,
+     "client_key": "9b2d7c1e-4f3a-4c5b-8d6e-7f8091a2b3c4",
+     "symbol": "MGC",
+     "direction": "short",
+     "quantity": "2",
+     "entry_price": "4421.3",
+     "clock": "America/New_York",
+     "day": "2026-10-23",
+     "entry": "10:24",
+     "exits": [
+      {
+       "quantity": "1",
+       "exit_price": "4409.3",
+       "exit": "10:31"
+      },
+      {
+       "quantity": "1",
+       "exit_price": "4421.3",
+       "exit": "10:38"
+      }
+     ],
+     "exit_price": "4415.3"
+    },
+    "platform": null,
+    "expected": {
+     "code": "bad_payload",
+     "field": "exits"
+    }
+   },
+   {
+    "label": "after: exits and exit",
+    "mode": "after",
+    "market": "futures",
+    "dry": false,
+    "payload": {
+     "v": 1,
+     "client_key": "9b2d7c1e-4f3a-4c5b-8d6e-7f8091a2b3c4",
+     "symbol": "MGC",
+     "direction": "short",
+     "quantity": "2",
+     "entry_price": "4421.3",
+     "clock": "America/New_York",
+     "day": "2026-10-23",
+     "entry": "10:24",
+     "exits": [
+      {
+       "quantity": "1",
+       "exit_price": "4409.3",
+       "exit": "10:31"
+      },
+      {
+       "quantity": "1",
+       "exit_price": "4421.3",
+       "exit": "10:38"
+      }
+     ],
+     "exit": "10:38"
+    },
+    "platform": null,
+    "expected": {
+     "code": "bad_payload",
+     "field": "exits"
+    }
+   },
+   {
+    "label": "after: one item",
+    "mode": "after",
+    "market": "futures",
+    "dry": false,
+    "payload": {
+     "v": 1,
+     "client_key": "9b2d7c1e-4f3a-4c5b-8d6e-7f8091a2b3c4",
+     "symbol": "MGC",
+     "direction": "short",
+     "quantity": "2",
+     "entry_price": "4421.3",
+     "clock": "America/New_York",
+     "day": "2026-10-23",
+     "entry": "10:24",
+     "exits": [
+      {
+       "quantity": "1",
+       "exit_price": "4409.3",
+       "exit": "10:31"
+      }
+     ]
+    },
+    "platform": null,
+    "expected": {
+     "code": "bad_payload",
+     "field": "exits"
+    }
+   },
+   {
+    "label": "after: 21 items",
+    "mode": "after",
+    "market": "futures",
+    "dry": false,
+    "payload": {
+     "v": 1,
+     "client_key": "9b2d7c1e-4f3a-4c5b-8d6e-7f8091a2b3c4",
+     "symbol": "MGC",
+     "direction": "short",
+     "quantity": "2",
+     "entry_price": "4421.3",
+     "clock": "America/New_York",
+     "day": "2026-10-23",
+     "entry": "10:24",
+     "exits": [
+      {
+       "quantity": "1",
+       "exit_price": "4409.3",
+       "exit": "10:31"
+      },
+      {
+       "quantity": "1",
+       "exit_price": "4409.3",
+       "exit": "10:31"
+      },
+      {
+       "quantity": "1",
+       "exit_price": "4409.3",
+       "exit": "10:31"
+      },
+      {
+       "quantity": "1",
+       "exit_price": "4409.3",
+       "exit": "10:31"
+      },
+      {
+       "quantity": "1",
+       "exit_price": "4409.3",
+       "exit": "10:31"
+      },
+      {
+       "quantity": "1",
+       "exit_price": "4409.3",
+       "exit": "10:31"
+      },
+      {
+       "quantity": "1",
+       "exit_price": "4409.3",
+       "exit": "10:31"
+      },
+      {
+       "quantity": "1",
+       "exit_price": "4409.3",
+       "exit": "10:31"
+      },
+      {
+       "quantity": "1",
+       "exit_price": "4409.3",
+       "exit": "10:31"
+      },
+      {
+       "quantity": "1",
+       "exit_price": "4409.3",
+       "exit": "10:31"
+      },
+      {
+       "quantity": "1",
+       "exit_price": "4409.3",
+       "exit": "10:31"
+      },
+      {
+       "quantity": "1",
+       "exit_price": "4409.3",
+       "exit": "10:31"
+      },
+      {
+       "quantity": "1",
+       "exit_price": "4409.3",
+       "exit": "10:31"
+      },
+      {
+       "quantity": "1",
+       "exit_price": "4409.3",
+       "exit": "10:31"
+      },
+      {
+       "quantity": "1",
+       "exit_price": "4409.3",
+       "exit": "10:31"
+      },
+      {
+       "quantity": "1",
+       "exit_price": "4409.3",
+       "exit": "10:31"
+      },
+      {
+       "quantity": "1",
+       "exit_price": "4409.3",
+       "exit": "10:31"
+      },
+      {
+       "quantity": "1",
+       "exit_price": "4409.3",
+       "exit": "10:31"
+      },
+      {
+       "quantity": "1",
+       "exit_price": "4409.3",
+       "exit": "10:31"
+      },
+      {
+       "quantity": "1",
+       "exit_price": "4409.3",
+       "exit": "10:31"
+      },
+      {
+       "quantity": "1",
+       "exit_price": "4409.3",
+       "exit": "10:31"
+      }
+     ]
+    },
+    "platform": null,
+    "expected": {
+     "code": "bad_payload",
+     "field": "exits"
+    }
+   },
+   {
+    "label": "after: 20 items",
+    "mode": "after",
+    "market": "futures",
+    "dry": false,
+    "payload": {
+     "v": 1,
+     "client_key": "9b2d7c1e-4f3a-4c5b-8d6e-7f8091a2b3c4",
+     "symbol": "MGC",
+     "direction": "short",
+     "quantity": "2",
+     "entry_price": "4421.3",
+     "clock": "America/New_York",
+     "day": "2026-10-23",
+     "entry": "10:24",
+     "exits": [
+      {
+       "quantity": "1",
+       "exit_price": "4409.3",
+       "exit": "10:31"
+      },
+      {
+       "quantity": "1",
+       "exit_price": "4409.3",
+       "exit": "10:31"
+      },
+      {
+       "quantity": "1",
+       "exit_price": "4409.3",
+       "exit": "10:31"
+      },
+      {
+       "quantity": "1",
+       "exit_price": "4409.3",
+       "exit": "10:31"
+      },
+      {
+       "quantity": "1",
+       "exit_price": "4409.3",
+       "exit": "10:31"
+      },
+      {
+       "quantity": "1",
+       "exit_price": "4409.3",
+       "exit": "10:31"
+      },
+      {
+       "quantity": "1",
+       "exit_price": "4409.3",
+       "exit": "10:31"
+      },
+      {
+       "quantity": "1",
+       "exit_price": "4409.3",
+       "exit": "10:31"
+      },
+      {
+       "quantity": "1",
+       "exit_price": "4409.3",
+       "exit": "10:31"
+      },
+      {
+       "quantity": "1",
+       "exit_price": "4409.3",
+       "exit": "10:31"
+      },
+      {
+       "quantity": "1",
+       "exit_price": "4409.3",
+       "exit": "10:31"
+      },
+      {
+       "quantity": "1",
+       "exit_price": "4409.3",
+       "exit": "10:31"
+      },
+      {
+       "quantity": "1",
+       "exit_price": "4409.3",
+       "exit": "10:31"
+      },
+      {
+       "quantity": "1",
+       "exit_price": "4409.3",
+       "exit": "10:31"
+      },
+      {
+       "quantity": "1",
+       "exit_price": "4409.3",
+       "exit": "10:31"
+      },
+      {
+       "quantity": "1",
+       "exit_price": "4409.3",
+       "exit": "10:31"
+      },
+      {
+       "quantity": "1",
+       "exit_price": "4409.3",
+       "exit": "10:31"
+      },
+      {
+       "quantity": "1",
+       "exit_price": "4409.3",
+       "exit": "10:31"
+      },
+      {
+       "quantity": "1",
+       "exit_price": "4409.3",
+       "exit": "10:31"
+      },
+      {
+       "quantity": "1",
+       "exit_price": "4409.3",
+       "exit": "10:31"
+      }
+     ]
+    },
+    "platform": null,
+    "expected": null
+   },
+   {
+    "label": "after: exits not an array",
+    "mode": "after",
+    "market": "futures",
+    "dry": false,
+    "payload": {
+     "v": 1,
+     "client_key": "9b2d7c1e-4f3a-4c5b-8d6e-7f8091a2b3c4",
+     "symbol": "MGC",
+     "direction": "short",
+     "quantity": "2",
+     "entry_price": "4421.3",
+     "clock": "America/New_York",
+     "day": "2026-10-23",
+     "entry": "10:24",
+     "exits": {
+      "a": {
+       "quantity": "1",
+       "exit_price": "4409.3",
+       "exit": "10:31"
+      }
+     }
+    },
+    "platform": null,
+    "expected": {
+     "code": "bad_payload",
+     "field": "exits"
+    }
+   },
+   {
+    "label": "after: exits null",
+    "mode": "after",
+    "market": "futures",
+    "dry": false,
+    "payload": {
+     "v": 1,
+     "client_key": "9b2d7c1e-4f3a-4c5b-8d6e-7f8091a2b3c4",
+     "symbol": "MGC",
+     "direction": "short",
+     "quantity": "2",
+     "entry_price": "4421.3",
+     "clock": "America/New_York",
+     "day": "2026-10-23",
+     "entry": "10:24",
+     "exits": null
+    },
+    "platform": null,
+    "expected": {
+     "code": "bad_payload",
+     "field": "exits"
+    }
+   },
+   {
+    "label": "after: an item not an object",
+    "mode": "after",
+    "market": "futures",
+    "dry": false,
+    "payload": {
+     "v": 1,
+     "client_key": "9b2d7c1e-4f3a-4c5b-8d6e-7f8091a2b3c4",
+     "symbol": "MGC",
+     "direction": "short",
+     "quantity": "2",
+     "entry_price": "4421.3",
+     "clock": "America/New_York",
+     "day": "2026-10-23",
+     "entry": "10:24",
+     "exits": [
+      {
+       "quantity": "1",
+       "exit_price": "4409.3",
+       "exit": "10:31"
+      },
+      "x"
+     ]
+    },
+    "platform": null,
+    "expected": {
+     "code": "unknown_key",
+     "field": "exits"
+    }
+   },
+   {
+    "label": "after: an unknown key in an item",
+    "mode": "after",
+    "market": "futures",
+    "dry": false,
+    "payload": {
+     "v": 1,
+     "client_key": "9b2d7c1e-4f3a-4c5b-8d6e-7f8091a2b3c4",
+     "symbol": "MGC",
+     "direction": "short",
+     "quantity": "2",
+     "entry_price": "4421.3",
+     "clock": "America/New_York",
+     "day": "2026-10-23",
+     "entry": "10:24",
+     "exits": [
+      {
+       "quantity": "1",
+       "exit_price": "4409.3",
+       "exit": "10:31"
+      },
+      {
+       "quantity": "1",
+       "exit_price": "4421.3",
+       "exit": "10:38",
+       "symbol": "MGC"
+      }
+     ]
+    },
+    "platform": null,
+    "expected": {
+     "code": "unknown_key",
+     "field": "exits"
+    }
+   },
+   {
+    "label": "after: «Custos» in an item where the market has none",
+    "mode": "after",
+    "market": "futures",
+    "dry": false,
+    "payload": {
+     "v": 1,
+     "client_key": "9b2d7c1e-4f3a-4c5b-8d6e-7f8091a2b3c4",
+     "symbol": "MGC",
+     "direction": "short",
+     "quantity": "2",
+     "entry_price": "4421.3",
+     "clock": "America/New_York",
+     "day": "2026-10-23",
+     "entry": "10:24",
+     "exits": [
+      {
+       "quantity": "1",
+       "exit_price": "4409.3",
+       "exit": "10:31"
+      },
+      {
+       "quantity": "1",
+       "exit_price": "4421.3",
+       "exit": "10:38",
+       "costs": "1"
+      }
+     ]
+    },
+    "platform": null,
+    "expected": {
+     "code": "not_for_market",
+     "field": "exits"
+    }
+   },
+   {
+    "label": "after: «Custos» in an item (forex)",
+    "mode": "after",
+    "market": "forex",
+    "dry": false,
+    "payload": {
+     "v": 1,
+     "client_key": "9b2d7c1e-4f3a-4c5b-8d6e-7f8091a2b3c4",
+     "symbol": "EUR/USD",
+     "direction": "long",
+     "quantity": "1",
+     "entry_price": "1.0852",
+     "clock": "America/New_York",
+     "day": "2026-10-23",
+     "entry": "10:24",
+     "exits": [
+      {
+       "quantity": "0.5",
+       "exit_price": "1.0865",
+       "exit": "10:31"
+      },
+      {
+       "quantity": "0.5",
+       "exit_price": "1.087",
+       "exit": "10:38",
+       "costs": "7"
+      }
+     ]
+    },
+    "platform": null,
+    "expected": null
+   },
+   {
+    "label": "after: a bad «Custos» in an item",
+    "mode": "after",
+    "market": "forex",
+    "dry": false,
+    "payload": {
+     "v": 1,
+     "client_key": "9b2d7c1e-4f3a-4c5b-8d6e-7f8091a2b3c4",
+     "symbol": "EUR/USD",
+     "direction": "long",
+     "quantity": "1",
+     "entry_price": "1.0852",
+     "clock": "America/New_York",
+     "day": "2026-10-23",
+     "entry": "10:24",
+     "exits": [
+      {
+       "quantity": "1",
+       "exit_price": "4409.3",
+       "exit": "10:31"
+      },
+      {
+       "quantity": "1",
+       "exit_price": "4421.3",
+       "exit": "10:38",
+       "costs": "-1"
+      }
+     ]
+    },
+    "platform": null,
+    "expected": {
+     "code": "bad_costs",
+     "field": "exits"
+    }
+   },
+   {
+    "label": "after: an item without quantity",
+    "mode": "after",
+    "market": "futures",
+    "dry": false,
+    "payload": {
+     "v": 1,
+     "client_key": "9b2d7c1e-4f3a-4c5b-8d6e-7f8091a2b3c4",
+     "symbol": "MGC",
+     "direction": "short",
+     "quantity": "2",
+     "entry_price": "4421.3",
+     "clock": "America/New_York",
+     "day": "2026-10-23",
+     "entry": "10:24",
+     "exits": [
+      {
+       "quantity": "1",
+       "exit_price": "4409.3",
+       "exit": "10:31"
+      },
+      {
+       "exit_price": "4421.3",
+       "exit": "10:38"
+      }
+     ]
+    },
+    "platform": null,
+    "expected": {
+     "code": "bad_quantity",
+     "field": "exits"
+    }
+   },
+   {
+    "label": "after: an item quantity as a number",
+    "mode": "after",
+    "market": "futures",
+    "dry": false,
+    "payload": {
+     "v": 1,
+     "client_key": "9b2d7c1e-4f3a-4c5b-8d6e-7f8091a2b3c4",
+     "symbol": "MGC",
+     "direction": "short",
+     "quantity": "2",
+     "entry_price": "4421.3",
+     "clock": "America/New_York",
+     "day": "2026-10-23",
+     "entry": "10:24",
+     "exits": [
+      {
+       "quantity": "1",
+       "exit_price": "4409.3",
+       "exit": "10:31"
+      },
+      {
+       "quantity": 1,
+       "exit_price": "4421.3",
+       "exit": "10:38"
+      }
+     ]
+    },
+    "platform": null,
+    "expected": {
+     "code": "bad_quantity",
+     "field": "exits"
+    }
+   },
+   {
+    "label": "after: an item without price",
+    "mode": "after",
+    "market": "futures",
+    "dry": false,
+    "payload": {
+     "v": 1,
+     "client_key": "9b2d7c1e-4f3a-4c5b-8d6e-7f8091a2b3c4",
+     "symbol": "MGC",
+     "direction": "short",
+     "quantity": "2",
+     "entry_price": "4421.3",
+     "clock": "America/New_York",
+     "day": "2026-10-23",
+     "entry": "10:24",
+     "exits": [
+      {
+       "quantity": "1",
+       "exit_price": "4409.3",
+       "exit": "10:31"
+      },
+      {
+       "quantity": "1",
+       "exit": "10:38"
+      }
+     ]
+    },
+    "platform": null,
+    "expected": {
+     "code": "bad_price",
+     "field": "exits"
+    }
+   },
+   {
+    "label": "after: an item without hour",
+    "mode": "after",
+    "market": "futures",
+    "dry": false,
+    "payload": {
+     "v": 1,
+     "client_key": "9b2d7c1e-4f3a-4c5b-8d6e-7f8091a2b3c4",
+     "symbol": "MGC",
+     "direction": "short",
+     "quantity": "2",
+     "entry_price": "4421.3",
+     "clock": "America/New_York",
+     "day": "2026-10-23",
+     "entry": "10:24",
+     "exits": [
+      {
+       "quantity": "1",
+       "exit_price": "4409.3",
+       "exit": "10:31"
+      },
+      {
+       "quantity": "1",
+       "exit_price": "4421.3"
+      }
+     ]
+    },
+    "platform": null,
+    "expected": {
+     "code": "bad_time",
+     "field": "exits"
+    }
+   },
+   {
+    "label": "after: an item with a bad hour",
+    "mode": "after",
+    "market": "futures",
+    "dry": false,
+    "payload": {
+     "v": 1,
+     "client_key": "9b2d7c1e-4f3a-4c5b-8d6e-7f8091a2b3c4",
+     "symbol": "MGC",
+     "direction": "short",
+     "quantity": "2",
+     "entry_price": "4421.3",
+     "clock": "America/New_York",
+     "day": "2026-10-23",
+     "entry": "10:24",
+     "exits": [
+      {
+       "quantity": "1",
+       "exit_price": "4409.3",
+       "exit": "10:31"
+      },
+      {
+       "quantity": "1",
+       "exit_price": "4421.3",
+       "exit": "10h38"
+      }
+     ]
+    },
+    "platform": null,
+    "expected": {
+     "code": "bad_time",
+     "field": "exits"
+    }
+   },
+   {
+    "label": "after: an item with a bad result",
+    "mode": "after",
+    "market": "futures",
+    "dry": false,
+    "payload": {
+     "v": 1,
+     "client_key": "9b2d7c1e-4f3a-4c5b-8d6e-7f8091a2b3c4",
+     "symbol": "MGC",
+     "direction": "short",
+     "quantity": "2",
+     "entry_price": "4421.3",
+     "clock": "America/New_York",
+     "day": "2026-10-23",
+     "entry": "10:24",
+     "exits": [
+      {
+       "quantity": "1",
+       "exit_price": "4409.3",
+       "exit": "10:31"
+      },
+      {
+       "quantity": "1",
+       "exit_price": "4421.3",
+       "exit": "10:38",
+       "pnl": "x"
+      }
+     ]
+    },
+    "platform": null,
+    "expected": {
+     "code": "bad_pnl",
+     "field": "exits"
+    }
+   },
+   {
+    "label": "after: an item with a typed result",
+    "mode": "after",
+    "market": "futures",
+    "dry": false,
+    "payload": {
+     "v": 1,
+     "client_key": "9b2d7c1e-4f3a-4c5b-8d6e-7f8091a2b3c4",
+     "symbol": "ZN",
+     "direction": "short",
+     "quantity": "2",
+     "entry_price": "4421.3",
+     "clock": "America/New_York",
+     "day": "2026-10-23",
+     "entry": "10:24",
+     "exits": [
+      {
+       "quantity": "1",
+       "exit_price": "4409.3",
+       "exit": "10:31",
+       "pnl": "120"
+      },
+      {
+       "quantity": "1",
+       "exit_price": "4421.3",
+       "exit": "10:38",
+       "pnl": "0"
+      }
+     ]
+    },
+    "platform": null,
+    "expected": null
+   },
+   {
+    "label": "after: exits without clock",
+    "mode": "after",
+    "market": "futures",
+    "dry": false,
+    "payload": {
+     "v": 1,
+     "client_key": "9b2d7c1e-4f3a-4c5b-8d6e-7f8091a2b3c4",
+     "symbol": "MGC",
+     "direction": "short",
+     "quantity": "2",
+     "entry_price": "4421.3",
+     "day": "2026-10-23",
+     "entry": "10:24",
+     "exits": [
+      {
+       "quantity": "1",
+       "exit_price": "4409.3",
+       "exit": "10:31"
+      },
+      {
+       "quantity": "1",
+       "exit_price": "4421.3",
+       "exit": "10:38"
+      }
+     ]
+    },
+    "platform": null,
+    "expected": {
+     "code": "bad_clock",
+     "field": "clock"
+    }
+   },
+   {
+    "label": "after: no exit and no exits",
+    "mode": "after",
+    "market": "futures",
+    "dry": false,
+    "payload": {
+     "v": 1,
+     "client_key": "9b2d7c1e-4f3a-4c5b-8d6e-7f8091a2b3c4",
+     "symbol": "MGC",
+     "direction": "short",
+     "quantity": "2",
+     "entry_price": "4421.3",
+     "clock": "America/New_York",
+     "day": "2026-10-23",
+     "entry": "10:24"
+    },
+    "platform": null,
+    "expected": {
+     "code": "bad_time",
+     "field": "exit"
+    }
+   },
+   {
+    "label": "after: breakeven not an object",
+    "mode": "after",
+    "market": "futures",
+    "dry": false,
+    "payload": {
+     "v": 1,
+     "client_key": "9b2d7c1e-4f3a-4c5b-8d6e-7f8091a2b3c4",
+     "symbol": "MGC",
+     "direction": "short",
+     "quantity": "2",
+     "entry_price": "4421.3",
+     "clock": "America/New_York",
+     "day": "2026-10-23",
+     "entry": "10:24",
+     "exit": "10:38",
+     "exit_price": "4415.3",
+     "breakeven": "4409.3"
+    },
+    "platform": null,
+    "expected": {
+     "code": "bad_payload",
+     "field": "breakeven"
+    }
+   },
+   {
+    "label": "after: breakeven with another key",
+    "mode": "after",
+    "market": "futures",
+    "dry": false,
+    "payload": {
+     "v": 1,
+     "client_key": "9b2d7c1e-4f3a-4c5b-8d6e-7f8091a2b3c4",
+     "symbol": "MGC",
+     "direction": "short",
+     "quantity": "2",
+     "entry_price": "4421.3",
+     "clock": "America/New_York",
+     "day": "2026-10-23",
+     "entry": "10:24",
+     "exit": "10:38",
+     "exit_price": "4415.3",
+     "breakeven": {
+      "price_then": "4409.3",
+      "favor": "12"
+     }
+    },
+    "platform": null,
+    "expected": {
+     "code": "bad_payload",
+     "field": "breakeven"
+    }
+   },
+   {
+    "label": "after: breakeven without the price",
+    "mode": "after",
+    "market": "futures",
+    "dry": false,
+    "payload": {
+     "v": 1,
+     "client_key": "9b2d7c1e-4f3a-4c5b-8d6e-7f8091a2b3c4",
+     "symbol": "MGC",
+     "direction": "short",
+     "quantity": "2",
+     "entry_price": "4421.3",
+     "clock": "America/New_York",
+     "day": "2026-10-23",
+     "entry": "10:24",
+     "exit": "10:38",
+     "exit_price": "4415.3",
+     "breakeven": {}
+    },
+    "platform": null,
+    "expected": {
+     "code": "bad_price",
+     "field": "breakeven"
+    }
+   },
+   {
+    "label": "after: breakeven price as a number",
+    "mode": "after",
+    "market": "futures",
+    "dry": false,
+    "payload": {
+     "v": 1,
+     "client_key": "9b2d7c1e-4f3a-4c5b-8d6e-7f8091a2b3c4",
+     "symbol": "MGC",
+     "direction": "short",
+     "quantity": "2",
+     "entry_price": "4421.3",
+     "clock": "America/New_York",
+     "day": "2026-10-23",
+     "entry": "10:24",
+     "exit": "10:38",
+     "exit_price": "4415.3",
+     "breakeven": {
+      "price_then": 4409.3
+     }
+    },
+    "platform": null,
+    "expected": {
+     "code": "bad_price",
+     "field": "breakeven"
+    }
+   },
+   {
+    "label": "after: binaries never take exits",
+    "mode": "after",
+    "market": "binary",
+    "dry": false,
+    "payload": {
+     "v": 1,
+     "client_key": "9b2d7c1e-4f3a-4c5b-8d6e-7f8091a2b3c4",
+     "symbol": "EUR/USD",
+     "direction": "call",
+     "stake": "10",
+     "payout": "87",
+     "duration_s": 300,
+     "clock": "America/Sao_Paulo",
+     "day": "2026-10-23",
+     "entry": "10:00",
+     "outcome": "ganho",
+     "exits": [
+      {
+       "quantity": "1",
+       "exit_price": "4409.3",
+       "exit": "10:31"
+      },
+      {
+       "quantity": "1",
+       "exit_price": "4421.3",
+       "exit": "10:38"
+      }
+     ]
+    },
+    "platform": "ebinex",
+    "expected": {
+     "code": "not_for_market",
+     "field": "exits"
+    }
+   },
+   {
+    "label": "after: binaries never take breakeven",
+    "mode": "after",
+    "market": "binary",
+    "dry": false,
+    "payload": {
+     "v": 1,
+     "client_key": "9b2d7c1e-4f3a-4c5b-8d6e-7f8091a2b3c4",
+     "symbol": "EUR/USD",
+     "direction": "call",
+     "stake": "10",
+     "payout": "87",
+     "duration_s": 300,
+     "clock": "America/Sao_Paulo",
+     "day": "2026-10-23",
+     "entry": "10:00",
+     "outcome": "ganho",
+     "breakeven": {
+      "price_then": "1"
+     }
+    },
+    "platform": "ebinex",
+    "expected": {
+     "code": "not_for_market",
+     "field": "breakeven"
+    }
+   },
+   {
+    "label": "partial: another clock",
+    "mode": "partial",
+    "market": "futures",
+    "dry": false,
+    "payload": {
+     "v": 1,
+     "client_key": "9b2d7c1e-4f3a-4c5b-8d6e-7f8091a2b3c4",
+     "quantity": "1",
+     "exit_price": "7920.5",
+     "exit": "10:20",
+     "clock": "Europe/London"
+    },
+    "platform": null,
+    "expected": {
+     "code": "bad_clock",
+     "field": "clock"
+    }
+   },
+   {
+    "label": "partial: a result with three decimals",
+    "mode": "partial",
+    "market": "futures",
+    "dry": false,
+    "payload": {
+     "v": 1,
+     "client_key": "9b2d7c1e-4f3a-4c5b-8d6e-7f8091a2b3c4",
+     "quantity": "1",
+     "exit_price": "7920.5",
+     "pnl": "12.345"
+    },
+    "platform": null,
+    "expected": {
+     "code": "bad_pnl",
+     "field": "pnl"
+    }
+   },
+   {
+    "label": "partial: not an object",
+    "mode": "partial",
+    "market": "futures",
+    "dry": false,
+    "payload": [
+     "x"
+    ],
+    "platform": null,
+    "expected": {
+     "code": "bad_payload",
+     "field": null
+    }
+   },
+   {
+    "label": "partial: forex lots",
+    "mode": "partial",
+    "market": "forex",
+    "dry": false,
+    "payload": {
+     "v": 1,
+     "client_key": "9b2d7c1e-4f3a-4c5b-8d6e-7f8091a2b3c4",
+     "quantity": "0.5",
+     "exit_price": "1.08575"
+    },
+    "platform": null,
+    "expected": null
+   },
+   {
+    "label": "partial: crypto",
+    "mode": "partial",
+    "market": "crypto",
+    "dry": false,
+    "payload": {
+     "v": 1,
+     "client_key": "9b2d7c1e-4f3a-4c5b-8d6e-7f8091a2b3c4",
+     "quantity": "0.015",
+     "exit_price": "60123.45"
+    },
+    "platform": null,
+    "expected": null
+   },
+   {
+    "label": "partial: B3 shares",
+    "mode": "partial",
+    "market": "b3",
+    "dry": false,
+    "payload": {
+     "v": 1,
+     "client_key": "9b2d7c1e-4f3a-4c5b-8d6e-7f8091a2b3c4",
+     "quantity": "100",
+     "exit_price": "30.8"
+    },
+    "platform": null,
+    "expected": null
+   },
+   {
+    "label": "partial: an option contract",
+    "mode": "partial",
+    "market": "options",
+    "dry": false,
+    "payload": {
+     "v": 1,
+     "client_key": "9b2d7c1e-4f3a-4c5b-8d6e-7f8091a2b3c4",
+     "quantity": "1",
+     "exit_price": "2.35"
+    },
+    "platform": null,
+    "expected": null
+   },
+   {
+    "label": "partial: a binary with an outcome only",
+    "mode": "partial",
+    "market": "binary",
+    "dry": false,
+    "payload": {
+     "v": 1,
+     "client_key": "9b2d7c1e-4f3a-4c5b-8d6e-7f8091a2b3c4",
+     "outcome": "ganho"
+    },
+    "platform": "ebinex",
+    "expected": {
+     "code": "unknown_key",
+     "field": null
+    }
+   },
+   {
+    "label": "partial: an unknown market",
+    "mode": "partial",
+    "market": "xyz",
+    "dry": false,
+    "payload": {
+     "v": 1,
+     "client_key": "9b2d7c1e-4f3a-4c5b-8d6e-7f8091a2b3c4",
+     "quantity": "1",
+     "exit_price": "7920.5"
+    },
+    "platform": null,
+    "expected": {
+     "code": "not_for_market",
+     "field": null
+    }
+   },
+   {
+    "label": "entry: \"exits\" is not an entry key",
+    "mode": "entry",
+    "market": "futures",
+    "dry": false,
+    "payload": {
+     "v": 1,
+     "client_key": "9b2d7c1e-4f3a-4c5b-8d6e-7f8091a2b3c4",
+     "symbol": "MGC",
+     "direction": "short",
+     "quantity": "2",
+     "entry_price": "4421.3",
+     "clock": "America/New_York",
+     "entry": "10:24",
+     "exits": [
+      {
+       "quantity": "1",
+       "exit_price": "4409.3",
+       "exit": "10:31"
+      },
+      {
+       "quantity": "1",
+       "exit_price": "4421.3",
+       "exit": "10:38"
+      }
+     ]
+    },
+    "platform": null,
+    "expected": {
+     "code": "unknown_key",
+     "field": null
+    }
+   },
+   {
+    "label": "entry: \"breakeven\" is not an entry key",
+    "mode": "entry",
+    "market": "futures",
+    "dry": false,
+    "payload": {
+     "v": 1,
+     "client_key": "9b2d7c1e-4f3a-4c5b-8d6e-7f8091a2b3c4",
+     "symbol": "MGC",
+     "direction": "short",
+     "quantity": "2",
+     "entry_price": "4421.3",
+     "clock": "America/New_York",
+     "entry": "10:24",
+     "breakeven": {
+      "price_then": "4409.3"
+     }
+    },
+    "platform": null,
+    "expected": {
+     "code": "unknown_key",
+     "field": null
+    }
+   },
+   {
+    "label": "after: exits beside pnl",
+    "mode": "after",
+    "market": "futures",
+    "dry": false,
+    "payload": {
+     "v": 1,
+     "client_key": "9b2d7c1e-4f3a-4c5b-8d6e-7f8091a2b3c4",
+     "symbol": "MGC",
+     "direction": "short",
+     "quantity": "2",
+     "entry_price": "4421.3",
+     "clock": "America/New_York",
+     "day": "2026-10-23",
+     "entry": "10:24",
+     "exits": [
+      {
+       "quantity": "1",
+       "exit_price": "4409.3",
+       "exit": "10:31"
+      },
+      {
+       "quantity": "1",
+       "exit_price": "4421.3",
+       "exit": "10:38"
+      }
+     ],
+     "pnl": "100"
+    },
+    "platform": null,
+    "expected": {
+     "code": "bad_payload",
+     "field": "exits"
+    }
+   },
+   {
+    "label": "after: exits beside costs (forex)",
+    "mode": "after",
+    "market": "forex",
+    "dry": false,
+    "payload": {
+     "v": 1,
+     "client_key": "9b2d7c1e-4f3a-4c5b-8d6e-7f8091a2b3c4",
+     "symbol": "EUR/USD",
+     "direction": "long",
+     "quantity": "1",
+     "entry_price": "1.0852",
+     "clock": "America/New_York",
+     "day": "2026-10-23",
+     "entry": "10:24",
+     "exits": [
+      {
+       "quantity": "0.5",
+       "exit_price": "1.0865",
+       "exit": "10:31"
+      },
+      {
+       "quantity": "0.5",
+       "exit_price": "1.087",
+       "exit": "10:38"
+      }
+     ],
+     "costs": "7"
+    },
+    "platform": null,
+    "expected": {
+     "code": "bad_payload",
+     "field": "exits"
+    }
+   },
+   {
+    "label": "after: breakeven null",
+    "mode": "after",
+    "market": "futures",
+    "dry": false,
+    "payload": {
+     "v": 1,
+     "client_key": "9b2d7c1e-4f3a-4c5b-8d6e-7f8091a2b3c4",
+     "symbol": "MGC",
+     "direction": "short",
+     "quantity": "2",
+     "entry_price": "4421.3",
+     "clock": "America/New_York",
+     "day": "2026-10-23",
+     "entry": "10:24",
+     "exit": "10:38",
+     "exit_price": "4415.3",
+     "breakeven": null
+    },
+    "platform": null,
+    "expected": {
+     "code": "bad_payload",
+     "field": "breakeven"
+    }
+   }
+  ]
+ },
+ "qty": {
+  "about": "trade_qty(trade_instrument(market, symbol, option), x)::text: a quantity with the instrument's decimals (null otherwise)",
+  "cases": [
+   {
+    "market": "futures",
+    "symbol": "MES",
+    "option": null,
+    "x": "1",
+    "expected": "1"
+   },
+   {
+    "market": "futures",
+    "symbol": "MES",
+    "option": null,
+    "x": "3",
+    "expected": "3"
+   },
+   {
+    "market": "futures",
+    "symbol": "MES",
+    "option": null,
+    "x": "999999",
+    "expected": "999999"
+   },
+   {
+    "market": "futures",
+    "symbol": "MES",
+    "option": null,
+    "x": "1000000",
+    "expected": null
+   },
+   {
+    "market": "futures",
+    "symbol": "MES",
+    "option": null,
+    "x": "1.5",
+    "expected": null
+   },
+   {
+    "market": "futures",
+    "symbol": "MES",
+    "option": null,
+    "x": "0",
+    "expected": "0"
+   },
+   {
+    "market": "futures",
+    "symbol": "MES",
+    "option": null,
+    "x": "-1",
+    "expected": null
+   },
+   {
+    "market": "futures",
+    "symbol": "MES",
+    "option": null,
+    "x": "01",
+    "expected": "1"
+   },
+   {
+    "market": "futures",
+    "symbol": "MES",
+    "option": null,
+    "x": " 2",
+    "expected": null
+   },
+   {
+    "market": "futures",
+    "symbol": "MES",
+    "option": null,
+    "x": "2.0",
+    "expected": null
+   },
+   {
+    "market": "futures",
+    "symbol": "MES",
+    "option": null,
+    "x": 2,
+    "expected": null
+   },
+   {
+    "market": "futures",
+    "symbol": "MES",
+    "option": null,
+    "x": null,
+    "expected": null
+   },
+   {
+    "market": "futures",
+    "symbol": "MES",
+    "option": null,
+    "x": "",
+    "expected": null
+   },
+   {
+    "market": "forex",
+    "symbol": "EUR/USD",
+    "option": null,
+    "x": "0.01",
+    "expected": "0.01"
+   },
+   {
+    "market": "forex",
+    "symbol": "EUR/USD",
+    "option": null,
+    "x": "0.5",
+    "expected": "0.5"
+   },
+   {
+    "market": "forex",
+    "symbol": "EUR/USD",
+    "option": null,
+    "x": "1.10",
+    "expected": "1.10"
+   },
+   {
+    "market": "forex",
+    "symbol": "EUR/USD",
+    "option": null,
+    "x": "0.015",
+    "expected": null
+   },
+   {
+    "market": "forex",
+    "symbol": "EUR/USD",
+    "option": null,
+    "x": "0.001",
+    "expected": null
+   },
+   {
+    "market": "forex",
+    "symbol": "EUR/USD",
+    "option": null,
+    "x": "10",
+    "expected": "10"
+   },
+   {
+    "market": "crypto",
+    "symbol": "BTC/USDT",
+    "option": null,
+    "x": "0.00000001",
+    "expected": "0.00000001"
+   },
+   {
+    "market": "crypto",
+    "symbol": "BTC/USDT",
+    "option": null,
+    "x": "0.000000001",
+    "expected": null
+   },
+   {
+    "market": "crypto",
+    "symbol": "BTC/USDT",
+    "option": null,
+    "x": "0.015",
+    "expected": "0.015"
+   },
+   {
+    "market": "crypto",
+    "symbol": "BTC/USDT",
+    "option": null,
+    "x": "2",
+    "expected": "2"
+   },
+   {
+    "market": "stocks",
+    "symbol": "AAPL",
+    "option": null,
+    "x": "0.123456",
+    "expected": "0.123456"
+   },
+   {
+    "market": "stocks",
+    "symbol": "AAPL",
+    "option": null,
+    "x": "0.1234567",
+    "expected": null
+   },
+   {
+    "market": "stocks",
+    "symbol": "AAPL",
+    "option": null,
+    "x": "10",
+    "expected": "10"
+   },
+   {
+    "market": "b3",
+    "symbol": "PETR4",
+    "option": null,
+    "x": "100",
+    "expected": "100"
+   },
+   {
+    "market": "b3",
+    "symbol": "PETR4",
+    "option": null,
+    "x": "100.5",
+    "expected": null
+   },
+   {
+    "market": "b3",
+    "symbol": "WINZ26",
+    "option": null,
+    "x": "5",
+    "expected": "5"
+   },
+   {
+    "market": "options",
+    "symbol": "SPX",
+    "option": {
+     "right": "call",
+     "strike": "200",
+     "expires_on": "2026-11-20"
+    },
+    "x": "1",
+    "expected": "1"
+   },
+   {
+    "market": "options",
+    "symbol": "SPX",
+    "option": {
+     "right": "call",
+     "strike": "200",
+     "expires_on": "2026-11-20"
+    },
+    "x": "1.5",
+    "expected": null
+   }
+  ]
+ }
+}

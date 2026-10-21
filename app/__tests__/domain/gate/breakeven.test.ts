@@ -3,7 +3,8 @@
  *
  * «Mover para o breakeven com +N» in the versioned rules (Phase 3c, 20261023000001_regra_breakeven.sql):
  * the optional tenth key of a version, the settings' check and the absent-when-off rule. The SQL's
- * codes for every shape are recorded in breakeven.cases.json (cases3c.test.ts); here, the domain form.
+ * codes for every shape are recorded in ../cases3c.json (cases3c.test.ts: rules_is_dist,
+ * rules_check_breakeven, rules_check_resolved, rules_resolve); here, the domain form.
  */
 import {
   BREAKEVEN_UNITS,
