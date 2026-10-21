@@ -58,6 +58,7 @@ import {
   mgcUmaSaida,
   mnqAntesDaParcial,
   mnqFechadaS14,
+  mnqSemChegar,
   parcialEur,
   parcialMnq,
   parcialParciais,
@@ -480,17 +481,19 @@ describe('scenario 16 · the partial that reaches the limit', () => {
     expect(modeloMoverStop(apex, antes, CS({ modo: 'outro', novo: '30.865,00' }), agora1055, true)!.avisoLimite).toBeNull()
   })
 
-  it('step 3 «Breakeven: o stop foi movido, sem chegar à entrada · sua regra: +30 pts.»', () => {
-    const p = parcialMnq()
-    const mv = comMovimento(estadoJson('partial-mnq-limite'), 'futures', {
-      id: 7,
-      at: etEm('10:54'),
-      payload: { v: 1, client_key: '00000000-0000-4000-8000-000000000004', kind: 'ajuste', stop_price: '30860', price_now: '30870' },
-    })
-    const s = mv.state
-    const closed = { ...s, trade: { ...s.trade, status: 'closed' as const, exitPrice: '30870', exitTime: at('10:56'), pnl: '-120' } }
-    expect(cartaoComParciais(apex, v(closed), at('10:56')).breakeven).toBe('Breakeven: o stop foi movido, sem chegar à entrada · sua regra: +30 pts.')
-    expect(p.repeated).toBe(false)
+  it('step 3 «Breakeven: o stop foi movido, sem chegar à entrada · sua regra: +30 pts.» (composed: 30.860,00 with 30.870,00, out at 30.870,00)', () => {
+    const s = mnqSemChegar()
+    const c = cartaoComParciais(apex, v(s), at('10:27'))
+    expect(c.breakeven).toBe('Breakeven: o stop foi movido, sem chegar à entrada · sua regra: +30 pts.')
+    expect(c.valor).toBe(nb('−US$ 120,00'))
+    expect(c.linha).toBe('MNQ · Compra · 3 ct · 30.880,00 → 30.860,00 em média · −20,00 pts · 10:18–10:27 ET')
+    expect(c.r).toEqual({ valor: '−0,50 R', sub: 'com o stop inicial de 40 pts' })
+    expect(c.tempo!.map((x) => x.texto)).toEqual([
+      'Entrada · 3 ct a 30.880,00 · stop 40 pts',
+      nb('Parcial · 2 ct a 30.855,00 · −25,00 pts · −US$ 100,00'),
+      'Stop movido · 30.860,00 · com 10,00 pts contra',
+      nb('Saída · 1 ct a 30.870,00 · −10,00 pts · −US$ 20,00'),
+    ])
   })
 })
 

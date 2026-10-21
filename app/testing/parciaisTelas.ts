@@ -332,6 +332,40 @@ export const parcialMnq = (min = MIN_16): PartialRegistered => parsePartialRegis
 /** «Desfazer» it at 10:27 */
 export const desfeitaMnq = (min = MIN_16): EventUndone => parseEventUndone(deslocar(estadoJson('partial-mnq-desfeita'), min));
 
+/**
+ * Scenario 16's variant closed: «Mover stop» «Outro preço» 30.860,00 with «Preço agora» 30.870,00 at
+ * 10:26, then «Saída» of the last contract at 30.870,00 at 10:27 (the stop never reached the entry)
+ */
+export function mnqSemChegar(min = MIN_16): TradeState {
+  const json = deslocar(estadoJson('partial-mnq-limite'), min);
+  const spec = tradeInstrument('futures', 'MNQ', null)!;
+  const moved = comMovimento(json, 'futures', {
+    id: 7,
+    at: new Date(new Date(json.server_now).getTime() + 60_000).toISOString(),
+    payload: { v: 1, client_key: '00000000-0000-4000-8000-000000000016', kind: 'ajuste', stop_price: '30860', price_now: '30870' },
+  });
+  const out = clone(json);
+  const at = new Date(new Date(json.server_now).getTime() + 120_000).toISOString();
+  const pnl = Number(pnlFromPrices(spec, 1, '1', '30880', '30870'));
+  out.stop_moves = moved.state.stopMoves.map((m) => ({
+    id: m.id,
+    kind: m.kind,
+    unit: m.unit,
+    favor: m.favor === null ? null : Number(m.favor),
+    origin: m.origin,
+    ao_vivo: m.aoVivo,
+    moved_at: m.movedAt.toISOString(),
+    prev_stop: m.prevStop === null ? null : Number(m.prevStop),
+    price_now: m.priceNow === null ? null : Number(m.priceNow),
+    voided_at: null,
+    stop_price: Number(m.stopPrice),
+  }));
+  out.exits = [...out.exits, { ...out.exits[0], id: 6, kind: 'final', quantity: 1, exit_price: 30870, exit_time: at, registered_at: at, pnl }];
+  out.trade = { ...out.trade, status: 'closed', exit_price: 30860, exit_time: at, exit_registered_at: at, pnl: Number(out.exits[0].pnl) + pnl, pnl_basis: 'prices', result: 'loss' };
+  out.server_now = at;
+  return parseTradeState(semPosicao(out));
+}
+
 // ---------------------------------------------------------------------------------------------
 // Scenario 6 (FTMO EUR/USD): the board's 0,50 lote and partial 0,25 (the recording: 1,00 and 0,50)
 // ---------------------------------------------------------------------------------------------

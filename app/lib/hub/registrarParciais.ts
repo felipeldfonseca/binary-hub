@@ -308,7 +308,7 @@ function dinDaSaida(pnl: string | null, basis: string | null, currency: Currency
  * or more, else right after the entry), in time order (ties: entry, told move, partial, move, exit).
  * A closed trade without exit rows (one exit) gets one «Saída» item from its own columns.
  */
-export function linhaDoTempo(conta: ContaReg, view: TradeView, now: Date): ItemTempo[] {
+export function linhaDoTempo(conta: ContaReg, view: TradeView, now: Date, opcoes: { comUndo: boolean } = { comUndo: true }): ItemTempo[] {
   const t = view.trade
   const forma = formaDaOperacao(conta.market, t)
   if (!forma || t.entryPrice === null) return []
@@ -397,7 +397,7 @@ export function linhaDoTempo(conta: ContaReg, view: TradeView, now: Date): ItemT
   }
   return it
     .sort((a, b) => a.t - b.t || a.o - b.o || a.id - b.id)
-    .map(({ t: _t, o: _o, id: _id, ...x }) => x)
+    .map(({ t: _t, o: _o, id: _id, ...x }) => (opcoes.comUndo ? x : { ...x, evento: null }))
 }
 
 export interface ModeloDesfazer {
@@ -937,7 +937,7 @@ export function cartaoComParciais(conta: ContaReg, view: TradeView, now: Date): 
               : FECHADA_3C.comStopInicialEm(nivel),
     }
   }
-  if (contando.length >= 2 || moves.length > 0) out.tempo = linhaDoTempo(conta, view, now)
+  if (contando.length >= 2 || moves.length > 0) out.tempo = linhaDoTempo(conta, view, now, { comUndo: false })
   out.breakeven = linhaBreakeven(conta, view, forma)
   return out
 }

@@ -68,7 +68,8 @@ export default function FormParcial({
               className="hub-pill"
               onClick={() => {
                 aoMudar({ qtd: m.metade as string })
-                focar('f-pq')
+                // The field is on screen already: the focus moves at once (RO js l.1588: «Metade» → f-pq)
+                document.getElementById('f-pq')?.focus()
               }}
             >
               {PARCIAL.metade}
