@@ -1,0 +1,192 @@
+{
+  "trade": {
+    "id": "d816f0d0-a032-4538-bd0a-ad0658b125fd",
+    "pnl": null,
+    "note": null,
+    "result": "pending",
+    "source": "live",
+    "status": "open",
+    "strike": null,
+    "symbol": "EUR/USD",
+    "quantity": 1,
+    "direction": "long",
+    "exit_time": null,
+    "pnl_basis": null,
+    "timeframe": null,
+    "account_id": "c2cc43c6-f9c6-43fd-9e32-0f4205937908",
+    "asset_type": "forex",
+    "commission": null,
+    "entry_time": "2026-10-23T15:15:04.745024+00:00",
+    "exit_price": null,
+    "expires_at": null,
+    "expires_on": null,
+    "multiplier": null,
+    "stop_price": 1.084,
+    "entry_price": 1.0852,
+    "trading_day": "2026-10-23",
+    "option_right": null,
+    "stake_amount": null,
+    "target_price": null,
+    "note_saved_at": null,
+    "registered_at": "2026-10-23T15:15:04.745024+00:00",
+    "payout_percent": null,
+    "rule_version_id": "bdc832c9-59f9-4449-8bde-c59a43f9df90",
+    "duration_seconds": null,
+    "exit_registered_at": null
+  },
+  "context": {
+    "gate": {
+      "at": "2026-10-23T15:15:04.745024+00:00",
+      "block": {
+        "state": "nao_avaliado",
+        "reason": "so_futuros"
+      },
+      "desde": "2026-10-23T13:00:04.869934+00:00",
+      "label": "FTMO",
+      "limit": {
+        "usd": 1000,
+        "mode": "conta",
+        "near": false,
+        "used": 0,
+        "state": "ok",
+        "hit_at": null,
+        "reason": null,
+        "trades": 0,
+        "net_usd": 0,
+        "at_limit": "encerrar",
+        "worst_usd": 0
+      },
+      "today": {
+        "trades": 0,
+        "net_usd": 0,
+        "worst_usd": 0
+      },
+      "market": "forex",
+      "status": "liberado",
+      "window": {
+        "next": {
+          "opens_at": "2026-10-26T12:00:00+00:00",
+          "closes_at": "2026-10-26T19:00:00+00:00",
+          "trading_day": "2026-10-26"
+        },
+        "state": "dentro",
+        "reason": null,
+        "current": {
+          "opens_at": "2026-10-23T12:00:00+00:00",
+          "closes_at": "2026-10-23T19:00:00+00:00"
+        },
+        "position": "dentro"
+      },
+      "version": {
+        "id": "bdc832c9-59f9-4449-8bde-c59a43f9df90",
+        "origin": "criar",
+        "version_no": 1,
+        "effective_from": "2026-10-23T13:00:04.869934+00:00"
+      },
+      "warnings": [],
+      "desde_day": "2026-10-23",
+      "account_id": "c2cc43c6-f9c6-43fd-9e32-0f4205937908",
+      "changes_at": "2026-10-23T19:00:00+00:00",
+      "state_rule": {
+        "state": "nao_avaliado",
+        "reason": "so_futuros"
+      },
+      "trading_day": "2026-10-23",
+      "checks_evaluated": [
+        "janela",
+        "limite"
+      ]
+    },
+    "origin": "live",
+    "rule_ok": null,
+    "in_block": null,
+    "warnings": [],
+    "in_window": true,
+    "after_limit": false,
+    "captured_at": "2026-10-23T15:15:04.745024+00:00",
+    "gate_status": "liberado",
+    "evaluated_at": "2026-10-23T15:15:04.745024+00:00",
+    "state_choice": null,
+    "checks_evaluated": [
+      "janela",
+      "limite"
+    ],
+    "day_pnl_at_entry": 0,
+    "day_worst_at_entry": 0
+  },
+  "marks": [],
+  "marksNow": [],
+  "images": [],
+  "version": {
+    "id": "bdc832c9-59f9-4449-8bde-c59a43f9df90",
+    "resolved": {
+      "v": 1,
+      "day": {
+        "tz": "America/New_York",
+        "start_min": 1020
+      },
+      "block": null,
+      "limit": {
+        "usd": 1000,
+        "mode": "conta",
+        "at_limit": "encerrar"
+      },
+      "market": "forex",
+      "states": null,
+      "windows": [
+        {
+          "tz": "America/New_York",
+          "end_min": 900,
+          "weekdays": 31,
+          "start_min": 480
+        }
+      ],
+      "breakeven": {
+        "by": {
+          "EURUSD": {
+            "n": 7.5,
+            "un": "pips"
+          }
+        }
+      },
+      "window_rule": {
+        "on": true,
+        "outside": "fora"
+      },
+      "windows_from": "account"
+    },
+    "version_no": 1
+  },
+  "exits": [
+    {
+      "id": 7,
+      "pnl": 65,
+      "kind": "parcial",
+      "counts": true,
+      "origin": "app",
+      "quantity": 0.5,
+      "exit_time": "2026-10-23T15:17:04.777261+00:00",
+      "pnl_basis": "prices",
+      "voided_at": null,
+      "commission": null,
+      "exit_price": 1.0865,
+      "file_exit_at": null,
+      "registered_at": "2026-10-23T15:17:04.777261+00:00"
+    }
+  ],
+  "stopMoves": [
+    {
+      "id": 4,
+      "kind": "ajuste",
+      "unit": "pips",
+      "favor": 13,
+      "origin": "live",
+      "ao_vivo": true,
+      "moved_at": "2026-10-23T15:17:04.798684+00:00",
+      "prev_stop": 1.084,
+      "price_now": 1.0865,
+      "voided_at": null,
+      "stop_price": 1.0856
+    }
+  ]
+}

@@ -1,0 +1,15 @@
+{
+  "user": "1d798b55-6035-43a6-9938-904bc1ce4b6a",
+  "accounts": {
+    "topOne": "d5d58ed4-cdd7-4096-b823-6632ba921983",
+    "apex": "943e4448-3542-456a-86f8-cbd31456abf0",
+    "ftmo": "c2cc43c6-f9c6-43fd-9e32-0f4205937908"
+  },
+  "trades": {
+    "mes": "a53da769-e87f-48e6-af95-13063b118aaa",
+    "mgc": "1c38287d-9109-4108-b172-2a6128af131e",
+    "mnq": "dc693199-266f-4dee-97da-2b54e1c2ef50",
+    "eur": "d816f0d0-a032-4538-bd0a-ad0658b125fd",
+    "mesEntrada": "9a1f099a-490d-42d0-9990-50a2f3f8fa12"
+  }
+}

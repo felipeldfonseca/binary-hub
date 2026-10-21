@@ -8,6 +8,7 @@ import type { AccountMarket } from '../markets';
 import { tradeInstrument, type Direction, type OptionContract } from './caps';
 import {
   MAX_IMAGE_NAME,
+  type AfterExitPayload,
   type AfterPayload,
   type Clock,
   type EntryPayload,
@@ -17,7 +18,10 @@ import {
   type ImageSlotsRequest,
   type Marks,
   type MarksPayload,
+  type MovePayload,
   type Outcome,
+  type PartialPayload,
+  type UndoEventPayload,
 } from './payload';
 
 export interface EntryFields {
@@ -84,20 +88,80 @@ export interface AfterFields extends Omit<EntryFields, 'entry'> {
   costs?: string;
   /** Binaries */
   outcome?: Outcome;
+  /**
+   * Phase 3c: «+ Outra saída», two or more rows in the order they happened (sortExitsByHour);
+   * they replace exit / exitPrice / pnl / costs. A typed result or «Custos» go on their row
+   * («Corrigir» on the total: lastExitPnl on the last row).
+   */
+  exits?: { quantity: string; exitPrice: string; exit: string; pnl?: string; costs?: string }[];
+  /** Phase 3c: «Movi o stop para o breakeven» with «Preço quando moveu» */
+  breakevenPriceThen?: string;
 }
 
 /** register_after's payload («Já fechada») */
 export function afterPayload(market: AccountMarket, f: AfterFields): AfterPayload {
   const p = { ...entryPayload(market, f), day: f.day, entry: f.entry } as AfterPayload;
   if (market === 'binary') put(p, 'outcome', f.outcome);
-  else {
+  else if (f.exits && f.exits.length > 1) {
+    p.exits = f.exits.map((x) => {
+      const e = { quantity: x.quantity, exit_price: x.exitPrice, exit: x.exit } as AfterExitPayload;
+      put(e, 'pnl', x.pnl);
+      put(e, 'costs', x.costs);
+      return e;
+    });
+  } else {
     put(p, 'exit', f.exit);
     put(p, 'exit_price', f.exitPrice);
     put(p, 'pnl', f.pnl);
     put(p, 'costs', f.costs);
   }
+  if (market !== 'binary' && f.breakevenPriceThen !== undefined) p.breakeven = { price_then: f.breakevenPriceThen };
   return p;
 }
+
+export interface PartialFields {
+  /** Required unless a dry run: one per partial, kept across retries, new after a success */
+  clientKey?: string;
+  quantity: string;
+  exitPrice: string;
+  /** "HH:MM"; left out = now */
+  exit?: string;
+  clock?: Clock;
+  /** This partial's typed result, or its correction («Corrigir») */
+  pnl?: string;
+}
+
+/** register_partial's payload («Registrar parcial»; never «Custos»: they go on the final exit) */
+export function partialPayload(f: PartialFields): PartialPayload {
+  const p = { v: 1, quantity: f.quantity, exit_price: f.exitPrice } as PartialPayload;
+  put(p, 'client_key', f.clientKey);
+  put(p, 'exit', f.exit);
+  put(p, 'clock', f.clock);
+  put(p, 'pnl', f.pnl);
+  return p;
+}
+
+export interface MoveFields {
+  /** One per move, kept across retries */
+  clientKey: string;
+  /** «Breakeven · {entrada}» or «Outro preço» */
+  kind: 'breakeven' | 'ajuste';
+  /** «Outro preço» only */
+  stopPrice?: string;
+  /** «Preço agora»: required with «Breakeven» */
+  priceNow?: string;
+}
+
+/** move_stop's payload («Mover stop»): the shortcut never sends a level of its own */
+export function movePayload(f: MoveFields): MovePayload {
+  const p: MovePayload = { v: 1, client_key: f.clientKey, kind: f.kind };
+  if (f.kind === 'ajuste') put(p, 'stop_price', f.stopPrice);
+  put(p, 'price_now', f.priceNow);
+  return p;
+}
+
+/** undo_event's payload: «Desfazer» names the event (trade_state.position.undo) */
+export const undoEventPayload = (kind: 'parcial' | 'stop', id: number): UndoEventPayload => ({ v: 1, kind, id });
 
 export interface ExitFields {
   /** Price markets */

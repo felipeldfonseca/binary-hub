@@ -9,6 +9,8 @@ import '@/styles/hub-registrar.css'
 import '@/styles/hub-operacoes-dia.css'
 // Phase 3 · 3-4: lane B's option block («O que você operou?», Tipo/Strike/Vencimento, «Venceu sem valor»)
 import '@/styles/hub-registrar-opcao.css'
+// Phase 3c: lane C1's partials and stop moves in the Registrar sheet
+import '@/styles/hub-registrar-parciais.css'
 import ProtectedRoute from '@/components/auth/ProtectedRoute'
 import AppShell from '@/components/hub/AppShell'
 import HubGate, { HubLoading } from '@/components/hub/HubGate'

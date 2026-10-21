@@ -14,11 +14,20 @@
  *                     "mode": "conta" | "soma" (futures), "at_limit": "encerrar" | "avisar"},
  *    "states": null (every market but futures) | {"alinhadas" | "so_tecnica" | "so_fundamentos" | "em_conflito" | "sem_direcao": choice | null},
  *    "day": {"tz", "start_min"}}
+ *   plus, only when the rule acts (Phase 3c, 20261023000001_regra_breakeven.sql):
+ *    "breakeven": {"by": {KEY: {"n": N, "un": "pts" | "pips" | "price"}}}  (1..20 assets)
  *
- * Which of block, states and «soma» a market has, and its currency, come from MARKET_SPEC
- * (../markets, the database's market_caps). The amount's key is the market's currency's: `brl` on
- * B3, `usd` everywhere else. The domain form keeps cents only; their currency is
- * currencyOf(rules.market).
+ * Which of block, states, «soma» and the breakeven rule a market has, and its currency, come from
+ * MARKET_SPEC (../markets, the database's market_caps). The amount's key is the market's
+ * currency's: `brl` on B3, `usd` everywhere else. The domain form keeps cents only; their currency
+ * is currencyOf(rules.market).
+ *
+ * «Mover para o breakeven com +N» never changes «Posso operar hoje?»: it is trade management, kept
+ * in the version so a trade is judged by the rule in force at its entry. KEY is the asset as
+ * tradeMatchKey writes it (MES, EURUSD, WIN, PETR4, BTCUSDT); N a number > 0, ≤ 1 000 000, with at
+ * most 8 decimals, in the asset's unit of stops («un», frozen in the version). A version without
+ * the rule has no key at all (nine keys), so an account that never set it resolves to exactly the
+ * jsonb it resolved to before.
  */
 import {
   MARKET_SPEC,
@@ -29,6 +38,8 @@ import {
   type AccountMarket,
   type WindowTz,
 } from '../markets';
+import { tradeMatchKey, type StopUnit } from '../registro/caps';
+import { decimalFromJson } from '../registro/numeric';
 import { assertTimeZone, type DayClock, type TradingWindow } from '../tempo';
 
 export { WINDOW_TZS, type WindowTz } from '../markets';
@@ -49,6 +60,21 @@ export const STATES_WITHOUT_DIRECTION: readonly StateName[] = ['em_conflito', 's
 export const CALENDAR_CODES: readonly CalendarCode[] = ['us', 'eu', 'br'];
 /** «Limite do dia»: at most 1.000.000 in the account's currency (US$ or R$) */
 export const MAX_LIMIT_CENTS = 100_000_000;
+/** «Mover para o breakeven»: at most 20 assets in one rule */
+export const MAX_BREAKEVEN_ASSETS = 20;
+/** «+N» of the breakeven rule: above zero, at most 1 000 000, at most 8 decimals (rules_is_dist) */
+export const MAX_BREAKEVEN_N = 1_000_000;
+export const BREAKEVEN_N_DP = 8;
+/** The units a «+N» can be in: the asset's unit of stops (points, pips or a price distance) */
+export const BREAKEVEN_UNITS: readonly StopUnit[] = ['pts', 'pips', 'price'];
+
+/**
+ * «Mover para o breakeven com +N» as a version holds it: per asset (tradeMatchKey), N as decimal
+ * text without trailing zeros ('10', '7.5') and the asset's unit of stops when the version was saved
+ */
+export interface BreakevenRule {
+  by: Record<string, { n: string; un: StopUnit }>;
+}
 
 /** The parsed form of account_rule_versions.resolved (or of an unsaved draft). Money in integer cents. */
 export interface Rules {
@@ -72,6 +98,11 @@ export interface Rules {
   states: Record<StateName, StateChoice | null> | null;
   /** The account's day clock when the version was saved */
   day: DayClock;
+  /**
+   * «Mover para o breakeven com +N» (Phase 3c), only when the rule acts; absent = no rule, as the
+   * version's jsonb has no key then (so rules without it compare and read exactly as before)
+   */
+  breakeven?: BreakevenRule;
 }
 
 /** One saved version of an account's rules. A draft («Como fica hoje») has only `rules`. */
@@ -100,6 +131,7 @@ export type RulesErrorCode =
   | 'bad_limit'
   | 'bad_state_rule'
   | 'bad_state_choice'
+  | 'bad_breakeven'
   | 'not_for_market';
 
 export class RulesError extends Error {
@@ -224,15 +256,66 @@ function checkLimit(market: string, l: Json): RulesErrorCode | null {
 
 const RESOLVED_KEYS = ['v', 'market', 'windows', 'windows_from', 'window_rule', 'block', 'limit', 'states', 'day'];
 
+/** Decimals of a JSON number as its shortest text writes them ('7.5' → 1, '1e-7' → 7, '20' → 0) */
+function decimalsOf(x: number): number {
+  const m = /^-?\d+(?:\.(\d+))?(?:e([+-]\d+))?$/i.exec(String(x));
+  if (!m) return Infinity;
+  return Math.max(0, (m[1]?.length ?? 0) - Number(m[2] ?? 0));
+}
+
+/** rules_is_dist: a JSON number above zero, at most 1 000 000, with at most 8 decimals («+N») */
+export function isBreakevenN(x: unknown): x is number {
+  return typeof x === 'number' && Number.isFinite(x) && x > 0 && x <= MAX_BREAKEVEN_N && decimalsOf(x) <= BREAKEVEN_N_DP;
+}
+
+/** A canonical asset key of a market: letters and digits, at most 20, as tradeMatchKey writes it */
+export function isBreakevenKey(market: string, k: string): boolean {
+  return /^[A-Z0-9]{1,20}$/.test(k) && tradeMatchKey(market, k) === k;
+}
+
+/**
+ * The stored setting {"on": boolean, "by": {KEY: N}} of MarketRules and AccountRules
+ * (rules_check_breakeven): not_for_market where the market has no breakeven rule (binaries), then
+ * bad_breakeven / unknown_key. Null = valid.
+ */
+export function checkBreakevenSetting(market: string, p: unknown): RulesErrorCode | null {
+  if (!isAccountMarket(market) || !MARKET_SPEC[market].rules.breakeven) return 'not_for_market';
+  if (!isObj(p)) return 'bad_breakeven';
+  if (!keysOk(p, ['on', 'by'])) return 'unknown_key';
+  if (typeof p.on !== 'boolean' || !isObj(p.by)) return 'bad_breakeven';
+  const by = p.by;
+  if (Object.keys(by).length > MAX_BREAKEVEN_ASSETS) return 'bad_breakeven';
+  for (const [k, v] of Object.entries(by)) if (!isBreakevenKey(market, k) || !isBreakevenN(v)) return 'bad_breakeven';
+  return null;
+}
+
+/** A version's "breakeven" (the tenth key): {"by": {KEY: {"n", "un"}}}, 1..20 assets. Null = valid. */
+function checkResolvedBreakeven(market: string, b: Json): RulesErrorCode | null {
+  if (!isAccountMarket(market) || !MARKET_SPEC[market].rules.breakeven) return 'not_for_market';
+  if (!isObj(b) || !keysOk(b, ['by']) || !isObj(b.by)) return 'bad_breakeven';
+  const by = b.by;
+  const n = Object.keys(by).length;
+  if (n < 1 || n > MAX_BREAKEVEN_ASSETS) return 'bad_breakeven';
+  for (const [k, v] of Object.entries(by)) {
+    if (!isBreakevenKey(market, k) || !isObj(v) || !keysOk(v, ['n', 'un']) || !isBreakevenN(v.n)) return 'bad_breakeven';
+    if (typeof v.un !== 'string' || !(BREAKEVEN_UNITS as readonly string[]).includes(v.un)) return 'bad_breakeven';
+  }
+  return null;
+}
+
 /**
  * The code the database would give this `resolved` value (rules_check_resolved), or null when it
- * is valid. One difference: `day.tz` must also be a zone this module can compute with ('UTC' or
- * Area/Location, see tempo.assertTimeZone), else 'invalid_tz'.
+ * is valid: nine keys, or ten with "breakeven" (Phase 3c, checked last). One difference: `day.tz`
+ * must also be a zone this module can compute with ('UTC' or Area/Location, see
+ * tempo.assertTimeZone), else 'invalid_tz'.
  */
 export function checkRules(p: unknown): RulesErrorCode | null {
   if (!isObj(p)) return 'bad_rules';
   if (p.v !== 1) return 'bad_rules_version';
-  if (!keysOk(p, RESOLVED_KEYS) || Object.keys(p).length !== RESOLVED_KEYS.length) return 'bad_rules';
+  const withBreakeven = has(p, 'breakeven');
+  if (!keysOk(p, [...RESOLVED_KEYS, 'breakeven']) || Object.keys(p).length !== RESOLVED_KEYS.length + (withBreakeven ? 1 : 0)) {
+    return 'bad_rules';
+  }
   if (!isAccountMarket(p.market)) return 'unsupported_market';
   const caps = MARKET_SPEC[p.market].rules;
   if (!Array.isArray(p.windows)) return 'bad_window';
@@ -269,6 +352,10 @@ export function checkRules(p: unknown): RulesErrorCode | null {
   const day = p.day as Obj;
   const tzLength = keysOk(day, ['tz', 'start_min']) && typeof day.tz === 'string' ? Array.from(day.tz).length : 0;
   if (tzLength < 1 || tzLength > 64 || !isInt(day.start_min, 0, 1439)) return 'bad_rules';
+  if (withBreakeven) {
+    const bcode = checkResolvedBreakeven(p.market, p.breakeven);
+    if (bcode) return bcode;
+  }
   try {
     assertTimeZone(day.tz as string);
   } catch {
@@ -312,6 +399,20 @@ export function parseRules(json: unknown): Rules {
     },
     states: s && (Object.fromEntries(STATE_NAMES.map((k) => [k, s[k] as StateChoice | null])) as Record<StateName, StateChoice | null>),
     day: { tz: day.tz as string, startMin: day.start_min as number },
+    ...(has(p, 'breakeven') ? { breakeven: breakevenOfJson(p.breakeven as Obj) } : {}),
+  };
+}
+
+/** A version's checked "breakeven" in the domain form (n as decimal text) */
+function breakevenOfJson(b: Obj): BreakevenRule {
+  const by = b.by as Obj;
+  return {
+    by: Object.fromEntries(
+      Object.entries(by).map(([k, v]) => {
+        const e = v as Obj;
+        return [k, { n: decimalFromJson(e.n, BREAKEVEN_N_DP) as string, un: e.un as StopUnit }];
+      }),
+    ),
   };
 }
 
@@ -339,6 +440,10 @@ export function toResolvedJson(r: Rules): Record<string, unknown> {
     },
     states: r.states && Object.fromEntries(STATE_NAMES.map((k) => [k, r.states![k]])),
     day: { tz: r.day.tz, start_min: r.day.startMin },
+    // Only when the rule acts: a version without it is the nine keys it always was
+    ...(r.breakeven
+      ? { breakeven: { by: Object.fromEntries(Object.entries(r.breakeven.by).map(([k, v]) => [k, { n: Number(v.n), un: v.un }])) } }
+      : {}),
   };
 }
 

@@ -225,8 +225,8 @@ select tests.eq((select count(*) from public.trades where source = 'import' and 
                    and registered_at is null), 0::bigint, 'old imported rows keep a null pnl_basis');
 select tests.eq((select jsonb_agg(tgname::text order by tgname) from pg_trigger
                  where tgrelid = 'public.trades'::regclass and not tgisinternal),
-                '["trades_bridge", "trades_delete_log", "trades_guard", "update_session_stats_on_delete", "update_session_stats_on_insert", "update_session_stats_on_update", "update_trades_updated_at"]'::jsonb,
-                'trades triggers: the guard sorts between the bridge and updated_at');
+                '["trades_bridge", "trades_delete_log", "trades_exits_sums", "trades_guard", "update_session_stats_on_delete", "update_session_stats_on_insert", "update_session_stats_on_update", "update_trades_updated_at"]'::jsonb,
+                'trades triggers: the guard sorts between the bridge and updated_at (Phase 3c: + the deferred sums check)');
 
 -- =============================================================================================
 -- 2. Descriptors and helpers
@@ -900,8 +900,8 @@ select tests.eq((select jsonb_agg(p.proname::text order by p.proname) from pg_pr
                  where p.pronamespace = 'public'::regnamespace
                    and p.proname ~ '^(trade_|trades_guard$|trades_delete_log$|instrument_specs$|register_|add_marks$|undo_entry$|image_|save_extras$)'
                    and has_function_privilege('authenticated', p.oid, 'EXECUTE')),
-                '["add_marks", "image_slots", "image_trash_done", "instrument_specs", "register_after", "register_entry", "register_exit", "save_extras", "trade_caps", "trade_caps_all", "trade_image_delete_ok", "trade_image_upload_ok", "trade_instrument", "trade_match_key", "trade_result_known_at", "undo_entry"]'::jsonb,
-                'authenticated runs the API, the descriptors and what views and policies call; nothing internal');
+                '["add_marks", "image_slots", "image_trash_done", "instrument_specs", "register_after", "register_entry", "register_exit", "register_partial", "save_extras", "trade_caps", "trade_caps_all", "trade_image_delete_ok", "trade_image_upload_ok", "trade_instrument", "trade_match_key", "trade_result_known_at", "undo_entry"]'::jsonb,
+                'authenticated runs the API, the descriptors and what views and policies call; nothing internal (Phase 3c: + register_partial)');
 select tests.eq((select count(*) from pg_proc p
                  where p.pronamespace = 'public'::regnamespace and p.prosecdef
                    and p.proname ~ '^(trade_|trades_|register_|add_marks$|undo_entry$|image_|save_extras$|import_)'
@@ -1579,7 +1579,9 @@ select tests.eq((select entry_time from public.trades where external_id = 'P3WAL
 select public.import_fix_tz(:'top2', 'America/New_York', false)->>'changed';
 commit;
 
--- «Esta operação parece já ter vindo do arquivo» (D30): a «Já fechada» or a live entry like an imported trade
+-- «Esta operação parece já ter vindo do arquivo» (D30): a «Já fechada» or a live entry like an imported trade.
+-- Each «Já fechada» states the trading day of its own entry: the day of «3 hours ago» turned to the next one
+-- for a few minutes after 21:00 New York, before an entry typed 179 or 183 minutes back (then in the future)
 insert into tests.p3 select 'file4', jsonb_build_array(
   tests.row(2, 'P3SIM', 'MESM6', 'futures', 'long', date_trunc('minute', now()) - interval '3 hours',
             date_trunc('minute', now()) - interval '3 hours' + interval '5 minutes', '7900.00', '7901.00', '1', null, null, 'win', '5.00', '0.62'),
@@ -1592,7 +1594,7 @@ select tests.eq(public.import_commit(:'top2', 'topone', 's.csv', null, 'UTC', (s
                 'two imported trades');
 select public.register_after(:'top2', jsonb_build_object('v', 1, 'symbol', 'MES', 'direction', 'long', 'quantity', '1',
          'entry_price', '7900.00', 'clock', 'America/New_York',
-         'day', public.compute_trading_day(:'top2', date_trunc('minute', now()) - interval '3 hours')::text,
+         'day', public.compute_trading_day(:'top2', date_trunc('minute', now()) - interval '179 minutes')::text,
          'entry', to_char((date_trunc('minute', now()) - interval '179 minutes') at time zone 'America/New_York', 'HH24:MI'),
          'exit', to_char((date_trunc('minute', now()) - interval '176 minutes') at time zone 'America/New_York', 'HH24:MI'),
          'exit_price', '7901.00'), true) as d \gset
@@ -1601,14 +1603,14 @@ select tests.eq((:'d'::jsonb)->'similar', (select jsonb_build_array(id) from pub
 select tests.fails(format($$select public.register_after(%L, %L::jsonb)$$, :'top2',
                           jsonb_build_object('v', 1, 'client_key', tests.ck(), 'symbol', 'MES', 'direction', 'long',
                             'quantity', '1', 'entry_price', '7900.00', 'clock', 'America/New_York',
-                            'day', public.compute_trading_day(:'top2', date_trunc('minute', now()) - interval '3 hours')::text,
+                            'day', public.compute_trading_day(:'top2', date_trunc('minute', now()) - interval '179 minutes')::text,
                             'entry', to_char((date_trunc('minute', now()) - interval '179 minutes') at time zone 'America/New_York', 'HH24:MI'),
                             'exit', to_char((date_trunc('minute', now()) - interval '176 minutes') at time zone 'America/New_York', 'HH24:MI'),
                             'exit_price', '7901.00')),
                    'similar_trade', null, '«Já fechada» of a trade the file already brought: confirm first');
 select tests.ok(public.register_after(:'top2', jsonb_build_object('v', 1, 'client_key', tests.ck(), 'symbol', 'MES', 'direction', 'long',
                   'quantity', '1', 'entry_price', '7900.00', 'clock', 'America/New_York',
-                  'day', public.compute_trading_day(:'top2', date_trunc('minute', now()) - interval '3 hours')::text,
+                  'day', public.compute_trading_day(:'top2', date_trunc('minute', now()) - interval '179 minutes')::text,
                   'entry', to_char((date_trunc('minute', now()) - interval '179 minutes') at time zone 'America/New_York', 'HH24:MI'),
                   'exit', to_char((date_trunc('minute', now()) - interval '176 minutes') at time zone 'America/New_York', 'HH24:MI'),
                   'exit_price', '7901.00', 'allow_similar', true))->>'repeated' = 'false', '… and registers once confirmed');
@@ -1621,7 +1623,7 @@ select tests.fails(format($$select public.register_entry(%L, %L::jsonb)$$, :'top
 -- minutes; the size does not matter (the import pairs a different size too); the side does
 select tests.eq(public.register_after(:'top2', jsonb_build_object('v', 1, 'symbol', 'MES', 'direction', 'long', 'quantity', '1',
                   'entry_price', '7900.00', 'clock', 'America/New_York',
-                  'day', public.compute_trading_day(:'top2', date_trunc('minute', now()) - interval '3 hours')::text,
+                  'day', public.compute_trading_day(:'top2', date_trunc('minute', now()) - interval '183 minutes')::text,
                   'entry', to_char((date_trunc('minute', now()) - interval '183 minutes') at time zone 'America/New_York', 'HH24:MI'),
                   'exit', to_char((date_trunc('minute', now()) - interval '176 minutes') at time zone 'America/New_York', 'HH24:MI'),
                   'exit_price', '7901.00'), true)->'similar',
@@ -1629,7 +1631,7 @@ select tests.eq(public.register_after(:'top2', jsonb_build_object('v', 1, 'symbo
                 '«Já fechada» typed 3 minutes before the broker''s fill');
 select tests.eq(public.register_after(:'top2', jsonb_build_object('v', 1, 'symbol', 'MES', 'direction', 'long', 'quantity', '2',
                   'entry_price', '7900.00', 'clock', 'America/New_York',
-                  'day', public.compute_trading_day(:'top2', date_trunc('minute', now()) - interval '3 hours')::text,
+                  'day', public.compute_trading_day(:'top2', date_trunc('minute', now()) - interval '179 minutes')::text,
                   'entry', to_char((date_trunc('minute', now()) - interval '179 minutes') at time zone 'America/New_York', 'HH24:MI'),
                   'exit', to_char((date_trunc('minute', now()) - interval '176 minutes') at time zone 'America/New_York', 'HH24:MI'),
                   'exit_price', '7901.00'), true)->'similar',
@@ -1637,7 +1639,7 @@ select tests.eq(public.register_after(:'top2', jsonb_build_object('v', 1, 'symbo
                 'another size («Contratos» typed wrong) still looks like it');
 select tests.eq(public.register_after(:'top2', jsonb_build_object('v', 1, 'symbol', 'MES', 'direction', 'short', 'quantity', '1',
                   'entry_price', '7900.00', 'clock', 'America/New_York',
-                  'day', public.compute_trading_day(:'top2', date_trunc('minute', now()) - interval '3 hours')::text,
+                  'day', public.compute_trading_day(:'top2', date_trunc('minute', now()) - interval '179 minutes')::text,
                   'entry', to_char((date_trunc('minute', now()) - interval '179 minutes') at time zone 'America/New_York', 'HH24:MI'),
                   'exit', to_char((date_trunc('minute', now()) - interval '176 minutes') at time zone 'America/New_York', 'HH24:MI'),
                   'exit_price', '7899.00'), true)->'similar', '[]'::jsonb, 'the other side does not');
@@ -1719,7 +1721,15 @@ set local role authenticated;
 select tests.eq(public.import_preview(:'liga', 'topone', null, 'UTC', (select v from tests.p3 where k = 'fileL')::jsonb)
                 - array['errors', 'first_day', 'last_day', 'account_tz', 'tz_confirmed', 'already_imported'],
                 '{"new": 3, "linked": 6, "linked_differs": 2, "duplicate": 0, "completable": 0, "other_account": 0,
-                  "day_changes": 0, "tz_status": "ok", "rows_total": 9}'::jsonb,
+                  "tz_status": "ok", "rows_total": 9}'::jsonb
+                -- day_changes: the three new rows (PL3, PL4, PL9) whose trading day is not the file's date. None,
+                -- except while the window this test opens around now (−90 min) starts after 18:00 New York,
+                -- when the futures day has turned and the file's (UTC) date has not: then all three
+                || jsonb_build_object('day_changes', (
+                     select count(*) from jsonb_array_elements((select v from tests.p3 where k = 'fileL')::jsonb) x
+                     where x->>'external_id' in ('PL3', 'PL4', 'PL9')
+                       and public.compute_trading_day(:'liga', (x->>'local_entry' || (x->>'utc_offset'))::timestamptz)
+                           <> (x->>'local_entry')::date)),
                 'preview: six registered, two of them with other money, three new');
 select public.import_commit(:'liga', 'topone', 'liga.csv', null, 'UTC', (select v from tests.p3 where k = 'fileL')::jsonb) as c \gset
 select tests.eq((:'c'::jsonb) - 'batch_id' - 'errors', '{"inserted": 3, "duplicate": 0, "completed": 0, "other_account": 0, "linked": 6}'::jsonb,

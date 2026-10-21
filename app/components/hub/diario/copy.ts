@@ -47,6 +47,13 @@ export const OPERACOES_DIA = {
   venda: 'Venda',
   alta: 'Alta',
   baixa: 'Baixa',
+  // Phase 3c (board approved 21 Oct, RO js l.2193–2199): the «Operação» cell's second line
+  /** «1 parcial, +US$ 40,00» / «2 parciais, +US$ 65,00» */
+  parciais: (n: number, v: string) => (n === 1 ? `1 parcial, ${v}` : `${n} parciais, ${v}`),
+  stopBe: 'stop no breakeven',
+  stopMovido: 'stop movido',
+  /** A closed trade: «em 2 saídas» */
+  emSaidas: (n: number) => `em ${n} saídas`,
 }
 
 /**

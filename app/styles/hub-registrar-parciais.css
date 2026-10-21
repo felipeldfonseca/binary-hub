@@ -1,0 +1,92 @@
+/*
+ * Phase 3c · lane C1: the open and closed trade with partials and stop moves in the «Registrar
+ * operação» sheet (step 2 «Agora», «Linha do tempo» and «Desfazer», «Parcial», «Mover stop», the
+ * breakeven suggestion; step 3's breakeven line). Every rule is scoped to .hub (tokens from
+ * styles/hub.css); classes are prefixed hub-rp-. Imported by app/(hub)/layout.tsx after
+ * hub-registrar-opcao.css; only lane C1 edits this file. Measures from the approved board
+ * RegistrarOperacao.dc.html (21 Oct 2026): `.tempo-l`, `.sub-op` (RO l.161–165), the suggestion's
+ * block and the notes with a negative top margin (RO l.507–509, 552, 581).
+ */
+
+/* «Linha do tempo» (board `.tempo-l`): one row per event; the time keeps 44 px, the text wraps */
+.hub .hub-rp-tempo {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.hub .hub-rp-tempo li {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0 10px;
+  min-width: 0;
+  font-size: 13px;
+}
+.hub .hub-rp-tempo time,
+.hub .hub-rp-tempo .hub-rp-sem-hora {
+  flex: none;
+  min-width: 44px;
+  font-size: 12px;
+  color: var(--text-2);
+}
+.hub .hub-rp-item {
+  flex: 1 1 200px;
+  min-width: 0;
+  text-wrap: pretty;
+}
+/* The sub-line under an item (board `.sub-op`): «registrada às 10:20» */
+.hub .hub-rp-sub {
+  display: block;
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--text-2);
+  text-wrap: pretty;
+}
+/* «Desfazer» and «Até 10:33, …» beside the newest event */
+.hub .hub-rp-undo {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0 8px;
+}
+
+/* «Agora»: «Se o stop for atingido: … no total.» in bold */
+.hub .hub-rp-forte {
+  font-weight: 700;
+}
+
+/* The breakeven suggestion sits close to the action status (RO l.507) */
+.hub .hub-rp-sug {
+  margin-top: -6px;
+}
+
+/* «Sai com os 2 ct em aberto.» under the pills (RO l.509) */
+.hub .hub-rp-nota-sai {
+  margin-top: -6px;
+}
+
+/* «Mover stop»: «Se o novo stop for atingido: …» right under the status (RO l.552) */
+.hub .hub-rp-se {
+  margin-top: -10px;
+  font-weight: 700;
+}
+
+/* «Parcial»: the quantity field and «Metade» side by side, wrapping on narrow phones */
+.hub .hub-rp-qtd {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* Step 3's breakeven line (RO l.581): neutral text, close to the timeline */
+.hub .hub-rp-be {
+  margin: -6px 0 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text);
+  text-wrap: pretty;
+}

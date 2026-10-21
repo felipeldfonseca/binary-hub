@@ -929,6 +929,9 @@ export function PassoPrevia({
           them again, and those whose money the file corrects (absent before the migration: none) */}
       {linked > 0 && <p className="hub-passo__txt">{PASSO_D.linked(linked)}</p>}
       {(preview.linked_differs ?? 0) > 0 && <p className="hub-passo__txt">{PASSO_D.linkedDiffers(preview.linked_differs ?? 0)}</p>}
+      {/* Phase 3c (§5.12): a file with partial exits (absent keys before the migration, or in a file of one row per trade: none) */}
+      {(preview.grouped ?? 0) > 0 && <p className="hub-passo__txt">{PASSO_D.agrupadas(preview.grouped ?? 0)}</p>}
+      {(preview.attached ?? 0) > 0 && <p className="hub-passo__txt">{PASSO_D.anexadas(preview.attached ?? 0)}</p>}
       {notices.map((text) => (
         <div key={text} className="hub-linha-i">
           <span>{text}</span>

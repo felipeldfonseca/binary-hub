@@ -1,0 +1,164 @@
+{
+  "r": 0.4,
+  "pnl": 120,
+  "gate": {
+    "at": "2026-10-23T14:24:00+00:00",
+    "block": {
+      "state": "nao_avaliado",
+      "reason": "fase5"
+    },
+    "desde": "2026-10-23T13:00:04.869934+00:00",
+    "label": "Top One #1",
+    "limit": {
+      "usd": 400,
+      "mode": "conta",
+      "near": false,
+      "used": 0,
+      "state": "ok",
+      "hit_at": null,
+      "reason": null,
+      "trades": 1,
+      "net_usd": 40,
+      "at_limit": "encerrar",
+      "worst_usd": 0
+    },
+    "today": {
+      "trades": 1,
+      "net_usd": 40,
+      "worst_usd": 0
+    },
+    "market": "futures",
+    "status": "liberado",
+    "window": {
+      "next": {
+        "opens_at": "2026-10-26T14:00:00+00:00",
+        "closes_at": "2026-10-26T15:00:00+00:00",
+        "trading_day": "2026-10-26"
+      },
+      "state": "dentro",
+      "reason": null,
+      "current": {
+        "opens_at": "2026-10-23T14:00:00+00:00",
+        "closes_at": "2026-10-23T15:00:00+00:00"
+      },
+      "position": "dentro"
+    },
+    "version": {
+      "id": "396d68c0-80dd-4955-b03a-534cf9453940",
+      "origin": "criar",
+      "version_no": 1,
+      "effective_from": "2026-10-23T13:00:04.869934+00:00"
+    },
+    "warnings": [],
+    "desde_day": "2026-10-23",
+    "account_id": "d5d58ed4-cdd7-4096-b823-6632ba921983",
+    "changes_at": "2026-10-23T15:00:00+00:00",
+    "state_rule": {
+      "state": "nao_avaliado",
+      "reason": "fase5"
+    },
+    "trading_day": "2026-10-23",
+    "checks_evaluated": [
+      "janela",
+      "limite"
+    ]
+  },
+  "plan": {
+    "breaks": [],
+    "verdict": "no_plano",
+    "checks_evaluated": [
+      "janela",
+      "limite"
+    ]
+  },
+  "exits": [
+    {
+      "pnl": 120,
+      "points": 12,
+      "result": "win",
+      "exit_at": "2026-10-23T14:31:00+00:00",
+      "quantity": 1,
+      "pnl_basis": "prices",
+      "commission": null,
+      "exit_price": 4409.3
+    },
+    {
+      "pnl": 0,
+      "points": 0,
+      "result": "breakeven",
+      "exit_at": "2026-10-23T14:38:00+00:00",
+      "quantity": 1,
+      "pnl_basis": "prices",
+      "commission": null,
+      "exit_price": 4421.3
+    }
+  ],
+  "points": 6,
+  "result": "win",
+  "context": {
+    "rule_ok": null,
+    "in_block": null,
+    "warnings": [],
+    "in_window": true,
+    "after_limit": false,
+    "gate_status": "liberado",
+    "state_choice": null,
+    "checks_evaluated": [
+      "janela",
+      "limite"
+    ],
+    "day_pnl_at_entry": 40,
+    "day_worst_at_entry": 0
+  },
+  "dry_run": true,
+  "exit_at": "2026-10-23T14:38:00+00:00",
+  "preview": {
+    "risk": 300,
+    "reward": 600,
+    "stop_points": 15,
+    "target_points": 30
+  },
+  "similar": [],
+  "version": {
+    "id": "396d68c0-80dd-4955-b03a-534cf9453940",
+    "version_no": 1
+  },
+  "entry_at": "2026-10-23T14:24:00+00:00",
+  "repeated": false,
+  "breakeven": {
+    "unit": "pts",
+    "favor": 12,
+    "price_then": 4409.3,
+    "stop_price": 4421.3
+  },
+  "pnl_basis": "prices",
+  "commission": null,
+  "exit_price": 4415.3,
+  "expires_at": null,
+  "instrument": {
+    "key": "MGC",
+    "pip": null,
+    "pnl": "prices",
+    "mult": "10",
+    "tick": "0.10",
+    "costs": false,
+    "known": true,
+    "stops": "pts",
+    "qty_dp": 0,
+    "correct": false,
+    "price_dp": 8,
+    "asset_type": "futures"
+  },
+  "limit_room": {
+    "usd": 400,
+    "left": 440,
+    "risk": 300,
+    "above": false,
+    "net_usd": 40,
+    "reached": false
+  },
+  "server_now": "2026-10-23T14:45:04.674922+00:00",
+  "stop_price": 4436.3,
+  "trading_day": "2026-10-23",
+  "target_price": 4391.3
+}

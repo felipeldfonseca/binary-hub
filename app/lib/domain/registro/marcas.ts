@@ -8,6 +8,10 @@
  * strictly before its result could be known (the exit typed, or a binary's expiry) and before the
  * app registered the exit. Every other mark is «depois do resultado»: «Já fechada» trades,
  * imported trades, marks after the exit. What counts in Análises is the last «limpa» one.
+ *
+ * Phase 3c (20261023000002_trade_exits.sql): the first exit not undone (a partial reveals part of
+ * the result) cuts too, at its hour or its registration, whichever is first
+ * (parciais.firstExitCut).
  */
 import type { MarkKind } from './payload';
 
@@ -53,6 +57,8 @@ export interface MarkTiming {
   exitTime: Date | null;
   expiresAt: Date | null;
   exitRegisteredAt: Date | null;
+  /** Phase 3c: the earliest exit not undone, least(exit_time, registered_at); absent or null = none */
+  firstExit?: Date | null;
 }
 
 /**
@@ -62,10 +68,11 @@ export interface MarkTiming {
  * after): see isClean.
  */
 export function cleanUntil(t: MarkTiming): Date | null {
-  const known = resultKnownAt(t.exitTime, t.expiresAt);
-  if (known === null) return t.exitRegisteredAt;
-  if (t.exitRegisteredAt === null) return known;
-  return known.getTime() <= t.exitRegisteredAt.getTime() ? known : t.exitRegisteredAt;
+  let best: Date | null = null;
+  for (const d of [resultKnownAt(t.exitTime, t.expiresAt), t.exitRegisteredAt, t.firstExit ?? null]) {
+    if (d !== null && (best === null || d.getTime() < best.getTime())) best = d;
+  }
+  return best;
 }
 
 /** trade_marks_v.limpa for a mark made at `markedAt` */

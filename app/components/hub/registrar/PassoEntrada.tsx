@@ -34,6 +34,7 @@ import {
   type ModeloEntrada,
   type Rascunho,
 } from '@/lib/hub/registrarForm'
+import { comSaidas, saidaDoLimite, textoRecusaBreakeven } from '@/lib/hub/registrarSaidas'
 import { MARKET_LABEL, PHASE_LABEL } from '@/components/hub/contas/copy'
 import { Disclosure, InfoButton, InfoPanel, useToggle } from '@/components/hub/contas/ui'
 import BlocoResultado from './BlocoResultado'
@@ -389,6 +390,9 @@ function alvoFoco(campo: CampoEntrada, r: Rascunho, m: ModeloEntrada): string {
       return (m.quantidade ? m.quantidade.outro : r.qtdOutro) ? 'f-q' : 'g-q-0'
     case 'par':
       return r.parOutro ? 'f-parOutro' : 'g-par-0'
+    // 3c: the rows' sum takes the first row's quantity (RO js l.1286); a row's field is `f-s{id}{q|p|h|r}`
+    case 'soma':
+      return `f-s${r.saidas?.[0]?.id ?? 1}q`
     default:
       return `f-${campo}`
   }
@@ -441,6 +445,9 @@ function campoDoServidor(field: string | null, market: ContaReg['market']): Camp
       return 'dia'
     case 'outcome':
       return 'fimB'
+    // 3c: «Preço quando moveu»
+    case 'breakeven':
+      return 'bePreco'
     default:
       return null
   }
@@ -487,7 +494,7 @@ export default function PassoEntrada(props: PassoEntradaProps) {
   const entrada = useRegisterEntry()
   const depois = useRegisterAfter()
   const fechada = r.modo === 'fechada'
-  const m = modeloEntrada({ conta, r, now, hoje, tentou, padroes: defaults })
+  const m0 = modeloEntrada({ conta, r, now, hoje, tentou, padroes: defaults })
   useMexido(rascunhoMexido(r, inicial))
 
   // «Posso operar hoje?»: rules_now for the current minute, gate_at at a typed hour or another day.
@@ -496,12 +503,15 @@ export default function PassoEntrada(props: PassoEntradaProps) {
   // asked now (not a placeholder: useGateAt keys on that instant at once, so during its 300 ms wait
   // the last answer is a placeholder too) or, while that instant waits or is asked, when it is of the
   // same trading day (no flicker per keystroke); otherwise the question alone, without «Limite do dia».
-  const noGateAt = !m.diaRecusado && !m.noMinutoAtual && m.entradaEm ? m.entradaEm : null
+  const noGateAt = !m0.diaRecusado && !m0.noMinutoAtual && m0.entradaEm ? m0.entradaEm : null
   const gateAt = useGateAt(conta.id, noGateAt)
   const respostaAt =
     noGateAt && gateAt.data && (!gateAt.isPlaceholderData || gateAt.data.gate.tradingDay === diaDe(conta, noGateAt)) ? gateAt.data : null
   const gate: GateResult | null = noGateAt ? respostaAt?.gate ?? null : agora?.gate ?? null
   const rulesDoGate = noGateAt ? respostaAt?.rules ?? null : rules
+  // 3c: «Já fechada»'s rows and «Movi o stop para o breakeven» (contract §6.1); «Sua regra» in the
+  // pill's status reads the rules in force at the typed entry instant (the version the trade carries)
+  const m = comSaidas(m0, r, { conta, now, tentou, rules: rulesDoGate })
   const falhou = noGateAt ? gateAt.isError : rulesNowFalhou && !agora
   const pergunta = perguntaGate(m, r.modo)
   const presente = !fechada && m.agora
@@ -581,7 +591,8 @@ export default function PassoEntrada(props: PassoEntradaProps) {
               tradeDay: ans.state.trade.tradingDay,
               before: ans.limitBefore,
               after: ans.gateNow ? { tradingDay: ans.gateNow.tradingDay, limit: ans.gateNow.limit } : null,
-              exitAt: ans.state.trade.exitTime,
+              // 3c: with several exits, the one the limit was hit at (scenario 12: 10:12, not the last at 10:20)
+              exitAt: saidaDoLimite(ans.state, ans.gateNow),
               pref80,
             })
         seguir(ans.state.trade, banner)
@@ -590,7 +601,13 @@ export default function PassoEntrada(props: PassoEntradaProps) {
       const err = e instanceof RegistrarDataError ? e : new RegistrarDataError('unknown')
       if (err.code === 'similar_trade') setSimilar(desc ?? '')
       else if (err.code === 'no_rules') aoSemRegras()
-      else {
+      else if (err.field === 'exits') {
+        // 3c: a refusal of the rows as a whole (sums that do not fit the trade): the sheet's alert
+        // says it, the first row's quantity takes the focus (contract §3.3)
+        setErroGeral(err.code)
+        const primeira = r.saidas?.[0]?.id
+        if (primeira !== undefined) requestAnimationFrame(() => document.getElementById(`f-s${primeira}q`)?.focus())
+      } else {
         const campo = err.code === 'before_rules' ? (fechada ? 'dia' : 'hora') : campoDoServidor(err.field, conta.market)
         if (campo) {
           const texto =
@@ -600,7 +617,9 @@ export default function PassoEntrada(props: PassoEntradaProps) {
                 ? ERROS.entradaFutura(horaRel(conta, now))
                 : err.code === 'exit_in_future'
                   ? ERROS.saidaFutura(horaRel(conta, now))
-                  : textoDaRecusa(err.code, err.field, { forma: m.forma, lado: r.lado }) ?? ERRO_REGISTRAR[err.code]
+                  : campo === 'bePreco'
+                    ? textoRecusaBreakeven(err.code, m.forma) ?? ERRO_REGISTRAR[err.code]
+                    : textoDaRecusa(err.code, err.field, { forma: m.forma, lado: r.lado }) ?? ERRO_REGISTRAR[err.code]
           // The server asks for the result where the form computed it: «Corrigir» opens its field, empty
           if (campo === 'res' && !m.resultado?.campo && m.resultado?.corrigir) setR((x) => ({ ...x, corrigir: true, res: '' }))
           setErroServidor({ campo, texto })
@@ -713,7 +732,7 @@ export default function PassoEntrada(props: PassoEntradaProps) {
           }
         />
       ) : (
-        <CamposPrecos conta={conta} r={r} m={m} erros={erros} mudar={mudar} aviso={aviso2} padroes={defaults} aoRecomecar={() => setTentou(false)} />
+        <CamposPrecos conta={conta} r={r} m={m} rules={rules} erros={erros} mudar={mudar} aviso={aviso2} padroes={defaults} aoRecomecar={() => setTentou(false)} />
       )}
       {plano && (
         <div className="hub-reg-plano-linha">

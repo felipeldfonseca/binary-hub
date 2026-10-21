@@ -6,7 +6,7 @@ import type { Rules } from '@/lib/domain/gate'
 import { BIN_CLOCK, brt, ebinexRules, et, topOneRules } from '@/testing/gate'
 import { configAntes, configDepois, idsDono } from '@/testing/regras'
 import { pendingVersions, resolveRules, type ConfigVersion, type RulesConfig, type WindowSetting } from '@/lib/hub/regras'
-import { PADRAO_FUTUROS_CONTA, comLimite, comRegraJanela } from '@/lib/hub/rascunho'
+import { PADRAO_FUTUROS_CONTA, comBreakeven, comLimite, comRegraJanela } from '@/lib/hub/rascunho'
 import { aoSalvarConta, aoSalvarPadrao, comoFicaHoje, notaVersao, partesVersao, quandoVersao, type ComoFicaHoje } from '@/lib/hub/comoFicaHoje'
 
 /** « · » with a no-break space on each side (personalizar/copy.ts SEP): it never starts or ends a line */
@@ -171,6 +171,8 @@ describe('version notes (board partesSig, contrato §4.8)', () => {
       bloq: 'bloqueio 5 min antes e 10 depois',
       lim: 'limite US$\u00a0400 por conta',
       est: 'regra por estado: nenhuma escolha',
+      // Fase 3c: futures only; «sem breakeven» while the rule does not act
+      be: 'sem breakeven',
       cal: 'calendários: EUA',
     })
     expect(partesVersao(ebinexRules())).toEqual({
@@ -318,5 +320,41 @@ describe('the new markets (Fase 2b)', () => {
     expect(notaVersao([versao(clear(), '2026-10-17'), versao({ ...clear(), limit: { cents: 75050, mode: 'conta', atLimit: 'encerrar' } }, '2026-10-18')], 1, labelOf)).toBe(
       'limite R$\u00a0750,50',
     )
+  })
+})
+
+describe('Fase 3c \u00b7 \u00abMover para o breakeven\u00bb in the version notes (board partesSig `be`, contract \u00a76.5 E49)', () => {
+  const comBe = (by: Record<string, string>): Rules => ({
+    ...topOneRules(),
+    breakeven: { by: Object.fromEntries(Object.entries(by).map(([k, n]) => [k, { n, un: 'pts' as const }])) },
+  })
+
+  it('\u00abbreakeven com +8 pts no MES, +30 no MNQ e +5 no MGC\u00bb, in the futures table\u2019s order whatever the keys\u2019 order', () => {
+    expect(partesVersao(comBe({ MGC: '5', MES: '8', MNQ: '30' })).be).toBe('breakeven com +8 pts no MES, +30 no MNQ e +5 no MGC')
+    expect(partesVersao(comBe({ CL: '0.5', ES: '2.25' })).be).toBe('breakeven com +2,25 pts no ES e +0,5 no CL')
+    expect(partesVersao(comBe({ MES: '8' })).be).toBe('breakeven com +8 pts no MES')
+    // A key outside the table goes after it, alphabetically
+    expect(partesVersao(comBe({ ZN: '1', MES: '8', NG: '2' })).be).toBe('breakeven com +8 pts no MES, +2 no NG e +1 no ZN')
+  })
+
+  it('\u00absem breakeven\u00bb without the rule; futures only; the first version\u2019s note stays \u00ab{janela} \u00b7 {limite}\u00bb', () => {
+    expect(partesVersao(topOneRules()).be).toBe('sem breakeven')
+    expect(partesVersao(ebinexRules())).not.toHaveProperty('be')
+    expect(notaVersao([versao(comBe({ MES: '8' }), '2026-10-17')], 0, labelOf)).toBe(`janela 10:00\u201311:00 ET${SEP}seg\u2013sex${SEP}limite US$\u00a0400 por conta`)
+    // A later version that only adds the rule says only that
+    expect(notaVersao([versao(topOneRules(), '2026-10-17'), versao(comBe({ MES: '8', MNQ: '30' }), '2026-10-21')], 1, labelOf)).toBe(
+      'breakeven com +8 pts no MES e +30 no MNQ',
+    )
+    expect(notaVersao([versao(comBe({ MES: '8' }), '2026-10-17'), versao(topOneRules(), '2026-10-21')], 1, labelOf)).toBe('sem breakeven')
+  })
+
+  it('no version when the rule is off, or on without an asset (pendingVersions); a value makes one in every futures account that inherits it', () => {
+    const c = configDepois()
+    const padrao = { tipo: 'padrao' } as const
+    expect(pendingVersions(c, comBreakeven(c.settings, padrao, { on: false, by: { MES: '8' } }))).toEqual([])
+    expect(pendingVersions(c, comBreakeven(c.settings, padrao, { on: true, by: {} }))).toEqual([])
+    const p = pendingVersions(c, comBreakeven(c.settings, padrao, { on: true, by: { MES: '8', MNQ: '30', MGC: '5' } }))
+    expect(p.map((x) => x.accountId)).toEqual([ids.topOne])
+    expect(partesVersao(p[0].rules).be).toBe('breakeven com +8 pts no MES, +30 no MNQ e +5 no MGC')
   })
 })

@@ -119,7 +119,10 @@ describe('a trade’s rows', () => {
                 ? rows.marksNow
                 : c.table === 'trade_attachments'
                   ? rows.images
-                  : rows.version,
+                  : // Phase 3c: the trade's exits and stop moves (none recorded for this Phase 3 trade)
+                    c.table === 'trade_exits_v' || c.table === 'trade_stop_moves_v'
+                    ? []
+                    : rows.version,
     }));
     expect(await fetchTradeState(f.db, ids.trades.mes)).toEqual(tradeViewOfRows(rows));
     expect(() => tradeViewOfRows({ ...rows, images: [{ id: 1 }] })).toThrow(expect.objectContaining({ code: 'bad_answer' }));

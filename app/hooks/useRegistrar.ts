@@ -7,7 +7,7 @@ import { regrasKeys } from '@/hooks/useRegras';
 import { useAgora } from '@/hooks/useAgora';
 import type { AccountMarket } from '@/lib/domain/markets';
 import type { LimitCheck } from '@/lib/domain/gate';
-import type { AfterPayload, EntryPayload, ExitPayload, Marks } from '@/lib/domain/registro';
+import type { AfterPayload, EntryPayload, ExitPayload, Marks, MovePayload, PartialPayload, UndoEventPayload } from '@/lib/domain/registro';
 import { marksPayload } from '@/lib/domain/registro';
 import type { AccountNow, RulesNow } from '@/lib/hub/regras';
 import { fetchRulesNow } from '@/lib/hub/regrasDb';
@@ -20,22 +20,30 @@ import {
   fetchGateAt,
   fetchOpenTrades,
   fetchRecentTrades,
+  fetchTradeEvents,
   fetchTradeState,
+  moveStop,
   previewAfter,
   previewEntry,
   previewExit,
   registerAfter,
   registerEntry,
   registerExit,
+  registerPartial,
   undoEntry,
+  undoEvent,
   type AfterDryRun,
   type AfterRegistered,
   type DayTrade,
   type EntryDryRun,
+  type EventUndone,
   type ExitDryRun,
   type ExitRegistered,
+  type MoveRegistered,
+  type PartialRegistered,
   type Registered,
   type RegisteredTrade,
+  type TradeEvents,
   type TradeState,
   type TradeView,
 } from '@/lib/hub/registrarDb';
@@ -65,6 +73,8 @@ export const registrarKeys = {
     ['hub', uid, 'registrar', 'previa', kind, target, payload] as const,
   /** The server's clock offset from the last Registrar answer */
   relogio: (uid: string | undefined) => ['hub', uid, 'registrar', 'relogio'] as const,
+  /** Phase 3c: the exits and stop moves of the listed trades (`ids`: sorted, joined by ',') */
+  eventos: (uid: string | undefined, ids: string) => ['hub', uid, 'registrar', 'eventos', ids] as const,
 };
 
 /** The prefixes a write makes stale */
@@ -74,10 +84,11 @@ const prefix = {
   recentes: (uid: string | undefined) => ['hub', uid, 'registrar', 'recentes'] as const,
   previa: (uid: string | undefined) => ['hub', uid, 'registrar', 'previa'] as const,
   atividade: (uid: string | undefined) => ['hub', uid, 'atividade'] as const,
+  eventos: (uid: string | undefined) => ['hub', uid, 'registrar', 'eventos'] as const,
 };
 
 /** What each write changes, besides the trade's own entry (set from the answer) */
-export type RegistrarWrite = 'entrada' | 'saida' | 'fechada' | 'desfazer' | 'marcas' | 'extras';
+export type RegistrarWrite = 'entrada' | 'saida' | 'fechada' | 'desfazer' | 'marcas' | 'extras' | 'parcial' | 'stop' | 'evento';
 
 /**
  * The caches each write makes stale (contract §2.3). rules_now: the day's net and «Encerrado por
@@ -86,13 +97,20 @@ export type RegistrarWrite = 'entrada' | 'saida' | 'fechada' | 'desfazer' | 'mar
  * ['trades'] and ['trade-stats'] (/trades and the dashboard read the same rows). rules_config is
  * never made stale by a trade: rules_config() reads no trade.
  */
-export const REGISTRAR_INVALIDATIONS: Readonly<Record<RegistrarWrite, readonly ('abertas' | 'dia' | 'recentes' | 'previa' | 'regrasAgora' | 'atividade' | 'paginasAntigas')[]>> = {
+export const REGISTRAR_INVALIDATIONS: Readonly<
+  Record<RegistrarWrite, readonly ('abertas' | 'dia' | 'eventos' | 'recentes' | 'previa' | 'regrasAgora' | 'atividade' | 'paginasAntigas')[]>
+> = {
   entrada: ['abertas', 'dia', 'recentes', 'previa', 'regrasAgora', 'atividade', 'paginasAntigas'],
-  saida: ['abertas', 'dia', 'previa', 'regrasAgora', 'paginasAntigas'],
-  fechada: ['dia', 'recentes', 'previa', 'regrasAgora', 'atividade', 'paginasAntigas'],
-  desfazer: ['abertas', 'dia', 'recentes', 'previa', 'regrasAgora', 'atividade', 'paginasAntigas'],
+  saida: ['abertas', 'dia', 'eventos', 'previa', 'regrasAgora', 'paginasAntigas'],
+  fechada: ['dia', 'eventos', 'recentes', 'previa', 'regrasAgora', 'atividade', 'paginasAntigas'],
+  desfazer: ['abertas', 'dia', 'eventos', 'recentes', 'previa', 'regrasAgora', 'atividade', 'paginasAntigas'],
   marcas: [],
   extras: ['dia'],
+  // Phase 3c: a partial counts on the day's limit at its minute; a move changes no money; an undone
+  // partial leaves it (the bridge's second line and the chooser's «… em aberto» read 'eventos')
+  parcial: ['abertas', 'dia', 'eventos', 'previa', 'regrasAgora'],
+  stop: ['dia', 'eventos', 'previa'],
+  evento: ['abertas', 'dia', 'eventos', 'previa', 'regrasAgora'],
 };
 
 /**
@@ -108,6 +126,8 @@ export function invalidateAfterRegistrar(queryClient: QueryClient, uid: string |
         return [{ queryKey: [...prefix.abertas(uid)] }];
       case 'dia':
         return [{ queryKey: [...prefix.dia(uid)] }];
+      case 'eventos':
+        return [{ queryKey: [...prefix.eventos(uid)] }];
       case 'recentes':
         return [{ queryKey: [...prefix.recentes(uid)] }];
       case 'previa':
@@ -215,6 +235,23 @@ export function useDayTrades(
     queryKey: registrarKeys.dia(userId, account?.id ?? '', day ?? ''),
     queryFn: () => fetchDayTrades(db, (account as { id: string }).id, day as string, inicioDoDia(day as string, (account as { market: AccountMarket }).market)),
     enabled: !!userId && !!account && !!day && enabled,
+    refetchOnWindowFocus: 'always',
+  });
+}
+
+/**
+ * Phase 3c: the exits and stop moves of the listed trades (the chooser's «2 ct em aberto», the
+ * bridge's «1 parcial, +US$ 40,00 · stop no breakeven»), one read for the list; nothing asked for
+ * without ids. Read again on focus, as the lists it completes.
+ */
+export function useTradeEvents(tradeIds: readonly string[] | null, { enabled = true }: { enabled?: boolean } = {}) {
+  const { db, userId } = useHubDb();
+  const ids = tradeIds ? Array.from(new Set(tradeIds)).sort() : [];
+  const key = ids.join(',');
+  return useQuery<Record<string, TradeEvents>, RegistrarDataError>({
+    queryKey: registrarKeys.eventos(userId, key),
+    queryFn: () => fetchTradeEvents(db, key.split(',')),
+    enabled: !!userId && ids.length > 0 && enabled,
     refetchOnWindowFocus: 'always',
   });
 }
@@ -435,6 +472,102 @@ export function useRegisterAfter() {
       recordServerNow(queryClient, userId, answer.state.serverNow);
       setTradeView(queryClient, userId, answer.state);
       return invalidateAfterRegistrar(queryClient, userId, 'fechada');
+    },
+  });
+}
+
+export interface PartialVariables {
+  tradeId: string;
+  accountId: string;
+  /** With its client_key (one per partial, kept across retries, new after a success) */
+  payload: PartialPayload;
+}
+
+/** register_partial's answer, and the account's limit before it (for the banner: avisoDoLimite) */
+export type PartialDone = PartialRegistered & { limitBefore: { tradingDay: string; limit: LimitCheck } | null };
+
+/** «Registrar parcial» (Phase 3c): a part of what is open leaves at a price and an hour */
+export function useRegisterPartial() {
+  const { db, userId } = useHubDb();
+  const queryClient = useQueryClient();
+  return useMutation<PartialDone, RegistrarDataError, PartialVariables>({
+    ...WRITE,
+    mutationFn: async ({ tradeId, accountId, payload }) => {
+      assertOnline();
+      const limitBefore = limitBeforeOf(queryClient, userId, accountId);
+      return { ...(await registerPartial(db, tradeId, payload)), limitBefore };
+    },
+    onSuccess: (answer) => {
+      recordServerNow(queryClient, userId, answer.state.serverNow);
+      setTradeView(queryClient, userId, answer.state);
+      return invalidateAfterRegistrar(queryClient, userId, 'parcial');
+    },
+  });
+}
+
+export interface MoveVariables {
+  tradeId: string;
+  /** With its client_key (one per move, kept across retries, new after a success) */
+  payload: MovePayload;
+}
+
+/** «Registrar stop» (Phase 3c): the stop moves on the server's clock */
+export function useMoveStop() {
+  const { db, userId } = useHubDb();
+  const queryClient = useQueryClient();
+  return useMutation<MoveRegistered, RegistrarDataError, MoveVariables>({
+    ...WRITE,
+    mutationFn: ({ tradeId, payload }) => {
+      assertOnline();
+      return moveStop(db, tradeId, payload);
+    },
+    onSuccess: (answer) => {
+      recordServerNow(queryClient, userId, answer.state.serverNow);
+      setTradeView(queryClient, userId, answer.state);
+      return invalidateAfterRegistrar(queryClient, userId, 'stop');
+    },
+  });
+}
+
+export interface UndoEventVariables {
+  tradeId: string;
+  accountId: string;
+  payload: UndoEventPayload;
+}
+
+/**
+ * undo_event's answer with the account's limit before it (the cached rules_now) and after it
+ * (rules_now read again at once): «Com a parcial desfeita, o limite do dia volta a …»
+ */
+export type EventUndoneDone = EventUndone & {
+  limitBefore: { tradingDay: string; limit: LimitCheck } | null;
+  limitAfter: { tradingDay: string; limit: LimitCheck } | null;
+};
+
+/** The timeline's «Sim, desfazer» (Phase 3c): the newest partial or stop move, within 15 minutes */
+export function useUndoEvent() {
+  const { db, userId } = useHubDb();
+  const queryClient = useQueryClient();
+  return useMutation<EventUndoneDone, RegistrarDataError, UndoEventVariables>({
+    ...WRITE,
+    mutationFn: async ({ tradeId, accountId, payload }) => {
+      assertOnline();
+      const limitBefore = limitBeforeOf(queryClient, userId, accountId);
+      const answer = await undoEvent(db, tradeId, payload);
+      let limitAfter: EventUndoneDone['limitAfter'] = null;
+      try {
+        const now = await queryClient.fetchQuery<RulesNow>({ queryKey: regrasKeys.agora(userId), queryFn: () => fetchRulesNow(db), staleTime: 0 });
+        const account = now.accounts.find((a) => a.accountId === accountId);
+        limitAfter = account ? { tradingDay: account.gate.tradingDay, limit: account.gate.limit } : null;
+      } catch {
+        // Without the fresh limit, the line about it is left out
+      }
+      return { ...answer, limitBefore, limitAfter };
+    },
+    onSuccess: (answer) => {
+      recordServerNow(queryClient, userId, answer.state.serverNow);
+      setTradeView(queryClient, userId, answer.state);
+      return invalidateAfterRegistrar(queryClient, userId, 'evento');
     },
   });
 }
