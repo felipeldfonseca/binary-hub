@@ -26,6 +26,8 @@ import {
   telasJson,
   type TelasAgora,
 } from '@/testing/registrarTelas'
+import { idsParciais } from '@/testing/parciais'
+import { agoraParciais, contasParciais, estadoJson, etEm, eventosRows, parcialParciais, stopParciais } from '@/testing/parciaisTelas'
 
 jest.mock('@/lib/supabase', () => ({ createDataClient: jest.fn(() => ({ storage: { from: () => ({}) } })) }))
 jest.mock('@/hooks/useAuth', () => ({ useAuth: () => ({ user: { id: 'user-1' }, session: { access_token: 'user-jwt' } }) }))
@@ -47,6 +49,7 @@ jest.mock('@/lib/hub/registrarDb', () => ({
   undoEntry: jest.fn(),
   drainImageTrash: jest.fn(),
   signedImageUrl: jest.fn(),
+  fetchTradeEvents: jest.fn(),
 }))
 
 const db = registrarDb as jest.Mocked<typeof registrarDb>
@@ -550,5 +553,48 @@ describe('step 2: double taps and the server’s other answers (review gaps)', (
     await userEvent.click(screen.getByRole('button', { name: 'Registrar saída' }))
     expect(await screen.findByRole('heading', { level: 3, name: 'Entrada' })).toHaveFocus()
     expect(screen.getByText('Esta operação não foi encontrada.')).toBeInTheDocument()
+  })
+})
+
+// ------------------------------------------------------------------------------------------------
+// Phase 3c (lane C1): the chooser after a partial, and the two «Passaram 15 minutos» texts (§5.8)
+// ------------------------------------------------------------------------------------------------
+
+describe('Phase 3c on step 2’s frame', () => {
+  const ids3c = idsParciais()
+
+  it('«Operações abertas» after a partial: «MES · Compra · 3 ct · 2 ct em aberto · desde 10:12 ET»; the row as built while the exits are read or without a partial', async () => {
+    fetchAccounts.mockResolvedValue(contasParciais())
+    fetchRulesNow.mockResolvedValue(agoraParciais('dia-top-1018', { iso: etEm('11:32') }))
+    const mes = parcialParciais('partial-mes').state.trade
+    const outra = stopParciais('stop-mes-entrada-ajuste').state.trade
+    db.fetchOpenTrades.mockResolvedValue([outra, mes])
+    const { tradeEventsOfRows } = jest.requireActual('@/lib/hub/registrarDb') as typeof registrarDb
+    let responder: (v: Record<string, registrarDb.TradeEvents>) => void = () => undefined
+    db.fetchTradeEvents.mockImplementation(() => new Promise((r) => (responder = r)))
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: Infinity } } })
+    render(
+      <QueryClientProvider client={queryClient}>
+        <RegistrarSheet accountId={ids3c.accounts.topOne} tradeId={null} onClose={jest.fn()} />
+      </QueryClientProvider>,
+    )
+    await screen.findByRole('heading', { level: 3, name: 'Operações abertas' })
+    const linhas = () => within(screen.getByRole('list', { name: 'Operações abertas' })).getAllByRole('listitem').map((li) => li.firstChild?.textContent)
+    expect(linhas()).toEqual(['MES · Compra · 3 ct · desde 10:12 ET', 'MES · Compra · 2 ct · desde 11:30 ET'])
+    expect(db.fetchTradeEvents).toHaveBeenCalledWith(expect.anything(), [mes.id, outra.id].sort())
+    await act(async () => responder(tradeEventsOfRows(eventosRows({ json: estadoJson('partial-mes') }, { json: estadoJson('stop-mes-entrada-ajuste') }))))
+    await waitFor(() => expect(linhas()).toEqual(['MES · Compra · 3 ct · 2 ct em aberto · desde 10:12 ET', 'MES · Compra · 2 ct · desde 11:30 ET']))
+    expect(screen.getByRole('button', { name: 'Registrar saída: MES · Compra · 3 ct · 2 ct em aberto · desde 10:12 ET' })).toBeInTheDocument()
+  })
+
+  it('«Desfazer entrada» refused late keeps «Passaram 15 minutos: a entrada não pode mais ser desfeita.» (an event undo reads «… não dá mais para desfazer.»)', async () => {
+    fetchRulesNow.mockResolvedValue(agoraAs('agora-qui-1031-et', '2026-10-22T14:13:00.000Z'))
+    db.fetchTradeState.mockResolvedValue(entradaTelas('entry-mes').state)
+    db.undoEntry.mockRejectedValueOnce(new registrarDb.RegistrarDataError('undo_too_late'))
+    abrir(ids.trades.mes)
+    await screen.findByRole('heading', { level: 3, name: 'Operação aberta' })
+    await userEvent.click(screen.getByRole('button', { name: 'Desfazer entrada' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Sim, desfazer' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('Passaram 15 minutos: a entrada não pode mais ser desfeita.')
   })
 })

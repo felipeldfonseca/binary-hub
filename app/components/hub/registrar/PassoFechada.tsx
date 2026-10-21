@@ -3,10 +3,12 @@
 import { useRef, useState } from 'react'
 import { useServerNow } from '@/hooks/useRegistrar'
 import type { TradeView } from '@/lib/hub/registrarDb'
-import { cartaoFechada, linhaDepois, marcasDivididas, type ContaReg, type MarcaKind } from '@/lib/hub/registrarForm'
+import { marcasDivididas, type ContaReg, type MarcaKind } from '@/lib/hub/registrarForm'
+import { cartaoComParciais, linhaDepoisComParciais } from '@/lib/hub/registrarParciais'
 import { Disclosure, InfoButton, InfoPanel, useToggle } from '@/components/hub/contas/ui'
 import { ABERTA, FECHADA, FOLHA_REG, RODAPE } from './copy'
 import ImagensENota, { useAnexos } from './ImagensENota'
+import LinhaDoTempo from './LinhaDoTempo'
 import { AvisosMarca, PillsMarca, useMarcar } from './Marcas'
 import { PlanoDaOperacao } from './PassoAberta'
 import { Rodape, Tempo, useMexido } from './ui'
@@ -30,7 +32,9 @@ const TOM: Record<'mint' | 'red' | 'neutral', string> = { mint: 'var(--mint)', r
  * Step 3 · «Operação fechada» (RO l.484–546, 1291–1346): the result (3-4: with how it is known, a
  * typed or estimated result, and the costs with the net), the exit banner, the plan, the marks
  * before the exit and after the result, «Marcar ou mudar», «Imagens e nota», and
- * «Registrar outra» / «Ver no Diário» (both save what is pending first).
+ * «Registrar outra» / «Ver no Diário» (both save what is pending first). Phase 3c (RO l.567–585):
+ * with several exits the average exit, R on the initial stop after a move, «Linha do tempo» and
+ * the breakeven line between the card and the banner; the marks line names the first partial.
  */
 export default function PassoFechada({ conta, view, aviso, fora, headingRef, aoRegistrarOutra, aoVerNoDiario }: PassoFechadaProps) {
   const now = useServerNow(60_000)
@@ -43,9 +47,9 @@ export default function PassoFechada({ conta, view, aviso, fora, headingRef, aoR
   useMexido(anexos.pendente)
 
   const t = view.trade
-  const cartao = cartaoFechada(conta, t, now)
+  const cartao = cartaoComParciais(conta, view, now)
   const marcas = marcasDivididas(conta, view.marks, now)
-  const linha = linhaDepois(conta, t, view.marks, view.context?.origin ?? null)
+  const linha = linhaDepoisComParciais(conta, view)
   const foraDoPlano = view.plan?.verdict === 'fora_do_plano'
 
   const sair = async (depois: (anterior: string | null) => void) => {
@@ -85,6 +89,8 @@ export default function PassoFechada({ conta, view, aviso, fora, headingRef, aoR
           </span>
         )}
       </div>
+      {cartao.tempo && <LinhaDoTempo itens={cartao.tempo} />}
+      {cartao.breakeven && <p className="hub-rp-be">{cartao.breakeven}</p>}
       {aviso && (
         <p className={aviso.atingido ? 'hub-reg-aviso-lim hub-reg-aviso-lim--atingido' : 'hub-reg-aviso-lim'} role="status">
           {aviso.texto}
