@@ -8,8 +8,9 @@
 -- it moves the stored instant back with the table's guard off.
 --
 -- Every import of section 8 goes through tests.imp81: the preview, then the commit, and the preview's
--- counts must be the commit's, key by key. Sections 8.14–8.18 pin how a position whose exits the app
--- registered as separate trades is linked (row by row, every row once, the day equal to the file).
+-- counts must be the commit's, key by key. Sections 8.14–8.18 and 8.23 pin how a position whose exits the
+-- app registered as separate trades is linked (row by row, every row once, the day equal to the file),
+-- in one file or over several.
 
 set timezone to 'UTC';
 
@@ -85,7 +86,9 @@ insert into public.trading_accounts (user_id, market, label, platform) values
   (:V, 'futures', 'Limite V', 'topone'), (:V, 'futures', 'Curto V', 'topone'), (:V, 'stocks', 'Opcoes V', 'ibkr'),
   (:V, 'futures', 'Hora V', 'topone'), (:V, 'futures', 'Grupo V', 'topone'), (:V, 'futures', 'Parede V', 'topone'),
   (:V, 'futures', 'Par1 V', 'topone'), (:V, 'futures', 'Par2 V', 'topone'), (:V, 'futures', 'Par3 V', 'topone'),
-  (:V, 'futures', 'Par4 V', 'topone'), (:V, 'futures', 'Par5 V', 'topone');
+  (:V, 'futures', 'Par4 V', 'topone'), (:V, 'futures', 'Par5 V', 'topone'), (:V, 'futures', 'Par6 V', 'topone'),
+  (:V, 'futures', 'Par7 V', 'topone'), (:V, 'futures', 'Par8 V', 'topone'), (:V, 'futures', 'Par9 V', 'topone'),
+  (:V, 'futures', 'Par10 V', 'topone'), (:V, 'futures', 'Par11 V', 'topone');
 commit;
 select id as par from public.trading_accounts where user_id = :V and label = 'Parciais V' \gset
 select id as reg from public.trading_accounts where user_id = :V and label = 'Regra V' \gset
@@ -107,6 +110,12 @@ select id as sa2 from public.trading_accounts where user_id = :V and label = 'Pa
 select id as sa3 from public.trading_accounts where user_id = :V and label = 'Par3 V' \gset
 select id as sa4 from public.trading_accounts where user_id = :V and label = 'Par4 V' \gset
 select id as sa5 from public.trading_accounts where user_id = :V and label = 'Par5 V' \gset
+select id as sb1 from public.trading_accounts where user_id = :V and label = 'Par6 V' \gset
+select id as sb2 from public.trading_accounts where user_id = :V and label = 'Par7 V' \gset
+select id as sb3 from public.trading_accounts where user_id = :V and label = 'Par8 V' \gset
+select id as sb4 from public.trading_accounts where user_id = :V and label = 'Par9 V' \gset
+select id as sb5 from public.trading_accounts where user_id = :V and label = 'Par10 V' \gset
+select id as sb6 from public.trading_accounts where user_id = :V and label = 'Par11 V' \gset
 
 begin;
 select set_config('request.jwt.claim.sub', :V, true);
@@ -127,8 +136,8 @@ select tests.eq(jsonb_array_length(public.save_rules(jsonb_build_object('v', 1, 
   || (select jsonb_object_agg(a.id::text, jsonb_build_object('rules', '{"v": 1}'::jsonb, 'window', tests.win(:NY, -90, 90), 'version', 'force'))
       from public.trading_accounts a
       where a.user_id = :V and a.label in ('Curto V', 'Opcoes V', 'Hora V', 'Grupo V', 'Parede V', 'Par1 V', 'Par2 V', 'Par3 V', 'Par4 V',
-                                           'Par5 V'))))->'versions'),
-  17, 'seventeen accounts with rules');
+                                           'Par5 V', 'Par6 V', 'Par7 V', 'Par8 V', 'Par9 V', 'Par10 V', 'Par11 V'))))->'versions'),
+  23, 'twenty-three accounts with rules');
 commit;
 alter table public.account_rule_versions disable trigger account_rule_versions_guard;
 update public.account_rule_versions v set effective_from = v.effective_from - interval '30 days' where v.user_id = :V;
@@ -2107,6 +2116,406 @@ values ('ffffffff-0000-0000-0000-000000000081', :V, :'grp', 'ES', 'futures', 'lo
 select tests.eq((public.limit_usage(:'grp', (select trading_day from public.trades where id = 'ffffffff-0000-0000-0000-000000000081'),
                                     false, null, :'d4'::timestamptz + interval '200 minutes')->>'worst_usd')::numeric,
                 -26.24, 'the trade entered first counts first (53,76 − 80 = −26,24 before the +100), though its id sorts last');
+
+-- 8.23 A later file brings the rest of a position the app registered as several trades, an earlier file
+--      having put its first rows in one of them: the new rows link one to one to the others (as
+--      20261020000004 did), never joined to the trade the earlier file reached; the day is the file's
+--      money. Unless that trade was registered as the whole position (then the rows join it).
+-- (a) The owner's pair: the first exit registered, a mid-session export, the second exit, the full export
+begin;
+select set_config('request.jwt.claim.sub', :V, true);
+set local role authenticated;
+insert into tests.p81 select 'sv' || i, public.register_entry(:'sb1', tests.entry81('MCLZ6', 'long', '1', '70.00', -10))->>'trade_id'
+from generate_series(1, 2) i;
+commit;
+select (array_agg(v order by v::uuid))[1] as sv1, (array_agg(v order by v::uuid))[2] as sv2 from tests.p81 where k like 'sv%' \gset
+begin;
+select set_config('request.jwt.claim.sub', :V, true);
+set local role authenticated;
+select public.register_exit(:'sv1', '{"v": 1, "exit_price": "70.10"}')->>'pnl';
+commit;
+select tests.fp81(:'sv1') as fpsv1 \gset
+select entry_time as sv_entry, trading_day as sv_day from public.trades where id = :'sv1' \gset
+create temp table f823 as select
+  tests.row(2, 'MCLZ6/23001', 'MCLZ6', 'futures', 'long', :'sv_entry'::timestamptz, now() - interval '6 minutes',
+            '70.00', '70.05', '1', null, null, 'win', '5.00', '0.62') as x,
+  tests.row(3, 'MCLZ6/23002', 'MCLZ6', 'futures', 'long', :'sv_entry'::timestamptz, now() - interval '2 minutes',
+            '70.00', '70.15', '1', null, null, 'win', '15.00', '0.62') as y;
+select x as x23, y as y23 from f823 \gset
+begin;
+select set_config('request.jwt.claim.sub', :V, true);
+set local role authenticated;
+select tests.imp81(:'sb1', 'topone', 'f23a.csv', jsonb_build_array(:'x23'::jsonb)) as c23a \gset
+commit;
+select tests.eq((select external_id from public.trades where id = :'sv1'), 'MCLZ6/23001', 'the mid-session export: its row on the first trade');
+begin;
+select set_config('request.jwt.claim.sub', :V, true);
+set local role authenticated;
+select public.register_exit(:'sv2', '{"v": 1, "exit_price": "70.20"}')->>'pnl';
+commit;
+select tests.fp81(:'sv2') as fpsv2 \gset
+begin;
+select set_config('request.jwt.claim.sub', :V, true);
+set local role authenticated;
+select tests.imp81(:'sb1', 'topone', 'f23b.csv', jsonb_build_array(:'x23'::jsonb, :'y23'::jsonb)) as c23b \gset
+select tests.eq((:'c23b'::jsonb) - 'batch_id' - 'errors', '{"inserted": 0, "duplicate": 1, "completed": 0, "other_account": 0, "linked": 1}'::jsonb,
+                'the full export: the second row links to the other registered trade, not to the first');
+commit;
+select tests.eq((select jsonb_agg(jsonb_build_array(t.external_id, t.quantity::int, t.pnl, t.pnl_basis) order by t.external_id)
+                 from public.trades t where t.account_id = :'sb1'),
+                '[["MCLZ6/23001", 1, 5.00, "file"], ["MCLZ6/23002", 1, 15.00, "file"]]'::jsonb, 'each trade holds its own row''s money');
+select tests.eq((select count(*) from public.trade_exits e where e.account_id = :'sb1'), 0::bigint, 'the row path: no exit rows');
+select tests.eq(public.limit_usage(:'sb1', :'sv_day', false, null, 'infinity') - 'hit_at',
+                '{"trades": 2, "net_usd": 18.76, "worst_usd": 0}'::jsonb,
+                'the day is the file''s: US$ 18,76 net (US$ 38,76 if the second row joined the first trade)');
+begin;
+select set_config('request.jwt.claim.sub', :V, true);
+set local role authenticated;
+select tests.eq(tests.imp81(:'sb1', 'topone', 'f23b.csv', jsonb_build_array(:'x23'::jsonb, :'y23'::jsonb)) - 'errors',
+                '{"batch_id": null, "inserted": 0, "duplicate": 2, "completed": 0, "other_account": 0, "linked": 0}'::jsonb,
+                'the full export again: two duplicates, nothing written');
+select public.import_undo((:'c23b'::jsonb->>'batch_id')::uuid)->>'deleted', public.import_undo((:'c23a'::jsonb->>'batch_id')::uuid)->>'deleted';
+commit;
+select tests.eq(tests.fp81(:'sv1') || tests.fp81(:'sv2'), :'fpsv1' || :'fpsv2', 'undone newest first: both as registered');
+begin;
+select set_config('request.jwt.claim.sub', :V, true);
+set local role authenticated;
+select tests.imp81(:'sb1', 'topone', 'f23a.csv', jsonb_build_array(:'x23'::jsonb)) as c23a \gset
+commit;
+begin;
+select set_config('request.jwt.claim.sub', :V, true);
+set local role authenticated;
+select tests.imp81(:'sb1', 'topone', 'f23b.csv', jsonb_build_array(:'x23'::jsonb, :'y23'::jsonb)) as c23b \gset
+commit;
+begin;
+select set_config('request.jwt.claim.sub', :V, true);
+set local role authenticated;
+select public.import_undo((:'c23a'::jsonb->>'batch_id')::uuid)->>'deleted';
+commit;
+select tests.eq(tests.fp81(:'sv1') || (select external_id || ' ' || pnl from public.trades where id = :'sv2'), :'fpsv1' || 'MCLZ6/23002 15.00',
+                'the mid-session export undone: the first trade as registered, the second keeps the full export''s row');
+begin;
+select set_config('request.jwt.claim.sub', :V, true);
+set local role authenticated;
+select public.import_undo((:'c23b'::jsonb->>'batch_id')::uuid)->>'deleted';
+commit;
+select tests.eq(tests.fp81(:'sv1') || tests.fp81(:'sv2'), :'fpsv1' || :'fpsv2', 'undone oldest first: both as registered');
+
+-- (b) The second trade still open when the full export comes: its row closes it (undo: open again)
+begin;
+select set_config('request.jwt.claim.sub', :V, true);
+set local role authenticated;
+insert into tests.p81 select 'sw' || i, public.register_entry(:'sb2', tests.entry81('MCLZ6', 'long', '1', '70.00', -10))->>'trade_id'
+from generate_series(1, 2) i;
+commit;
+select (array_agg(v order by v::uuid))[1] as sw1, (array_agg(v order by v::uuid))[2] as sw2 from tests.p81 where k like 'sw%' \gset
+begin;
+select set_config('request.jwt.claim.sub', :V, true);
+set local role authenticated;
+select public.register_exit(:'sw1', '{"v": 1, "exit_price": "70.10"}')->>'pnl';
+commit;
+select tests.fp81(:'sw1') || tests.fp81(:'sw2') as fpsw \gset
+select entry_time as sw_entry, trading_day as sw_day from public.trades where id = :'sw1' \gset
+create temp table f823b as select
+  tests.row(2, 'MCLZ6/23101', 'MCLZ6', 'futures', 'long', :'sw_entry'::timestamptz, now() - interval '6 minutes',
+            '70.00', '70.05', '1', null, null, 'win', '5.00', '0.62') as x,
+  tests.row(3, 'MCLZ6/23102', 'MCLZ6', 'futures', 'long', :'sw_entry'::timestamptz, now() - interval '2 minutes',
+            '70.00', '70.15', '1', null, null, 'win', '15.00', '0.62') as y;
+select x as x23b, y as y23b, (y->>'local_exit')::timestamp at time zone 'UTC' as y23b_exit from f823b \gset
+begin;
+select set_config('request.jwt.claim.sub', :V, true);
+set local role authenticated;
+select tests.imp81(:'sb2', 'topone', 'f23c.csv', jsonb_build_array(:'x23b'::jsonb)) as c23c \gset
+commit;
+begin;
+select set_config('request.jwt.claim.sub', :V, true);
+set local role authenticated;
+select tests.imp81(:'sb2', 'topone', 'f23d.csv', jsonb_build_array(:'x23b'::jsonb, :'y23b'::jsonb)) as c23d \gset
+select tests.eq((:'c23d'::jsonb) - 'batch_id' - 'errors', '{"inserted": 0, "duplicate": 1, "completed": 0, "other_account": 0, "linked": 1}'::jsonb,
+                'the full export: the second row links to the open trade');
+commit;
+select tests.eq((select jsonb_build_object('status', status, 'pnl', pnl, 'key', external_id, 'exit', exit_time = :'y23b_exit'::timestamptz)
+                 from public.trades where id = :'sw2'),
+                '{"status": "closed", "pnl": 15.00, "key": "MCLZ6/23102", "exit": true}'::jsonb, 'it closes at the row''s exit');
+select tests.eq(public.limit_usage(:'sb2', :'sw_day', false, null, 'infinity')->>'net_usd', '18.76', 'the day is the file''s');
+begin;
+select set_config('request.jwt.claim.sub', :V, true);
+set local role authenticated;
+select public.import_undo((:'c23c'::jsonb->>'batch_id')::uuid)->>'deleted', public.import_undo((:'c23d'::jsonb->>'batch_id')::uuid)->>'deleted';
+commit;
+select tests.eq(tests.fp81(:'sw1') || tests.fp81(:'sw2'), :'fpsw', 'undone: the first closed as registered, the second open again');
+
+-- (c) Three registered trades of one entry (the broker's entry price a tick off the one registered): the
+--     mid-session export has the first row, the full export three; then a first export of two rows,
+--     undone after the full one, and the full one again
+begin;
+select set_config('request.jwt.claim.sub', :V, true);
+set local role authenticated;
+insert into tests.p81 select 'sx' || i, public.register_entry(:'sb3', tests.entry81('MCLZ6', 'long', '1', '70.00', -10))->>'trade_id'
+from generate_series(1, 3) i;
+commit;
+select (array_agg(v order by v::uuid))[1] as sx1, (array_agg(v order by v::uuid))[2] as sx2, (array_agg(v order by v::uuid))[3] as sx3
+from tests.p81 where k like 'sx%' \gset
+begin;
+select set_config('request.jwt.claim.sub', :V, true);
+set local role authenticated;
+select public.register_exit(:'sx1', '{"v": 1, "exit_price": "70.10"}')->>'pnl', public.register_exit(:'sx2', '{"v": 1, "exit_price": "70.20"}')->>'pnl',
+       public.register_exit(:'sx3', '{"v": 1, "exit_price": "70.30"}')->>'pnl';
+commit;
+select tests.fp81(:'sx1') || tests.fp81(:'sx2') || tests.fp81(:'sx3') as fpsx \gset
+select entry_time as sx_entry, trading_day as sx_day from public.trades where id = :'sx1' \gset
+create temp table f823c as select
+  tests.row(2, 'MCLZ6/23201', 'MCLZ6', 'futures', 'long', :'sx_entry'::timestamptz, now() - interval '6 minutes',
+            '70.01', '70.05', '1', null, null, 'win', '5.00', '0.62') as x,
+  tests.row(3, 'MCLZ6/23202', 'MCLZ6', 'futures', 'long', :'sx_entry'::timestamptz, now() - interval '4 minutes',
+            '70.01', '70.05', '1', null, null, 'win', '5.00', '0.62') as y,
+  tests.row(4, 'MCLZ6/23203', 'MCLZ6', 'futures', 'long', :'sx_entry'::timestamptz, now() - interval '2 minutes',
+            '70.01', '70.05', '1', null, null, 'win', '5.00', '0.62') as z;
+select x as x23c, y as y23c, z as z23c from f823c \gset
+begin;
+select set_config('request.jwt.claim.sub', :V, true);
+set local role authenticated;
+select tests.imp81(:'sb3', 'topone', 'f23e.csv', jsonb_build_array(:'x23c'::jsonb)) as c23e \gset
+commit;
+begin;
+select set_config('request.jwt.claim.sub', :V, true);
+set local role authenticated;
+select tests.imp81(:'sb3', 'topone', 'f23f.csv', jsonb_build_array(:'x23c'::jsonb, :'y23c'::jsonb, :'z23c'::jsonb)) as c23f \gset
+select tests.eq((:'c23f'::jsonb) - 'batch_id' - 'errors', '{"inserted": 0, "duplicate": 1, "completed": 0, "other_account": 0, "linked": 2}'::jsonb,
+                'three trades, the full export: its two new rows link to the two other trades');
+commit;
+select tests.eq((select jsonb_agg(jsonb_build_array(external_id, entry_price) order by id) from public.trades where account_id = :'sb3'),
+                '[["MCLZ6/23201", 70.01], ["MCLZ6/23202", 70.01], ["MCLZ6/23203", 70.01]]'::jsonb,
+                'one row each, the broker''s entry price on each (the first trade''s, written by the first export, is not what was registered)');
+select tests.eq(public.limit_usage(:'sb3', :'sx_day', false, null, 'infinity')->>'net_usd', '13.14',
+                'the day is the file''s: US$ 15 gross, three commissions (US$ 43,14 if the rows joined the first trade)');
+begin;
+select set_config('request.jwt.claim.sub', :V, true);
+set local role authenticated;
+select public.import_undo((:'c23f'::jsonb->>'batch_id')::uuid)->>'deleted', public.import_undo((:'c23e'::jsonb->>'batch_id')::uuid)->>'deleted';
+commit;
+select tests.eq(tests.fp81(:'sx1') || tests.fp81(:'sx2') || tests.fp81(:'sx3'), :'fpsx', 'undone: the three as registered');
+begin;
+select set_config('request.jwt.claim.sub', :V, true);
+set local role authenticated;
+select tests.imp81(:'sb3', 'topone', 'f23g.csv', jsonb_build_array(:'x23c'::jsonb, :'y23c'::jsonb)) as c23g \gset
+commit;
+begin;
+select set_config('request.jwt.claim.sub', :V, true);
+set local role authenticated;
+select tests.imp81(:'sb3', 'topone', 'f23f.csv', jsonb_build_array(:'x23c'::jsonb, :'y23c'::jsonb, :'z23c'::jsonb)) as c23f \gset
+commit;
+begin;
+select set_config('request.jwt.claim.sub', :V, true);
+set local role authenticated;
+select public.import_undo((:'c23g'::jsonb->>'batch_id')::uuid)->>'deleted';
+commit;
+begin;
+select set_config('request.jwt.claim.sub', :V, true);
+set local role authenticated;
+select tests.imp81(:'sb3', 'topone', 'f23f2.csv', jsonb_build_array(:'x23c'::jsonb, :'y23c'::jsonb, :'z23c'::jsonb)) as c23f2 \gset
+select tests.eq((:'c23f2'::jsonb) - 'batch_id' - 'errors', '{"inserted": 0, "duplicate": 1, "completed": 0, "other_account": 0, "linked": 2}'::jsonb,
+                'the two-row export undone, the full one again: its rows the third trade does not hold link to the other two');
+commit;
+select tests.eq(public.limit_usage(:'sb3', :'sx_day', false, null, 'infinity')->>'net_usd', '13.14',
+                'the day is the file''s (US$ 63,14 if the rows joined the third trade)');
+begin;
+select set_config('request.jwt.claim.sub', :V, true);
+set local role authenticated;
+select public.import_undo((:'c23f'::jsonb->>'batch_id')::uuid)->>'deleted', public.import_undo((:'c23f2'::jsonb->>'batch_id')::uuid)->>'deleted';
+commit;
+select tests.eq(tests.fp81(:'sx1') || tests.fp81(:'sx2') || tests.fp81(:'sx3'), :'fpsx', 'undone oldest first: the three as registered');
+
+-- (d) Registered as 2 ct and 1 ct: the first export (two rows) goes whole to the 2 ct trade (its size,
+--     8.18); the full export's third row links to the 1 ct trade, since the position is now 3 ct
+begin;
+select set_config('request.jwt.claim.sub', :V, true);
+set local role authenticated;
+insert into tests.p81 values ('sy1', public.register_entry(:'sb4', tests.entry81('MCLZ6', 'long', '2', '70.00', -10))->>'trade_id'),
+                             ('sy2', public.register_entry(:'sb4', tests.entry81('MCLZ6', 'long', '1', '70.00', -10))->>'trade_id');
+commit;
+select max(v) filter (where k = 'sy1') as sy1, max(v) filter (where k = 'sy2') as sy2 from tests.p81 \gset
+begin;
+select set_config('request.jwt.claim.sub', :V, true);
+set local role authenticated;
+select public.register_exit(:'sy1', '{"v": 1, "exit_price": "70.10"}')->>'pnl', public.register_exit(:'sy2', '{"v": 1, "exit_price": "70.10"}')->>'pnl';
+commit;
+select tests.fp81(:'sy1') || tests.fp81(:'sy2') as fpsy \gset
+select entry_time as sy_entry, trading_day as sy_day from public.trades where id = :'sy1' \gset
+create temp table f823d as select
+  tests.row(2, 'MCLZ6/23401', 'MCLZ6', 'futures', 'long', :'sy_entry'::timestamptz, now() - interval '6 minutes',
+            '70.00', '70.05', '1', null, null, 'win', '5.00', '0.62') as x,
+  tests.row(3, 'MCLZ6/23402', 'MCLZ6', 'futures', 'long', :'sy_entry'::timestamptz, now() - interval '4 minutes',
+            '70.00', '70.15', '1', null, null, 'win', '15.00', '0.62') as y,
+  tests.row(4, 'MCLZ6/23403', 'MCLZ6', 'futures', 'long', :'sy_entry'::timestamptz, now() - interval '2 minutes',
+            '70.00', '70.10', '1', null, null, 'win', '10.00', '0.62') as z;
+select x as x23d, y as y23d, z as z23d from f823d \gset
+begin;
+select set_config('request.jwt.claim.sub', :V, true);
+set local role authenticated;
+select tests.imp81(:'sb4', 'topone', 'f23h.csv', jsonb_build_array(:'x23d'::jsonb, :'y23d'::jsonb)) as c23h \gset
+select tests.eq((:'c23h'::jsonb) - 'batch_id' - 'errors',
+                '{"inserted": 0, "duplicate": 0, "completed": 0, "other_account": 0, "linked": 1, "trades": 0, "grouped": 1, "attached": 0}'::jsonb,
+                'the first export: whole on the 2 ct trade');
+commit;
+begin;
+select set_config('request.jwt.claim.sub', :V, true);
+set local role authenticated;
+select tests.imp81(:'sb4', 'topone', 'f23i.csv', jsonb_build_array(:'x23d'::jsonb, :'y23d'::jsonb, :'z23d'::jsonb)) as c23i \gset
+select tests.eq((:'c23i'::jsonb) - 'batch_id' - 'errors', '{"inserted": 0, "duplicate": 2, "completed": 0, "other_account": 0, "linked": 1}'::jsonb,
+                'the full export: the third row links to the 1 ct trade');
+commit;
+select tests.eq(jsonb_build_object('two', (select quantity::int || ' ' || pnl from public.trades where id = :'sy1'),
+                                   'one', (select quantity::int || ' ' || pnl || ' ' || external_id from public.trades where id = :'sy2')),
+                '{"two": "2 20.00", "one": "1 10.00 MCLZ6/23403"}'::jsonb, 'two rows on the 2 ct trade, one on the 1 ct');
+select tests.eq(public.limit_usage(:'sb4', :'sy_day', false, null, 'infinity')->>'net_usd', '28.14',
+                'the day is the file''s: US$ 30 gross, three commissions (US$ 38,14 if the third row joined the 2 ct trade)');
+begin;
+select set_config('request.jwt.claim.sub', :V, true);
+set local role authenticated;
+select public.import_undo((:'c23h'::jsonb->>'batch_id')::uuid)->>'deleted', public.import_undo((:'c23i'::jsonb->>'batch_id')::uuid)->>'deleted';
+commit;
+select tests.eq(tests.fp81(:'sy1') || tests.fp81(:'sy2'), :'fpsy', 'undone oldest first: both as registered');
+begin;
+select set_config('request.jwt.claim.sub', :V, true);
+set local role authenticated;
+select tests.imp81(:'sb4', 'topone', 'f23h.csv', jsonb_build_array(:'x23d'::jsonb, :'y23d'::jsonb)) as c23h \gset
+commit;
+begin;
+select set_config('request.jwt.claim.sub', :V, true);
+set local role authenticated;
+select tests.imp81(:'sb4', 'topone', 'f23i.csv', jsonb_build_array(:'x23d'::jsonb, :'y23d'::jsonb, :'z23d'::jsonb)) as c23i \gset
+commit;
+begin;
+select set_config('request.jwt.claim.sub', :V, true);
+set local role authenticated;
+select public.import_undo((:'c23i'::jsonb->>'batch_id')::uuid)->>'deleted', public.import_undo((:'c23h'::jsonb->>'batch_id')::uuid)->>'deleted';
+commit;
+select tests.eq(tests.fp81(:'sy1') || tests.fp81(:'sy2'), :'fpsy', 'undone newest first: both as registered');
+
+-- (e) The trade the earlier export reached was registered as the whole position (2 ct, another 2 ct
+--     trade at the entry): the full export's new row joins it (8.18 for a later file)
+begin;
+select set_config('request.jwt.claim.sub', :V, true);
+set local role authenticated;
+insert into tests.p81 select 'sz' || i, public.register_entry(:'sb5', tests.entry81('MESZ6', 'long', '2', '7000.00', -10))->>'trade_id'
+from generate_series(1, 2) i;
+commit;
+select (array_agg(v order by v::uuid))[1] as sz1, (array_agg(v order by v::uuid))[2] as sz2 from tests.p81 where k like 'sz%' \gset
+begin;
+select set_config('request.jwt.claim.sub', :V, true);
+set local role authenticated;
+select public.register_exit(:'sz1', '{"v": 1, "exit_price": "7001.00"}')->>'pnl', public.register_exit(:'sz2', '{"v": 1, "exit_price": "7001.00"}')->>'pnl';
+commit;
+select tests.fp81(:'sz2') as fpsz2 \gset
+select entry_time as sz_entry from public.trades where id = :'sz1' \gset
+create temp table f823e as select
+  tests.row(2, 'MESZ6/23501', 'MESZ6', 'futures', 'long', :'sz_entry'::timestamptz, now() - interval '6 minutes',
+            '7000.00', '7000.50', '1', null, null, 'win', '2.50', '0.62') as x,
+  tests.row(3, 'MESZ6/23502', 'MESZ6', 'futures', 'long', :'sz_entry'::timestamptz, now() - interval '2 minutes',
+            '7000.00', '7002.00', '1', null, null, 'win', '10.00', '0.62') as y;
+select x as x23e, y as y23e from f823e \gset
+begin;
+select set_config('request.jwt.claim.sub', :V, true);
+set local role authenticated;
+select tests.imp81(:'sb5', 'topone', 'f23j.csv', jsonb_build_array(:'x23e'::jsonb))->>'linked';
+commit;
+begin;
+select set_config('request.jwt.claim.sub', :V, true);
+set local role authenticated;
+select tests.eq(tests.imp81(:'sb5', 'topone', 'f23k.csv', jsonb_build_array(:'x23e'::jsonb, :'y23e'::jsonb)) - 'batch_id' - 'errors',
+                '{"inserted": 0, "duplicate": 1, "completed": 0, "other_account": 0, "linked": 0, "trades": 0, "grouped": 0, "attached": 1}'::jsonb,
+                'the trade the export reached was registered as the position''s 2 ct: the new row joins it');
+commit;
+select tests.eq((select quantity::int || ' ' || pnl || ' ' || external_id from public.trades where id = :'sz1'), '2 12.50 MESZ6/23501',
+                'both rows on it');
+select tests.eq(tests.fp81(:'sz2'), :'fpsz2', 'the other 2 ct trade, which the file does not bring, as registered');
+
+-- (e2) The same through the exits path: the trade the earlier export reached has a partial of its own (its
+--      row is a file exit of it); the position is still its registered 2 ct, so the new row joins it
+begin;
+select set_config('request.jwt.claim.sub', :V, true);
+set local role authenticated;
+insert into tests.p81 values ('sz3', public.register_entry(:'sb5', tests.entry81('MNQZ6', 'long', '2', '21000.00', -10))->>'trade_id');
+commit;
+begin;
+select set_config('request.jwt.claim.sub', :V, true);
+set local role authenticated;
+insert into tests.p81 values ('sz4', public.register_entry(:'sb5', tests.entry81('MNQZ6', 'long', '2', '21000.00', -9))->>'trade_id');
+select public.register_partial(v::uuid, jsonb_build_object('v', 1, 'client_key', tests.ck(), 'quantity', '1', 'exit_price', '21002.00',
+                                                          'clock', :NY, 'exit', tests.hm(:NY, -6)))->>'pnl'
+from tests.p81 where k = 'sz3';
+commit;
+select max(v) filter (where k = 'sz3') as sz3, max(v) filter (where k = 'sz4') as sz4 from tests.p81 \gset
+begin;
+select set_config('request.jwt.claim.sub', :V, true);
+set local role authenticated;
+select public.register_exit(:'sz3', '{"v": 1, "exit_price": "21004.00"}')->>'pnl', public.register_exit(:'sz4', '{"v": 1, "exit_price": "21004.00"}')->>'pnl';
+commit;
+select tests.fp81(:'sz4') as fpsz4 \gset
+select entry_time as sz3_entry from public.trades where id = :'sz3' \gset
+create temp table f823e2 as select
+  tests.row(2, 'MNQZ6/23511', 'MNQZ6', 'futures', 'long', :'sz3_entry'::timestamptz, now() - interval '5 minutes',
+            '21000.00', '21002.00', '1', null, null, 'win', '4.00', '0.62') as x,
+  tests.row(3, 'MNQZ6/23512', 'MNQZ6', 'futures', 'long', :'sz3_entry'::timestamptz, now() - interval '2 minutes',
+            '21000.00', '21005.00', '1', null, null, 'win', '10.00', '0.62') as y;
+select x as x23e2, y as y23e2 from f823e2 \gset
+begin;
+select set_config('request.jwt.claim.sub', :V, true);
+set local role authenticated;
+select tests.imp81(:'sb5', 'topone', 'f23n.csv', jsonb_build_array(:'x23e2'::jsonb))->>'linked';
+commit;
+select tests.eq((select count(*) from public.trade_exits e where e.trade_id = :'sz3' and e.origin = 'file'), 1::bigint,
+                'the earlier export: its row a file exit of the trade with the partial (the nearer entry)');
+begin;
+select set_config('request.jwt.claim.sub', :V, true);
+set local role authenticated;
+select tests.eq(tests.imp81(:'sb5', 'topone', 'f23o.csv', jsonb_build_array(:'x23e2'::jsonb, :'y23e2'::jsonb)) - 'batch_id' - 'errors',
+                '{"inserted": 0, "duplicate": 1, "completed": 0, "other_account": 0, "linked": 0, "trades": 0, "grouped": 0, "attached": 1}'::jsonb,
+                'the position is the 2 ct registered: the new row joins the trade');
+commit;
+select tests.eq((select quantity::int || ' ' || pnl from public.trades where id = :'sz3'), '2 14.00', 'both rows on it');
+select tests.eq(tests.fp81(:'sz4'), :'fpsz4', 'the other trade as registered');
+
+-- (f) An imported trade, and a trade registered after its export at the same entry: the full export's
+--     new row links to the registered trade, not to the imported one
+begin;
+select set_config('request.jwt.claim.sub', :V, true);
+set local role authenticated;
+select tests.imp81(:'sb6', 'topone', 'f23l.csv', jsonb_build_array(
+  tests.row(2, 'MCLZ6/23601', 'MCLZ6', 'futures', 'long', date_trunc('minute', now()) - interval '10 minutes', now() - interval '6 minutes',
+            '71.00', '71.05', '1', null, null, 'win', '5.00', '0.62')))->>'inserted';
+insert into tests.p81 values ('si', public.register_entry(:'sb6', tests.entry81('MCLZ6', 'long', '1', '71.00', -10))->>'trade_id');
+commit;
+select v as si from tests.p81 where k = 'si' \gset
+begin;
+select set_config('request.jwt.claim.sub', :V, true);
+set local role authenticated;
+select public.register_exit(:'si', '{"v": 1, "exit_price": "71.10"}')->>'pnl';
+commit;
+select tests.fp81(:'si') as fpsi \gset
+select id as si_imp, entry_time as si_entry, trading_day as si_day from public.trades where account_id = :'sb6' and external_id = 'MCLZ6/23601' \gset
+select tests.fp81(:'si_imp') as fpsi_imp \gset
+begin;
+select set_config('request.jwt.claim.sub', :V, true);
+set local role authenticated;
+select tests.imp81(:'sb6', 'topone', 'f23m.csv', jsonb_build_array(
+  tests.row(2, 'MCLZ6/23601', 'MCLZ6', 'futures', 'long', :'si_entry'::timestamptz, now() - interval '6 minutes',
+            '71.00', '71.05', '1', null, null, 'win', '5.00', '0.62'),
+  tests.row(3, 'MCLZ6/23602', 'MCLZ6', 'futures', 'long', :'si_entry'::timestamptz, now() - interval '2 minutes',
+            '71.00', '71.15', '1', null, null, 'win', '15.00', '0.62'))) as c23m \gset
+select tests.eq((:'c23m'::jsonb) - 'batch_id' - 'errors', '{"inserted": 0, "duplicate": 1, "completed": 0, "other_account": 0, "linked": 1}'::jsonb,
+                'the new row links to the registered trade');
+commit;
+select tests.eq(tests.fp81(:'si_imp') || (select external_id || ' ' || pnl from public.trades where id = :'si'), :'fpsi_imp' || 'MCLZ6/23602 15.00',
+                'the imported trade keeps its row, the registered one takes the other');
+select tests.eq(public.limit_usage(:'sb6', :'si_day', false, null, 'infinity')->>'net_usd', '18.76', 'the day is the file''s');
+begin;
+select set_config('request.jwt.claim.sub', :V, true);
+set local role authenticated;
+select public.import_undo((:'c23m'::jsonb->>'batch_id')::uuid)->>'deleted';
+commit;
+select tests.eq(tests.fp81(:'si'), :'fpsi', 'undone: as registered');
 
 -- =============================================================================================
 -- 9. The tables are as specified

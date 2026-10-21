@@ -1317,14 +1317,16 @@ $$;
 --              price that share the symbol as written, the side, the open instant and the open price;
 --              any other row (a binary, no exit) is its own (-rn)
 --   path       'dup' (the ticket is in the account: a trade's key or a file exit), 'attach' (new, and the
---              position's other rows are all in one trade of the account: new exits of that trade),
+--              position's other rows are all in one trade of the account: new exits of that trade, or
+--              back to 'row' when the app registered the position as several trades, below),
 --              'group' (new, two or more new rows of a position that is not in the account), 'row'
 --              (new, alone: 20261020000004's row)
 --   attach_id  the trade an 'attach' row joins
 -- A file of one row per position classifies every row as 20261020000004 did ('row' or 'dup').
 -- Links: a position is linked whole to at most one app trade; a position the app registered as several
--- trades of the same entry (its matched trade is not its size, another such trade is free) goes back to
--- rows, linked one to one as 20261020000004 linked them. Every valid row ends in exactly one trade.
+-- trades of the same entry (its trade is not its size, another such trade is free) goes back to rows,
+-- linked one to one as 20261020000004 linked them, whether its trade is the one this file matched or
+-- the one an earlier file put its first rows in. Every valid row ends in exactly one trade.
 create or replace function public.import_stage(p_account public.trading_accounts, p_platform text, p_file_tz text,
                                                p_rows jsonb)
 returns void
@@ -1418,32 +1420,48 @@ begin
     exit when pass = 2;
 
     -- A position the app registered as several trades (before Phase 3c, one trade per exit was the
-    -- only way to register two exits): the trade the whole position matched is not the position's
-    -- size, and another app trade of the same entry is free (no ID, no file exit, the same side,
-    -- instrument and entry price as that trade, inside the position's window, matched by no other
-    -- position of this file). Folding the rows into one of them would leave the others with the
-    -- app's money beside the file's, so the position goes back to rows, each matched on its own
-    -- (20261020000004's rule) and each left alone if no trade takes it: every row counts once.
-    update pg_temp.import_rows u set link_id = null, path = 'row', grp = -u.rn
-    where u.path = 'group' and u.grp in (
+    -- only way to register two exits): its trade is not the position's size, and another app trade of
+    -- the same entry is free (no ID, no file exit, the same side, instrument and entry price as that
+    -- trade, inside the position's window, matched by no other position of this file). Folding the
+    -- rows into one of them would leave the others with the app's money beside the file's, so the
+    -- position goes back to rows, each matched on its own (20261020000004's rule) and each left alone
+    -- if no trade takes it: every row counts once. Its trade is the one this file matched the whole
+    -- position to ('group'), or the one an earlier file put the position's first rows in ('attach':
+    -- the new rows go back to rows, its rows in the account stay where they are). The trade's size
+    -- and entry price are what it had before any file wrote over them (the earliest link's before);
+    -- the position's size is its rows in this file and its file exits in the account, each once.
+    update pg_temp.import_rows u set link_id = null, attach_id = null, path = 'row', grp = -u.rn
+    where u.path in ('group', 'attach') and u.grp in (
       select p.grp
-      from (select x.grp, min(x.link_id::text)::uuid as tid, sum(x.quantity) as g_qty, min(x.entry_time) as entry_time,
-                   min(x.direction) as direction, min(x.symbol) as symbol
-            from pg_temp.import_rows x where x.path = 'group' and x.link_id is not null group by x.grp) p
+      from (select x.grp, min(coalesce(x.link_id, x.attach_id)::text)::uuid as tid,
+                   coalesce(sum(x.quantity) filter (where x.exit_of is null), 0) as f_qty,
+                   min(x.entry_time) as entry_time, min(x.direction) as direction, min(x.symbol) as symbol
+            from pg_temp.import_rows x
+            where x.code is null and not x.elsewhere
+            group by x.grp
+            having bool_or(x.path = 'group' and x.link_id is not null) or bool_or(x.path = 'attach')) p
       join public.trades t on t.id = p.tid
-      where t.quantity <> p.g_qty
+      cross join lateral (
+        select coalesce((select (l.before->>'quantity')::numeric from public.trade_import_links l
+                         where l.trade_id = t.id and l.before ? 'quantity' order by l.linked_at, l.batch_id limit 1),
+                        t.quantity) as qty,
+               coalesce((select (l.before->>'entry_price')::numeric from public.trade_import_links l
+                         where l.trade_id = t.id and l.before ? 'entry_price' order by l.linked_at, l.batch_id limit 1),
+                        t.entry_price) as entry_price) w
+      where w.qty <> p.f_qty + coalesce((select sum(e.quantity) from public.trade_exits e
+                                         where e.trade_id = t.id and e.origin = 'file'), 0)
         and exists (
           select 1
           from public.trades o
           join public.trade_entry_context ox on ox.trade_id = o.id
           where o.account_id = p_account.id and o.user_id = p_account.user_id and o.id <> t.id
-            and o.external_id is null and o.direction = p.direction and o.entry_price = t.entry_price
+            and o.external_id is null and o.direction = p.direction and o.entry_price = w.entry_price
             and o.entry_time between p.entry_time - case when ox.origin = 'reconstructed' then interval '16 minutes'
                                                          else interval '2 minutes' end
                                  and p.entry_time + interval '16 minutes'
             and public.trade_match_key(p_account.market, o.symbol) = public.trade_match_key(p_account.market, p.symbol)
             and not exists (select 1 from public.trade_exits e where e.trade_id = o.id and e.origin = 'file')
-            and not exists (select 1 from pg_temp.import_rows w where w.link_id = o.id)));
+            and not exists (select 1 from pg_temp.import_rows w2 where w2.link_id = o.id)));
     exit when not found;
   end loop;
 
