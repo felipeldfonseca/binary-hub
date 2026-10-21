@@ -6,7 +6,7 @@ import * as regrasDb from '@/lib/hub/regrasDb'
 import { readImportFile } from '@/lib/domain/import'
 import { useImportSheet, type SheetMode } from '@/components/hub/importar/ImportSheetProvider'
 import { EMPTY_FORM, PassoNovaConta } from '@/components/hub/importar/passos'
-import { operacoesDoArquivo, operacoesDoLote, toastDoLote } from '@/components/hub/importar/ImportSheet'
+import { arquivoComParciais, operacoesDoArquivo, operacoesDoLote, toastDoLote } from '@/components/hub/importar/ImportSheet'
 import { PASSO_G } from '@/components/hub/contas/copy'
 import { changedOnlyHere } from '@/hooks/useRegras'
 import type { AccountConfig, RulesConfig, SaveRulesResult } from '@/lib/hub/regras'
@@ -2929,5 +2929,85 @@ describe('ImportSheet · Phase 3c · a file with partial exits (§5.12, on the f
     expect(toastDoLote({ inserted: 0, completed: 0, linked: 1, trades: 0, attached: 2 }, 'Top One #1')).toBe(
       '1 já registrada por você foi completada. 2 saídas a mais entraram em operações que já estavam.',
     )
+  })
+})
+
+/** topone_ok with its 09/03 BUY of 2 lots as two rows of one broker position (the same open instant and price, two exits) */
+function topOneComPosicao() {
+  const file = fixtureFile('topone_ok')
+  if (!file.outcome.ok) throw new Error('fixture')
+  const rows = file.outcome.rows
+  const r = rows[1]
+  const a = { ...r, quantity: '1', pnl: '-100' }
+  const b = { ...r, line: 9, external_id: 'MNQM6/900000000008', quantity: '1', local_exit: '2026-03-09T14:05:00', exit_price: '21471.75', pnl: '-77.5' }
+  return { ...file, outcome: { ...file.outcome, rows: [rows[0], a, b, ...rows.slice(2)], records: file.outcome.records + 1 } }
+}
+
+describe('ImportSheet · Phase 3c · the file card and the rules lines count trades, not rows', () => {
+  const cartao = (dialog: HTMLElement) => dialog.querySelector('.hub-arq__txt')?.textContent ?? ''
+
+  it('a file with a position in two rows: the card says «8 linhas» (never «8 operações») on the preview and at the end', async () => {
+    readFile.mockResolvedValue(topOneComPosicao())
+    importPreview.mockResolvedValue(makePreview({ new: 8, rows_total: 8, trades_new: 7, grouped: 1 }))
+    importCommit.mockResolvedValue({ batch_id: 'batch-3c4', inserted: 8, duplicate: 0, completed: 0, other_account: 0, linked: 0, trades: 7, grouped: 1, attached: 0, errors: [] })
+    const dialog = await openSheet({ accountId: topOne.id })
+    await chooseFile(dialog)
+    await within(dialog).findByRole('heading', { name: 'Prévia' })
+    expect(cartao(dialog)).toMatch(/^Top One Futures · Trade History · 8 linhas · .+ · o arquivo não diz a conta$/)
+    expect(primaryOf(dialog)).toHaveTextContent('Importar 7 operações')
+    await userEvent.click(primaryOf(dialog))
+    await within(dialog).findByRole('heading', { name: 'Importação feita' })
+    expect(cartao(dialog)).toContain('· 8 linhas ·')
+  })
+
+  it('a file of one row per position keeps «7 operações»', async () => {
+    readFile.mockResolvedValue(fixtureFile('topone_ok'))
+    importPreview.mockResolvedValue(makePreview({ new: 7, rows_total: 7 }))
+    const dialog = await openSheet({ accountId: topOne.id })
+    await chooseFile(dialog)
+    await within(dialog).findByRole('heading', { name: 'Prévia' })
+    expect(cartao(dialog)).toMatch(/^Top One Futures · Trade History · 7 operações · /)
+  })
+
+  it('arquivoComParciais: the database’s position key (symbol, side, open instant and price, rows with an exit)', () => {
+    const file = topOneComPosicao()
+    if (!file.outcome.ok) throw new Error('fixture')
+    const parsed = file.outcome
+    expect(arquivoComParciais(parsed)).toBe(true)
+    const [, a, b] = parsed.rows
+    // The same price written with another number of zeros is the same price
+    expect(arquivoComParciais({ market: 'futures', rows: [a, { ...b, entry_price: `${b.entry_price}0` }] })).toBe(true)
+    expect(arquivoComParciais({ market: 'futures', rows: [a, { ...b, direction: 'short' }] })).toBe(false)
+    expect(arquivoComParciais({ market: 'futures', rows: [a, { ...b, local_entry: '2026-03-09T13:35:03' }] })).toBe(false)
+    expect(arquivoComParciais({ market: 'futures', rows: [a, { ...b, entry_price: '21510.25' }] })).toBe(false)
+    expect(arquivoComParciais({ market: 'futures', rows: [a, { ...b, local_exit: null }] })).toBe(false)
+    expect(arquivoComParciais({ market: 'futures', rows: [a, { ...b, local_exit: '2026-03-09T13:00:00' }] })).toBe(false)
+    expect(arquivoComParciais({ market: 'binary', rows: [a, b] })).toBe(false)
+    const um = fixtureFile('topone_ok')
+    expect(um.outcome.ok && arquivoComParciais(um.outcome)).toBe(false)
+  })
+
+  describe('the rules lines (the owner’s accounts, rules from 17 out)', () => {
+    beforeEach(comRegrasDoDono)
+
+    it('every row before the rules: «Antes de 17 out …: 6 vão …» counts the trades (6), not the rows (7)', async () => {
+      readFile.mockResolvedValue(fixtureFile('topone_ok'))
+      importPreview.mockResolvedValue(makePreview({ new: 7, rows_total: 7, trades_new: 6, grouped: 1 }))
+      const { dialog } = await openRules({ accountId: ids.topOne })
+      await chooseFile(dialog)
+      await within(dialog).findByRole('heading', { name: 'Prévia' })
+      expect(within(dialog).getByText('Antes de 17 out (início das regras): 6 vão para Histórico importado · só resultado.')).toBeInTheDocument()
+    })
+
+    it('every row after the rules: «6 operações importadas.» counts the batch’s trades, not its rows', async () => {
+      readFile.mockResolvedValue(topOneFile(7))
+      importPreview.mockResolvedValue(makePreview({ new: 7, rows_total: 7, trades_new: 6, grouped: 1 }))
+      importCommit.mockResolvedValue({ batch_id: 'batch-3c5', inserted: 7, duplicate: 0, completed: 0, other_account: 0, linked: 0, trades: 6, grouped: 1, attached: 0, errors: [] })
+      const { dialog } = await openRules({ accountId: ids.topOne })
+      await chooseFile(dialog)
+      await within(dialog).findByRole('heading', { name: 'Prévia' })
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Importar 6 operações' }))
+      expect(await within(dialog).findByText('6 operações importadas.')).toBeInTheDocument()
+    })
   })
 })

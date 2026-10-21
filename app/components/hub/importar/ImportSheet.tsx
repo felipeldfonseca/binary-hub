@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { FileText } from 'lucide-react'
-import { buildImportArgs, previewArgs, readImportFile, type ReadImportFileResult } from '@/lib/domain/import'
+import { buildImportArgs, previewArgs, readImportFile, type ParsedFile, type ReadImportFileResult } from '@/lib/domain/import'
 import { MARKET_SPEC, currencyOf } from '@/lib/domain/markets'
 import { FIRM_MAX, LABEL_MAX, PLATFORM_UNKNOWN, labelTaken, parseSize, zoneKeyOf, type TradingAccount } from '@/lib/hub/contas'
 import {
@@ -57,6 +57,7 @@ import {
   SOLTE,
   UNDO,
   firmAndPlatform,
+  ops as operacoesTexto,
   undoAria,
   zoneName,
 } from '@/components/hub/contas/copy'
@@ -153,6 +154,41 @@ export function toastDoLote(commit: Pick<ImportCommitResult, 'inserted' | 'compl
     attached > 0 ? FIM.anexadas(attached) : '',
   ].filter(Boolean)
   return parts.length ? parts.join(' ') : FIM.toast(0, label)
+}
+
+/** A decimal without its trailing zeros («21510.50» = «21510.5»), to compare prices as the database does */
+const semZeros = (x: string) => (x.includes('.') ? x.replace(/0+$/, '').replace(/\.$/, '') : x)
+
+/**
+ * Phase 3c (§5.12): a price-market file with partial exits, two or more rows of one broker position
+ * on the database's key (import_stage: the symbol as written, the side, the open instant and the
+ * open price, each row with an exit not before its entry). Its rows are no longer its trades.
+ */
+export function arquivoComParciais(parsed: Pick<ParsedFile, 'market' | 'rows'>): boolean {
+  if (parsed.market === 'binary') return false
+  const vistos = new Set<string>()
+  for (const r of parsed.rows) {
+    if (r.local_exit === null || r.entry_price === null || r.local_exit < r.local_entry) continue
+    const chave = [r.symbol, r.direction, r.local_entry, r.utc_offset ?? '', semZeros(r.entry_price)].join('\u0000')
+    if (vistos.has(chave)) return true
+    vistos.add(chave)
+  }
+  return false
+}
+
+/**
+ * The file's card (flow's fileSummary). Phase 3c: a file with partial exits counts «{n} linhas», the
+ * card's own words for a file with errors, never «{n} operações» (the preview and the end count its
+ * trades: «Importar 16 operações» for 17 rows)
+ */
+export function linhaDoArquivo(parsed: ParsedFile, currentYear: number): string {
+  const linha = fileSummary(parsed, currentYear)
+  if (parsed.errors.length > 0 || !arquivoComParciais(parsed)) return linha
+  const comoOperacoes = operacoesTexto(parsed.rows.length)
+  return linha
+    .split(' · ')
+    .map((parte) => (parte === comoOperacoes ? ARQUIVO.rows(parsed.records) : parte))
+    .join(' · ')
 }
 
 const initialFlow = (mode: SheetMode, accountId: string | null): Flow => ({
@@ -953,7 +989,7 @@ export default function ImportSheet({ mode, accountId, onClose }: { mode: SheetM
     flow.passo === 'solte'
       ? null
       : parsed
-        ? fileSummary(parsed, new Date().getFullYear())
+        ? linhaDoArquivo(parsed, new Date().getFullYear())
         : flow.passo === 'erro'
           ? emptyFileSummary(flow.file)
           : null
