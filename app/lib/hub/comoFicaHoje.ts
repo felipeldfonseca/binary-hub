@@ -18,6 +18,7 @@ import { dinheiroCompacto, type Tom } from './posso';
 import { formatDiaMes } from './formato';
 import { effectiveDayAt, type ConfigVersion, type PendingVersion, type WindowSetting } from './regras';
 import { faixaJanela, resumoDias } from './janelas';
+import { itensBreakeven } from './personalizarBreakeven';
 import { ATIVO_NA_FASE_5, CALENDARIO_NOME, ESCOLHA_NOME, ESTADO_NOME, HOJE, NOTA, RELOGIO, SEP, VERSAO } from '@/components/hub/personalizar/copy';
 
 export interface Trecho {
@@ -130,7 +131,7 @@ export function descricaoJanelas(windows: readonly WindowSetting[]): string {
   return windows.map((w) => `${faixaJanela(w.startMin, w.endMin)} ${RELOGIO[w.tz].de}${SEP}${resumoDias(w.weekdays)}`).join('; ');
 }
 
-type Parte = 'janela' | 'gate' | 'fora' | 'bloq' | 'lim' | 'est' | 'cal';
+type Parte = 'janela' | 'gate' | 'fora' | 'bloq' | 'lim' | 'est' | 'be' | 'cal';
 
 /** Each part of the rules as the version list writes it; keys missing when they do not apply */
 export function partesVersao(r: Rules): Partial<Record<Parte, string>> {
@@ -151,6 +152,12 @@ export function partesVersao(r: Rules): Partial<Record<Parte, string>> {
       (r.limit.atLimit === 'avisar' ? NOTA.soAvisa : '')
     : NOTA.semLimite;
   if (caps.states) o.est = NOTA.estado(resumoEstados(r.states) || NOTA.nenhumaEscolha);
+  // Fase 3c (board partesSig `be`): «Mover para o breakeven», Futuros only (the UI's market for the
+  // rule); off and on without an asset resolve to no key: «sem breakeven», never a version of its own
+  if (r.market === 'futures') {
+    const itens = itensBreakeven(r.breakeven);
+    o.be = itens.length ? NOTA.breakeven(itens) : NOTA.semBreakeven;
+  }
   // The calendars live in the data block
   if (caps.block) o.cal = NOTA.calendarios((r.block?.calendars ?? []).map((c: CalendarCode) => CALENDARIO_NOME[c]));
   return o;

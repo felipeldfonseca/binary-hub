@@ -847,8 +847,9 @@ describe('SuasRegras in six markets (Fase 2b)', () => {
     render(<Regras config={configMercados()} selecionado={im.clear} fases={FASES_MERCADOS} />)
     await userEvent.click(screen.getByRole('button', { name: 'Como ler: Suas regras' }))
     const info = document.getElementById('info-regras') as HTMLElement
+    // Fase 3c: the breakeven sentence sits between these two (Personalizar approved 21 Oct, P l.758)
     expect(info).toHaveTextContent(
-      'Bloqueio de dados e regra por estado valem só para Futuros até a Fase 5; a regra por estado é uma só para o mercado. Nos outros mercados, as regras são a janela e o limite do dia.',
+      'Bloqueio de dados e regra por estado valem só para Futuros até a Fase 5; a regra por estado é uma só para o mercado. “Mover para o breakeven” (Futuros) não muda o “Posso operar hoje?”: o Registrar sugere, sem bloquear, e as Análises conferem depois. Nos outros mercados, as regras são a janela e o limite do dia.',
     )
     expect(info).toHaveTextContent('O limite do dia fica na moeda da conta, R$ na B3 e US$ nos outros mercados, e nunca soma contas de mercados diferentes.')
     expect(info).not.toHaveTextContent('Futuros com binárias')

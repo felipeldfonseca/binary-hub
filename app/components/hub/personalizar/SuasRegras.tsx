@@ -14,6 +14,7 @@ import Calendarios from './Calendarios'
 import ComoFicaHoje from './ComoFicaHoje'
 import { MERCADO_NOME, REGRAS } from './copy'
 import type { FormLimite } from './PersonalizarProvider'
+import RegraBreakeven from './RegraBreakeven'
 import { RegraBloqueio, RegraEstado, RegraJanela, RegraLimite, RegraSoDentro } from './RegrasLinhas'
 import { EstadoCarga, useFocoPendente, type Carga } from './ui'
 
@@ -157,6 +158,9 @@ function Regras({
         />
         {caps.states && <RegraEstado draft={draft} mudou={mud.estados} onEditar={onEditar} />}
       </ul>
+
+      {/* Fase 3c: «Durante a operação» › «Mover para o breakeven», on «Padrão Futuros» and futures accounts */}
+      {market === 'futures' && <RegraBreakeven entidade={entidade} draft={draft} salvo={salvo} onEditar={onEditar} futuros={futuros} />}
 
       <ComoFicaHoje dados={hoje} />
 
