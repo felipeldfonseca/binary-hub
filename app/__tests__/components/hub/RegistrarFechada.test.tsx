@@ -15,6 +15,20 @@ import * as registrarDb from '@/lib/hub/registrarDb'
 import * as imagens from '@/lib/hub/registrarImagens'
 import RegistrarSheet from '@/components/hub/registrar/RegistrarSheet'
 import { agoraTelas, contasTelas, estadoTelas, idsTelas, operacaoTelas, recentesTelas, saidaTelas } from '@/testing/registrarTelas'
+import { idsParciais } from '@/testing/parciais'
+import {
+  agoraParciais,
+  contasParciais,
+  etEm,
+  fechadaParciais,
+  mesBeUmaSaida,
+  mgcUmaSaida,
+  mnqFechadaS14,
+  saidaMesComBe,
+  saidaMesPassou,
+  saidaParciais,
+  vistaDe,
+} from '@/testing/parciaisTelas'
 
 const mockRouter = { push: jest.fn(), replace: jest.fn(), prefetch: jest.fn() }
 let mockPathname = '/diario'
@@ -413,5 +427,115 @@ describe('«Imagens e nota»: what counts as pending, the note sent, a double ta
     await act(async () => finish())
     await waitFor(() => expect(screen.getByRole('button', { name: 'Editar imagens e nota' })).toBeInTheDocument())
     expect(save).toHaveBeenCalledTimes(1)
+  })
+})
+
+// ------------------------------------------------------------------------------------------------
+// Phase 3c (lane C1): step 3 with several exits or stop moves (E29–E34; RO l.567–585)
+// ------------------------------------------------------------------------------------------------
+
+describe('step 3 with partials and stop moves (Phase 3c)', () => {
+  const ids3c = idsParciais()
+  const texto = (el: Element) => (el.textContent ?? '').replace(/\u00a0/g, ' ')
+  beforeEach(() => {
+    fetchAccounts.mockResolvedValue(contasParciais())
+    fetchRulesNow.mockResolvedValue(agoraParciais('dia-top-1045', { iso: etEm('10:45') }))
+  })
+
+  it('exit-mes (composed: the 10:19 breakeven only): the sum, «em média», R on the initial stop, the timeline, the breakeven line, in the board’s order', async () => {
+    db.fetchTradeState.mockResolvedValue(vistaDe(saidaMesComBe().state))
+    abrir(ids3c.trades.mes, ids3c.accounts.topOne)
+    expect(await screen.findByRole('heading', { level: 3, name: 'Operação fechada' })).toBeInTheDocument()
+    const valor = screen.getByText('+US$ 175,00')
+    expect(screen.getByText('MES · Compra · 3 ct · 7.912,50 → 7.924,17 em média · +11,67 pts · 10:12–10:31 ET')).toBeInTheDocument()
+    expect(screen.getByText('+1,17 R').parentElement).toHaveTextContent('+1,17 R com o stop inicial de 10 pts')
+    const lista = screen.getByRole('list', { name: 'Linha do tempo' })
+    expect(within(lista).getAllByRole('listitem').map(texto)).toEqual([
+      '10:12Entrada · 3 ct a 7.912,50 · stop 10 pts',
+      '10:18Parcial · 1 ct a 7.920,50 · +8,00 pts · +US$ 40,00',
+      '10:19Stop no breakeven · 7.912,50 · com +8,00 pts a favor',
+      '10:31Saída · 2 ct a 7.926,00 · +13,50 pts · +US$ 135,00',
+    ])
+    expect(within(lista).queryByRole('button')).not.toBeInTheDocument()
+    const be = screen.getByText('Breakeven às 10:19, com +8,00 pts a favor · sua regra: +8 pts.')
+    const plano = screen.getByText('No plano')
+    // card → timeline → breakeven line → plan line → «Suas marcas»
+    const antes = (a: Node, b: Node) => !!(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING)
+    expect(antes(valor, lista)).toBe(true)
+    expect(antes(lista, be)).toBe(true)
+    expect(antes(be, plano)).toBe(true)
+    expect(screen.getByText('Marcas feitas a partir das 10:18 (sua primeira parcial) contam como depois do resultado.')).toBeInTheDocument()
+  })
+
+  it('exit-mes as recorded (the 10:19 move undone, 10:21 live): «Breakeven às 10:21, …»; the variant: «passou da entrada às 10:30»', async () => {
+    db.fetchTradeState.mockResolvedValue(vistaDe(saidaParciais().state))
+    const { unmount } = abrir(ids3c.trades.mes, ids3c.accounts.topOne)
+    expect(await screen.findByText('Breakeven às 10:21, com +8,00 pts a favor · sua regra: +8 pts.')).toBeInTheDocument()
+    expect(screen.queryByText(/10:19Stop no breakeven/)).not.toBeInTheDocument()
+    unmount()
+    db.fetchTradeState.mockResolvedValue(vistaDe(saidaMesPassou().state))
+    abrir(ids3c.trades.mes, ids3c.accounts.topOne)
+    expect(await screen.findByText('Breakeven: o stop passou da entrada às 10:30, com +11,00 pts a favor · sua regra: +8 pts.')).toBeInTheDocument()
+    expect(screen.getByText('10:30').closest('li')).toHaveTextContent('Stop movido · 7.915,00 · com +11,00 pts a favor')
+  })
+
+  it('after-mgc («Já fechada» in two exits): «Nª saída», the told breakeven without time, «Breakeven com +12,00 pts a favor, registrado depois · …»', async () => {
+    db.fetchTradeState.mockResolvedValue(vistaDe(fechadaParciais().state))
+    abrir(ids3c.trades.mgc, ids3c.accounts.topOne)
+    expect(await screen.findByRole('heading', { level: 3, name: 'Operação fechada' })).toBeInTheDocument()
+    expect(screen.getByText('Passo 2 de 2 · Fechada')).toBeInTheDocument()
+    expect(screen.getByText('+US$ 120,00')).toBeInTheDocument()
+    expect(screen.getByText('MGC · Venda · 2 ct · 4.421,30 → 4.415,30 em média · +6,00 pts · 10:24–10:38 ET')).toBeInTheDocument()
+    expect(screen.getByText('+0,40 R').parentElement).toHaveTextContent('+0,40 R com o stop inicial de 15 pts')
+    const itens = within(screen.getByRole('list', { name: 'Linha do tempo' })).getAllByRole('listitem')
+    expect(itens.map(texto)).toEqual([
+      '10:24Entrada · 2 ct a 4.421,30 · stop 15 pts',
+      '10:311ª saída · 1 ct a 4.409,30 · +12,00 pts · +US$ 120,00',
+      '—sem horaStop no breakeven · com +12,00 pts a favor · registrado depois',
+      '10:382ª saída · 1 ct a 4.421,30 · 0,00 pts · US$ 0,00',
+    ])
+    expect(within(itens[2]).getByText('—')).toHaveAttribute('aria-hidden', 'true')
+    expect(within(itens[2]).getByText('sem hora')).toHaveClass('sr-only')
+    expect(screen.getByText('Breakeven com +12,00 pts a favor, registrado depois · sua regra: +5 pts.')).toBeInTheDocument()
+  })
+
+  it('the composed one-exit states: a live trade moved then closed in one «Saída»; «Já fechada» in one exit with the pill', async () => {
+    db.fetchTradeState.mockResolvedValue(vistaDe(mesBeUmaSaida()))
+    const { unmount } = abrir(ids3c.trades.mes, ids3c.accounts.topOne)
+    const lista = await screen.findByRole('list', { name: 'Linha do tempo' })
+    expect(within(lista).getAllByRole('listitem').map(texto)).toEqual([
+      '10:12Entrada · 3 ct a 7.912,50 · stop 10 pts',
+      '10:19Stop no breakeven · 7.912,50 · com +8,00 pts a favor',
+      '10:31Saída · 3 ct a 7.926,00 · +13,50 pts · +US$ 202,50',
+    ])
+    expect(screen.getByText('MES · Compra · 3 ct · 7.912,50 → 7.926,00 · +13,50 pts · 10:12–10:31 ET')).toBeInTheDocument()
+    unmount()
+    db.fetchTradeState.mockResolvedValue(vistaDe(mgcUmaSaida()))
+    abrir(ids3c.trades.mgc, ids3c.accounts.topOne)
+    const lista2 = await screen.findByRole('list', { name: 'Linha do tempo' })
+    expect(within(lista2).getAllByRole('listitem').map(texto)).toEqual([
+      '10:24Entrada · 2 ct a 4.421,30 · stop 15 pts',
+      '—sem horaStop no breakeven · com +12,00 pts a favor · registrado depois',
+      '10:31Saída · 2 ct a 4.409,30 · +12,00 pts · +US$ 240,00',
+    ])
+  })
+
+  it('a trade without moves or partials: as built (no timeline, no breakeven line without a rule)', async () => {
+    fetchAccounts.mockResolvedValue(contasTelas())
+    fetchRulesNow.mockResolvedValue(agoraTelas('agora-qui-1042-et'))
+    db.fetchTradeState.mockResolvedValue(mesFechadaSemAnexos())
+    abrir(ids.trades.mes)
+    await screen.findByRole('heading', { level: 3, name: 'Operação fechada' })
+    expect(screen.queryByText('Linha do tempo')).not.toBeInTheDocument()
+    expect(screen.queryByText(/^Breakeven/)).not.toBeInTheDocument()
+    expect(screen.getByText('com stop de 10 pts', { exact: false })).toBeInTheDocument()
+  })
+
+  it('the earlier MNQ of scenario 14 (composed): «Breakeven às 10:04, com +20,00 pts a favor · sua regra: +30 pts.»', async () => {
+    const s = mnqFechadaS14()
+    db.fetchTradeState.mockResolvedValue(vistaDe(s))
+    abrir(s.trade.id, ids3c.accounts.topOne)
+    expect(await screen.findByText('Breakeven às 10:04, com +20,00 pts a favor · sua regra: +30 pts.')).toBeInTheDocument()
+    expect(screen.getByText('MNQ · Venda · 2 ct · 30.950,00 → 30.940,00 em média · +10,00 pts · 10:01–10:07 ET')).toBeInTheDocument()
   })
 })

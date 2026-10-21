@@ -7,6 +7,15 @@ import { CampoTexto } from './ui'
 /** What «Corrigir» controls (RO l.410: `aria-controls="caixa-res"`) */
 export const CAIXA_RES = 'caixa-res'
 
+/** The block's ids: the exit's by default; «Parcial» (3c) passes its own (`f-pres`, `caixa-pres`, `f-pcustos`) */
+export interface IdsResultado {
+  res: string
+  caixa: string
+  custos: string
+}
+
+export const IDS_RESULTADO: IdsResultado = { res: 'f-res', caixa: CAIXA_RES, custos: 'f-custos' }
+
 /**
  * The result of a price market's exit (RO l.409–414, 471–474, 929–966), in «Já fechada» and on step
  * 2: the line (`role="status"`: «Resultado: +11,5 pips · +US$ 57,50», «Se sair a 1,08635: …»),
@@ -26,6 +35,7 @@ export default function BlocoResultado({
   aoCorrigir,
   aoMudarRes,
   aoMudarCustos,
+  ids = IDS_RESULTADO,
 }: {
   linha: string
   bloco: BlocoResultadoModelo | null
@@ -36,6 +46,8 @@ export default function BlocoResultado({
   aoCorrigir: () => void
   aoMudarRes: (v: string) => void
   aoMudarCustos: (v: string) => void
+  /** Phase 3c: «Parcial» renders the block with its own ids; every other render keeps the default */
+  ids?: IdsResultado
 }) {
   return (
     <>
@@ -44,7 +56,7 @@ export default function BlocoResultado({
           {linha}
         </span>
         {bloco?.corrigir && (
-          <button type="button" className="hub-reg-link" aria-expanded={bloco.corrigir.aberto} aria-controls={CAIXA_RES} onClick={aoCorrigir}>
+          <button type="button" className="hub-reg-link" aria-expanded={bloco.corrigir.aberto} aria-controls={ids.caixa} onClick={aoCorrigir}>
             {bloco.corrigir.rotulo}
           </button>
         )}
@@ -52,8 +64,8 @@ export default function BlocoResultado({
       {bloco?.notaEstimativa && <span className="hub-nota hub-reg-nota-est">{bloco.notaEstimativa}</span>}
       {bloco?.campo && (
         <CampoTexto
-          campoId={CAIXA_RES}
-          id="f-res"
+          campoId={ids.caixa}
+          id={ids.res}
           rotulo={bloco.campo.rotulo}
           valor={bloco.campo.valor}
           classe="hub-reg-curto"
@@ -64,7 +76,7 @@ export default function BlocoResultado({
       )}
       {bloco?.custos && (
         <CampoTexto
-          id="f-custos"
+          id={ids.custos}
           rotulo={
             <>
               {bloco.custos.rotulo} <span className="hub-opc">{FUTUROS.opcional}</span>

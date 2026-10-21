@@ -3,11 +3,24 @@
 import { useEffect, useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useHubDb } from '@/hooks/useContas'
-import { registrarKeys, setTradeView, useExitPreview, useRegisterExit, useServerNow, useUndoEntry } from '@/hooks/useRegistrar'
-import type { Outcome } from '@/lib/domain/registro'
+import { useRulesNow } from '@/hooks/useRegras'
+import {
+  registrarKeys,
+  setTradeView,
+  useExitPreview,
+  useMoveStop,
+  useRegisterExit,
+  useRegisterPartial,
+  useServerNow,
+  useUndoEntry,
+  useUndoEvent,
+} from '@/hooks/useRegistrar'
+import { countingExits, favorOf, movePayload, partialPayload, undoEventPayload, type Outcome } from '@/lib/domain/registro'
+import { abs, cmp, numeric } from '@/lib/domain/registro/numeric'
+import { lerNumero } from '@/lib/hub/numero'
 import { conferidos } from '@/lib/hub/posso'
 import { avisoDoLimite, type AvisoDoLimite } from '@/lib/hub/registrar'
-import { RegistrarDataError, type RegistrarErrorCode, type TradeView } from '@/lib/hub/registrarDb'
+import { RegistrarDataError, newClientKey, type RegistrarErrorCode, type TradeView } from '@/lib/hub/registrarDb'
 import {
   ORDEM_SAIDA,
   avisoDesfeita,
@@ -15,25 +28,63 @@ import {
   hora,
   horaRel,
   modeloResultado,
-  modeloSaida,
   podeDesfazer,
+  precoDe,
   resumoAberta,
+  textoAviso,
   textoDaRecusa,
   textoQuebras,
   type ContaReg,
   type MarcaKind,
   type SaidaCampos,
 } from '@/lib/hub/registrarForm'
+import {
+  CAMPOS_PARCIAL,
+  CAMPOS_STOP,
+  ORDEM_PARCIAL,
+  ORDEM_STOP,
+  desfazerEvento,
+  formaDaOperacao,
+  linhaDoTempo,
+  modeloAgora,
+  modeloMoverStop,
+  modeloParcial,
+  modosDaAberta,
+  movimentoAtual,
+  notaPrimeiraParcial,
+  perguntaDesfazerEntrada,
+  precoParaCampo,
+  regraNoResumo,
+  saidaComParciais,
+  sugestaoBreakeven,
+  textoDepoisDoUndo,
+  textoParcialRegistrada,
+  textoStopRegistrado,
+  type CampoParcial,
+  type CampoStop,
+  type CamposParcial,
+  type CamposStop,
+  type ModoAberta,
+} from '@/lib/hub/registrarParciais'
 import { Disclosure, useToggle } from '@/components/hub/contas/ui'
+import AcoesAberta from './AcoesAberta'
+import BlocoAgora from './BlocoAgora'
 import BlocoResultado from './BlocoResultado'
-import { ABERTA, EBINEX, ERRO_REGISTRAR, ERROS, FUTUROS, MARCAS, RODAPE } from './copy'
+import { ABERTA, EBINEX, ERRO_REGISTRAR, ERROS, ERROS_PRECOS, FUTUROS, MARCAS, RODAPE } from './copy'
+import { ACOES, ERRO_3C, PARCIAL, STOP } from './copyParciais'
+import FormMoverStop from './FormMoverStop'
+import FormParcial from './FormParcial'
+import LinhaDoTempo from './LinhaDoTempo'
 import { AvisosMarca, PillsMarca, useMarcar } from './Marcas'
-import { CampoTexto, Erro, GrupoPills, PlanoPill, Rodape, Tempo, descrito } from './ui'
+import SugestaoBreakeven from './SugestaoBreakeven'
+import { CampoTexto, Erro, GrupoPills, PRIMARIA_ID, PlanoPill, Rodape, Tempo, descrito } from './ui'
 import VenceuSemValor from './VenceuSemValor'
 
 /** The exit's fields a server refusal can name (its HINT), in ORDEM_SAIDA's words */
 type CampoSaida = (typeof ORDEM_SAIDA)[number]
 const CAMPO_DO_SERVIDOR: Partial<Record<string, CampoSaida>> = { exit_price: 'spreco', exit: 'shora', pnl: 'res', costs: 'custos' }
+/** Phase 3c: the partial's and the move's fields a refusal can name */
+const CAMPO_PARCIAL: Partial<Record<string, CampoParcial>> = { quantity: 'pq', exit_price: 'ppreco', exit: 'phora', pnl: 'pres' }
 
 /** The plan pill of a registered trade: «No plano» / «● fora da janela» / «—» */
 export function PlanoDaOperacao({ view, nota }: { view: Pick<TradeView, 'plan'>; nota?: React.ReactNode }) {
@@ -69,42 +120,90 @@ export interface PassoAbertaProps {
   aoSumiu: () => void
 }
 
+/** What the last write left on screen until the next one (E20, E21, E22) */
+interface AcaoSt {
+  texto: string
+  sugestao: { texto: string; preco: string } | null
+  aviso: { texto: string; atingido: boolean } | null
+}
+
+/** Which write the sheet's alert speaks for (§5.8): the 3c writes read ERRO_3C first */
+type ErroGeral = { code: RegistrarErrorCode; de: 'antes' | '3c' }
+
 /**
- * Step 2 · «Operação aberta» / «Opção vencida» (RO l.437–482, 1225–1289): the summary, the plan,
- * the marks (one tap = one mark on the server's clock), the exit (every price market: «Venceu sem
- * valor» of an option, the exit price and hour, the result block with «Corrigir», the typed result
- * and «Custos») or the result (Ebinex, after the expiry), «Desfazer entrada» within 15 minutes, and
- * «Registrar saída» / «Registrar resultado».
+ * Step 2 · «Operação aberta» / «Opção vencida» (RO l.437–482, 1225–1289; Phase 3c RO l.466–561):
+ * the summary (and the trade's breakeven rule), «Agora» and «Linha do tempo» with «Desfazer» after
+ * a partial or a move, the plan, the marks (one tap = one mark on the server's clock), and on price
+ * markets «O que registrar agora?»: «Saída» (the exit of what is open: «Venceu sem valor» of an
+ * option, the exit price and hour, the result block with «Corrigir», the typed result and
+ * «Custos»), «Parcial» or «Mover stop», each with its status after the write, the breakeven
+ * suggestion and the limit banner; Ebinex the result after the expiry; «Desfazer entrada» within 15
+ * minutes; the footer's primary by mode.
  */
 export default function PassoAberta({ conta, view, pref80, headingRef, aoNovaEntrada, aoFechar, aoFechadaFora, aoDesfeita, aoSumiu }: PassoAbertaProps) {
   const now = useServerNow(1000)
   const { userId } = useHubDb()
   const queryClient = useQueryClient()
+  const rulesNow = useRulesNow()
   const t = view.trade
   const binaria = conta.market === 'binary'
+  const contaId = t.accountId ?? conta.id
   const [campos, setCampos] = useState<SaidaCampos>({ preco: '', hora: null })
+  const [cp, setCp] = useState<CamposParcial>(CAMPOS_PARCIAL)
+  const [cs, setCs] = useState<CamposStop>(CAMPOS_STOP)
+  const [modoEscolhido, setModoEscolhido] = useState<ModoAberta>('saida')
   const [outcome, setOutcome] = useState<Outcome | null>(null)
   const [tentou, setTentou] = useState(false)
+  const [tentouP, setTentouP] = useState(false)
+  const [tentouS, setTentouS] = useState(false)
   const [ocupado, setOcupado] = useState(false)
-  const [erroGeral, setErroGeral] = useState<RegistrarErrorCode | null>(null)
+  const [erroGeral, setErroGeral] = useState<ErroGeral | null>(null)
   /** A server refusal of a field the form let through: under that field («Preço de saída», «Hora da saída», the result, the costs, «Como terminou?») */
   const [erroCampo, setErroCampo] = useState<{ campo: CampoSaida | 'fim'; texto: string } | null>(null)
+  const [erroParcial, setErroParcial] = useState<Partial<Record<CampoParcial, string>>>({})
+  const [erroStop, setErroStop] = useState<Partial<Record<CampoStop, string>>>({})
+  const [acaoSt, setAcaoSt] = useState<AcaoSt | null>(null)
+  const [undoAberto, setUndoAberto] = useState(false)
+  /** An event the server said is too late to undo: its link goes */
+  const [undoNegado, setUndoNegado] = useState<string | null>(null)
+  const [focoLink, setFocoLink] = useState(0)
+  const [focoAcao, setFocoAcao] = useState(0)
+  /** A refused undo closed its confirmation (the focus was on «Sim»): the sheet's alert takes it */
+  const [focoAlerta, setFocoAlerta] = useState(0)
   const [confirmando, setConfirmando] = useState(false)
   const [mudarAberto, alternarMudar] = useToggle()
   const ocupadoRef = useRef(false)
+  /** One client_key per form, kept across retries, new after a success */
+  const chaves = useRef({ parcial: newClientKey(), stop: newClientKey() })
   /** This sheet sent an exit for the trade: a «repeated» answer is then its own (C5, §8 C3) */
   const enviouSaida = useRef(false)
   const desfazerRef = useRef<HTMLButtonElement>(null)
   const simRef = useRef<HTMLButtonElement>(null)
+  const acaoRef = useRef<HTMLParagraphElement>(null)
   const saida = useRegisterExit()
+  const parcial = useRegisterPartial()
+  const mover = useMoveStop()
+  const desfazerEv = useUndoEvent()
   const desfazer = useUndoEntry()
   const marcar = useMarcar(conta, view)
 
   const resumo = resumoAberta(conta, t, now)
-  const ms = binaria ? null : modeloSaida(conta, t, campos, now, tentou)
+  const modos = binaria ? [] : modosDaAberta(conta, view)
+  const modo: ModoAberta = modos.includes(modoEscolhido) ? modoEscolhido : 'saida'
+  const ms = binaria ? null : saidaComParciais(conta, view, campos, now, tentou)
   const mr = binaria ? modeloResultado(conta, t, outcome, now) : null
+  const agoraConta = rulesNow.data?.accounts.find((a) => a.accountId === contaId) ?? null
+  const mp = !binaria && modo === 'parcial' ? modeloParcial(conta, view, cp, now, tentouP) : null
+  const mst = !binaria && modo === 'stop' ? modeloMoverStop(conta, view, cs, agoraConta, tentouS) : null
   const vencida = !!mr?.vencida
   const payload = ms ? ms.payload : mr ? mr.payload : null
+  const regra = binaria ? null : regraNoResumo(conta, view)
+  const temEventos = !binaria && (view.position.partials > 0 || movimentoAtual(view.stopMoves) !== null)
+  const agora = temEventos ? modeloAgora(conta, view) : null
+  const tempo = temEventos ? linhaDoTempo(conta, view, now) : null
+  const undo0 = binaria ? null : desfazerEvento(conta, view, now)
+  const undo = undo0 && undoNegado !== `${undo0.kind}-${undo0.id}` ? undo0 : null
+  const notaParcial = binaria ? null : notaPrimeiraParcial(conta, view)
 
   // Closed elsewhere: the trade read again (focus) or the exit's dry run says so, before this sheet sent an exit
   const dry = useExitPreview(t.id, payload)
@@ -120,11 +219,66 @@ export default function PassoAberta({ conta, view, pref80, headingRef, aoNovaEnt
   useEffect(() => {
     if (confirmando) simRef.current?.focus()
   }, [confirmando])
+  // The undo's deadline (or the event gone): an open confirmation closes, as «Desfazer entrada»'s does
+  const temUndo = !!undo
+  useEffect(() => {
+    if (!temUndo) setUndoAberto(false)
+  }, [temUndo])
+  // After a write, the action status takes the focus (it says what happened)
+  useEffect(() => {
+    if (focoAcao) acaoRef.current?.focus()
+  }, [focoAcao])
   // The alert appears above the footer, below the screen on a phone: scrolled into view (role="alert" reads it)
   const alertaRef = useRef<HTMLDivElement>(null)
   useEffect(() => {
     if (erroGeral) alertaRef.current?.scrollIntoView?.({ block: 'nearest' })
   }, [erroGeral])
+  useEffect(() => {
+    if (focoAlerta) alertaRef.current?.focus()
+  }, [focoAlerta])
+
+  const focar = (id: string) => document.getElementById(id)?.focus()
+  /**
+   * The trade read again after a refusal another device caused (a partial or a move made there):
+   * the fresh view, which the step shows from now on, or the one on screen when the read fails
+   */
+  const lerDeNovo = async (): Promise<TradeView> => {
+    await queryClient.refetchQueries({ queryKey: registrarKeys.operacao(userId, t.id) })
+    return queryClient.getQueryData<TradeView | null>(registrarKeys.operacao(userId, t.id)) ?? view
+  }
+  /** After a refused undo the confirmation is gone: a retry (offline, network) goes back to the link, else to the alert */
+  const focoDepoisDaRecusa = (code: RegistrarErrorCode, aoLink: () => void) => {
+    if (code === 'offline' || code === 'network') aoLink()
+    else setFocoAlerta((n) => n + 1)
+  }
+  /** After a partial, a move or an undo: back to «Saída», every form's errors gone, the status focused */
+  const depoisDaEscrita = (st: AcaoSt) => {
+    setAcaoSt(st)
+    setModoEscolhido('saida')
+    setTentou(false)
+    setTentouP(false)
+    setTentouS(false)
+    setUndoAberto(false)
+    setFocoAcao((n) => n + 1)
+  }
+
+  /** A refusal of «Registrar parcial», «Registrar stop» or «Sim, desfazer» that is not a field's */
+  const recusa3c = async (err: RegistrarDataError, desfazendo = false): Promise<boolean> => {
+    if (err.code === 'not_open') {
+      await queryClient.refetchQueries({ queryKey: registrarKeys.operacao(userId, t.id) })
+      aoFechadaFora()
+      return true
+    }
+    if (err.code === 'unknown_trade') {
+      aoSumiu()
+      return true
+    }
+    if (desfazendo && (err.code === 'not_newest' || err.code === 'nothing_to_undo')) {
+      void queryClient.refetchQueries({ queryKey: registrarKeys.operacao(userId, t.id) })
+    }
+    setErroGeral({ code: err.code, de: '3c' })
+    return true
+  }
 
   const registrar = async () => {
     if (ocupadoRef.current) return
@@ -133,11 +287,11 @@ export default function PassoAberta({ conta, view, pref80, headingRef, aoNovaEnt
     setErroCampo(null)
     const primeiro = ms ? ORDEM_SAIDA.find((k) => ms.erros[k]) : undefined
     if (primeiro) {
-      document.getElementById(`f-${primeiro}`)?.focus()
+      focar(`f-${primeiro}`)
       return
     }
     if (mr && mr.erro) {
-      document.getElementById('g-fim-0')?.focus()
+      focar('g-fim-0')
       return
     }
     if (!payload) return
@@ -167,13 +321,18 @@ export default function PassoAberta({ conta, view, pref80, headingRef, aoNovaEnt
       else if (err.code === 'not_expired' || err.code === 'bad_outcome') setErroCampo({ campo: 'fim', texto: ERRO_REGISTRAR[err.code] })
       else if (err.field && CAMPO_DO_SERVIDOR[err.field]) {
         const campo = CAMPO_DO_SERVIDOR[err.field] as CampoSaida
+        // A partial this screen does not show (made on another device): the trade read again names it
+        const exits = err.code === 'exit_before_partial' ? (await lerDeNovo()).exits : view.exits
+        const ultima = countingExits(exits).reduce<Date | null>((m, x) => (m === null || x.exitTime > m ? x.exitTime : m), null)
         // The local check's wording, with its values, when the server's code is one of its own
         const texto =
           err.code === 'exit_in_future'
             ? ERROS.saidaFutura(horaRel(conta, now))
             : err.code === 'exit_before_entry'
               ? ERROS.saidaAntes(hora(conta, t.entryTime))
-              : textoDaRecusa(err.code, err.field, { forma: null, lado: null }) ?? ERRO_REGISTRAR[err.code]
+              : err.code === 'exit_before_partial' && ultima
+                ? ACOES.saidaAntesParcial(hora(conta, ultima))
+                : textoDaRecusa(err.code, err.field, { forma: null, lado: null }) ?? ERRO_REGISTRAR[err.code]
         // The server asks for the result where the form computed it: «Corrigir» opens its field, empty
         if (campo === 'res' && !ms?.bloco?.campo && ms?.bloco?.corrigir) setCampos((c) => ({ ...c, corrigir: true, resultado: '' }))
         setErroCampo({ campo, texto })
@@ -184,10 +343,204 @@ export default function PassoAberta({ conta, view, pref80, headingRef, aoNovaEnt
           if (alvo) alvo.focus()
           else {
             setErroCampo(null)
-            setErroGeral(codigo)
+            setErroGeral({ code: codigo, de: 'antes' })
           }
         })
-      } else setErroGeral(err.code)
+      } else setErroGeral({ code: err.code, de: 'antes' })
+    } finally {
+      ocupadoRef.current = false
+      setOcupado(false)
+    }
+  }
+
+  const registrarParcial = async () => {
+    if (ocupadoRef.current || !mp) return
+    setTentouP(true)
+    setErroGeral(null)
+    setErroParcial({})
+    const primeiro = ORDEM_PARCIAL.find((k) => mp.erros[k])
+    if (primeiro) {
+      focar(primeiro === 'pq' ? (mp.chips && !mp.chips.outroAberto ? 'g-pq-0' : 'f-pq') : `f-${primeiro}`)
+      return
+    }
+    if (!mp.campos) return
+    ocupadoRef.current = true
+    setOcupado(true)
+    try {
+      const ans = await parcial.mutateAsync({ tradeId: t.id, accountId: contaId, payload: partialPayload({ clientKey: chaves.current.parcial, ...mp.campos }) })
+      chaves.current.parcial = newClientKey()
+      const e = ans.state.exits.find((x) => x.id === ans.exitId)
+      const sug = e?.exitPrice ? sugestaoBreakeven(conta, ans.state, e.exitPrice) : null
+      const aviso =
+        ans.repeated || !ans.partial
+          ? null
+          : avisoDoLimite({
+              market: conta.market,
+              tradeDay: ans.state.trade.tradingDay,
+              before: ans.limitBefore,
+              after: ans.gateNow ? { tradingDay: ans.gateNow.tradingDay, limit: ans.gateNow.limit } : null,
+              exitAt: ans.partial.exitAt,
+              pref80,
+            })
+      setCp(CAMPOS_PARCIAL)
+      depoisDaEscrita({
+        texto: textoParcialRegistrada(conta, ans.state, ans.exitId) ?? '',
+        sugestao: sug && e?.exitPrice ? { texto: sug, preco: e.exitPrice } : null,
+        aviso: aviso && ans.partial ? textoAviso(conta, aviso, ans.partial.exitAt) : null,
+      })
+    } catch (x) {
+      const err = x instanceof RegistrarDataError ? x : new RegistrarDataError('unknown')
+      const campo = err.field ? CAMPO_PARCIAL[err.field] : undefined
+      const forma = formaDaOperacao(conta.market, t)
+      if (campo && err.code !== 'not_open' && err.code !== 'unknown_trade') {
+        // Too large for what is open now: another device took part of it; the trade read again says how much is left
+        const fresca = err.code === 'partial_too_large' ? await lerDeNovo() : view
+        if (!modosDaAberta(conta, fresca).includes('parcial')) {
+          // What is left cannot be split any more: no «Parcial» to show the text under
+          setErroGeral({ code: err.code, de: '3c' })
+          return
+        }
+        const texto =
+          err.code === 'partial_too_large' && forma
+            ? PARCIAL.demais(forma.quantidade.sufixo(fresca.position.open ?? '0'))
+            : err.code === 'exit_in_future'
+              ? PARCIAL.futura(horaRel(conta, now))
+              : err.code === 'exit_before_entry'
+                ? PARCIAL.antes(hora(conta, t.entryTime))
+                : err.code === 'pnl_required'
+                  ? ERROS_PRECOS.resVazio
+                  : err.code === 'bad_pnl'
+                    ? ERROS_PRECOS.resNumero
+                    : err.code === 'bad_quantity'
+                      ? mp.erros.pq ?? ERROS.qtdVazia
+                      : err.code === 'bad_time'
+                        ? ERROS.hora
+                        : mp.erros[campo] ?? ERRO_REGISTRAR[err.code]
+        // The quantity's place on the fresh view (its chips follow what is open now)
+        const mf = fresca === view ? mp : modeloParcial(conta, fresca, cp, now, true) ?? mp
+        const qtdEm = mf.chips && !mf.chips.outroAberto ? 'g-pq-0' : 'f-pq'
+        const alvo = campo === 'pq' ? qtdEm : campo === 'pres' ? 'f-pres' : `f-${campo}`
+        if (campo === 'pres' && !mp.bloco.campo && mp.bloco.corrigir) setCp((c) => ({ ...c, corrigir: true, resultado: '' }))
+        setErroParcial({ [campo]: texto })
+        const codigo = err.code
+        requestAnimationFrame(() => {
+          const el = document.getElementById(alvo) ?? (campo === 'pq' ? document.getElementById(qtdEm === 'f-pq' ? 'g-pq-0' : 'f-pq') : null)
+          if (el) el.focus()
+          else {
+            setErroParcial({})
+            setErroGeral({ code: codigo, de: '3c' })
+          }
+        })
+      } else await recusa3c(err)
+    } finally {
+      ocupadoRef.current = false
+      setOcupado(false)
+    }
+  }
+
+  const registrarStop = async () => {
+    if (ocupadoRef.current || !mst) return
+    setTentouS(true)
+    setErroGeral(null)
+    setErroStop({})
+    const primeiro = ORDEM_STOP.find((k) => mst.erros[k])
+    if (primeiro) {
+      focar(primeiro === 'sModo' ? 'g-sModo-0' : `f-${primeiro}`)
+      return
+    }
+    const enviado = mst.campos
+    if (!enviado) return
+    ocupadoRef.current = true
+    setOcupado(true)
+    try {
+      const ans = await mover.mutateAsync({ tradeId: t.id, payload: movePayload({ clientKey: chaves.current.stop, ...enviado }) })
+      chaves.current.stop = newClientKey()
+      setCs(CAMPOS_STOP)
+      depoisDaEscrita({ texto: textoStopRegistrado(conta, ans.state, ans.moveId) ?? '', sugestao: null, aviso: null })
+    } catch (x) {
+      const err = x instanceof RegistrarDataError ? x : new RegistrarDataError('unknown')
+      const forma = formaDaOperacao(conta.market, t)
+      const campo: CampoStop | null =
+        err.field === 'stop_price' ? (err.code === 'same_stop' && mst.modo === 'be' ? 'sModo' : 'sNovo') : err.field === 'price_now' ? 'sAgora' : null
+      if (campo && forma && err.code !== 'not_open' && err.code !== 'unknown_trade') {
+        if (err.code === 'same_stop') {
+          // The stop is already where it was sent (another device moved it there): the trade read
+          // again shows it, and the mode sent stays pressed (the default could turn to «Outro preço»)
+          await lerDeNovo()
+          setCs((c) => ({ ...c, modo: mst.modo }))
+        }
+        const lado = t.direction === 'short' ? STOP.ladoVenda : STOP.ladoCompra
+        const opcao = forma.tipo === 'opcao'
+        const temAgora = cs.agora.trim() !== ''
+        const lido = lerNumero(cs.agora, { ponto: forma.pontoDecimal })
+        const longe =
+          lido.ok && t.entryPrice !== null && forma.spec.stops === 'pips'
+            ? cmp(abs(numeric(favorOf(forma.spec, t.direction === 'short' ? -1 : 1, t.entryPrice, lido.value))), numeric('10000000000')) >= 0
+            : false
+        const texto =
+          err.code === 'same_stop'
+            ? STOP.jaEsta(precoDe(forma, (enviado.kind === 'ajuste' ? enviado.stopPrice : null) ?? t.entryPrice ?? '0'))
+            : err.code === 'bad_stop'
+              ? campo === 'sAgora' || temAgora
+                ? lado
+                : STOP.zero
+              : err.code === 'bad_price'
+                ? !temAgora
+                  ? opcao
+                    ? STOP.agoraVazioPremio
+                    : STOP.agoraVazio
+                  : longe
+                    ? STOP.agoraLonge
+                    : opcao
+                      ? STOP.agoraZeroPremio
+                      : STOP.agoraZero
+                : mst.erros[campo] ?? ERRO_REGISTRAR[err.code]
+        setErroStop({ [campo]: texto })
+        const alvo = campo === 'sModo' ? 'g-sModo-0' : `f-${campo}`
+        const codigo = err.code
+        requestAnimationFrame(() => {
+          const el = document.getElementById(alvo)
+          if (el) el.focus()
+          else {
+            setErroStop({})
+            setErroGeral({ code: codigo, de: '3c' })
+          }
+        })
+      } else await recusa3c(err)
+    } finally {
+      ocupadoRef.current = false
+      setOcupado(false)
+    }
+  }
+
+  const confirmarDesfazerEvento = async () => {
+    if (ocupadoRef.current || !undo) return
+    ocupadoRef.current = true
+    setOcupado(true)
+    setErroGeral(null)
+    const ev = undo
+    try {
+      const ans = await desfazerEv.mutateAsync({ tradeId: t.id, accountId: contaId, payload: undoEventPayload(ev.kind, ev.id) })
+      const desfeito =
+        ev.kind === 'parcial' ? ans.state.exits.find((x) => x.id === ev.id)?.voidedAt : ans.state.stopMoves.find((x) => x.id === ev.id)?.voidedAt
+      depoisDaEscrita({
+        texto: textoDepoisDoUndo(conta, { kind: ev.kind, hora: ev.hora }, desfeito ?? ans.state.serverNow, {
+          market: conta.market,
+          tradeDay: ans.state.trade.tradingDay,
+          before: ans.limitBefore,
+          after: ans.limitAfter,
+          pref80,
+        }),
+        sugestao: null,
+        aviso: null,
+      })
+    } catch (x) {
+      const err = x instanceof RegistrarDataError ? x : new RegistrarDataError('unknown')
+      setUndoAberto(false)
+      if (err.code === 'undo_too_late') setUndoNegado(`${ev.kind}-${ev.id}`)
+      await recusa3c(err, true)
+      // «Sim, desfazer» had the focus and is gone: never left on the page's body
+      if (err.code !== 'not_open' && err.code !== 'unknown_trade') focoDepoisDaRecusa(err.code, () => setFocoLink((n) => n + 1))
     } finally {
       ocupadoRef.current = false
       setOcupado(false)
@@ -208,7 +561,8 @@ export default function PassoAberta({ conta, view, pref80, headingRef, aoNovaEnt
       if (err.code === 'unknown_trade') aoDesfeita(avisoDesfeita(conta, t, now))
       else {
         setConfirmando(false)
-        setErroGeral(err.code)
+        setErroGeral({ code: err.code, de: 'antes' })
+        focoDepoisDaRecusa(err.code, () => requestAnimationFrame(() => desfazerRef.current?.focus()))
       }
     } finally {
       ocupadoRef.current = false
@@ -236,6 +590,26 @@ export default function PassoAberta({ conta, view, pref80, headingRef, aoNovaEnt
     setCampos((c) => ({ ...c, ...patch }))
     setErroCampo(null)
   }
+  // E19: a pill sets the mode, clears every form's «tentou», closes an open undo confirmation and drops the suggestion (RO js l.1755)
+  const escolherModo = (m: ModoAberta) => {
+    setModoEscolhido(m)
+    setTentou(false)
+    setTentouP(false)
+    setTentouS(false)
+    setErroCampo(null)
+    setErroParcial({})
+    setErroStop({})
+    setUndoAberto(false)
+    setAcaoSt((a) => (a ? { ...a, sugestao: null } : null))
+  }
+  const textoAlerta = erroGeral ? (erroGeral.de === '3c' ? ERRO_3C[erroGeral.code] ?? ERRO_REGISTRAR[erroGeral.code] : ERRO_REGISTRAR[erroGeral.code]) : null
+  const primaria = binaria
+    ? { rotulo: RODAPE.registrarResultado, aoClicar: () => void registrar() }
+    : modo === 'parcial'
+      ? { rotulo: ACOES.registrarParcial, aoClicar: () => void registrarParcial() }
+      : modo === 'stop'
+        ? { rotulo: ACOES.registrarStop, aoClicar: () => void registrarStop() }
+        : { rotulo: RODAPE.registrarSaida, aoClicar: () => void registrar() }
 
   return (
     <div className="hub-passo">
@@ -249,7 +623,31 @@ export default function PassoAberta({ conta, view, pref80, headingRef, aoNovaEnt
         <b>{resumo.op}</b>
         <span>{resumo.entrada}</span>
         {resumo.stop && <span className="hub-nota hub-num">{resumo.stop}</span>}
+        {regra && <span className="hub-nota">{regra}</span>}
       </div>
+      {agora && <BlocoAgora modelo={agora} />}
+      {tempo && (
+        <LinhaDoTempo
+          itens={tempo}
+          focoLink={focoLink}
+          undo={
+            undo && {
+              evento: { kind: undo.kind, id: undo.id },
+              aria: undo.aria,
+              ate: undo.ate,
+              pergunta: undo.pergunta,
+              aberto: undoAberto,
+              ocupado,
+              aoAbrir: () => setUndoAberto(true),
+              aoConfirmar: () => void confirmarDesfazerEvento(),
+              aoManter: () => {
+                setUndoAberto(false)
+                setFocoLink((n) => n + 1)
+              },
+            }
+          }
+        />
+      )}
       <PlanoDaOperacao view={view} nota={conf ? <span className="hub-nota">{conf}</span> : null} />
 
       <div className="hub-bloco">
@@ -272,6 +670,7 @@ export default function PassoAberta({ conta, view, pref80, headingRef, aoNovaEnt
           <span className="hub-nota">{ABERTA.nenhumaAinda}</span>
         )}
         {vencida && <span className="hub-reg-txt">{ABERTA.depoisDoResultado}</span>}
+        {!vencida && notaParcial && <p className="hub-reg-txt">{notaParcial}</p>}
       </div>
       <PillsMarca
         id="emo"
@@ -296,8 +695,39 @@ export default function PassoAberta({ conta, view, pref80, headingRef, aoNovaEnt
       </div>
       <AvisosMarca m={marcar} />
 
-      {ms && (
+      {!binaria && modos.length > 0 && (
         <>
+          <AcoesAberta modos={modos} modo={modo} aoEscolher={escolherModo} />
+          <p ref={acaoRef} id="reg-acao-st" role="status" tabIndex={-1} className={acaoSt?.texto ? 'hub-reg-st' : 'sr-only'}>
+            {acaoSt?.texto ?? ''}
+          </p>
+          {acaoSt?.sugestao && (
+            <SugestaoBreakeven
+              texto={acaoSt.sugestao.texto}
+              aoMover={() => {
+                const preco = acaoSt.sugestao?.preco
+                setModoEscolhido('stop')
+                setCs({ modo: 'be', novo: '', agora: preco ? precoParaCampo(conta.market, t, preco) : '' })
+                setTentou(false)
+                setTentouP(false)
+                setTentouS(false)
+                setErroStop({})
+                setAcaoSt((a) => (a ? { ...a, sugestao: null } : null))
+                requestAnimationFrame(() => focar(PRIMARIA_ID))
+              }}
+            />
+          )}
+          {acaoSt?.aviso && (
+            <p className={acaoSt.aviso.atingido ? 'hub-reg-aviso-lim hub-reg-aviso-lim--atingido' : 'hub-reg-aviso-lim'} role="status">
+              {acaoSt.aviso.texto}
+            </p>
+          )}
+        </>
+      )}
+
+      {ms && modo === 'saida' && (
+        <>
+          {ms.nota && <span className="hub-nota hub-rp-nota-sai">{ms.nota}</span>}
           {ms.vsv && (
             <VenceuSemValor
               estado={ms.vsv}
@@ -324,7 +754,44 @@ export default function PassoAberta({ conta, view, pref80, headingRef, aoNovaEnt
               erro={erroSaida.shora ?? doServidor('shora')}
             />
           </div>
+          <BlocoResultado
+            linha={ms.previa}
+            bloco={ms.bloco}
+            erroRes={erroSaida.res ?? doServidor('res')}
+            erroCustos={ms.erros.custos ?? doServidor('custos')}
+            aoCorrigir={() => {
+              const abrir = !campos.corrigir
+              mudarCampos(abrir ? { corrigir: true, resultado: ms.bloco?.calculado ?? '' } : { corrigir: false, resultado: '' })
+              if (abrir) requestAnimationFrame(() => focar('f-res'))
+            }}
+            aoMudarRes={(v) => mudarCampos({ resultado: v })}
+            aoMudarCustos={(v) => mudarCampos({ custos: v })}
+          />
         </>
+      )}
+      {mp && (
+        <FormParcial
+          modelo={mp}
+          campos={cp}
+          tentou={tentouP}
+          erroServidor={erroParcial}
+          aoMudar={(patch) => {
+            setCp((c) => ({ ...c, ...patch }))
+            setErroParcial({})
+          }}
+        />
+      )}
+      {mst && (
+        <FormMoverStop
+          modelo={mst}
+          campos={cs}
+          tentou={tentouS}
+          erroServidor={erroStop}
+          aoMudar={(patch) => {
+            setCs((c) => ({ ...c, ...patch }))
+            setErroStop({})
+          }}
+        />
       )}
       {mr && (
         <GrupoPills
@@ -349,24 +816,10 @@ export default function PassoAberta({ conta, view, pref80, headingRef, aoNovaEnt
           }
         />
       )}
-      {ms ? (
-        <BlocoResultado
-          linha={ms.previa}
-          bloco={ms.bloco}
-          erroRes={erroSaida.res ?? doServidor('res')}
-          erroCustos={ms.erros.custos ?? doServidor('custos')}
-          aoCorrigir={() => {
-            const abrir = !campos.corrigir
-            mudarCampos(abrir ? { corrigir: true, resultado: ms.bloco?.calculado ?? '' } : { corrigir: false, resultado: '' })
-            if (abrir) requestAnimationFrame(() => document.getElementById('f-res')?.focus())
-          }}
-          aoMudarRes={(v) => mudarCampos({ resultado: v })}
-          aoMudarCustos={(v) => mudarCampos({ custos: v })}
-        />
-      ) : (
+      {mr && (
         <div className="hub-linha-i">
           <span className="hub-num" role="status">
-            {mr?.previa}
+            {mr.previa}
           </span>
         </div>
       )}
@@ -383,7 +836,7 @@ export default function PassoAberta({ conta, view, pref80, headingRef, aoNovaEnt
           ) : (
             <div className="hub-reg-confirma" role="group" aria-labelledby="t-desfazer">
               <p id="t-desfazer" className="hub-reg-txt">
-                {ABERTA.desfazerPergunta(hora(conta, t.entryTime), resumo.op)}
+                {perguntaDesfazerEntrada(conta, view)}
               </p>
               <div className="hub-acoes">
                 <button ref={simRef} type="button" className="hub-btn" aria-disabled={ocupado || undefined} onClick={() => void confirmarDesfazer()}>
@@ -405,14 +858,14 @@ export default function PassoAberta({ conta, view, pref80, headingRef, aoNovaEnt
         </div>
       )}
 
-      {erroGeral && (
-        <div ref={alertaRef} role="alert" className="hub-alerta">
-          {ERRO_REGISTRAR[erroGeral]}
+      {textoAlerta && (
+        <div ref={alertaRef} role="alert" className="hub-alerta" tabIndex={-1}>
+          {textoAlerta}
         </div>
       )}
       <Rodape
         esquerda={{ rotulo: RODAPE.novaEntrada, aoClicar: aoNovaEntrada }}
-        primaria={{ rotulo: binaria ? RODAPE.registrarResultado : RODAPE.registrarSaida, aoClicar: () => void registrar(), ocupado }}
+        primaria={{ id: PRIMARIA_ID, rotulo: primaria.rotulo, aoClicar: primaria.aoClicar, ocupado }}
         ocupado={ocupado}
       />
     </div>
