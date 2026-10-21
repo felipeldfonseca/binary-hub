@@ -43,6 +43,7 @@ import {
   stopLevel,
   tradeInstrument,
   undoUntil,
+  type AfterFields,
   type AfterPayload,
   type Clock,
   type Direction,
@@ -183,9 +184,29 @@ export const DURACOES_EBINEX: readonly number[] = [60, 300, 900];
 
 export type TipoEua = 'acao' | 'opcao';
 
-/** Step 1's draft, v2 (3-4): v1 plus the new markets' fields. A stored v1 is read as v2 (lerRascunho). */
+/**
+ * 3c: one row of «Já fechada» in several exits («+ Outra saída»), as typed. `id` names the row's
+ * fields (`f-s{id}q`…) and never changes while the row lives; `hora` null follows the server's
+ * clock (the last row follows «Venceu sem valor»'s 16:00 ET while it is on).
+ */
+export interface SaidaRascunho {
+  id: number;
+  qtd: string;
+  preco: string;
+  hora: string | null;
+  /** «Resultado desta saída» (instruments whose result is typed), as typed (signed) */
+  res: string;
+}
+
+/** At most 20 exits per trade (sintese C7: too_many_exits) */
+export const MAX_SAIDAS = 20;
+
+/**
+ * Step 1's draft, v3 (3c): v2 (3-4: v1 plus the new markets' fields) plus «Já fechada»'s rows and
+ * «Movi o stop para o breakeven». A stored v1 or v2 is read as v3 (lerRascunho).
+ */
 export interface Rascunho {
-  v: 2;
+  v: 3;
   accountId: string;
   /** One per form, kept across retries and a reopened sheet (C6, C23) */
   clientKey: string;
@@ -241,6 +262,17 @@ export interface Rascunho {
   corrigir: boolean;
   /** «Já fechada»: «Custos · opcional», as typed */
   custos: string;
+  // 3c
+  /** «Já fechada»: 2–20 rows after «+ Outra saída»; null = one exit (precoSaida, horaSaida) */
+  saidas: SaidaRascunho[] | null;
+  /**
+   * «Já fechada»: «Movi o stop para o breakeven» as pressed. Kept while the pill is not on screen
+   * (no valid stop): it counts only while rendered (registrarSaidas.comSaidas), so a stop typed back
+   * brings the pill back pressed (board `beFormOn = temBeForm && f.be`)
+   */
+  be: boolean;
+  /** «Preço quando moveu», as typed */
+  bePreco: string;
 }
 
 /** A decimal text the pt-BR way, for a prefilled field ('17.5' → '17,5') */
@@ -268,12 +300,15 @@ const NOVOS_CAMPOS = {
   custos: '',
 };
 
+/** The 3c fields at rest: one exit, the pill off */
+const CAMPOS_3C = { saidas: null, be: false, bePreco: '' };
+
 /** Step 1 as it opens on an account (its starting values: D5, D6; 3-4 §5.1) */
 export function rascunhoInicial(conta: Pick<ContaReg, 'id' | 'market'>, defaults: RegistrarDefaults | null, clientKey: string): Rascunho {
   const d = defaults ?? { symbol: null, quantity: '1', pairs: [], payoutBySymbol: {}, stake: null };
   const market = conta.market;
   const comum = {
-    v: 2 as const,
+    v: 3 as const,
     accountId: conta.id,
     clientKey,
     modo: 'aberta' as Modo,
@@ -291,6 +326,7 @@ export function rascunhoInicial(conta: Pick<ContaReg, 'id' | 'market'>, defaults
     marcas: {},
     maisAberto: false,
     ...NOVOS_CAMPOS,
+    ...CAMPOS_3C,
   };
   if (market === 'futures' || market === 'binary') {
     const futures = market === 'futures';
@@ -345,14 +381,34 @@ const strOrNull = (x: unknown): x is string | null => x === null || typeof x ===
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
 /**
+ * 3c: a stored row set, when every row has its shape (2–20 rows, distinct whole ids); else null
+ * (the draft goes back to one exit, the rest of it kept)
+ */
+function lerSaidas(x: unknown): SaidaRascunho[] | null {
+  if (!Array.isArray(x) || x.length < 2 || x.length > MAX_SAIDAS) return null;
+  const ids = new Set<number>();
+  const out: SaidaRascunho[] = [];
+  for (const s of x) {
+    if (!s || typeof s !== 'object') return null;
+    const o = s as Record<string, unknown>;
+    if (typeof o.id !== 'number' || !Number.isInteger(o.id) || o.id < 1 || ids.has(o.id)) return null;
+    if (!str(o.qtd) || !str(o.preco) || !strOrNull(o.hora) || !str(o.res)) return null;
+    ids.add(o.id);
+    out.push({ id: o.id, qtd: o.qtd, preco: o.preco, hora: o.hora, res: o.res });
+  }
+  return out;
+}
+
+/**
  * A stored draft, when it has this shape and belongs to this account; else null. A v1 draft (3-3,
- * the same clientKey: C6) is read as v2 with the 3-4 fields at rest.
+ * the same clientKey: C6) is read with the 3-4 fields at rest, a v1 or v2 with the 3c fields at
+ * rest (one exit, the pill off); a v3 with rows that are not all well formed goes back to one exit.
  */
 export function lerRascunho(json: unknown, accountId: string): Rascunho | null {
   if (!json || typeof json !== 'object') return null;
   const r = json as Record<string, unknown>;
   const v1 =
-    (r.v === 1 || r.v === 2) &&
+    (r.v === 1 || r.v === 2 || r.v === 3) &&
     r.accountId === accountId &&
     str(r.clientKey) &&
     /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(r.clientKey) &&
@@ -400,7 +456,11 @@ export function lerRascunho(json: unknown, accountId: string): Rascunho | null {
     if (str(v) && MARCA_VALORES[k].includes(v)) marcas[k] = v;
   }
   const base = r.v === 1 ? { ...(r as object), ...NOVOS_CAMPOS } : { ...(r as object) };
-  return { ...(base as unknown as Rascunho), v: 2, marcas };
+  const c3 =
+    r.v === 3
+      ? { saidas: lerSaidas(r.saidas), be: r.be === true, bePreco: str(r.bePreco) ? r.bePreco : '' }
+      : CAMPOS_3C;
+  return { ...(base as unknown as Rascunho), v: 3, marcas, ...c3 };
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -409,9 +469,10 @@ export function lerRascunho(json: unknown, accountId: string): Rascunho | null {
 
 /**
  * What choosing another instrument, quote or kind clears (RO `limpar`, l.1081): never the exit hour
- * typed in «Já fechada», which 3-3 and the board keep
+ * typed in «Já fechada», which 3-3 and the board keep. 3c: also the rows («+ Outra saída») and
+ * «Movi o stop para o breakeven» with its price (they were in the old instrument's units).
  */
-const LIMPAR = { busca: '', preco: '', stop: '', alvo: '', precoSaida: '', res: '', corrigir: false, vsv: false } as const;
+const LIMPAR = { busca: '', preco: '', stop: '', alvo: '', precoSaida: '', res: '', corrigir: false, vsv: false, saidas: null, be: false, bePreco: '' } as const;
 
 /** The quantity kind's starting value for a draft (the last one used, else the first chip, else empty) */
 function qtdDoTipo(forma: FormaAtivo | null, padroes: RegistrarDefaults | null | undefined, market: AccountMarket): { qtd: string; qtdOutro: boolean } {
@@ -466,8 +527,17 @@ export function mudarTipoEua(r: Rascunho, tipoEua: TipoEua, padroes?: RegistrarD
 /** «Vencimento» changed: «Venceu sem valor» turns off and the exit it filled clears (RO l.1158) */
 export const mudarVencimento = (r: Rascunho, vencimento: string | null): Rascunho => ({ ...r, vencimento, vsv: false, precoSaida: '', horaSaida: null });
 
-/** «Venceu sem valor» on or off: the exit premium and hour follow it (0 at 16:00 ET) until typed over */
-export const alternarVsv = (r: Rascunho): Rascunho => ({ ...r, vsv: !r.vsv, precoSaida: '', horaSaida: null });
+/**
+ * «Venceu sem valor» on or off: the exit premium and hour follow it (0 at 16:00 ET) until typed
+ * over. 3c: with rows, it applies to the last one (RO js l.1257), whose premium and hour start over.
+ */
+export const alternarVsv = (r: Rascunho): Rascunho => ({
+  ...r,
+  vsv: !r.vsv,
+  precoSaida: '',
+  horaSaida: null,
+  ...(r.saidas ? { saidas: r.saidas.map((s, k, l) => (k === l.length - 1 ? { ...s, preco: '', hora: null } : s)) } : {}),
+});
 
 /**
  * «Corrigir» ↔ «Usar o calculado»: opening fills the field with the computed result
@@ -504,13 +574,13 @@ const curto = (x: number) => {
 /** A decimal text, up to two decimals, without trailing zeros («150», «5,5») */
 const curtoDec = (decimal: string, signed = false) => formatDecimal(plainText(round(numeric(decimal), 2)), { signed });
 
-/** 'dólar' / 'reais' (RO `moedaPal`) */
-const moedaPal = (currency: Currency) => (currency === 'BRL' ? RISCO.reais : RISCO.dolar);
+/** 'dólar' / 'reais' (RO `moedaPal`; exported in 3c for registrarSaidas) */
+export const moedaPal = (currency: Currency) => (currency === 'BRL' ? RISCO.reais : RISCO.dolar);
 
-/** Decimals of a decimal text as the reader gave it (trailing zeros already gone) */
-const casasDe = (decimal: string) => (decimal.includes('.') ? decimal.length - decimal.indexOf('.') - 1 : 0);
-/** Digits before the point */
-const inteirosDe = (decimal: string) => decimal.replace(/^-/, '').split('.')[0].replace(/^0+(?=\d)/, '').length;
+/** Decimals of a decimal text as the reader gave it (trailing zeros already gone; exported in 3c) */
+export const casasDe = (decimal: string) => (decimal.includes('.') ? decimal.length - decimal.indexOf('.') - 1 : 0);
+/** Digits before the point (exported in 3c) */
+export const inteirosDe = (decimal: string) => decimal.replace(/^-/, '').split('.')[0].replace(/^0+(?=\d)/, '').length;
 
 /** A field read as a positive decimal ('7896.25'), or why not */
 function positivo(text: string, ponto = false): { ok: true; value: string } | { ok: false; reason: 'empty' | 'invalid' | 'zero' } {
@@ -521,7 +591,8 @@ function positivo(text: string, ponto = false): { ok: true; value: string } | { 
   return { ok: true, value: n.value };
 }
 
-const naoMultiplo = (value: string, tick: string | null) => !!tick && !isMultipleOf(numeric(value), numeric(tick));
+/** Off the instrument's tick (exported in 3c) */
+export const naoMultiplo = (value: string, tick: string | null) => !!tick && !isMultipleOf(numeric(value), numeric(tick));
 
 /** The instrument of a symbol (3-3: the futures roots; 3-4: any market's) */
 export const instrumento = (market: MercadoReg, symbol: string): InstrumentSpec | null => tradeInstrument(market, symbol);
@@ -573,10 +644,11 @@ export function diferencaTexto(forma: FormaAtivo, dif: string): string {
 // The price markets' readers (the board's erroPreco, erroNivel, erroQ; the server's limits)
 // ---------------------------------------------------------------------------------------------
 
-type Lido = { value: string | null; erro?: string };
+/** A field read: its decimal value, or its error (exported in 3c with the readers below, for registrarSaidas) */
+export type Lido = { value: string | null; erro?: string };
 
 /** «Preço de entrada» / «de saída» (or «Prêmio»): empty, numbers, above zero (an option exits at 0), the tick, the decimals */
-function lerPrecoDe(forma: FormaAtivo, text: string, lado: 'entrada' | 'saída', zeroOk = false): Lido {
+export function lerPrecoDe(forma: FormaAtivo, text: string, lado: 'entrada' | 'saída', zeroOk = false): Lido {
   const oque = forma.unidadeStop === 'premio' ? 'prêmio' : 'preço';
   const n = lerNumero(text, { ponto: forma.pontoDecimal });
   if (!n.ok) return { value: null, erro: n.reason === 'empty' ? ERROS_PRECOS.vazio(oque, lado) : ERROS_PRECOS.numero(forma.exemplo) };
@@ -612,7 +684,7 @@ function lerNivel(forma: FormaAtivo, text: string, side: 'stop' | 'target', lado
 }
 
 /** The quantity: a chip, or the field (whole numbers, decimals, the server's digits) */
-function lerQuantidade(forma: FormaAtivo, r: Pick<Rascunho, 'qtd' | 'qtdOutro'>): Lido {
+export function lerQuantidade(forma: FormaAtivo, r: Pick<Rascunho, 'qtd' | 'qtdOutro'>): Lido {
   const q = forma.quantidade;
   if (q.chips && !r.qtdOutro) return q.chips.includes(r.qtd) ? { value: r.qtd } : { value: null, erro: ERROS.qtdVazia };
   const n = lerNumero(r.qtd);
@@ -628,7 +700,7 @@ function lerQuantidade(forma: FormaAtivo, r: Pick<Rascunho, 'qtd' | 'qtdOutro'>)
 }
 
 /** A typed result («Resultado, US$»; signed) or «Custos» (not signed): up to 16 digits and 2 decimals */
-function lerDinheiro(text: string, sinal: boolean): Lido & { vazio: boolean } {
+export function lerDinheiro(text: string, sinal: boolean): Lido & { vazio: boolean } {
   const n = lerNumero(text, { sinal });
   if (!n.ok) return { value: null, vazio: n.reason === 'empty', erro: n.reason === 'empty' ? undefined : sinal ? ERROS_PRECOS.resNumero : ERROS_PRECOS.custosNumero };
   if (inteirosDe(n.value) > 16) return { value: null, vazio: false, erro: sinal ? ERROS_PRECOS.resNumero : ERROS_PRECOS.custosNumero };
@@ -880,10 +952,22 @@ export type CampoEntrada =
   | 'strike'
   | 'venc'
   | 'res'
-  | 'custos';
+  | 'custos'
+  // 3c («Já fechada» in several exits): a row's quantity, price, hour and typed result
+  // (`s{id}q` … `s{id}r`), the rows' sum, «Preço quando moveu»
+  | CampoSaida
+  | 'soma'
+  | 'bePreco';
 
-/** The board's order for every price market (RO l.1064): where the focus goes on «Registrar» */
-export const ORDEM_PRECOS: readonly CampoEntrada[] = ['dia', 'opTipo', 'strike', 'venc', 'lado', 'q', 'preco', 'hora', 'spreco', 'shora', 'stop', 'alvo', 'res', 'custos'];
+/** 3c: a field of one «Já fechada» row (its id, then q · p · h · r): `s2q` → `f-s2q` */
+export type CampoSaida = `s${number}${'q' | 'p' | 'h' | 'r'}`;
+
+/**
+ * The board's order for every price market (RO l.1064; 3c js l.1278): where the focus goes on
+ * «Registrar». The rows' fields (`s{id}q`, `s{id}p`, `s{id}h`, `s{id}r`, row by row) go right
+ * before 'soma' (registrarSaidas.ordemComSaidas); 'soma' and 'bePreco' are set only there.
+ */
+export const ORDEM_PRECOS: readonly CampoEntrada[] = ['dia', 'opTipo', 'strike', 'venc', 'lado', 'q', 'preco', 'hora', 'spreco', 'shora', 'soma', 'stop', 'alvo', 'bePreco', 'res', 'custos'];
 /** 3-3's name for the price markets' order (futures never have the option, result or costs errors) */
 export const ORDEM_FUTUROS: readonly CampoEntrada[] = ORDEM_PRECOS;
 export const ORDEM_EBINEX: readonly CampoEntrada[] = ['dia', 'par', 'dir', 'exp', 'stake', 'payout', 'hora', 'fimB'];
@@ -990,6 +1074,15 @@ export interface ModeloEntrada {
   vsv: EstadoVsv | null;
   /** «Já fechada» of a price market: the result block */
   resultado: BlocoResultadoModelo | null;
+  // 3c (read by registrarSaidas.comSaidas and the step-1 rule line; null on binaries)
+  /** What the entry fields read without an error (decimal text; `hm` the entry's "HH:MM") */
+  lidos: { qtd: string | null; preco: string | null; stop: string | null; hm: string | null } | null;
+  /**
+   * «Já fechada» of a price market: what payloadFechada was built from (afterPayload's fields),
+   * when the form is complete. With rows (r.saidas), the entry part alone, as soon as it is
+   * complete: comSaidas adds the rows, the corrected total, «Custos» and «Preço quando moveu».
+   */
+  afterInput: AfterFields | null;
 }
 
 export interface EntradaInput {
@@ -1094,6 +1187,8 @@ export function modeloEntrada({ conta, r, now, hoje, tentou, padroes }: EntradaI
     linhaPosicao: null,
     vsv: null,
     resultado: null,
+    lidos: null,
+    afterInput: null,
   };
 
   if (bin) entradaBinaria(out, { conta, r, now, fechada, hm, entry, entryPrevia, marks });
@@ -1338,13 +1433,17 @@ function entradaPrecos(out: ModeloEntrada, x: Contexto & { hoje: string; tentou:
   const entrada = lerPrecoDe(forma, r.preco, 'entrada');
   if (entrada.erro) erros.preco = entrada.erro;
 
-  // «Já fechada»: the exit, «Venceu sem valor»
+  // «Já fechada»: the exit, «Venceu sem valor». 3c: with rows («+ Outra saída»), the single exit's
+  // fields are not on screen: registrarSaidas.comSaidas checks the rows instead
+  const linhas = fechada && !!r.saidas;
   let saida: Lido = { value: null };
   if (fechada) {
     if (opcao) out.vsv = estadoVsv(conta, r.vencimento, out.dia, hoje, r.vsv, now);
     const vsvLigado = !!out.vsv?.ligado;
     out.precoSaidaCampo = r.precoSaida !== '' ? r.precoSaida : vsvLigado ? '0' : '';
     out.horaSaidaCampo = r.horaSaida ?? (vsvLigado && out.vsv?.hora ? out.vsv.hora : hmOn(now, conta.clock));
+  }
+  if (fechada && !linhas) {
     saida = lerPrecoDe(forma, out.precoSaidaCampo, 'saída', opcao);
     if (saida.erro) erros.spreco = saida.erro;
     const shm = parseHhMm(out.horaSaidaCampo) === null ? null : formatHhMm(parseHhMm(out.horaSaidaCampo) as number);
@@ -1374,10 +1473,10 @@ function entradaPrecos(out: ModeloEntrada, x: Contexto & { hoje: string; tentou:
     out.linhaPosicao = PRECOS.posicao(compacto(total, forma.cotacao === 'R$' ? 'BRL' : 'USD'));
   }
 
-  // «Já fechada»: the result block
+  // «Já fechada»: the result block (with rows: comSaidas's, on the rows)
   let pnl: string | undefined;
   let costs: string | undefined;
-  if (fechada) {
+  if (fechada && !linhas) {
     const b = blocoResultado({
       conta,
       forma,
@@ -1420,8 +1519,18 @@ function entradaPrecos(out: ModeloEntrada, x: Contexto & { hoje: string; tentou:
     out.payload = entryPayload(market, { ...base, entry });
     out.payloadPrevia = entryPayload(market, { ...base, entry: entryPrevia });
   }
-  if (fechada && completo && !erros.dia && !erros.spreco && !erros.shora && !erros.res && !erros.custos && hm !== null) {
-    out.payloadFechada = afterPayload(market, { ...base, day: out.dia, entry: hm, exit: out.horaSaidaCampo, exitPrice: saida.value ?? undefined, pnl, costs });
+  out.lidos = {
+    qtd,
+    preco: entrada.value,
+    stop: stop.value && !stop.erro ? stop.value : null,
+    hm,
+  };
+  if (fechada && linhas && completo && !erros.dia && hm !== null) {
+    out.afterInput = { ...base, day: out.dia, entry: hm };
+  }
+  if (fechada && !linhas && completo && !erros.dia && !erros.spreco && !erros.shora && !erros.res && !erros.custos && hm !== null) {
+    out.afterInput = { ...base, day: out.dia, entry: hm, exit: out.horaSaidaCampo, exitPrice: saida.value ?? undefined, pnl, costs };
+    out.payloadFechada = afterPayload(market, out.afterInput);
   }
 }
 

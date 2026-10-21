@@ -5,11 +5,15 @@
  */
 import { parseRulesNow, type AccountNow } from '@/lib/hub/regras'
 import { padroesDoRegistrar } from '@/lib/hub/registrar'
+import * as form from '@/lib/hub/registrarForm'
 import {
+  ORDEM_PRECOS,
+  alternarVsv,
   avisoLimiteEntrada,
   cartaoFechada,
   contaReg,
   desdeTexto,
+  escolherAtivo,
   faixaJanelas,
   lerRascunho,
   linhaDepois,
@@ -19,6 +23,8 @@ import {
   modeloEntrada,
   modeloResultado,
   modeloSaida,
+  mudarCotacao,
+  mudarTipoEua,
   opTexto,
   periodo,
   quebrasDoGate,
@@ -29,6 +35,7 @@ import {
   textoQuebras,
   type ContaReg,
   type Rascunho,
+  type SaidaRascunho,
 } from '@/lib/hub/registrarForm'
 import type { MarkEvent } from '@/lib/domain/registro'
 import { agoraTelas, contasTelas, entradaTelas, estadoTelas, idsTelas, recentesTelas, saidaTelas, telasJson } from '@/testing/registrarTelas'
@@ -452,5 +459,101 @@ describe('the gate line, the limit line and step 3 (review)', () => {
     const m = (id: number, value: string, iso: string, limpa: boolean): MarkEvent => ({ id, kind: 'setup', value, markedAt: at(iso), limpa })
     const events = [m(1, 'A', '2026-10-22T23:10:20Z', true), m(2, 'B', '2026-10-22T23:12:10Z', false), m(3, 'A', '2026-10-22T23:12:40Z', false)]
     expect(marcasDivididas(ebx, events, at('2026-10-22T23:13:00Z'))).toEqual({ antes: [{ texto: 'Setup A', quando: 'às 20:10', historico: null }], depois: [] })
+  })
+})
+
+// -------------------------------------------------------------------------------------------------
+// Phase 3c · lane C2 (telas contract §6.1, §6.3, §8.2): the draft v3 («Já fechada» in several exits,
+// «Movi o stop para o breakeven»), LIMPAR, the order with the rows; the exports C1 and the frozen
+// files import (each named here, so removing one fails tsc)
+// -------------------------------------------------------------------------------------------------
+
+describe('3c · the draft v3', () => {
+  const linhas: SaidaRascunho[] = [
+    { id: 1, qtd: '1', preco: '4.409,30', hora: '10:31', res: '' },
+    { id: 2, qtd: '1', preco: '4.421,30', hora: null, res: '' },
+  ]
+
+  it('starts with one exit and the pill off; reads v1 and v2 with those at rest, v3 as stored', () => {
+    const r = rascunhoTop()
+    expect(r).toMatchObject({ v: 3, saidas: null, be: false, bePreco: '' })
+    const { saidas: _s, be: _b, bePreco: _p, ...v2 } = { ...r, saidas: linhas, be: true, bePreco: '4.409,30' }
+    expect(lerRascunho({ ...v2, v: 2 }, ids.accounts.topOne)).toEqual(r)
+    const { tipoEua: _t, cotacao: _c, busca: _bu, opTipo: _o, strike: _st, vencimento: _v, vsv: _x, res: _r, corrigir: _g, custos: _u, ...v1 } = v2
+    expect(lerRascunho({ ...v1, v: 1 }, ids.accounts.topOne)).toEqual(r)
+    const v3 = { ...r, modo: 'fechada' as const, saidas: linhas, be: true, bePreco: '4.409,30' }
+    expect(lerRascunho(JSON.parse(JSON.stringify(v3)), ids.accounts.topOne)).toEqual(v3)
+  })
+
+  it('a bad row set goes back to one exit, the rest of the draft kept', () => {
+    const v3 = { ...rascunhoTop(), modo: 'fechada' as const, saidas: linhas, be: true, bePreco: '1' }
+    const um = (saidas: unknown) => lerRascunho({ ...v3, saidas }, ids.accounts.topOne)
+    expect(um([linhas[0]])).toMatchObject({ saidas: null, be: true, bePreco: '1', modo: 'fechada' })
+    expect(um([linhas[0], { ...linhas[1], id: 1 }])?.saidas).toBeNull()
+    expect(um([linhas[0], { ...linhas[1], qtd: 2 }])?.saidas).toBeNull()
+    expect(um([linhas[0], { ...linhas[1], id: 0 }])?.saidas).toBeNull()
+    expect(um(Array.from({ length: 21 }, (_, k) => ({ ...linhas[1], id: k + 1 })))?.saidas).toBeNull()
+    expect(um('x')?.saidas).toBeNull()
+    expect(lerRascunho({ ...v3, be: 'sim', bePreco: 7 }, ids.accounts.topOne)).toMatchObject({ be: false, bePreco: '' })
+    expect(lerRascunho({ ...v3, v: 4 }, ids.accounts.topOne)).toBeNull()
+  })
+
+  it('another instrument, quote or kind clears the rows and the pill (LIMPAR); «Aberta» / «Já fechada» keeps them', () => {
+    const r = { ...rascunhoTop(), modo: 'fechada' as const, saidas: linhas, be: true, bePreco: '4.409,30' }
+    expect(escolherAtivo(r, 'futures', 'MES')).toMatchObject({ saidas: null, be: false, bePreco: '' })
+    expect(mudarCotacao(r, 'USDC')).toMatchObject({ saidas: null, be: false, bePreco: '' })
+    expect(mudarTipoEua(r, 'opcao')).toMatchObject({ saidas: null, be: false, bePreco: '' })
+    expect({ ...r, modo: 'aberta' }).toMatchObject({ saidas: linhas, be: true })
+    // «Venceu sem valor» with rows: the last row's premium and hour start over
+    expect(alternarVsv(r).saidas).toEqual([linhas[0], { ...linhas[1], preco: '', hora: null }])
+    expect(alternarVsv({ ...r, saidas: null }).saidas).toBeNull()
+  })
+
+  it('a row or the pill counts as something typed', () => {
+    const r = rascunhoTop()
+    expect(rascunhoMexido({ ...r, saidas: linhas }, r)).toBe(true)
+    expect(rascunhoMexido({ ...r, be: true }, r)).toBe(true)
+    expect(rascunhoMexido({ ...r, bePreco: '1' }, r)).toBe(true)
+  })
+
+  it('the order: the rows’ fields go before the sum, «Preço quando moveu» after «Alvo»', () => {
+    expect(ORDEM_PRECOS).toEqual(['dia', 'opTipo', 'strike', 'venc', 'lado', 'q', 'preco', 'hora', 'spreco', 'shora', 'soma', 'stop', 'alvo', 'bePreco', 'res', 'custos'])
+  })
+
+  it('with rows, modeloEntrada leaves the single exit’s checks, result and payload to registrarSaidas', () => {
+    const now = at('2026-10-22T14:31:05Z')
+    const r = rascunhoTop({ modo: 'fechada', ativo: 'MGC', lado: 'short', qtd: '2', preco: '4.421,30', hora: '10:24', stop: '15', saidas: linhas })
+    const m = modeloEntrada({ conta: top, r, now, hoje: '2026-10-22', tentou: true })
+    expect(m.erros.spreco).toBeUndefined()
+    expect(m.erros.shora).toBeUndefined()
+    expect(m.resultado).toBeNull()
+    expect(m.payloadFechada).toBeNull()
+    expect(m.lidos).toEqual({ qtd: '2', preco: '4421.3', stop: '15', hm: '10:24' })
+    expect(m.afterInput).toMatchObject({ symbol: 'MGC', direction: 'short', quantity: '2', entryPrice: '4421.3', stop: '15', day: '2026-10-22', entry: '10:24' })
+    expect(m.afterInput).not.toHaveProperty('exitPrice')
+    // One exit: as built, and afterInput is what payloadFechada was built from
+    const um = modeloEntrada({ conta: top, r: { ...r, saidas: null, precoSaida: '4.415,30', horaSaida: '10:30' }, now, hoje: '2026-10-22', tentou: true })
+    expect(um.payloadFechada).toMatchObject({ exit: '10:30', exit_price: '4415.3' })
+    expect(um.afterInput).toMatchObject({ exit: '10:30', exitPrice: '4415.3' })
+  })
+})
+
+describe('3c · the exports C1 and the frozen files import (contract §6.1)', () => {
+  it('are all still there', () => {
+    const valores = [
+      form.contaReg, form.hora, form.horaRel, form.sufixo, form.sufixoCampo, form.diaDe, form.diaRelativo, form.mercadoNovo, form.preco,
+      form.precoDe, form.diferencaTexto, form.centavos, form.instrumento, form.opTexto, form.ativoCurto, form.desdeTexto, form.linhaEscolha,
+      form.pontosDoStop, form.distanciaDoStop, form.resumoAberta, form.podeDesfazer, form.ORDEM_SAIDA, form.modeloSaida, form.modeloResultado,
+      form.periodo, form.cartaoFechada, form.textoAviso, form.textoDaRecusa, form.textoQuebras, form.MARCA_KINDS, form.MARCA_VALORES,
+      form.valorMarca, form.quandoMarca, form.chipMarca, form.marcasAtuais, form.marcasDivididas, form.linhaDepois, form.anuncioMarca,
+      form.indicador, form.avisoDesfeita, form.chaveRascunho, form.lerRascunho, form.rascunhoInicial, form.rascunhoMexido,
+    ]
+    type Tipos = [
+      form.ContaReg, form.SaidaCampos, form.ModeloSaida, form.CartaoFechada, form.MarcaKind, form.BlocoResultadoModelo, form.EstadoVsv,
+      form.ModeloAtivo, form.ModeloOpcao, form.TipoEua, form.ModeloEntrada, form.Rascunho,
+    ]
+    const tipos: Tipos | null = null
+    expect(tipos).toBeNull()
+    for (const v of valores) expect(v).toBeDefined()
   })
 })

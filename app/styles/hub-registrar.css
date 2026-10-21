@@ -608,3 +608,27 @@
     transition: none;
   }
 }
+
+/*
+ * 3c · Já fechada em várias saídas (RegistrarOperacao approved 21 Oct, RO l.384–398; contract §6.3,
+ * §6.7): each row is a dashed .hub-reg-editor card; its header «1ª saída» is the board's `.sub-rot`
+ * (12 px bold, --text-2 on --bg: the as-built pair) with «Remover» (.hub-reg-link, 44 px) at the
+ * right; the row's quantity is 120 px; price | hour is .hub-campos2 (one column ≤ 420 px, hub.css).
+ * The rows' sum is bold and sits 6 px closer to «+ Outra saída».
+ */
+.hub .hub-rs-rot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-2);
+}
+.hub .hub-reg .hub-rs-qtd {
+  max-width: 120px;
+}
+.hub .hub-rs-soma {
+  margin-top: -6px;
+  font-weight: 700;
+}

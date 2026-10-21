@@ -1,5 +1,6 @@
 'use client'
 
+import type { Rules } from '@/lib/domain/gate'
 import type { RegistrarDefaults } from '@/lib/hub/registrar'
 import {
   alternarVsv,
@@ -9,21 +10,30 @@ import {
   mudarVencimento,
   type CampoEntrada,
   type ContaReg,
-  type ModeloEntrada,
   type Rascunho,
 } from '@/lib/hub/registrarForm'
+import { linhaRegra, regraDoAtivo } from '@/lib/hub/registrarRegra'
+import { mudarSaida, outraSaida, removerSaida, type ModeloSaidas } from '@/lib/hub/registrarSaidas'
 import BlocoOpcao from './BlocoOpcao'
 import BuscaAtivo, { focarAtivoEscolhido } from './BuscaAtivo'
 import CotadaEm from './CotadaEm'
 import { FUTUROS } from './copy'
+import MoviBreakeven from './MoviBreakeven'
 import OQueOperou from './OQueOperou'
+import SaidasJaFechada from './SaidasJaFechada'
 import { CampoTexto, Erro, GrupoPills, descrito } from './ui'
 import VenceuSemValor from './VenceuSemValor'
 
 export interface CamposPrecosProps {
   conta: ContaReg
   r: Rascunho
-  m: ModeloEntrada
+  /** modeloEntrada's answer with «Já fechada»'s rows and pill (registrarSaidas.comSaidas) */
+  m: ModeloSaidas
+  /**
+   * 3c: the account's current rules (rules_now's version), for «Sua regra: breakeven com +8 pts,
+   * em 7.920,50.» under the risk line in «Aberta» (E1); null while unknown
+   */
+  rules: Rules | null
   /** Errors on screen (local, or the server's refusal of a field) */
   erros: Partial<Record<CampoEntrada, string>>
   /** A patch of the draft (a whole draft from registrarForm's transitions), and where the focus goes */
@@ -58,12 +68,23 @@ function errosDaOpcao(erros: Partial<Record<CampoEntrada, string>>): Partial<Rec
  * saída», then «Stop e alvo, em pontos / pips / preço» or «do prêmio», the risk line, «Posição de …»
  * and the limit warning. Everything shown comes from registrarForm.modeloEntrada; the draft moves
  * through its transitions (escolherAtivo, mudarCotacao, mudarTipoEua, mudarVencimento, alternarVsv).
+ *
+ * Phase 3c (contract §6.2–6.4): in «Aberta», «Sua regra: breakeven com …» after the risk line (E1,
+ * `#n-regra`, a plain note); in «Já fechada», «+ Outra saída» and the rows in place of the single
+ * exit (SaidasJaFechada, E2–E6), and after the limit warning «Movi o stop para o breakeven» (E10–E11,
+ * only with a valid stop), from registrarSaidas.comSaidas's model.
  */
-export default function CamposPrecos({ conta, r, m, erros, mudar, aviso, padroes, aoRecomecar }: CamposPrecosProps) {
+export default function CamposPrecos({ conta, r, m, rules, erros, mudar, aviso, padroes, aoRecomecar }: CamposPrecosProps) {
   const market = conta.market
   const fechada = r.modo === 'fechada'
   const q = m.quantidade
   const rot = m.rotulos
+  // E1: the rule of the account's current version for the chosen asset (its price once the side and
+  // a valid entry price are known), «Aberta» only
+  const regra =
+    !fechada && m.forma
+      ? regraDoAtivo(rules, m.forma.simbolo, { option: m.forma.tipo === 'opcao', direction: r.lado, entryPrice: m.lidos?.preco ?? null })
+      : null
 
   /** A chip, a search result or «Usar»: the same instrument only empties the search */
   const escolher = (codigo: string, daBusca: boolean) => {
@@ -171,10 +192,25 @@ export default function CamposPrecos({ conta, r, m, erros, mudar, aviso, padroes
               }}
             />
           )}
-          <div className="hub-campos2">
-            <CampoTexto id="f-spreco" rotulo={rot?.precoSaida} valor={m.precoSaidaCampo} decimal aoMudar={(v) => mudar({ precoSaida: v })} erro={erros.spreco} />
-            <CampoTexto id="f-shora" rotulo={rot?.horaSaida} valor={m.horaSaidaCampo} tipo="time" aoMudar={(v) => mudar({ horaSaida: v })} erro={erros.shora} />
-          </div>
+          {!m.saidas && (
+            <div className="hub-campos2">
+              <CampoTexto id="f-spreco" rotulo={rot?.precoSaida} valor={m.precoSaidaCampo} decimal aoMudar={(v) => mudar({ precoSaida: v })} erro={erros.spreco} />
+              <CampoTexto id="f-shora" rotulo={rot?.horaSaida} valor={m.horaSaidaCampo} tipo="time" aoMudar={(v) => mudar({ horaSaida: v })} erro={erros.shora} />
+            </div>
+          )}
+          <SaidasJaFechada
+            m={m}
+            rotulos={rot}
+            aoOutra={() => {
+              const x = outraSaida(r)
+              if (x) mudar(x.r, x.foco)
+            }}
+            aoRemover={(id) => {
+              const x = removerSaida(r, id)
+              mudar(x.r, x.foco)
+            }}
+            aoMudar={(id, campo, valor) => mudar(mudarSaida(r, id, campo, valor))}
+          />
         </>
       )}
       <div className="hub-campo">
@@ -196,6 +232,11 @@ export default function CamposPrecos({ conta, r, m, erros, mudar, aviso, padroes
         <span id="n-risco" className="hub-nota hub-num">
           {m.linhaRisco}
         </span>
+        {regra && (
+          <span id="n-regra" className="hub-nota">
+            {linhaRegra(m.forma, regra)}
+          </span>
+        )}
         {m.linhaPosicao && (
           <span id="n-pos" className="hub-nota hub-num">
             {m.linhaPosicao}
@@ -206,6 +247,13 @@ export default function CamposPrecos({ conta, r, m, erros, mudar, aviso, padroes
           {aviso ?? ''}
         </p>
       </div>
+      {m.be && (
+        <MoviBreakeven
+          be={{ ...m.be, erro: erros.bePreco ?? null }}
+          aoAlternar={() => mudar({ be: !r.be }, r.be ? undefined : 'f-bePreco')}
+          aoMudar={(v) => mudar({ bePreco: v })}
+        />
+      )}
     </>
   )
 }

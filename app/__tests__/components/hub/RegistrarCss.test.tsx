@@ -306,4 +306,19 @@ describe('the 3-4 fields of the price markets (contract 3-4 §5.11)', () => {
     const grupo = container.querySelector('[role="group"]') as HTMLElement
     expect(vencedora(grupo, 'flex-wrap', PHONE)?.valor).toBe('wrap')
   })
+
+  // Phase 3c · lane C2 (contract §6.3, §6.7): «Já fechada» in several exits
+  it('3c: the row header is the board’s `.sub-rot` (12 px bold, --text-2), the row’s quantity 120 px, the sum bold 6 px up', () => {
+    const rot = regra('.hub .hub-rs-rot')
+    expect(rot.getPropertyValue('font-size')).toBe('12px')
+    expect(rot.getPropertyValue('font-weight')).toBe('700')
+    expect(rot.getPropertyValue('color')).toBe('var(--text-2)')
+    expect(regra('.hub .hub-reg .hub-rs-qtd').getPropertyValue('max-width')).toBe('120px')
+    const soma = regra('.hub .hub-rs-soma')
+    expect(soma.getPropertyValue('margin-top')).toBe('-6px')
+    expect(soma.getPropertyValue('font-weight')).toBe('700')
+    // «+ Outra saída» and «Remover» are .hub-reg-link (44 px), the row a dashed .hub-reg-editor card
+    expect(regra('.hub .hub-reg-link').getPropertyValue('min-height')).toBe('44px')
+    expect(regra('.hub .hub-reg-editor').getPropertyValue('border')).toContain('dashed')
+  })
 })
