@@ -37,9 +37,13 @@ export default function LinhaDoTempo({ itens, undo, focoLink }: { itens: readonl
   useEffect(() => {
     if (aberto) simRef.current?.focus()
   }, [aberto])
-  // «Manter» (or a closed confirmation the owner asked to leave) gives the focus back to the link
+  // «Manter» gives the focus back to the link: each new `focoLink` once (never at mount: a timeline
+  // that appears again after an undo and a new partial leaves the focus where the step put it)
+  const focoVisto = useRef(focoLink)
   useEffect(() => {
-    if (focoLink) linkRef.current?.focus()
+    if (!focoLink || focoLink === focoVisto.current) return
+    focoVisto.current = focoLink
+    linkRef.current?.focus()
   }, [focoLink])
   const doEvento = (x: ItemTempo) => !!undo && !!x.evento && x.evento.kind === undo.evento.kind && x.evento.id === undo.evento.id
   return (
