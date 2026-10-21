@@ -91,6 +91,17 @@ export interface StopMove {
 const n = (x: string): Numeric => numeric(x);
 const t = (x: Numeric): string => plainText(x);
 const ZERO = numeric('0');
+const tOrNull = (x: string | null): string | null => (x === null ? null : t(n(x)));
+
+/** An exit's result without trailing zeros, as the data layer reads the database's answer */
+export const plainExit = (x: ExitResult): ExitResult => ({
+  exitPrice: tOrNull(x.exitPrice),
+  pnl: t(n(x.pnl)),
+  pnlBasis: x.pnlBasis,
+  result: x.result,
+  commission: tOrNull(x.commission),
+  points: tOrNull(x.points),
+});
 
 /** trade_exits_v.counts for every row of one trade: its file rows when it has any, else its app rows not undone */
 export function exitCounts(exits: readonly Pick<TradeExit, 'origin' | 'voidedAt'>[]): boolean[] {
@@ -417,7 +428,7 @@ export function validatePartial(
     ok: true,
     quantity: plainText(qty),
     openAfter: plainText(sub(sub(position, done), qty)),
-    exit: { exitPrice: x.exitPrice, pnl: x.pnl, pnlBasis: x.pnlBasis, result: x.result, commission: x.commission, points: x.points },
+    exit: plainExit(x),
     exitAt: at.at,
   };
 }
@@ -467,16 +478,7 @@ export function afterExits(
     prev = at;
     const x = parseExit(spec, it, entry.sgn, plainText(q), entry.entryPrice ?? '0', null);
     if (!x.ok) return refuse(x.code, 'exits');
-    out.push({
-      quantity: plainText(q),
-      exitAt: at,
-      exitPrice: x.exitPrice,
-      pnl: x.pnl,
-      pnlBasis: x.pnlBasis,
-      result: x.result,
-      commission: x.commission,
-      points: x.points,
-    });
+    out.push({ quantity: plainText(q), exitAt: at, ...plainExit(x) });
     qsum = add(qsum, q);
   }
   if (cmp(qsum, n(entry.quantity)) !== 0) return refuse('bad_quantity', 'exits');

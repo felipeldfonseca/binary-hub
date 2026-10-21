@@ -120,7 +120,10 @@ export interface MoveTrade {
 
 /** The move move_stop would store */
 export interface MoveResult {
-  /** Stored 'breakeven' for the shortcut, and for «Outro preço» exactly at the entry */
+  /**
+   * Stored 'breakeven' for the shortcut, and for «Outro preço» exactly at the entry with «Preço
+   * agora» (a breakeven move always carries the price: trade_stop_moves' check); else 'ajuste'
+   */
   kind: 'breakeven' | 'ajuste';
   stopPrice: string;
   /** The stop before it: the newest move not undone, else the initial stop */
@@ -188,7 +191,9 @@ export function validateMove(tr: MoveTrade, moves: readonly Pick<StopMove, 'id' 
 
   return {
     ok: true,
-    kind: be || cmp(lvl, n(tr.entryPrice)) === 0 ? 'breakeven' : 'ajuste',
+    // «Outro preço» at the entry without «Preço agora» stays an «ajuste»: the table keeps a
+    // breakeven only with its price (20261023000002: kind = 'ajuste' or price_now is not null)
+    kind: be || (px !== null && cmp(lvl, n(tr.entryPrice)) === 0) ? 'breakeven' : 'ajuste',
     stopPrice: t(lvl),
     prevStop: prev === null ? null : t(n(prev)),
     priceNow: px && t(px),

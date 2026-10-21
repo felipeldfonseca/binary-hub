@@ -538,11 +538,6 @@ function parseBreakeven(x: unknown): TradeBreakeven | null {
   return { key: str(b.key), n: dec(b.n, PRICE), un: oneOf(b.un, UNITS), level: decOrNull(b.level, PRICE) };
 }
 
-/** A trade's position from its rows (the domain's twin of trade_state's), for the tables and old answers */
-function positionFrom(trade: RegisteredTrade, exits: TradeExit[], moves: StopMove[], origin: StoredContext['origin'] | null, now: Date | null): Position {
-  return positionOf(trade, exits, moves, origin, now);
-}
-
 /** trade_state(): every answer that names a trade carries it */
 export function parseTradeState(json: unknown): TradeState {
   const s = obj(json);
@@ -573,7 +568,7 @@ export function parseTradeState(json: unknown): TradeState {
     images: list(s.images, parseImage),
     exits,
     stopMoves,
-    position: s.position === undefined ? positionFrom(trade, exits, stopMoves, context?.origin ?? null, serverNow) : parsePosition(s.position),
+    position: s.position === undefined ? positionOf(trade, exits, stopMoves, context?.origin ?? null, serverNow) : parsePosition(s.position),
     breakeven: parseBreakeven(s.breakeven),
   };
 }
@@ -1205,7 +1200,7 @@ export function tradeViewOfRows(rows: TradeViewRows): TradeView {
       images: list(rows.images ?? [], parseImage),
       exits,
       stopMoves,
-      position: positionFrom(trade, exits, stopMoves, context?.origin ?? null, null),
+      position: positionOf(trade, exits, stopMoves, context?.origin ?? null, null),
       breakeven: breakevenOfVersion(rows.version, trade),
     };
   }, null);

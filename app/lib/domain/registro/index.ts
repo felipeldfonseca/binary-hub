@@ -15,7 +15,8 @@
  *   horario    the entry, exit and «Já fechada» instants, the binary expiry, «Desfazer entrada»
  *   marcas     resultKnownAt, isClean («limpa»), marksNow, entryPlanOf (the plan of a stored context)
  *   match      the import's one-to-one link of file rows to app trades, what a link writes,
- *              similar imports
+ *              similar imports (Phase 3 only: a broker position in several rows, Phase 3c, is
+ *              grouped and linked by the database alone)
  *   validar    a whole register_* check in the database's order
  *   montar     the payloads from the form's values
  *   numeric    Postgres numeric arithmetic (scales, rounding, division)
@@ -211,6 +212,7 @@ export {
   lastEvent,
   lastExitPnl,
   partialQuantityError,
+  plainExit,
   positionOf,
   rOfExits,
   sortExitsByHour,
