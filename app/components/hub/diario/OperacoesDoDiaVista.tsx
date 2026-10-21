@@ -142,6 +142,7 @@ function Linha({ linha, onAbrir }: { linha: LinhaDoDia; onAbrir: (tradeId: strin
             <Clipe label={linha.clip} />
           </>
         )}
+        {linha.sub && <span className="hub-ops-dia__sub">{linha.sub}</span>}
       </span>
       <span role="cell" className="hub-ops-dia__res">
         {linha.resultado ? (

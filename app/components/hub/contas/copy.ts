@@ -552,6 +552,14 @@ export const PASSO_D = {
   zoneFor: (zone: string, label: string) => `Fuso do arquivo: ${zone} · lembrado para ${label}`,
   importN: (count: number) => (count === 1 ? 'Importar 1 operação' : `Importar ${formatInt(count)} operações`),
   completeN: (count: number) => (count === 1 ? 'Completar 1 operação' : `Completar ${formatInt(count)} operações`), // NEW
+  // NEW (Fase 3c, §5.12: not on the 3c boards): a file with partial exits (rows of one broker
+  // position). Rows that are another row's trade's exits, and rows that join a trade already there
+  agrupadas: (count: number) =>
+    count === 1 ? '1 saída parcial juntada à sua operação.' : `${formatInt(count)} saídas parciais juntadas às suas operações.`,
+  anexadas: (count: number) =>
+    count === 1 ? '1 saída a mais de uma operação que já estava.' : `${formatInt(count)} saídas a mais de operações que já estavam.`,
+  // NEW (Fase 3c): the primary of a file that only adds rows to trades already in the account
+  juntarN: (count: number) => (count === 1 ? 'Juntar 1 saída' : `Juntar ${formatInt(count)} saídas`),
 }
 
 /** «Linha n: …» reasons, by error code. NEW (suggested in the parsers spec; the board only has "data vazia"). */
@@ -602,6 +610,11 @@ export const FIM = {
   // NEW (Fase 3, D29): the trades registered in the app that this file completed
   linked: (count: number) =>
     count === 1 ? '1 já registrada por você foi completada.' : `${formatInt(count)} já registradas por você foram completadas.`,
+  // NEW (Fase 3c, §5.12): a file with partial exits
+  agrupadas: (count: number) =>
+    count === 1 ? '1 saída parcial foi juntada à sua operação.' : `${formatInt(count)} saídas parciais foram juntadas às suas operações.`,
+  anexadas: (count: number) =>
+    count === 1 ? '1 saída a mais entrou numa operação que já estava.' : `${formatInt(count)} saídas a mais entraram em operações que já estavam.`,
   undoLater: 'Desfazer depois: Personalizar › Suas contas › Importações.', // ADAPTED: "› Editar." had no destination
   toast: (count: number, label: string) => `${ops(count)} em ${label}.`,
   created: (label: string) => `${label} criada.`,

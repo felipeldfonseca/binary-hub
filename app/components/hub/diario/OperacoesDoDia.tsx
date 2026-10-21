@@ -4,7 +4,7 @@ import { useMemo } from 'react'
 import { MARKET_SPEC, type AccountMarket } from '@/lib/domain/markets'
 import { useContaAtual } from '@/hooks/useContas'
 import { useRulesNow } from '@/hooks/useRegras'
-import { useDayTrades, useServerNow } from '@/hooks/useRegistrar'
+import { useDayTrades, useServerNow, useTradeEvents } from '@/hooks/useRegistrar'
 import { diaDeHoje, podeRegistrar } from '@/lib/hub/registrar'
 import type { RulesNow } from '@/lib/hub/regras'
 import { rulesNowFailed } from '@/components/hub/posso/rulesNowRead'
@@ -53,6 +53,9 @@ export default function OperacoesDoDia() {
   const day = current ? diaDaPonte(rulesNow.data, failed, current, serverNow) : null
   const account = useMemo(() => (current ? { id: current.id, market: current.market } : null), [current])
   const dia = useDayTrades(account, day)
+  // Phase 3c: the rows' exits and stop moves (the second line); none on binaries
+  const ids = useMemo(() => (current && current.market !== 'binary' && dia.data ? dia.data.map((d) => d.trade.id) : null), [current, dia.data])
+  const eventos = useTradeEvents(ids)
 
   // The table's HH:MM: the account's window clock (its market's by default: ET on Futuros, Forex
   // and Ações; Brasília on Ebinex, Cripto and B3)
@@ -65,7 +68,7 @@ export default function OperacoesDoDia() {
   if (!current || !tz) return null
 
   let estado: EstadoDoDia
-  if (dia.data && day) estado = { status: 'ready', linhas: linhasDoDia(dia.data, { market: current.market, day, tz }) }
+  if (dia.data && day) estado = { status: 'ready', linhas: linhasDoDia(dia.data, { market: current.market, day, tz }, eventos.data ?? null) }
   else if (dia.isError) estado = { status: 'error' }
   else if (dia.fetchStatus === 'paused') estado = { status: 'offline' }
   else estado = { status: 'loading' }

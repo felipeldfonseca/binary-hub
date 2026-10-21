@@ -29,6 +29,18 @@ import { registrarKeys } from '@/hooks/useRegistrar'
 import type { RulesNow } from '@/lib/hub/regras'
 import { agoraTelas, contasTelas, diaRowsTelas, diaTelas, idsTelas } from '@/testing/registrarTelas'
 import { agoraMercados, contasMercados, diaMercados, diaRowsMercados, idsMercados } from '@/testing/registrarMercados'
+import { idsParciais } from '@/testing/parciais'
+import {
+  agoraParciais,
+  comMovimento,
+  contasParciais,
+  diaDeEstados,
+  estadoJson,
+  etEm,
+  eventosDeEstados,
+  mnqFechadaS14,
+  stopParciais,
+} from '@/testing/parciaisTelas'
 
 jest.mock('@/lib/supabase', () => ({ createDataClient: jest.fn(() => ({})) }))
 
@@ -73,6 +85,7 @@ jest.mock('@/lib/hub/regrasDb', () => ({
 jest.mock('@/lib/hub/registrarDb', () => ({
   ...jest.requireActual('@/lib/hub/registrarDb'),
   fetchDayTrades: jest.fn(),
+  fetchTradeEvents: jest.fn(),
 }))
 
 // The Registrar sheet is lane A's (contract §6.2, C9): a stand-in that shows the props it got
@@ -106,6 +119,7 @@ const fetchImportFormats = contasDb.fetchImportFormats as jest.MockedFunction<ty
 const fetchRulesNow = regrasDb.fetchRulesNow as jest.MockedFunction<typeof regrasDb.fetchRulesNow>
 const mergePreferences = regrasDb.mergePreferences as jest.MockedFunction<typeof regrasDb.mergePreferences>
 const fetchDayTrades = registrarDb.fetchDayTrades as jest.MockedFunction<typeof registrarDb.fetchDayTrades>
+const fetchTradeEvents = registrarDb.fetchTradeEvents as jest.MockedFunction<typeof registrarDb.fetchTradeEvents>
 
 const ids = idsTelas()
 
@@ -119,6 +133,8 @@ beforeEach(() => {
   fetchRulesNow.mockReset().mockResolvedValue(agoraTelas('agora-qui-1031-et'))
   mergePreferences.mockReset().mockImplementation(async (_db, patch) => ({ ...patch }) as contasDb.HubPreferences)
   fetchDayTrades.mockReset().mockResolvedValue(diaTelas('dia-qui-1031'))
+  // Phase 3c: the rows' exits and stop moves (none in the 3-3 recordings: no second line)
+  fetchTradeEvents.mockReset().mockResolvedValue({})
 })
 
 afterEach(() => {
@@ -698,5 +714,73 @@ describe('hub-operacoes-dia.css', () => {
     expect(value('', '.hub .hub-pz-chave', 'width')).toBe('56px')
     expect(value('', '.hub .hub-pz-chave', 'min-height')).toBe('44px')
     expect(value('(prefers-reduced-motion: reduce)', '.hub .hub-pz-chave__tr::after', 'transition')).toBe('none')
+  })
+})
+
+describe('«Operações do dia» · the second line (Phase 3c; RO l.282, js l.2193–2199)', () => {
+  const ids3c = idsParciais()
+  const mnq = () => mnqFechadaS14()
+  const mesBe = () => stopParciais('stop-mes-breakeven').state
+  beforeEach(() => {
+    fetchAccounts.mockResolvedValue(contasParciais())
+    fetchRulesNow.mockResolvedValue(agoraParciais('dia-top-1018', { iso: etEm('10:19') }))
+  })
+  const sub = (region: HTMLElement, op: string) => within(region).getByText(op, { exact: false }).closest('[role="cell"]')?.querySelector('.hub-ops-dia__sub')?.textContent?.replace(/\u00a0/g, ' ') ?? null
+
+  it('open: «1 parcial, +US$ 40,00 · stop no breakeven»; closed in two exits: «em 2 saídas»; inside the «Operação» cell, the action’s aria unchanged', async () => {
+    fetchDayTrades.mockResolvedValue(diaDeEstados(mnq(), mesBe()))
+    fetchTradeEvents.mockResolvedValue(eventosDeEstados(mnq(), mesBe()))
+    renderHub(<OperacoesDoDia />)
+    const region = await ponte()
+    await within(region).findByText('1 parcial, +US$ 40,00 · stop no breakeven')
+    expect(sub(region, 'MES · Compra')).toBe('1 parcial, +US$ 40,00 · stop no breakeven')
+    expect(sub(region, 'MNQ · Venda')).toBe('em 2 saídas')
+    const el = within(region).getByText('em 2 saídas')
+    expect(el).toHaveClass('hub-ops-dia__sub')
+    expect(el.closest('[role="cell"]')).toHaveClass('hub-ops-dia__op')
+    expect(within(region).getByRole('button', { name: 'Registrar saída: Compra de MES às 10:12' })).toBeInTheDocument()
+    expect(within(region).getByRole('button', { name: 'Abrir no Registrar: Venda de MNQ às 10:01' })).toBeInTheDocument()
+    expect(fetchTradeEvents).toHaveBeenCalledWith(expect.anything(), [mnq().trade.id, ids3c.trades.mes].sort())
+  })
+
+  it('the stop part names only the current move: a breakeven at 10:19 then 7.915,00 at 10:30 → «stop movido»', async () => {
+    const depois = comMovimento(estadoJson('stop-mes-breakeven'), 'futures', {
+      id: 9,
+      at: etEm('10:30', 4),
+      payload: { v: 1, client_key: '00000000-0000-4000-8000-000000000007', kind: 'ajuste', stop_price: '7915', price_now: '7923.5' },
+    }).state
+    fetchDayTrades.mockResolvedValue(diaDeEstados(depois))
+    fetchTradeEvents.mockResolvedValue(eventosDeEstados(depois))
+    renderHub(<OperacoesDoDia />)
+    const region = await ponte()
+    expect(await within(region).findByText('1 parcial, +US$ 40,00 · stop movido')).toBeInTheDocument()
+  })
+
+  it('no second line while the exits are read, nor when the read fails (never a spinner or an error there)', async () => {
+    fetchDayTrades.mockResolvedValue(diaDeEstados(mnq(), mesBe()))
+    fetchTradeEvents.mockImplementation(() => new Promise(() => undefined))
+    const { unmount } = renderHub(<OperacoesDoDia />)
+    let region = await ponte()
+    await within(region).findByRole('table')
+    expect(region.querySelector('.hub-ops-dia__sub')).toBeNull()
+    unmount()
+    fetchTradeEvents.mockRejectedValue(new RegistrarDataError('network'))
+    renderHub(<OperacoesDoDia />)
+    region = await ponte()
+    await within(region).findByRole('table')
+    await waitFor(() => expect(fetchTradeEvents).toHaveBeenCalledTimes(2))
+    expect(region.querySelector('.hub-ops-dia__sub')).toBeNull()
+    expect(within(region).queryByRole('alert')).not.toBeInTheDocument()
+  })
+
+  it('binaries ask for no exits', async () => {
+    fetchAccounts.mockResolvedValue(contasTelas())
+    fetchRulesNow.mockResolvedValue(agoraTelas('agora-qui-2024-brt'))
+    fetchDayTrades.mockResolvedValue(diaTelas('dia-ebinex'))
+    mockSearch = `conta=${ids.accounts.ebinex}`
+    renderHub(<OperacoesDoDia />)
+    const region = await ponte()
+    await within(region).findByRole('table')
+    expect(fetchTradeEvents).not.toHaveBeenCalled()
   })
 })
