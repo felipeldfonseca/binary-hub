@@ -17,17 +17,25 @@ import {
   useExitPreview,
   useGateAt,
   useImageTrashSweep,
+  useMoveStop,
   useOpenTrades,
   useRegisterAfter,
   useRegisterEntry,
   useRegisterExit,
+  useRegisterPartial,
   useRegistrarDefaults,
+  useTradeEvents,
+  useUndoEvent,
   useSaveImagesAndNote,
   useServerClock,
   useServerNow,
   useTradeView,
   useUndoEntry,
 } from '@/hooks/useRegistrar'
+import * as regrasDb from '@/lib/hub/regrasDb'
+import { movePayload, partialPayload, undoEventPayload } from '@/lib/domain/registro'
+import { idsParciais } from '@/testing/parciais'
+import { agoraParciais, desfeitaMnq, eventosRows, estadoJson, parcialMnq, parcialParciais, stopParciais } from '@/testing/parciaisTelas'
 import { newClientKey } from '@/lib/hub/registrarDb'
 import { entryPayload, entryPayload as buildEntry, exitPayload, afterPayload, type EntryPayload } from '@/lib/domain/registro'
 import {
@@ -65,7 +73,13 @@ jest.mock('@/lib/hub/registrarDb', () => ({
   addMarks: jest.fn(),
   undoEntry: jest.fn(),
   drainImageTrash: jest.fn(),
+  registerPartial: jest.fn(),
+  moveStop: jest.fn(),
+  undoEvent: jest.fn(),
+  fetchTradeEvents: jest.fn(),
 }))
+
+jest.mock('@/lib/hub/regrasDb', () => ({ ...jest.requireActual('@/lib/hub/regrasDb'), fetchRulesNow: jest.fn() }))
 
 jest.mock('@/lib/hub/registrarImagens', () => ({
   ...jest.requireActual('@/lib/hub/registrarImagens'),
@@ -111,6 +125,7 @@ describe('cache keys and what each write makes stale', () => {
       registrarKeys.recentes('u', 'a'),
       registrarKeys.previa('u', 'entrada', 'a', '{}'),
       registrarKeys.relogio('u'),
+      registrarKeys.eventos('u', 'a,b'),
     ]) {
       expect(key.slice(0, 2)).toEqual(hubKeys.all('u'))
     }
@@ -120,11 +135,15 @@ describe('cache keys and what each write makes stale', () => {
   it('names the caches per write (never rules_config: it reads no trade)', () => {
     expect(REGISTRAR_INVALIDATIONS).toEqual({
       entrada: ['abertas', 'dia', 'recentes', 'previa', 'regrasAgora', 'atividade', 'paginasAntigas'],
-      saida: ['abertas', 'dia', 'previa', 'regrasAgora', 'paginasAntigas'],
-      fechada: ['dia', 'recentes', 'previa', 'regrasAgora', 'atividade', 'paginasAntigas'],
-      desfazer: ['abertas', 'dia', 'recentes', 'previa', 'regrasAgora', 'atividade', 'paginasAntigas'],
+      saida: ['abertas', 'dia', 'eventos', 'previa', 'regrasAgora', 'paginasAntigas'],
+      fechada: ['dia', 'eventos', 'recentes', 'previa', 'regrasAgora', 'atividade', 'paginasAntigas'],
+      desfazer: ['abertas', 'dia', 'eventos', 'recentes', 'previa', 'regrasAgora', 'atividade', 'paginasAntigas'],
       marcas: [],
       extras: ['dia'],
+      // Phase 3c: a partial counts on the day's limit; a move changes no money; an event undone leaves the limit
+      parcial: ['abertas', 'dia', 'eventos', 'previa', 'regrasAgora'],
+      stop: ['dia', 'eventos', 'previa'],
+      evento: ['abertas', 'dia', 'eventos', 'previa', 'regrasAgora'],
     })
   })
 
@@ -135,6 +154,8 @@ describe('cache keys and what each write makes stale', () => {
     expect(spy.mock.calls.map(([f]) => f)).toEqual([
       { queryKey: ['hub', 'u', 'registrar', 'abertas'] },
       { queryKey: ['hub', 'u', 'registrar', 'dia'] },
+      // Phase 3c: the exits and moves the chooser and the bridge read
+      { queryKey: ['hub', 'u', 'registrar', 'eventos'] },
       // The dry runs only go stale: the one on screen is not asked again about what was just written
       { queryKey: ['hub', 'u', 'registrar', 'previa'], refetchType: 'none' },
       { queryKey: regrasKeys.agora('u') },
@@ -374,6 +395,106 @@ describe('writes', () => {
     expect(queryClient.getQueryData(registrarKeys.operacao('user-1', 'es-1'))).toBeNull()
     expect(saveImagesAndNote).toHaveBeenCalledWith(expect.anything(), ids.trades.mes, { items: [], note: 'x' }, { onProgress: undefined })
     expect(queryClient.getQueryData(registrarKeys.operacao('user-1', ids.trades.mes))).toMatchObject({ trade: { note: 'Saí no stop: o rompimento não confirmou.' } })
+  })
+})
+
+describe('Phase 3c writes and reads', () => {
+  const ids3c = idsParciais()
+  const fetchRulesNow = regrasDb.fetchRulesNow as jest.MockedFunction<typeof regrasDb.fetchRulesNow>
+
+  it('«Registrar parcial»: the limit before it (cached rules_now), the answer as the trade’s view, the lists and the limit stale', async () => {
+    db.registerPartial.mockResolvedValue(parcialParciais('partial-mes'))
+    const { queryClient, wrapper } = setup()
+    queryClient.setQueryData(regrasKeys.agora('user-1'), agoraParciais('agora-sex-0900'))
+    const spy = jest.spyOn(queryClient, 'invalidateQueries')
+    const { result } = renderHook(() => useRegisterPartial(), { wrapper })
+    const payload = partialPayload({ clientKey: newClientKey(), quantity: '1', exitPrice: '7920.5', clock: 'America/New_York' })
+    let done: Awaited<ReturnType<typeof result.current.mutateAsync>> | undefined
+    await act(async () => {
+      done = await result.current.mutateAsync({ tradeId: ids3c.trades.mes, accountId: ids3c.accounts.topOne, payload })
+    })
+    expect(db.registerPartial).toHaveBeenCalledWith(expect.anything(), ids3c.trades.mes, payload)
+    expect(done?.limitBefore).toMatchObject({ tradingDay: '2026-10-23', limit: { state: 'ok', worstCents: 0 } })
+    expect(queryClient.getQueryData(registrarKeys.operacao('user-1', ids3c.trades.mes))).toMatchObject({ position: { open: '2', partials: 1 } })
+    expect(queryClient.getQueryData(registrarKeys.relogio('user-1'))).toMatchObject({ offsetMs: expect.any(Number) })
+    const keys = spy.mock.calls.map(([f]) => (f as { queryKey: unknown[] }).queryKey)
+    expect(keys).toEqual([
+      ['hub', 'user-1', 'registrar', 'abertas'],
+      ['hub', 'user-1', 'registrar', 'dia'],
+      ['hub', 'user-1', 'registrar', 'eventos'],
+      ['hub', 'user-1', 'registrar', 'previa'],
+      regrasKeys.agora('user-1'),
+    ])
+  })
+
+  it('«Registrar stop»: the move’s answer as the view; offline nothing is sent; a refusal is never retried', async () => {
+    db.moveStop.mockResolvedValueOnce(stopParciais('stop-mes-breakeven'))
+    const { queryClient, wrapper } = setup()
+    const { result } = renderHook(() => useMoveStop(), { wrapper })
+    const payload = movePayload({ clientKey: newClientKey(), kind: 'breakeven', priceNow: '7920.5' })
+    await act(async () => {
+      await result.current.mutateAsync({ tradeId: ids3c.trades.mes, payload })
+    })
+    expect(queryClient.getQueryData(registrarKeys.operacao('user-1', ids3c.trades.mes))).toMatchObject({ position: { stopNow: '7912.5', stopKind: 'breakeven' } })
+    online = false
+    await act(async () => {
+      await expect(result.current.mutateAsync({ tradeId: ids3c.trades.mes, payload })).rejects.toMatchObject({ code: 'offline' })
+    })
+    expect(db.moveStop).toHaveBeenCalledTimes(1)
+    online = true
+    db.moveStop.mockRejectedValueOnce(new registrarDb.RegistrarDataError('same_stop', 'stop_price'))
+    await act(async () => {
+      await expect(result.current.mutateAsync({ tradeId: ids3c.trades.mes, payload })).rejects.toMatchObject({ code: 'same_stop', field: 'stop_price' })
+    })
+    expect(db.moveStop).toHaveBeenCalledTimes(2)
+  })
+
+  it('«Sim, desfazer»: the limit before (cached) and after (rules_now read again at once)', async () => {
+    const p = parcialMnq()
+    db.undoEvent.mockResolvedValue(desfeitaMnq())
+    fetchRulesNow.mockResolvedValue(agoraParciais('dia-apex-1055', { min: -28 }))
+    const { queryClient, wrapper } = setup()
+    queryClient.setQueryData(regrasKeys.agora('user-1'), agoraParciais('dia-apex-1053', { min: -28 }))
+    const { result } = renderHook(() => useUndoEvent(), { wrapper })
+    let done: Awaited<ReturnType<typeof result.current.mutateAsync>> | undefined
+    await act(async () => {
+      done = await result.current.mutateAsync({ tradeId: ids3c.trades.mnq, accountId: ids3c.accounts.apex, payload: undoEventPayload('parcial', p.exitId) })
+    })
+    expect(db.undoEvent).toHaveBeenCalledWith(expect.anything(), ids3c.trades.mnq, { v: 1, kind: 'parcial', id: p.exitId })
+    expect(done?.limitBefore?.limit).toMatchObject({ state: 'atingido', worstCents: -40000 })
+    expect(done?.limitAfter?.limit).toMatchObject({ state: 'ok', worstCents: -30000 })
+    expect(fetchRulesNow).toHaveBeenCalledTimes(1)
+    expect(queryClient.getQueryData(registrarKeys.operacao('user-1', ids3c.trades.mnq))).toMatchObject({ position: { open: '3', partials: 0, undo: null } })
+  })
+
+  it('«Sim, desfazer» without a fresh rules_now: limitAfter null, the undo still succeeds', async () => {
+    db.undoEvent.mockResolvedValue(desfeitaMnq())
+    fetchRulesNow.mockRejectedValue(new Error('offline'))
+    const { wrapper } = setup()
+    const { result } = renderHook(() => useUndoEvent(), { wrapper })
+    let done: Awaited<ReturnType<typeof result.current.mutateAsync>> | undefined
+    await act(async () => {
+      done = await result.current.mutateAsync({ tradeId: ids3c.trades.mnq, accountId: ids3c.accounts.apex, payload: undoEventPayload('parcial', 5) })
+    })
+    expect(done?.limitAfter).toBeNull()
+    expect(done?.limitBefore).toBeNull()
+  })
+
+  it('useTradeEvents: one read for the listed trades (sorted, deduplicated); nothing without ids', async () => {
+    const rows = eventosRows({ json: estadoJson('exit-mes') })
+    const { tradeEventsOfRows } = jest.requireActual('@/lib/hub/registrarDb') as typeof registrarDb
+    db.fetchTradeEvents.mockResolvedValue(tradeEventsOfRows(rows))
+    const { queryClient, wrapper } = setup()
+    const { result, rerender } = renderHook(({ list }: { list: string[] | null }) => useTradeEvents(list), { wrapper, initialProps: { list: null as string[] | null } })
+    expect(result.current.fetchStatus).toBe('idle')
+    rerender({ list: [] })
+    expect(result.current.fetchStatus).toBe('idle')
+    rerender({ list: ['b', ids3c.trades.mes, 'b'] })
+    await waitFor(() => expect(result.current.data).toBeDefined())
+    const sorted = ['b', ids3c.trades.mes].sort()
+    expect(db.fetchTradeEvents).toHaveBeenCalledWith(expect.anything(), sorted)
+    expect(queryClient.getQueryData(registrarKeys.eventos('user-1', sorted.join(',')))).toBeDefined()
+    expect(result.current.data?.[ids3c.trades.mes].exits).toHaveLength(2)
   })
 })
 
