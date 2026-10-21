@@ -283,21 +283,38 @@ export interface RowError {
   code: string;
 }
 
+/**
+ * import_preview's answer. Since Phase 3c (20261023000003) every key counts as import_commit
+ * counts it: new = inserted, completable = completed, trades_new = trades, the rest by name.
+ */
 export interface ImportPreviewResult {
+  /** Lines the commit inserts: new trades' rows, and new lines of a trade imported earlier */
   new: number;
+  /** Lines whose ID is in the account already (a trade's, or a file exit's) */
   duplicate: number;
   /** Already in the account and missing fields the file has (commission, stop, target, exit, payout) */
   completable: number;
   other_account: number;
   /**
-   * Phase 3 (migration 20261020000004; absent before it is pasted): rows that complete a trade
-   * registered in the app instead of inserting it again («{n} já registradas por você: o arquivo
-   * completa a comissão.»), and how many of those the file corrects on money («{n} com preço ou
-   * resultado diferente: vale o do arquivo.»)
+   * Phase 3 (migration 20261020000004; absent before it is pasted): trades registered in the app
+   * that the file completes instead of inserting them again, a broker position counting once («{n}
+   * já registradas por você: o arquivo completa a comissão.»), and the registered trades the commit
+   * records with other money than registered («{n} com preço ou resultado diferente: vale o do
+   * arquivo.»; Phase 3c: also those whose exits a file wrote, compared with what was registered)
    */
   linked?: number;
   linked_differs?: number;
-  /** New trades whose trading day is not the date on the file's clock */
+  /**
+   * Phase 3c (20261023000003; only when the file has partial exits: rows of one broker position,
+   * same symbol, side, open instant and open price): the trades it creates, the rows that are
+   * another row's trade's exits («{n} saída parcial juntada à sua operação»), and the rows that join
+   * a trade already in the account («{n} saída a mais de uma operação que já estava»). A position
+   * the app registered as one trade per exit is linked row by row and adds to none of these.
+   */
+  trades_new?: number;
+  grouped?: number;
+  attached?: number;
+  /** New trades whose trading day is not the date on the file's clock (a position counts once) */
   day_changes: number;
   first_day: string | null;
   last_day: string | null;
@@ -315,8 +332,15 @@ export interface ImportCommitResult {
   duplicate: number;
   completed: number;
   other_account: number;
-  /** Phase 3: app-registered trades this file completed (absent before migration 20261020000004) */
+  /**
+   * Phase 3: app-registered trades this file completed (absent before migration 20261020000004); a
+   * broker position counts once
+   */
   linked?: number;
+  /** Phase 3c, only when the file had partial exits: trades created, rows grouped into them, rows attached */
+  trades?: number;
+  grouped?: number;
+  attached?: number;
   errors: RowError[];
 }
 

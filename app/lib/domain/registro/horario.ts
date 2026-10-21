@@ -94,16 +94,28 @@ export interface AfterInput {
 }
 
 /**
- * register_after's instants (entry, exit, expiry), in the database's order of refusals:
- * not_in_day, entry_in_future, before_rules, bad_option (an option's date), not_expired or
- * exit_in_future.
+ * register_after's entry instant, in the database's order of refusals: not_in_day,
+ * entry_in_future, before_rules, bad_option (an option's date). «Já fechada» in several exits
+ * (Phase 3c) continues with parciais.afterExits.
  */
-export function afterInstants(x: AfterInput): Checked<{ entryAt: Date; exitAt: Date; expiresAt: Date | null }> {
+export function afterEntryAt(x: Omit<AfterInput, 'exit' | 'binary'>): Checked<{ entryAt: Date }> {
   const entryAt = localHmInTradingDay(x.day, x.entry, x.clock, x.dayOf);
   if (!entryAt) return refuse('not_in_day', 'entry');
   if (entryAt.getTime() > x.now.getTime()) return refuse('entry_in_future', 'entry');
   if (x.inRules && !x.inRules(entryAt)) return refuse('before_rules', 'day');
   if (x.optionExpiresOn && optionExpiredAt(x.optionExpiresOn, entryAt)) return refuse('bad_option', 'option.expires_on');
+  return { ok: true, entryAt };
+}
+
+/**
+ * register_after's instants (entry, exit, expiry), in the database's order of refusals:
+ * not_in_day, entry_in_future, before_rules, bad_option (an option's date), not_expired or
+ * exit_in_future.
+ */
+export function afterInstants(x: AfterInput): Checked<{ entryAt: Date; exitAt: Date; expiresAt: Date | null }> {
+  const e = afterEntryAt(x);
+  if (!e.ok) return e;
+  const entryAt = e.entryAt;
   if (x.binary) {
     const expiresAt = binaryExpiry(x.binary.platform, entryAt, x.binary.durationS);
     if (expiresAt.getTime() > x.now.getTime()) return refuse('not_expired', 'outcome');

@@ -484,6 +484,16 @@ export const ERRO_REGISTRAR: Record<RegistrarErrorCode, string> = {
   note_too_long: 'A nota vai até 1.000 caracteres.', // NEW
   frozen: ALGO,
   append_only: ALGO,
+  // Phase 3c (partials, «Mover stop», «Desfazer»; telas.md §4.3–4.7, sintese.md §5.2): the forms
+  // say these with the values (the open quantity, the stop, the hour); here, without them
+  partial_too_large: 'Use menos que o que está em aberto; para sair com tudo, use “Saída”.', // ADAPTED (telas qtdDemais)
+  exit_before_partial: 'A saída não pode ser antes da última parcial.', // ADAPTED (telas, without the hour)
+  too_many_exits: 'Até 20 saídas por operação.', // NEW (sintese C7: 20)
+  too_many_moves: 'Até 20 movimentos de stop por operação.', // NEW (sintese C7)
+  same_stop: 'O stop já está nesse preço.', // ADAPTED (telas «O stop já está em 7.912,50.»)
+  nothing_to_undo: 'Não há o que desfazer.', // NEW
+  not_newest: 'Só o último registro pode ser desfeito.', // NEW (telas §4.7)
+  exits_mismatch: ALGO,
   network: ERROR_TEXT.network,
   // NEW (D14): nothing is queued; the time comes from the server
   offline: 'Sem conexão. Nada foi registrado: o horário vem do servidor. Tente de novo quando a conexão voltar.',

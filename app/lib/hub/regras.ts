@@ -17,11 +17,20 @@
  * Every market of ACCOUNT_MARKETS has a window rule, windows and a daily limit; the data block,
  * the state rule and «somando» exist where MARKET_SPEC[m].rules says (futures only until Phase 5).
  * The limit's amount is in the market's currency, under its key: `brl` on B3, `usd` elsewhere.
+ *
+ * Phase 3c (20261023000001_regra_breakeven.sql): «Mover para o breakeven com +N» per asset, on
+ * every market but binaries (MARKET_SPEC[m].rules.breakeven), as a market default and «só nesta
+ * conta» (the whole setting, like the window). Absent everywhere until set, so the settings, the
+ * payloads and what they resolve to are byte for byte the ones before; Rules get the key only
+ * when the rule acts (on, with an asset whose unit is known).
  */
 import {
   ACCOUNT_MARKETS,
+  BREAKEVEN_N_DP,
   CALENDAR_CODES,
   MARKET_SPEC,
+  MAX_BREAKEVEN_ASSETS,
+  MAX_BREAKEVEN_N,
   STATE_NAMES,
   STATES_WITHOUT_DIRECTION,
   MAX_LIMIT_CENTS,
@@ -30,6 +39,7 @@ import {
   centsToUsd,
   currencyOf,
   isAccountMarket,
+  isBreakevenKey,
   limitKey,
   parseRules,
   parseServerGate,
@@ -37,6 +47,7 @@ import {
   usdToCents,
   type AccountMarket,
   type AtLimit,
+  type BreakevenRule,
   type CalendarCode,
   type GateResult,
   type LimitMode,
@@ -48,7 +59,9 @@ import {
   type WindowTz,
 } from '@/lib/domain/gate';
 import { tradingDayFor, type DayClock } from '@/lib/domain/tempo';
+import { decimalFromJson, parseNumeric, plainText, tradeInstrument } from '@/lib/domain/registro';
 import type { HubPreferences } from './contasDb';
+import { lerNumero } from './numero';
 
 // ---------------------------------------------------------------------------------------------
 // The editor's form of the saved settings
@@ -99,6 +112,16 @@ export interface StateSetting {
 }
 
 /**
+ * «Mover para o breakeven com +N» as edited (Phase 3c): the switch and «+N» per asset, keyed by
+ * tradeMatchKey (MES, EURUSD, PETR4), as decimal text ('10', '7.5') in the asset's unit of stops.
+ * `on: false` keeps the values and resolves like no rule; on with no asset does not act either.
+ */
+export interface BreakevenSetting {
+  on: boolean;
+  by: Record<string, string>;
+}
+
+/**
  * A market's default («Padrão Futuros», and the defaults of the other markets the boards never
  * name): market_rule_defaults + its windows
  */
@@ -110,6 +133,11 @@ export interface MarketSettings {
   states: Partial<Record<StateName, StateSetting>>;
   /** 0–2 windows on one clock; [] = «Sem janela» */
   windows: WindowSetting[];
+  /**
+   * «Mover para o breakeven» (Phase 3c), where the market has it (every market but binaries);
+   * absent = never set (no rule)
+   */
+  breakeven?: BreakevenSetting;
 }
 
 /** «Limite do dia» of one account, in cents of its market's currency (currencyOf). Never inherited from a market. */
@@ -133,6 +161,11 @@ export interface AccountSettings {
   limit: LimitSetting | null;
   /** «Ajustar só nesta conta»: one window, on the market's clock; null = uses the market's */
   window: WindowSetting | null;
+  /**
+   * «Mover para o breakeven» «só nesta conta» (Phase 3c): the whole setting replaces the market's;
+   * absent = the market's («padrão de Futuros»)
+   */
+  breakeven?: BreakevenSetting;
 }
 
 /** Everything «Salvar alterações» saves, in one value: the page-wide draft (and the saved base) */
@@ -204,6 +237,12 @@ export interface WindowSpecJson {
   weekdays: number;
 }
 
+/** The stored «Mover para o breakeven» (MarketRules and AccountRules): «+N» as JSON numbers */
+export interface BreakevenJson {
+  on: boolean;
+  by: Record<string, number>;
+}
+
 /** market_rule_defaults.rules (MarketRules v1) */
 export interface MarketRulesJson {
   v: 1;
@@ -212,6 +251,8 @@ export interface MarketRulesJson {
   block?: { on: boolean; before_min: number; after_min: number };
   /** where the market has the state rule (futures) */
   states?: Partial<Record<StateName, { choice: StateChoice | null; text?: string }>>;
+  /** Phase 3c, only once set (every market but binaries) */
+  breakeven?: BreakevenJson;
 }
 
 /**
@@ -227,6 +268,8 @@ export interface AccountRulesJson {
   /** where the market has the data block (futures) */
   block?: Partial<{ on: boolean; before_min: number; after_min: number }>;
   limit?: LimitJson | null;
+  /** Phase 3c: «só nesta conta» (the whole setting); absent = the market's */
+  breakeven?: BreakevenJson;
 }
 
 /** The stored limit of a market's account: its amount under the currency's key */
@@ -234,6 +277,26 @@ export function limitJson(m: AccountMarket, l: LimitSetting): LimitJson {
   const amount = centsToUsd(l.cents);
   const head = limitKey(currencyOf(m)) === 'brl' ? { brl: amount } : { usd: amount };
   return { ...head, mode: l.mode, at_limit: l.atLimit };
+}
+
+/** The stored form of a setting: «+N» as JSON numbers ('7.5' → 7.5) */
+export function breakevenJson(b: BreakevenSetting): BreakevenJson {
+  return { on: b.on, by: Object.fromEntries(Object.entries(b.by).map(([k, n]) => [k, Number(n)])) };
+}
+
+/** A stored setting → the editor's form («+N» as decimal text); any other shape is not the as-built one */
+function breakevenFromJson(x: unknown): BreakevenSetting {
+  const b = obj(x);
+  const by = obj(b.by);
+  return {
+    on: bool(b.on),
+    by: Object.fromEntries(
+      Object.entries(by).map(([k, v]) => {
+        const n = typeof v === 'number' ? decimalFromJson(v, BREAKEVEN_N_DP) : null;
+        return [k, n === null ? bad() : n];
+      }),
+    ),
+  };
 }
 
 export const toWindowSpec = (w: WindowSetting): WindowSpecJson => ({
@@ -285,12 +348,14 @@ export function marketSettingsFromJson(m: AccountMarket, rulesJson: unknown, win
   const b = obj(builtinJson);
   const wr = obj(r.window_rule);
   const caps = MARKET_SPEC[m].rules;
-  return {
+  const out: MarketSettings = {
     windowRule: { on: bool(wr.on), outside: outside(wr.outside) },
     block: caps.block ? (blockFromJson(r.block ?? b.block, false) as BlockSetting) : null,
     states: caps.states ? statesFromJson(r.states) : {},
     windows: (Array.isArray(windowsJson) ? windowsJson : windowsJson == null ? [] : bad()).map(windowFromJson),
   };
+  if (caps.breakeven && r.breakeven !== undefined) out.breakeven = breakevenFromJson(r.breakeven);
+  return out;
 }
 
 /**
@@ -317,6 +382,7 @@ export function accountSettingsFromJson(m: AccountMarket, rulesJson: unknown, wi
     const atLimit = l.at_limit === 'encerrar' || l.at_limit === 'avisar' ? l.at_limit : bad();
     out.limit = { cents: cents(l[key]), mode, atLimit };
   }
+  if (r.breakeven !== undefined) out.breakeven = breakevenFromJson(r.breakeven);
   return out;
 }
 
@@ -336,6 +402,7 @@ export function marketRulesJson(m: AccountMarket, s: MarketSettings): MarketRule
     }
     out.states = states;
   }
+  if (caps.breakeven && s.breakeven) out.breakeven = breakevenJson(s.breakeven);
   return out;
 }
 
@@ -354,6 +421,7 @@ export function accountRulesJson(m: AccountMarket, s: AccountSettings): AccountR
     if (Object.keys(b).length) out.block = b;
   }
   out.limit = s.limit && limitJson(m, s.limit);
+  if (MARKET_SPEC[m].rules.breakeven && s.breakeven) out.breakeven = breakevenJson(s.breakeven);
   return out;
 }
 
@@ -476,6 +544,7 @@ export function resolveRules(account: RulesAccount, s: RulesSettings): Rules {
   }
 
   const mb = m.block ?? { on: true, beforeMin: 5, afterMin: 10 };
+  const breakeven = resolveBreakeven(account.market, effectiveBreakeven(s, account));
   return {
     market: account.market,
     windows: windows.map((w) => ({ tz: w.tz, startMin: w.startMin, endMin: w.endMin, weekdays: w.weekdays })),
@@ -497,8 +566,40 @@ export function resolveRules(account: RulesAccount, s: RulesSettings): Rules {
       ? (Object.fromEntries(STATE_NAMES.map((k) => [k, m.states[k]?.choice ?? null])) as Record<StateName, StateChoice | null>)
       : null,
     day: { tz: account.day.tz, startMin: account.day.startMin },
+    ...(breakeven ? { breakeven } : {}),
   };
 }
+
+/**
+ * The «Mover para o breakeven» an account uses: its own («só nesta conta», the whole setting),
+ * else its market's; undefined when neither was ever set
+ */
+export function effectiveBreakeven(s: RulesSettings, account: Pick<RulesAccount, 'id' | 'market'>): BreakevenSetting | undefined {
+  const own = s.accounts[account.id]?.breakeven;
+  return own !== undefined ? own : s.markets[account.market].breakeven;
+}
+
+/**
+ * What a setting resolves to in a version (SQL rules_resolve, Phase 3c): null unless the market
+ * has the rule and the setting is on; each asset with the unit of stops trade_instrument gives it
+ * now (frozen in the version) and «+N» without trailing zeros; an asset without a unit, or a value
+ * that is not a number, is left out, and none left = null (no key).
+ */
+export function resolveBreakeven(market: AccountMarket, b: BreakevenSetting | undefined | null): BreakevenRule | null {
+  if (!MARKET_SPEC[market].rules.breakeven || !b || b.on !== true) return null;
+  const by: BreakevenRule['by'] = {};
+  for (const [k, text] of Object.entries(b.by)) {
+    const un = tradeInstrument(market, k, null)?.stops ?? null;
+    const n = typeof text === 'string' ? parseNumeric(text) : null;
+    if (un === null || !n) continue;
+    by[k] = { n: plainText(n), un };
+  }
+  return Object.keys(by).length ? { by } : null;
+}
+
+/** The same setting, as the database compares two settings: «+N» by value ('10.0' = '10') */
+export const sameBreakeven = (a: BreakevenSetting | undefined | null, b: BreakevenSetting | undefined | null) =>
+  canon(a ? breakevenJson(a) : null) === canon(b ? breakevenJson(b) : null);
 
 /** Two rule values compare as the database compares two `resolved` jsonb values */
 export const sameRules = (a: Rules, b: Rules) => canon(toResolvedJson(a)) === canon(toResolvedJson(b));
@@ -518,7 +619,16 @@ export function effectiveDayAt(at: Date, r: Rules): string {
 export function withAccountRule(
   s: RulesSettings,
   account: Pick<RulesAccount, 'id' | 'market'>,
-  patch: { windowRule?: Partial<WindowRuleSetting>; block?: Partial<BlockSetting> },
+  patch: {
+    windowRule?: Partial<WindowRuleSetting>;
+    block?: Partial<BlockSetting>;
+    /**
+     * «Mover para o breakeven» «só nesta conta» (Phase 3c), the whole setting; null = back to the
+     * market's. A setting that is the market's (a market never set counts as off with no asset)
+     * is not kept as the account's own.
+     */
+    breakeven?: BreakevenSetting | null;
+  },
 ): RulesSettings {
   const m = s.markets[account.market];
   const cur = s.accounts[account.id] ?? emptyAccountSettings();
@@ -532,7 +642,54 @@ export function withAccountRule(
     if (v === undefined || (m.block && v === m.block[k])) delete block[k];
     else (block as Obj)[k] = v;
   }
-  return { ...s, accounts: { ...s.accounts, [account.id]: { ...cur, windowRule, block } } };
+  const next: AccountSettings = { ...cur, windowRule, block };
+  if (patch.breakeven !== undefined) {
+    if (patch.breakeven === null || sameBreakeven(patch.breakeven, m.breakeven ?? BREAKEVEN_OFF)) delete next.breakeven;
+    else next.breakeven = { on: patch.breakeven.on, by: { ...patch.breakeven.by } };
+  }
+  return { ...s, accounts: { ...s.accounts, [account.id]: next } };
+}
+
+/** A market whose «Mover para o breakeven» was never set reads as off, with no asset */
+export const BREAKEVEN_OFF: Readonly<BreakevenSetting> = Object.freeze({ on: false, by: Object.freeze({}) as Record<string, string> });
+
+/** Why a typed «+N» is refused: «Digite um número maior que zero, como 10 ou 7,5.» */
+export type BreakevenNError = 'empty' | 'invalid' | 'not_positive' | 'too_large' | 'too_many_decimals';
+
+/**
+ * «+N» as typed (pt-BR, «7,5» or «7.5»; a threshold, not a price: no tick) → decimal text, as the
+ * database takes it (rules_is_dist: above zero, at most 1 000 000, at most 8 decimals)
+ */
+export function readBreakevenN(text: string): { ok: true; n: string } | { ok: false; reason: BreakevenNError } {
+  const r = lerNumero(text, { ponto: true });
+  if (!r.ok) return { ok: false, reason: r.reason };
+  const n = parseNumeric(r.value);
+  if (!n || n.units <= BigInt(0)) return { ok: false, reason: 'not_positive' };
+  if (n.scale > BREAKEVEN_N_DP) return { ok: false, reason: 'too_many_decimals' };
+  if (Number(r.value) > MAX_BREAKEVEN_N) return { ok: false, reason: 'too_large' };
+  return { ok: true, n: plainText(n) };
+}
+
+/** Why an asset cannot join the rule: «Escolha um ativo.», «Use só letras e números…», «Este ativo já está na regra.», «Use até 20 ativos.» */
+export type BreakevenKeyError = 'empty' | 'invalid' | 'repeated' | 'too_many';
+
+/**
+ * The asset an «Adicionar ativo» names, as the rule keys it (tradeMatchKey: MESZ5 → MES, EUR/USD →
+ * EURUSD, PETR4F → PETR4), with the refusals of the form; `current` is the rule's assets now
+ */
+export function breakevenKeyOf(
+  market: AccountMarket,
+  code: string,
+  current: Readonly<Record<string, unknown>>,
+): { ok: true; key: string } | { ok: false; reason: BreakevenKeyError } {
+  const typed = String(code ?? '').trim();
+  if (typed === '') return { ok: false, reason: 'empty' };
+  if (!/^[A-Za-z0-9][A-Za-z0-9./:() _-]*$/.test(typed)) return { ok: false, reason: 'invalid' };
+  const key = tradeInstrument(market, typed, null)?.key ?? '';
+  if (!isBreakevenKey(market, key)) return { ok: false, reason: 'invalid' };
+  if (Object.prototype.hasOwnProperty.call(current, key)) return { ok: false, reason: 'repeated' };
+  if (Object.keys(current).length >= MAX_BREAKEVEN_ASSETS) return { ok: false, reason: 'too_many' };
+  return { ok: true, key };
 }
 
 /**

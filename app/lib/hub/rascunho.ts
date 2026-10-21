@@ -15,19 +15,23 @@ import type { RegrasErrorCode } from './regrasDb';
 import { formatDiaMes } from './formato';
 import {
   BLOCK_MAX,
+  BREAKEVEN_OFF,
   STATE_TEXT_MAX,
   activeAccounts,
+  breakevenJson,
   canon,
   emptyAccountSettings,
   normCalendars,
   rebaseSettings,
   sameAccount,
+  sameBreakeven,
   sameMarket,
   settingsIssues,
   withAccountRule,
   type AccountConfig,
   type AccountSettings,
   type BlockSetting,
+  type BreakevenSetting,
   type DisplayTz,
   type LimitSetting,
   type MarketSettings,
@@ -302,6 +306,68 @@ export function comCalendario(s: RulesSettings, code: CalendarCode, on: boolean)
 export const comHorarios = (s: RulesSettings, displayTz: DisplayTz): RulesSettings => ({ ...s, displayTz });
 
 // ---------------------------------------------------------------------------------------------
+// «Mover para o breakeven» (Phase 3c): «Padrão Futuros» or an account («só nesta conta», whole)
+// ---------------------------------------------------------------------------------------------
+
+/**
+ * The setting an entity shows, as edited: «Padrão Futuros»'s, or an account's own (`propria`) else
+ * its market's. Never set reads as off, with no asset.
+ */
+export function breakevenEfetivo(s: RulesSettings, e: Entidade): { setting: BreakevenSetting; propria: boolean } {
+  if (e.tipo === 'padrao') return { setting: s.markets.futures.breakeven ?? BREAKEVEN_OFF, propria: false };
+  const own = s.accounts[e.conta.id]?.breakeven;
+  if (own !== undefined) return { setting: own, propria: true };
+  return { setting: s.markets[e.conta.market].breakeven ?? BREAKEVEN_OFF, propria: false };
+}
+
+/**
+ * The whole setting of an entity. On «Padrão Futuros», off with no asset is the same as never set
+ * (the key goes); on an account, null = «Voltar ao padrão», and a setting equal to the market's is
+ * not kept as its own (withAccountRule).
+ */
+export function comBreakeven(s: RulesSettings, e: Entidade, setting: BreakevenSetting | null): RulesSettings {
+  if (e.tipo === 'conta') return withAccountRule(s, e.conta, { breakeven: setting });
+  const rest: MarketSettings = { ...s.markets.futures };
+  delete rest.breakeven;
+  const keep = setting !== null && !sameBreakeven(setting, BREAKEVEN_OFF);
+  return {
+    ...s,
+    markets: { ...s.markets, futures: keep ? { ...rest, breakeven: { on: setting.on, by: { ...setting.by } } } : rest },
+  };
+}
+
+/** The switch («Ligada» / «Desligada»): the assets stay */
+export function comBreakevenLigado(s: RulesSettings, e: Entidade, on: boolean): RulesSettings {
+  const { setting } = breakevenEfetivo(s, e);
+  return comBreakeven(s, e, { on, by: { ...setting.by } });
+}
+
+/**
+ * One asset of the rule (its key as tradeMatchKey writes it; regras.breakevenKeyOf): a value
+ * (decimal text, regras.readBreakevenN) adds or changes it, null takes it out («Tirar»). New assets
+ * go at the end.
+ */
+export function comBreakevenAtivo(s: RulesSettings, e: Entidade, key: string, n: string | null): RulesSettings {
+  const { setting } = breakevenEfetivo(s, e);
+  const by = { ...setting.by };
+  if (n === null) delete by[key];
+  else by[key] = n;
+  return comBreakeven(s, e, { on: setting.on, by });
+}
+
+/**
+ * «não salvo» on the row: the setting the entity holds itself changed («Padrão Futuros»: the
+ * market's; an account: its own, or whether it has one)
+ */
+export function breakevenMudou(saved: RulesSettings, draft: RulesSettings, e: Entidade): boolean {
+  const of = (x: RulesSettings) =>
+    e.tipo === 'padrao' ? x.markets.futures.breakeven : x.accounts[e.conta.id]?.breakeven;
+  const a = of(draft);
+  const b = of(saved);
+  return canon(a ? breakevenJson(a) : null) !== canon(b ? breakevenJson(b) : null);
+}
+
+// ---------------------------------------------------------------------------------------------
 // What is «não salvo», «só nesta conta», «padrão de Futuros»
 // ---------------------------------------------------------------------------------------------
 
@@ -352,10 +418,12 @@ export function mudancasDaEntidade(saved: RulesSettings, draft: RulesSettings, e
   };
 }
 
-/** Whether an account sets any of these keys itself («só nesta conta») */
-export function temProprio(s: RulesSettings, id: string, rule: 'windowRule' | 'block'): boolean {
+/** Whether an account sets any of these keys itself («só nesta conta»); the breakeven rule is whole (Phase 3c) */
+export function temProprio(s: RulesSettings, id: string, rule: 'windowRule' | 'block' | 'breakeven'): boolean {
   const a = s.accounts[id];
-  return !!a && Object.keys(a[rule]).some((k) => (a[rule] as Record<string, unknown>)[k] !== undefined);
+  if (!a) return false;
+  if (rule === 'breakeven') return a.breakeven !== undefined;
+  return Object.keys(a[rule]).some((k) => (a[rule] as Record<string, unknown>)[k] !== undefined);
 }
 
 // ---------------------------------------------------------------------------------------------

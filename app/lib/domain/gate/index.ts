@@ -18,19 +18,27 @@ export {
   type WindowTz,
 } from '../markets';
 export {
+  BREAKEVEN_N_DP,
+  BREAKEVEN_UNITS,
   CALENDAR_CODES,
+  MAX_BREAKEVEN_ASSETS,
+  MAX_BREAKEVEN_N,
   MAX_LIMIT_CENTS,
   RulesError,
   STATE_NAMES,
   STATES_WITHOUT_DIRECTION,
   centsToUsd,
+  checkBreakevenSetting,
   checkRules,
+  isBreakevenKey,
+  isBreakevenN,
   parseRuleVersion,
   parseRules,
   toResolvedJson,
   usdToCents,
   versionAt,
   type AtLimit,
+  type BreakevenRule,
   type CalendarCode,
   type LimitMode,
   type OutsideShows,
@@ -40,7 +48,7 @@ export {
   type StateChoice,
   type StateName,
 } from './rules';
-export { dayResultFromServer, dayUsage, type DayResult, type DayTrade } from './usage';
+export { dayResultFromServer, dayUsage, type DayExit, type DayResult, type DayTrade } from './usage';
 export {
   CHECK_ORDER,
   NOT_YET,

@@ -1,5 +1,6 @@
 /**
- * The rules API of migration 20261018000003, as 20261019000001 extended it to seven markets
+ * The rules API of migration 20261018000003, as 20261019000001 extended it to seven markets (and
+ * 20261023000001 to the optional «Mover para o breakeven»)
  * (rules_config, save_rules, rules_now, merge_preferences), through a Supabase client that carries the user's JWT (useHubDb). Every
  * function takes the caller from the JWT; nothing here reads or writes the rule tables directly
  * (they are read-only to the API roles).
@@ -41,6 +42,8 @@ export const RULES_RPC_ERROR_CODES = [
   'bad_state_rule',
   'bad_state_choice',
   'bad_state_text',
+  /** «Mover para o breakeven» (Phase 3c, 20261023000001): not a setting of assets and numbers above zero */
+  'bad_breakeven',
   'bad_preferences',
   'unknown_account',
   'archived_account',

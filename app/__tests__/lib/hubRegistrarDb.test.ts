@@ -328,7 +328,17 @@ describe('reading a trade back from the tables', () => {
     expect(_now).toBeInstanceOf(Date);
     expect(await fetchTradeState(db, ID)).toEqual(view);
     expect(calls[0]).toEqual(['trades', ['select', TRADE_COLUMNS], ['eq', 'id', ID]]);
-    expect(calls.map((c) => c[0])).toEqual(['trades', 'trade_entry_context', 'trade_marks_v', 'trade_marks_now_v', 'trade_attachments', 'account_rule_versions']);
+    // Phase 3c: the trade's exits and stop moves too (none in these Phase 3 answers)
+    expect(calls.map((c) => c[0])).toEqual([
+      'trades',
+      'trade_entry_context',
+      'trade_marks_v',
+      'trade_marks_now_v',
+      'trade_attachments',
+      'account_rule_versions',
+      'trade_exits_v',
+      'trade_stop_moves_v',
+    ]);
   });
 
   it('answers null for a trade the caller cannot see, and lists the open ones', async () => {
