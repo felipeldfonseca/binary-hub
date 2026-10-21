@@ -178,6 +178,13 @@ select tests.eq((select jsonb_build_array(
     {"key": "PETR4", "n": 0.5, "un": "price", "level": 38.92}, {"key": "BTCUSDT", "n": 500, "un": "price", "level": 65500},
     null, null, null, null, null]'::jsonb,
   'trade_breakeven: the level by side and unit (pips × the pip); no rule for another asset, an option, a binary, no entry');
+-- An n of 8 decimals in pips gives a level of 12 decimals: rounded to 8, as a stored price (the same
+-- level whether read from trade_state or computed from the tables)
+select tests.eq(jsonb_build_array(
+    public.trade_breakeven('{"breakeven": {"by": {"EURUSD": {"n": 7.12345678, "un": "pips"}}}}', 'forex', 'EUR/USD', false, 'long', 1.0852)->>'level',
+    public.trade_breakeven('{"breakeven": {"by": {"EURUSD": {"n": 7.12345678, "un": "pips"}}}}', 'forex', 'EUR/USD', false, 'short', 1.08537)->>'level',
+    public.trade_breakeven('{"breakeven": {"by": {"USDJPY": {"n": 3.33333333, "un": "pips"}}}}', 'forex', 'USDJPY', false, 'short', 151.237)->>'level'),
+  '["1.08591235", "1.08465765", "151.20366667"]'::jsonb, 'trade_breakeven: the level to 8 decimals');
 
 -- The gate never changes because of it (a management rule)
 select tests.eq(public.gate_eval(r80.base || '{"breakeven": {"by": {"MES": {"n": 8, "un": "pts"}}}}', null, now(), null),

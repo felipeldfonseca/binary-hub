@@ -3021,4 +3021,228 @@ select tests.eq(public.register_exit(:'s5', '{"v": 1, "exit_price": "6001.00"}',
                 'register_exit: a null dry-run flag writes (only true is a dry run)');
 rollback;
 
+-- =============================================================================================
+-- 9. What the twins must refuse too (the domain review): the average exit of «Já fechada» and of a
+--    broker file's position as the commit checks it, sums that would not fit the trade, points in
+--    favour that would not fit a move
+-- =============================================================================================
+
+begin;
+select set_config('request.jwt.claim.sub', :V, true);
+set local role authenticated;
+insert into public.trading_accounts (user_id, market, label, platform) values
+  (:V, 'crypto', 'Cripto V', 'binance'), (:V, 'stocks', 'Acoes V', 'ibkr');
+select tests.eq(jsonb_array_length(public.save_rules(jsonb_build_object('v', 1, 'accounts',
+  (select jsonb_object_agg(a.id::text, jsonb_build_object('rules', '{"v": 1}'::jsonb, 'window', null, 'version', 'force'))
+   from public.trading_accounts a where a.user_id = :V and a.label in ('Cripto V', 'Acoes V'))))->'versions'),
+  2, 'two more accounts with rules');
+commit;
+alter table public.account_rule_versions disable trigger account_rule_versions_guard;
+update public.account_rule_versions v set effective_from = v.effective_from - interval '30 days'
+where v.account_id in (select a.id from public.trading_accounts a where a.user_id = :V and a.label in ('Cripto V', 'Acoes V'));
+alter table public.account_rule_versions enable trigger account_rule_versions_guard;
+select id as cry from public.trading_accounts where user_id = :V and label = 'Cripto V' \gset
+select id as stk from public.trading_accounts where user_id = :V and label = 'Acoes V' \gset
+
+-- «Já fechada» an hour ago, on the New York clock, with these exits (minutes from now)
+create or replace function tests.after9(p_acc uuid, p_symbol text, p_qty text, p_price text, p_exits jsonb, p_extra jsonb default '{}')
+returns jsonb language sql volatile as $$
+  select jsonb_build_object('v', 1, 'client_key', tests.ck(), 'symbol', p_symbol, 'direction', 'long', 'quantity', p_qty,
+    'entry_price', p_price, 'clock', 'America/New_York', 'allow_similar', true,
+    'day', public.compute_trading_day(p_acc, now() - interval '60 minutes')::text, 'entry', tests.hm('America/New_York', -60),
+    'exits', (select jsonb_agg(x - 'min' || jsonb_build_object('exit', tests.hm('America/New_York', (x->>'min')::int)) order by o)
+              from jsonb_array_elements(p_exits) with ordinality as e(x, o))) || p_extra
+$$;
+grant execute on all functions in schema tests to authenticated;
+
+-- 9.1 An average of 10 000 or more: the dry run answers what the commit stores and checks
+begin;
+select set_config('request.jwt.claim.sub', :V, true);
+set local role authenticated;
+select public.register_after(:'cry', tests.after9(:'cry', 'BTCUSDT', '0.69708937', '65000',
+  '[{"quantity": "0.40781226", "exit_price": "65110.85", "min": -50}, {"quantity": "0.28927711", "exit_price": "65346.58", "min": -30}]'),
+  true)->>'exit_price' as btc_dry \gset
+select tests.eq(:'btc_dry'::numeric, 65208.67288480, 'BTC: the average from the stored operands (the typed scales gave …481)');
+select public.register_after(:'cry', tests.after9(:'cry', 'BTCUSDT', '0.69708937', '65000',
+  '[{"quantity": "0.40781226", "exit_price": "65110.85", "min": -50}, {"quantity": "0.28927711", "exit_price": "65346.58", "min": -30}]'))
+  as btc \gset
+select public.register_after(:'stk', tests.after9(:'stk', 'AAPL', '11.466939', '13000',
+  '[{"quantity": "1.65344", "exit_price": "13490.1765", "min": -55}, {"quantity": "4.139845", "exit_price": "13338.688", "min": -50},
+    {"quantity": "1.402982", "exit_price": "12117.7305", "min": -40}, {"quantity": "4.270672", "exit_price": "12934.8146", "min": -30}]'),
+  true)->>'exit_price' as stk_dry \gset
+select public.register_after(:'stk', tests.after9(:'stk', 'AAPL', '11.466939', '13000',
+  '[{"quantity": "1.65344", "exit_price": "13490.1765", "min": -55}, {"quantity": "4.139845", "exit_price": "13338.688", "min": -50},
+    {"quantity": "1.402982", "exit_price": "12117.7305", "min": -40}, {"quantity": "4.270672", "exit_price": "12934.8146", "min": -30}]'))
+  as stk \gset
+commit;
+select tests.eq((select t.exit_price from public.trades t where t.id = ((:'btc'::jsonb)->>'trade_id')::uuid), :'btc_dry'::numeric,
+                'BTC: the commit stores the dry run''s average');
+select tests.eq((select t.exit_price from public.trades t where t.id = ((:'btc'::jsonb)->>'trade_id')::uuid),
+                (public.trade_exits_sum(((:'btc'::jsonb)->>'trade_id')::uuid)->>'exit_price')::numeric, 'BTC: = trade_exits_sum');
+select tests.eq(:'stk_dry'::numeric, 13060.73107786, 'shares of 6 decimals: the stored operands'' average');
+select tests.eq((select t.exit_price from public.trades t where t.id = ((:'stk'::jsonb)->>'trade_id')::uuid), :'stk_dry'::numeric,
+                'shares: the commit stores the dry run''s average');
+
+-- 9.2 Sums that would not fit the trade (numeric(18, 2)) are refused with a code, dry run and write
+begin;
+select set_config('request.jwt.claim.sub', :V, true);
+set local role authenticated;
+select tests.fails(format('select public.register_after(%L, %L, true)', :'arq', tests.after9(:'arq', 'ZNZ6', '2', '110',
+                     '[{"quantity": "1", "exit_price": "111", "pnl": "9999999999999999.99", "min": -50},
+                       {"quantity": "1", "exit_price": "111", "pnl": "9999999999999999.99", "min": -30}]')),
+                   'bad_pnl', 'exits', 'two results of 16 digits: their sum does not fit (dry run)');
+select tests.fails(format('select public.register_after(%L, %L)', :'arq', tests.after9(:'arq', 'ZNZ6', '2', '110',
+                     '[{"quantity": "1", "exit_price": "111", "pnl": "9999999999999999.99", "min": -50},
+                       {"quantity": "1", "exit_price": "111", "pnl": "9999999999999999.99", "min": -30}]')),
+                   'bad_pnl', 'exits', 'nor written');
+select tests.fails(format('select public.register_after(%L, %L, true)', :'arq', tests.after9(:'arq', 'ZNZ6', '2', '110',
+                     '[{"quantity": "1", "exit_price": "111", "pnl": "-9999999999999999.99", "min": -50},
+                       {"quantity": "1", "exit_price": "111", "pnl": "-0.01", "min": -30}]')),
+                   'bad_pnl', 'exits', 'a loss too');
+select tests.eq(public.register_after(:'arq', tests.after9(:'arq', 'ZNZ6', '2', '110',
+                  '[{"quantity": "1", "exit_price": "111", "pnl": "5000000000000000.00", "min": -50},
+                    {"quantity": "1", "exit_price": "111", "pnl": "4999999999999999.99", "min": -30}]'), true)->>'pnl',
+                '9999999999999999.99', 'the largest sum that fits');
+select tests.fails(format('select public.register_after(%L, %L, true)', :'cry', tests.after9(:'cry', 'BTCUSDT', '2', '65000',
+                     '[{"quantity": "1", "exit_price": "65100", "costs": "9999999999999999.99", "min": -50},
+                       {"quantity": "1", "exit_price": "65100", "costs": "0.01", "min": -30}]')),
+                   'bad_costs', 'exits', '«Custos» that add up past 16 digits');
+commit;
+
+-- After a partial of 16 digits, the exit whose total does not fit
+begin;
+select set_config('request.jwt.claim.sub', :V, true);
+set local role authenticated;
+insert into tests.p81 values ('t9', public.register_entry(:'arq', tests.entry81('ZNZ6', 'long', '2', '110', -10))->>'trade_id');
+commit;
+select v as t9 from tests.p81 where k = 't9' \gset
+begin;
+select set_config('request.jwt.claim.sub', :V, true);
+set local role authenticated;
+select tests.eq(public.register_partial(:'t9', jsonb_build_object('v', 1, 'client_key', tests.ck(), 'quantity', '1', 'exit_price', '111',
+                  'pnl', '9999999999999999.99'))->>'repeated', 'false', 'a partial of 16 digits fits on its own');
+commit;
+begin;
+select set_config('request.jwt.claim.sub', :V, true);
+set local role authenticated;
+select tests.fails(format('select public.register_exit(%L, %L, true)', :'t9', '{"v": 1, "exit_price": "111", "pnl": "0.01"}'),
+                   'bad_pnl', 'pnl', 'the total of the exits does not fit the trade (dry run)');
+select tests.fails(format('select public.register_exit(%L, %L)', :'t9', '{"v": 1, "exit_price": "111", "pnl": "0.01"}'),
+                   'bad_pnl', 'pnl', 'nor written');
+select tests.eq(public.register_exit(:'t9', '{"v": 1, "exit_price": "111", "pnl": "0"}', true)->>'total_pnl', '9999999999999999.99',
+                'a total that fits');
+commit;
+select tests.eq((select status from public.trades where id = :'t9'), 'open', 'the trade stays open');
+
+-- 9.3 Points in favour that would not fit a stop move (pips, a typo far from the entry)
+begin;
+select set_config('request.jwt.claim.sub', :V, true);
+set local role authenticated;
+insert into tests.p81 values ('t9fx', public.register_entry(:'fx', tests.entry81('EUR/USD', 'long', '1', '1.08000', -10,
+  '{"stop_pips": "20"}'))->>'trade_id');
+commit;
+select v as t9fx from tests.p81 where k = 't9fx' \gset
+begin;
+select set_config('request.jwt.claim.sub', :V, true);
+set local role authenticated;
+select tests.fails(format('select public.move_stop(%L, %L)', :'t9fx', tests.mv81('breakeven', null, '2000000')),
+                   'bad_price', 'price_now', '«Preço agora» 2 000 000 on EUR/USD: about 2 × 10^10 pips');
+select tests.fails(format('select public.move_stop(%L, %L)', :'t9fx', tests.mv81('ajuste', '1.08100', '1000001.08000')),
+                   'bad_price', 'price_now', 'exactly 10^10 pips does not fit');
+select tests.eq(public.move_stop(:'t9fx', tests.mv81('ajuste', '1.08100', '1000001.07999'))#>>'{stop_moves,0,favor}', '9999999999.90000000',
+                'just below fits');
+select tests.fails(format('select public.register_after(%L, %L, true)', :'fx', jsonb_build_object('v', 1, 'symbol', 'EUR/USD',
+                     'direction', 'long', 'quantity', '1', 'entry_price', '1.08000', 'clock', :NY,
+                     'day', public.compute_trading_day(:'fx', now() - interval '60 minutes')::text, 'entry', tests.hm(:NY, -60),
+                     'exit', tests.hm(:NY, -30), 'exit_price', '1.09000', 'breakeven', jsonb_build_object('price_then', '2000000'))),
+                   'bad_price', 'breakeven', '«Movi o stop para o breakeven» at a price far from the entry (dry run)');
+select tests.fails(format('select public.register_after(%L, %L)', :'fx', jsonb_build_object('v', 1, 'client_key', tests.ck(), 'symbol', 'EUR/USD',
+                     'direction', 'long', 'quantity', '1', 'entry_price', '1.08000', 'clock', :NY, 'allow_similar', true,
+                     'day', public.compute_trading_day(:'fx', now() - interval '60 minutes')::text, 'entry', tests.hm(:NY, -60),
+                     'exit', tests.hm(:NY, -30), 'exit_price', '1.09000', 'breakeven', jsonb_build_object('price_then', '2000000'))),
+                   'bad_price', 'breakeven', 'nor written');
+commit;
+
+-- 9.4 A broker file's position whose average is 10 000 or more (import_commit's group path): a Top
+--     One position of two rows in one file is one trade at the average trade_exits_sum takes at commit
+--     from the stored numeric(18, 8) operands (the typed scales gave …481), the preview as the commit
+begin;
+select set_config('request.jwt.claim.sub', :V, true);
+set local role authenticated;
+insert into public.trading_accounts (user_id, market, label, platform) values
+  (:V, 'futures', 'Lotes V', 'topone'), (:V, 'futures', 'Lotes2 V', 'topone');
+commit;
+select id as lot from public.trading_accounts where user_id = :V and label = 'Lotes V' \gset
+select id as lot2 from public.trading_accounts where user_id = :V and label = 'Lotes2 V' \gset
+create temp table f94 as select
+  tests.row(2, 'BTCUSD/9401', 'BTCUSD', 'futures', 'long', now() - interval '3 days', now() - interval '3 days' + interval '10 minutes',
+            '65000.00', '65110.85', '0.40781226', null, null, 'win', '45.21', null) as x,
+  tests.row(3, 'BTCUSD/9402', 'BTCUSD', 'futures', 'long', now() - interval '3 days', now() - interval '3 days' + interval '30 minutes',
+            '65000.00', '65346.58', '0.28927711', null, null, 'win', '100.26', null) as y;
+select x as x94, y as y94 from f94 \gset
+begin;
+select set_config('request.jwt.claim.sub', :V, true);
+set local role authenticated;
+select tests.eq(public.import_preview(:'lot', 'topone', null, 'UTC', jsonb_build_array(:'x94'::jsonb, :'y94'::jsonb))
+                  - array['first_day', 'last_day', 'account_tz', 'tz_confirmed', 'tz_status', 'already_imported', 'day_changes'],
+                '{"new": 2, "duplicate": 0, "completable": 0, "other_account": 0, "linked": 0, "linked_differs": 0,
+                  "trades_new": 1, "grouped": 1, "attached": 0, "rows_total": 2, "errors": []}'::jsonb,
+                'BTC lots in two rows: the preview, one trade');
+select tests.imp81(:'lot', 'topone', 'f94.csv', jsonb_build_array(:'x94'::jsonb, :'y94'::jsonb)) as c94 \gset
+select tests.eq((:'c94'::jsonb) - 'batch_id' - 'errors',
+                '{"inserted": 2, "duplicate": 0, "completed": 0, "other_account": 0, "linked": 0, "trades": 1, "grouped": 1, "attached": 0}'::jsonb,
+                'BTC lots in two rows: the commit, one trade');
+select tests.eq((select jsonb_build_object('q', t.quantity, 'px', t.exit_price, 'pnl', t.pnl,
+                                           'exits', (select count(*) from public.trade_exits e where e.trade_id = t.id and e.origin = 'file'))
+                 from public.trades t where t.account_id = :'lot'),
+                '{"q": 0.69708937, "px": 65208.67288480, "pnl": 145.47, "exits": 2}'::jsonb,
+                'BTC lots: 0.69708937 @ 65 208.67288480 (the typed scales gave …481), two file exits');
+reset role;
+select tests.eq((select t.exit_price from public.trades t where t.account_id = :'lot'),
+                (public.trade_exits_sum((select t.id from public.trades t where t.account_id = :'lot'))->>'exit_price')::numeric,
+                'BTC lots: the trade''s average = trade_exits_sum''s, before the commit checks it');
+commit;
+
+-- 9.5 import_exits_link's «differs» average: a registered trade whose registration agrees with such a
+--     file (its two exits, its result) is not «com preço ou resultado diferente». The app takes whole
+--     contracts on a futures account, so the registration register_after would write for these lots
+--     («Já fechada» in two exits) is written by the table owner, as 50_phase3 writes trades of its own.
+begin;
+insert into public.trades (user_id, account_id, source, status, symbol, asset_type, direction, quantity, entry_price, exit_price,
+                           result, pnl, pnl_basis, entry_time, exit_time, exit_registered_at)
+values (:V, :'lot2', 'after', 'closed', 'BTCUSD', 'futures', 'long', 0.69708937, 65000.00, 65208.67288480, 'win', 145.47, 'typed',
+        now() - interval '2 days', now() - interval '2 days' + interval '30 minutes', now())
+returning id as rb95 \gset
+insert into public.trade_entry_context (trade_id, user_id, origin, evaluated_at, gate)
+values (:'rb95', :V, 'reconstructed', now() - interval '2 days', '{}');
+insert into public.trade_exits (user_id, trade_id, account_id, origin, kind, quantity, exit_price, exit_time, pnl, pnl_basis)
+values (:V, :'rb95', :'lot2', 'app', 'parcial', 0.40781226, 65110.85, now() - interval '2 days' + interval '10 minutes', 45.21, 'typed'),
+       (:V, :'rb95', :'lot2', 'app', 'final', 0.28927711, 65346.58, now() - interval '2 days' + interval '30 minutes', 100.26, 'typed');
+commit;
+select tests.eq((select t.exit_price from public.trades t where t.id = :'rb95'),
+                (public.trade_exits_sum(:'rb95')->>'exit_price')::numeric, 'the registration: its average is its exits''');
+select entry_time as rb95_entry from public.trades where id = :'rb95' \gset
+create temp table f95 as select
+  tests.row(2, 'BTCUSD/9501', 'BTCUSD', 'futures', 'long', :'rb95_entry'::timestamptz, :'rb95_entry'::timestamptz + interval '10 minutes',
+            '65000.00', '65110.85', '0.40781226', null, null, 'win', '45.21', null) as x,
+  tests.row(3, 'BTCUSD/9502', 'BTCUSD', 'futures', 'long', :'rb95_entry'::timestamptz, :'rb95_entry'::timestamptz + interval '30 minutes',
+            '65000.00', '65346.58', '0.28927711', null, null, 'win', '100.26', null) as y;
+select x as x95, y as y95 from f95 \gset
+begin;
+select set_config('request.jwt.claim.sub', :V, true);
+set local role authenticated;
+select tests.eq(public.import_preview(:'lot2', 'topone', null, 'UTC', jsonb_build_array(:'x95'::jsonb, :'y95'::jsonb))
+                  - array['first_day', 'last_day', 'account_tz', 'tz_confirmed', 'tz_status', 'already_imported', 'day_changes'],
+                '{"new": 0, "duplicate": 0, "completable": 0, "other_account": 0, "linked": 1, "linked_differs": 0,
+                  "trades_new": 0, "grouped": 1, "attached": 0, "rows_total": 2, "errors": []}'::jsonb,
+                'the file as registered: linked, the preview warns of nothing');
+select tests.imp81(:'lot2', 'topone', 'f95.csv', jsonb_build_array(:'x95'::jsonb, :'y95'::jsonb)) as c95 \gset
+select tests.eq((select jsonb_build_object('differs', l.differs, 'px', t.exit_price, 'q', t.quantity, 'pnl', t.pnl,
+                                           'exits', (select count(*) from public.trade_exits e where e.trade_id = t.id and e.origin = 'file'))
+                 from public.trade_import_links l join public.trades t on t.id = l.trade_id
+                 where l.batch_id = (:'c95'::jsonb->>'batch_id')::uuid),
+                '{"differs": [], "px": 65208.67288480, "q": 0.69708937, "pnl": 145.47, "exits": 2}'::jsonb,
+                'nor does the batch record a difference (the typed scales gave …481: «com preço diferente»)');
+commit;
+
 select 'parciais: all tests passed' as result;

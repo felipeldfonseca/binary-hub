@@ -178,7 +178,8 @@ $$;
 
 -- The breakeven rule of a trade, from its version's Resolved: {key, n, un, level} or null (no rule,
 -- a binary, an option contract, no side or entry, the asset not in the rule). level = entry ± n (×
--- the pip for pips), not snapped to the tick (a threshold); null for pips without a pip.
+-- the pip for pips), not snapped to the tick (a threshold), rounded to 8 decimals as a stored price
+-- (an n of 8 decimals in pips would give 12); null for pips without a pip.
 create or replace function public.trade_breakeven(p_resolved jsonb, p_market text, p_symbol text, p_option boolean,
                                                   p_direction text, p_entry numeric)
 returns jsonb
@@ -206,8 +207,8 @@ begin
   return jsonb_build_object(
     'key', k, 'n', n, 'un', r->>'un',
     'level', case when r->>'un' = 'pips' and pip is null then null
-                  else p_entry + (case when p_direction = 'long' then 1 else -1 end) * n
-                                 * (case when r->>'un' = 'pips' then pip else 1 end) end);
+                  else round(p_entry + (case when p_direction = 'long' then 1 else -1 end) * n
+                                       * (case when r->>'un' = 'pips' then pip else 1 end), 8) end);
 exception when others then
   return null;
 end;
@@ -755,6 +756,10 @@ begin
       extra := jsonb_build_object('quantity', t.quantity - done,
                                   'total_pnl', (select sum(e.pnl) from public.trade_exits_v e
                                                 where e.trade_id = t.id and e.counts) + (x->>'pnl')::numeric);
+      -- The trade takes the total (numeric(18, 2)): it must fit, as each exit's result does
+      if abs((extra->>'total_pnl')::numeric) >= 10000000000000000 then
+        perform public.trade_fail('bad_pnl', 'pnl');
+      end if;
     end if;
   end if;
 
@@ -913,7 +918,9 @@ begin
   -- «Preço agora»: required for a breakeven, optional for another level; on the tick
   if p_move ? 'price_now' then
     px := public.trade_num(p_move->'price_now', 10, pdp);
-    if px is null or px <= 0 or px >= 10000000000 then
+    -- …and the points in favour it gives fit trade_stop_moves.favor (numeric(18, 8))
+    if px is null or px <= 0 or px >= 10000000000
+       or abs(public.trade_favor(spec, sgn, t.entry_price, px)) >= 10000000000 then
       perform public.trade_fail('bad_price', 'price_now');
     end if;
     if tick is not null and mod(px, tick) <> 0 then
@@ -1175,8 +1182,12 @@ begin
       perform public.trade_fail('bad_quantity', 'exits');
     end if;
     exit_at := prev;
+    -- The average exit as trade_exits_sum computes it at commit: from the stored numeric(18, 8)
+    -- operands (dividing the typed scales rounds at another scale, and an average ≥ 10 000 could
+    -- then differ in its 8th decimal and fail the commit with exits_mismatch)
     select jsonb_build_object(
-             'exit_price', round(sum((e->>'quantity')::numeric * (e->>'exit_price')::numeric) / sum((e->>'quantity')::numeric), 8),
+             'exit_price', round(sum((e->>'quantity')::numeric(18, 8) * (e->>'exit_price')::numeric(18, 8))
+                                 / sum((e->>'quantity')::numeric(18, 8)), 8),
              'pnl', sum((e->>'pnl')::numeric),
              'commission', case when count(*) filter (where jsonb_typeof(e->'commission') = 'number') > 0
                                 then sum((e->>'commission')::numeric) end,
@@ -1186,6 +1197,13 @@ begin
              'points', round(sum((e->>'quantity')::numeric * (e->>'points')::numeric) / sum((e->>'quantity')::numeric), 8))
       into x
     from jsonb_array_elements(xs) e;
+    -- Each exit's result and «Custos» fit; their sums must fit the trade too (numeric(18, 2))
+    if abs((x->>'pnl')::numeric) >= 10000000000000000 then
+      perform public.trade_fail('bad_pnl', 'exits');
+    end if;
+    if (x->>'commission')::numeric >= 10000000000000000 then
+      perform public.trade_fail('bad_costs', 'exits');
+    end if;
     v_r := public.trade_r_of((f->>'entry_price')::numeric, (f->>'stop_price')::numeric, (f->>'sgn')::int,
                              (f->>'quantity')::numeric, xs);
   else
@@ -1203,7 +1221,10 @@ begin
   -- Phase 3c: «Movi o stop para o breakeven», with the price then (in favour, on the tick)
   if p_trade ? 'breakeven' then
     pt := public.trade_num(p_trade->'breakeven'->'price_then', 10, (spec->>'price_dp')::int);
-    if pt is null or pt <= 0 or pt >= 10000000000 then
+    -- The price then, and the points in favour it gives (trade_stop_moves.favor, numeric(18, 8): a
+    -- typo far from the entry in pips does not fit)
+    if pt is null or pt <= 0 or pt >= 10000000000
+       or abs(public.trade_favor(spec, (f->>'sgn')::int, (f->>'entry_price')::numeric, pt)) >= 10000000000 then
       perform public.trade_fail('bad_price', 'breakeven');
     end if;
     if (spec->>'tick') is not null and mod(pt, (spec->>'tick')::numeric) <> 0 then
@@ -1584,7 +1605,10 @@ begin
   if writes then
     -- What the exits that count will add up to: the trade's file exits (a file exit always counts)
     -- and this file's rows
-    select sum(z.q), sum(z.pnl), case when count(z.px) = count(*) then round(sum(z.q * z.px) / sum(z.q), 8) end
+    -- (the average as trade_exits_sum takes it: from numeric(18, 8) operands)
+    select sum(z.q), sum(z.pnl),
+           case when count(z.px) = count(*)
+                then round(sum(z.q::numeric(18, 8) * z.px::numeric(18, 8)) / sum(z.q::numeric(18, 8)), 8) end
       into pq, ppnl, ppx
     from (select e.quantity as q, e.pnl, e.exit_price as px from public.trade_exits e
           where e.trade_id = tr.id and e.origin = 'file'
@@ -1939,7 +1963,10 @@ begin
            f.stop_price, f.target_price
     from (select sum(r.quantity) as qty, sum(r.pnl) as pnl,
                  case when count(r.commission) > 0 then sum(r.commission) end as com,
-                 case when count(r.exit_price) = count(*) then round(sum(r.quantity * r.exit_price) / sum(r.quantity), 8) end as avg_px
+                 -- the average as trade_exits_sum takes it at commit: from numeric(18, 8) operands
+                 case when count(r.exit_price) = count(*)
+                      then round(sum(r.quantity::numeric(18, 8) * r.exit_price::numeric(18, 8))
+                                 / sum(r.quantity::numeric(18, 8)), 8) end as avg_px
           from pg_temp.import_rows r where r.grp = g.grp and r.path = 'group') x,
          lateral (select r.* from pg_temp.import_rows r where r.grp = g.grp and r.path = 'group'
                   order by r.exit_time, r.line, r.rn limit 1) f,
