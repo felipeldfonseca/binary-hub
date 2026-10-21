@@ -44,8 +44,8 @@ create or replace function tests.day81(p_account uuid) returns date language sql
 $$;
 -- An import as the sheet makes it: the preview, then the commit, in one transaction. The preview counts
 -- every key as the commit does (new = inserted, completable = completed, trades_new = trades, the rest
--- by name; linked_differs = the registered trades the batch records with other money). Returns the
--- commit's answer.
+-- by name; linked_differs = the registered trades the batch records with other money than registered).
+-- Returns the commit's answer.
 create or replace function tests.imp81(p_acc uuid, p_platform text, p_name text, p_rows jsonb, p_tz text default 'UTC')
 returns jsonb language plpgsql volatile as $$
 declare
@@ -88,7 +88,8 @@ insert into public.trading_accounts (user_id, market, label, platform) values
   (:V, 'futures', 'Par1 V', 'topone'), (:V, 'futures', 'Par2 V', 'topone'), (:V, 'futures', 'Par3 V', 'topone'),
   (:V, 'futures', 'Par4 V', 'topone'), (:V, 'futures', 'Par5 V', 'topone'), (:V, 'futures', 'Par6 V', 'topone'),
   (:V, 'futures', 'Par7 V', 'topone'), (:V, 'futures', 'Par8 V', 'topone'), (:V, 'futures', 'Par9 V', 'topone'),
-  (:V, 'futures', 'Par10 V', 'topone'), (:V, 'futures', 'Par11 V', 'topone'), (:V, 'futures', 'Parede2 V', 'topone');
+  (:V, 'futures', 'Par10 V', 'topone'), (:V, 'futures', 'Par11 V', 'topone'), (:V, 'futures', 'Parede2 V', 'topone'),
+  (:V, 'futures', 'Dif V', 'topone');
 commit;
 select id as par from public.trading_accounts where user_id = :V and label = 'Parciais V' \gset
 select id as reg from public.trading_accounts where user_id = :V and label = 'Regra V' \gset
@@ -117,6 +118,7 @@ select id as sb4 from public.trading_accounts where user_id = :V and label = 'Pa
 select id as sb5 from public.trading_accounts where user_id = :V and label = 'Par10 V' \gset
 select id as sb6 from public.trading_accounts where user_id = :V and label = 'Par11 V' \gset
 select id as wl2 from public.trading_accounts where user_id = :V and label = 'Parede2 V' \gset
+select id as dif from public.trading_accounts where user_id = :V and label = 'Dif V' \gset
 
 begin;
 select set_config('request.jwt.claim.sub', :V, true);
@@ -137,8 +139,9 @@ select tests.eq(jsonb_array_length(public.save_rules(jsonb_build_object('v', 1, 
   || (select jsonb_object_agg(a.id::text, jsonb_build_object('rules', '{"v": 1}'::jsonb, 'window', tests.win(:NY, -90, 90), 'version', 'force'))
       from public.trading_accounts a
       where a.user_id = :V and a.label in ('Curto V', 'Opcoes V', 'Hora V', 'Grupo V', 'Parede V', 'Par1 V', 'Par2 V', 'Par3 V', 'Par4 V',
-                                           'Par5 V', 'Par6 V', 'Par7 V', 'Par8 V', 'Par9 V', 'Par10 V', 'Par11 V', 'Parede2 V'))))->'versions'),
-  24, 'twenty-four accounts with rules');
+                                           'Par5 V', 'Par6 V', 'Par7 V', 'Par8 V', 'Par9 V', 'Par10 V', 'Par11 V', 'Parede2 V',
+                                           'Dif V'))))->'versions'),
+  25, 'twenty-five accounts with rules');
 commit;
 alter table public.account_rule_versions disable trigger account_rule_versions_guard;
 update public.account_rule_versions v set effective_from = v.effective_from - interval '30 days' where v.user_id = :V;
@@ -1332,6 +1335,8 @@ select tests.imp81(:'arq', 'topone', 'f10b.csv', jsonb_build_array(:'x10'::jsonb
 commit;
 select tests.eq((select status || ' ' || quantity::int || ' ' || pnl from public.trades where id = :'a10'), 'closed 2 30.00',
                 'the second file: both exits');
+select tests.eq((select differs from public.trade_import_links where trade_id = :'a10' and batch_id = (:'c10b'::jsonb->>'batch_id')::uuid),
+                '{}'::text[], 'the 2 ct registered, no money registered: nothing differs (the first file''s 1 ct did)');
 begin;
 select set_config('request.jwt.claim.sub', :V, true);
 set local role authenticated;
@@ -1422,6 +1427,8 @@ commit;
 select tests.eq((select jsonb_build_object('q', quantity, 'pnl', pnl, 'exit', exit_time = :'a11_exit'::timestamptz) from public.trades where id = :'a11'),
                 '{"q": 3, "pnl": 450.00, "exit": true}'::jsonb, 'three exits, the registered exit hour last');
 select tests.eq(:'c11b'::jsonb->>'attached', '1', 'the third row attached');
+select tests.eq((select differs from public.trade_import_links where trade_id = :'a11' and batch_id = (:'c11b'::jsonb->>'batch_id')::uuid),
+                array['pnl', 'exit_price'], 'against what was registered (3 ct, US$ 600 at 6004): the money differs, the size no longer');
 begin;
 select set_config('request.jwt.claim.sub', :V, true);
 set local role authenticated;
@@ -2018,6 +2025,8 @@ select tests.imp81(:'wal', 'topone', 'w2.csv', jsonb_build_array(
 commit;
 select tests.eq((select source_local_exit = (:'d3'::timestamptz + interval '15 minutes') at time zone 'UTC' and quantity = 3 and pnl = 30
                  from public.trades where id = :'wt'), true, 'the attached exit is the last: the trade''s wall clock is its');
+select tests.eq((select differs from public.trade_import_links where trade_id = :'wt' and batch_id = (:'cw'::jsonb->>'batch_id')::uuid),
+                '{}'::text[], 'an imported trade has nothing registered: no difference recorded');
 begin;
 select set_config('request.jwt.claim.sub', :V, true);
 set local role authenticated;
@@ -2624,6 +2633,155 @@ set local role authenticated;
 select public.import_fix_tz(:'wl2', 'UTC', false)->>'changed';
 commit;
 select tests.eq(tests.fp81(:'wt3'), :'fpwt3', 'back on the first zone: as the first file left it');
+
+-- 8.25 «com preço ou resultado diferente» compares with what the app registered: a later file that
+--      brings the rest of the registration differs in nothing, one that disagrees in what it disagrees on
+begin;
+select set_config('request.jwt.claim.sub', :V, true);
+set local role authenticated;
+insert into tests.p81 values ('df', public.register_entry(:'dif', tests.entry81('MESZ6', 'long', '2', '7900.00', -10))->>'trade_id');
+commit;
+select v as df from tests.p81 where k = 'df' \gset
+begin;
+select set_config('request.jwt.claim.sub', :V, true);
+set local role authenticated;
+select public.register_partial(:'df', jsonb_build_object('v', 1, 'client_key', tests.ck(), 'quantity', '1', 'exit_price', '7904.00',
+                                                        'clock', :NY, 'exit', tests.hm(:NY, -6)))->>'pnl';
+commit;
+begin;
+select set_config('request.jwt.claim.sub', :V, true);
+set local role authenticated;
+select public.register_exit(:'df', '{"v": 1, "exit_price": "7906.00"}')->>'pnl';
+commit;
+select tests.fp81(:'df') as fpdf \gset
+select entry_time as df_entry from public.trades where id = :'df' \gset
+create temp table f825 as select
+  tests.row(2, 'MESZ6/25001', 'MESZ6', 'futures', 'long', :'df_entry'::timestamptz, now() - interval '6 minutes',
+            '7900.00', '7904.00', '1', null, null, 'win', '20.00', '0.62') as x,
+  tests.row(3, 'MESZ6/25002', 'MESZ6', 'futures', 'long', :'df_entry'::timestamptz, now() - interval '1 minute',
+            '7900.00', '7906.00', '1', null, null, 'win', '30.00', '0.62') as y;
+select x as x25, y as y25 from f825 \gset
+begin;
+select set_config('request.jwt.claim.sub', :V, true);
+set local role authenticated;
+select tests.imp81(:'dif', 'topone', 'f25a.csv', jsonb_build_array(:'x25'::jsonb)) as c25a \gset
+commit;
+select tests.eq((select differs from public.trade_import_links where batch_id = (:'c25a'::jsonb->>'batch_id')::uuid),
+                array['quantity', 'pnl', 'exit_price'], 'the mid-session export: 1 ct and US$ 20 against the 2 ct and US$ 50 registered');
+begin;
+select set_config('request.jwt.claim.sub', :V, true);
+set local role authenticated;
+select tests.eq(public.import_preview(:'dif', 'topone', null, 'UTC', jsonb_build_array(:'x25'::jsonb, :'y25'::jsonb))->>'linked_differs', '0',
+                'the full export, as registered: the preview warns of nothing');
+select tests.imp81(:'dif', 'topone', 'f25b.csv', jsonb_build_array(:'x25'::jsonb, :'y25'::jsonb)) as c25b \gset
+commit;
+select tests.eq((select jsonb_build_object('differs', l.differs, 'trade', (select quantity::int || ' ' || pnl || ' ' || exit_price from public.trades where id = :'df'))
+                 from public.trade_import_links l where l.batch_id = (:'c25b'::jsonb->>'batch_id')::uuid),
+                '{"differs": [], "trade": "2 50.00 7905.00000000"}'::jsonb, 'nor does the batch record a difference (it did against the first export''s money)');
+begin;
+select set_config('request.jwt.claim.sub', :V, true);
+set local role authenticated;
+select public.import_undo((:'c25b'::jsonb->>'batch_id')::uuid)->>'deleted';
+commit;
+begin;
+select set_config('request.jwt.claim.sub', :V, true);
+set local role authenticated;
+select tests.imp81(:'dif', 'topone', 'f25c.csv', jsonb_build_array(:'x25'::jsonb, (:'y25'::jsonb) || '{"exit_price": "7907.00", "pnl": "35.00"}'::jsonb)) as c25c \gset
+commit;
+select tests.eq((select differs from public.trade_import_links where batch_id = (:'c25c'::jsonb->>'batch_id')::uuid),
+                array['pnl', 'exit_price'], 'a full export that disagrees: the money, not the 2 ct registered');
+begin;
+select set_config('request.jwt.claim.sub', :V, true);
+set local role authenticated;
+select public.import_undo((:'c25c'::jsonb->>'batch_id')::uuid)->>'deleted', public.import_undo((:'c25a'::jsonb->>'batch_id')::uuid)->>'deleted';
+commit;
+select tests.eq(tests.fp81(:'df'), :'fpdf', 'undone: as registered');
+-- The mid-session export had the entry price a tick off; the full export brings the registered one back
+begin;
+select set_config('request.jwt.claim.sub', :V, true);
+set local role authenticated;
+select tests.imp81(:'dif', 'topone', 'f25d.csv', jsonb_build_array((:'x25'::jsonb) || '{"entry_price": "7900.25"}'::jsonb)) as c25d \gset
+commit;
+select tests.eq((select differs from public.trade_import_links where batch_id = (:'c25d'::jsonb->>'batch_id')::uuid),
+                array['entry_price', 'quantity', 'pnl', 'exit_price'], 'the entry price a tick off');
+begin;
+select set_config('request.jwt.claim.sub', :V, true);
+set local role authenticated;
+select tests.imp81(:'dif', 'topone', 'f25b.csv', jsonb_build_array(:'x25'::jsonb, :'y25'::jsonb)) as c25b \gset
+commit;
+select tests.eq((select jsonb_build_object('differs', l.differs, 'px', (select entry_price from public.trades where id = :'df'))
+                 from public.trade_import_links l where l.batch_id = (:'c25b'::jsonb->>'batch_id')::uuid),
+                '{"differs": [], "px": 7900.00}'::jsonb, 'the full export writes the registered entry price back: no difference');
+begin;
+select set_config('request.jwt.claim.sub', :V, true);
+set local role authenticated;
+select public.import_undo((:'c25b'::jsonb->>'batch_id')::uuid)->>'deleted', public.import_undo((:'c25d'::jsonb->>'batch_id')::uuid)->>'deleted';
+commit;
+select tests.eq(tests.fp81(:'df'), :'fpdf', 'undone: as registered');
+-- Three exports of a trade registered in three exits: each compares with the registration, not with
+-- the export before it
+begin;
+select set_config('request.jwt.claim.sub', :V, true);
+set local role authenticated;
+insert into tests.p81 values ('dg', public.register_entry(:'dif', tests.entry81('MNQZ6', 'long', '3', '21000.00', -10))->>'trade_id');
+commit;
+select v as dg from tests.p81 where k = 'dg' \gset
+begin;
+select set_config('request.jwt.claim.sub', :V, true);
+set local role authenticated;
+select public.register_partial(:'dg', jsonb_build_object('v', 1, 'client_key', tests.ck(), 'quantity', '1', 'exit_price', '21002.00',
+                                                        'clock', :NY, 'exit', tests.hm(:NY, -8)))->>'pnl';
+commit;
+begin;
+select set_config('request.jwt.claim.sub', :V, true);
+set local role authenticated;
+select public.register_partial(:'dg', jsonb_build_object('v', 1, 'client_key', tests.ck(), 'quantity', '1', 'exit_price', '21004.00',
+                                                        'clock', :NY, 'exit', tests.hm(:NY, -5)))->>'pnl';
+commit;
+begin;
+select set_config('request.jwt.claim.sub', :V, true);
+set local role authenticated;
+select public.register_exit(:'dg', '{"v": 1, "exit_price": "21006.00"}')->>'pnl';
+commit;
+select tests.fp81(:'dg') as fpdg \gset
+select entry_time as dg_entry from public.trades where id = :'dg' \gset
+create temp table f825g as select
+  tests.row(2, 'MNQZ6/25101', 'MNQZ6', 'futures', 'long', :'dg_entry'::timestamptz, now() - interval '7 minutes',
+            '21000.00', '21002.00', '1', null, null, 'win', '4.00', '0.62') as x,
+  tests.row(3, 'MNQZ6/25102', 'MNQZ6', 'futures', 'long', :'dg_entry'::timestamptz, now() - interval '4 minutes',
+            '21000.00', '21004.00', '1', null, null, 'win', '8.00', '0.62') as y,
+  tests.row(4, 'MNQZ6/25103', 'MNQZ6', 'futures', 'long', :'dg_entry'::timestamptz, now() - interval '1 minute',
+            '21000.00', '21006.00', '1', null, null, 'win', '12.00', '0.62') as z;
+select x as x25g, y as y25g, z as z25g from f825g \gset
+begin;
+select set_config('request.jwt.claim.sub', :V, true);
+set local role authenticated;
+select tests.imp81(:'dif', 'topone', 'f25e.csv', jsonb_build_array(:'x25g'::jsonb)) as c25e \gset
+commit;
+begin;
+select set_config('request.jwt.claim.sub', :V, true);
+set local role authenticated;
+select tests.imp81(:'dif', 'topone', 'f25f.csv', jsonb_build_array(:'x25g'::jsonb, :'y25g'::jsonb)) as c25f \gset
+commit;
+begin;
+select set_config('request.jwt.claim.sub', :V, true);
+set local role authenticated;
+select tests.imp81(:'dif', 'topone', 'f25g.csv', jsonb_build_array(:'x25g'::jsonb, :'y25g'::jsonb, :'z25g'::jsonb)) as c25g \gset
+commit;
+select tests.eq((select jsonb_agg(l.differs order by l.linked_at) from public.trade_import_links l where l.trade_id = :'dg'),
+                '[["quantity", "pnl", "exit_price"], ["quantity", "pnl", "exit_price"], []]'::jsonb,
+                'two exports short of the 3 ct registered, then the full one: as registered');
+begin;
+select set_config('request.jwt.claim.sub', :V, true);
+set local role authenticated;
+select public.import_undo((:'c25f'::jsonb->>'batch_id')::uuid)->>'deleted';
+commit;
+begin;
+select set_config('request.jwt.claim.sub', :V, true);
+set local role authenticated;
+select public.import_undo((:'c25e'::jsonb->>'batch_id')::uuid)->>'deleted', public.import_undo((:'c25g'::jsonb->>'batch_id')::uuid)->>'deleted';
+commit;
+select tests.eq(tests.fp81(:'dg'), :'fpdg', 'undone (the middle first): as registered');
 
 -- =============================================================================================
 -- 9. The tables are as specified

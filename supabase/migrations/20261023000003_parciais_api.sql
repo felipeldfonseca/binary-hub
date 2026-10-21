@@ -1488,9 +1488,11 @@ $$;
 -- the trade, with the app's final hour last); an open app trade closes at the file's last exit (never
 -- after now); an imported trade takes the file's instants. An open trade whose file exit is after now
 -- (a file read on the wrong clock), or a row without an exit, gets the key and the entry price only.
--- "differs" (the money the trade had otherwise) is computed before anything is written, from what the
--- exits that count will add up to (the trade's file exits and this file's rows), so p_dry (the
--- preview: no batch, no lock, nothing written) answers what the commit records.
+-- "differs" (the money the app registered otherwise: what the trade had before any file wrote over it,
+-- so a later file that brings the rest of what was registered differs in nothing) is computed before
+-- anything is written, from what the exits that count will add up to (the trade's file exits and this
+-- file's rows), so p_dry (the preview: no batch, no lock, nothing written) answers what the commit
+-- records.
 -- Returns {rows: file exits written, new_rows: this file's new lines for the trade, app, differs} or
 -- null (nothing of this file for the trade).
 create or replace function public.import_exits_link(p_trade uuid, p_batch uuid, p_platform text, p_grp bigint,
@@ -1520,6 +1522,7 @@ declare
   s jsonb := '{}'::jsonb;
   sm jsonb;
   differs text[] := '{}';
+  was jsonb := '{}'::jsonb;
   closes boolean := false;
   first_line int;
   last_file timestamptz;
@@ -1555,13 +1558,26 @@ begin
   end if;
   writes := writes and not (tr.status = 'open' and last_file > now());
 
+  -- What the app registered: a value an earlier file wrote over is in that file's link (the earliest
+  -- link's before; an undo gives a later link's before back), any other is the trade's own. An imported
+  -- trade has nothing registered: its links record no differences.
+  if app then
+    select jsonb_build_object('entry_price', tr.entry_price, 'quantity', tr.quantity, 'pnl', tr.pnl, 'exit_price', tr.exit_price)
+           || coalesce(jsonb_object_agg(k.key, k.value), '{}'::jsonb)
+      into was
+    from (select distinct on (b.key) b.key, b.value
+          from public.trade_import_links l, jsonb_each(l.before) b
+          where l.trade_id = tr.id and b.key in ('entry_price', 'quantity', 'pnl', 'exit_price')
+          order by b.key, l.linked_at, l.batch_id) k;
+  end if;
+
   if tr.external_id is null then
     s := jsonb_build_object('source_platform', p_platform, 'external_id', f_rows[1]->>'external_id',
                             'notes', p_platform || ':' || (f_rows[1]->>'external_id'));
   end if;
   if entry_px is not null and tr.entry_price is distinct from entry_px then
     s := s || jsonb_build_object('entry_price', entry_px);
-    if tr.entry_price is not null then
+    if (was->>'entry_price')::numeric <> entry_px then
       differs := differs || 'entry_price'::text;
     end if;
   end if;
@@ -1574,13 +1590,13 @@ begin
           where e.trade_id = tr.id and e.origin = 'file'
           union all
           select (r->>'quantity')::numeric, (r->>'pnl')::numeric, (r->>'exit_price')::numeric from unnest(f_rows) r) z;
-    if tr.quantity is not null and tr.quantity <> pq then
+    if (was->>'quantity')::numeric <> pq then
       differs := differs || 'quantity'::text;
     end if;
-    if tr.pnl is not null and tr.pnl <> ppnl then
+    if (was->>'pnl')::numeric <> ppnl then
       differs := differs || 'pnl'::text;
     end if;
-    if tr.exit_price is not null and tr.exit_price is distinct from ppx then
+    if (was->>'exit_price')::numeric is distinct from ppx and was->>'exit_price' is not null then
       differs := differs || 'exit_price'::text;
     end if;
   end if;
