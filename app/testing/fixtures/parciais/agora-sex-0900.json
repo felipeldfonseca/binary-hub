@@ -1,12 +1,12 @@
 {
   "accounts": [
     {
-      "at": "2026-10-23T13:00:04.925217+00:00",
+      "at": "2026-10-23T13:00:04.893389+00:00",
       "block": {
         "state": "nao_avaliado",
         "reason": "fase5"
       },
-      "desde": "2026-10-23T13:00:04.900554+00:00",
+      "desde": "2026-10-23T13:00:04.869934+00:00",
       "label": "Top One #1",
       "limit": {
         "usd": 400,
@@ -97,14 +97,14 @@
         "position": "antes"
       },
       "version": {
-        "id": "1da732fe-33ac-4dbe-b77e-e79ae4390c7c",
+        "id": "396d68c0-80dd-4955-b03a-534cf9453940",
         "origin": "criar",
         "version_no": 1,
-        "effective_from": "2026-10-23T13:00:04.900554+00:00"
+        "effective_from": "2026-10-23T13:00:04.869934+00:00"
       },
       "warnings": [],
       "desde_day": "2026-10-23",
-      "account_id": "701ac848-6d51-4742-a472-c303b8da7a1d",
+      "account_id": "d5d58ed4-cdd7-4096-b823-6632ba921983",
       "changes_at": "2026-10-23T14:00:00+00:00",
       "state_rule": {
         "state": "nao_avaliado",
@@ -117,12 +117,12 @@
       ]
     },
     {
-      "at": "2026-10-23T13:00:04.925217+00:00",
+      "at": "2026-10-23T13:00:04.893389+00:00",
       "block": {
         "state": "nao_avaliado",
         "reason": "fase5"
       },
-      "desde": "2026-10-23T13:00:04.900554+00:00",
+      "desde": "2026-10-23T13:00:04.869934+00:00",
       "label": "Apex A",
       "limit": {
         "usd": 400,
@@ -213,14 +213,14 @@
         "position": "antes"
       },
       "version": {
-        "id": "1de74d16-a9a8-4c5d-812e-305f9b272f42",
+        "id": "b02ff33d-08bd-44c8-bf45-30fa4abad20b",
         "origin": "criar",
         "version_no": 1,
-        "effective_from": "2026-10-23T13:00:04.900554+00:00"
+        "effective_from": "2026-10-23T13:00:04.869934+00:00"
       },
       "warnings": [],
       "desde_day": "2026-10-23",
-      "account_id": "bddc0593-0f9e-4eed-8ad6-aafdcb41bf41",
+      "account_id": "943e4448-3542-456a-86f8-cbd31456abf0",
       "changes_at": "2026-10-23T14:00:00+00:00",
       "state_rule": {
         "state": "nao_avaliado",
@@ -233,12 +233,12 @@
       ]
     },
     {
-      "at": "2026-10-23T13:00:04.925217+00:00",
+      "at": "2026-10-23T13:00:04.893389+00:00",
       "block": {
         "state": "nao_avaliado",
         "reason": "so_futuros"
       },
-      "desde": "2026-10-23T13:00:04.900554+00:00",
+      "desde": "2026-10-23T13:00:04.869934+00:00",
       "label": "FTMO",
       "limit": {
         "usd": 1000,
@@ -311,14 +311,14 @@
         "position": "dentro"
       },
       "version": {
-        "id": "22ce9548-fb7c-4215-957a-a478e078d0b3",
+        "id": "bdc832c9-59f9-4449-8bde-c59a43f9df90",
         "origin": "criar",
         "version_no": 1,
-        "effective_from": "2026-10-23T13:00:04.900554+00:00"
+        "effective_from": "2026-10-23T13:00:04.869934+00:00"
       },
       "warnings": [],
       "desde_day": "2026-10-23",
-      "account_id": "c6e063b9-50ea-40b4-8fe9-593a6b2df449",
+      "account_id": "c2cc43c6-f9c6-43fd-9e32-0f4205937908",
       "changes_at": "2026-10-23T19:00:00+00:00",
       "state_rule": {
         "state": "nao_avaliado",
@@ -331,5 +331,5 @@
       ]
     }
   ],
-  "server_now": "2026-10-23T13:00:04.925217+00:00"
+  "server_now": "2026-10-23T13:00:04.893389+00:00"
 }

@@ -6,7 +6,7 @@
       "state": "nao_avaliado",
       "reason": "fase5"
     },
-    "desde": "2026-10-23T13:00:04.900554+00:00",
+    "desde": "2026-10-23T13:00:04.869934+00:00",
     "label": "Top One #1",
     "limit": {
       "usd": 400,
@@ -43,14 +43,14 @@
       "position": "dentro"
     },
     "version": {
-      "id": "1da732fe-33ac-4dbe-b77e-e79ae4390c7c",
+      "id": "396d68c0-80dd-4955-b03a-534cf9453940",
       "origin": "criar",
       "version_no": 1,
-      "effective_from": "2026-10-23T13:00:04.900554+00:00"
+      "effective_from": "2026-10-23T13:00:04.869934+00:00"
     },
     "warnings": [],
     "desde_day": "2026-10-23",
-    "account_id": "701ac848-6d51-4742-a472-c303b8da7a1d",
+    "account_id": "d5d58ed4-cdd7-4096-b823-6632ba921983",
     "changes_at": "2026-10-23T15:00:00+00:00",
     "state_rule": {
       "state": "nao_avaliado",
@@ -84,7 +84,7 @@
       "commission": null,
       "exit_price": 4409.3,
       "file_exit_at": null,
-      "registered_at": "2026-10-23T14:45:04.961388+00:00"
+      "registered_at": "2026-10-23T14:45:05.064297+00:00"
     },
     {
       "id": 4,
@@ -99,12 +99,12 @@
       "commission": null,
       "exit_price": 4421.3,
       "file_exit_at": null,
-      "registered_at": "2026-10-23T14:45:04.961388+00:00"
+      "registered_at": "2026-10-23T14:45:05.064297+00:00"
     }
   ],
   "marks": [],
   "trade": {
-    "id": "c5bb75fa-e710-4594-97aa-021a5f3fedeb",
+    "id": "1c38287d-9109-4108-b172-2a6128af131e",
     "pnl": 120,
     "note": null,
     "option": null,
@@ -117,7 +117,7 @@
     "exit_time": "2026-10-23T14:38:00+00:00",
     "pnl_basis": "prices",
     "timeframe": null,
-    "account_id": "701ac848-6d51-4742-a472-c303b8da7a1d",
+    "account_id": "d5d58ed4-cdd7-4096-b823-6632ba921983",
     "asset_type": "futures",
     "commission": null,
     "entry_time": "2026-10-23T14:24:00+00:00",
@@ -129,10 +129,10 @@
     "stake_amount": null,
     "target_price": 4391.3,
     "note_saved_at": null,
-    "registered_at": "2026-10-23T14:45:04.961388+00:00",
+    "registered_at": "2026-10-23T14:45:05.064297+00:00",
     "payout_percent": null,
     "duration_seconds": null,
-    "exit_registered_at": "2026-10-23T14:45:04.961388+00:00"
+    "exit_registered_at": "2026-10-23T14:45:05.064297+00:00"
   },
   "images": [],
   "points": 6,
@@ -143,7 +143,7 @@
     "warnings": [],
     "in_window": true,
     "after_limit": false,
-    "captured_at": "2026-10-23T14:45:04.961388+00:00",
+    "captured_at": "2026-10-23T14:45:05.064297+00:00",
     "gate_status": "liberado",
     "evaluated_at": "2026-10-23T14:24:00+00:00",
     "state_choice": null,
@@ -157,17 +157,17 @@
   "dry_run": false,
   "similar": [],
   "version": {
-    "id": "1da732fe-33ac-4dbe-b77e-e79ae4390c7c",
+    "id": "396d68c0-80dd-4955-b03a-534cf9453940",
     "version_no": 1
   },
   "entry_at": "2026-10-23T14:24:00+00:00",
   "gate_now": {
-    "at": "2026-10-23T14:45:04.961388+00:00",
+    "at": "2026-10-23T14:45:05.064297+00:00",
     "block": {
       "state": "nao_avaliado",
       "reason": "fase5"
     },
-    "desde": "2026-10-23T13:00:04.900554+00:00",
+    "desde": "2026-10-23T13:00:04.869934+00:00",
     "label": "Top One #1",
     "limit": {
       "usd": 400,
@@ -204,14 +204,14 @@
       "position": "dentro"
     },
     "version": {
-      "id": "1da732fe-33ac-4dbe-b77e-e79ae4390c7c",
+      "id": "396d68c0-80dd-4955-b03a-534cf9453940",
       "origin": "criar",
       "version_no": 1,
-      "effective_from": "2026-10-23T13:00:04.900554+00:00"
+      "effective_from": "2026-10-23T13:00:04.869934+00:00"
     },
     "warnings": [],
     "desde_day": "2026-10-23",
-    "account_id": "701ac848-6d51-4742-a472-c303b8da7a1d",
+    "account_id": "d5d58ed4-cdd7-4096-b823-6632ba921983",
     "changes_at": "2026-10-23T15:00:00+00:00",
     "state_rule": {
       "state": "nao_avaliado",
@@ -237,7 +237,7 @@
     "stop_initial": 4436.3
   },
   "repeated": false,
-  "trade_id": "c5bb75fa-e710-4594-97aa-021a5f3fedeb",
+  "trade_id": "1c38287d-9109-4108-b172-2a6128af131e",
   "breakeven": {
     "n": 5,
     "un": "pts",
@@ -245,7 +245,7 @@
     "level": 4416.3
   },
   "marks_now": [],
-  "server_now": "2026-10-23T14:45:04.961388+00:00",
+  "server_now": "2026-10-23T14:45:05.064297+00:00",
   "stop_moves": [
     {
       "id": 3,
@@ -254,7 +254,7 @@
       "favor": 12,
       "origin": "reconstructed",
       "ao_vivo": false,
-      "moved_at": "2026-10-23T14:45:04.961388+00:00",
+      "moved_at": "2026-10-23T14:45:05.064297+00:00",
       "prev_stop": 4436.3,
       "price_now": 4409.3,
       "voided_at": null,
@@ -262,5 +262,5 @@
     }
   ],
   "trading_day": "2026-10-23",
-  "registered_at": "2026-10-23T14:45:04.961388+00:00"
+  "registered_at": "2026-10-23T14:45:05.064297+00:00"
 }

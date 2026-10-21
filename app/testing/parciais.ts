@@ -13,6 +13,7 @@
  *   entry-mes               10:12 MES Compra 3 ct a 7.912,50, stop 10 · alvo 20 (rule: em 7.920,50)
  *   partial-dry-mes         10:18 «Parcial» 1 ct a 7.920,50: +8 pts · +US$ 40, ficam 2
  *   partial-mes             the same, registered (undo: the partial)
+ *   partial-mes-repetida    the same client_key again: «repeated», what was registered, nothing written
  *   dia-top-1018            Top One's trades and exits of the day, and rules_now(): the partial counts
  *   stop-mes-breakeven      10:19 «Mover stop» Breakeven with «Preço agora» 7.920,50 (+8 pts)
  *   stop-mes-desfeito       10:20 «Desfazer» the move (the stop back to 7.902,50)
@@ -31,6 +32,9 @@
  *                           «Preço agora» (an «ajuste», no points)
  *   stop-mes-entrada-breakeven 11:32 the same level with «Preço agora» 7.934,25, after «Desfazer»
  *                           (a breakeven, +4,25 pts)
+ *   rows-<answer>           what the API's table reads (readTradeViewRows) returned right after the
+ *                           answer of that name: partial-mes, exit-mes, after-mgc, partial-mnq-desfeita,
+ *                           stop-eurusd-ajuste (hubParciais.test.ts reads them back with fetchTradeState)
  */
 import fs from 'fs';
 import path from 'path';

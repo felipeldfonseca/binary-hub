@@ -1,11 +1,11 @@
 {
   "gate": {
-    "at": "2026-10-23T15:15:04.642266+00:00",
+    "at": "2026-10-23T15:15:04.745024+00:00",
     "block": {
       "state": "nao_avaliado",
       "reason": "so_futuros"
     },
-    "desde": "2026-10-23T13:00:04.900554+00:00",
+    "desde": "2026-10-23T13:00:04.869934+00:00",
     "label": "FTMO",
     "limit": {
       "usd": 1000,
@@ -42,14 +42,14 @@
       "position": "dentro"
     },
     "version": {
-      "id": "22ce9548-fb7c-4215-957a-a478e078d0b3",
+      "id": "bdc832c9-59f9-4449-8bde-c59a43f9df90",
       "origin": "criar",
       "version_no": 1,
-      "effective_from": "2026-10-23T13:00:04.900554+00:00"
+      "effective_from": "2026-10-23T13:00:04.869934+00:00"
     },
     "warnings": [],
     "desde_day": "2026-10-23",
-    "account_id": "c6e063b9-50ea-40b4-8fe9-593a6b2df449",
+    "account_id": "c2cc43c6-f9c6-43fd-9e32-0f4205937908",
     "changes_at": "2026-10-23T19:00:00+00:00",
     "state_rule": {
       "state": "nao_avaliado",
@@ -77,18 +77,18 @@
       "counts": true,
       "origin": "app",
       "quantity": 0.5,
-      "exit_time": "2026-10-23T15:17:04.673563+00:00",
+      "exit_time": "2026-10-23T15:17:04.777261+00:00",
       "pnl_basis": "prices",
       "voided_at": null,
       "commission": null,
       "exit_price": 1.0865,
       "file_exit_at": null,
-      "registered_at": "2026-10-23T15:17:04.673563+00:00"
+      "registered_at": "2026-10-23T15:17:04.777261+00:00"
     }
   ],
   "marks": [],
   "trade": {
-    "id": "5afb1e7b-d2eb-4b89-ac7f-eebca85ad29e",
+    "id": "d816f0d0-a032-4538-bd0a-ad0658b125fd",
     "pnl": null,
     "note": null,
     "option": null,
@@ -101,10 +101,10 @@
     "exit_time": null,
     "pnl_basis": null,
     "timeframe": null,
-    "account_id": "c6e063b9-50ea-40b4-8fe9-593a6b2df449",
+    "account_id": "c2cc43c6-f9c6-43fd-9e32-0f4205937908",
     "asset_type": "forex",
     "commission": null,
-    "entry_time": "2026-10-23T15:15:04.642266+00:00",
+    "entry_time": "2026-10-23T15:15:04.745024+00:00",
     "exit_price": null,
     "expires_at": null,
     "stop_price": 1.084,
@@ -113,7 +113,7 @@
     "stake_amount": null,
     "target_price": null,
     "note_saved_at": null,
-    "registered_at": "2026-10-23T15:15:04.642266+00:00",
+    "registered_at": "2026-10-23T15:15:04.745024+00:00",
     "payout_percent": null,
     "duration_seconds": null,
     "exit_registered_at": null
@@ -126,9 +126,9 @@
     "warnings": [],
     "in_window": true,
     "after_limit": false,
-    "captured_at": "2026-10-23T15:15:04.642266+00:00",
+    "captured_at": "2026-10-23T15:15:04.745024+00:00",
     "gate_status": "liberado",
-    "evaluated_at": "2026-10-23T15:15:04.642266+00:00",
+    "evaluated_at": "2026-10-23T15:15:04.745024+00:00",
     "state_choice": null,
     "checks_evaluated": [
       "janela",
@@ -139,17 +139,17 @@
   },
   "move_id": 4,
   "version": {
-    "id": "22ce9548-fb7c-4215-957a-a478e078d0b3",
+    "id": "bdc832c9-59f9-4449-8bde-c59a43f9df90",
     "version_no": 1
   },
-  "entry_at": "2026-10-23T15:15:04.642266+00:00",
+  "entry_at": "2026-10-23T15:15:04.745024+00:00",
   "position": {
     "r": null,
     "open": 0.5,
     "undo": {
       "id": 4,
       "kind": "stop",
-      "until": "2026-10-23T15:32:04.695197+00:00"
+      "until": "2026-10-23T15:32:04.798684+00:00"
     },
     "exits": 1,
     "closed": 0.5,
@@ -161,7 +161,7 @@
     "stop_initial": 1.084
   },
   "repeated": false,
-  "trade_id": "5afb1e7b-d2eb-4b89-ac7f-eebca85ad29e",
+  "trade_id": "d816f0d0-a032-4538-bd0a-ad0658b125fd",
   "breakeven": {
     "n": 7.5,
     "un": "pips",
@@ -169,7 +169,7 @@
     "level": 1.08595
   },
   "marks_now": [],
-  "server_now": "2026-10-23T15:17:04.695197+00:00",
+  "server_now": "2026-10-23T15:17:04.798684+00:00",
   "stop_moves": [
     {
       "id": 4,
@@ -178,7 +178,7 @@
       "favor": 13,
       "origin": "live",
       "ao_vivo": true,
-      "moved_at": "2026-10-23T15:17:04.695197+00:00",
+      "moved_at": "2026-10-23T15:17:04.798684+00:00",
       "prev_stop": 1.084,
       "price_now": 1.0865,
       "voided_at": null,
@@ -186,5 +186,5 @@
     }
   ],
   "trading_day": "2026-10-23",
-  "registered_at": "2026-10-23T15:15:04.642266+00:00"
+  "registered_at": "2026-10-23T15:15:04.745024+00:00"
 }

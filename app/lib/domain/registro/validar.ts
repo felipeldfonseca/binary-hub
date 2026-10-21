@@ -16,8 +16,8 @@ import type { AccountMarket } from '../markets';
 import { tradeInstrument, type Direction, type OptionContract } from './caps';
 import { afterBreakeven, type AfterBreakeven } from './breakeven';
 import { afterEntryAt, afterInstants, binaryExpiry, entryInstant, exitInstant, isExpired, optionExpiredAt } from './horario';
-import { add, numeric, plainText, sub } from './numeric';
-import { afterExits, countingExits, rOfExits, type AfterExitResult, type TradeExit } from './parciais';
+import { abs, add, cmp, numeric, plainText, sub } from './numeric';
+import { MAX_AMOUNT, afterExits, countingExits, rOfExits, type AfterExitResult, type TradeExit } from './parciais';
 import { checkPayload, parseEntry, refuse, type AfterPayload, type Checked, type EntryPayload, type ExitPayload, type ParsedEntry } from './payload';
 import { pnlFor, rMultiple, type ExitResult } from './pnl';
 
@@ -86,7 +86,9 @@ export interface ExitRest {
  * register_exit: the trade, the payload, the binary expiry or the exit (result, instant, R).
  * After partials (Phase 3c) the exit is the rest of the position: its result is the rest's (the
  * commission stays unknown until «Custos» or a file), its hour not before the last partial
- * (exit_before_partial), R covers every exit, and `rest` says what it closes and the total.
+ * (exit_before_partial), R covers every exit, the total fits the trade (bad_pnl, field 'pnl'), and
+ * `rest` says what it closes and the total. The partials' results are as the data layer read them
+ * (JSON numbers: exact to the cent below about 9 × 10^13, far beyond any trade).
  */
 export function validateExit(
   t: OpenTrade,
@@ -125,7 +127,10 @@ export function validateExit(
   if (at.at.getTime() < last) return refuse('exit_before_partial', 'exit');
   const sgn: 1 | -1 = t.direction === 'long' ? 1 : -1;
   const r = rOfExits(t.entryPrice, t.stopPrice, sgn, t.quantity, [...partials, { quantity: rest as string, exitPrice: exit.exitPrice }]);
-  const totalPnl = plainText(partials.reduce((s, e) => add(s, numeric(e.pnl)), numeric(exit.pnl)));
+  const total = partials.reduce((s, e) => add(s, numeric(e.pnl)), numeric(exit.pnl));
+  // The trade takes the total (numeric(18, 2)): it must fit, as each exit's result does
+  if (cmp(abs(total), MAX_AMOUNT) >= 0) return refuse('bad_pnl', 'pnl');
+  const totalPnl = plainText(total);
   return { ok: true, exit, exitAt: at.at, r, rest: { quantity: rest as string, totalPnl } };
 }
 

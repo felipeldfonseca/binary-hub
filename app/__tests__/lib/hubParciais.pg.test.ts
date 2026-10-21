@@ -46,7 +46,6 @@ import {
   validateMove,
   validatePartial,
   type OpenTrade,
-  type TradeExit,
 } from '@/lib/domain/registro';
 import { parseRulesNow, type RulesNow } from '@/lib/hub/regras';
 import {
@@ -135,8 +134,11 @@ describePg('Phase 3c × the real SQL: partials, «Mover stop», «Desfazer» and
     return r.data as Record<string, unknown>[];
   };
 
-  /** The state the write answered = the twins on its own rows; the tables read back the same trade */
-  async function checkState(s: TradeState, market: string) {
+  /**
+   * The state the write answered = the twins on its own rows; the tables read back the same trade
+   * (`name`: also records those rows, for hubParciais.test.ts to read them back without a database)
+   */
+  async function checkState(s: TradeState, market: string, name?: string) {
     const origin = s.context?.origin ?? null;
     expect(s.position).toEqual(positionOf(s.trade, s.exits, s.stopMoves, origin, s.serverNow));
     const rules = rulesNow().parsed.accounts.find((a) => a.accountId === s.trade.accountId)!.rules!;
@@ -154,7 +156,9 @@ describePg('Phase 3c × the real SQL: partials, «Mover stop», «Desfazer» and
     for (const m of s.marks) {
       expect(isClean(m.markedAt, { origin, exitTime: s.trade.exitTime, expiresAt: s.trade.expiresAt, exitRegisteredAt: s.trade.exitRegisteredAt, firstExit: firstExitCut(s.exits) })).toBe(m.limpa);
     }
-    const view = tradeViewOfRows((await readTradeViewRows(db, s.trade.id))!);
+    const viewRows = (await readTradeViewRows(db, s.trade.id))!;
+    if (name) write(`rows-${name}`, viewRows);
+    const view = tradeViewOfRows(viewRows);
     const { serverNow: _now, ...answered } = s;
     // Read from the tables there is no server clock: «Desfazer» names the newest event whatever its age
     expect({ ...view, position: { ...view.position, undo: answered.position.undo } }).toEqual(answered);
@@ -284,12 +288,13 @@ delete from public.profiles where id = '${uid}';`);
     // «Esta parcial saiu com +8,00 pts. Pela sua regra, com +8 pts o stop vai para o breakeven.»
     const spec = tradeInstrument('futures', 'MES')!;
     expect(breakevenSuggestion(spec, reg.state.breakeven, 1, '7912.5', '7920.5', reg.state.position.stopNow)).toEqual({ favor: '8', n: '8', un: 'pts' });
-    await checkState(reg.state, 'futures');
+    await checkState(reg.state, 'futures', 'partial-mes');
     // The limit counts the partial at its own minute
     const day = await checkDay(acc.topOne, '2026-10-23', 'top-1018');
     expect(day.today).toEqual({ trades: 1, netCents: 4000, worstCents: 0 });
 
     const again = await registerPartial(db, trades.mes, partialPayload({ quantity: '1', exitPrice: '7920.50', exit: '10:18', clock: NY, clientKey: key }));
+    write('partial-mes-repetida', lastAnswer());
     expect(again).toMatchObject({ repeated: true, exitId: reg.exitId, partial: null, gateNow: null });
   });
 
@@ -390,7 +395,7 @@ delete from public.profiles where id = '${uid}';`);
       ['parcial', '1', '40'],
       ['final', '2', '135'],
     ]);
-    await checkState(reg.state, 'futures');
+    await checkState(reg.state, 'futures', 'exit-mes');
     await checkDay(acc.topOne, '2026-10-23', 'top-1031');
   });
 
@@ -455,7 +460,7 @@ delete from public.profiles where id = '${uid}';`);
       expect.objectContaining({ origin: 'reconstructed', kind: 'breakeven', stopPrice: '4421.3', prevStop: '4436.3', priceNow: '4409.3', favor: '12', aoVivo: false }),
     ]);
     expect(reg.state.breakeven).toEqual({ key: 'MGC', n: '5', un: 'pts', level: '4416.3' });
-    await checkState(reg.state, 'futures');
+    await checkState(reg.state, 'futures', 'after-mgc');
     await checkDay(acc.topOne, '2026-10-23', 'top-1045');
   });
 
@@ -485,7 +490,7 @@ delete from public.profiles where id = '${uid}';`);
     write('partial-mnq-desfeita', lastAnswer());
     expect(undone.state.position).toMatchObject({ open: '3', closed: '0', realizedPnl: null, exits: 0, partials: 0, undo: null });
     expect(undone.state.exits).toEqual([expect.objectContaining({ id: reg.exitId, voidedAt: expect.any(Date), counts: false })]);
-    await checkState(undone.state, 'futures');
+    await checkState(undone.state, 'futures', 'partial-mnq-desfeita');
     const after = await checkDay(acc.apex, '2026-10-23', 'apex-1055');
     expect(after.today).toEqual({ trades: 1, netCents: -30000, worstCents: -30000 });
 
@@ -511,7 +516,7 @@ delete from public.profiles where id = '${uid}';`);
     write('stop-eurusd-ajuste', lastAnswer());
     expect(mv.state.stopMoves[0]).toMatchObject({ kind: 'ajuste', stopPrice: '1.0856', favor: '13', unit: 'pips' });
     expect(stopNowStatus(spec, 1, '1.0852', mv.state.position.stopNow, mv.state.position.stopKind)).toEqual({ state: 'garante', distance: '4', unit: 'pips' });
-    await checkState(mv.state, 'forex');
+    await checkState(mv.state, 'forex', 'stop-eurusd-ajuste');
   });
 
   it('every price market: a partial (dry run, refusals, result), the exit after it and «Já fechada» in two exits = the domain', async () => {
@@ -644,6 +649,142 @@ delete from public.profiles where id = '${uid}';`);
     expect(m2.state.stopMoves.find((m) => m.id === m2.moveId)).toMatchObject({ kind: 'breakeven', stopPrice: '7930', prevStop: '7920', priceNow: '7934.25', favor: '4.25', unit: 'pts' });
     expect(m2.state.position).toMatchObject({ stopNow: '7930', stopKind: 'breakeven' });
     await checkState(m2.state, 'futures');
+  });
+
+  it('11:40 · 12:10: the domain review\'s edges, server = domain: averages of 10 000 or more, sums and points that would not fit, stops at the price', async () => {
+    setClock('2026-10-23T15:40:05Z');
+    const binance = await createAccountAsUser(uid, { market: 'crypto', label: 'Binance R', platform: 'binance', firm: null, external_ref: null, phase: 'pessoal', size: null, is_primary: false });
+    const ibkr = await createAccountAsUser(uid, { market: 'stocks', label: 'IBKR R', platform: 'ibkr', firm: null, external_ref: null, phase: 'pessoal', size: null, is_primary: false });
+    const top = await createAccountAsUser(uid, { market: 'futures', label: 'Top One R', platform: 'topone', firm: null, external_ref: null, phase: 'pessoal', size: null, is_primary: false });
+    asUser(
+      uid,
+      `public.save_rules(${lit({
+        v: 1,
+        base_rev: (asUser(uid, 'public.rules_config()') as { rev: string }).rev,
+        accounts: Object.fromEntries([binance, ibkr, top].map((id) => [id, { rules: { v: 1 }, window: null, version: 'force' }])),
+      })})`,
+    );
+    // «Já fechada» from 11:45 (after the version these rules created), at 12:10
+    setClock('2026-10-23T16:10:05Z');
+    const dayOf = (account: string) => (instant: Date) =>
+      JSON.parse(psql(`select to_jsonb(public.compute_trading_day('${account}', '${instant.toISOString()}'))::text;`).trim()) as string;
+    const after = (account: string, market: 'futures' | 'forex' | 'stocks' | 'crypto', fields: Record<string, unknown>) => {
+      const p = afterPayload(market, { clientKey: newClientKey(), clock: NY, day: '2026-10-23', entry: '11:45', ...fields } as never);
+      return { p, domain: validateAfter(market, p, { now: new Date('2026-10-23T16:10:05Z'), dry: true, dayOf: dayOf(account), inRules: () => true }) };
+    };
+    const asRefusal = (r: { ok: boolean; code?: string; field?: string | null }) => (r.ok ? null : { code: r.code, field: r.field });
+
+    // «Já fechada» whose average exit is 10 000 or more: the dry run = the domain = what the commit stores
+    for (const [account, market, fields, want] of [
+      [binance, 'crypto', { symbol: 'BTC/USDT', direction: 'long', quantity: '0.69708937', entryPrice: '65000',
+        exits: [{ quantity: '0.40781226', exitPrice: '65110.85', exit: '11:50' }, { quantity: '0.28927711', exitPrice: '65346.58', exit: '12:00' }] }, '65208.6728848'],
+      [ibkr, 'stocks', { symbol: 'AAPL', direction: 'long', quantity: '11.466939', entryPrice: '13000',
+        exits: [{ quantity: '1.65344', exitPrice: '13490.1765', exit: '11:50' }, { quantity: '4.139845', exitPrice: '13338.688', exit: '11:55' },
+          { quantity: '1.402982', exitPrice: '12117.7305', exit: '12:00' }, { quantity: '4.270672', exitPrice: '12934.8146', exit: '12:05' }] }, '13060.73107786'],
+    ] as const) {
+      const { p, domain } = after(account, market, fields);
+      const dry = await previewAfter(db, account, p);
+      if (!domain.ok) throw new Error(domain.code);
+      expect([domain.exit.exitPrice, dry.exit.exitPrice]).toEqual([want, want]);
+      expect(domain.exits).toEqual(dry.exits);
+      const reg = await registerAfter(db, account, p);
+      expect(reg.state.trade.exitPrice).toBe(want);
+      await checkState(reg.state, market);
+    }
+
+    // What the server refuses (dry run and write) = what the domain refuses
+    const big = '9999999999999999.99';
+    for (const [label, account, market, fields] of [
+      ['two results whose sum does not fit', top, 'futures', { symbol: 'ZNZ6', direction: 'long', quantity: '2', entryPrice: '110',
+        exits: [{ quantity: '1', exitPrice: '111', exit: '11:50', pnl: big }, { quantity: '1', exitPrice: '111', exit: '12:00', pnl: big }] }],
+      ['«Custos» whose sum does not fit', binance, 'crypto', { symbol: 'BTC/USDT', direction: 'long', quantity: '2', entryPrice: '65000',
+        exits: [{ quantity: '1', exitPrice: '65100', exit: '11:50', costs: big }, { quantity: '1', exitPrice: '65100', exit: '12:00', costs: '0.01' }] }],
+      ['less than the position', top, 'futures', { symbol: 'MGCZ6', direction: 'short', quantity: '3', entryPrice: '4421.3',
+        exits: [{ quantity: '1', exitPrice: '4409.3', exit: '11:50' }, { quantity: '1', exitPrice: '4421.3', exit: '12:00' }] }],
+      ['an hour before the exit before', top, 'futures', { symbol: 'MGCZ6', direction: 'short', quantity: '2', entryPrice: '4421.3',
+        exits: [{ quantity: '1', exitPrice: '4409.3', exit: '12:00' }, { quantity: '1', exitPrice: '4421.3', exit: '11:50' }] }],
+      ['the price then far from the entry in pips', acc.ftmo, 'forex', { symbol: 'EUR/USD', direction: 'long', quantity: '1', entryPrice: '1.08000',
+        exit: '12:00', exitPrice: '1.09000', breakevenPriceThen: '2000000' }],
+    ] as const) {
+      const { p, domain } = after(account, market, fields);
+      const dry = await refusal(previewAfter(db, account, p));
+      expect([label, asRefusal(domain)]).toEqual([label, dry]);
+      expect([label, await refusal(registerAfter(db, account, p))]).toEqual([label, dry]);
+    }
+    // Two exits in the same minute are in order
+    const sameMinute = after(top, 'futures', { symbol: 'MGCZ6', direction: 'short', quantity: '2', entryPrice: '4421.3',
+      exits: [{ quantity: '1', exitPrice: '4409.3', exit: '11:50' }, { quantity: '1', exitPrice: '4421.3', exit: '11:50' }] });
+    const sm = await previewAfter(db, top, sameMinute.p);
+    expect(sameMinute.domain.ok && [sameMinute.domain.exit.pnl, sameMinute.domain.exitAt]).toEqual([sm.exit.pnl, sm.exit.exitAt]);
+
+    // «Mover stop»: points in favour that would not fit (pips), a stop at the price now, the stop before
+    const eur = await registerEntry(db, acc.ftmo, entryPayload('forex', { clientKey: newClientKey(), symbol: 'EUR/USD', direction: 'long', quantity: '1', entryPrice: '1.08000', stop: '20', clock: NY }));
+    const mes = await registerEntry(db, top, entryPayload('futures', { clientKey: newClientKey(), symbol: 'MES', direction: 'short', quantity: '2', entryPrice: '7912.50', stop: '10', clock: NY }));
+    const mtOf = (s: TradeState, market: string) => ({ market, symbol: s.trade.symbol, direction: s.trade.direction, entryPrice: s.trade.entryPrice, stopPrice: s.trade.stopPrice, status: s.trade.status, option: null, origin: s.context!.origin });
+    for (const [label, s, market, patch] of [
+      ['«Preço agora» 2 000 000 on EUR/USD', eur.state, 'forex', { kind: 'breakeven', price_now: '2000000' }],
+      ['exactly 10^10 pips', eur.state, 'forex', { kind: 'ajuste', stop_price: '1.08100', price_now: '1000001.08000' }],
+      ['a stop at the price now', mes.state, 'futures', { kind: 'ajuste', stop_price: '7910.00', price_now: '7910.00' }],
+      ['a breakeven at the price now', mes.state, 'futures', { kind: 'breakeven', price_now: '7912.50' }],
+    ] as const) {
+      const payload = { v: 1, client_key: newClientKey(), ...patch };
+      const server = await refusal(moveStop(db, s.trade.id, payload as never));
+      expect([label, asRefusal(validateMove(mtOf(s, market), [], payload))]).toEqual([label, server]);
+    }
+    const near = { v: 1, client_key: newClientKey(), kind: 'ajuste', stop_price: '1.08100', price_now: '1000001.07999' } as const;
+    const wantNear = validateMove(mtOf(eur.state, 'forex'), [], near);
+    const movedNear = await moveStop(db, eur.state.trade.id, near as never);
+    // (18 significant digits do not survive a JSON number: the stored 9999999999.90000000 reads as
+    // 9999999999.89999962, the same double)
+    expect(wantNear).toMatchObject({ ok: true, favor: '9999999999.9', unit: 'pips' });
+    expect(Number(movedNear.state.stopMoves[0].favor)).toBe(Number('9999999999.9'));
+    await checkState(movedNear.state, 'forex');
+    // Two live moves: the stop before is the newest one's
+    let moves = mes.state.stopMoves;
+    for (const [minute, stop] of [['12', '7918.00'], ['13', '7915.00'], ['14', '7914.00']] as const) {
+      setClock(`2026-10-23T16:${minute}:05Z`);
+      const payload = { v: 1, client_key: newClientKey(), kind: 'ajuste', stop_price: stop } as const;
+      const want = validateMove(mtOf(mes.state, 'futures'), moves, payload);
+      const moved = await moveStop(db, mes.state.trade.id, payload as never);
+      expect(want).toMatchObject({ ok: true, prevStop: moved.state.stopMoves.find((m) => m.id === moved.moveId)!.prevStop });
+      moves = moved.state.stopMoves;
+    }
+    const same = { v: 1, client_key: newClientKey(), kind: 'ajuste', stop_price: '7914.00' } as const;
+    expect(asRefusal(validateMove(mtOf(mes.state, 'futures'), moves, same))).toEqual(await refusal(moveStop(db, mes.state.trade.id, same as never)));
+    // undo_event names only partials: the final exit's id is nothing to undo
+    setClock('2026-10-23T16:16:05Z');
+    const mesPartial = await registerPartial(db, mes.state.trade.id, partialPayload({ clientKey: newClientKey(), quantity: '1', exitPrice: '7905.00', clock: NY }));
+    setClock('2026-10-23T16:17:05Z');
+    const mesClosed = await registerExit(db, mes.state.trade.id, exitPayload('futures', { exitPrice: '7904.00', clock: NY }));
+    await checkState(mesClosed.state, 'futures');
+    const final = mesClosed.state.exits.find((e) => e.kind === 'final')!;
+    expect(await refusal(undoEvent(db, mes.state.trade.id, undoEventPayload('parcial', final.id)))).toEqual({
+      code: undoEventRefusal({ status: 'closed', origin: 'live' }, mesClosed.state.exits, mesClosed.state.stopMoves, { kind: 'parcial', id: final.id }, new Date('2026-10-23T16:17:05Z')),
+      field: null,
+    });
+    expect(await refusal(undoEvent(db, mes.state.trade.id, undoEventPayload('parcial', mesPartial.exitId)))).toEqual({ code: 'not_open', field: null });
+
+    // Last (its day no longer reads: rules_now's net in cents passes 2^53): a partial of 16 digits,
+    // then an exit whose total does not fit the trade
+    const zn = await registerEntry(db, top, entryPayload('futures', { clientKey: newClientKey(), symbol: 'ZNZ6', direction: 'long', quantity: '2', entryPrice: '110', clock: NY }));
+    setClock('2026-10-23T16:21:05Z');
+    const znPartial = await registerPartial(db, zn.state.trade.id, partialPayload({ clientKey: newClientKey(), quantity: '1', exitPrice: '111', pnl: big, exit: '12:21', clock: NY }));
+    // (The partial's 16 digits come back as a JSON number, so the domain sees 10^16: above about
+    // 9 × 10^13 the data layer's numbers lose cents. Both refuse past the limit; within it only
+    // the verdict and the quantity are compared.)
+    for (const [pnl, ok] of [['0.01', false], ['-0.01', true]] as const) {
+      // At the partial's minute, on the server's clock of the partial (the hour of the minute now is now)
+      const ex = exitPayload('futures', { exitPrice: '111', pnl, exit: '12:21', clock: NY });
+      const domain = validateExit(openTradeOf(znPartial.state), ex, { now: znPartial.state.serverNow, dry: true });
+      if (ok) {
+        const dry = await previewExit(db, zn.state.trade.id, ex);
+        expect([domain.ok, domain.ok && domain.rest!.quantity]).toEqual([true, !dry.repeated && dry.rest!.quantity]);
+      } else {
+        const dry = await refusal(previewExit(db, zn.state.trade.id, ex));
+        expect(asRefusal(domain)).toEqual(dry);
+        expect(await refusal(registerExit(db, zn.state.trade.id, ex))).toEqual(dry);
+      }
+    }
   });
 
   it('records the ids the fixtures refer to', () => {

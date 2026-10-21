@@ -59,6 +59,12 @@ describe('the stored setting ↔ the editor\'s form', () => {
     expect('breakeven' in accountRulesJson('forex', emptyAccountSettings())).toBe(false);
   });
 
+  it('a small «+N» reads as decimal text, never in exponent form (1e-7 is 0,0000001)', () => {
+    const m = marketSettingsFromJson('futures', { ...BUILTIN_FUT, breakeven: { on: true, by: { MES: 1e-7, MGC: 0.00000001 } } }, [], BUILTIN_FUT);
+    expect(m.breakeven).toEqual({ on: true, by: { MES: '0.0000001', MGC: '0.00000001' } });
+    expect(accountSettingsFromJson('forex', { v: 1, breakeven: { on: true, by: { EURUSD: 2.5e-7 } } }, null).breakeven).toEqual({ on: true, by: { EURUSD: '0.00000025' } });
+  });
+
   it('a binary never stores it; a malformed one is not the as-built shape', () => {
     expect('breakeven' in marketRulesJson('binary', { ...settings().markets.binary, breakeven: { on: true, by: { EURUSD: '5' } } })).toBe(false);
     expect('breakeven' in marketSettingsFromJson('binary', { ...BUILTIN, breakeven: { on: true, by: {} } }, [], BUILTIN)).toBe(false);
@@ -136,6 +142,18 @@ describe('«só nesta conta» and the draft\'s edits', () => {
     expect(temProprio(back, 'top', 'breakeven')).toBe(false);
     expect(breakevenMudou(base, back, e)).toBe(false);
   });
+
+  it('«não salvo» compares by value: a value edited back to the saved one is saved again', () => {
+    const PADRAO = { tipo: 'padrao' } as const;
+    const base = settings({ futures: { ...settings().markets.futures, breakeven: { on: true, by: { MES: '8', MNQ: '30' } } } });
+    const edited = comBreakevenAtivo(base, PADRAO, 'MNQ', '40');
+    expect(breakevenMudou(base, edited, PADRAO)).toBe(true);
+    const back = comBreakevenAtivo(edited, PADRAO, 'MNQ', '30.0');
+    expect(back.markets.futures.breakeven).not.toBe(base.markets.futures.breakeven);
+    expect(breakevenMudou(base, back, PADRAO)).toBe(false);
+    const own = comBreakevenAtivo(base, conta(TOP), 'MNQ', '40');
+    expect(breakevenMudou(own, comBreakevenAtivo(own, conta(TOP), 'MNQ', '40'), conta(TOP))).toBe(false);
+  });
 });
 
 describe('what the row takes', () => {
@@ -160,6 +178,11 @@ describe('what the row takes', () => {
     expect(breakevenKeyOf('crypto', 'BTC/USDT', {})).toEqual({ ok: true, key: 'BTCUSDT' });
     expect(breakevenKeyOf('futures', '  ', {})).toEqual({ ok: false, reason: 'empty' });
     expect(breakevenKeyOf('futures', 'M#S', {})).toEqual({ ok: false, reason: 'invalid' });
+    // A code the form takes whose key no rule can hold (rules_check_breakeven: [A-Z0-9]{1,20});
+    // separators go, as tradeMatchKey drops them
+    expect(breakevenKeyOf('futures', 'ABCDEFGHIJKLMNOPQRSTU', {})).toEqual({ ok: false, reason: 'invalid' });
+    expect(breakevenKeyOf('futures', 'ABCDEFGHIJKLMNOPQRST', {})).toEqual({ ok: true, key: 'ABCDEFGHIJKLMNOPQRST' });
+    expect(breakevenKeyOf('futures', 'M ES', {})).toEqual({ ok: true, key: 'MES' });
     expect(breakevenKeyOf('futures', 'MES', { MES: '8' })).toEqual({ ok: false, reason: 'repeated' });
     const twenty = Object.fromEntries(Array.from({ length: 20 }, (_, i) => [`K${i}`, '1']));
     expect(breakevenKeyOf('futures', 'MNQ', twenty)).toEqual({ ok: false, reason: 'too_many' });

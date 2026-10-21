@@ -21,7 +21,7 @@
  */
 import type { BreakevenRule } from '../gate/rules';
 import { tradeInstrument, tradeMatchKey, type Direction, type InstrumentSpec, type OptionContract, type StopUnit } from './caps';
-import { add, cmp, div, fromInt, isMultipleOf, mul, numeric, plainText, round, sign, sub, tradeNum, type Numeric } from './numeric';
+import { abs, add, cmp, div, fromInt, isMultipleOf, mul, numeric, plainText, round, sign, sub, tradeNum, type Numeric } from './numeric';
 import { MAX_PAYLOAD_BYTES, jsonbTextBytes, refuse, type Checked, type MovePayload } from './payload';
 import { pnlFromPrices } from './pnl';
 import type { StopMove } from './parciais';
@@ -53,6 +53,15 @@ export function favorOf(spec: Pick<InstrumentSpec, 'stops' | 'pip'>, sgn: 1 | -1
   return t(round(div(d, pip && sign(pip) > 0 ? pip : fromInt(1)), 8));
 }
 
+/**
+ * Whether the points in favour at a price fit trade_stop_moves.favor (numeric(18, 8): below 10^10
+ * either way). In pips a typo far from the entry does not (1.08 → 2 000 000 on EUR/USD is about
+ * 2 × 10^10 pips): move_stop and register_after refuse that price (bad_price).
+ */
+function favorFits(spec: Pick<InstrumentSpec, 'stops' | 'pip'>, sgn: 1 | -1, entryPrice: string, price: Numeric): boolean {
+  return cmp(abs(n(favorOf(spec, sgn, entryPrice, t(price)))), MAX_LEVEL) < 0;
+}
+
 /** The breakeven rule of one trade (trade_state's "breakeven") */
 export interface TradeBreakeven {
   /** The asset as the rule keys it (tradeMatchKey) */
@@ -61,8 +70,8 @@ export interface TradeBreakeven {
   n: string;
   un: StopUnit;
   /**
-   * The price N names: entry ± N (× the pip for pips), not snapped to the tick (a threshold); null
-   * for pips when the asset has no pip today
+   * The price N names: entry ± N (× the pip for pips), not snapped to the tick (a threshold),
+   * rounded to 8 decimals; null for pips when the asset has no pip today
    */
   level: string | null;
 }
@@ -90,7 +99,8 @@ export function breakevenOf(
   const sgn = direction === 'long' ? 1 : -1;
   let level: string | null;
   if (r.un === 'pips' && pipText === null) level = null;
-  else level = t(add(n(entryPrice), mul(mul(fromInt(sgn), n(r.n)), r.un === 'pips' ? n(pipText as string) : fromInt(1))));
+  // Rounded to 8 decimals, as a stored price (an n of 8 decimals in pips would give 12)
+  else level = t(round(add(n(entryPrice), mul(mul(fromInt(sgn), n(r.n)), r.un === 'pips' ? n(pipText as string) : fromInt(1))), 8));
   return { key, n: t(n(r.n)), un: r.un, level };
 }
 
@@ -137,10 +147,11 @@ export interface MoveResult {
 /**
  * move_stop's checks and the move it stores, in the database's order: not_app_trade (only a live
  * trade), not_for_market (binaries), the payload (v, keys, client_key, kind, types), not_open, the
- * level (bad_stop, off_tick; «Breakeven» is the entry price), «Preço agora» (bad_price, off_tick;
- * required with «Breakeven»), the stop on the safe side of the price (bad_stop: past it the trade
- * would already have closed), same_stop, too_many_moves. `moves` are the trade's stop moves. Left
- * to the server: the lookups and a client_key used already ("repeated").
+ * level (bad_stop, off_tick; «Breakeven» is the entry price), «Preço agora» (bad_price, also when
+ * its points in favour do not fit; off_tick; required with «Breakeven»), the stop on the safe side
+ * of the price (bad_stop: past it the trade would already have closed), same_stop, too_many_moves.
+ * `moves` are the trade's stop moves. Left to the server: the lookups and a client_key used already
+ * ("repeated").
  */
 export function validateMove(tr: MoveTrade, moves: readonly Pick<StopMove, 'id' | 'stopPrice' | 'voidedAt' | 'movedAt'>[], p: unknown): Checked<MoveResult> {
   if (tr.origin !== 'live') return refuse('not_app_trade');
@@ -179,7 +190,7 @@ export function validateMove(tr: MoveTrade, moves: readonly Pick<StopMove, 'id' 
   let px: Numeric | null = null;
   if (has(p, 'price_now')) {
     px = tradeNum(payload.price_now, 10, pdp);
-    if (!px || sign(px) <= 0 || cmp(px, MAX_LEVEL) >= 0) return refuse('bad_price', 'price_now');
+    if (!px || sign(px) <= 0 || cmp(px, MAX_LEVEL) >= 0 || !favorFits(spec, sgn, tr.entryPrice, px)) return refuse('bad_price', 'price_now');
     if (tick && !isMultipleOf(px, tick)) return refuse('off_tick', 'price_now');
     if (sign(mul(sub(px, lvl), fromInt(sgn))) <= 0) return refuse('bad_stop', be ? 'price_now' : 'stop_price');
   } else if (be) return refuse('bad_price', 'price_now');
@@ -214,12 +225,13 @@ export interface AfterBreakeven {
 
 /**
  * register_after's "breakeven" (after the exits): the price then with the instrument's decimals,
- * above zero and below 10^10 (bad_price), on the tick (off_tick), in favour of the entry (bad_stop:
- * a stop at the entry would already have been hit); every refusal names the field 'breakeven'
+ * above zero and below 10^10, its points in favour fitting too (bad_price), on the tick (off_tick),
+ * in favour of the entry (bad_stop: a stop at the entry would already have been hit); every refusal
+ * names the field 'breakeven'
  */
 export function afterBreakeven(spec: InstrumentSpec, sgn: 1 | -1, entryPrice: string, priceThen: unknown): Checked<AfterBreakeven> {
   const pt = tradeNum(priceThen, 10, spec.priceDp ?? 0);
-  if (!pt || sign(pt) <= 0 || cmp(pt, MAX_LEVEL) >= 0) return refuse('bad_price', 'breakeven');
+  if (!pt || sign(pt) <= 0 || cmp(pt, MAX_LEVEL) >= 0 || !favorFits(spec, sgn, entryPrice, pt)) return refuse('bad_price', 'breakeven');
   if (spec.tick !== null && !isMultipleOf(pt, n(spec.tick))) return refuse('off_tick', 'breakeven');
   if (sign(mul(sub(pt, n(entryPrice)), fromInt(sgn))) <= 0) return refuse('bad_stop', 'breakeven');
   return { ok: true, stopPrice: t(n(entryPrice)), priceThen: t(pt), favor: favorOf(spec, sgn, entryPrice, t(pt)), unit: favorUnitOf(spec) };

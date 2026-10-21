@@ -2,7 +2,7 @@
  * @jest-environment node
  *
  * The shared cases of Phase 3c: every "expected" in cases3c.json was computed by the functions of
- * migrations 20261023000001..3 (fase-3c/banco) on a throwaway PG15 cluster, with the generator kept
+ * migrations 20261023000001..3 (as fase-3c/dominio has them) on a throwaway PG15 cluster, with the generator kept
  * outside the repo (it also re-asked the 3c trade_check_payload every Phase 3 shape case of
  * registro/cases.json: none changed). The TypeScript domain must give the same answer for the same
  * inputs: «+N» of the rule, the breakeven rule in a version and in the settings, what a setting

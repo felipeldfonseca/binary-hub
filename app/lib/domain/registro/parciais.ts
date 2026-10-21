@@ -26,7 +26,7 @@
 import { tradeInstrument, type Direction, type InstrumentSpec, type OptionContract } from './caps';
 import { firstLocalHmAtOrAfter } from '../tempo';
 import { exitInstant } from './horario';
-import { add, cmp, div, fromInt, mul, numeric, plainText, pow10, round, sign, sub, type Numeric } from './numeric';
+import { abs, add, cmp, div, fromInt, mul, numeric, plainText, pow10, round, sign, sub, type Numeric } from './numeric';
 import { checkPayload, refuse, tradeQty, type AfterExitPayload, type Checked, type FieldError, type PartialPayload } from './payload';
 import { parseExit, resultOf, type ExitResult, type PnlBasis } from './pnl';
 
@@ -91,7 +91,26 @@ export interface StopMove {
 const n = (x: string): Numeric => numeric(x);
 const t = (x: Numeric): string => plainText(x);
 const ZERO = numeric('0');
+/** 10^16: a result or «Custos» stored on a trade stays below it (numeric(18, 2)) */
+export const MAX_AMOUNT = numeric('10000000000000000');
 const tOrNull = (x: string | null): string | null => (x === null ? null : t(n(x)));
+/**
+ * A quantity or price as trade_exits stores it (numeric(18, 8): always 8 decimals). The average exit
+ * divides these, as trade_exits_sum does: dividing the typed scales would round at another scale
+ * (Postgres picks it from the operands), and an average of 10 000 or more could then differ in its
+ * 8th decimal from the one the commit checks.
+ */
+const stored = (x: string): Numeric => round(n(x), 8);
+/** Σ q·p ÷ Σ q of stored operands, to 8 decimals (null without a quantity) */
+function weightedAverage(rows: readonly { quantity: string; price: string }[]): string | null {
+  let q = ZERO;
+  let qp = ZERO;
+  for (const r of rows) {
+    q = add(q, stored(r.quantity));
+    qp = add(qp, mul(stored(r.quantity), stored(r.price)));
+  }
+  return sign(q) > 0 ? t(round(div(qp, q), 8)) : null;
+}
 
 /** An exit's result without trailing zeros, as the data layer reads the database's answer */
 export const plainExit = (x: ExitResult): ExitResult => ({
@@ -137,15 +156,11 @@ export function exitsSum(
   let q = ZERO;
   let pnl = ZERO;
   let commission: Numeric | null = null;
-  let qp = ZERO;
-  let priced = true;
   let last = exits[0].exitTime;
   for (const e of exits) {
     q = add(q, n(e.quantity));
     pnl = add(pnl, n(e.pnl));
     if (e.commission !== null) commission = add(commission ?? ZERO, n(e.commission));
-    if (e.exitPrice === null) priced = false;
-    else qp = add(qp, mul(n(e.quantity), n(e.exitPrice)));
     if (e.exitTime.getTime() > last.getTime()) last = e.exitTime;
   }
   const basis: ExitBasis = exits.some((e) => e.pnlBasis === 'file')
@@ -160,22 +175,19 @@ export function exitsSum(
     quantity: t(q),
     pnl: t(pnl),
     commission: commission && t(commission),
-    exitPrice: priced && sign(q) > 0 ? t(round(div(qp, q), 8)) : null,
+    exitPrice: averageExit(exits),
     lastAt: last,
     basis,
   };
 }
 
-/** The quantity-weighted average exit price (8 decimals), «7.912,50 → 7.924,17 em média»; null when a price is missing */
+/**
+ * The quantity-weighted average exit price (8 decimals) as trade_exits_sum gives it, «7.912,50 →
+ * 7.924,17 em média»; null when a price is missing or there is no quantity
+ */
 export function averageExit(exits: readonly { quantity: string; exitPrice: string | null }[]): string | null {
-  let q = ZERO;
-  let qp = ZERO;
-  for (const e of exits) {
-    if (e.exitPrice === null) return null;
-    q = add(q, n(e.quantity));
-    qp = add(qp, mul(n(e.quantity), n(e.exitPrice)));
-  }
-  return sign(q) > 0 ? t(round(div(qp, q), 8)) : null;
+  if (exits.some((e) => e.exitPrice === null)) return null;
+  return weightedAverage(exits.map((e) => ({ quantity: e.quantity, price: e.exitPrice as string })));
 }
 
 /**
@@ -457,8 +469,10 @@ export interface AfterExits {
  * register_after's loop over "exits" (Phase 3c), after the entry: in the order given, each at the
  * first instant with its hour at or after the entry, not after now (exit_in_future), not before
  * the one before (exit_before_partial), its price and result as an exit of its quantity
- * (trade_parse_exit); together exactly the position (bad_quantity). Every refusal names the field
- * 'exits'. `entry` is the parsed entry (prices as Postgres text).
+ * (trade_parse_exit); together exactly the position (bad_quantity), their results and «Custos»
+ * summed below 10^16 as the trade stores them (bad_pnl, bad_costs). Every refusal names the field
+ * 'exits'. The average exit is trade_exits_sum's (stored operands). `entry` is the parsed entry
+ * (prices as Postgres text).
  */
 export function afterExits(
   spec: InstrumentSpec,
@@ -484,17 +498,19 @@ export function afterExits(
   if (cmp(qsum, n(entry.quantity)) !== 0) return refuse('bad_quantity', 'exits');
   let pnl = ZERO;
   let commission: Numeric | null = null;
-  let qp = ZERO;
   let qpts = ZERO;
   for (const e of out) {
     pnl = add(pnl, n(e.pnl));
     if (e.commission !== null) commission = add(commission ?? ZERO, n(e.commission));
-    qp = add(qp, mul(n(e.quantity), n(e.exitPrice as string)));
     qpts = add(qpts, mul(n(e.quantity), n(e.points as string)));
   }
+  // Each exit's result and «Custos» fit; their sums must fit the trade too (numeric(18, 2))
+  if (cmp(abs(pnl), MAX_AMOUNT) >= 0) return refuse('bad_pnl', 'exits');
+  if (commission && cmp(commission, MAX_AMOUNT) >= 0) return refuse('bad_costs', 'exits');
   const basis: PnlBasis = out.some((e) => e.pnlBasis === 'typed') ? 'typed' : out.some((e) => e.pnlBasis === 'estimate') ? 'estimate' : 'prices';
   const total: ExitResult = {
-    exitPrice: t(round(div(qp, qsum), 8)),
+    // As trade_exits_sum will check it at commit (stored operands)
+    exitPrice: weightedAverage(out.map((e) => ({ quantity: e.quantity, price: e.exitPrice as string }))),
     pnl: t(pnl),
     pnlBasis: basis,
     result: resultOf(t(pnl)),

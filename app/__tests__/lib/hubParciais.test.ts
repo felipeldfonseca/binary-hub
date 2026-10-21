@@ -5,13 +5,17 @@
  * (testing/fixtures/parciais, recorded by hubParciais.pg.test.ts): every trade_state reads strictly,
  * and its position, breakeven rule, sums and marks are what positionOf, breakevenOf, exitsSum and
  * isClean compute from its own rows; the day the limit saw is dayUsage over the trades and their
- * exits; answers recorded before the migrations (Phase 3 fixtures) read with no exits and no rule.
+ * exits; answers recorded before the migrations (Phase 3 fixtures) read with no exits and no rule;
+ * the tables the API reads back (rows-*, recorded at the same moment as the answer) are the trade
+ * the write answered, its rule, «Desfazer» and exits included.
  */
+import type { SupabaseClient } from '@supabase/supabase-js';
 import { dayUsage, usdToCents, type DayTrade } from '@/lib/domain/gate';
 import { breakevenOf, countingExits, exitsSum, firstExitCut, isClean, positionOf } from '@/lib/domain/registro';
 import { parseRulesNow } from '@/lib/hub/regras';
 import {
   REGISTRAR_FIELDS,
+  fetchTradeState,
   parseAfterDryRun,
   parseAfterRegistered,
   parseEventUndone,
@@ -22,7 +26,9 @@ import {
   parsePartialRegistered,
   parseRegistered,
   parseTradeState,
+  tradeViewOfRows,
   type TradeState,
+  type TradeViewRows,
 } from '@/lib/hub/registrarDb';
 import { idsParciais, parciaisJson } from '@/testing/parciais';
 import { registrarJson } from '@/testing/registrar';
@@ -169,5 +175,102 @@ describe('limit_usage (SQL, via rules_now today) = dayUsage over the trades and 
     const at = (name: string) => parseRulesNow((parciaisJson(name) as { agora: unknown }).agora).accounts.find((a) => a.accountId === ids.accounts.apex)!;
     expect(at('dia-apex-1053')).toMatchObject({ today: { trades: 2, netCents: -40000, worstCents: -40000 }, gate: { status: 'encerrado' } });
     expect(at('dia-apex-1055').today).toEqual({ trades: 1, netCents: -30000, worstCents: -30000 });
+  });
+});
+
+/**
+ * A stand-in PostgREST client over recorded rows: each read returns its table's rows cut to the
+ * columns it selects, as PostgREST does (a column left out of a select is missing from the trade)
+ */
+function rowsDb(rows: TradeViewRows) {
+  const byTable: Record<string, unknown> = {
+    trades: rows.trade,
+    trade_entry_context: rows.context,
+    trade_marks_v: rows.marks,
+    trade_marks_now_v: rows.marksNow,
+    trade_attachments: rows.images,
+    account_rule_versions: rows.version,
+    trade_exits_v: rows.exits,
+    trade_stop_moves_v: rows.stopMoves,
+  };
+  const selects: Record<string, string> = {};
+  const cut = (row: unknown, cols: string[]) =>
+    row === null || typeof row !== 'object' ? row : Object.fromEntries(cols.filter((c) => c in (row as object)).map((c) => [c, (row as Record<string, unknown>)[c]]));
+  const db = {
+    from: (table: string) => {
+      let cols: string[] = [];
+      const chain: Record<string, unknown> = {};
+      for (const m of ['eq', 'in', 'or', 'order', 'limit', 'maybeSingle']) chain[m] = () => chain;
+      chain.select = (list: string) => {
+        selects[table] = list;
+        cols = list.split(',').map((c) => c.trim());
+        return chain;
+      };
+      chain.then = (resolve: (v: unknown) => unknown) => {
+        const data = byTable[table];
+        return Promise.resolve({ data: Array.isArray(data) ? data.map((r) => cut(r, cols)) : cut(data ?? null, cols), error: null }).then(resolve);
+      };
+      return chain;
+    },
+  } as unknown as SupabaseClient;
+  return { db, selects };
+}
+
+describe('a trade read back from the tables (fetchTradeState) = the trade the write answered', () => {
+  const READ: [string, (json: unknown) => TradeState][] = [
+    ['partial-mes', (j) => parsePartialRegistered(j).state],
+    ['exit-mes', (j) => parseExitRegistered(j).state],
+    ['after-mgc', (j) => parseAfterRegistered(j).state],
+    ['partial-mnq-desfeita', (j) => parseEventUndone(j).state],
+    ['stop-eurusd-ajuste', (j) => parseMoveRegistered(j).state],
+  ];
+
+  it.each(READ)('%s', async (name, parse) => {
+    const { serverNow: _now, ...answered } = parse(parciaisJson(name));
+    const rows = parciaisJson(`rows-${name}`) as TradeViewRows;
+    const { db, selects } = rowsDb(rows);
+    const view = await fetchTradeState(db, answered.trade.id);
+    // Without a server clock «Desfazer» names the newest event whatever its age: the answer's, here
+    expect(view).toEqual(answered);
+    expect(view).toEqual(tradeViewOfRows(rows));
+    // The version's rules are read with it (the trade's breakeven rule)
+    expect(selects.account_rule_versions.split(',').map((c) => c.trim())).toContain('resolved');
+  });
+
+  it('an open trade registered live offers «Desfazer» of its newest event; its rule comes from its version', async () => {
+    const view = (await fetchTradeState(rowsDb(parciaisJson('rows-partial-mes') as TradeViewRows).db, ids.trades.mes))!;
+    expect(view.position.undo).toMatchObject({ kind: 'parcial', id: view.exits[0].id });
+    expect(view.breakeven).toEqual({ key: 'MES', n: '8', un: 'pts', level: '7920.5' });
+  });
+
+  it('an option contract has no breakeven rule, even with its underlying in the rule', () => {
+    const rows = parciaisJson('rows-partial-mes') as TradeViewRows & { trade: Record<string, unknown> };
+    const option = { ...rows, trade: { ...rows.trade, option_right: 'call', strike: 7900, expires_on: '2026-11-20', multiplier: 50 } };
+    expect(tradeViewOfRows(rows).breakeven).not.toBeNull();
+    expect(tradeViewOfRows(option).breakeven).toBeNull();
+  });
+
+  it('every exit row says whether it counts (a boolean)', () => {
+    const rows = parciaisJson('rows-partial-mes') as TradeViewRows & { exits: Record<string, unknown>[] };
+    expect(() => tradeViewOfRows({ ...rows, exits: rows.exits.map((e) => ({ ...e, counts: 'true' })) })).toThrow(expect.objectContaining({ code: 'bad_answer' }));
+    const j = parciaisJson('partial-mes') as { exits: Record<string, unknown>[] };
+    expect(() => parseTradeState({ ...j, exits: j.exits.map((e) => ({ ...e, counts: null })) })).toThrow('bad_answer');
+  });
+});
+
+describe('answers the data layer reads strictly', () => {
+  it('a retried «Registrar parcial» (the same client_key) answers what was registered, without the partial\'s result', () => {
+    const r = parsePartialRegistered(parciaisJson('partial-mes-repetida'));
+    const first = parsePartialRegistered(parciaisJson('partial-mes'));
+    expect(r).toMatchObject({ repeated: true, exitId: first.exitId, partial: null, gateNow: null });
+    expect(r.state.exits).toEqual(first.state.exits);
+  });
+
+  it('the breakeven level trade_state answers (8 decimals) is the domain\'s, an n of 8 decimals in pips too', () => {
+    const j = parciaisJson('partial-eurusd') as Record<string, unknown>;
+    const s = parseTradeState({ ...j, breakeven: { key: 'EURUSD', n: 7.12345678, un: 'pips', level: 1.08591235 } });
+    const rule = { by: { EURUSD: { n: '7.12345678', un: 'pips' as const } } };
+    expect(s.breakeven).toEqual(breakevenOf(rule, 'forex', s.trade.symbol, false, s.trade.direction, s.trade.entryPrice));
+    expect(s.breakeven!.level).toBe('1.08591235');
   });
 });

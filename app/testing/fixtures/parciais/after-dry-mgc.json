@@ -7,7 +7,7 @@
       "state": "nao_avaliado",
       "reason": "fase5"
     },
-    "desde": "2026-10-23T13:00:04.900554+00:00",
+    "desde": "2026-10-23T13:00:04.869934+00:00",
     "label": "Top One #1",
     "limit": {
       "usd": 400,
@@ -44,14 +44,14 @@
       "position": "dentro"
     },
     "version": {
-      "id": "1da732fe-33ac-4dbe-b77e-e79ae4390c7c",
+      "id": "396d68c0-80dd-4955-b03a-534cf9453940",
       "origin": "criar",
       "version_no": 1,
-      "effective_from": "2026-10-23T13:00:04.900554+00:00"
+      "effective_from": "2026-10-23T13:00:04.869934+00:00"
     },
     "warnings": [],
     "desde_day": "2026-10-23",
-    "account_id": "701ac848-6d51-4742-a472-c303b8da7a1d",
+    "account_id": "d5d58ed4-cdd7-4096-b823-6632ba921983",
     "changes_at": "2026-10-23T15:00:00+00:00",
     "state_rule": {
       "state": "nao_avaliado",
@@ -120,7 +120,7 @@
   },
   "similar": [],
   "version": {
-    "id": "1da732fe-33ac-4dbe-b77e-e79ae4390c7c",
+    "id": "396d68c0-80dd-4955-b03a-534cf9453940",
     "version_no": 1
   },
   "entry_at": "2026-10-23T14:24:00+00:00",
@@ -157,7 +157,7 @@
     "net_usd": 40,
     "reached": false
   },
-  "server_now": "2026-10-23T14:45:04.58919+00:00",
+  "server_now": "2026-10-23T14:45:04.674922+00:00",
   "stop_price": 4436.3,
   "trading_day": "2026-10-23",
   "target_price": 4391.3

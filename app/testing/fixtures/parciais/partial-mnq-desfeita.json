@@ -1,11 +1,11 @@
 {
   "gate": {
-    "at": "2026-10-23T14:46:05.177008+00:00",
+    "at": "2026-10-23T14:46:05.284182+00:00",
     "block": {
       "state": "nao_avaliado",
       "reason": "fase5"
     },
-    "desde": "2026-10-23T13:00:04.900554+00:00",
+    "desde": "2026-10-23T13:00:04.869934+00:00",
     "label": "Apex A",
     "limit": {
       "usd": 400,
@@ -42,14 +42,14 @@
       "position": "dentro"
     },
     "version": {
-      "id": "1de74d16-a9a8-4c5d-812e-305f9b272f42",
+      "id": "b02ff33d-08bd-44c8-bf45-30fa4abad20b",
       "origin": "criar",
       "version_no": 1,
-      "effective_from": "2026-10-23T13:00:04.900554+00:00"
+      "effective_from": "2026-10-23T13:00:04.869934+00:00"
     },
     "warnings": [],
     "desde_day": "2026-10-23",
-    "account_id": "bddc0593-0f9e-4eed-8ad6-aafdcb41bf41",
+    "account_id": "943e4448-3542-456a-86f8-cbd31456abf0",
     "changes_at": "2026-10-23T15:00:00+00:00",
     "state_rule": {
       "state": "nao_avaliado",
@@ -77,18 +77,18 @@
       "counts": false,
       "origin": "app",
       "quantity": 2,
-      "exit_time": "2026-10-23T14:53:05.208804+00:00",
+      "exit_time": "2026-10-23T14:53:05.317867+00:00",
       "pnl_basis": "prices",
-      "voided_at": "2026-10-23T14:55:05.403562+00:00",
+      "voided_at": "2026-10-23T14:55:05.514138+00:00",
       "commission": null,
       "exit_price": 30855,
       "file_exit_at": null,
-      "registered_at": "2026-10-23T14:53:05.208804+00:00"
+      "registered_at": "2026-10-23T14:53:05.317867+00:00"
     }
   ],
   "marks": [],
   "trade": {
-    "id": "99c86e05-6a08-4349-a63f-938456f117cf",
+    "id": "dc693199-266f-4dee-97da-2b54e1c2ef50",
     "pnl": null,
     "note": null,
     "option": null,
@@ -101,10 +101,10 @@
     "exit_time": null,
     "pnl_basis": null,
     "timeframe": null,
-    "account_id": "bddc0593-0f9e-4eed-8ad6-aafdcb41bf41",
+    "account_id": "943e4448-3542-456a-86f8-cbd31456abf0",
     "asset_type": "futures",
     "commission": null,
-    "entry_time": "2026-10-23T14:46:05.177008+00:00",
+    "entry_time": "2026-10-23T14:46:05.284182+00:00",
     "exit_price": null,
     "expires_at": null,
     "stop_price": 30840,
@@ -113,7 +113,7 @@
     "stake_amount": null,
     "target_price": null,
     "note_saved_at": null,
-    "registered_at": "2026-10-23T14:46:05.177008+00:00",
+    "registered_at": "2026-10-23T14:46:05.284182+00:00",
     "payout_percent": null,
     "duration_seconds": null,
     "exit_registered_at": null
@@ -130,9 +130,9 @@
     "warnings": [],
     "in_window": true,
     "after_limit": false,
-    "captured_at": "2026-10-23T14:46:05.177008+00:00",
+    "captured_at": "2026-10-23T14:46:05.284182+00:00",
     "gate_status": "liberado",
-    "evaluated_at": "2026-10-23T14:46:05.177008+00:00",
+    "evaluated_at": "2026-10-23T14:46:05.284182+00:00",
     "state_choice": null,
     "checks_evaluated": [
       "janela",
@@ -142,10 +142,10 @@
     "day_worst_at_entry": -300
   },
   "version": {
-    "id": "1de74d16-a9a8-4c5d-812e-305f9b272f42",
+    "id": "b02ff33d-08bd-44c8-bf45-30fa4abad20b",
     "version_no": 1
   },
-  "entry_at": "2026-10-23T14:46:05.177008+00:00",
+  "entry_at": "2026-10-23T14:46:05.284182+00:00",
   "position": {
     "r": null,
     "open": 3,
@@ -160,7 +160,7 @@
     "stop_initial": 30840
   },
   "repeated": false,
-  "trade_id": "99c86e05-6a08-4349-a63f-938456f117cf",
+  "trade_id": "dc693199-266f-4dee-97da-2b54e1c2ef50",
   "breakeven": {
     "n": 30,
     "un": "pts",
@@ -168,8 +168,8 @@
     "level": 30910
   },
   "marks_now": [],
-  "server_now": "2026-10-23T14:55:05.403562+00:00",
+  "server_now": "2026-10-23T14:55:05.514138+00:00",
   "stop_moves": [],
   "trading_day": "2026-10-23",
-  "registered_at": "2026-10-23T14:46:05.177008+00:00"
+  "registered_at": "2026-10-23T14:46:05.284182+00:00"
 }

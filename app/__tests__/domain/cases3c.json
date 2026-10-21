@@ -1,5 +1,5 @@
 {
- "about": "Shared cases for Phase 3c (the breakeven rule, partial exits, stop moves) and the SQL. Inputs are invented; every \"expected\" was computed by the SQL named in each group (migrations 20261023000001..3 of fase-3c/banco), so the TypeScript test (cases3c.test.ts) checks that both sides give the same answer. Amounts are trimmed of trailing zeros (trim_scale) as the data layer reads them.",
+ "about": "Shared cases for Phase 3c (the breakeven rule, partial exits, stop moves) and the SQL. Inputs are invented; every \"expected\" was computed by the SQL named in each group (migrations 20261023000001..3 as fase-3c/dominio has them, with the fixes of the domain review), so the TypeScript test (cases3c.test.ts) checks that both sides give the same answer. Amounts are trimmed of trailing zeros (trim_scale) as the data layer reads them.",
  "generatedWith": "15.13 (Homebrew)",
  "builtin": {
   "b3": {
@@ -5832,6 +5832,132 @@
     "direction": null,
     "entry": "7912.5",
     "expected": null
+   },
+   {
+    "resolved": {
+     "v": 1,
+     "market": "forex",
+     "windows": [],
+     "windows_from": null,
+     "window_rule": {
+      "on": true,
+      "outside": "fora"
+     },
+     "block": null,
+     "limit": null,
+     "states": null,
+     "day": {
+      "tz": "America/New_York",
+      "start_min": 1020
+     },
+     "breakeven": {
+      "by": {
+       "EURUSD": {
+        "n": 7.12345678,
+        "un": "pips"
+       },
+       "USDJPY": {
+        "n": 3.33333333,
+        "un": "pips"
+       }
+      }
+     }
+    },
+    "market": "forex",
+    "symbol": "EUR/USD",
+    "option": false,
+    "direction": "long",
+    "entry": "1.0852",
+    "expected": {
+     "n": 7.12345678,
+     "un": "pips",
+     "key": "EURUSD",
+     "level": 1.08591235
+    }
+   },
+   {
+    "resolved": {
+     "v": 1,
+     "market": "forex",
+     "windows": [],
+     "windows_from": null,
+     "window_rule": {
+      "on": true,
+      "outside": "fora"
+     },
+     "block": null,
+     "limit": null,
+     "states": null,
+     "day": {
+      "tz": "America/New_York",
+      "start_min": 1020
+     },
+     "breakeven": {
+      "by": {
+       "EURUSD": {
+        "n": 7.12345678,
+        "un": "pips"
+       },
+       "USDJPY": {
+        "n": 3.33333333,
+        "un": "pips"
+       }
+      }
+     }
+    },
+    "market": "forex",
+    "symbol": "EUR/USD",
+    "option": false,
+    "direction": "short",
+    "entry": "1.08537",
+    "expected": {
+     "n": 7.12345678,
+     "un": "pips",
+     "key": "EURUSD",
+     "level": 1.08465765
+    }
+   },
+   {
+    "resolved": {
+     "v": 1,
+     "market": "forex",
+     "windows": [],
+     "windows_from": null,
+     "window_rule": {
+      "on": true,
+      "outside": "fora"
+     },
+     "block": null,
+     "limit": null,
+     "states": null,
+     "day": {
+      "tz": "America/New_York",
+      "start_min": 1020
+     },
+     "breakeven": {
+      "by": {
+       "EURUSD": {
+        "n": 7.12345678,
+        "un": "pips"
+       },
+       "USDJPY": {
+        "n": 3.33333333,
+        "un": "pips"
+       }
+      }
+     }
+    },
+    "market": "forex",
+    "symbol": "USD/JPY",
+    "option": false,
+    "direction": "short",
+    "entry": "151.237",
+    "expected": {
+     "n": 3.33333333,
+     "un": "pips",
+     "key": "USDJPY",
+     "level": 151.20366667
+    }
    }
   ]
  },
@@ -7843,6 +7969,108 @@
      "code": "bad_payload",
      "field": "breakeven"
     }
+   },
+   {
+    "label": "after: an item with a typed loss",
+    "mode": "after",
+    "market": "futures",
+    "dry": false,
+    "payload": {
+     "v": 1,
+     "client_key": "9b2d7c1e-4f3a-4c5b-8d6e-7f8091a2b3c4",
+     "symbol": "ZN",
+     "direction": "short",
+     "quantity": "2",
+     "entry_price": "4421.3",
+     "clock": "America/New_York",
+     "day": "2026-10-23",
+     "entry": "10:24",
+     "exits": [
+      {
+       "quantity": "1",
+       "exit_price": "4409.3",
+       "exit": "10:31",
+       "pnl": "-120.5"
+      },
+      {
+       "quantity": "1",
+       "exit_price": "4421.3",
+       "exit": "10:38",
+       "pnl": "-0.01"
+      }
+     ]
+    },
+    "platform": null,
+    "expected": null
+   },
+   {
+    "label": "after: an item with a result of 17 digits",
+    "mode": "after",
+    "market": "futures",
+    "dry": false,
+    "payload": {
+     "v": 1,
+     "client_key": "9b2d7c1e-4f3a-4c5b-8d6e-7f8091a2b3c4",
+     "symbol": "ZN",
+     "direction": "short",
+     "quantity": "2",
+     "entry_price": "4421.3",
+     "clock": "America/New_York",
+     "day": "2026-10-23",
+     "entry": "10:24",
+     "exits": [
+      {
+       "quantity": "1",
+       "exit_price": "4409.3",
+       "exit": "10:31",
+       "pnl": "10000000000000000"
+      },
+      {
+       "quantity": "1",
+       "exit_price": "4421.3",
+       "exit": "10:38",
+       "pnl": "0"
+      }
+     ]
+    },
+    "platform": null,
+    "expected": {
+     "code": "bad_pnl",
+     "field": "exits"
+    }
+   },
+   {
+    "label": "after: an item with a loss of 16 digits",
+    "mode": "after",
+    "market": "futures",
+    "dry": false,
+    "payload": {
+     "v": 1,
+     "client_key": "9b2d7c1e-4f3a-4c5b-8d6e-7f8091a2b3c4",
+     "symbol": "ZN",
+     "direction": "short",
+     "quantity": "2",
+     "entry_price": "4421.3",
+     "clock": "America/New_York",
+     "day": "2026-10-23",
+     "entry": "10:24",
+     "exits": [
+      {
+       "quantity": "1",
+       "exit_price": "4409.3",
+       "exit": "10:31",
+       "pnl": "-9999999999999999.99"
+      },
+      {
+       "quantity": "1",
+       "exit_price": "4421.3",
+       "exit": "10:38",
+       "pnl": "0"
+      }
+     ]
+    },
+    "platform": null,
+    "expected": null
    }
   ]
  },
@@ -9457,6 +9685,510 @@
      "1": "9e0e0000-0000-4000-8000-0003c0001901",
      "2": "9e0e0000-0000-4000-8000-0003c0001902",
      "3": "9e0e0000-0000-4000-8000-0003c0001903"
+    }
+   },
+   {
+    "label": "two rows at two open instants are two positions: the nearer row takes the 2 ct trade",
+    "market": "futures",
+    "trades": [
+     {
+      "id": "9e0e0000-0000-4000-8000-0003c0002201",
+      "symbol": "MCL",
+      "direction": "long",
+      "entry_time": "2026-10-14T14:07:00.000Z",
+      "origin": "live",
+      "expires_at": null,
+      "quantity": "2",
+      "stake": null,
+      "entry_price": "70",
+      "eligible": true
+     }
+    ],
+    "rows": [
+     {
+      "rn": 1,
+      "line": 2,
+      "symbol": "MCLZ6",
+      "direction": "long",
+      "entry_time": "2026-10-14T14:06:40+00:00",
+      "exit_time": "2026-10-14T14:15:00+00:00",
+      "quantity": "1",
+      "stake": null,
+      "entry_price": "70.00",
+      "code": null
+     },
+     {
+      "rn": 2,
+      "line": 3,
+      "symbol": "MCLZ6",
+      "direction": "long",
+      "entry_time": "2026-10-14T14:06:50+00:00",
+      "exit_time": "2026-10-14T14:20:00+00:00",
+      "quantity": "1",
+      "stake": null,
+      "entry_price": "70.00",
+      "code": null
+     }
+    ],
+    "expected": {
+     "2": "9e0e0000-0000-4000-8000-0003c0002201"
+    }
+   },
+   {
+    "label": "a row whose exit is its entry is part of the position: linked whole",
+    "market": "futures",
+    "trades": [
+     {
+      "id": "9e0e0000-0000-4000-8000-0003c0002301",
+      "symbol": "MCL",
+      "direction": "long",
+      "entry_time": "2026-10-14T14:07:00.000Z",
+      "origin": "live",
+      "expires_at": null,
+      "quantity": "2",
+      "stake": null,
+      "entry_price": "70",
+      "eligible": true
+     }
+    ],
+    "rows": [
+     {
+      "rn": 1,
+      "line": 2,
+      "symbol": "MCLZ6",
+      "direction": "long",
+      "entry_time": "2026-10-14T14:06:40+00:00",
+      "exit_time": "2026-10-14T14:15:00+00:00",
+      "quantity": "1",
+      "stake": null,
+      "entry_price": "70.00",
+      "code": null
+     },
+     {
+      "rn": 2,
+      "line": 3,
+      "symbol": "MCLZ6",
+      "direction": "long",
+      "entry_time": "2026-10-14T14:06:40+00:00",
+      "exit_time": "2026-10-14T14:06:40+00:00",
+      "quantity": "1",
+      "stake": null,
+      "entry_price": "70.00",
+      "code": null
+     }
+    ],
+    "expected": {
+     "1": "9e0e0000-0000-4000-8000-0003c0002301",
+     "2": "9e0e0000-0000-4000-8000-0003c0002301"
+    }
+   },
+   {
+    "label": "the other app trade 17 minutes after the file is no twin (16 at most): whole",
+    "market": "futures",
+    "trades": [
+     {
+      "id": "9e0e0000-0000-4000-8000-0003c0002401",
+      "symbol": "MCL",
+      "direction": "long",
+      "entry_time": "2026-10-14T14:07:00.000Z",
+      "origin": "live",
+      "expires_at": null,
+      "quantity": "1",
+      "stake": null,
+      "entry_price": "70",
+      "eligible": true
+     },
+     {
+      "id": "9e0e0000-0000-4000-8000-0003c0002402",
+      "symbol": "MCL",
+      "direction": "long",
+      "entry_time": "2026-10-14T14:23:40.000Z",
+      "origin": "live",
+      "expires_at": null,
+      "quantity": "1",
+      "stake": null,
+      "entry_price": "70",
+      "eligible": true
+     }
+    ],
+    "rows": [
+     {
+      "rn": 1,
+      "line": 2,
+      "symbol": "MCLZ6",
+      "direction": "long",
+      "entry_time": "2026-10-14T14:06:40+00:00",
+      "exit_time": "2026-10-14T14:15:00+00:00",
+      "quantity": "1",
+      "stake": null,
+      "entry_price": "70.00",
+      "code": null
+     },
+     {
+      "rn": 2,
+      "line": 3,
+      "symbol": "MCLZ6",
+      "direction": "long",
+      "entry_time": "2026-10-14T14:06:40+00:00",
+      "exit_time": "2026-10-14T14:20:00+00:00",
+      "quantity": "1",
+      "stake": null,
+      "entry_price": "70.00",
+      "code": null
+     }
+    ],
+    "expected": {
+     "1": "9e0e0000-0000-4000-8000-0003c0002401",
+     "2": "9e0e0000-0000-4000-8000-0003c0002401"
+    }
+   },
+   {
+    "label": "the other app trade of another instrument is no twin: whole",
+    "market": "futures",
+    "trades": [
+     {
+      "id": "9e0e0000-0000-4000-8000-0003c0002501",
+      "symbol": "MCL",
+      "direction": "long",
+      "entry_time": "2026-10-14T14:07:00.000Z",
+      "origin": "live",
+      "expires_at": null,
+      "quantity": "1",
+      "stake": null,
+      "entry_price": "70",
+      "eligible": true
+     },
+     {
+      "id": "9e0e0000-0000-4000-8000-0003c0002502",
+      "symbol": "MES",
+      "direction": "long",
+      "entry_time": "2026-10-14T14:07:00.000Z",
+      "origin": "live",
+      "expires_at": null,
+      "quantity": "1",
+      "stake": null,
+      "entry_price": "70",
+      "eligible": true
+     }
+    ],
+    "rows": [
+     {
+      "rn": 1,
+      "line": 2,
+      "symbol": "MCLZ6",
+      "direction": "long",
+      "entry_time": "2026-10-14T14:06:40+00:00",
+      "exit_time": "2026-10-14T14:15:00+00:00",
+      "quantity": "1",
+      "stake": null,
+      "entry_price": "70.00",
+      "code": null
+     },
+     {
+      "rn": 2,
+      "line": 3,
+      "symbol": "MCLZ6",
+      "direction": "long",
+      "entry_time": "2026-10-14T14:06:40+00:00",
+      "exit_time": "2026-10-14T14:20:00+00:00",
+      "quantity": "1",
+      "stake": null,
+      "entry_price": "70.00",
+      "code": null
+     }
+    ],
+    "expected": {
+     "1": "9e0e0000-0000-4000-8000-0003c0002501",
+     "2": "9e0e0000-0000-4000-8000-0003c0002501"
+    }
+   },
+   {
+    "label": "the twin's window is the position's: 16,5 minutes after the file (15,5 after the trade) is no twin: whole",
+    "market": "futures",
+    "trades": [
+     {
+      "id": "9e0e0000-0000-4000-8000-0003c0002601",
+      "symbol": "MCL",
+      "direction": "long",
+      "entry_time": "2026-10-14T14:07:40.000Z",
+      "origin": "live",
+      "expires_at": null,
+      "quantity": "1",
+      "stake": null,
+      "entry_price": "70",
+      "eligible": true
+     },
+     {
+      "id": "9e0e0000-0000-4000-8000-0003c0002602",
+      "symbol": "MCL",
+      "direction": "long",
+      "entry_time": "2026-10-14T14:23:10.000Z",
+      "origin": "live",
+      "expires_at": null,
+      "quantity": "1",
+      "stake": null,
+      "entry_price": "70",
+      "eligible": true
+     }
+    ],
+    "rows": [
+     {
+      "rn": 1,
+      "line": 2,
+      "symbol": "MCLZ6",
+      "direction": "long",
+      "entry_time": "2026-10-14T14:06:40+00:00",
+      "exit_time": "2026-10-14T14:15:00+00:00",
+      "quantity": "1",
+      "stake": null,
+      "entry_price": "70.00",
+      "code": null
+     },
+     {
+      "rn": 2,
+      "line": 3,
+      "symbol": "MCLZ6",
+      "direction": "long",
+      "entry_time": "2026-10-14T14:06:40+00:00",
+      "exit_time": "2026-10-14T14:20:00+00:00",
+      "quantity": "1",
+      "stake": null,
+      "entry_price": "70.00",
+      "code": null
+     }
+    ],
+    "expected": {
+     "1": "9e0e0000-0000-4000-8000-0003c0002601",
+     "2": "9e0e0000-0000-4000-8000-0003c0002601"
+    }
+   },
+   {
+    "label": "two positions of the same size and exits for one trade: the one whose first row (same exit) has the lower line",
+    "market": "futures",
+    "trades": [
+     {
+      "id": "9e0e0000-0000-4000-8000-0003c0002701",
+      "symbol": "MCL",
+      "direction": "long",
+      "entry_time": "2026-10-14T14:07:00.000Z",
+      "origin": "live",
+      "expires_at": null,
+      "quantity": "2",
+      "stake": null,
+      "entry_price": "70",
+      "eligible": true
+     }
+    ],
+    "rows": [
+     {
+      "rn": 1,
+      "line": 9,
+      "symbol": "MCLZ6",
+      "direction": "long",
+      "entry_time": "2026-10-14T14:06:40+00:00",
+      "exit_time": "2026-10-14T14:20:00+00:00",
+      "quantity": "1",
+      "stake": null,
+      "entry_price": "70.00",
+      "code": null
+     },
+     {
+      "rn": 2,
+      "line": 5,
+      "symbol": "MCLZ6",
+      "direction": "long",
+      "entry_time": "2026-10-14T14:06:40+00:00",
+      "exit_time": "2026-10-14T14:20:00+00:00",
+      "quantity": "1",
+      "stake": null,
+      "entry_price": "70.10",
+      "code": null
+     },
+     {
+      "rn": 3,
+      "line": 6,
+      "symbol": "MCLZ6",
+      "direction": "long",
+      "entry_time": "2026-10-14T14:06:40+00:00",
+      "exit_time": "2026-10-14T14:20:00+00:00",
+      "quantity": "1",
+      "stake": null,
+      "entry_price": "70.10",
+      "code": null
+     },
+     {
+      "rn": 4,
+      "line": 2,
+      "symbol": "MCLZ6",
+      "direction": "long",
+      "entry_time": "2026-10-14T14:06:40+00:00",
+      "exit_time": "2026-10-14T14:20:00+00:00",
+      "quantity": "1",
+      "stake": null,
+      "entry_price": "70.00",
+      "code": null
+     }
+    ],
+    "expected": {
+     "1": "9e0e0000-0000-4000-8000-0003c0002701",
+     "4": "9e0e0000-0000-4000-8000-0003c0002701"
+    }
+   },
+   {
+    "label": "a position goes back to rows; a row of its own linked to a trade of another size stays linked",
+    "market": "futures",
+    "trades": [
+     {
+      "id": "9e0e0000-0000-4000-8000-0003c0002801",
+      "symbol": "MCL",
+      "direction": "long",
+      "entry_time": "2026-10-14T14:06:50.000Z",
+      "origin": "live",
+      "expires_at": null,
+      "quantity": "2",
+      "stake": null,
+      "entry_price": "70",
+      "eligible": true
+     },
+     {
+      "id": "9e0e0000-0000-4000-8000-0003c0002802",
+      "symbol": "MCL",
+      "direction": "long",
+      "entry_time": "2026-10-14T14:07:00.000Z",
+      "origin": "live",
+      "expires_at": null,
+      "quantity": "1",
+      "stake": null,
+      "entry_price": "70",
+      "eligible": true
+     },
+     {
+      "id": "9e0e0000-0000-4000-8000-0003c0002803",
+      "symbol": "MCL",
+      "direction": "long",
+      "entry_time": "2026-10-14T14:07:00.000Z",
+      "origin": "live",
+      "expires_at": null,
+      "quantity": "1",
+      "stake": null,
+      "entry_price": "70",
+      "eligible": true
+     }
+    ],
+    "rows": [
+     {
+      "rn": 1,
+      "line": 2,
+      "symbol": "MCLZ6",
+      "direction": "long",
+      "entry_time": "2026-10-14T14:06:40+00:00",
+      "exit_time": "2026-10-14T14:15:00+00:00",
+      "quantity": "1",
+      "stake": null,
+      "entry_price": "70.00",
+      "code": null
+     },
+     {
+      "rn": 2,
+      "line": 3,
+      "symbol": "MCLZ6",
+      "direction": "long",
+      "entry_time": "2026-10-14T14:06:40+00:00",
+      "exit_time": "2026-10-14T14:20:00+00:00",
+      "quantity": "1",
+      "stake": null,
+      "entry_price": "70.00",
+      "code": null
+     },
+     {
+      "rn": 3,
+      "line": 4,
+      "symbol": "MCLZ6",
+      "direction": "long",
+      "entry_time": "2026-10-14T14:06:40+00:00",
+      "exit_time": "2026-10-14T14:25:00+00:00",
+      "quantity": "1",
+      "stake": null,
+      "entry_price": "70.00",
+      "code": null
+     },
+     {
+      "rn": 4,
+      "line": 5,
+      "symbol": "MCLZ6",
+      "direction": "long",
+      "entry_time": "2026-10-14T14:08:30+00:00",
+      "exit_time": "2026-10-14T14:30:00+00:00",
+      "quantity": "5",
+      "stake": null,
+      "entry_price": "70.10",
+      "code": null
+     }
+    ],
+    "expected": {
+     "1": "9e0e0000-0000-4000-8000-0003c0002803",
+     "2": "9e0e0000-0000-4000-8000-0003c0002801",
+     "4": "9e0e0000-0000-4000-8000-0003c0002802"
+    }
+   },
+   {
+    "label": "binary rows at one instant, price and expiry are two orders: one to one",
+    "market": "binary",
+    "trades": [
+     {
+      "id": "9e0e0000-0000-4000-8000-0003c0002901",
+      "symbol": "EUR/USD",
+      "direction": "call",
+      "entry_time": "2026-10-14T14:07:00.000Z",
+      "origin": "live",
+      "expires_at": "2026-10-14T14:12:00.000Z",
+      "quantity": null,
+      "stake": "10",
+      "entry_price": null,
+      "eligible": true
+     },
+     {
+      "id": "9e0e0000-0000-4000-8000-0003c0002902",
+      "symbol": "EUR/USD",
+      "direction": "call",
+      "entry_time": "2026-10-14T14:07:00.000Z",
+      "origin": "live",
+      "expires_at": "2026-10-14T14:12:00.000Z",
+      "quantity": null,
+      "stake": "10",
+      "entry_price": null,
+      "eligible": true
+     }
+    ],
+    "rows": [
+     {
+      "rn": 1,
+      "line": 2,
+      "symbol": "EUR/USD",
+      "direction": "call",
+      "entry_time": "2026-10-14T14:07:00+00:00",
+      "exit_time": "2026-10-14T14:12:00+00:00",
+      "quantity": null,
+      "stake": "10",
+      "entry_price": "1.0852",
+      "code": null
+     },
+     {
+      "rn": 2,
+      "line": 3,
+      "symbol": "EUR/USD",
+      "direction": "call",
+      "entry_time": "2026-10-14T14:07:00+00:00",
+      "exit_time": "2026-10-14T14:12:00+00:00",
+      "quantity": null,
+      "stake": "10",
+      "entry_price": "1.0852",
+      "code": null
+     }
+    ],
+    "expected": {
+     "1": "9e0e0000-0000-4000-8000-0003c0002901",
+     "2": "9e0e0000-0000-4000-8000-0003c0002902"
     }
    }
   ]

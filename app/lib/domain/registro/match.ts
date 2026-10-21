@@ -104,10 +104,6 @@ const uuidOrder = (a: string, b: string) => (a.toLowerCase() < b.toLowerCase() ?
 /** `(expires_at = exit_time) is true`: both present and the same instant */
 const expiryIsExit = (t: MatchTrade, r: MatchRow) => t.expiresAt !== null && r.exitTime !== null && t.expiresAt.getTime() === r.exitTime.getTime();
 
-/** `(binary ? stake = stake : quantity = quantity) is true` */
-const sameSize = (market: string, t: MatchTrade, r: MatchRow) =>
-  market === 'binary' ? sameAmount(t.stake, r.stake) : sameAmount(t.quantity, r.quantity);
-
 /** Whether a row and a trade are candidates (import_stage's join) */
 export function canLink(market: string, r: MatchRow, t: MatchTrade): boolean {
   if (t.direction !== r.direction) return false;
