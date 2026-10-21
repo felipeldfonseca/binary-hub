@@ -1,0 +1,242 @@
+{
+  "pnl": -100,
+  "gate": {
+    "at": "2026-10-23T14:46:04.767838+00:00",
+    "block": {
+      "state": "nao_avaliado",
+      "reason": "fase5"
+    },
+    "desde": "2026-10-23T13:00:05.344143+00:00",
+    "label": "Apex A",
+    "limit": {
+      "usd": 400,
+      "mode": "conta",
+      "near": false,
+      "used": 0.75,
+      "state": "ok",
+      "hit_at": null,
+      "reason": null,
+      "trades": 1,
+      "net_usd": -300,
+      "at_limit": "encerrar",
+      "worst_usd": -300
+    },
+    "today": {
+      "trades": 1,
+      "net_usd": -300,
+      "worst_usd": -300
+    },
+    "market": "futures",
+    "status": "liberado",
+    "window": {
+      "next": {
+        "opens_at": "2026-10-26T14:00:00+00:00",
+        "closes_at": "2026-10-26T15:00:00+00:00",
+        "trading_day": "2026-10-26"
+      },
+      "state": "dentro",
+      "reason": null,
+      "current": {
+        "opens_at": "2026-10-23T14:00:00+00:00",
+        "closes_at": "2026-10-23T15:00:00+00:00"
+      },
+      "position": "dentro"
+    },
+    "version": {
+      "id": "23074e9e-65c1-484d-a417-f7e2ac0bffb4",
+      "origin": "criar",
+      "version_no": 1,
+      "effective_from": "2026-10-23T13:00:05.344143+00:00"
+    },
+    "warnings": [],
+    "desde_day": "2026-10-23",
+    "account_id": "edd440ee-0921-43c2-8fd0-1c740a235dbe",
+    "changes_at": "2026-10-23T15:00:00+00:00",
+    "state_rule": {
+      "state": "nao_avaliado",
+      "reason": "fase5"
+    },
+    "trading_day": "2026-10-23",
+    "checks_evaluated": [
+      "janela",
+      "limite"
+    ]
+  },
+  "plan": {
+    "breaks": [],
+    "verdict": "no_plano",
+    "checks_evaluated": [
+      "janela",
+      "limite"
+    ]
+  },
+  "exits": [
+    {
+      "id": 5,
+      "pnl": -100,
+      "kind": "parcial",
+      "counts": true,
+      "origin": "app",
+      "quantity": 2,
+      "exit_time": "2026-10-23T14:53:04.801464+00:00",
+      "pnl_basis": "prices",
+      "voided_at": null,
+      "commission": null,
+      "exit_price": 30855,
+      "file_exit_at": null,
+      "registered_at": "2026-10-23T14:53:04.801464+00:00"
+    }
+  ],
+  "marks": [],
+  "trade": {
+    "id": "47ffd2ff-8c60-45c5-9803-2dd0ce84c89a",
+    "pnl": null,
+    "note": null,
+    "option": null,
+    "result": "pending",
+    "source": "live",
+    "status": "open",
+    "symbol": "MNQ",
+    "quantity": 3,
+    "direction": "long",
+    "exit_time": null,
+    "pnl_basis": null,
+    "timeframe": null,
+    "account_id": "edd440ee-0921-43c2-8fd0-1c740a235dbe",
+    "asset_type": "futures",
+    "commission": null,
+    "entry_time": "2026-10-23T14:46:04.767838+00:00",
+    "exit_price": null,
+    "expires_at": null,
+    "stop_price": 30840,
+    "entry_price": 30880,
+    "trading_day": "2026-10-23",
+    "stake_amount": null,
+    "target_price": null,
+    "note_saved_at": null,
+    "registered_at": "2026-10-23T14:46:04.767838+00:00",
+    "payout_percent": null,
+    "duration_seconds": null,
+    "exit_registered_at": null
+  },
+  "images": [],
+  "points": -25,
+  "context": {
+    "origin": "live",
+    "rule_ok": null,
+    "in_block": null,
+    "warnings": [],
+    "in_window": true,
+    "after_limit": false,
+    "captured_at": "2026-10-23T14:46:04.767838+00:00",
+    "gate_status": "liberado",
+    "evaluated_at": "2026-10-23T14:46:04.767838+00:00",
+    "state_choice": null,
+    "checks_evaluated": [
+      "janela",
+      "limite"
+    ],
+    "day_pnl_at_entry": -300,
+    "day_worst_at_entry": -300
+  },
+  "dry_run": false,
+  "exit_at": "2026-10-23T14:53:04.801464+00:00",
+  "exit_id": 5,
+  "version": {
+    "id": "23074e9e-65c1-484d-a417-f7e2ac0bffb4",
+    "version_no": 1
+  },
+  "entry_at": "2026-10-23T14:46:04.767838+00:00",
+  "gate_now": {
+    "at": "2026-10-23T14:53:04.801464+00:00",
+    "block": {
+      "state": "nao_avaliado",
+      "reason": "fase5"
+    },
+    "desde": "2026-10-23T13:00:05.344143+00:00",
+    "label": "Apex A",
+    "limit": {
+      "usd": 400,
+      "mode": "conta",
+      "near": true,
+      "used": 1,
+      "state": "atingido",
+      "hit_at": "2026-10-23T14:53:04.801464+00:00",
+      "reason": null,
+      "trades": 2,
+      "net_usd": -400,
+      "at_limit": "encerrar",
+      "worst_usd": -400
+    },
+    "today": {
+      "trades": 2,
+      "net_usd": -400,
+      "worst_usd": -400
+    },
+    "market": "futures",
+    "status": "encerrado",
+    "window": {
+      "next": {
+        "opens_at": "2026-10-26T14:00:00+00:00",
+        "closes_at": "2026-10-26T15:00:00+00:00",
+        "trading_day": "2026-10-26"
+      },
+      "state": "dentro",
+      "reason": null,
+      "current": {
+        "opens_at": "2026-10-23T14:00:00+00:00",
+        "closes_at": "2026-10-23T15:00:00+00:00"
+      },
+      "position": "dentro"
+    },
+    "version": {
+      "id": "23074e9e-65c1-484d-a417-f7e2ac0bffb4",
+      "origin": "criar",
+      "version_no": 1,
+      "effective_from": "2026-10-23T13:00:05.344143+00:00"
+    },
+    "warnings": [],
+    "desde_day": "2026-10-23",
+    "account_id": "edd440ee-0921-43c2-8fd0-1c740a235dbe",
+    "changes_at": "2026-10-23T15:00:00+00:00",
+    "state_rule": {
+      "state": "nao_avaliado",
+      "reason": "fase5"
+    },
+    "trading_day": "2026-10-23",
+    "checks_evaluated": [
+      "janela",
+      "limite"
+    ]
+  },
+  "position": {
+    "r": null,
+    "open": 1,
+    "undo": {
+      "id": 5,
+      "kind": "parcial",
+      "until": "2026-10-23T15:08:04.801464+00:00"
+    },
+    "exits": 1,
+    "closed": 2,
+    "partials": 1,
+    "quantity": 3,
+    "stop_now": 30840,
+    "stop_kind": null,
+    "realized_pnl": -100,
+    "stop_initial": 30840
+  },
+  "repeated": false,
+  "trade_id": "47ffd2ff-8c60-45c5-9803-2dd0ce84c89a",
+  "breakeven": {
+    "n": 30,
+    "un": "pts",
+    "key": "MNQ",
+    "level": 30910
+  },
+  "marks_now": [],
+  "server_now": "2026-10-23T14:53:04.801464+00:00",
+  "stop_moves": [],
+  "trading_day": "2026-10-23",
+  "registered_at": "2026-10-23T14:46:04.767838+00:00"
+}

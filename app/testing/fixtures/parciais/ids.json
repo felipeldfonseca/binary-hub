@@ -1,0 +1,14 @@
+{
+  "user": "c11da716-765d-44a9-a4ee-a424d375169f",
+  "accounts": {
+    "topOne": "7fb72cf4-7a71-4e75-bd4a-c65022a5bb6b",
+    "apex": "edd440ee-0921-43c2-8fd0-1c740a235dbe",
+    "ftmo": "d817a46b-4760-4bfb-af3b-dfaa09309331"
+  },
+  "trades": {
+    "mes": "4356a5ad-8379-4592-b3b4-97696b984765",
+    "mgc": "2290e80a-5be5-4ca5-96e8-06889dc720ba",
+    "mnq": "47ffd2ff-8c60-45c5-9803-2dd0ce84c89a",
+    "eur": "1aa8b2a1-81f4-45e9-a0ad-558b93e1932e"
+  }
+}

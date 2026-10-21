@@ -1,0 +1,16 @@
+{
+  "r": 1.1667,
+  "pnl": 135,
+  "points": 13.5,
+  "result": "win",
+  "dry_run": true,
+  "exit_at": "2026-10-23T14:31:04.899552+00:00",
+  "quantity": 2,
+  "repeated": false,
+  "trade_id": "4356a5ad-8379-4592-b3b4-97696b984765",
+  "pnl_basis": "prices",
+  "total_pnl": 175,
+  "commission": null,
+  "exit_price": 7926,
+  "server_now": "2026-10-23T14:31:04.899552+00:00"
+}
