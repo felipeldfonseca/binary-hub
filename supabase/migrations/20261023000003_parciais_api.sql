@@ -2155,8 +2155,9 @@ end;
 $$;
 
 -- Re-place the account's imported trades on another file zone (20261020000004's); an imported trade's
--- file exits move with it, each from its own wall clock (rows with an explicit offset never move, nor
--- does anything on a trade registered in the app). With p_dry_run (the default) it only counts.
+-- file exits move with it, each from its own wall clock, and so do the instants of the links later
+-- files left on it (rows with an explicit offset never move, nor does anything on a trade registered
+-- in the app). With p_dry_run (the default) it only counts.
 create or replace function public.import_fix_tz(p_account uuid, p_new_tz text, p_dry_run boolean default true)
 returns jsonb
 language plpgsql
@@ -2204,6 +2205,25 @@ begin
       and (e.exit_time <> e.source_local_exit at time zone p_new_tz
            or e.file_exit_at <> e.source_local_exit at time zone p_new_tz);
     perform pg_catalog.set_config('binary_hub.exits', '', true);
+    -- A later file's link on a moved trade (its exits joined it) moves with it: the exit_time of its
+    -- before and after as the trade's own (from the wall clock beside it, or by the entry's shift), so
+    -- an undo gives back an exit on the trade's clock; the file's instants as its exits'
+    update public.trade_import_links l
+    set before = case when l.before ? 'exit_time' then l.before || jsonb_build_object('exit_time', case
+                   when l.before->>'source_local_exit' is not null then (l.before->>'source_local_exit')::timestamp at time zone p_new_tz
+                   else (l.before->>'exit_time')::timestamptz + m.shift end) else l.before end,
+        after = case when l.after ? 'exit_time' then l.after || jsonb_build_object('exit_time', case
+                  when l.after->>'source_local_exit' is not null then (l.after->>'source_local_exit')::timestamp at time zone p_new_tz
+                  else (l.after->>'exit_time')::timestamptz + m.shift end) else l.after end,
+        file_entry_at = l.file_entry_at + m.shift,
+        file_exit_at = coalesce((select max(e.file_exit_at) from public.trade_exits e
+                                 where e.trade_id = l.trade_id and e.batch_id = l.batch_id and e.origin = 'file'),
+                                l.file_exit_at + m.shift)
+    from (select t.id, (t.source_local_entry at time zone p_new_tz) - t.entry_time as shift
+          from public.trades t
+          where t.account_id = acc.id and t.source = 'import' and t.source_local_entry is not null
+            and t.entry_time <> t.source_local_entry at time zone p_new_tz) m
+    where l.trade_id = m.id;
     -- The bridge recomputes each moved trade's day with compute_trading_day
     update public.trades t
     set entry_time = t.source_local_entry at time zone p_new_tz,

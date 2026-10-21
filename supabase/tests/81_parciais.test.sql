@@ -88,7 +88,7 @@ insert into public.trading_accounts (user_id, market, label, platform) values
   (:V, 'futures', 'Par1 V', 'topone'), (:V, 'futures', 'Par2 V', 'topone'), (:V, 'futures', 'Par3 V', 'topone'),
   (:V, 'futures', 'Par4 V', 'topone'), (:V, 'futures', 'Par5 V', 'topone'), (:V, 'futures', 'Par6 V', 'topone'),
   (:V, 'futures', 'Par7 V', 'topone'), (:V, 'futures', 'Par8 V', 'topone'), (:V, 'futures', 'Par9 V', 'topone'),
-  (:V, 'futures', 'Par10 V', 'topone'), (:V, 'futures', 'Par11 V', 'topone');
+  (:V, 'futures', 'Par10 V', 'topone'), (:V, 'futures', 'Par11 V', 'topone'), (:V, 'futures', 'Parede2 V', 'topone');
 commit;
 select id as par from public.trading_accounts where user_id = :V and label = 'Parciais V' \gset
 select id as reg from public.trading_accounts where user_id = :V and label = 'Regra V' \gset
@@ -116,6 +116,7 @@ select id as sb3 from public.trading_accounts where user_id = :V and label = 'Pa
 select id as sb4 from public.trading_accounts where user_id = :V and label = 'Par9 V' \gset
 select id as sb5 from public.trading_accounts where user_id = :V and label = 'Par10 V' \gset
 select id as sb6 from public.trading_accounts where user_id = :V and label = 'Par11 V' \gset
+select id as wl2 from public.trading_accounts where user_id = :V and label = 'Parede2 V' \gset
 
 begin;
 select set_config('request.jwt.claim.sub', :V, true);
@@ -136,8 +137,8 @@ select tests.eq(jsonb_array_length(public.save_rules(jsonb_build_object('v', 1, 
   || (select jsonb_object_agg(a.id::text, jsonb_build_object('rules', '{"v": 1}'::jsonb, 'window', tests.win(:NY, -90, 90), 'version', 'force'))
       from public.trading_accounts a
       where a.user_id = :V and a.label in ('Curto V', 'Opcoes V', 'Hora V', 'Grupo V', 'Parede V', 'Par1 V', 'Par2 V', 'Par3 V', 'Par4 V',
-                                           'Par5 V', 'Par6 V', 'Par7 V', 'Par8 V', 'Par9 V', 'Par10 V', 'Par11 V'))))->'versions'),
-  23, 'twenty-three accounts with rules');
+                                           'Par5 V', 'Par6 V', 'Par7 V', 'Par8 V', 'Par9 V', 'Par10 V', 'Par11 V', 'Parede2 V'))))->'versions'),
+  24, 'twenty-four accounts with rules');
 commit;
 alter table public.account_rule_versions disable trigger account_rule_versions_guard;
 update public.account_rule_versions v set effective_from = v.effective_from - interval '30 days' where v.user_id = :V;
@@ -2516,6 +2517,113 @@ set local role authenticated;
 select public.import_undo((:'c23m'::jsonb->>'batch_id')::uuid)->>'deleted';
 commit;
 select tests.eq(tests.fp81(:'si'), :'fpsi', 'undone: as registered');
+
+-- 8.24 A later file's exits joined an imported trade on the file's wall clock, then the zone was fixed:
+--      undone in either order, the trade is as the first file left it on the new zone (its exit on its
+--      own wall clock, after its entry); the links moved with it
+create temp table f824 as select (date_trunc('day', now() - interval '20 days') + interval '14 hours') as d5;
+select d5 from f824 \gset
+create temp table f824r as select
+  tests.row(2, 'MESZ6/24001', 'MESZ6', 'futures', 'long', :'d5'::timestamptz, :'d5'::timestamptz + interval '5 minutes',
+            '7000.00', '7001.00', '1', null, null, 'win', '5.00', '0.62') - 'utc_offset' as x,
+  tests.row(3, 'MESZ6/24002', 'MESZ6', 'futures', 'long', :'d5'::timestamptz, :'d5'::timestamptz + interval '9 minutes',
+            '7000.00', '7002.00', '1', null, null, 'win', '10.00', '0.62') - 'utc_offset' as y,
+  tests.row(4, 'MESZ6/24003', 'MESZ6', 'futures', 'long', :'d5'::timestamptz, :'d5'::timestamptz + interval '15 minutes',
+            '7000.00', '7003.00', '1', null, null, 'win', '15.00', '0.62') - 'utc_offset' as z;
+select x as x24, y as y24, z as z24 from f824r \gset
+begin;
+select set_config('request.jwt.claim.sub', :V, true);
+set local role authenticated;
+select tests.imp81(:'wl2', 'topone', 'w24a.csv', jsonb_build_array(:'x24'::jsonb))->>'inserted';
+commit;
+select id as wt3 from public.trades where account_id = :'wl2' and external_id = 'MESZ6/24001' \gset
+select tests.fp81(:'wt3') as fpwt3 \gset
+create or replace function tests.moved81(p_trade uuid, p_d timestamptz) returns jsonb language sql stable as $$
+  select jsonb_build_object(
+    'entry', t.entry_time = (p_d at time zone 'UTC') at time zone 'America/Sao_Paulo',
+    'exit', t.exit_time = ((p_d + interval '5 minutes') at time zone 'UTC') at time zone 'America/Sao_Paulo',
+    'wall', t.source_local_exit = (p_d + interval '5 minutes') at time zone 'UTC',
+    'money', t.quantity = 1 and t.pnl = 5 and t.exit_price = 7001 and t.commission = 0.62 and t.result = 'win' and t.status = 'closed',
+    'exits', (select count(*) from public.trade_exits e where e.trade_id = t.id))
+  from public.trades t where t.id = p_trade
+$$;
+create or replace function tests.links_moved81(p_trade uuid) returns jsonb language sql stable as $$
+  select jsonb_build_object('n', count(*), 'moved', bool_and(
+    l.file_entry_at = t.entry_time
+    and l.file_exit_at = (select max(e.file_exit_at) from public.trade_exits e where e.trade_id = t.id and e.batch_id = l.batch_id)
+    and (l.before->>'exit_time')::timestamptz = (l.before->>'source_local_exit')::timestamp at time zone 'America/Sao_Paulo'
+    and (l.after->>'exit_time')::timestamptz = (l.after->>'source_local_exit')::timestamp at time zone 'America/Sao_Paulo'))
+  from public.trade_import_links l join public.trades t on t.id = l.trade_id where t.id = p_trade
+$$;
+begin;
+select set_config('request.jwt.claim.sub', :V, true);
+set local role authenticated;
+select tests.imp81(:'wl2', 'topone', 'w24b.csv', jsonb_build_array(:'x24'::jsonb, :'y24'::jsonb)) as cw24b \gset
+commit;
+begin;
+select set_config('request.jwt.claim.sub', :V, true);
+set local role authenticated;
+select tests.imp81(:'wl2', 'topone', 'w24c.csv', jsonb_build_array(:'x24'::jsonb, :'y24'::jsonb, :'z24'::jsonb)) as cw24c \gset
+commit;
+begin;
+select set_config('request.jwt.claim.sub', :V, true);
+set local role authenticated;
+select tests.eq(public.import_fix_tz(:'wl2', 'America/Sao_Paulo', false)->>'changed', '1', 'the zone fixed: the trade moves');
+commit;
+select tests.eq(tests.links_moved81(:'wt3'), '{"n": 2, "moved": true}'::jsonb,
+                'the later files'' links moved with it: their exits on their own wall clock, the file''s instants as its exits''');
+begin;
+select set_config('request.jwt.claim.sub', :V, true);
+set local role authenticated;
+select public.import_undo((:'cw24b'::jsonb->>'batch_id')::uuid)->>'deleted';
+commit;
+begin;
+select set_config('request.jwt.claim.sub', :V, true);
+set local role authenticated;
+select public.import_undo((:'cw24c'::jsonb->>'batch_id')::uuid)->>'deleted';
+commit;
+select tests.eq(tests.moved81(:'wt3', :'d5'), '{"entry": true, "exit": true, "wall": true, "money": true, "exits": 0}'::jsonb,
+                'undone in order: the first file''s trade on the new zone, its exit on its wall clock (not the old zone''s, before the entry)');
+begin;
+select set_config('request.jwt.claim.sub', :V, true);
+set local role authenticated;
+select public.import_fix_tz(:'wl2', 'UTC', false)->>'changed';
+commit;
+select tests.eq(tests.fp81(:'wt3'), :'fpwt3', 'back on the first zone: as the first file left it');
+begin;
+select set_config('request.jwt.claim.sub', :V, true);
+set local role authenticated;
+select tests.imp81(:'wl2', 'topone', 'w24b.csv', jsonb_build_array(:'x24'::jsonb, :'y24'::jsonb)) as cw24b \gset
+commit;
+begin;
+select set_config('request.jwt.claim.sub', :V, true);
+set local role authenticated;
+select tests.imp81(:'wl2', 'topone', 'w24c.csv', jsonb_build_array(:'x24'::jsonb, :'y24'::jsonb, :'z24'::jsonb)) as cw24c \gset
+commit;
+begin;
+select set_config('request.jwt.claim.sub', :V, true);
+set local role authenticated;
+select public.import_fix_tz(:'wl2', 'America/Sao_Paulo', false)->>'changed';
+commit;
+begin;
+select set_config('request.jwt.claim.sub', :V, true);
+set local role authenticated;
+select public.import_undo((:'cw24c'::jsonb->>'batch_id')::uuid)->>'deleted';
+commit;
+select tests.eq(tests.links_moved81(:'wt3'), '{"n": 1, "moved": true}'::jsonb, 'the last undone first: the other link still on the new zone');
+begin;
+select set_config('request.jwt.claim.sub', :V, true);
+set local role authenticated;
+select public.import_undo((:'cw24b'::jsonb->>'batch_id')::uuid)->>'deleted';
+commit;
+select tests.eq(tests.moved81(:'wt3', :'d5'), '{"entry": true, "exit": true, "wall": true, "money": true, "exits": 0}'::jsonb,
+                'undone newest first: the first file''s trade on the new zone');
+begin;
+select set_config('request.jwt.claim.sub', :V, true);
+set local role authenticated;
+select public.import_fix_tz(:'wl2', 'UTC', false)->>'changed';
+commit;
+select tests.eq(tests.fp81(:'wt3'), :'fpwt3', 'back on the first zone: as the first file left it');
 
 -- =============================================================================================
 -- 9. The tables are as specified
