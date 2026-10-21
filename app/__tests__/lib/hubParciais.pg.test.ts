@@ -604,6 +604,48 @@ delete from public.profiles where id = '${uid}';`);
     await checkState(reg.state, 'forex');
   });
 
+  it('11:30: «Outro preço» exactly at the entry is an «ajuste» without «Preço agora», a breakeven with it (= the domain)', async () => {
+    setClock('2026-10-23T15:30:05Z');
+    const e = await registerEntry(db, acc.topOne, entryPayload('futures', { clientKey: newClientKey(), symbol: 'MES', direction: 'long', quantity: '2', entryPrice: '7930.00', stop: '10', clock: NY }));
+    trades.mesEntrada = e.state.trade.id;
+    const mtOf = (s: { trade: TradeState['trade']; context: TradeState['context'] }) => ({
+      market: 'futures',
+      symbol: 'MES',
+      direction: 'long' as const,
+      entryPrice: s.trade.entryPrice,
+      stopPrice: s.trade.stopPrice,
+      status: s.trade.status,
+      option: null,
+      origin: s.context!.origin,
+    });
+
+    // No price: the move keeps no points, so it is no breakeven (a breakeven always carries them)
+    setClock('2026-10-23T15:31:05Z');
+    const p1 = movePayload({ clientKey: newClientKey(), kind: 'ajuste', stopPrice: '7930.00' });
+    const want1 = validateMove(mtOf(e.state), e.state.stopMoves, p1);
+    expect(want1).toEqual({ ok: true, kind: 'ajuste', stopPrice: '7930', prevStop: '7920', priceNow: null, favor: null, unit: 'pts' });
+    const m1 = await moveStop(db, trades.mesEntrada, p1);
+    write('stop-mes-entrada-ajuste', lastAnswer());
+    expect(m1.state.stopMoves.find((m) => m.id === m1.moveId)).toMatchObject({ kind: 'ajuste', stopPrice: '7930', prevStop: '7920', priceNow: null, favor: null, unit: 'pts', voidedAt: null });
+    expect(m1.state.position).toMatchObject({ stopNow: '7930', stopKind: 'ajuste', undo: { kind: 'stop', id: m1.moveId } });
+    // «Stop … · no breakeven» is where the stop is, whatever the move was called
+    expect(stopNowStatus(tradeInstrument('futures', 'MES')!, 1, '7930', m1.state.position.stopNow, m1.state.position.stopKind)).toEqual({ state: 'breakeven' });
+    await checkState(m1.state, 'futures');
+
+    // «Desfazer», then the same level with «Preço agora» 7.934,25: a breakeven with +4,25 pts
+    setClock('2026-10-23T15:32:05Z');
+    const undone = await undoEvent(db, trades.mesEntrada, undoEventPayload('stop', m1.moveId));
+    expect(undone.state.position).toMatchObject({ stopNow: '7920', stopKind: null });
+    const p2 = movePayload({ clientKey: newClientKey(), kind: 'ajuste', stopPrice: '7930.00', priceNow: '7934.25' });
+    const want2 = validateMove(mtOf(undone.state), undone.state.stopMoves, p2);
+    expect(want2).toEqual({ ok: true, kind: 'breakeven', stopPrice: '7930', prevStop: '7920', priceNow: '7934.25', favor: '4.25', unit: 'pts' });
+    const m2 = await moveStop(db, trades.mesEntrada, p2);
+    write('stop-mes-entrada-breakeven', lastAnswer());
+    expect(m2.state.stopMoves.find((m) => m.id === m2.moveId)).toMatchObject({ kind: 'breakeven', stopPrice: '7930', prevStop: '7920', priceNow: '7934.25', favor: '4.25', unit: 'pts' });
+    expect(m2.state.position).toMatchObject({ stopNow: '7930', stopKind: 'breakeven' });
+    await checkState(m2.state, 'futures');
+  });
+
   it('records the ids the fixtures refer to', () => {
     write('ids', { user: uid, accounts: acc, trades });
     expect(recorded.length).toBeGreaterThan(10);

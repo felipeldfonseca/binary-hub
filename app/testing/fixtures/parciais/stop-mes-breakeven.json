@@ -1,11 +1,11 @@
 {
   "gate": {
-    "at": "2026-10-23T14:12:05.409925+00:00",
+    "at": "2026-10-23T14:12:04.970101+00:00",
     "block": {
       "state": "nao_avaliado",
       "reason": "fase5"
     },
-    "desde": "2026-10-23T13:00:05.344143+00:00",
+    "desde": "2026-10-23T13:00:04.900554+00:00",
     "label": "Top One #1",
     "limit": {
       "usd": 400,
@@ -42,14 +42,14 @@
       "position": "dentro"
     },
     "version": {
-      "id": "7b35f37b-cc13-4608-a29c-ba64b7b9be68",
+      "id": "1da732fe-33ac-4dbe-b77e-e79ae4390c7c",
       "origin": "criar",
       "version_no": 1,
-      "effective_from": "2026-10-23T13:00:05.344143+00:00"
+      "effective_from": "2026-10-23T13:00:04.900554+00:00"
     },
     "warnings": [],
     "desde_day": "2026-10-23",
-    "account_id": "7fb72cf4-7a71-4e75-bd4a-c65022a5bb6b",
+    "account_id": "701ac848-6d51-4742-a472-c303b8da7a1d",
     "changes_at": "2026-10-23T15:00:00+00:00",
     "state_rule": {
       "state": "nao_avaliado",
@@ -77,13 +77,13 @@
       "counts": true,
       "origin": "app",
       "quantity": 1,
-      "exit_time": "2026-10-23T14:18:04.82245+00:00",
+      "exit_time": "2026-10-23T14:18:05.347839+00:00",
       "pnl_basis": "prices",
       "voided_at": null,
       "commission": null,
       "exit_price": 7920.5,
       "file_exit_at": null,
-      "registered_at": "2026-10-23T14:18:04.82245+00:00"
+      "registered_at": "2026-10-23T14:18:05.347839+00:00"
     }
   ],
   "marks": [
@@ -92,11 +92,11 @@
       "kind": "setup",
       "limpa": true,
       "value": "A",
-      "marked_at": "2026-10-23T14:12:05.409925+00:00"
+      "marked_at": "2026-10-23T14:12:04.970101+00:00"
     }
   ],
   "trade": {
-    "id": "4356a5ad-8379-4592-b3b4-97696b984765",
+    "id": "97425c22-f74c-4f26-b761-f9d30400251f",
     "pnl": null,
     "note": null,
     "option": null,
@@ -109,10 +109,10 @@
     "exit_time": null,
     "pnl_basis": null,
     "timeframe": null,
-    "account_id": "7fb72cf4-7a71-4e75-bd4a-c65022a5bb6b",
+    "account_id": "701ac848-6d51-4742-a472-c303b8da7a1d",
     "asset_type": "futures",
     "commission": null,
-    "entry_time": "2026-10-23T14:12:05.409925+00:00",
+    "entry_time": "2026-10-23T14:12:04.970101+00:00",
     "exit_price": null,
     "expires_at": null,
     "stop_price": 7902.5,
@@ -121,7 +121,7 @@
     "stake_amount": null,
     "target_price": 7932.5,
     "note_saved_at": null,
-    "registered_at": "2026-10-23T14:12:05.409925+00:00",
+    "registered_at": "2026-10-23T14:12:04.970101+00:00",
     "payout_percent": null,
     "duration_seconds": null,
     "exit_registered_at": null
@@ -134,9 +134,9 @@
     "warnings": [],
     "in_window": true,
     "after_limit": false,
-    "captured_at": "2026-10-23T14:12:05.409925+00:00",
+    "captured_at": "2026-10-23T14:12:04.970101+00:00",
     "gate_status": "liberado",
-    "evaluated_at": "2026-10-23T14:12:05.409925+00:00",
+    "evaluated_at": "2026-10-23T14:12:04.970101+00:00",
     "state_choice": null,
     "checks_evaluated": [
       "janela",
@@ -147,17 +147,17 @@
   },
   "move_id": 1,
   "version": {
-    "id": "7b35f37b-cc13-4608-a29c-ba64b7b9be68",
+    "id": "1da732fe-33ac-4dbe-b77e-e79ae4390c7c",
     "version_no": 1
   },
-  "entry_at": "2026-10-23T14:12:05.409925+00:00",
+  "entry_at": "2026-10-23T14:12:04.970101+00:00",
   "position": {
     "r": null,
     "open": 2,
     "undo": {
       "id": 1,
       "kind": "stop",
-      "until": "2026-10-23T14:34:05.26914+00:00"
+      "until": "2026-10-23T14:34:04.769483+00:00"
     },
     "exits": 1,
     "closed": 1,
@@ -169,7 +169,7 @@
     "stop_initial": 7902.5
   },
   "repeated": false,
-  "trade_id": "4356a5ad-8379-4592-b3b4-97696b984765",
+  "trade_id": "97425c22-f74c-4f26-b761-f9d30400251f",
   "breakeven": {
     "n": 8,
     "un": "pts",
@@ -179,15 +179,15 @@
   "marks_now": [
     {
       "kind": "setup",
-      "clean_at": "2026-10-23T14:12:05.409925+00:00",
-      "current_at": "2026-10-23T14:12:05.409925+00:00",
+      "clean_at": "2026-10-23T14:12:04.970101+00:00",
+      "current_at": "2026-10-23T14:12:04.970101+00:00",
       "clean_value": "A",
       "changed_after": false,
       "current_limpa": true,
       "current_value": "A"
     }
   ],
-  "server_now": "2026-10-23T14:19:05.26914+00:00",
+  "server_now": "2026-10-23T14:19:04.769483+00:00",
   "stop_moves": [
     {
       "id": 1,
@@ -196,7 +196,7 @@
       "favor": 8,
       "origin": "live",
       "ao_vivo": true,
-      "moved_at": "2026-10-23T14:19:05.26914+00:00",
+      "moved_at": "2026-10-23T14:19:04.769483+00:00",
       "prev_stop": 7902.5,
       "price_now": 7920.5,
       "voided_at": null,
@@ -204,5 +204,5 @@
     }
   ],
   "trading_day": "2026-10-23",
-  "registered_at": "2026-10-23T14:12:05.409925+00:00"
+  "registered_at": "2026-10-23T14:12:04.970101+00:00"
 }

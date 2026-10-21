@@ -1,7 +1,7 @@
 {
   "trades": [
     {
-      "id": "6e4f1402-b88c-4c99-a6a6-b37756b438b3",
+      "id": "d23d25e1-31ac-4f04-afdc-ab43186f0bfc",
       "pnl": -300,
       "note": null,
       "result": "loss",
@@ -14,7 +14,7 @@
       "exit_time": "2026-10-23T14:40:00+00:00",
       "pnl_basis": "prices",
       "timeframe": null,
-      "account_id": "edd440ee-0921-43c2-8fd0-1c740a235dbe",
+      "account_id": "bddc0593-0f9e-4eed-8ad6-aafdcb41bf41",
       "asset_type": "futures",
       "commission": null,
       "entry_time": "2026-10-23T14:30:00+00:00",
@@ -29,14 +29,14 @@
       "stake_amount": null,
       "target_price": null,
       "note_saved_at": null,
-      "registered_at": "2026-10-23T14:46:04.742041+00:00",
+      "registered_at": "2026-10-23T14:46:05.152334+00:00",
       "payout_percent": null,
-      "rule_version_id": "23074e9e-65c1-484d-a417-f7e2ac0bffb4",
+      "rule_version_id": "1de74d16-a9a8-4c5d-812e-305f9b272f42",
       "duration_seconds": null,
-      "exit_registered_at": "2026-10-23T14:46:04.742041+00:00"
+      "exit_registered_at": "2026-10-23T14:46:05.152334+00:00"
     },
     {
-      "id": "47ffd2ff-8c60-45c5-9803-2dd0ce84c89a",
+      "id": "99c86e05-6a08-4349-a63f-938456f117cf",
       "pnl": null,
       "note": null,
       "result": "pending",
@@ -49,10 +49,10 @@
       "exit_time": null,
       "pnl_basis": null,
       "timeframe": null,
-      "account_id": "edd440ee-0921-43c2-8fd0-1c740a235dbe",
+      "account_id": "bddc0593-0f9e-4eed-8ad6-aafdcb41bf41",
       "asset_type": "futures",
       "commission": null,
-      "entry_time": "2026-10-23T14:46:04.767838+00:00",
+      "entry_time": "2026-10-23T14:46:05.177008+00:00",
       "exit_price": null,
       "expires_at": null,
       "expires_on": null,
@@ -64,9 +64,9 @@
       "stake_amount": null,
       "target_price": null,
       "note_saved_at": null,
-      "registered_at": "2026-10-23T14:46:04.767838+00:00",
+      "registered_at": "2026-10-23T14:46:05.177008+00:00",
       "payout_percent": null,
-      "rule_version_id": "23074e9e-65c1-484d-a417-f7e2ac0bffb4",
+      "rule_version_id": "1de74d16-a9a8-4c5d-812e-305f9b272f42",
       "duration_seconds": null,
       "exit_registered_at": null
     }
@@ -79,25 +79,25 @@
       "counts": false,
       "origin": "app",
       "quantity": 2,
-      "trade_id": "47ffd2ff-8c60-45c5-9803-2dd0ce84c89a",
-      "exit_time": "2026-10-23T14:53:04.801464+00:00",
+      "trade_id": "99c86e05-6a08-4349-a63f-938456f117cf",
+      "exit_time": "2026-10-23T14:53:05.208804+00:00",
       "pnl_basis": "prices",
-      "voided_at": "2026-10-23T14:55:04.992701+00:00",
+      "voided_at": "2026-10-23T14:55:05.403562+00:00",
       "commission": null,
       "exit_price": 30855,
       "file_exit_at": null,
-      "registered_at": "2026-10-23T14:53:04.801464+00:00"
+      "registered_at": "2026-10-23T14:53:05.208804+00:00"
     }
   ],
   "agora": {
     "accounts": [
       {
-        "at": "2026-10-23T14:55:05.13558+00:00",
+        "at": "2026-10-23T14:55:05.54372+00:00",
         "block": {
           "state": "nao_avaliado",
           "reason": "fase5"
         },
-        "desde": "2026-10-23T13:00:05.344143+00:00",
+        "desde": "2026-10-23T13:00:04.900554+00:00",
         "label": "Top One #1",
         "limit": {
           "usd": 400,
@@ -191,14 +191,14 @@
           "position": "dentro"
         },
         "version": {
-          "id": "7b35f37b-cc13-4608-a29c-ba64b7b9be68",
+          "id": "1da732fe-33ac-4dbe-b77e-e79ae4390c7c",
           "origin": "criar",
           "version_no": 1,
-          "effective_from": "2026-10-23T13:00:05.344143+00:00"
+          "effective_from": "2026-10-23T13:00:04.900554+00:00"
         },
         "warnings": [],
         "desde_day": "2026-10-23",
-        "account_id": "7fb72cf4-7a71-4e75-bd4a-c65022a5bb6b",
+        "account_id": "701ac848-6d51-4742-a472-c303b8da7a1d",
         "changes_at": "2026-10-23T15:00:00+00:00",
         "state_rule": {
           "state": "nao_avaliado",
@@ -211,12 +211,12 @@
         ]
       },
       {
-        "at": "2026-10-23T14:55:05.13558+00:00",
+        "at": "2026-10-23T14:55:05.54372+00:00",
         "block": {
           "state": "nao_avaliado",
           "reason": "fase5"
         },
-        "desde": "2026-10-23T13:00:05.344143+00:00",
+        "desde": "2026-10-23T13:00:04.900554+00:00",
         "label": "Apex A",
         "limit": {
           "usd": 400,
@@ -310,14 +310,14 @@
           "position": "dentro"
         },
         "version": {
-          "id": "23074e9e-65c1-484d-a417-f7e2ac0bffb4",
+          "id": "1de74d16-a9a8-4c5d-812e-305f9b272f42",
           "origin": "criar",
           "version_no": 1,
-          "effective_from": "2026-10-23T13:00:05.344143+00:00"
+          "effective_from": "2026-10-23T13:00:04.900554+00:00"
         },
         "warnings": [],
         "desde_day": "2026-10-23",
-        "account_id": "edd440ee-0921-43c2-8fd0-1c740a235dbe",
+        "account_id": "bddc0593-0f9e-4eed-8ad6-aafdcb41bf41",
         "changes_at": "2026-10-23T15:00:00+00:00",
         "state_rule": {
           "state": "nao_avaliado",
@@ -330,12 +330,12 @@
         ]
       },
       {
-        "at": "2026-10-23T14:55:05.13558+00:00",
+        "at": "2026-10-23T14:55:05.54372+00:00",
         "block": {
           "state": "nao_avaliado",
           "reason": "so_futuros"
         },
-        "desde": "2026-10-23T13:00:05.344143+00:00",
+        "desde": "2026-10-23T13:00:04.900554+00:00",
         "label": "FTMO",
         "limit": {
           "usd": 1000,
@@ -408,14 +408,14 @@
           "position": "dentro"
         },
         "version": {
-          "id": "265c35b7-c58f-49d0-b189-d51315942106",
+          "id": "22ce9548-fb7c-4215-957a-a478e078d0b3",
           "origin": "criar",
           "version_no": 1,
-          "effective_from": "2026-10-23T13:00:05.344143+00:00"
+          "effective_from": "2026-10-23T13:00:04.900554+00:00"
         },
         "warnings": [],
         "desde_day": "2026-10-23",
-        "account_id": "d817a46b-4760-4bfb-af3b-dfaa09309331",
+        "account_id": "c6e063b9-50ea-40b4-8fe9-593a6b2df449",
         "changes_at": "2026-10-23T19:00:00+00:00",
         "state_rule": {
           "state": "nao_avaliado",
@@ -428,6 +428,6 @@
         ]
       }
     ],
-    "server_now": "2026-10-23T14:55:05.13558+00:00"
+    "server_now": "2026-10-23T14:55:05.54372+00:00"
   }
 }

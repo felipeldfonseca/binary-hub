@@ -8,8 +8,10 @@
  * inputs: «+N» of the rule, the breakeven rule in a version and in the settings, what a setting
  * resolves to, the points in favour at a price, a trade's rule and its price, R over several
  * exits, a quantity with the instrument's decimals, and the payloads of «Registrar parcial» and
- * «Já fechada» in several exits. Sums, the limit per exit, «Desfazer» and the stop moves need a
- * database's rows: hubParciais.pg.test.ts and its recorded answers (hubParciais.test.ts).
+ * «Já fechada» in several exits, and the import's links of one file's new rows when a broker
+ * position has several rows (import_stage; the generator also re-asked the 3c import_stage every
+ * Phase 3 matching scenario: none changed). Sums, the limit per exit, «Desfazer» and the stop moves
+ * need a database's rows: hubParciais.pg.test.ts and its recorded answers (hubParciais.test.ts).
  */
 import raw from './cases3c.json';
 import {
@@ -22,6 +24,7 @@ import {
   type AccountMarket,
 } from '@/lib/domain/gate';
 import {
+  assignImportLinks,
   breakevenOf,
   checkPayload,
   decimalFromJson,
@@ -31,6 +34,9 @@ import {
   tradeInstrument,
   tradeQty,
   type Direction,
+  type EntryOrigin,
+  type MatchRow,
+  type MatchTrade,
   type OptionContract,
   type PayloadMode,
 } from '@/lib/domain/registro';
@@ -60,6 +66,38 @@ interface Cases {
   }>;
   rOf: Group<{ label: string; entry: string; stop: string | null; sgn: 1 | -1; position: string; exits: { quantity: string; exit_price: string | null }[]; expected: string | null }>;
   shape: Group<{ label: string; mode: PayloadMode; market: string; dry: boolean; payload: unknown; platform: string | null; expected: { code: string; field: string | null } | null }>;
+  positions: {
+    about: string;
+    scenarios: {
+      label: string;
+      market: string;
+      trades: {
+        id: string;
+        symbol: string;
+        direction: Direction;
+        entry_time: string;
+        origin: EntryOrigin | null;
+        expires_at: string | null;
+        quantity: string | null;
+        stake: string | null;
+        entry_price: string;
+        eligible: boolean;
+      }[];
+      rows: {
+        rn: number;
+        line: number;
+        symbol: string;
+        direction: Direction;
+        entry_time: string;
+        exit_time: string | null;
+        quantity: string | null;
+        stake: string | null;
+        entry_price: string;
+        code: null;
+      }[];
+      expected: Record<string, string>;
+    }[];
+  };
 }
 const cases = raw as unknown as Cases;
 
@@ -143,5 +181,47 @@ describe('trade_qty (SQL) = tradeQty (TS): a quantity with the instrument\'s dec
   it.each(cases.qty.cases.map((c) => [`${c.market} ${c.symbol} ${JSON.stringify(c.x)}`, c] as const))('%s', (_label, c) => {
     const q = tradeQty(tradeInstrument(c.market, c.symbol, c.option)!, c.x);
     expect(q && numericText(q)).toBe(c.expected);
+  });
+});
+
+describe('import_stage (SQL) = assignImportLinks (TS): a broker position in several rows', () => {
+  it('covers whole links, rows again and rows of their own', () => {
+    const kinds = cases.positions.scenarios.map((s) => {
+      const ids = Object.values(s.expected);
+      return ids.length === 0 ? 'none' : new Set(ids).size < ids.length ? 'whole' : 'rows';
+    });
+    expect(new Set(kinds)).toEqual(new Set(['none', 'whole', 'rows']));
+    expect(cases.positions.scenarios.some((s) => Object.keys(s.expected).length < s.rows.length && Object.keys(s.expected).length > 0)).toBe(true);
+  });
+
+  it.each(cases.positions.scenarios.map((s) => [s.label, s] as const))('%s', (_l, s) => {
+    const rows: MatchRow[] = s.rows.map((r) => ({
+      rn: r.rn,
+      line: r.line,
+      symbol: r.symbol,
+      direction: r.direction,
+      entryTime: new Date(r.entry_time),
+      exitTime: r.exit_time === null ? null : new Date(r.exit_time),
+      quantity: r.quantity,
+      stake: r.stake,
+      entryPrice: r.entry_price,
+    }));
+    const trades: MatchTrade[] = s.trades
+      .filter((t) => t.eligible)
+      .map((t) => ({
+        id: t.id,
+        symbol: t.symbol,
+        direction: t.direction,
+        entryTime: new Date(t.entry_time),
+        origin: t.origin!,
+        expiresAt: t.expires_at === null ? null : new Date(t.expires_at),
+        quantity: t.quantity,
+        stake: t.stake,
+        entryPrice: t.entry_price,
+      }));
+    const links = assignImportLinks(s.market, rows, trades);
+    expect(Object.fromEntries(Array.from(links.entries()).map(([rn, id]) => [String(rn), id]))).toEqual(s.expected);
+    // The input order never matters
+    expect(assignImportLinks(s.market, [...rows].reverse(), [...trades].reverse())).toEqual(links);
   });
 });

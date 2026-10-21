@@ -191,8 +191,9 @@ export function validateMove(tr: MoveTrade, moves: readonly Pick<StopMove, 'id' 
 
   return {
     ok: true,
-    // «Outro preço» at the entry without «Preço agora» stays an «ajuste»: the table keeps a
-    // breakeven only with its price (20261023000002: kind = 'ajuste' or price_now is not null)
+    // «Outro preço» at the entry without «Preço agora» stays an «ajuste» with no points, as move_stop
+    // stores it (20261023000003): a breakeven always carries its price (20261023000002's check:
+    // kind = 'ajuste' or price_now is not null)
     kind: be || (px !== null && cmp(lvl, n(tr.entryPrice)) === 0) ? 'breakeven' : 'ajuste',
     stopPrice: t(lvl),
     prevStop: prev === null ? null : t(n(prev)),

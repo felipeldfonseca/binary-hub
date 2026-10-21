@@ -43,6 +43,8 @@ const STATES: [string, (json: unknown) => TradeState][] = [
   ['partial-mnq-desfeita', (j) => parseEventUndone(j).state],
   ['partial-eurusd', (j) => parsePartialRegistered(j).state],
   ['stop-eurusd-ajuste', (j) => parseMoveRegistered(j).state],
+  ['stop-mes-entrada-ajuste', (j) => parseMoveRegistered(j).state],
+  ['stop-mes-entrada-breakeven', (j) => parseMoveRegistered(j).state],
 ];
 
 describe('trade_state (SQL) = the domain on its own rows', () => {
@@ -106,6 +108,16 @@ describe('trade_state (SQL) = the domain on its own rows', () => {
     expect(parsePartialDryRun(parciaisJson('partial-dry-mes'))).toMatchObject({ quantity: '1', openAfter: '2', pnl: '40', points: '8', pnlBasis: 'prices' });
     const exit = parseExitDryRun(parciaisJson('exit-dry-mes'));
     expect(exit).toMatchObject({ repeated: false, pnl: '135', r: '1.1667', rest: { quantity: '2', totalPnl: '175' } });
+  });
+
+  it('reads «Outro preço» at the entry: an «ajuste» with no points without «Preço agora», a breakeven with it', () => {
+    const a = parseMoveRegistered(parciaisJson('stop-mes-entrada-ajuste'));
+    expect(a.state.stopMoves.find((m) => m.id === a.moveId)).toMatchObject({ kind: 'ajuste', stopPrice: '7930', priceNow: null, favor: null, unit: 'pts' });
+    expect(a.state.position).toMatchObject({ stopNow: '7930', stopKind: 'ajuste' });
+    const b = parseMoveRegistered(parciaisJson('stop-mes-entrada-breakeven'));
+    expect(b.state.stopMoves.find((m) => m.id === b.moveId)).toMatchObject({ kind: 'breakeven', stopPrice: '7930', priceNow: '7934.25', favor: '4.25' });
+    expect(b.state.stopMoves.find((m) => m.id === a.moveId)).toMatchObject({ kind: 'ajuste', voidedAt: expect.any(Date) });
+    expect(b.state.position).toMatchObject({ stopNow: '7930', stopKind: 'breakeven' });
   });
 
   it('a malformed exit, move or position is bad_answer', () => {

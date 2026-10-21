@@ -2,7 +2,8 @@
  * Test helpers for Phase 3c (partial exits, «Mover stop», «Desfazer», the breakeven rule on a trade).
  * Lives outside __tests__ so Jest does not run it as a suite.
  *
- * The JSON in fixtures/parciais is what the real functions of migrations 20261023000001..3 answered,
+ * The JSON in fixtures/parciais is what the real functions of migrations 20261023000001..3 answered
+ * (fase-3c/banco after its review fixes),
  * and what the API's table reads returned, on a throwaway local Postgres whose clock the recorder
  * moved between steps (__tests__/lib/hubParciais.pg.test.ts, with BH_PG_RECORD; an interposed clock
  * read the shift from a file). Invented user and data, random ids (ids.json). Fri 23 Oct 2026, ET:
@@ -26,6 +27,10 @@
  *   dia-apex-1055           the day after the undo
  *   partial-eurusd          FTMO 11:17 EUR/USD partial 0,50 lote a 1,08650 (+13 pips · +US$ 65)
  *   stop-eurusd-ajuste      the stop to 1,08560 with the price at 1,08650 (garante 4 pips)
+ *   stop-mes-entrada-ajuste    11:31 Top One MES 2 ct a 7.930,00: «Outro preço» at the entry without
+ *                           «Preço agora» (an «ajuste», no points)
+ *   stop-mes-entrada-breakeven 11:32 the same level with «Preço agora» 7.934,25, after «Desfazer»
+ *                           (a breakeven, +4,25 pts)
  */
 import fs from 'fs';
 import path from 'path';
@@ -46,7 +51,7 @@ export function parciaisJson(name: string): unknown {
 export interface ParciaisIds {
   user: string;
   accounts: { topOne: string; apex: string; ftmo: string };
-  trades: Record<'mes' | 'mgc' | 'mnq' | 'eur', string>;
+  trades: Record<'mes' | 'mgc' | 'mnq' | 'eur' | 'mesEntrada', string>;
 }
 
 export const idsParciais = (): ParciaisIds => parciaisJson('ids') as ParciaisIds;

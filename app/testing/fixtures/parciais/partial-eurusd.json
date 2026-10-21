@@ -1,12 +1,12 @@
 {
   "pnl": 65,
   "gate": {
-    "at": "2026-10-23T15:15:05.238894+00:00",
+    "at": "2026-10-23T15:15:04.642266+00:00",
     "block": {
       "state": "nao_avaliado",
       "reason": "so_futuros"
     },
-    "desde": "2026-10-23T13:00:05.344143+00:00",
+    "desde": "2026-10-23T13:00:04.900554+00:00",
     "label": "FTMO",
     "limit": {
       "usd": 1000,
@@ -43,14 +43,14 @@
       "position": "dentro"
     },
     "version": {
-      "id": "265c35b7-c58f-49d0-b189-d51315942106",
+      "id": "22ce9548-fb7c-4215-957a-a478e078d0b3",
       "origin": "criar",
       "version_no": 1,
-      "effective_from": "2026-10-23T13:00:05.344143+00:00"
+      "effective_from": "2026-10-23T13:00:04.900554+00:00"
     },
     "warnings": [],
     "desde_day": "2026-10-23",
-    "account_id": "d817a46b-4760-4bfb-af3b-dfaa09309331",
+    "account_id": "c6e063b9-50ea-40b4-8fe9-593a6b2df449",
     "changes_at": "2026-10-23T19:00:00+00:00",
     "state_rule": {
       "state": "nao_avaliado",
@@ -78,18 +78,18 @@
       "counts": true,
       "origin": "app",
       "quantity": 0.5,
-      "exit_time": "2026-10-23T15:17:05.275167+00:00",
+      "exit_time": "2026-10-23T15:17:04.673563+00:00",
       "pnl_basis": "prices",
       "voided_at": null,
       "commission": null,
       "exit_price": 1.0865,
       "file_exit_at": null,
-      "registered_at": "2026-10-23T15:17:05.275167+00:00"
+      "registered_at": "2026-10-23T15:17:04.673563+00:00"
     }
   ],
   "marks": [],
   "trade": {
-    "id": "1aa8b2a1-81f4-45e9-a0ad-558b93e1932e",
+    "id": "5afb1e7b-d2eb-4b89-ac7f-eebca85ad29e",
     "pnl": null,
     "note": null,
     "option": null,
@@ -102,10 +102,10 @@
     "exit_time": null,
     "pnl_basis": null,
     "timeframe": null,
-    "account_id": "d817a46b-4760-4bfb-af3b-dfaa09309331",
+    "account_id": "c6e063b9-50ea-40b4-8fe9-593a6b2df449",
     "asset_type": "forex",
     "commission": null,
-    "entry_time": "2026-10-23T15:15:05.238894+00:00",
+    "entry_time": "2026-10-23T15:15:04.642266+00:00",
     "exit_price": null,
     "expires_at": null,
     "stop_price": 1.084,
@@ -114,7 +114,7 @@
     "stake_amount": null,
     "target_price": null,
     "note_saved_at": null,
-    "registered_at": "2026-10-23T15:15:05.238894+00:00",
+    "registered_at": "2026-10-23T15:15:04.642266+00:00",
     "payout_percent": null,
     "duration_seconds": null,
     "exit_registered_at": null
@@ -128,9 +128,9 @@
     "warnings": [],
     "in_window": true,
     "after_limit": false,
-    "captured_at": "2026-10-23T15:15:05.238894+00:00",
+    "captured_at": "2026-10-23T15:15:04.642266+00:00",
     "gate_status": "liberado",
-    "evaluated_at": "2026-10-23T15:15:05.238894+00:00",
+    "evaluated_at": "2026-10-23T15:15:04.642266+00:00",
     "state_choice": null,
     "checks_evaluated": [
       "janela",
@@ -140,20 +140,20 @@
     "day_worst_at_entry": 0
   },
   "dry_run": false,
-  "exit_at": "2026-10-23T15:17:05.275167+00:00",
+  "exit_at": "2026-10-23T15:17:04.673563+00:00",
   "exit_id": 7,
   "version": {
-    "id": "265c35b7-c58f-49d0-b189-d51315942106",
+    "id": "22ce9548-fb7c-4215-957a-a478e078d0b3",
     "version_no": 1
   },
-  "entry_at": "2026-10-23T15:15:05.238894+00:00",
+  "entry_at": "2026-10-23T15:15:04.642266+00:00",
   "gate_now": {
-    "at": "2026-10-23T15:17:05.275167+00:00",
+    "at": "2026-10-23T15:17:04.673563+00:00",
     "block": {
       "state": "nao_avaliado",
       "reason": "so_futuros"
     },
-    "desde": "2026-10-23T13:00:05.344143+00:00",
+    "desde": "2026-10-23T13:00:04.900554+00:00",
     "label": "FTMO",
     "limit": {
       "usd": 1000,
@@ -190,14 +190,14 @@
       "position": "dentro"
     },
     "version": {
-      "id": "265c35b7-c58f-49d0-b189-d51315942106",
+      "id": "22ce9548-fb7c-4215-957a-a478e078d0b3",
       "origin": "criar",
       "version_no": 1,
-      "effective_from": "2026-10-23T13:00:05.344143+00:00"
+      "effective_from": "2026-10-23T13:00:04.900554+00:00"
     },
     "warnings": [],
     "desde_day": "2026-10-23",
-    "account_id": "d817a46b-4760-4bfb-af3b-dfaa09309331",
+    "account_id": "c6e063b9-50ea-40b4-8fe9-593a6b2df449",
     "changes_at": "2026-10-23T19:00:00+00:00",
     "state_rule": {
       "state": "nao_avaliado",
@@ -215,7 +215,7 @@
     "undo": {
       "id": 7,
       "kind": "parcial",
-      "until": "2026-10-23T15:32:05.275167+00:00"
+      "until": "2026-10-23T15:32:04.673563+00:00"
     },
     "exits": 1,
     "closed": 0.5,
@@ -227,7 +227,7 @@
     "stop_initial": 1.084
   },
   "repeated": false,
-  "trade_id": "1aa8b2a1-81f4-45e9-a0ad-558b93e1932e",
+  "trade_id": "5afb1e7b-d2eb-4b89-ac7f-eebca85ad29e",
   "breakeven": {
     "n": 7.5,
     "un": "pips",
@@ -235,8 +235,8 @@
     "level": 1.08595
   },
   "marks_now": [],
-  "server_now": "2026-10-23T15:17:05.275167+00:00",
+  "server_now": "2026-10-23T15:17:04.673563+00:00",
   "stop_moves": [],
   "trading_day": "2026-10-23",
-  "registered_at": "2026-10-23T15:15:05.238894+00:00"
+  "registered_at": "2026-10-23T15:15:04.642266+00:00"
 }
