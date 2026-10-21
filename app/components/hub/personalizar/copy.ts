@@ -211,7 +211,8 @@ export const REGRAS = {
   sub: 'Cada conta tem as suas; elas decidem o “Posso operar hoje?” dela.',
   // ADAPTED (board v53 `txt.infoRegras`): drops the example-accounts sentence; the last sentence is
   // NEW (Phase 5)
-  info: 'Elas decidem o “Posso operar hoje?” de cada conta: Liberado, Aguardar até HH:MM, Fora da sua janela ou Encerrado por hoje. Nunca há uma resposta só para várias contas: cada conta tem a sua linha. Durante um bloqueio de dados, a tela mostra “Aguardar até”, mesmo fora da janela; no limite, “Encerrado por hoje” vale o resto do dia. “Padrão Futuros” vale para toda conta de Futuros, menos no que for “só nesta conta”. Bloqueio de dados e regra por estado valem só para Futuros até a Fase 5; a regra por estado é uma só para o mercado. Nos outros mercados, as regras são a janela e o limite do dia. Em cada estado, escolha o que você faz: o diário confere a escolha sozinho, operação por operação. “Só a favor” é operar só na direção do estado. O texto é seu, aparece em “Seu plano”, na página do ativo, e o diário não tenta conferi-lo. O limite do dia fica na moeda da conta, R$ na B3 e US$ nos outros mercados, e nunca soma contas de mercados diferentes. Cada operação é conferida pela versão que valia na entrada: salvar uma mudança cria uma versão nova, com a data do dia, e não reescreve o passado. Antes da primeira versão, as operações ficam em “Histórico importado · só resultado”. Operações fora da janela ficam marcadas no diário, para as Análises compararem o plano com o que você fez. O Binary Hub não envia ordens nem se conecta à sua corretora: bloquear é mostrar o aviso na tela e marcar no diário. A IA nunca muda uma regra. O bloqueio de dados e a regra por estado passam a valer na Fase 5, quando o app tiver a agenda econômica e o estado do mercado; você já pode deixá-los prontos.',
+  // Fase 3c: one sentence after «… uma só para o mercado.» (B, Personalizar approved 21 Oct, P l.758 `infoRegras`)
+  info: 'Elas decidem o “Posso operar hoje?” de cada conta: Liberado, Aguardar até HH:MM, Fora da sua janela ou Encerrado por hoje. Nunca há uma resposta só para várias contas: cada conta tem a sua linha. Durante um bloqueio de dados, a tela mostra “Aguardar até”, mesmo fora da janela; no limite, “Encerrado por hoje” vale o resto do dia. “Padrão Futuros” vale para toda conta de Futuros, menos no que for “só nesta conta”. Bloqueio de dados e regra por estado valem só para Futuros até a Fase 5; a regra por estado é uma só para o mercado. “Mover para o breakeven” (Futuros) não muda o “Posso operar hoje?”: o Registrar sugere, sem bloquear, e as Análises conferem depois. Nos outros mercados, as regras são a janela e o limite do dia. Em cada estado, escolha o que você faz: o diário confere a escolha sozinho, operação por operação. “Só a favor” é operar só na direção do estado. O texto é seu, aparece em “Seu plano”, na página do ativo, e o diário não tenta conferi-lo. O limite do dia fica na moeda da conta, R$ na B3 e US$ nos outros mercados, e nunca soma contas de mercados diferentes. Cada operação é conferida pela versão que valia na entrada: salvar uma mudança cria uma versão nova, com a data do dia, e não reescreve o passado. Antes da primeira versão, as operações ficam em “Histórico importado · só resultado”. Operações fora da janela ficam marcadas no diário, para as Análises compararem o plano com o que você fez. O Binary Hub não envia ordens nem se conecta à sua corretora: bloquear é mostrar o aviso na tela e marcar no diário. A IA nunca muda uma regra. O bloqueio de dados e a regra por estado passam a valer na Fase 5, quando o app tiver a agenda econômica e o estado do mercado; você já pode deixá-los prontos.',
   /**
    * The ⓘ next to the chip of an account in a market opened in Fase 2b (board `infoMk`): `vira`
    * is viraODia of the account's own day clock («à meia-noite de Brasília», «às 17:00 ET»)
@@ -305,6 +306,35 @@ export const REGRAS = {
   estadoPlaceholder: 'O que você faz neste estado.',
 }
 
+/**
+ * Fase 3c · «Durante a operação» › «Mover para o breakeven» (Futuros; Personalizar approved 21 Oct,
+ * P l.604–639 and its script js P l.2289–2338; telas contract §6.6). B = the board's copy.
+ * «Ligada» is REGRAS.ligada; the tags are PADRAO_DE_FUTUROS, SO_NESTA_CONTA and NAO_SALVO.
+ */
+export const REGRAS_BE = {
+  grupo: 'Durante a operação', // B P l.607
+  grupoNota: 'Não muda o “Posso operar hoje?”: guia a operação aberta, e as Análises conferem depois.', // B P l.608
+  nome: 'Mover para o breakeven', // B P l.611
+  desligada: 'Desligada: o Registrar não sugere e as Análises não conferem.', // B P js l.2299
+  semAtivo: 'Sem ativo: esta regra não age.', // B P l.615
+  quantos: 'Com quantos pontos a favor', // B P l.617
+  mais: '+', // B P l.621 (aria-hidden)
+  pts: 'pts', // B P l.621 (aria-hidden)
+  /** «Pontos a favor no MES» */
+  valorAria: (ativo: string) => `Pontos a favor no ${ativo}`, // B P js l.2311
+  remover: 'Remover', // B P l.622
+  /** «Remover o MES desta regra» */
+  removerAria: (ativo: string) => `Remover o ${ativo} desta regra`, // B P js l.2311
+  erro: 'Digite pontos maiores que zero.', // B P js l.2311
+  /** «O MNQ voltou para +30 pts; use pontos maiores que zero.» */
+  voltou: (ativo: string, n: string) => `O ${ativo} voltou para +${n} pts; use pontos maiores que zero.`, // B P js l.2332
+  adicionar: 'Adicionar ativo', // B P l.629
+  nota: 'O Registrar mostra o preço do breakeven na entrada e sugere mover o stop quando uma parcial chegar lá; nunca bloqueia.', // B P l.632
+  voltarPadrao: 'Voltar ao padrão', // B P l.634
+  /** «Voltar ao padrão de Futuros: Apex B» */
+  voltarAria: (conta: string) => `Voltar ao padrão de Futuros: ${conta}`, // B P js l.2337
+}
+
 export const ESTADO_NOME: Record<StateName, string> = {
   alinhadas: 'Alinhadas',
   so_tecnica: 'Só a técnica',
@@ -392,6 +422,14 @@ export const NOTA = {
   // NEW: calendars are copied into every futures version (they version since Phase 2)
   calendarios: (nomes: readonly string[]) => `calendários: ${nomes.length ? lista(nomes) : 'nenhum'}`,
   copiadas: (label: string) => `copiadas de ${label}`,
+  /**
+   * Fase 3c (B, P js l.1761 `beTexto`): «breakeven com +8 pts no MES, +30 no MNQ e +5 no MGC», the
+   * items in the futures table's order (personalizarBreakeven.itensBreakeven), «+N» written pt-BR
+   */
+  breakeven: (itens: readonly { ativo: string; n: string }[]) =>
+    `breakeven ${lista(itens.map((x, k) => (k === 0 ? `com +${x.n} pts no ${x.ativo}` : `+${x.n} no ${x.ativo}`)))}`,
+  /** Off, or on without an asset (they say the same: neither makes a version) */
+  semBreakeven: 'sem breakeven', // B P js l.1761
 }
 
 // ------------------------------------------------------------------------------------------------

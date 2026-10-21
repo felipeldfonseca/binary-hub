@@ -11,6 +11,8 @@ import React from 'react'
 import { render } from '@testing-library/react'
 import { CampoTexto, GrupoPills } from '@/components/hub/registrar/ui'
 import BlocoResultado from '@/components/hub/registrar/BlocoResultado'
+import SaidasJaFechada from '@/components/hub/registrar/SaidasJaFechada'
+import MoviBreakeven from '@/components/hub/registrar/MoviBreakeven'
 
 const lerCss = (nome: string) => fs.readFileSync(path.join(__dirname, '../../../styles', nome), 'utf8')
 const css = lerCss('hub-registrar.css')
@@ -305,5 +307,47 @@ describe('the 3-4 fields of the price markets (contract 3-4 §5.11)', () => {
     )
     const grupo = container.querySelector('[role="group"]') as HTMLElement
     expect(vencedora(grupo, 'flex-wrap', PHONE)?.valor).toBe('wrap')
+  })
+
+  // Phase 3c · lane C2 (contract §6.3, §6.7): «Já fechada» in several exits
+  it('3c: the row header is the board’s `.sub-rot` (12 px bold, --text-2), the row’s quantity 120 px, the sum bold 6 px up', () => {
+    const rot = regra('.hub .hub-rs-rot')
+    expect(rot.getPropertyValue('font-size')).toBe('12px')
+    expect(rot.getPropertyValue('font-weight')).toBe('700')
+    expect(rot.getPropertyValue('color')).toBe('var(--text-2)')
+    expect(regra('.hub .hub-reg .hub-rs-qtd').getPropertyValue('max-width')).toBe('120px')
+    const soma = regra('.hub .hub-rs-soma')
+    expect(soma.getPropertyValue('margin-top')).toBe('-6px')
+    expect(soma.getPropertyValue('font-weight')).toBe('700')
+    // «+ Outra saída» and «Remover» are .hub-reg-link (44 px), the row a dashed .hub-reg-editor card
+    expect(regra('.hub .hub-reg-link').getPropertyValue('min-height')).toBe('44px')
+    expect(regra('.hub .hub-reg-editor').getPropertyValue('border')).toContain('dashed')
+  })
+
+  it('3c: «+ Outra saída» at 20 rows is drawn muted (the board’s `button[aria-disabled]`, RO l.20), not before; the pill row sits 6 px from its field (`.grupo-chips`)', () => {
+    const noop = () => undefined
+    const desenhar = (desabilitada: boolean) =>
+      render(
+        <div className="hub" data-tema="claro">
+          <section className="hub-folha hub-reg">
+            <SaidasJaFechada m={{ outra: { desabilitada }, saidas: null }} rotulos={null} aoOutra={noop} aoRemover={noop} aoMudar={noop} />
+            <MoviBreakeven be={{ ligado: true, rotulo: 'Preço quando moveu', valor: '', status: '', erro: null }} aoAlternar={noop} aoMudar={noop} />
+          </section>
+        </div>,
+      )
+    const cheio = desenhar(true)
+    const outra = cheio.container.querySelector('#b-outra') as HTMLElement
+    expect(outra).toHaveAttribute('aria-disabled', 'true')
+    expect(vencedora(outra, 'opacity')?.valor).toBe('0.4')
+    expect(vencedora(outra, 'cursor')?.valor).toBe('not-allowed')
+    expect(vencedora(outra, 'min-height')?.valor).toBe('44px')
+    // The pill row: the group's 6 px gap only (the «Expiração» header's 4 px margin does not apply)
+    const cab = (cheio.container.querySelector('#g-be') as HTMLElement).parentElement as HTMLElement
+    expect(vencedora(cab.parentElement as HTMLElement, 'gap')?.valor).toBe('6px')
+    expect(vencedora(cab, 'margin-bottom')?.valor).toBe('0')
+    cheio.unmount()
+    const livre = desenhar(false).container.querySelector('#b-outra') as HTMLElement
+    expect(livre).not.toHaveAttribute('aria-disabled')
+    expect(vencedora(livre, 'opacity')).toBeNull()
   })
 })

@@ -608,3 +608,44 @@
     transition: none;
   }
 }
+
+/*
+ * 3c · Já fechada em várias saídas (RegistrarOperacao approved 21 Oct, RO l.384–398; contract §6.3,
+ * §6.7): each row is a dashed .hub-reg-editor card; its header «1ª saída» is the board's `.sub-rot`
+ * (12 px bold, --text-2 on --bg: the as-built pair) with «Remover» (.hub-reg-link, 44 px) at the
+ * right; the row's quantity is 120 px; price | hour is .hub-campos2 (one column ≤ 420 px, hub.css).
+ * The rows' sum is bold and sits 6 px closer to «+ Outra saída».
+ */
+.hub .hub-rs-rot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-2);
+}
+.hub .hub-reg .hub-rs-qtd {
+  max-width: 120px;
+}
+.hub .hub-rs-soma {
+  margin-top: -6px;
+  font-weight: 700;
+}
+/*
+ * «+ Outra saída» at 20 rows: aria-disabled (still focusable, «Até 20 saídas por operação.» beside
+ * it) and drawn muted, as the board draws every aria-disabled button (RO l.20: opacity .4, .75 with
+ * the focus ring), the sheet's .hub-btn as built.
+ */
+.hub .hub-reg .hub-rs-outra[aria-disabled='true'] {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.hub .hub-reg .hub-rs-outra[aria-disabled='true']:focus-visible {
+  opacity: 0.75;
+}
+/* «Movi o stop para o breakeven»: the pill row sits 6 px from «Preço quando moveu» (the board's
+   `.grupo-chips` gap), without the 4 px the «Expiração» header keeps under its ⓘ */
+.hub .hub-reg-grupo.hub-rs-be > .hub-reg-cab {
+  margin-bottom: 0;
+}

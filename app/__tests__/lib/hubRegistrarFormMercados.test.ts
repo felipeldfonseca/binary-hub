@@ -108,7 +108,8 @@ describe('the accounts', () => {
 
 describe('the draft v2', () => {
   it('starts each market on its first chip or the account’s last instrument, quantity per kind', () => {
-    expect(rascunho(ftmo)).toMatchObject({ v: 2, ativo: 'EUR/USD', qtd: '0.01', qtdOutro: false, cotacao: 'USDT', tipoEua: 'acao' })
+    // 3c: the draft is v3 (one exit and the pill off at rest)
+    expect(rascunho(ftmo)).toMatchObject({ v: 3, ativo: 'EUR/USD', qtd: '0.01', qtdOutro: false, cotacao: 'USDT', tipoEua: 'acao', saidas: null, be: false, bePreco: '' })
     expect(rascunho(ibkr)).toMatchObject({ ativo: 'SPY', tipoEua: 'acao', qtd: '', qtdOutro: true })
     expect(rascunho(binance)).toMatchObject({ ativo: 'BTC', cotacao: 'USDT', qtd: '', qtdOutro: true })
     expect(rascunho(clear)).toMatchObject({ ativo: 'WIN', qtd: '1', qtdOutro: false })
@@ -121,14 +122,15 @@ describe('the draft v2', () => {
 
   it('reads a stored 3-3 draft (v1) as v2, keeping its clientKey; refuses a bad v2', () => {
     const r = rascunho(ftmo, { lado: 'long', preco: '1,0852' })
-    const { tipoEua: _t, cotacao: _c, busca: _b, opTipo: _o, strike: _s, vencimento: _v, vsv: _x, res: _r, corrigir: _g, custos: _u, ...v1 } = r
+    const { tipoEua: _t, cotacao: _c, busca: _b, opTipo: _o, strike: _s, vencimento: _v, vsv: _x, res: _r, corrigir: _g, custos: _u, saidas: _sa, be: _be, bePreco: _bp, ...v1 } = r
     const lido = lerRascunho({ ...v1, v: 1 }, ftmo.id)
-    expect(lido).toEqual({ ...r, v: 2 })
+    // 3c: read as v3, the 3c fields at rest
+    expect(lido).toEqual({ ...r, v: 3 })
     expect(lido?.clientKey).toBe(KEY)
     expect(lerRascunho(JSON.parse(JSON.stringify(r)), ftmo.id)).toEqual(r)
     expect(lerRascunho({ ...r, cotacao: 'BRL' }, ftmo.id)).toBeNull()
     expect(lerRascunho({ ...r, vencimento: '15/10/2026' }, ftmo.id)).toBeNull()
-    expect(lerRascunho({ ...r, v: 3 }, ftmo.id)).toBeNull()
+    expect(lerRascunho({ ...r, v: 4 }, ftmo.id)).toBeNull()
   })
 
   it('knows a search typed as something typed', () => {

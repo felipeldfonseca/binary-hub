@@ -730,3 +730,56 @@ export const PASSOS_PRECOS = {
   comStopPremio: (v: string) => `com stop do prêmio em ${v}`, // B l.1336
   semResultado: '—', // B l.1331
 }
+
+// ================================================================================================
+// 3c · «Já fechada» in several exits and «Movi o stop para o breakeven» (RegistrarOperacao approved
+// 21 Oct, 16 scenarios; telas contract §6.6). B = board copy (RO l.N markup, js l.N its script),
+// N = NEW. Every string above keeps its key and value.
+// ================================================================================================
+
+/** «+ Outra saída»: the rows of «Já fechada» (RO l.384–398, js l.1353–1382) */
+export const SAIDAS = {
+  outra: '+ Outra saída', // B l.397
+  maximo: 'Até 20 saídas por operação.', // B l.397
+  /** «1ª saída» … «20ª saída» */
+  rotulo: (k: number) => `${k}ª saída`, // B js l.1374
+  remover: 'Remover', // B l.387
+  /** «Remover a 2ª saída» */
+  removerAria: (k: number) => `Remover a ${k}ª saída`, // B js l.1374
+  /** «Saídas: 2 de 2 ct.» · «Saídas: 0,50 de 1,00 lote.» (`q` without its unit, `total` with it) */
+  soma: (q: string, total: string) => `Saídas: ${q} de ${total}.`, // B js l.1368
+  /** «As saídas somam 1 ct; a entrada tem 2 ct.» */
+  somaErro: (soma: string, total: string) => `As saídas somam ${soma}; a entrada tem ${total}.`, // B js l.1228
+  /** «Resultado desta saída, US$» */
+  resultado: (moeda: string) => `Resultado desta saída, ${moeda}`, // B js l.1357
+  /** «Pelos preços não dá para saber o valor em dólar: digite o resultado desta saída na sua plataforma, antes da comissão, com swap ou funding, se houver.» */
+  notaResultado: (moeda: string, swap: string) =>
+    `Pelos preços não dá para saber o valor em ${moeda}: digite o resultado desta saída na sua plataforma, antes da comissão${swap}.`, // B js l.1358
+  /** «Resultado: +6,00 pts em média · +US$ 120,00» */
+  linha: (dif: string, valor: string) => `Resultado: ${dif} em média · ${valor}`, // B js l.1242
+  digiteCada: 'digite o resultado de cada saída', // B js l.1241
+  precos: 'Resultado: preencha os preços das saídas.', // B js l.1232
+  quantidades: 'Resultado: confira as quantidades das saídas.', // B js l.1233
+  /** Appended to the «Custos» note: «Comissão por lote da sua conta, ida e volta. Da operação toda.» */
+  daOperacao: ' Da operação toda.', // B js l.1254
+  /** Appended (after a space) to the «Venceu sem valor» note, or alone */
+  vsvUltima: 'Vale para a última saída.', // B js l.1256
+}
+
+/** «Movi o stop para o breakeven» in «Já fechada» (RO l.411–416, js l.1260–1266, 1435–1437) */
+export const BE_FECHADA = {
+  pill: 'Movi o stop para o breakeven', // B l.413
+  opcional: 'opcional', // B l.413
+  preco: 'Preço quando moveu', // B js l.1435
+  premio: 'Prêmio quando moveu, US$ por ação', // B js l.1435
+  /** «Preço quando moveu, USDT» */
+  precoEm: (cotacao: string) => `Preço quando moveu, ${cotacao}`, // B js l.1435
+  /** «com +12,00 pts a favor · Sua regra: com +5 pts.» / «com +12,00 pts a favor.» (`regra` = «+5 pts») */
+  status: (aFavor: string, regra: string | null) => (regra ? `${aFavor} · Sua regra: com ${regra}.` : `${aFavor}.`), // B js l.1437
+  vazio: 'Informe o preço quando moveu.', // B js l.1265
+  vazioPremio: 'Informe o prêmio quando moveu.', // B js l.1265
+  lado: 'Para o breakeven, o preço precisava estar a favor.', // B js l.1266
+  // N (c7d38cd: register_after refuses, as bad_price on "breakeven", a pips price whose points in
+  // favour do not fit a stop move, 10^10 pips or more from the entry: a typo)
+  longe: 'Confira o preço quando moveu.',
+}
