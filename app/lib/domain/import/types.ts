@@ -254,6 +254,13 @@ export const ROW_ERROR_CODES = [
   'opened_before_file',
   /** Executions: the buys and sells of its symbol do not close in the file, and the trader did not say why */
   'unbalanced_symbol',
+  /** Executions: another execution of its symbol was refused (a side, a price, a date it cannot read), so its symbol cannot be paired */
+  'symbol_has_error',
+  /**
+   * Its trade passes what the database stores (a size of 10 integer digits, a result or a cost of
+   * 16): with the other rows (or executions) of its position, it stays out
+   */
+  'position_too_large',
 ] as const;
 export type RowErrorCode = (typeof ROW_ERROR_CODES)[number];
 
@@ -292,6 +299,8 @@ export const FILE_ERROR_CODES = [
   'header_not_found',
   /** Executions: some rows with an offset, some without, so they cannot be put in order */
   'mixed_clocks',
+  /** A spreadsheet (Excel .xlsx/.xls, OpenDocument .ods), not a CSV: «Salve como CSV na sua plataforma ou no Excel e tente de novo.» */
+  'spreadsheet',
 ] as const;
 export type FileErrorCode = (typeof FILE_ERROR_CODES)[number];
 

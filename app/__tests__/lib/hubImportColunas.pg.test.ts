@@ -17,7 +17,11 @@
  * Also: a registered trade the execution file closes (scenario 16), the Performance.csv of the same
  * trades recognised by «mesma hora e preço» (both orders), «Salvar como modelo», its exact and changed
  * matches and «Atualizar o modelo» (8, 15), «Conta» (17), the other-format warning and the zone rule on
- * a Top One account (8), and the client's error lines kept in the batch (16, 19).
+ * a Top One account (8), and the client's error lines kept in the batch (16, 19). Last, the review
+ * of 22 Oct: a position past the trades columns never reaches a commit that fails; the trades drawn
+ * are the database's on the zone's instants; executions refused, merged past the columns, with «>»
+ * in their IDs, starting mid-position («Resultado realizado», «Abre ou fecha») import their true
+ * trades or nothing.
  */
 import { createHash, randomUUID } from 'crypto';
 import fs from 'fs';
@@ -31,13 +35,19 @@ import {
   parseImportText,
   parseMappedRecords,
   previewArgs,
+  sniffDateOrder,
+  sniffDecimalMark,
   sniffFile,
   templateFromRow,
   templatePayload,
+  type EndOfFileAnswer,
+  type FieldKey,
   type ImportFile,
   type MappedFile,
   type MappedPosition,
+  type MappingChoices,
   type ParsedFile,
+  type RowKind,
   type Template,
 } from '@/lib/domain/import';
 import { entryPayload } from '@/lib/domain/registro';
@@ -134,9 +144,9 @@ describePg('Phase 3b × the real SQL: the column-mapping import end to end', () 
   }
 
   /** A sample imported once (the board's numbers), again (nothing new), undone (as before) and imported for good */
-  async function roundTrip(accountId: string, s: MappedSample, keep = true) {
+  async function roundTrip(accountId: string, s: MappedSample, keep = true, read: MappedFile = readSample(s)) {
     const before = fingerprint(accountId);
-    const file = readSample(s);
+    const file = read;
     const first = await importFile(accountId, file, `${s.label}.csv`, s.tz, s.text);
     expect(first.commit.batch_id).not.toBeNull();
     // What the database stored is what «conferir» drew
@@ -398,6 +408,137 @@ delete from public.profiles where id = '${uid}';`);
       { line: 7, code: 'bad_option' },
       { line: 9, code: 'open_at_end' },
     ]);
+  });
+
+  describe('the review of 22 Oct', () => {
+    /** A file read as the sheet reads it once «Em que fuso…» has its zone */
+    function read(
+      text: string,
+      fields: Record<string, FieldKey>,
+      market: 'futures' | 'crypto' | 'stocks',
+      tz: string,
+      opts: { rowKind?: RowKind; over?: Partial<MappingChoices>; answers?: Record<string, EndOfFileAnswer> } = {},
+    ): MappedFile {
+      const n = sniffFile(text);
+      if (!n.ok) throw new Error('file');
+      const columns = n.headers.map((h) => fields[h] ?? null);
+      const dec = sniffDecimalMark(n.records, columns, n.delimiter);
+      const choices: MappingChoices = {
+        rowKind: opts.rowKind ?? 'trade',
+        headers: n.headers,
+        headerSkip: n.headerSkip,
+        delimiter: n.delimiter,
+        decimalMark: dec.decided ?? dec.fallback,
+        dateOrder: sniffDateOrder(n.records, columns).decided,
+        columns,
+        resultIsNet: null,
+        sideWords: {},
+        openCloseWords: {},
+        ...opts.over,
+      };
+      const out = parseMappedRecords({ records: n.records, choices, market, fileTz: tz, endOfFile: opts.answers });
+      if (!out.ok) throw new Error(out.error);
+      return out;
+    }
+    /** Imported, again, undone and imported for good (roundTrip), the zone given */
+    async function trip(accountId: string, label: string, text: string, file: MappedFile, tz: string) {
+      return roundTrip(accountId, { label, text, fields: {}, rowKind: file.rowKind, market: file.market as MappedSample['market'], tz }, true, file);
+    }
+    const HEAD = 'Entry,Exit,Symbol,Side,Qty,Entry Price,Exit Price';
+    const TRADE: Record<string, FieldKey> = { entry: 'entry_time', exit: 'exit_time', symbol: 'symbol', side: 'side', qty: 'quantity', 'entry price': 'entry_price', 'exit price': 'exit_price' };
+    const FILL: Record<string, FieldKey> = { time: 'time', symbol: 'symbol', side: 'side', qty: 'quantity', price: 'price' };
+
+    it('a position past the trades columns: the reader leaves it out, so the preview predicts the commit; sent anyway, the commit would fail', async () => {
+      acc.edgeCrypto = await createAccountAsUser(uid, { market: 'crypto', label: 'Bordas cripto', platform: 'binance', firm: null, external_ref: null, phase: 'pessoal', size: null, is_primary: false });
+      const pepe = (exit: string, exitPrice: string) => `2026-10-01 09:30:00,2026-10-01 ${exit},PEPEUSDT,Buy,6000000000,0.00001200,${exitPrice}`;
+      const text = [HEAD, pepe('09:35:00', '0.00001210'), pepe('09:40:00', '0.00001220'), '2026-10-01 10:00:00,2026-10-01 10:05:00,BTCUSDT,Buy,0.01,60000,60100'].join('\n');
+      const file = read(text, TRADE, 'crypto', 'UTC');
+      expect(file.errors).toEqual([{ line: 2, code: 'position_too_large' }, { line: 3, code: 'position_too_large' }]);
+      const { preview } = await trip(acc.edgeCrypto, 'PEPE', text, file, 'UTC');
+      // Without grouping the preview answers as before (no trades_new)
+      expect(preview).toMatchObject({ new: 1, rows_total: 3, errors: file.errors.map((e) => ({ line: e.line, code: e.code })) });
+      expect(preview.trades_new).toBeUndefined();
+
+      // The two rows the reader refused, sent as a file of their own: each fits, their position does not
+      const alone = (line: string) => read([HEAD, line].join('\n'), TRADE, 'crypto', 'UTC').rows[0];
+      const forced: MappedFile = { ...file, rows: [{ ...alone(pepe('09:35:00', '0.00001210')), line: 2 }, { ...alone(pepe('09:40:00', '0.00001220')), line: 3 }], errors: [], records: 2 };
+      const args = buildImportArgs({ accountId: acc.edgeCrypto, platform: 'modelo', fileName: 'forced.csv', sha256: sha('forced'), fileTz: 'UTC', outcome: forced });
+      expect(await importPreview(db, previewArgs(args))).toMatchObject({ new: 2, trades_new: 1, grouped: 1, errors: [] });
+      await expect(importCommit(db, args)).rejects.toBeTruthy();
+
+      // Executions merged past 10 digits: the symbol out, the commit fine
+      const f = (time: string, side: string, price: string) => `2026-10-02 ${time},PEPEUSDT,${side},6000000000,${price}`;
+      const fills = ['Time,Symbol,Side,Qty,Price', f('09:30:00', 'Buy', '0.00001200'), f('09:30:00', 'Buy', '0.00001200'), f('09:40:00', 'Sell', '0.00001210'), f('09:40:00', 'Sell', '0.00001210')].join('\n');
+      const ff = read(fills, FILL, 'crypto', 'UTC', { rowKind: 'fill' });
+      expect([ff.rows, ff.errors.map((e) => e.code)]).toEqual([[], ['position_too_large', 'position_too_large', 'position_too_large', 'position_too_large']]);
+      const r = await importFile(acc.edgeCrypto, ff, 'fills.csv', 'UTC', fills);
+      expect(r.commit).toMatchObject({ inserted: 0, errors: ff.errors.map((e) => ({ line: e.line, code: e.code })) });
+    });
+
+    it('the trades drawn are the database\'s on New York\'s instants: an offset and a wall clock, a skipped hour, an exit before its entry', async () => {
+      acc.edgeFut = await createAccountAsUser(uid, { market: 'futures', label: 'Bordas futuros', platform: 'tradovate', firm: null, external_ref: null, phase: 'pessoal', size: null, is_primary: false });
+      const row = (entry: string, exit: string, price: string, exitPrice: string) => [entry, exit, 'MESZ6', 'Buy', '1', price, exitPrice].join(',');
+      const text = [
+        HEAD,
+        row('2026-10-01T09:30:00-04:00', '2026-10-01T09:35:00-04:00', '6800.00', '6801.00'),
+        row('2026-10-01 09:30:00', '2026-10-01 09:40:00', '6800.00', '6802.00'),
+        row('2026-03-08 02:30:00', '2026-03-08 04:00:00', '6700.00', '6701.00'),
+        row('2026-03-08 03:30:00', '2026-03-08 04:10:00', '6700.00', '6702.00'),
+        row('2026-03-08 02:50:00', '2026-03-08 03:10:00', '6750.00', '6751.00'),
+        row('2026-03-08 02:50:00', '2026-03-08 04:10:00', '6750.00', '6752.00'),
+      ].join('\n');
+      const file = read(text, TRADE, 'futures', NY);
+      expect(file.positions.map((p) => p.exits.length)).toEqual([2, 1, 1, 2]);
+      const { preview } = await trip(acc.edgeFut, 'DST', text, file, NY);
+      expect(preview).toMatchObject({ new: 6, trades_new: file.positions.length, grouped: 2, errors: [] });
+    });
+
+    it('execution IDs with «>», and a cost past 16 digits, never meet a refusal of the database', async () => {
+      const fills = ['Time,Symbol,Side,Qty,Price,Id', '2026-10-05 09:30:00,MESZ6,Buy,1,6800.00,x>y', '2026-10-05 09:31:00,MESZ6,Buy,1,6800.00,x', '2026-10-05 09:32:00,MESZ6,Sell,1,6801.00,z', '2026-10-05 09:33:00,MESZ6,Sell,1,6801.00,y>z'].join('\n');
+      const ff = read(fills, { ...FILL, id: 'fill_id' }, 'futures', NY, { rowKind: 'fill' });
+      const { preview } = await trip(acc.edgeFut, 'IDs', fills, ff, NY);
+      expect(preview).toMatchObject({ new: 2, errors: [] });
+      const costs = ['Entry,Symbol,Side,Qty,P&L,Commission,Fee', '2026-10-06 09:30:00,MESZ6,Buy,1,5.00,9999999999999999,1', '2026-10-06 09:40:00,MESZ6,Buy,1,5.00,1.24,0'].join('\n');
+      const cf = read(costs, { entry: 'entry_time', symbol: 'symbol', side: 'side', qty: 'quantity', 'p&l': 'pnl', commission: 'commission', fee: 'fee' }, 'futures', NY, { over: { resultIsNet: false } });
+      expect(cf.errors).toEqual([{ line: 2, code: 'bad_number', column: 'commission' }]);
+      const r = await trip(acc.edgeFut, 'costs', costs, cf, NY);
+      expect(r.preview).toMatchObject({ new: 1, errors: [{ line: 2, code: 'bad_number' }] });
+    });
+
+    it('executions starting mid-position import their true trades: realized (−2,00), «Não» (+2,00 · +2,00), «Abre ou fecha» (+150,00, «C;O»)', async () => {
+      const BF = 'Date(UTC),Symbol,Side,Price,Quantity,Amount,Fee,Realized Profit';
+      const bf = (time: string, side: string, price: string, qty: string, realized: string) => `2026-10-15 ${time},BTCUSDT,${side},${price},${qty},0,0.44USDT,${realized}`;
+      const fields: Record<string, FieldKey> = { 'date(utc)': 'time', symbol: 'symbol', side: 'side', price: 'price', quantity: 'quantity', fee: 'commission', 'realized profit': 'realized' };
+      const held = [BF, bf('13:00:00', 'BUY', '111000.0', '0.010', '0'), bf('13:05:00', 'SELL', '111500.0', '0.010', '15.00000000'), bf('13:10:00', 'SELL', '110800.0', '0.010', '-2.00000000')].join('\n');
+      const a = read(held, fields, 'crypto', 'UTC', { rowKind: 'fill', over: { resultIsNet: false } });
+      await trip(acc.edgeCrypto, 'held', held, a, 'UTC');
+      const two = [BF, bf('14:00:00', 'BUY', '111000.0', '0.010', '0'), bf('14:05:00', 'SELL', '111200.0', '0.030', '26.00000000'), bf('14:10:00', 'BUY', '111100.0', '0.010', '0'), bf('14:15:00', 'SELL', '111300.0', '0.010', '2.00000000')].join('\n');
+      const b = read(two, fields, 'crypto', 'UTC', { rowKind: 'fill', over: { resultIsNet: false }, answers: { BTCUSDT: 'no' } });
+      await trip(acc.edgeCrypto, 'two', two, b, 'UTC');
+      // L3's fee is shared with the 0.020 it closed from before the file: 0.15 of it is this trade's
+      expect(stored(acc.edgeCrypto, "t.symbol = 'BTCUSDT' and t.entry_time >= '2026-10-15'")).toEqual(['BTCUSDT long 0.01 [] -2.00 c=0.88', 'BTCUSDT long 0.01 [] 2.00 c=0.59', 'BTCUSDT long 0.01 [] 2.00 c=0.88']);
+
+      acc.edgeStocks = await createAccountAsUser(uid, { market: 'stocks', label: 'Bordas ações', platform: 'ibkr', firm: null, external_ref: null, phase: 'pessoal', size: null, is_primary: false });
+      const IB = 'Symbol,DateTime,Quantity,TradePrice,IBCommission,AssetClass,Open/CloseIndicator,TradeID';
+      const ibText = [IB, 'AAPL,20261014;100000,50,247.00,-0.50,STK,O,551239001', 'AAPL,20261014;110000,-100,248.00,-1.00,STK,C,551239002', 'AAPL,20261014;120000,-50,250.00,-0.50,STK,C,551239003'].join('\n');
+      const ib = read(ibText, { symbol: 'symbol', datetime: 'time', quantity: 'quantity', tradeprice: 'price', ibcommission: 'commission', 'open/closeindicator': 'open_close', tradeid: 'fill_id' }, 'stocks', NY, { rowKind: 'fill' });
+      await trip(acc.edgeStocks, 'IBKR', ibText, ib, NY);
+      expect(stored(acc.edgeStocks)).toEqual(['AAPL long 50 [] 150.00 c=1.00']);
+      const co = ['Time,Symbol,Side,Qty,Price,Effect', '2026-10-16 10:00:00,MSFT,Buy,1,510.00,O', '2026-10-16 10:05:00,MSFT,Sell,3,512.00,C;O', '2026-10-16 10:10:00,MSFT,Buy,3,511.00,C;O', '2026-10-16 10:15:00,MSFT,Sell,2,513.00,C'].join('\n');
+      const cf = read(co, { ...FILL, effect: 'open_close' }, 'stocks', NY, { rowKind: 'fill' });
+      await trip(acc.edgeStocks, 'C;O', co, cf, NY);
+      expect(stored(acc.edgeStocks, "t.symbol = 'MSFT'")).toEqual(['MSFT long 1 [] 2.00 c=-', 'MSFT long 2 [] 4.00 c=-', 'MSFT short 1 [] 1.00 c=-']);
+    });
+
+    it('an execution the reader refuses takes its symbol out: nothing is imported around it', async () => {
+      const TV = 'Time,Contract,B/S,Qty,Price';
+      const t = (time: string, side: string, price: string) => `10/13/2026 ${time},MNQZ6,${side},1,${price}`;
+      const text = [TV, t('10:00:00', 'Buy', '25000.00'), t('10:05:00', 'Exercise', '25005.00'), t('10:10:00', 'Buy', '25001.00'), t('10:15:00', 'Exercise', '25002.00'), t('10:20:00', 'Sell', '25010.00'), t('10:25:00', 'Sell', '24990.00')].join('\n');
+      const file = read(text, { time: 'time', contract: 'symbol', 'b/s': 'side', qty: 'quantity', price: 'price' }, 'futures', NY, { rowKind: 'fill', over: { sideWords: { exercise: 'skip' } } });
+      expect(file.rows).toEqual([]);
+      const r = await importFile(acc.edgeFut, file, 'skip.csv', NY, text);
+      expect(r.commit).toMatchObject({ inserted: 0, errors: file.errors.map((e) => ({ line: e.line, code: e.code })) });
+    });
   });
 
   it('every board file\'s model is saved as the screens send it', async () => {

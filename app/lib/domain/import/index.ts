@@ -46,7 +46,7 @@ export { bestReaderMatch, detectPlatform, type Detection, type ReaderMatch } fro
 export { NEAR_COMPLETE_MISSING, routeFile, type FileRoute } from './route';
 export { ebinexExit, parseEbinexRecords } from './ebinex';
 export { parseTopOneRecords } from './topone';
-export { parseImportText, readImportFile, sha256Hex, type ReadImportFileResult } from './parseFile';
+export { isSpreadsheet, parseImportText, readImportFile, sha256Hex, type ReadImportFileResult } from './parseFile';
 export { entryHistogram, entrySpan, previewInstant, totals } from './preview';
 export {
   buildImportArgs,

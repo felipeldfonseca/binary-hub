@@ -42,11 +42,18 @@ export interface EndOfFileQuestion {
   symbol: string;
   /** The «Conta» value as the file writes it, when the file holds several accounts' rows and all are read; else null */
   account: string | null;
-  /** What the file's executions leave: positive = bought («sobram … compradas»), negative = sold */
+  /** What the file's executions leave, their signed sum: positive = bought («sobram … compradas»), negative = sold */
   net: Decimal;
   /** Executions of the symbol in the file */
   fills: number;
   answer: EndOfFileAnswer;
+}
+
+/** An execution's time as the file writes it (with the header's clock when the cell states none) */
+export interface ExecutionTime {
+  line: number;
+  local: LocalStamp;
+  offset: UtcOffset | null;
 }
 
 /** One exit of a trade as the database will hold it (a file row, or a slice of an execution file) */
@@ -60,8 +67,9 @@ export interface MappedExit {
 
 /**
  * A trade the rows make in the database: rows (or slices) with an exit that share the symbol as
- * written, the side, the entry instant and the entry price are one position (3c's import_stage);
- * any other row is its own trade.
+ * written, the side, the entry instant and the entry price are one position (3c's import_stage), as
+ * long as the exit is not before the entry; any other row is its own trade. The instants are the
+ * file zone's (`fileTz`) for rows without an offset; without a zone, their wall clocks.
  */
 export interface MappedPosition {
   symbol: string;
@@ -113,7 +121,16 @@ export interface MappedFile {
   executions: number;
   /** Execution files: rows with no executed quantity, skipped (never sent) */
   unfilled: number;
-  /** Execution files without «Abre ou fecha»: one question per symbol whose buys and sells do not close */
+  /**
+   * Execution files: every execution read, in file order, as the file writes its time, those the
+   * pairing leaves out included (the zone step's span and histogram, «No arquivo: execuções
+   * 10:31–11:48, sem fuso.»); [] for a trade file, whose rows' entries are its times
+   */
+  executionTimes: ExecutionTime[];
+  /**
+   * Execution files: one question per symbol whose executions do not add up to zero, unless
+   * «Abre ou fecha» (every value understood) or «Resultado realizado» shows where it started
+   */
   endOfFile: EndOfFileQuestion[];
   /** The trades the rows make, in order of entry */
   positions: MappedPosition[];

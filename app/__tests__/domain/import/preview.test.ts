@@ -8,6 +8,7 @@ import {
   MAX_FILE_BYTES,
   entryHistogram,
   entrySpan,
+  isSpreadsheet,
   previewInstant,
   readImportFile,
   sha256Hex,
@@ -168,6 +169,23 @@ describe('readImportFile', () => {
     const big = new Blob([new Uint8Array(MAX_FILE_BYTES + 1)]);
     const read = await readImportFile(big);
     expect(read).toEqual({ fileName: '', size: MAX_FILE_BYTES + 1, sha256: '', outcome: { ok: false, error: 'too_large' } });
+  });
+
+  it('a spreadsheet (the board\'s «Planilha do Excel»): by its bytes or by its name, never read as text', async () => {
+    const zip = new Uint8Array(400);
+    zip.set([0x50, 0x4b, 0x03, 0x04]);
+    const xlsx = await readImportFile(new File([zip], 'Performance.xlsx'));
+    expect(xlsx.outcome).toEqual({ ok: false, error: 'spreadsheet' });
+    expect(xlsx.sha256).toMatch(/^[0-9a-f]{64}$/);
+    const ole = new Uint8Array([0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1, 0, 0]);
+    expect((await readImportFile(new Blob([ole]))).outcome).toEqual({ ok: false, error: 'spreadsheet' });
+    // A broker's «.xls» that is an HTML table
+    expect((await readImportFile(new File(['<table><tr><td>1</td></tr></table>'], 'Extrato.XLS'))).outcome).toEqual({ ok: false, error: 'spreadsheet' });
+    expect(isSpreadsheet(new TextEncoder().encode('Symbol,Qty\nMES,1'), 'orders.csv')).toBe(false);
+    expect(isSpreadsheet(new Uint8Array([0x50, 0x4b, 0x03]), 'x.csv')).toBe(false);
+    expect(isSpreadsheet(new Uint8Array([0x50, 0x4b, 0x03, 0x04]), '')).toBe(true);
+    for (const name of ['a.xlsm', 'a.xlsb', 'a.ods', 'a.numbers', ' b.xlsx ']) expect(isSpreadsheet(new Uint8Array(0), name)).toBe(true);
+    expect(isSpreadsheet(new Uint8Array(0), 'a.xlsx.csv')).toBe(false);
   });
 
   it('an empty file', async () => {

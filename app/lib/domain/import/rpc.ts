@@ -6,7 +6,7 @@
  * model, R3); a reader's file never sends p_format, so today's calls stay as they are.
  */
 import { MARKET_SPEC } from '../markets';
-import { assertTimeZone } from '../tempo';
+import { assertZoneName } from '../tempo';
 import type { CountUnit, ImportFormat, MappedFile } from './mapped/types';
 import {
   IMPORT_ROW_KEYS,
@@ -93,7 +93,8 @@ export function toRpcRow(row: ImportRow): ImportRow {
 /**
  * Builds the RPC arguments for a file. Throws RangeError (with no file content in the message)
  * when the account is missing, the platform differs from the file's, the hash is not a SHA-256,
- * the zone is not 'UTC' or an IANA Area/Location name, or a mapped file is for a market without
+ * the zone is not 'UTC' or an IANA Area/Location name as the database writes it (isZoneName: its
+ * case too, 'america/new_york' is not one), or a mapped file is for a market without
  * mapping (binaries) or its format is not a signature and a model id (formatProblem).
  */
 export function buildImportArgs(i: {
@@ -107,7 +108,7 @@ export function buildImportArgs(i: {
   if (!i.accountId) throw new RangeError('Missing account');
   if (i.platform !== i.outcome.platform) throw new RangeError('Platform does not match the file');
   if (!SHA256.test(i.sha256)) throw new RangeError('Invalid file hash');
-  assertTimeZone(i.fileTz);
+  assertZoneName(i.fileTz);
   const args: ImportRpcArgs = {
     p_account: i.accountId,
     p_platform: i.platform,

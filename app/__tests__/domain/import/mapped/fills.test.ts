@@ -507,10 +507,14 @@ describe('a fill that also closed a position from before the file (R7 with a par
 describe('«Abre ou fecha» at the edges', () => {
   const fields = { ...SMALL_FIELDS, exec: 'open_close' as FieldKey };
 
-  it('«C;O» with nothing to close: what it opened has an unknown size, so all of it stays out', () => {
+  it('«C;O» with nothing to close: what it opened has an unknown size, so the start is not proven and the symbol is asked about', () => {
     const out = parse(file(fill('2026-10-14 10:00:00', 'AAPL', 'Sell', '3', '101', { exec: 'C;O' }), fill('2026-10-14 10:05:00', 'AAPL', 'Buy', '2', '99', { exec: 'C' })), fields, 'stocks');
     expect(out.rows).toEqual([]);
-    expect(errs(out)).toEqual(['L2 opened_before_file', 'L3 opened_before_file']);
+    expect(out.endOfFile.map((q) => [q.symbol, q.net])).toEqual([['AAPL', '-1']]);
+    expect(errs(out)).toEqual(['L2 unbalanced_symbol', 'L3 unbalanced_symbol']);
+    // «Sim» (it began flat and ended short 1): the guard leaves the flip out, and the close after it
+    const yes = parse(file(fill('2026-10-14 10:00:00', 'AAPL', 'Sell', '3', '101', { exec: 'C;O' }), fill('2026-10-14 10:05:00', 'AAPL', 'Buy', '2', '99', { exec: 'C' })), fields, 'stocks', { answers: { AAPL: 'yes' } });
+    expect([yes.rows, errs(yes)]).toEqual([[], ['L2 opened_before_file', 'L3 opened_before_file']]);
   });
 
   it('a flip whose new side is still open at the end: the closed part enters, the notice counts the fill', () => {

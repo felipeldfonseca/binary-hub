@@ -1195,7 +1195,7 @@
     ]
   },
   "rows": {
-    "about": "import_checked_rows(account of the market, 'modelo', zone, rows): per row, the code (null = accepted), asset_type, pnl_basis, key_kind (real: the file's ID; synthetic: derived), the ID, or the derived key's hash prefix ('@' + 32 hex) and occurrence n",
+    "about": "import_checked_rows(account of the market, 'modelo', zone, rows): per row, the code (null = accepted), asset_type, pnl_basis, key_kind (real: the file's ID; synthetic: derived), the key (the ID, or the whole derived key), and the derived key's hash prefix ('@' + 32 hex) and occurrence n",
     "cases": [
       {
         "label": "futures: every check, one row each",
@@ -1919,7 +1919,7 @@
         "expected": [
           {
             "n": 1,
-            "key": null,
+            "key": "@9ccdb6bf0f52e4c4b7f17d11498588f3.1",
             "code": null,
             "hash": "@9ccdb6bf0f52e4c4b7f17d11498588f3",
             "line": 2,
@@ -2089,7 +2089,7 @@
           },
           {
             "n": 1,
-            "key": null,
+            "key": "@3b24c0127a24ffc67907355be8efea1f.1",
             "code": null,
             "hash": "@3b24c0127a24ffc67907355be8efea1f",
             "line": 19,
@@ -2109,7 +2109,7 @@
           },
           {
             "n": 1,
-            "key": null,
+            "key": "@947b82bc8a4bb3072e23389929a03e19.1",
             "code": null,
             "hash": "@947b82bc8a4bb3072e23389929a03e19",
             "line": 21,
@@ -2119,7 +2119,7 @@
           },
           {
             "n": 1,
-            "key": null,
+            "key": "@95446efa46183aeecb41ca62b7a3071c.1",
             "code": null,
             "hash": "@95446efa46183aeecb41ca62b7a3071c",
             "line": 22,
@@ -2139,7 +2139,7 @@
           },
           {
             "n": 2,
-            "key": null,
+            "key": "@9ccdb6bf0f52e4c4b7f17d11498588f3.2",
             "code": null,
             "hash": "@9ccdb6bf0f52e4c4b7f17d11498588f3",
             "line": 24,
@@ -2169,7 +2169,7 @@
           },
           {
             "n": 1,
-            "key": null,
+            "key": "@206b3f7037e4bf2432803769a9e55fba.1",
             "code": null,
             "hash": "@206b3f7037e4bf2432803769a9e55fba",
             "line": 27,
@@ -2219,7 +2219,7 @@
           },
           {
             "n": 3,
-            "key": null,
+            "key": "@9ccdb6bf0f52e4c4b7f17d11498588f3.3",
             "code": null,
             "hash": "@9ccdb6bf0f52e4c4b7f17d11498588f3",
             "line": 32,
@@ -2491,7 +2491,7 @@
         "expected": [
           {
             "n": 1,
-            "key": null,
+            "key": "@9ccdb6bf0f52e4c4b7f17d11498588f3.1",
             "code": null,
             "hash": "@9ccdb6bf0f52e4c4b7f17d11498588f3",
             "line": 2,
@@ -2501,7 +2501,7 @@
           },
           {
             "n": 2,
-            "key": null,
+            "key": "@9ccdb6bf0f52e4c4b7f17d11498588f3.2",
             "code": null,
             "hash": "@9ccdb6bf0f52e4c4b7f17d11498588f3",
             "line": 3,
@@ -2511,7 +2511,7 @@
           },
           {
             "n": 1,
-            "key": null,
+            "key": "@a799963e3839c3cb7547e13bee0af775.1",
             "code": null,
             "hash": "@a799963e3839c3cb7547e13bee0af775",
             "line": 4,
@@ -2521,7 +2521,7 @@
           },
           {
             "n": 2,
-            "key": null,
+            "key": "@a799963e3839c3cb7547e13bee0af775.2",
             "code": null,
             "hash": "@a799963e3839c3cb7547e13bee0af775",
             "line": 5,
@@ -2531,7 +2531,7 @@
           },
           {
             "n": 3,
-            "key": null,
+            "key": "@9ccdb6bf0f52e4c4b7f17d11498588f3.3",
             "code": null,
             "hash": "@9ccdb6bf0f52e4c4b7f17d11498588f3",
             "line": 6,
@@ -2541,7 +2541,7 @@
           },
           {
             "n": 4,
-            "key": null,
+            "key": "@9ccdb6bf0f52e4c4b7f17d11498588f3.4",
             "code": null,
             "hash": "@9ccdb6bf0f52e4c4b7f17d11498588f3",
             "line": 7,
@@ -2581,7 +2581,7 @@
           },
           {
             "n": 1,
-            "key": null,
+            "key": "@cbc5b361add2ed45ef2d4150aed80c0a.1",
             "code": null,
             "hash": "@cbc5b361add2ed45ef2d4150aed80c0a",
             "line": 11,
@@ -2591,7 +2591,7 @@
           },
           {
             "n": 2,
-            "key": null,
+            "key": "@cbc5b361add2ed45ef2d4150aed80c0a.2",
             "code": null,
             "hash": "@cbc5b361add2ed45ef2d4150aed80c0a",
             "line": 12,
@@ -2748,7 +2748,7 @@
         "expected": [
           {
             "n": 1,
-            "key": null,
+            "key": "@75f6cadbec4e996d757f8c2f1f5a0291.1",
             "code": null,
             "hash": "@75f6cadbec4e996d757f8c2f1f5a0291",
             "line": 2,
@@ -2758,7 +2758,7 @@
           },
           {
             "n": 1,
-            "key": null,
+            "key": "@ed4cac872ce3850369f602c620783946.1",
             "code": null,
             "hash": "@ed4cac872ce3850369f602c620783946",
             "line": 3,
@@ -2768,7 +2768,7 @@
           },
           {
             "n": 1,
-            "key": null,
+            "key": "@e4502bf203c228d9158b40d6de535593.1",
             "code": null,
             "hash": "@e4502bf203c228d9158b40d6de535593",
             "line": 4,
@@ -2798,7 +2798,7 @@
           },
           {
             "n": 1,
-            "key": null,
+            "key": "@75c10e0dc1fa35ba21aef70ce703e544.1",
             "code": null,
             "hash": "@75c10e0dc1fa35ba21aef70ce703e544",
             "line": 7,
@@ -2932,7 +2932,7 @@
         "expected": [
           {
             "n": 1,
-            "key": null,
+            "key": "@b5245b01416a3c00088ad02b3fd9cd3b.1",
             "code": null,
             "hash": "@b5245b01416a3c00088ad02b3fd9cd3b",
             "line": 2,
@@ -2942,7 +2942,7 @@
           },
           {
             "n": 1,
-            "key": null,
+            "key": "@9d49c5f3a51f60f5ab72a953a23ac1ff.1",
             "code": null,
             "hash": "@9d49c5f3a51f60f5ab72a953a23ac1ff",
             "line": 3,
@@ -3060,7 +3060,7 @@
         "expected": [
           {
             "n": 1,
-            "key": null,
+            "key": "@35ca64fb5e8073c80bc84579b53d2519.1",
             "code": null,
             "hash": "@35ca64fb5e8073c80bc84579b53d2519",
             "line": 2,
@@ -3191,7 +3191,7 @@
         "expected": [
           {
             "n": 1,
-            "key": null,
+            "key": "@2965184e706ab30a8388c1902d29c941.1",
             "code": null,
             "hash": "@2965184e706ab30a8388c1902d29c941",
             "line": 2,
@@ -3201,7 +3201,7 @@
           },
           {
             "n": 1,
-            "key": null,
+            "key": "@04368e11a65820679629cbbea4d4a3c7.1",
             "code": null,
             "hash": "@04368e11a65820679629cbbea4d4a3c7",
             "line": 3,
@@ -3221,7 +3221,7 @@
           },
           {
             "n": 1,
-            "key": null,
+            "key": "@5343e352620e25980517a504bbd1896a.1",
             "code": null,
             "hash": "@5343e352620e25980517a504bbd1896a",
             "line": 5,
@@ -3263,7 +3263,7 @@
         "expected": [
           {
             "n": 1,
-            "key": null,
+            "key": "@02f513e5d618068bd1fc4a54013426ee.1",
             "code": null,
             "hash": "@02f513e5d618068bd1fc4a54013426ee",
             "line": 2,
@@ -3811,7 +3811,7 @@
         "expected": [
           {
             "n": 1,
-            "key": null,
+            "key": "@9ccdb6bf0f52e4c4b7f17d11498588f3.1",
             "code": null,
             "hash": "@9ccdb6bf0f52e4c4b7f17d11498588f3",
             "line": 2,
@@ -3821,7 +3821,7 @@
           },
           {
             "n": 1,
-            "key": null,
+            "key": "@11e513aa4413db52e385c93d0117a9d3.1",
             "code": null,
             "hash": "@11e513aa4413db52e385c93d0117a9d3",
             "line": 3,
@@ -3831,7 +3831,7 @@
           },
           {
             "n": 1,
-            "key": null,
+            "key": "@bd1121c3debbc87dc99eff24216bf59c.1",
             "code": null,
             "hash": "@bd1121c3debbc87dc99eff24216bf59c",
             "line": 4,
@@ -3841,7 +3841,7 @@
           },
           {
             "n": 1,
-            "key": null,
+            "key": "@6a538062cab450c96e04f02ccd4e3285.1",
             "code": null,
             "hash": "@6a538062cab450c96e04f02ccd4e3285",
             "line": 5,
@@ -3851,7 +3851,7 @@
           },
           {
             "n": 2,
-            "key": null,
+            "key": "@9ccdb6bf0f52e4c4b7f17d11498588f3.2",
             "code": null,
             "hash": "@9ccdb6bf0f52e4c4b7f17d11498588f3",
             "line": 6,
@@ -3861,7 +3861,7 @@
           },
           {
             "n": 1,
-            "key": null,
+            "key": "@95446efa46183aeecb41ca62b7a3071c.1",
             "code": null,
             "hash": "@95446efa46183aeecb41ca62b7a3071c",
             "line": 7,
@@ -3871,7 +3871,7 @@
           },
           {
             "n": 1,
-            "key": null,
+            "key": "@0e5b9b0a88bb3eb2993438b5f20ea094.1",
             "code": null,
             "hash": "@0e5b9b0a88bb3eb2993438b5f20ea094",
             "line": 8,
@@ -3881,7 +3881,7 @@
           },
           {
             "n": 3,
-            "key": null,
+            "key": "@9ccdb6bf0f52e4c4b7f17d11498588f3.3",
             "code": null,
             "hash": "@9ccdb6bf0f52e4c4b7f17d11498588f3",
             "line": 9,
@@ -3891,7 +3891,7 @@
           },
           {
             "n": 1,
-            "key": null,
+            "key": "@55566db76b35c5478a473db34aa088e5.1",
             "code": null,
             "hash": "@55566db76b35c5478a473db34aa088e5",
             "line": 10,
@@ -3901,7 +3901,7 @@
           },
           {
             "n": 1,
-            "key": null,
+            "key": "@8db94b605c41168b67811b29be3c6627.1",
             "code": null,
             "hash": "@8db94b605c41168b67811b29be3c6627",
             "line": 11,
@@ -3911,7 +3911,7 @@
           },
           {
             "n": 1,
-            "key": null,
+            "key": "@164df9e1e7cfefb1a279d8ad000639c7.1",
             "code": null,
             "hash": "@164df9e1e7cfefb1a279d8ad000639c7",
             "line": 12,
@@ -3921,7 +3921,7 @@
           },
           {
             "n": 1,
-            "key": null,
+            "key": "@a799963e3839c3cb7547e13bee0af775.1",
             "code": null,
             "hash": "@a799963e3839c3cb7547e13bee0af775",
             "line": 13,
@@ -3931,7 +3931,7 @@
           },
           {
             "n": 1,
-            "key": null,
+            "key": "@74a7d6f763efa72c746fa09cb881d91f.1",
             "code": null,
             "hash": "@74a7d6f763efa72c746fa09cb881d91f",
             "line": 14,
@@ -3941,7 +3941,7 @@
           },
           {
             "n": 1,
-            "key": null,
+            "key": "@cbc5b361add2ed45ef2d4150aed80c0a.1",
             "code": null,
             "hash": "@cbc5b361add2ed45ef2d4150aed80c0a",
             "line": 15,
@@ -3951,7 +3951,7 @@
           },
           {
             "n": 2,
-            "key": null,
+            "key": "@cbc5b361add2ed45ef2d4150aed80c0a.2",
             "code": null,
             "hash": "@cbc5b361add2ed45ef2d4150aed80c0a",
             "line": 16,
@@ -3961,7 +3961,7 @@
           },
           {
             "n": 4,
-            "key": null,
+            "key": "@9ccdb6bf0f52e4c4b7f17d11498588f3.4",
             "code": null,
             "hash": "@9ccdb6bf0f52e4c4b7f17d11498588f3",
             "line": 17,
@@ -3971,7 +3971,7 @@
           },
           {
             "n": 5,
-            "key": null,
+            "key": "@9ccdb6bf0f52e4c4b7f17d11498588f3.5",
             "code": null,
             "hash": "@9ccdb6bf0f52e4c4b7f17d11498588f3",
             "line": 18,
@@ -3991,7 +3991,7 @@
           },
           {
             "n": 6,
-            "key": null,
+            "key": "@9ccdb6bf0f52e4c4b7f17d11498588f3.6",
             "code": null,
             "hash": "@9ccdb6bf0f52e4c4b7f17d11498588f3",
             "line": 20,
@@ -4001,7 +4001,7 @@
           },
           {
             "n": 1,
-            "key": null,
+            "key": "@da5efdaa97d69247238e2363e6ceba09.1",
             "code": null,
             "hash": "@da5efdaa97d69247238e2363e6ceba09",
             "line": 21,
@@ -4011,7 +4011,7 @@
           },
           {
             "n": 1,
-            "key": null,
+            "key": "@c48c770981a5b1d8bf7ced6af332cac3.1",
             "code": null,
             "hash": "@c48c770981a5b1d8bf7ced6af332cac3",
             "line": 22,
@@ -4021,7 +4021,7 @@
           },
           {
             "n": 1,
-            "key": null,
+            "key": "@7e0c4e7a0f21aa696deb961a324d50d4.1",
             "code": null,
             "hash": "@7e0c4e7a0f21aa696deb961a324d50d4",
             "line": 23,
@@ -4031,12 +4031,1497 @@
           },
           {
             "n": 1,
-            "key": null,
+            "key": "@18b02c5b267ad0499a5e897b86dabb92.1",
             "code": null,
             "hash": "@18b02c5b267ad0499a5e897b86dabb92",
             "line": 24,
             "key_kind": "synthetic",
             "pnl_basis": "prices",
+            "asset_type": "futures"
+          }
+        ]
+      },
+      {
+        "label": "futures: keys left out of a row read as null",
+        "market": "futures",
+        "tz": "America/New_York",
+        "rows": [
+          {
+            "line": "2",
+            "external_id": null,
+            "symbol": "MESZ6",
+            "asset_type": null,
+            "direction": "long",
+            "local_entry": "2026-10-01T09:30:00",
+            "local_exit": "2026-10-01T09:35:00",
+            "utc_offset": null,
+            "entry_price": "6800.00",
+            "exit_price": "6801.00",
+            "quantity": "1",
+            "stake_amount": null,
+            "payout_percent": null,
+            "duration_seconds": null,
+            "timeframe": null,
+            "result": "win",
+            "pnl": "5.00",
+            "commission": null,
+            "stop_price": null,
+            "pnl_basis": "prices"
+          },
+          {
+            "line": "3",
+            "external_id": null,
+            "symbol": "MESZ6",
+            "asset_type": null,
+            "direction": "long",
+            "local_entry": "2026-10-01T09:30:00",
+            "local_exit": "2026-10-01T09:35:00",
+            "utc_offset": null,
+            "entry_price": "6800.00",
+            "exit_price": "6801.00",
+            "quantity": "1",
+            "stake_amount": null,
+            "payout_percent": null,
+            "duration_seconds": null,
+            "timeframe": null,
+            "result": "win",
+            "pnl": "5.00",
+            "commission": null,
+            "target_price": null,
+            "pnl_basis": "prices"
+          },
+          {
+            "line": "4",
+            "external_id": null,
+            "symbol": "MESZ6",
+            "asset_type": null,
+            "direction": "long",
+            "local_entry": "2026-10-01T09:30:00",
+            "local_exit": "2026-10-01T09:35:00",
+            "utc_offset": null,
+            "entry_price": "6800.00",
+            "exit_price": "6801.00",
+            "quantity": "1",
+            "stake_amount": null,
+            "payout_percent": null,
+            "duration_seconds": null,
+            "timeframe": null,
+            "result": "win",
+            "pnl": "5.00",
+            "stop_price": null,
+            "target_price": null,
+            "pnl_basis": "prices"
+          },
+          {
+            "line": "5",
+            "symbol": "MESZ6",
+            "asset_type": null,
+            "direction": "long",
+            "local_entry": "2026-10-01T09:30:00",
+            "local_exit": "2026-10-01T09:35:00",
+            "utc_offset": null,
+            "entry_price": "6800.00",
+            "exit_price": "6801.00",
+            "quantity": "1",
+            "stake_amount": null,
+            "payout_percent": null,
+            "duration_seconds": null,
+            "timeframe": null,
+            "result": "win",
+            "pnl": "5.00",
+            "commission": null,
+            "stop_price": null,
+            "target_price": null,
+            "pnl_basis": "prices"
+          },
+          {
+            "line": "6",
+            "symbol": "MESZ6",
+            "direction": "long",
+            "local_entry": "2026-10-01T09:30:00",
+            "local_exit": "2026-10-01T09:35:00",
+            "utc_offset": null,
+            "entry_price": "6800.00",
+            "exit_price": "6801.00",
+            "quantity": "1",
+            "result": "win",
+            "pnl": "5.00",
+            "pnl_basis": "prices"
+          },
+          {
+            "line": "7",
+            "external_id": null,
+            "symbol": "MESZ6",
+            "asset_type": null,
+            "direction": "long",
+            "local_entry": "2026-10-01T09:30:00",
+            "local_exit": "2026-10-01T09:35:00",
+            "utc_offset": null,
+            "entry_price": "6800.00",
+            "quantity": "1",
+            "stake_amount": null,
+            "payout_percent": null,
+            "duration_seconds": null,
+            "timeframe": null,
+            "result": "win",
+            "pnl": "7.00",
+            "commission": null,
+            "stop_price": null,
+            "target_price": null,
+            "pnl_basis": "file"
+          },
+          {
+            "line": "8",
+            "external_id": null,
+            "symbol": "MESZ6",
+            "asset_type": null,
+            "direction": "long",
+            "local_entry": "2026-10-01T09:30:00",
+            "local_exit": "2026-10-01T09:35:00",
+            "utc_offset": null,
+            "entry_price": "6800.00",
+            "exit_price": "6801.00",
+            "quantity": "1",
+            "stake_amount": null,
+            "payout_percent": null,
+            "duration_seconds": null,
+            "timeframe": null,
+            "result": "win",
+            "pnl": "5.00",
+            "commission": null,
+            "stop_price": null,
+            "target_price": null
+          },
+          {
+            "line": "9",
+            "external_id": null,
+            "symbol": "MESZ6",
+            "asset_type": null,
+            "direction": "long",
+            "local_entry": "2026-10-01T09:30:00",
+            "local_exit": "2026-10-01T09:35:00",
+            "entry_price": "6800.00",
+            "exit_price": "6801.00",
+            "quantity": "1",
+            "stake_amount": null,
+            "payout_percent": null,
+            "duration_seconds": null,
+            "timeframe": null,
+            "result": "win",
+            "pnl": "5.00",
+            "commission": null,
+            "stop_price": null,
+            "target_price": null,
+            "pnl_basis": "prices"
+          },
+          {
+            "line": "10",
+            "external_id": null,
+            "symbol": "MESZ6",
+            "asset_type": null,
+            "direction": "long",
+            "local_entry": "2026-10-01T09:30:00",
+            "utc_offset": null,
+            "entry_price": "6800.00",
+            "exit_price": "6801.00",
+            "quantity": "1",
+            "stake_amount": null,
+            "payout_percent": null,
+            "duration_seconds": null,
+            "timeframe": null,
+            "result": "win",
+            "pnl": "5.00",
+            "commission": null,
+            "stop_price": null,
+            "target_price": null,
+            "pnl_basis": "prices"
+          },
+          {
+            "line": "11",
+            "external_id": null,
+            "symbol": "MESZ6",
+            "asset_type": null,
+            "direction": "long",
+            "local_entry": "2026-10-01T09:30:00",
+            "utc_offset": null,
+            "entry_price": "6800.00",
+            "quantity": "1",
+            "stake_amount": null,
+            "payout_percent": null,
+            "duration_seconds": null,
+            "timeframe": null,
+            "result": "breakeven",
+            "pnl": "0.00",
+            "commission": null,
+            "stop_price": null,
+            "target_price": null,
+            "pnl_basis": "file"
+          }
+        ],
+        "expected": [
+          {
+            "n": 1,
+            "key": "@9ccdb6bf0f52e4c4b7f17d11498588f3.1",
+            "code": null,
+            "hash": "@9ccdb6bf0f52e4c4b7f17d11498588f3",
+            "line": 2,
+            "key_kind": "synthetic",
+            "pnl_basis": "prices",
+            "asset_type": "futures"
+          },
+          {
+            "n": 2,
+            "key": "@9ccdb6bf0f52e4c4b7f17d11498588f3.2",
+            "code": null,
+            "hash": "@9ccdb6bf0f52e4c4b7f17d11498588f3",
+            "line": 3,
+            "key_kind": "synthetic",
+            "pnl_basis": "prices",
+            "asset_type": "futures"
+          },
+          {
+            "n": 3,
+            "key": "@9ccdb6bf0f52e4c4b7f17d11498588f3.3",
+            "code": null,
+            "hash": "@9ccdb6bf0f52e4c4b7f17d11498588f3",
+            "line": 4,
+            "key_kind": "synthetic",
+            "pnl_basis": "prices",
+            "asset_type": "futures"
+          },
+          {
+            "n": 4,
+            "key": "@9ccdb6bf0f52e4c4b7f17d11498588f3.4",
+            "code": null,
+            "hash": "@9ccdb6bf0f52e4c4b7f17d11498588f3",
+            "line": 5,
+            "key_kind": "synthetic",
+            "pnl_basis": "prices",
+            "asset_type": "futures"
+          },
+          {
+            "n": 5,
+            "key": "@9ccdb6bf0f52e4c4b7f17d11498588f3.5",
+            "code": null,
+            "hash": "@9ccdb6bf0f52e4c4b7f17d11498588f3",
+            "line": 6,
+            "key_kind": "synthetic",
+            "pnl_basis": "prices",
+            "asset_type": "futures"
+          },
+          {
+            "n": 1,
+            "key": "@f35ace0d144b1008fa91f41c87ee827f.1",
+            "code": null,
+            "hash": "@f35ace0d144b1008fa91f41c87ee827f",
+            "line": 7,
+            "key_kind": "synthetic",
+            "pnl_basis": "file",
+            "asset_type": "futures"
+          },
+          {
+            "n": 6,
+            "key": "@9ccdb6bf0f52e4c4b7f17d11498588f3.6",
+            "code": null,
+            "hash": "@9ccdb6bf0f52e4c4b7f17d11498588f3",
+            "line": 8,
+            "key_kind": "synthetic",
+            "pnl_basis": "file",
+            "asset_type": "futures"
+          },
+          {
+            "n": 7,
+            "key": "@9ccdb6bf0f52e4c4b7f17d11498588f3.7",
+            "code": null,
+            "hash": "@9ccdb6bf0f52e4c4b7f17d11498588f3",
+            "line": 9,
+            "key_kind": "synthetic",
+            "pnl_basis": "prices",
+            "asset_type": "futures"
+          },
+          {
+            "n": 1,
+            "key": "@b408cbe51b97e80a07b441b8d28cabc0.1",
+            "code": null,
+            "hash": "@b408cbe51b97e80a07b441b8d28cabc0",
+            "line": 10,
+            "key_kind": "synthetic",
+            "pnl_basis": "prices",
+            "asset_type": "futures"
+          },
+          {
+            "n": 1,
+            "key": "@a799963e3839c3cb7547e13bee0af775.1",
+            "code": null,
+            "hash": "@a799963e3839c3cb7547e13bee0af775",
+            "line": 11,
+            "key_kind": "synthetic",
+            "pnl_basis": "file",
+            "asset_type": "futures"
+          }
+        ]
+      },
+      {
+        "label": "forex: an exit price left out of a row priced by the prices",
+        "market": "forex",
+        "tz": "America/New_York",
+        "rows": [
+          {
+            "line": "2",
+            "external_id": null,
+            "symbol": "PETR4",
+            "asset_type": null,
+            "direction": "long",
+            "local_entry": "2026-10-01T09:30:00",
+            "local_exit": "2026-10-01T09:35:00",
+            "utc_offset": null,
+            "entry_price": "38.50",
+            "quantity": "100",
+            "stake_amount": null,
+            "payout_percent": null,
+            "duration_seconds": null,
+            "timeframe": null,
+            "result": "win",
+            "pnl": "40.00",
+            "commission": null,
+            "stop_price": null,
+            "target_price": null,
+            "pnl_basis": "prices"
+          },
+          {
+            "line": "3",
+            "external_id": null,
+            "symbol": "EURUSD",
+            "asset_type": null,
+            "direction": "long",
+            "local_entry": "2026-10-01T09:30:00",
+            "local_exit": "2026-10-01T09:35:00",
+            "utc_offset": null,
+            "entry_price": "1.08500",
+            "quantity": "0.10",
+            "stake_amount": null,
+            "payout_percent": null,
+            "duration_seconds": null,
+            "timeframe": null,
+            "result": "win",
+            "pnl": "10.00",
+            "commission": null,
+            "stop_price": null,
+            "target_price": null,
+            "pnl_basis": "prices"
+          }
+        ],
+        "expected": [
+          {
+            "n": null,
+            "key": null,
+            "code": "no_price_result",
+            "hash": null,
+            "line": 2,
+            "key_kind": null,
+            "pnl_basis": null,
+            "asset_type": null
+          },
+          {
+            "n": null,
+            "key": null,
+            "code": "no_price_result",
+            "hash": null,
+            "line": 3,
+            "key_kind": null,
+            "pnl_basis": null,
+            "asset_type": null
+          }
+        ]
+      },
+      {
+        "label": "stocks: IDs and OCC symbols with white space outside ASCII",
+        "market": "stocks",
+        "tz": "America/New_York",
+        "rows": [
+          {
+            "line": "2",
+            "external_id": "a b",
+            "symbol": "AAPL",
+            "asset_type": null,
+            "direction": "long",
+            "local_entry": "2026-10-01T09:30:00",
+            "local_exit": "2026-10-01T09:35:00",
+            "utc_offset": null,
+            "entry_price": "100.00",
+            "exit_price": "101.00",
+            "quantity": "1",
+            "stake_amount": null,
+            "payout_percent": null,
+            "duration_seconds": null,
+            "timeframe": null,
+            "result": "win",
+            "pnl": "1.00",
+            "commission": null,
+            "stop_price": null,
+            "target_price": null,
+            "pnl_basis": "prices"
+          },
+          {
+            "line": "3",
+            "external_id": "a b",
+            "symbol": "AAPL",
+            "asset_type": null,
+            "direction": "long",
+            "local_entry": "2026-10-01T09:30:00",
+            "local_exit": "2026-10-01T09:35:00",
+            "utc_offset": null,
+            "entry_price": "100.00",
+            "exit_price": "101.00",
+            "quantity": "1",
+            "stake_amount": null,
+            "payout_percent": null,
+            "duration_seconds": null,
+            "timeframe": null,
+            "result": "win",
+            "pnl": "1.00",
+            "commission": null,
+            "stop_price": null,
+            "target_price": null,
+            "pnl_basis": "prices"
+          },
+          {
+            "line": "4",
+            "external_id": "a　b",
+            "symbol": "AAPL",
+            "asset_type": null,
+            "direction": "long",
+            "local_entry": "2026-10-01T09:30:00",
+            "local_exit": "2026-10-01T09:35:00",
+            "utc_offset": null,
+            "entry_price": "100.00",
+            "exit_price": "101.00",
+            "quantity": "1",
+            "stake_amount": null,
+            "payout_percent": null,
+            "duration_seconds": null,
+            "timeframe": null,
+            "result": "win",
+            "pnl": "1.00",
+            "commission": null,
+            "stop_price": null,
+            "target_price": null,
+            "pnl_basis": "prices"
+          },
+          {
+            "line": "5",
+            "external_id": "a﻿b",
+            "symbol": "AAPL",
+            "asset_type": null,
+            "direction": "long",
+            "local_entry": "2026-10-01T09:30:00",
+            "local_exit": "2026-10-01T09:35:00",
+            "utc_offset": null,
+            "entry_price": "100.00",
+            "exit_price": "101.00",
+            "quantity": "1",
+            "stake_amount": null,
+            "payout_percent": null,
+            "duration_seconds": null,
+            "timeframe": null,
+            "result": "win",
+            "pnl": "1.00",
+            "commission": null,
+            "stop_price": null,
+            "target_price": null,
+            "pnl_basis": "prices"
+          },
+          {
+            "line": "6",
+            "external_id": "ab",
+            "symbol": "AAPL",
+            "asset_type": null,
+            "direction": "long",
+            "local_entry": "2026-10-01T09:30:00",
+            "local_exit": "2026-10-01T09:35:00",
+            "utc_offset": null,
+            "entry_price": "100.00",
+            "exit_price": "101.00",
+            "quantity": "1",
+            "stake_amount": null,
+            "payout_percent": null,
+            "duration_seconds": null,
+            "timeframe": null,
+            "result": "win",
+            "pnl": "1.00",
+            "commission": null,
+            "stop_price": null,
+            "target_price": null,
+            "pnl_basis": "prices"
+          },
+          {
+            "line": "7",
+            "external_id": "a\tb",
+            "symbol": "AAPL",
+            "asset_type": null,
+            "direction": "long",
+            "local_entry": "2026-10-01T09:30:00",
+            "local_exit": "2026-10-01T09:35:00",
+            "utc_offset": null,
+            "entry_price": "100.00",
+            "exit_price": "101.00",
+            "quantity": "1",
+            "stake_amount": null,
+            "payout_percent": null,
+            "duration_seconds": null,
+            "timeframe": null,
+            "result": "win",
+            "pnl": "1.00",
+            "commission": null,
+            "stop_price": null,
+            "target_price": null,
+            "pnl_basis": "prices"
+          },
+          {
+            "line": "8",
+            "external_id": "a\u000bb",
+            "symbol": "AAPL",
+            "asset_type": null,
+            "direction": "long",
+            "local_entry": "2026-10-01T09:30:00",
+            "local_exit": "2026-10-01T09:35:00",
+            "utc_offset": null,
+            "entry_price": "100.00",
+            "exit_price": "101.00",
+            "quantity": "1",
+            "stake_amount": null,
+            "payout_percent": null,
+            "duration_seconds": null,
+            "timeframe": null,
+            "result": "win",
+            "pnl": "1.00",
+            "commission": null,
+            "stop_price": null,
+            "target_price": null,
+            "pnl_basis": "prices"
+          },
+          {
+            "line": "9",
+            "external_id": null,
+            "symbol": "AAPL 261120C00150000",
+            "asset_type": null,
+            "direction": "long",
+            "local_entry": "2026-10-01T09:30:00",
+            "local_exit": "2026-10-01T09:35:00",
+            "utc_offset": null,
+            "entry_price": "1.85",
+            "exit_price": "2.10",
+            "quantity": "2",
+            "stake_amount": null,
+            "payout_percent": null,
+            "duration_seconds": null,
+            "timeframe": null,
+            "result": "win",
+            "pnl": "50.00",
+            "commission": null,
+            "stop_price": null,
+            "target_price": null,
+            "pnl_basis": "file"
+          },
+          {
+            "line": "10",
+            "external_id": null,
+            "symbol": "AAPL\t261120C00150000",
+            "asset_type": null,
+            "direction": "long",
+            "local_entry": "2026-10-01T09:30:00",
+            "local_exit": "2026-10-01T09:35:00",
+            "utc_offset": null,
+            "entry_price": "1.85",
+            "exit_price": "2.10",
+            "quantity": "2",
+            "stake_amount": null,
+            "payout_percent": null,
+            "duration_seconds": null,
+            "timeframe": null,
+            "result": "win",
+            "pnl": "50.00",
+            "commission": null,
+            "stop_price": null,
+            "target_price": null,
+            "pnl_basis": "file"
+          },
+          {
+            "line": "11",
+            "external_id": null,
+            "symbol": "AAPL　261120C00150000",
+            "asset_type": null,
+            "direction": "long",
+            "local_entry": "2026-10-01T09:30:00",
+            "local_exit": "2026-10-01T09:35:00",
+            "utc_offset": null,
+            "entry_price": "1.85",
+            "exit_price": "2.10",
+            "quantity": "2",
+            "stake_amount": null,
+            "payout_percent": null,
+            "duration_seconds": null,
+            "timeframe": null,
+            "result": "win",
+            "pnl": "50.00",
+            "commission": null,
+            "stop_price": null,
+            "target_price": null,
+            "pnl_basis": "file"
+          }
+        ],
+        "expected": [
+          {
+            "n": null,
+            "key": "a b",
+            "code": null,
+            "hash": null,
+            "line": 2,
+            "key_kind": "real",
+            "pnl_basis": "prices",
+            "asset_type": "stock"
+          },
+          {
+            "n": null,
+            "key": "a b",
+            "code": null,
+            "hash": null,
+            "line": 3,
+            "key_kind": "real",
+            "pnl_basis": "prices",
+            "asset_type": "stock"
+          },
+          {
+            "n": null,
+            "key": "a　b",
+            "code": null,
+            "hash": null,
+            "line": 4,
+            "key_kind": "real",
+            "pnl_basis": "prices",
+            "asset_type": "stock"
+          },
+          {
+            "n": null,
+            "key": "a﻿b",
+            "code": null,
+            "hash": null,
+            "line": 5,
+            "key_kind": "real",
+            "pnl_basis": "prices",
+            "asset_type": "stock"
+          },
+          {
+            "n": null,
+            "key": "ab",
+            "code": null,
+            "hash": null,
+            "line": 6,
+            "key_kind": "real",
+            "pnl_basis": "prices",
+            "asset_type": "stock"
+          },
+          {
+            "n": null,
+            "key": "a\tb",
+            "code": "bad_id",
+            "hash": null,
+            "line": 7,
+            "key_kind": null,
+            "pnl_basis": null,
+            "asset_type": null
+          },
+          {
+            "n": null,
+            "key": "a\u000bb",
+            "code": "bad_id",
+            "hash": null,
+            "line": 8,
+            "key_kind": null,
+            "pnl_basis": null,
+            "asset_type": null
+          },
+          {
+            "n": 1,
+            "key": "@19a5e29be76242b20a1410605512fb2e.1",
+            "code": null,
+            "hash": "@19a5e29be76242b20a1410605512fb2e",
+            "line": 9,
+            "key_kind": "synthetic",
+            "pnl_basis": "file",
+            "asset_type": "stock"
+          },
+          {
+            "n": null,
+            "key": null,
+            "code": "bad_option",
+            "hash": null,
+            "line": 10,
+            "key_kind": null,
+            "pnl_basis": null,
+            "asset_type": null
+          },
+          {
+            "n": 1,
+            "key": "@9654c9a9bc2e529a91d9067e4491d528.1",
+            "code": null,
+            "hash": "@9654c9a9bc2e529a91d9067e4491d528",
+            "line": 11,
+            "key_kind": "synthetic",
+            "pnl_basis": "file",
+            "asset_type": "stock"
+          }
+        ]
+      },
+      {
+        "label": "options account: an OCC symbol with a non-breaking space",
+        "market": "options",
+        "tz": "America/New_York",
+        "rows": [
+          {
+            "line": "2",
+            "external_id": null,
+            "symbol": "AAPL 261120C00150000",
+            "asset_type": null,
+            "direction": "long",
+            "local_entry": "2026-10-01T09:30:00",
+            "local_exit": "2026-10-01T09:35:00",
+            "utc_offset": null,
+            "entry_price": "1.85",
+            "exit_price": "2.10",
+            "quantity": "2",
+            "stake_amount": null,
+            "payout_percent": null,
+            "duration_seconds": null,
+            "timeframe": null,
+            "result": "win",
+            "pnl": "50.00",
+            "commission": null,
+            "stop_price": null,
+            "target_price": null,
+            "pnl_basis": "file"
+          },
+          {
+            "line": "3",
+            "external_id": null,
+            "symbol": "AAPL 261120C00150000",
+            "asset_type": null,
+            "direction": "long",
+            "local_entry": "2026-10-01T09:30:00",
+            "local_exit": "2026-10-01T09:35:00",
+            "utc_offset": null,
+            "entry_price": "1.85",
+            "exit_price": "2.10",
+            "quantity": "2",
+            "stake_amount": null,
+            "payout_percent": null,
+            "duration_seconds": null,
+            "timeframe": null,
+            "result": "win",
+            "pnl": "50.00",
+            "commission": null,
+            "stop_price": null,
+            "target_price": null,
+            "pnl_basis": "file"
+          }
+        ],
+        "expected": [
+          {
+            "n": 1,
+            "key": "@19a5e29be76242b20a1410605512fb2e.1",
+            "code": null,
+            "hash": "@19a5e29be76242b20a1410605512fb2e",
+            "line": 2,
+            "key_kind": "synthetic",
+            "pnl_basis": "file",
+            "asset_type": "option"
+          },
+          {
+            "n": null,
+            "key": null,
+            "code": "bad_option",
+            "hash": null,
+            "line": 3,
+            "key_kind": null,
+            "pnl_basis": null,
+            "asset_type": null
+          }
+        ]
+      },
+      {
+        "label": "crypto: the sizes a row may have",
+        "market": "crypto",
+        "tz": "UTC",
+        "rows": [
+          {
+            "line": "2",
+            "external_id": null,
+            "symbol": "PEPEUSDT",
+            "asset_type": null,
+            "direction": "long",
+            "local_entry": "2026-10-01T09:30:00",
+            "local_exit": "2026-10-01T09:35:00",
+            "utc_offset": null,
+            "entry_price": "0.00001200",
+            "exit_price": "0.00001210",
+            "quantity": "9999999999",
+            "stake_amount": null,
+            "payout_percent": null,
+            "duration_seconds": null,
+            "timeframe": null,
+            "result": "win",
+            "pnl": "1000.00",
+            "commission": null,
+            "stop_price": null,
+            "target_price": null,
+            "pnl_basis": "file"
+          },
+          {
+            "line": "3",
+            "external_id": null,
+            "symbol": "PEPEUSDT",
+            "asset_type": null,
+            "direction": "long",
+            "local_entry": "2026-10-01T09:30:00",
+            "local_exit": "2026-10-01T09:35:00",
+            "utc_offset": null,
+            "entry_price": "0.00001200",
+            "exit_price": "0.00001210",
+            "quantity": "10000000000",
+            "stake_amount": null,
+            "payout_percent": null,
+            "duration_seconds": null,
+            "timeframe": null,
+            "result": "win",
+            "pnl": "1000.00",
+            "commission": null,
+            "stop_price": null,
+            "target_price": null,
+            "pnl_basis": "file"
+          },
+          {
+            "line": "4",
+            "external_id": null,
+            "symbol": "PEPEUSDT",
+            "asset_type": null,
+            "direction": "long",
+            "local_entry": "2026-10-01T09:30:00",
+            "local_exit": "2026-10-01T09:35:00",
+            "utc_offset": null,
+            "entry_price": "0.00001200",
+            "exit_price": "0.00001210",
+            "quantity": "12000000000",
+            "stake_amount": null,
+            "payout_percent": null,
+            "duration_seconds": null,
+            "timeframe": null,
+            "result": "win",
+            "pnl": "1200.00",
+            "commission": null,
+            "stop_price": null,
+            "target_price": null,
+            "pnl_basis": "file"
+          },
+          {
+            "line": "5",
+            "external_id": null,
+            "symbol": "BTCUSDT",
+            "asset_type": null,
+            "direction": "long",
+            "local_entry": "2026-10-01T09:30:00",
+            "local_exit": "2026-10-01T09:35:00",
+            "utc_offset": null,
+            "entry_price": "1",
+            "exit_price": "2",
+            "quantity": "1",
+            "stake_amount": null,
+            "payout_percent": null,
+            "duration_seconds": null,
+            "timeframe": null,
+            "result": "win",
+            "pnl": "9999999999999999.99",
+            "commission": null,
+            "stop_price": null,
+            "target_price": null,
+            "pnl_basis": "file"
+          },
+          {
+            "line": "6",
+            "external_id": null,
+            "symbol": "BTCUSDT",
+            "asset_type": null,
+            "direction": "long",
+            "local_entry": "2026-10-01T09:30:00",
+            "local_exit": "2026-10-01T09:35:00",
+            "utc_offset": null,
+            "entry_price": "2",
+            "exit_price": "1",
+            "quantity": "1",
+            "stake_amount": null,
+            "payout_percent": null,
+            "duration_seconds": null,
+            "timeframe": null,
+            "result": "loss",
+            "pnl": "-10000000000000000.00",
+            "commission": null,
+            "stop_price": null,
+            "target_price": null,
+            "pnl_basis": "file"
+          },
+          {
+            "line": "7",
+            "external_id": null,
+            "symbol": "BTCUSDT",
+            "asset_type": null,
+            "direction": "long",
+            "local_entry": "2026-10-01T09:30:00",
+            "local_exit": "2026-10-01T09:35:00",
+            "utc_offset": null,
+            "entry_price": "1",
+            "exit_price": "2",
+            "quantity": "1",
+            "stake_amount": null,
+            "payout_percent": null,
+            "duration_seconds": null,
+            "timeframe": null,
+            "result": "win",
+            "pnl": "1.00",
+            "commission": "9999999999999999.99",
+            "stop_price": null,
+            "target_price": null,
+            "pnl_basis": "file"
+          },
+          {
+            "line": "8",
+            "external_id": null,
+            "symbol": "BTCUSDT",
+            "asset_type": null,
+            "direction": "long",
+            "local_entry": "2026-10-01T09:30:00",
+            "local_exit": "2026-10-01T09:35:00",
+            "utc_offset": null,
+            "entry_price": "1",
+            "exit_price": "2",
+            "quantity": "1",
+            "stake_amount": null,
+            "payout_percent": null,
+            "duration_seconds": null,
+            "timeframe": null,
+            "result": "win",
+            "pnl": "1.00",
+            "commission": "10000000000000000.00",
+            "stop_price": null,
+            "target_price": null,
+            "pnl_basis": "file"
+          }
+        ],
+        "expected": [
+          {
+            "n": 1,
+            "key": "@21075a11769990ab000ed305ed6a74c8.1",
+            "code": null,
+            "hash": "@21075a11769990ab000ed305ed6a74c8",
+            "line": 2,
+            "key_kind": "synthetic",
+            "pnl_basis": "file",
+            "asset_type": "crypto"
+          },
+          {
+            "n": null,
+            "key": null,
+            "code": "bad_quantity",
+            "hash": null,
+            "line": 3,
+            "key_kind": null,
+            "pnl_basis": null,
+            "asset_type": null
+          },
+          {
+            "n": null,
+            "key": null,
+            "code": "bad_quantity",
+            "hash": null,
+            "line": 4,
+            "key_kind": null,
+            "pnl_basis": null,
+            "asset_type": null
+          },
+          {
+            "n": 1,
+            "key": "@1bcad60d401fadfeb662cd2b93e8aa17.1",
+            "code": null,
+            "hash": "@1bcad60d401fadfeb662cd2b93e8aa17",
+            "line": 5,
+            "key_kind": "synthetic",
+            "pnl_basis": "file",
+            "asset_type": "crypto"
+          },
+          {
+            "n": null,
+            "key": null,
+            "code": "bad_number",
+            "hash": null,
+            "line": 6,
+            "key_kind": null,
+            "pnl_basis": null,
+            "asset_type": null
+          },
+          {
+            "n": 2,
+            "key": "@1bcad60d401fadfeb662cd2b93e8aa17.2",
+            "code": null,
+            "hash": "@1bcad60d401fadfeb662cd2b93e8aa17",
+            "line": 7,
+            "key_kind": "synthetic",
+            "pnl_basis": "file",
+            "asset_type": "crypto"
+          },
+          {
+            "n": null,
+            "key": null,
+            "code": "bad_number",
+            "hash": null,
+            "line": 8,
+            "key_kind": null,
+            "pnl_basis": null,
+            "asset_type": null
+          }
+        ]
+      },
+      {
+        "label": "futures: the bounds of a symbol and of a time, an OCC symbol",
+        "market": "futures",
+        "tz": "America/New_York",
+        "rows": [
+          {
+            "line": "2",
+            "external_id": null,
+            "symbol": "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
+            "asset_type": null,
+            "direction": "long",
+            "local_entry": "2026-10-01T09:30:00",
+            "local_exit": "2026-10-01T09:35:00",
+            "utc_offset": null,
+            "entry_price": "6800.00",
+            "exit_price": "6801.00",
+            "quantity": "1",
+            "stake_amount": null,
+            "payout_percent": null,
+            "duration_seconds": null,
+            "timeframe": null,
+            "result": "win",
+            "pnl": "5.00",
+            "commission": null,
+            "stop_price": null,
+            "target_price": null,
+            "pnl_basis": "file"
+          },
+          {
+            "line": "3",
+            "external_id": null,
+            "symbol": "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
+            "asset_type": null,
+            "direction": "long",
+            "local_entry": "2026-10-01T09:30:00",
+            "local_exit": "2026-10-01T09:35:00",
+            "utc_offset": null,
+            "entry_price": "6800.00",
+            "exit_price": "6801.00",
+            "quantity": "1",
+            "stake_amount": null,
+            "payout_percent": null,
+            "duration_seconds": null,
+            "timeframe": null,
+            "result": "win",
+            "pnl": "5.00",
+            "commission": null,
+            "stop_price": null,
+            "target_price": null,
+            "pnl_basis": "file"
+          },
+          {
+            "line": "4",
+            "external_id": null,
+            "symbol": "   ",
+            "asset_type": null,
+            "direction": "long",
+            "local_entry": "2026-10-01T09:30:00",
+            "local_exit": "2026-10-01T09:35:00",
+            "utc_offset": null,
+            "entry_price": "6800.00",
+            "exit_price": "6801.00",
+            "quantity": "1",
+            "stake_amount": null,
+            "payout_percent": null,
+            "duration_seconds": null,
+            "timeframe": null,
+            "result": "win",
+            "pnl": "5.00",
+            "commission": null,
+            "stop_price": null,
+            "target_price": null,
+            "pnl_basis": "file"
+          },
+          {
+            "line": "5",
+            "external_id": null,
+            "symbol": "",
+            "asset_type": null,
+            "direction": "long",
+            "local_entry": "2026-10-01T09:30:00",
+            "local_exit": "2026-10-01T09:35:00",
+            "utc_offset": null,
+            "entry_price": "6800.00",
+            "exit_price": "6801.00",
+            "quantity": "1",
+            "stake_amount": null,
+            "payout_percent": null,
+            "duration_seconds": null,
+            "timeframe": null,
+            "result": "win",
+            "pnl": "5.00",
+            "commission": null,
+            "stop_price": null,
+            "target_price": null,
+            "pnl_basis": "file"
+          },
+          {
+            "line": "6",
+            "external_id": null,
+            "symbol": "AAPL 261120C00150000",
+            "asset_type": null,
+            "direction": "long",
+            "local_entry": "2026-10-01T09:30:00",
+            "local_exit": "2026-10-01T09:35:00",
+            "utc_offset": null,
+            "entry_price": "6800.00",
+            "exit_price": "6801.00",
+            "quantity": "1",
+            "stake_amount": null,
+            "payout_percent": null,
+            "duration_seconds": null,
+            "timeframe": null,
+            "result": "win",
+            "pnl": "5.00",
+            "commission": null,
+            "stop_price": null,
+            "target_price": null,
+            "pnl_basis": "file"
+          },
+          {
+            "line": "7",
+            "external_id": null,
+            "symbol": "MESZ6",
+            "asset_type": null,
+            "direction": "long",
+            "local_entry": "2026-10-01T24:00:00",
+            "local_exit": "2026-10-01T09:35:00",
+            "utc_offset": null,
+            "entry_price": "6800.00",
+            "exit_price": "6801.00",
+            "quantity": "1",
+            "stake_amount": null,
+            "payout_percent": null,
+            "duration_seconds": null,
+            "timeframe": null,
+            "result": "win",
+            "pnl": "5.00",
+            "commission": null,
+            "stop_price": null,
+            "target_price": null,
+            "pnl_basis": "prices"
+          },
+          {
+            "line": "8",
+            "external_id": null,
+            "symbol": "MESZ6",
+            "asset_type": null,
+            "direction": "long",
+            "local_entry": "2026-10-01T10:60:00",
+            "local_exit": "2026-10-01T09:35:00",
+            "utc_offset": null,
+            "entry_price": "6800.00",
+            "exit_price": "6801.00",
+            "quantity": "1",
+            "stake_amount": null,
+            "payout_percent": null,
+            "duration_seconds": null,
+            "timeframe": null,
+            "result": "win",
+            "pnl": "5.00",
+            "commission": null,
+            "stop_price": null,
+            "target_price": null,
+            "pnl_basis": "prices"
+          },
+          {
+            "line": "9",
+            "external_id": null,
+            "symbol": "MESZ6",
+            "asset_type": null,
+            "direction": "long",
+            "local_entry": "2026-10-01T10:00:60",
+            "local_exit": "2026-10-01T09:35:00",
+            "utc_offset": null,
+            "entry_price": "6800.00",
+            "exit_price": "6801.00",
+            "quantity": "1",
+            "stake_amount": null,
+            "payout_percent": null,
+            "duration_seconds": null,
+            "timeframe": null,
+            "result": "win",
+            "pnl": "5.00",
+            "commission": null,
+            "stop_price": null,
+            "target_price": null,
+            "pnl_basis": "prices"
+          },
+          {
+            "line": "10",
+            "external_id": null,
+            "symbol": "MESZ6",
+            "asset_type": null,
+            "direction": "long",
+            "local_entry": "0000-10-01T10:00:00",
+            "local_exit": "2026-10-01T09:35:00",
+            "utc_offset": null,
+            "entry_price": "6800.00",
+            "exit_price": "6801.00",
+            "quantity": "1",
+            "stake_amount": null,
+            "payout_percent": null,
+            "duration_seconds": null,
+            "timeframe": null,
+            "result": "win",
+            "pnl": "5.00",
+            "commission": null,
+            "stop_price": null,
+            "target_price": null,
+            "pnl_basis": "prices"
+          },
+          {
+            "line": "11",
+            "external_id": null,
+            "symbol": "MESZ6",
+            "asset_type": null,
+            "direction": "long",
+            "local_entry": "2026-10-01T09:30:00",
+            "local_exit": "2026-10-01T24:00:00",
+            "utc_offset": null,
+            "entry_price": "6800.00",
+            "exit_price": "6801.00",
+            "quantity": "1",
+            "stake_amount": null,
+            "payout_percent": null,
+            "duration_seconds": null,
+            "timeframe": null,
+            "result": "win",
+            "pnl": "5.00",
+            "commission": null,
+            "stop_price": null,
+            "target_price": null,
+            "pnl_basis": "prices"
+          },
+          {
+            "line": "12",
+            "external_id": null,
+            "symbol": "MESZ6",
+            "asset_type": null,
+            "direction": "long",
+            "local_entry": "2026-10-01T09:30:00",
+            "local_exit": "2026-10-01T09:35:60",
+            "utc_offset": null,
+            "entry_price": "6800.00",
+            "exit_price": "6801.00",
+            "quantity": "1",
+            "stake_amount": null,
+            "payout_percent": null,
+            "duration_seconds": null,
+            "timeframe": null,
+            "result": "win",
+            "pnl": "5.00",
+            "commission": null,
+            "stop_price": null,
+            "target_price": null,
+            "pnl_basis": "prices"
+          },
+          {
+            "line": "13",
+            "external_id": null,
+            "symbol": "MESZ6",
+            "asset_type": null,
+            "direction": "long",
+            "local_entry": "2026-10-01T23:59:59.999999",
+            "local_exit": "2026-10-02T00:00:00",
+            "utc_offset": null,
+            "entry_price": "6800.00",
+            "exit_price": "6801.00",
+            "quantity": "1",
+            "stake_amount": null,
+            "payout_percent": null,
+            "duration_seconds": null,
+            "timeframe": null,
+            "result": "win",
+            "pnl": "5.00",
+            "commission": null,
+            "stop_price": null,
+            "target_price": null,
+            "pnl_basis": "file"
+          },
+          {
+            "line": "14",
+            "external_id": null,
+            "symbol": "MESZ6",
+            "asset_type": null,
+            "direction": "long",
+            "local_entry": "0001-01-01T00:00:00",
+            "local_exit": null,
+            "utc_offset": null,
+            "entry_price": "6800.00",
+            "exit_price": null,
+            "quantity": "1",
+            "stake_amount": null,
+            "payout_percent": null,
+            "duration_seconds": null,
+            "timeframe": null,
+            "result": "breakeven",
+            "pnl": "0.00",
+            "commission": null,
+            "stop_price": null,
+            "target_price": null,
+            "pnl_basis": "file"
+          }
+        ],
+        "expected": [
+          {
+            "n": 1,
+            "key": "@0f01405fde75600553c68e789c3b6d3b.1",
+            "code": null,
+            "hash": "@0f01405fde75600553c68e789c3b6d3b",
+            "line": 2,
+            "key_kind": "synthetic",
+            "pnl_basis": "file",
+            "asset_type": "futures"
+          },
+          {
+            "n": null,
+            "key": null,
+            "code": "missing_symbol",
+            "hash": null,
+            "line": 3,
+            "key_kind": null,
+            "pnl_basis": null,
+            "asset_type": null
+          },
+          {
+            "n": null,
+            "key": null,
+            "code": "missing_symbol",
+            "hash": null,
+            "line": 4,
+            "key_kind": null,
+            "pnl_basis": null,
+            "asset_type": null
+          },
+          {
+            "n": null,
+            "key": null,
+            "code": "missing_symbol",
+            "hash": null,
+            "line": 5,
+            "key_kind": null,
+            "pnl_basis": null,
+            "asset_type": null
+          },
+          {
+            "n": 1,
+            "key": "@b396f7d74f81ab6dfdb1fb0da7f8f456.1",
+            "code": null,
+            "hash": "@b396f7d74f81ab6dfdb1fb0da7f8f456",
+            "line": 6,
+            "key_kind": "synthetic",
+            "pnl_basis": "file",
+            "asset_type": "futures"
+          },
+          {
+            "n": null,
+            "key": null,
+            "code": "bad_date",
+            "hash": null,
+            "line": 7,
+            "key_kind": null,
+            "pnl_basis": null,
+            "asset_type": null
+          },
+          {
+            "n": null,
+            "key": null,
+            "code": "bad_date",
+            "hash": null,
+            "line": 8,
+            "key_kind": null,
+            "pnl_basis": null,
+            "asset_type": null
+          },
+          {
+            "n": null,
+            "key": null,
+            "code": "bad_date",
+            "hash": null,
+            "line": 9,
+            "key_kind": null,
+            "pnl_basis": null,
+            "asset_type": null
+          },
+          {
+            "n": null,
+            "key": null,
+            "code": "bad_date",
+            "hash": null,
+            "line": 10,
+            "key_kind": null,
+            "pnl_basis": null,
+            "asset_type": null
+          },
+          {
+            "n": null,
+            "key": null,
+            "code": "bad_exit_time",
+            "hash": null,
+            "line": 11,
+            "key_kind": null,
+            "pnl_basis": null,
+            "asset_type": null
+          },
+          {
+            "n": null,
+            "key": null,
+            "code": "bad_exit_time",
+            "hash": null,
+            "line": 12,
+            "key_kind": null,
+            "pnl_basis": null,
+            "asset_type": null
+          },
+          {
+            "n": 1,
+            "key": "@511e7a918e8a4d71373eb290035dd430.1",
+            "code": null,
+            "hash": "@511e7a918e8a4d71373eb290035dd430",
+            "line": 13,
+            "key_kind": "synthetic",
+            "pnl_basis": "file",
+            "asset_type": "futures"
+          },
+          {
+            "n": 1,
+            "key": "@91bfa824dbb091f4ed70a5989cbaf2e2.1",
+            "code": null,
+            "hash": "@91bfa824dbb091f4ed70a5989cbaf2e2",
+            "line": 14,
+            "key_kind": "synthetic",
+            "pnl_basis": "file",
             "asset_type": "futures"
           }
         ]
@@ -4129,7 +5614,7 @@
           },
           {
             "n": 1,
-            "key": null,
+            "key": "@d02f0ebd46e99d0a196c48e607c45922.1",
             "code": null,
             "hash": "@d02f0ebd46e99d0a196c48e607c45922",
             "line": 3,
@@ -4469,7 +5954,7 @@
         "expected": [
           {
             "n": 1,
-            "key": null,
+            "key": "@8e819b2087e1f541d4f84f14525af9b3.1",
             "code": null,
             "hash": "@8e819b2087e1f541d4f84f14525af9b3",
             "line": 2,
@@ -4479,7 +5964,7 @@
           },
           {
             "n": 1,
-            "key": null,
+            "key": "@435f1e0e6bb2861407784151ae6c6ea6.1",
             "code": null,
             "hash": "@435f1e0e6bb2861407784151ae6c6ea6",
             "line": 3,
@@ -4489,7 +5974,7 @@
           },
           {
             "n": 1,
-            "key": null,
+            "key": "@ec9312ecbc527d2887f0b6b14237f81d.1",
             "code": null,
             "hash": "@ec9312ecbc527d2887f0b6b14237f81d",
             "line": 4,
@@ -4499,7 +5984,7 @@
           },
           {
             "n": 1,
-            "key": null,
+            "key": "@054601e948ebdb8894cf7d2eca38cdc0.1",
             "code": null,
             "hash": "@054601e948ebdb8894cf7d2eca38cdc0",
             "line": 5,
@@ -4611,7 +6096,7 @@
         "expected": [
           {
             "n": 1,
-            "key": null,
+            "key": "@8cea9d08a5fc63fab16091ac43b65806.1",
             "code": null,
             "hash": "@8cea9d08a5fc63fab16091ac43b65806",
             "line": 2,
@@ -4621,7 +6106,7 @@
           },
           {
             "n": 1,
-            "key": null,
+            "key": "@61c84d43fa8004e2656dfd099b7745d3.1",
             "code": null,
             "hash": "@61c84d43fa8004e2656dfd099b7745d3",
             "line": 3,
@@ -4631,7 +6116,7 @@
           },
           {
             "n": 1,
-            "key": null,
+            "key": "@32670683bf10034abab4dd691b32acff.1",
             "code": null,
             "hash": "@32670683bf10034abab4dd691b32acff",
             "line": 4,
@@ -4641,7 +6126,7 @@
           },
           {
             "n": 1,
-            "key": null,
+            "key": "@b4ede337a8f48bde7c51391b5842a8d3.1",
             "code": null,
             "hash": "@b4ede337a8f48bde7c51391b5842a8d3",
             "line": 5,
@@ -4707,7 +6192,7 @@
         "expected": [
           {
             "n": 1,
-            "key": null,
+            "key": "@8cea9d08a5fc63fab16091ac43b65806.1",
             "code": null,
             "hash": "@8cea9d08a5fc63fab16091ac43b65806",
             "line": 2,
@@ -4717,7 +6202,7 @@
           },
           {
             "n": 1,
-            "key": null,
+            "key": "@32670683bf10034abab4dd691b32acff.1",
             "code": null,
             "hash": "@32670683bf10034abab4dd691b32acff",
             "line": 4,
@@ -5869,7 +7354,7 @@
         "expected": [
           {
             "n": 1,
-            "key": null,
+            "key": "@c4026f9cc844614872f0b98f3106d95e.1",
             "code": null,
             "hash": "@c4026f9cc844614872f0b98f3106d95e",
             "line": 6,
@@ -5879,7 +7364,7 @@
           },
           {
             "n": 1,
-            "key": null,
+            "key": "@78e1faa81dc4b3648256985e21d3b9ef.1",
             "code": null,
             "hash": "@78e1faa81dc4b3648256985e21d3b9ef",
             "line": 6,
@@ -5889,7 +7374,7 @@
           },
           {
             "n": 1,
-            "key": null,
+            "key": "@899e985de4cae416d1ef8d68aca6c5a6.1",
             "code": null,
             "hash": "@899e985de4cae416d1ef8d68aca6c5a6",
             "line": 8,
@@ -5899,7 +7384,7 @@
           },
           {
             "n": 1,
-            "key": null,
+            "key": "@0a62f93177a36404f8aca6f388955f30.1",
             "code": null,
             "hash": "@0a62f93177a36404f8aca6f388955f30",
             "line": 9,
@@ -5909,7 +7394,7 @@
           },
           {
             "n": 1,
-            "key": null,
+            "key": "@7dd5968da024e362c65bd075b06575cb.1",
             "code": null,
             "hash": "@7dd5968da024e362c65bd075b06575cb",
             "line": 11,
@@ -8142,6 +9627,726 @@
         }
       },
       {
+        "label": "tz_hint america/new_york",
+        "payload": {
+          "v": 1,
+          "name": "Minha plataforma",
+          "headers": [
+            "data",
+            "ativo",
+            "lado",
+            "qtd",
+            "entrada",
+            "saida",
+            "res. liq.",
+            "comissao"
+          ],
+          "delimiter": "semicolon",
+          "decimal_mark": "comma",
+          "row_kind": "trade",
+          "columns": {
+            "data": "entry_time",
+            "ativo": "symbol",
+            "lado": "side",
+            "qtd": "quantity",
+            "entrada": "entry_price",
+            "saida": "exit_price",
+            "res. liq.": "pnl",
+            "comissao": "commission"
+          },
+          "result_is_net": true,
+          "tz_hint": "america/new_york"
+        },
+        "expected": {
+          "code": "bad_template",
+          "hint": "tz_hint"
+        }
+      },
+      {
+        "label": "tz_hint AMERICA/SAO_PAULO",
+        "payload": {
+          "v": 1,
+          "name": "Minha plataforma",
+          "headers": [
+            "data",
+            "ativo",
+            "lado",
+            "qtd",
+            "entrada",
+            "saida",
+            "res. liq.",
+            "comissao"
+          ],
+          "delimiter": "semicolon",
+          "decimal_mark": "comma",
+          "row_kind": "trade",
+          "columns": {
+            "data": "entry_time",
+            "ativo": "symbol",
+            "lado": "side",
+            "qtd": "quantity",
+            "entrada": "entry_price",
+            "saida": "exit_price",
+            "res. liq.": "pnl",
+            "comissao": "commission"
+          },
+          "result_is_net": true,
+          "tz_hint": "AMERICA/SAO_PAULO"
+        },
+        "expected": {
+          "code": "bad_template",
+          "hint": "tz_hint"
+        }
+      },
+      {
+        "label": "tz_hint America/new_york",
+        "payload": {
+          "v": 1,
+          "name": "Minha plataforma",
+          "headers": [
+            "data",
+            "ativo",
+            "lado",
+            "qtd",
+            "entrada",
+            "saida",
+            "res. liq.",
+            "comissao"
+          ],
+          "delimiter": "semicolon",
+          "decimal_mark": "comma",
+          "row_kind": "trade",
+          "columns": {
+            "data": "entry_time",
+            "ativo": "symbol",
+            "lado": "side",
+            "qtd": "quantity",
+            "entrada": "entry_price",
+            "saida": "exit_price",
+            "res. liq.": "pnl",
+            "comissao": "commission"
+          },
+          "result_is_net": true,
+          "tz_hint": "America/new_york"
+        },
+        "expected": {
+          "code": "bad_template",
+          "hint": "tz_hint"
+        }
+      },
+      {
+        "label": "tz_hint us/eastern",
+        "payload": {
+          "v": 1,
+          "name": "Minha plataforma",
+          "headers": [
+            "data",
+            "ativo",
+            "lado",
+            "qtd",
+            "entrada",
+            "saida",
+            "res. liq.",
+            "comissao"
+          ],
+          "delimiter": "semicolon",
+          "decimal_mark": "comma",
+          "row_kind": "trade",
+          "columns": {
+            "data": "entry_time",
+            "ativo": "symbol",
+            "lado": "side",
+            "qtd": "quantity",
+            "entrada": "entry_price",
+            "saida": "exit_price",
+            "res. liq.": "pnl",
+            "comissao": "commission"
+          },
+          "result_is_net": true,
+          "tz_hint": "us/eastern"
+        },
+        "expected": {
+          "code": "bad_template",
+          "hint": "tz_hint"
+        }
+      },
+      {
+        "label": "tz_hint Us/Eastern",
+        "payload": {
+          "v": 1,
+          "name": "Minha plataforma",
+          "headers": [
+            "data",
+            "ativo",
+            "lado",
+            "qtd",
+            "entrada",
+            "saida",
+            "res. liq.",
+            "comissao"
+          ],
+          "delimiter": "semicolon",
+          "decimal_mark": "comma",
+          "row_kind": "trade",
+          "columns": {
+            "data": "entry_time",
+            "ativo": "symbol",
+            "lado": "side",
+            "qtd": "quantity",
+            "entrada": "entry_price",
+            "saida": "exit_price",
+            "res. liq.": "pnl",
+            "comissao": "commission"
+          },
+          "result_is_net": true,
+          "tz_hint": "Us/Eastern"
+        },
+        "expected": {
+          "code": "bad_template",
+          "hint": "tz_hint"
+        }
+      },
+      {
+        "label": "tz_hint US/EASTERN",
+        "payload": {
+          "v": 1,
+          "name": "Minha plataforma",
+          "headers": [
+            "data",
+            "ativo",
+            "lado",
+            "qtd",
+            "entrada",
+            "saida",
+            "res. liq.",
+            "comissao"
+          ],
+          "delimiter": "semicolon",
+          "decimal_mark": "comma",
+          "row_kind": "trade",
+          "columns": {
+            "data": "entry_time",
+            "ativo": "symbol",
+            "lado": "side",
+            "qtd": "quantity",
+            "entrada": "entry_price",
+            "saida": "exit_price",
+            "res. liq.": "pnl",
+            "comissao": "commission"
+          },
+          "result_is_net": true,
+          "tz_hint": "US/EASTERN"
+        },
+        "expected": {
+          "code": "bad_template",
+          "hint": "tz_hint"
+        }
+      },
+      {
+        "label": "tz_hint utc",
+        "payload": {
+          "v": 1,
+          "name": "Minha plataforma",
+          "headers": [
+            "data",
+            "ativo",
+            "lado",
+            "qtd",
+            "entrada",
+            "saida",
+            "res. liq.",
+            "comissao"
+          ],
+          "delimiter": "semicolon",
+          "decimal_mark": "comma",
+          "row_kind": "trade",
+          "columns": {
+            "data": "entry_time",
+            "ativo": "symbol",
+            "lado": "side",
+            "qtd": "quantity",
+            "entrada": "entry_price",
+            "saida": "exit_price",
+            "res. liq.": "pnl",
+            "comissao": "commission"
+          },
+          "result_is_net": true,
+          "tz_hint": "utc"
+        },
+        "expected": {
+          "code": "bad_template",
+          "hint": "tz_hint"
+        }
+      },
+      {
+        "label": "tz_hint Utc",
+        "payload": {
+          "v": 1,
+          "name": "Minha plataforma",
+          "headers": [
+            "data",
+            "ativo",
+            "lado",
+            "qtd",
+            "entrada",
+            "saida",
+            "res. liq.",
+            "comissao"
+          ],
+          "delimiter": "semicolon",
+          "decimal_mark": "comma",
+          "row_kind": "trade",
+          "columns": {
+            "data": "entry_time",
+            "ativo": "symbol",
+            "lado": "side",
+            "qtd": "quantity",
+            "entrada": "entry_price",
+            "saida": "exit_price",
+            "res. liq.": "pnl",
+            "comissao": "commission"
+          },
+          "result_is_net": true,
+          "tz_hint": "Utc"
+        },
+        "expected": {
+          "code": "bad_template",
+          "hint": "tz_hint"
+        }
+      },
+      {
+        "label": "tz_hint etc/utc",
+        "payload": {
+          "v": 1,
+          "name": "Minha plataforma",
+          "headers": [
+            "data",
+            "ativo",
+            "lado",
+            "qtd",
+            "entrada",
+            "saida",
+            "res. liq.",
+            "comissao"
+          ],
+          "delimiter": "semicolon",
+          "decimal_mark": "comma",
+          "row_kind": "trade",
+          "columns": {
+            "data": "entry_time",
+            "ativo": "symbol",
+            "lado": "side",
+            "qtd": "quantity",
+            "entrada": "entry_price",
+            "saida": "exit_price",
+            "res. liq.": "pnl",
+            "comissao": "commission"
+          },
+          "result_is_net": true,
+          "tz_hint": "etc/utc"
+        },
+        "expected": {
+          "code": "bad_template",
+          "hint": "tz_hint"
+        }
+      },
+      {
+        "label": "tz_hint UTC",
+        "payload": {
+          "v": 1,
+          "name": "Minha plataforma",
+          "headers": [
+            "data",
+            "ativo",
+            "lado",
+            "qtd",
+            "entrada",
+            "saida",
+            "res. liq.",
+            "comissao"
+          ],
+          "delimiter": "semicolon",
+          "decimal_mark": "comma",
+          "row_kind": "trade",
+          "columns": {
+            "data": "entry_time",
+            "ativo": "symbol",
+            "lado": "side",
+            "qtd": "quantity",
+            "entrada": "entry_price",
+            "saida": "exit_price",
+            "res. liq.": "pnl",
+            "comissao": "commission"
+          },
+          "result_is_net": true,
+          "tz_hint": "UTC"
+        },
+        "expected": {
+          "code": null,
+          "hint": null
+        }
+      },
+      {
+        "label": "tz_hint Etc/UTC",
+        "payload": {
+          "v": 1,
+          "name": "Minha plataforma",
+          "headers": [
+            "data",
+            "ativo",
+            "lado",
+            "qtd",
+            "entrada",
+            "saida",
+            "res. liq.",
+            "comissao"
+          ],
+          "delimiter": "semicolon",
+          "decimal_mark": "comma",
+          "row_kind": "trade",
+          "columns": {
+            "data": "entry_time",
+            "ativo": "symbol",
+            "lado": "side",
+            "qtd": "quantity",
+            "entrada": "entry_price",
+            "saida": "exit_price",
+            "res. liq.": "pnl",
+            "comissao": "commission"
+          },
+          "result_is_net": true,
+          "tz_hint": "Etc/UTC"
+        },
+        "expected": {
+          "code": null,
+          "hint": null
+        }
+      },
+      {
+        "label": "tz_hint US/Eastern",
+        "payload": {
+          "v": 1,
+          "name": "Minha plataforma",
+          "headers": [
+            "data",
+            "ativo",
+            "lado",
+            "qtd",
+            "entrada",
+            "saida",
+            "res. liq.",
+            "comissao"
+          ],
+          "delimiter": "semicolon",
+          "decimal_mark": "comma",
+          "row_kind": "trade",
+          "columns": {
+            "data": "entry_time",
+            "ativo": "symbol",
+            "lado": "side",
+            "qtd": "quantity",
+            "entrada": "entry_price",
+            "saida": "exit_price",
+            "res. liq.": "pnl",
+            "comissao": "commission"
+          },
+          "result_is_net": true,
+          "tz_hint": "US/Eastern"
+        },
+        "expected": {
+          "code": null,
+          "hint": null
+        }
+      },
+      {
+        "label": "tz_hint Asia/Kolkata",
+        "payload": {
+          "v": 1,
+          "name": "Minha plataforma",
+          "headers": [
+            "data",
+            "ativo",
+            "lado",
+            "qtd",
+            "entrada",
+            "saida",
+            "res. liq.",
+            "comissao"
+          ],
+          "delimiter": "semicolon",
+          "decimal_mark": "comma",
+          "row_kind": "trade",
+          "columns": {
+            "data": "entry_time",
+            "ativo": "symbol",
+            "lado": "side",
+            "qtd": "quantity",
+            "entrada": "entry_price",
+            "saida": "exit_price",
+            "res. liq.": "pnl",
+            "comissao": "commission"
+          },
+          "result_is_net": true,
+          "tz_hint": "Asia/Kolkata"
+        },
+        "expected": {
+          "code": null,
+          "hint": null
+        }
+      },
+      {
+        "label": "tz_hint Asia/Calcutta",
+        "payload": {
+          "v": 1,
+          "name": "Minha plataforma",
+          "headers": [
+            "data",
+            "ativo",
+            "lado",
+            "qtd",
+            "entrada",
+            "saida",
+            "res. liq.",
+            "comissao"
+          ],
+          "delimiter": "semicolon",
+          "decimal_mark": "comma",
+          "row_kind": "trade",
+          "columns": {
+            "data": "entry_time",
+            "ativo": "symbol",
+            "lado": "side",
+            "qtd": "quantity",
+            "entrada": "entry_price",
+            "saida": "exit_price",
+            "res. liq.": "pnl",
+            "comissao": "commission"
+          },
+          "result_is_net": true,
+          "tz_hint": "Asia/Calcutta"
+        },
+        "expected": {
+          "code": null,
+          "hint": null
+        }
+      },
+      {
+        "label": "tz_hint Europe/Kyiv",
+        "payload": {
+          "v": 1,
+          "name": "Minha plataforma",
+          "headers": [
+            "data",
+            "ativo",
+            "lado",
+            "qtd",
+            "entrada",
+            "saida",
+            "res. liq.",
+            "comissao"
+          ],
+          "delimiter": "semicolon",
+          "decimal_mark": "comma",
+          "row_kind": "trade",
+          "columns": {
+            "data": "entry_time",
+            "ativo": "symbol",
+            "lado": "side",
+            "qtd": "quantity",
+            "entrada": "entry_price",
+            "saida": "exit_price",
+            "res. liq.": "pnl",
+            "comissao": "commission"
+          },
+          "result_is_net": true,
+          "tz_hint": "Europe/Kyiv"
+        },
+        "expected": {
+          "code": null,
+          "hint": null
+        }
+      },
+      {
+        "label": "tz_hint America/Port-au-Prince",
+        "payload": {
+          "v": 1,
+          "name": "Minha plataforma",
+          "headers": [
+            "data",
+            "ativo",
+            "lado",
+            "qtd",
+            "entrada",
+            "saida",
+            "res. liq.",
+            "comissao"
+          ],
+          "delimiter": "semicolon",
+          "decimal_mark": "comma",
+          "row_kind": "trade",
+          "columns": {
+            "data": "entry_time",
+            "ativo": "symbol",
+            "lado": "side",
+            "qtd": "quantity",
+            "entrada": "entry_price",
+            "saida": "exit_price",
+            "res. liq.": "pnl",
+            "comissao": "commission"
+          },
+          "result_is_net": true,
+          "tz_hint": "America/Port-au-Prince"
+        },
+        "expected": {
+          "code": null,
+          "hint": null
+        }
+      },
+      {
+        "label": "tz_hint Etc/GMT+5",
+        "payload": {
+          "v": 1,
+          "name": "Minha plataforma",
+          "headers": [
+            "data",
+            "ativo",
+            "lado",
+            "qtd",
+            "entrada",
+            "saida",
+            "res. liq.",
+            "comissao"
+          ],
+          "delimiter": "semicolon",
+          "decimal_mark": "comma",
+          "row_kind": "trade",
+          "columns": {
+            "data": "entry_time",
+            "ativo": "symbol",
+            "lado": "side",
+            "qtd": "quantity",
+            "entrada": "entry_price",
+            "saida": "exit_price",
+            "res. liq.": "pnl",
+            "comissao": "commission"
+          },
+          "result_is_net": true,
+          "tz_hint": "Etc/GMT+5"
+        },
+        "expected": {
+          "code": null,
+          "hint": null
+        }
+      },
+      {
+        "label": "tz_hint America/Sao_Paulo",
+        "payload": {
+          "v": 1,
+          "name": "Minha plataforma",
+          "headers": [
+            "data",
+            "ativo",
+            "lado",
+            "qtd",
+            "entrada",
+            "saida",
+            "res. liq.",
+            "comissao"
+          ],
+          "delimiter": "semicolon",
+          "decimal_mark": "comma",
+          "row_kind": "trade",
+          "columns": {
+            "data": "entry_time",
+            "ativo": "symbol",
+            "lado": "side",
+            "qtd": "quantity",
+            "entrada": "entry_price",
+            "saida": "exit_price",
+            "res. liq.": "pnl",
+            "comissao": "commission"
+          },
+          "result_is_net": true,
+          "tz_hint": "America/Sao_Paulo"
+        },
+        "expected": {
+          "code": null,
+          "hint": null
+        }
+      },
+      {
+        "label": "tz_hint Europe/London",
+        "payload": {
+          "v": 1,
+          "name": "Minha plataforma",
+          "headers": [
+            "data",
+            "ativo",
+            "lado",
+            "qtd",
+            "entrada",
+            "saida",
+            "res. liq.",
+            "comissao"
+          ],
+          "delimiter": "semicolon",
+          "decimal_mark": "comma",
+          "row_kind": "trade",
+          "columns": {
+            "data": "entry_time",
+            "ativo": "symbol",
+            "lado": "side",
+            "qtd": "quantity",
+            "entrada": "entry_price",
+            "saida": "exit_price",
+            "res. liq.": "pnl",
+            "comissao": "commission"
+          },
+          "result_is_net": true,
+          "tz_hint": "Europe/London"
+        },
+        "expected": {
+          "code": null,
+          "hint": null
+        }
+      },
+      {
+        "label": "tz_hint America/Chicago",
+        "payload": {
+          "v": 1,
+          "name": "Minha plataforma",
+          "headers": [
+            "data",
+            "ativo",
+            "lado",
+            "qtd",
+            "entrada",
+            "saida",
+            "res. liq.",
+            "comissao"
+          ],
+          "delimiter": "semicolon",
+          "decimal_mark": "comma",
+          "row_kind": "trade",
+          "columns": {
+            "data": "entry_time",
+            "ativo": "symbol",
+            "lado": "side",
+            "qtd": "quantity",
+            "entrada": "entry_price",
+            "saida": "exit_price",
+            "res. liq.": "pnl",
+            "comissao": "commission"
+          },
+          "result_is_net": true,
+          "tz_hint": "America/Chicago"
+        },
+        "expected": {
+          "code": null,
+          "hint": null
+        }
+      },
+      {
         "label": "routes without a batch",
         "payload": {
           "v": 1,
@@ -9771,6 +11976,3697 @@
         "expected": {
           "1": "9e0e0000-0000-4000-8000-0003b0000007"
         }
+      }
+    ]
+  },
+  "zones": {
+    "about": "pg_timezone_names: whether the name exists as written (name = …, as import_tz_status and the template's tz_hint ask): every name of the Area/Location shape, then other spellings of some",
+    "cases": [
+      {
+        "label": "Africa/Abidjan",
+        "name": "Africa/Abidjan",
+        "expected": true
+      },
+      {
+        "label": "Africa/Accra",
+        "name": "Africa/Accra",
+        "expected": true
+      },
+      {
+        "label": "Africa/Addis_Ababa",
+        "name": "Africa/Addis_Ababa",
+        "expected": true
+      },
+      {
+        "label": "Africa/Algiers",
+        "name": "Africa/Algiers",
+        "expected": true
+      },
+      {
+        "label": "Africa/Asmara",
+        "name": "Africa/Asmara",
+        "expected": true
+      },
+      {
+        "label": "Africa/Asmera",
+        "name": "Africa/Asmera",
+        "expected": true
+      },
+      {
+        "label": "Africa/Bamako",
+        "name": "Africa/Bamako",
+        "expected": true
+      },
+      {
+        "label": "Africa/Bangui",
+        "name": "Africa/Bangui",
+        "expected": true
+      },
+      {
+        "label": "Africa/Banjul",
+        "name": "Africa/Banjul",
+        "expected": true
+      },
+      {
+        "label": "Africa/Bissau",
+        "name": "Africa/Bissau",
+        "expected": true
+      },
+      {
+        "label": "Africa/Blantyre",
+        "name": "Africa/Blantyre",
+        "expected": true
+      },
+      {
+        "label": "Africa/Brazzaville",
+        "name": "Africa/Brazzaville",
+        "expected": true
+      },
+      {
+        "label": "Africa/Bujumbura",
+        "name": "Africa/Bujumbura",
+        "expected": true
+      },
+      {
+        "label": "Africa/Cairo",
+        "name": "Africa/Cairo",
+        "expected": true
+      },
+      {
+        "label": "Africa/Casablanca",
+        "name": "Africa/Casablanca",
+        "expected": true
+      },
+      {
+        "label": "Africa/Ceuta",
+        "name": "Africa/Ceuta",
+        "expected": true
+      },
+      {
+        "label": "Africa/Conakry",
+        "name": "Africa/Conakry",
+        "expected": true
+      },
+      {
+        "label": "Africa/Dakar",
+        "name": "Africa/Dakar",
+        "expected": true
+      },
+      {
+        "label": "Africa/Dar_es_Salaam",
+        "name": "Africa/Dar_es_Salaam",
+        "expected": true
+      },
+      {
+        "label": "Africa/Djibouti",
+        "name": "Africa/Djibouti",
+        "expected": true
+      },
+      {
+        "label": "Africa/Douala",
+        "name": "Africa/Douala",
+        "expected": true
+      },
+      {
+        "label": "Africa/El_Aaiun",
+        "name": "Africa/El_Aaiun",
+        "expected": true
+      },
+      {
+        "label": "Africa/Freetown",
+        "name": "Africa/Freetown",
+        "expected": true
+      },
+      {
+        "label": "Africa/Gaborone",
+        "name": "Africa/Gaborone",
+        "expected": true
+      },
+      {
+        "label": "Africa/Harare",
+        "name": "Africa/Harare",
+        "expected": true
+      },
+      {
+        "label": "Africa/Johannesburg",
+        "name": "Africa/Johannesburg",
+        "expected": true
+      },
+      {
+        "label": "Africa/Juba",
+        "name": "Africa/Juba",
+        "expected": true
+      },
+      {
+        "label": "Africa/Kampala",
+        "name": "Africa/Kampala",
+        "expected": true
+      },
+      {
+        "label": "Africa/Khartoum",
+        "name": "Africa/Khartoum",
+        "expected": true
+      },
+      {
+        "label": "Africa/Kigali",
+        "name": "Africa/Kigali",
+        "expected": true
+      },
+      {
+        "label": "Africa/Kinshasa",
+        "name": "Africa/Kinshasa",
+        "expected": true
+      },
+      {
+        "label": "Africa/Lagos",
+        "name": "Africa/Lagos",
+        "expected": true
+      },
+      {
+        "label": "Africa/Libreville",
+        "name": "Africa/Libreville",
+        "expected": true
+      },
+      {
+        "label": "Africa/Lome",
+        "name": "Africa/Lome",
+        "expected": true
+      },
+      {
+        "label": "Africa/Luanda",
+        "name": "Africa/Luanda",
+        "expected": true
+      },
+      {
+        "label": "Africa/Lubumbashi",
+        "name": "Africa/Lubumbashi",
+        "expected": true
+      },
+      {
+        "label": "Africa/Lusaka",
+        "name": "Africa/Lusaka",
+        "expected": true
+      },
+      {
+        "label": "Africa/Malabo",
+        "name": "Africa/Malabo",
+        "expected": true
+      },
+      {
+        "label": "Africa/Maputo",
+        "name": "Africa/Maputo",
+        "expected": true
+      },
+      {
+        "label": "Africa/Maseru",
+        "name": "Africa/Maseru",
+        "expected": true
+      },
+      {
+        "label": "Africa/Mbabane",
+        "name": "Africa/Mbabane",
+        "expected": true
+      },
+      {
+        "label": "Africa/Mogadishu",
+        "name": "Africa/Mogadishu",
+        "expected": true
+      },
+      {
+        "label": "Africa/Monrovia",
+        "name": "Africa/Monrovia",
+        "expected": true
+      },
+      {
+        "label": "Africa/Nairobi",
+        "name": "Africa/Nairobi",
+        "expected": true
+      },
+      {
+        "label": "Africa/Ndjamena",
+        "name": "Africa/Ndjamena",
+        "expected": true
+      },
+      {
+        "label": "Africa/Niamey",
+        "name": "Africa/Niamey",
+        "expected": true
+      },
+      {
+        "label": "Africa/Nouakchott",
+        "name": "Africa/Nouakchott",
+        "expected": true
+      },
+      {
+        "label": "Africa/Ouagadougou",
+        "name": "Africa/Ouagadougou",
+        "expected": true
+      },
+      {
+        "label": "Africa/Porto-Novo",
+        "name": "Africa/Porto-Novo",
+        "expected": true
+      },
+      {
+        "label": "Africa/Sao_Tome",
+        "name": "Africa/Sao_Tome",
+        "expected": true
+      },
+      {
+        "label": "Africa/Timbuktu",
+        "name": "Africa/Timbuktu",
+        "expected": true
+      },
+      {
+        "label": "Africa/Tripoli",
+        "name": "Africa/Tripoli",
+        "expected": true
+      },
+      {
+        "label": "Africa/Tunis",
+        "name": "Africa/Tunis",
+        "expected": true
+      },
+      {
+        "label": "Africa/Windhoek",
+        "name": "Africa/Windhoek",
+        "expected": true
+      },
+      {
+        "label": "America/Adak",
+        "name": "America/Adak",
+        "expected": true
+      },
+      {
+        "label": "America/Anchorage",
+        "name": "America/Anchorage",
+        "expected": true
+      },
+      {
+        "label": "America/Anguilla",
+        "name": "America/Anguilla",
+        "expected": true
+      },
+      {
+        "label": "America/Antigua",
+        "name": "America/Antigua",
+        "expected": true
+      },
+      {
+        "label": "America/Araguaina",
+        "name": "America/Araguaina",
+        "expected": true
+      },
+      {
+        "label": "America/Argentina/Buenos_Aires",
+        "name": "America/Argentina/Buenos_Aires",
+        "expected": true
+      },
+      {
+        "label": "America/Argentina/Catamarca",
+        "name": "America/Argentina/Catamarca",
+        "expected": true
+      },
+      {
+        "label": "America/Argentina/ComodRivadavia",
+        "name": "America/Argentina/ComodRivadavia",
+        "expected": true
+      },
+      {
+        "label": "America/Argentina/Cordoba",
+        "name": "America/Argentina/Cordoba",
+        "expected": true
+      },
+      {
+        "label": "America/Argentina/Jujuy",
+        "name": "America/Argentina/Jujuy",
+        "expected": true
+      },
+      {
+        "label": "America/Argentina/La_Rioja",
+        "name": "America/Argentina/La_Rioja",
+        "expected": true
+      },
+      {
+        "label": "America/Argentina/Mendoza",
+        "name": "America/Argentina/Mendoza",
+        "expected": true
+      },
+      {
+        "label": "America/Argentina/Rio_Gallegos",
+        "name": "America/Argentina/Rio_Gallegos",
+        "expected": true
+      },
+      {
+        "label": "America/Argentina/Salta",
+        "name": "America/Argentina/Salta",
+        "expected": true
+      },
+      {
+        "label": "America/Argentina/San_Juan",
+        "name": "America/Argentina/San_Juan",
+        "expected": true
+      },
+      {
+        "label": "America/Argentina/San_Luis",
+        "name": "America/Argentina/San_Luis",
+        "expected": true
+      },
+      {
+        "label": "America/Argentina/Tucuman",
+        "name": "America/Argentina/Tucuman",
+        "expected": true
+      },
+      {
+        "label": "America/Argentina/Ushuaia",
+        "name": "America/Argentina/Ushuaia",
+        "expected": true
+      },
+      {
+        "label": "America/Aruba",
+        "name": "America/Aruba",
+        "expected": true
+      },
+      {
+        "label": "America/Asuncion",
+        "name": "America/Asuncion",
+        "expected": true
+      },
+      {
+        "label": "America/Atikokan",
+        "name": "America/Atikokan",
+        "expected": true
+      },
+      {
+        "label": "America/Atka",
+        "name": "America/Atka",
+        "expected": true
+      },
+      {
+        "label": "America/Bahia",
+        "name": "America/Bahia",
+        "expected": true
+      },
+      {
+        "label": "America/Bahia_Banderas",
+        "name": "America/Bahia_Banderas",
+        "expected": true
+      },
+      {
+        "label": "America/Barbados",
+        "name": "America/Barbados",
+        "expected": true
+      },
+      {
+        "label": "America/Belem",
+        "name": "America/Belem",
+        "expected": true
+      },
+      {
+        "label": "America/Belize",
+        "name": "America/Belize",
+        "expected": true
+      },
+      {
+        "label": "America/Blanc-Sablon",
+        "name": "America/Blanc-Sablon",
+        "expected": true
+      },
+      {
+        "label": "America/Boa_Vista",
+        "name": "America/Boa_Vista",
+        "expected": true
+      },
+      {
+        "label": "America/Bogota",
+        "name": "America/Bogota",
+        "expected": true
+      },
+      {
+        "label": "America/Boise",
+        "name": "America/Boise",
+        "expected": true
+      },
+      {
+        "label": "America/Buenos_Aires",
+        "name": "America/Buenos_Aires",
+        "expected": true
+      },
+      {
+        "label": "America/Cambridge_Bay",
+        "name": "America/Cambridge_Bay",
+        "expected": true
+      },
+      {
+        "label": "America/Campo_Grande",
+        "name": "America/Campo_Grande",
+        "expected": true
+      },
+      {
+        "label": "America/Cancun",
+        "name": "America/Cancun",
+        "expected": true
+      },
+      {
+        "label": "America/Caracas",
+        "name": "America/Caracas",
+        "expected": true
+      },
+      {
+        "label": "America/Catamarca",
+        "name": "America/Catamarca",
+        "expected": true
+      },
+      {
+        "label": "America/Cayenne",
+        "name": "America/Cayenne",
+        "expected": true
+      },
+      {
+        "label": "America/Cayman",
+        "name": "America/Cayman",
+        "expected": true
+      },
+      {
+        "label": "America/Chicago",
+        "name": "America/Chicago",
+        "expected": true
+      },
+      {
+        "label": "America/Chihuahua",
+        "name": "America/Chihuahua",
+        "expected": true
+      },
+      {
+        "label": "America/Ciudad_Juarez",
+        "name": "America/Ciudad_Juarez",
+        "expected": true
+      },
+      {
+        "label": "America/Coral_Harbour",
+        "name": "America/Coral_Harbour",
+        "expected": true
+      },
+      {
+        "label": "America/Cordoba",
+        "name": "America/Cordoba",
+        "expected": true
+      },
+      {
+        "label": "America/Costa_Rica",
+        "name": "America/Costa_Rica",
+        "expected": true
+      },
+      {
+        "label": "America/Coyhaique",
+        "name": "America/Coyhaique",
+        "expected": true
+      },
+      {
+        "label": "America/Creston",
+        "name": "America/Creston",
+        "expected": true
+      },
+      {
+        "label": "America/Cuiaba",
+        "name": "America/Cuiaba",
+        "expected": true
+      },
+      {
+        "label": "America/Curacao",
+        "name": "America/Curacao",
+        "expected": true
+      },
+      {
+        "label": "America/Danmarkshavn",
+        "name": "America/Danmarkshavn",
+        "expected": true
+      },
+      {
+        "label": "America/Dawson",
+        "name": "America/Dawson",
+        "expected": true
+      },
+      {
+        "label": "America/Dawson_Creek",
+        "name": "America/Dawson_Creek",
+        "expected": true
+      },
+      {
+        "label": "America/Denver",
+        "name": "America/Denver",
+        "expected": true
+      },
+      {
+        "label": "America/Detroit",
+        "name": "America/Detroit",
+        "expected": true
+      },
+      {
+        "label": "America/Dominica",
+        "name": "America/Dominica",
+        "expected": true
+      },
+      {
+        "label": "America/Edmonton",
+        "name": "America/Edmonton",
+        "expected": true
+      },
+      {
+        "label": "America/Eirunepe",
+        "name": "America/Eirunepe",
+        "expected": true
+      },
+      {
+        "label": "America/El_Salvador",
+        "name": "America/El_Salvador",
+        "expected": true
+      },
+      {
+        "label": "America/Ensenada",
+        "name": "America/Ensenada",
+        "expected": true
+      },
+      {
+        "label": "America/Fort_Nelson",
+        "name": "America/Fort_Nelson",
+        "expected": true
+      },
+      {
+        "label": "America/Fort_Wayne",
+        "name": "America/Fort_Wayne",
+        "expected": true
+      },
+      {
+        "label": "America/Fortaleza",
+        "name": "America/Fortaleza",
+        "expected": true
+      },
+      {
+        "label": "America/Glace_Bay",
+        "name": "America/Glace_Bay",
+        "expected": true
+      },
+      {
+        "label": "America/Godthab",
+        "name": "America/Godthab",
+        "expected": true
+      },
+      {
+        "label": "America/Goose_Bay",
+        "name": "America/Goose_Bay",
+        "expected": true
+      },
+      {
+        "label": "America/Grand_Turk",
+        "name": "America/Grand_Turk",
+        "expected": true
+      },
+      {
+        "label": "America/Grenada",
+        "name": "America/Grenada",
+        "expected": true
+      },
+      {
+        "label": "America/Guadeloupe",
+        "name": "America/Guadeloupe",
+        "expected": true
+      },
+      {
+        "label": "America/Guatemala",
+        "name": "America/Guatemala",
+        "expected": true
+      },
+      {
+        "label": "America/Guayaquil",
+        "name": "America/Guayaquil",
+        "expected": true
+      },
+      {
+        "label": "America/Guyana",
+        "name": "America/Guyana",
+        "expected": true
+      },
+      {
+        "label": "America/Halifax",
+        "name": "America/Halifax",
+        "expected": true
+      },
+      {
+        "label": "America/Havana",
+        "name": "America/Havana",
+        "expected": true
+      },
+      {
+        "label": "America/Hermosillo",
+        "name": "America/Hermosillo",
+        "expected": true
+      },
+      {
+        "label": "America/Indiana/Indianapolis",
+        "name": "America/Indiana/Indianapolis",
+        "expected": true
+      },
+      {
+        "label": "America/Indiana/Knox",
+        "name": "America/Indiana/Knox",
+        "expected": true
+      },
+      {
+        "label": "America/Indiana/Marengo",
+        "name": "America/Indiana/Marengo",
+        "expected": true
+      },
+      {
+        "label": "America/Indiana/Petersburg",
+        "name": "America/Indiana/Petersburg",
+        "expected": true
+      },
+      {
+        "label": "America/Indiana/Tell_City",
+        "name": "America/Indiana/Tell_City",
+        "expected": true
+      },
+      {
+        "label": "America/Indiana/Vevay",
+        "name": "America/Indiana/Vevay",
+        "expected": true
+      },
+      {
+        "label": "America/Indiana/Vincennes",
+        "name": "America/Indiana/Vincennes",
+        "expected": true
+      },
+      {
+        "label": "America/Indiana/Winamac",
+        "name": "America/Indiana/Winamac",
+        "expected": true
+      },
+      {
+        "label": "America/Indianapolis",
+        "name": "America/Indianapolis",
+        "expected": true
+      },
+      {
+        "label": "America/Inuvik",
+        "name": "America/Inuvik",
+        "expected": true
+      },
+      {
+        "label": "America/Iqaluit",
+        "name": "America/Iqaluit",
+        "expected": true
+      },
+      {
+        "label": "America/Jamaica",
+        "name": "America/Jamaica",
+        "expected": true
+      },
+      {
+        "label": "America/Jujuy",
+        "name": "America/Jujuy",
+        "expected": true
+      },
+      {
+        "label": "America/Juneau",
+        "name": "America/Juneau",
+        "expected": true
+      },
+      {
+        "label": "America/Kentucky/Louisville",
+        "name": "America/Kentucky/Louisville",
+        "expected": true
+      },
+      {
+        "label": "America/Kentucky/Monticello",
+        "name": "America/Kentucky/Monticello",
+        "expected": true
+      },
+      {
+        "label": "America/Knox_IN",
+        "name": "America/Knox_IN",
+        "expected": true
+      },
+      {
+        "label": "America/Kralendijk",
+        "name": "America/Kralendijk",
+        "expected": true
+      },
+      {
+        "label": "America/La_Paz",
+        "name": "America/La_Paz",
+        "expected": true
+      },
+      {
+        "label": "America/Lima",
+        "name": "America/Lima",
+        "expected": true
+      },
+      {
+        "label": "America/Los_Angeles",
+        "name": "America/Los_Angeles",
+        "expected": true
+      },
+      {
+        "label": "America/Louisville",
+        "name": "America/Louisville",
+        "expected": true
+      },
+      {
+        "label": "America/Lower_Princes",
+        "name": "America/Lower_Princes",
+        "expected": true
+      },
+      {
+        "label": "America/Maceio",
+        "name": "America/Maceio",
+        "expected": true
+      },
+      {
+        "label": "America/Managua",
+        "name": "America/Managua",
+        "expected": true
+      },
+      {
+        "label": "America/Manaus",
+        "name": "America/Manaus",
+        "expected": true
+      },
+      {
+        "label": "America/Marigot",
+        "name": "America/Marigot",
+        "expected": true
+      },
+      {
+        "label": "America/Martinique",
+        "name": "America/Martinique",
+        "expected": true
+      },
+      {
+        "label": "America/Matamoros",
+        "name": "America/Matamoros",
+        "expected": true
+      },
+      {
+        "label": "America/Mazatlan",
+        "name": "America/Mazatlan",
+        "expected": true
+      },
+      {
+        "label": "America/Mendoza",
+        "name": "America/Mendoza",
+        "expected": true
+      },
+      {
+        "label": "America/Menominee",
+        "name": "America/Menominee",
+        "expected": true
+      },
+      {
+        "label": "America/Merida",
+        "name": "America/Merida",
+        "expected": true
+      },
+      {
+        "label": "America/Metlakatla",
+        "name": "America/Metlakatla",
+        "expected": true
+      },
+      {
+        "label": "America/Mexico_City",
+        "name": "America/Mexico_City",
+        "expected": true
+      },
+      {
+        "label": "America/Miquelon",
+        "name": "America/Miquelon",
+        "expected": true
+      },
+      {
+        "label": "America/Moncton",
+        "name": "America/Moncton",
+        "expected": true
+      },
+      {
+        "label": "America/Monterrey",
+        "name": "America/Monterrey",
+        "expected": true
+      },
+      {
+        "label": "America/Montevideo",
+        "name": "America/Montevideo",
+        "expected": true
+      },
+      {
+        "label": "America/Montreal",
+        "name": "America/Montreal",
+        "expected": true
+      },
+      {
+        "label": "America/Montserrat",
+        "name": "America/Montserrat",
+        "expected": true
+      },
+      {
+        "label": "America/Nassau",
+        "name": "America/Nassau",
+        "expected": true
+      },
+      {
+        "label": "America/New_York",
+        "name": "America/New_York",
+        "expected": true
+      },
+      {
+        "label": "America/Nipigon",
+        "name": "America/Nipigon",
+        "expected": true
+      },
+      {
+        "label": "America/Nome",
+        "name": "America/Nome",
+        "expected": true
+      },
+      {
+        "label": "America/Noronha",
+        "name": "America/Noronha",
+        "expected": true
+      },
+      {
+        "label": "America/North_Dakota/Beulah",
+        "name": "America/North_Dakota/Beulah",
+        "expected": true
+      },
+      {
+        "label": "America/North_Dakota/Center",
+        "name": "America/North_Dakota/Center",
+        "expected": true
+      },
+      {
+        "label": "America/North_Dakota/New_Salem",
+        "name": "America/North_Dakota/New_Salem",
+        "expected": true
+      },
+      {
+        "label": "America/Nuuk",
+        "name": "America/Nuuk",
+        "expected": true
+      },
+      {
+        "label": "America/Ojinaga",
+        "name": "America/Ojinaga",
+        "expected": true
+      },
+      {
+        "label": "America/Panama",
+        "name": "America/Panama",
+        "expected": true
+      },
+      {
+        "label": "America/Pangnirtung",
+        "name": "America/Pangnirtung",
+        "expected": true
+      },
+      {
+        "label": "America/Paramaribo",
+        "name": "America/Paramaribo",
+        "expected": true
+      },
+      {
+        "label": "America/Phoenix",
+        "name": "America/Phoenix",
+        "expected": true
+      },
+      {
+        "label": "America/Port-au-Prince",
+        "name": "America/Port-au-Prince",
+        "expected": true
+      },
+      {
+        "label": "America/Port_of_Spain",
+        "name": "America/Port_of_Spain",
+        "expected": true
+      },
+      {
+        "label": "America/Porto_Acre",
+        "name": "America/Porto_Acre",
+        "expected": true
+      },
+      {
+        "label": "America/Porto_Velho",
+        "name": "America/Porto_Velho",
+        "expected": true
+      },
+      {
+        "label": "America/Puerto_Rico",
+        "name": "America/Puerto_Rico",
+        "expected": true
+      },
+      {
+        "label": "America/Punta_Arenas",
+        "name": "America/Punta_Arenas",
+        "expected": true
+      },
+      {
+        "label": "America/Rainy_River",
+        "name": "America/Rainy_River",
+        "expected": true
+      },
+      {
+        "label": "America/Rankin_Inlet",
+        "name": "America/Rankin_Inlet",
+        "expected": true
+      },
+      {
+        "label": "America/Recife",
+        "name": "America/Recife",
+        "expected": true
+      },
+      {
+        "label": "America/Regina",
+        "name": "America/Regina",
+        "expected": true
+      },
+      {
+        "label": "America/Resolute",
+        "name": "America/Resolute",
+        "expected": true
+      },
+      {
+        "label": "America/Rio_Branco",
+        "name": "America/Rio_Branco",
+        "expected": true
+      },
+      {
+        "label": "America/Rosario",
+        "name": "America/Rosario",
+        "expected": true
+      },
+      {
+        "label": "America/Santa_Isabel",
+        "name": "America/Santa_Isabel",
+        "expected": true
+      },
+      {
+        "label": "America/Santarem",
+        "name": "America/Santarem",
+        "expected": true
+      },
+      {
+        "label": "America/Santiago",
+        "name": "America/Santiago",
+        "expected": true
+      },
+      {
+        "label": "America/Santo_Domingo",
+        "name": "America/Santo_Domingo",
+        "expected": true
+      },
+      {
+        "label": "America/Sao_Paulo",
+        "name": "America/Sao_Paulo",
+        "expected": true
+      },
+      {
+        "label": "America/Scoresbysund",
+        "name": "America/Scoresbysund",
+        "expected": true
+      },
+      {
+        "label": "America/Shiprock",
+        "name": "America/Shiprock",
+        "expected": true
+      },
+      {
+        "label": "America/Sitka",
+        "name": "America/Sitka",
+        "expected": true
+      },
+      {
+        "label": "America/St_Barthelemy",
+        "name": "America/St_Barthelemy",
+        "expected": true
+      },
+      {
+        "label": "America/St_Johns",
+        "name": "America/St_Johns",
+        "expected": true
+      },
+      {
+        "label": "America/St_Kitts",
+        "name": "America/St_Kitts",
+        "expected": true
+      },
+      {
+        "label": "America/St_Lucia",
+        "name": "America/St_Lucia",
+        "expected": true
+      },
+      {
+        "label": "America/St_Thomas",
+        "name": "America/St_Thomas",
+        "expected": true
+      },
+      {
+        "label": "America/St_Vincent",
+        "name": "America/St_Vincent",
+        "expected": true
+      },
+      {
+        "label": "America/Swift_Current",
+        "name": "America/Swift_Current",
+        "expected": true
+      },
+      {
+        "label": "America/Tegucigalpa",
+        "name": "America/Tegucigalpa",
+        "expected": true
+      },
+      {
+        "label": "America/Thule",
+        "name": "America/Thule",
+        "expected": true
+      },
+      {
+        "label": "America/Thunder_Bay",
+        "name": "America/Thunder_Bay",
+        "expected": true
+      },
+      {
+        "label": "America/Tijuana",
+        "name": "America/Tijuana",
+        "expected": true
+      },
+      {
+        "label": "America/Toronto",
+        "name": "America/Toronto",
+        "expected": true
+      },
+      {
+        "label": "America/Tortola",
+        "name": "America/Tortola",
+        "expected": true
+      },
+      {
+        "label": "America/Vancouver",
+        "name": "America/Vancouver",
+        "expected": true
+      },
+      {
+        "label": "America/Virgin",
+        "name": "America/Virgin",
+        "expected": true
+      },
+      {
+        "label": "America/Whitehorse",
+        "name": "America/Whitehorse",
+        "expected": true
+      },
+      {
+        "label": "America/Winnipeg",
+        "name": "America/Winnipeg",
+        "expected": true
+      },
+      {
+        "label": "America/Yakutat",
+        "name": "America/Yakutat",
+        "expected": true
+      },
+      {
+        "label": "America/Yellowknife",
+        "name": "America/Yellowknife",
+        "expected": true
+      },
+      {
+        "label": "Antarctica/Casey",
+        "name": "Antarctica/Casey",
+        "expected": true
+      },
+      {
+        "label": "Antarctica/Davis",
+        "name": "Antarctica/Davis",
+        "expected": true
+      },
+      {
+        "label": "Antarctica/DumontDUrville",
+        "name": "Antarctica/DumontDUrville",
+        "expected": true
+      },
+      {
+        "label": "Antarctica/Macquarie",
+        "name": "Antarctica/Macquarie",
+        "expected": true
+      },
+      {
+        "label": "Antarctica/Mawson",
+        "name": "Antarctica/Mawson",
+        "expected": true
+      },
+      {
+        "label": "Antarctica/McMurdo",
+        "name": "Antarctica/McMurdo",
+        "expected": true
+      },
+      {
+        "label": "Antarctica/Palmer",
+        "name": "Antarctica/Palmer",
+        "expected": true
+      },
+      {
+        "label": "Antarctica/Rothera",
+        "name": "Antarctica/Rothera",
+        "expected": true
+      },
+      {
+        "label": "Antarctica/South_Pole",
+        "name": "Antarctica/South_Pole",
+        "expected": true
+      },
+      {
+        "label": "Antarctica/Syowa",
+        "name": "Antarctica/Syowa",
+        "expected": true
+      },
+      {
+        "label": "Antarctica/Troll",
+        "name": "Antarctica/Troll",
+        "expected": true
+      },
+      {
+        "label": "Antarctica/Vostok",
+        "name": "Antarctica/Vostok",
+        "expected": true
+      },
+      {
+        "label": "Arctic/Longyearbyen",
+        "name": "Arctic/Longyearbyen",
+        "expected": true
+      },
+      {
+        "label": "Asia/Aden",
+        "name": "Asia/Aden",
+        "expected": true
+      },
+      {
+        "label": "Asia/Almaty",
+        "name": "Asia/Almaty",
+        "expected": true
+      },
+      {
+        "label": "Asia/Amman",
+        "name": "Asia/Amman",
+        "expected": true
+      },
+      {
+        "label": "Asia/Anadyr",
+        "name": "Asia/Anadyr",
+        "expected": true
+      },
+      {
+        "label": "Asia/Aqtau",
+        "name": "Asia/Aqtau",
+        "expected": true
+      },
+      {
+        "label": "Asia/Aqtobe",
+        "name": "Asia/Aqtobe",
+        "expected": true
+      },
+      {
+        "label": "Asia/Ashgabat",
+        "name": "Asia/Ashgabat",
+        "expected": true
+      },
+      {
+        "label": "Asia/Ashkhabad",
+        "name": "Asia/Ashkhabad",
+        "expected": true
+      },
+      {
+        "label": "Asia/Atyrau",
+        "name": "Asia/Atyrau",
+        "expected": true
+      },
+      {
+        "label": "Asia/Baghdad",
+        "name": "Asia/Baghdad",
+        "expected": true
+      },
+      {
+        "label": "Asia/Bahrain",
+        "name": "Asia/Bahrain",
+        "expected": true
+      },
+      {
+        "label": "Asia/Baku",
+        "name": "Asia/Baku",
+        "expected": true
+      },
+      {
+        "label": "Asia/Bangkok",
+        "name": "Asia/Bangkok",
+        "expected": true
+      },
+      {
+        "label": "Asia/Barnaul",
+        "name": "Asia/Barnaul",
+        "expected": true
+      },
+      {
+        "label": "Asia/Beirut",
+        "name": "Asia/Beirut",
+        "expected": true
+      },
+      {
+        "label": "Asia/Bishkek",
+        "name": "Asia/Bishkek",
+        "expected": true
+      },
+      {
+        "label": "Asia/Brunei",
+        "name": "Asia/Brunei",
+        "expected": true
+      },
+      {
+        "label": "Asia/Calcutta",
+        "name": "Asia/Calcutta",
+        "expected": true
+      },
+      {
+        "label": "Asia/Chita",
+        "name": "Asia/Chita",
+        "expected": true
+      },
+      {
+        "label": "Asia/Choibalsan",
+        "name": "Asia/Choibalsan",
+        "expected": true
+      },
+      {
+        "label": "Asia/Chongqing",
+        "name": "Asia/Chongqing",
+        "expected": true
+      },
+      {
+        "label": "Asia/Chungking",
+        "name": "Asia/Chungking",
+        "expected": true
+      },
+      {
+        "label": "Asia/Colombo",
+        "name": "Asia/Colombo",
+        "expected": true
+      },
+      {
+        "label": "Asia/Dacca",
+        "name": "Asia/Dacca",
+        "expected": true
+      },
+      {
+        "label": "Asia/Damascus",
+        "name": "Asia/Damascus",
+        "expected": true
+      },
+      {
+        "label": "Asia/Dhaka",
+        "name": "Asia/Dhaka",
+        "expected": true
+      },
+      {
+        "label": "Asia/Dili",
+        "name": "Asia/Dili",
+        "expected": true
+      },
+      {
+        "label": "Asia/Dubai",
+        "name": "Asia/Dubai",
+        "expected": true
+      },
+      {
+        "label": "Asia/Dushanbe",
+        "name": "Asia/Dushanbe",
+        "expected": true
+      },
+      {
+        "label": "Asia/Famagusta",
+        "name": "Asia/Famagusta",
+        "expected": true
+      },
+      {
+        "label": "Asia/Gaza",
+        "name": "Asia/Gaza",
+        "expected": true
+      },
+      {
+        "label": "Asia/Harbin",
+        "name": "Asia/Harbin",
+        "expected": true
+      },
+      {
+        "label": "Asia/Hebron",
+        "name": "Asia/Hebron",
+        "expected": true
+      },
+      {
+        "label": "Asia/Ho_Chi_Minh",
+        "name": "Asia/Ho_Chi_Minh",
+        "expected": true
+      },
+      {
+        "label": "Asia/Hong_Kong",
+        "name": "Asia/Hong_Kong",
+        "expected": true
+      },
+      {
+        "label": "Asia/Hovd",
+        "name": "Asia/Hovd",
+        "expected": true
+      },
+      {
+        "label": "Asia/Irkutsk",
+        "name": "Asia/Irkutsk",
+        "expected": true
+      },
+      {
+        "label": "Asia/Istanbul",
+        "name": "Asia/Istanbul",
+        "expected": true
+      },
+      {
+        "label": "Asia/Jakarta",
+        "name": "Asia/Jakarta",
+        "expected": true
+      },
+      {
+        "label": "Asia/Jayapura",
+        "name": "Asia/Jayapura",
+        "expected": true
+      },
+      {
+        "label": "Asia/Jerusalem",
+        "name": "Asia/Jerusalem",
+        "expected": true
+      },
+      {
+        "label": "Asia/Kabul",
+        "name": "Asia/Kabul",
+        "expected": true
+      },
+      {
+        "label": "Asia/Kamchatka",
+        "name": "Asia/Kamchatka",
+        "expected": true
+      },
+      {
+        "label": "Asia/Karachi",
+        "name": "Asia/Karachi",
+        "expected": true
+      },
+      {
+        "label": "Asia/Kashgar",
+        "name": "Asia/Kashgar",
+        "expected": true
+      },
+      {
+        "label": "Asia/Kathmandu",
+        "name": "Asia/Kathmandu",
+        "expected": true
+      },
+      {
+        "label": "Asia/Katmandu",
+        "name": "Asia/Katmandu",
+        "expected": true
+      },
+      {
+        "label": "Asia/Khandyga",
+        "name": "Asia/Khandyga",
+        "expected": true
+      },
+      {
+        "label": "Asia/Kolkata",
+        "name": "Asia/Kolkata",
+        "expected": true
+      },
+      {
+        "label": "Asia/Krasnoyarsk",
+        "name": "Asia/Krasnoyarsk",
+        "expected": true
+      },
+      {
+        "label": "Asia/Kuala_Lumpur",
+        "name": "Asia/Kuala_Lumpur",
+        "expected": true
+      },
+      {
+        "label": "Asia/Kuching",
+        "name": "Asia/Kuching",
+        "expected": true
+      },
+      {
+        "label": "Asia/Kuwait",
+        "name": "Asia/Kuwait",
+        "expected": true
+      },
+      {
+        "label": "Asia/Macao",
+        "name": "Asia/Macao",
+        "expected": true
+      },
+      {
+        "label": "Asia/Macau",
+        "name": "Asia/Macau",
+        "expected": true
+      },
+      {
+        "label": "Asia/Magadan",
+        "name": "Asia/Magadan",
+        "expected": true
+      },
+      {
+        "label": "Asia/Makassar",
+        "name": "Asia/Makassar",
+        "expected": true
+      },
+      {
+        "label": "Asia/Manila",
+        "name": "Asia/Manila",
+        "expected": true
+      },
+      {
+        "label": "Asia/Muscat",
+        "name": "Asia/Muscat",
+        "expected": true
+      },
+      {
+        "label": "Asia/Nicosia",
+        "name": "Asia/Nicosia",
+        "expected": true
+      },
+      {
+        "label": "Asia/Novokuznetsk",
+        "name": "Asia/Novokuznetsk",
+        "expected": true
+      },
+      {
+        "label": "Asia/Novosibirsk",
+        "name": "Asia/Novosibirsk",
+        "expected": true
+      },
+      {
+        "label": "Asia/Omsk",
+        "name": "Asia/Omsk",
+        "expected": true
+      },
+      {
+        "label": "Asia/Oral",
+        "name": "Asia/Oral",
+        "expected": true
+      },
+      {
+        "label": "Asia/Phnom_Penh",
+        "name": "Asia/Phnom_Penh",
+        "expected": true
+      },
+      {
+        "label": "Asia/Pontianak",
+        "name": "Asia/Pontianak",
+        "expected": true
+      },
+      {
+        "label": "Asia/Pyongyang",
+        "name": "Asia/Pyongyang",
+        "expected": true
+      },
+      {
+        "label": "Asia/Qatar",
+        "name": "Asia/Qatar",
+        "expected": true
+      },
+      {
+        "label": "Asia/Qostanay",
+        "name": "Asia/Qostanay",
+        "expected": true
+      },
+      {
+        "label": "Asia/Qyzylorda",
+        "name": "Asia/Qyzylorda",
+        "expected": true
+      },
+      {
+        "label": "Asia/Rangoon",
+        "name": "Asia/Rangoon",
+        "expected": true
+      },
+      {
+        "label": "Asia/Riyadh",
+        "name": "Asia/Riyadh",
+        "expected": true
+      },
+      {
+        "label": "Asia/Saigon",
+        "name": "Asia/Saigon",
+        "expected": true
+      },
+      {
+        "label": "Asia/Sakhalin",
+        "name": "Asia/Sakhalin",
+        "expected": true
+      },
+      {
+        "label": "Asia/Samarkand",
+        "name": "Asia/Samarkand",
+        "expected": true
+      },
+      {
+        "label": "Asia/Seoul",
+        "name": "Asia/Seoul",
+        "expected": true
+      },
+      {
+        "label": "Asia/Shanghai",
+        "name": "Asia/Shanghai",
+        "expected": true
+      },
+      {
+        "label": "Asia/Singapore",
+        "name": "Asia/Singapore",
+        "expected": true
+      },
+      {
+        "label": "Asia/Srednekolymsk",
+        "name": "Asia/Srednekolymsk",
+        "expected": true
+      },
+      {
+        "label": "Asia/Taipei",
+        "name": "Asia/Taipei",
+        "expected": true
+      },
+      {
+        "label": "Asia/Tashkent",
+        "name": "Asia/Tashkent",
+        "expected": true
+      },
+      {
+        "label": "Asia/Tbilisi",
+        "name": "Asia/Tbilisi",
+        "expected": true
+      },
+      {
+        "label": "Asia/Tehran",
+        "name": "Asia/Tehran",
+        "expected": true
+      },
+      {
+        "label": "Asia/Tel_Aviv",
+        "name": "Asia/Tel_Aviv",
+        "expected": true
+      },
+      {
+        "label": "Asia/Thimbu",
+        "name": "Asia/Thimbu",
+        "expected": true
+      },
+      {
+        "label": "Asia/Thimphu",
+        "name": "Asia/Thimphu",
+        "expected": true
+      },
+      {
+        "label": "Asia/Tokyo",
+        "name": "Asia/Tokyo",
+        "expected": true
+      },
+      {
+        "label": "Asia/Tomsk",
+        "name": "Asia/Tomsk",
+        "expected": true
+      },
+      {
+        "label": "Asia/Ujung_Pandang",
+        "name": "Asia/Ujung_Pandang",
+        "expected": true
+      },
+      {
+        "label": "Asia/Ulaanbaatar",
+        "name": "Asia/Ulaanbaatar",
+        "expected": true
+      },
+      {
+        "label": "Asia/Ulan_Bator",
+        "name": "Asia/Ulan_Bator",
+        "expected": true
+      },
+      {
+        "label": "Asia/Urumqi",
+        "name": "Asia/Urumqi",
+        "expected": true
+      },
+      {
+        "label": "Asia/Ust-Nera",
+        "name": "Asia/Ust-Nera",
+        "expected": true
+      },
+      {
+        "label": "Asia/Vientiane",
+        "name": "Asia/Vientiane",
+        "expected": true
+      },
+      {
+        "label": "Asia/Vladivostok",
+        "name": "Asia/Vladivostok",
+        "expected": true
+      },
+      {
+        "label": "Asia/Yakutsk",
+        "name": "Asia/Yakutsk",
+        "expected": true
+      },
+      {
+        "label": "Asia/Yangon",
+        "name": "Asia/Yangon",
+        "expected": true
+      },
+      {
+        "label": "Asia/Yekaterinburg",
+        "name": "Asia/Yekaterinburg",
+        "expected": true
+      },
+      {
+        "label": "Asia/Yerevan",
+        "name": "Asia/Yerevan",
+        "expected": true
+      },
+      {
+        "label": "Atlantic/Azores",
+        "name": "Atlantic/Azores",
+        "expected": true
+      },
+      {
+        "label": "Atlantic/Bermuda",
+        "name": "Atlantic/Bermuda",
+        "expected": true
+      },
+      {
+        "label": "Atlantic/Canary",
+        "name": "Atlantic/Canary",
+        "expected": true
+      },
+      {
+        "label": "Atlantic/Cape_Verde",
+        "name": "Atlantic/Cape_Verde",
+        "expected": true
+      },
+      {
+        "label": "Atlantic/Faeroe",
+        "name": "Atlantic/Faeroe",
+        "expected": true
+      },
+      {
+        "label": "Atlantic/Faroe",
+        "name": "Atlantic/Faroe",
+        "expected": true
+      },
+      {
+        "label": "Atlantic/Jan_Mayen",
+        "name": "Atlantic/Jan_Mayen",
+        "expected": true
+      },
+      {
+        "label": "Atlantic/Madeira",
+        "name": "Atlantic/Madeira",
+        "expected": true
+      },
+      {
+        "label": "Atlantic/Reykjavik",
+        "name": "Atlantic/Reykjavik",
+        "expected": true
+      },
+      {
+        "label": "Atlantic/South_Georgia",
+        "name": "Atlantic/South_Georgia",
+        "expected": true
+      },
+      {
+        "label": "Atlantic/St_Helena",
+        "name": "Atlantic/St_Helena",
+        "expected": true
+      },
+      {
+        "label": "Atlantic/Stanley",
+        "name": "Atlantic/Stanley",
+        "expected": true
+      },
+      {
+        "label": "Australia/ACT",
+        "name": "Australia/ACT",
+        "expected": true
+      },
+      {
+        "label": "Australia/Adelaide",
+        "name": "Australia/Adelaide",
+        "expected": true
+      },
+      {
+        "label": "Australia/Brisbane",
+        "name": "Australia/Brisbane",
+        "expected": true
+      },
+      {
+        "label": "Australia/Broken_Hill",
+        "name": "Australia/Broken_Hill",
+        "expected": true
+      },
+      {
+        "label": "Australia/Canberra",
+        "name": "Australia/Canberra",
+        "expected": true
+      },
+      {
+        "label": "Australia/Currie",
+        "name": "Australia/Currie",
+        "expected": true
+      },
+      {
+        "label": "Australia/Darwin",
+        "name": "Australia/Darwin",
+        "expected": true
+      },
+      {
+        "label": "Australia/Eucla",
+        "name": "Australia/Eucla",
+        "expected": true
+      },
+      {
+        "label": "Australia/Hobart",
+        "name": "Australia/Hobart",
+        "expected": true
+      },
+      {
+        "label": "Australia/LHI",
+        "name": "Australia/LHI",
+        "expected": true
+      },
+      {
+        "label": "Australia/Lindeman",
+        "name": "Australia/Lindeman",
+        "expected": true
+      },
+      {
+        "label": "Australia/Lord_Howe",
+        "name": "Australia/Lord_Howe",
+        "expected": true
+      },
+      {
+        "label": "Australia/Melbourne",
+        "name": "Australia/Melbourne",
+        "expected": true
+      },
+      {
+        "label": "Australia/NSW",
+        "name": "Australia/NSW",
+        "expected": true
+      },
+      {
+        "label": "Australia/North",
+        "name": "Australia/North",
+        "expected": true
+      },
+      {
+        "label": "Australia/Perth",
+        "name": "Australia/Perth",
+        "expected": true
+      },
+      {
+        "label": "Australia/Queensland",
+        "name": "Australia/Queensland",
+        "expected": true
+      },
+      {
+        "label": "Australia/South",
+        "name": "Australia/South",
+        "expected": true
+      },
+      {
+        "label": "Australia/Sydney",
+        "name": "Australia/Sydney",
+        "expected": true
+      },
+      {
+        "label": "Australia/Tasmania",
+        "name": "Australia/Tasmania",
+        "expected": true
+      },
+      {
+        "label": "Australia/Victoria",
+        "name": "Australia/Victoria",
+        "expected": true
+      },
+      {
+        "label": "Australia/West",
+        "name": "Australia/West",
+        "expected": true
+      },
+      {
+        "label": "Australia/Yancowinna",
+        "name": "Australia/Yancowinna",
+        "expected": true
+      },
+      {
+        "label": "Brazil/Acre",
+        "name": "Brazil/Acre",
+        "expected": true
+      },
+      {
+        "label": "Brazil/DeNoronha",
+        "name": "Brazil/DeNoronha",
+        "expected": true
+      },
+      {
+        "label": "Brazil/East",
+        "name": "Brazil/East",
+        "expected": true
+      },
+      {
+        "label": "Brazil/West",
+        "name": "Brazil/West",
+        "expected": true
+      },
+      {
+        "label": "Canada/Atlantic",
+        "name": "Canada/Atlantic",
+        "expected": true
+      },
+      {
+        "label": "Canada/Central",
+        "name": "Canada/Central",
+        "expected": true
+      },
+      {
+        "label": "Canada/Eastern",
+        "name": "Canada/Eastern",
+        "expected": true
+      },
+      {
+        "label": "Canada/Mountain",
+        "name": "Canada/Mountain",
+        "expected": true
+      },
+      {
+        "label": "Canada/Newfoundland",
+        "name": "Canada/Newfoundland",
+        "expected": true
+      },
+      {
+        "label": "Canada/Pacific",
+        "name": "Canada/Pacific",
+        "expected": true
+      },
+      {
+        "label": "Canada/Saskatchewan",
+        "name": "Canada/Saskatchewan",
+        "expected": true
+      },
+      {
+        "label": "Canada/Yukon",
+        "name": "Canada/Yukon",
+        "expected": true
+      },
+      {
+        "label": "Chile/Continental",
+        "name": "Chile/Continental",
+        "expected": true
+      },
+      {
+        "label": "Chile/EasterIsland",
+        "name": "Chile/EasterIsland",
+        "expected": true
+      },
+      {
+        "label": "Etc/GMT",
+        "name": "Etc/GMT",
+        "expected": true
+      },
+      {
+        "label": "Etc/GMT+0",
+        "name": "Etc/GMT+0",
+        "expected": true
+      },
+      {
+        "label": "Etc/GMT+1",
+        "name": "Etc/GMT+1",
+        "expected": true
+      },
+      {
+        "label": "Etc/GMT+10",
+        "name": "Etc/GMT+10",
+        "expected": true
+      },
+      {
+        "label": "Etc/GMT+11",
+        "name": "Etc/GMT+11",
+        "expected": true
+      },
+      {
+        "label": "Etc/GMT+12",
+        "name": "Etc/GMT+12",
+        "expected": true
+      },
+      {
+        "label": "Etc/GMT+2",
+        "name": "Etc/GMT+2",
+        "expected": true
+      },
+      {
+        "label": "Etc/GMT+3",
+        "name": "Etc/GMT+3",
+        "expected": true
+      },
+      {
+        "label": "Etc/GMT+4",
+        "name": "Etc/GMT+4",
+        "expected": true
+      },
+      {
+        "label": "Etc/GMT+5",
+        "name": "Etc/GMT+5",
+        "expected": true
+      },
+      {
+        "label": "Etc/GMT+6",
+        "name": "Etc/GMT+6",
+        "expected": true
+      },
+      {
+        "label": "Etc/GMT+7",
+        "name": "Etc/GMT+7",
+        "expected": true
+      },
+      {
+        "label": "Etc/GMT+8",
+        "name": "Etc/GMT+8",
+        "expected": true
+      },
+      {
+        "label": "Etc/GMT+9",
+        "name": "Etc/GMT+9",
+        "expected": true
+      },
+      {
+        "label": "Etc/GMT-0",
+        "name": "Etc/GMT-0",
+        "expected": true
+      },
+      {
+        "label": "Etc/GMT-1",
+        "name": "Etc/GMT-1",
+        "expected": true
+      },
+      {
+        "label": "Etc/GMT-10",
+        "name": "Etc/GMT-10",
+        "expected": true
+      },
+      {
+        "label": "Etc/GMT-11",
+        "name": "Etc/GMT-11",
+        "expected": true
+      },
+      {
+        "label": "Etc/GMT-12",
+        "name": "Etc/GMT-12",
+        "expected": true
+      },
+      {
+        "label": "Etc/GMT-13",
+        "name": "Etc/GMT-13",
+        "expected": true
+      },
+      {
+        "label": "Etc/GMT-14",
+        "name": "Etc/GMT-14",
+        "expected": true
+      },
+      {
+        "label": "Etc/GMT-2",
+        "name": "Etc/GMT-2",
+        "expected": true
+      },
+      {
+        "label": "Etc/GMT-3",
+        "name": "Etc/GMT-3",
+        "expected": true
+      },
+      {
+        "label": "Etc/GMT-4",
+        "name": "Etc/GMT-4",
+        "expected": true
+      },
+      {
+        "label": "Etc/GMT-5",
+        "name": "Etc/GMT-5",
+        "expected": true
+      },
+      {
+        "label": "Etc/GMT-6",
+        "name": "Etc/GMT-6",
+        "expected": true
+      },
+      {
+        "label": "Etc/GMT-7",
+        "name": "Etc/GMT-7",
+        "expected": true
+      },
+      {
+        "label": "Etc/GMT-8",
+        "name": "Etc/GMT-8",
+        "expected": true
+      },
+      {
+        "label": "Etc/GMT-9",
+        "name": "Etc/GMT-9",
+        "expected": true
+      },
+      {
+        "label": "Etc/GMT0",
+        "name": "Etc/GMT0",
+        "expected": true
+      },
+      {
+        "label": "Etc/Greenwich",
+        "name": "Etc/Greenwich",
+        "expected": true
+      },
+      {
+        "label": "Etc/UCT",
+        "name": "Etc/UCT",
+        "expected": true
+      },
+      {
+        "label": "Etc/UTC",
+        "name": "Etc/UTC",
+        "expected": true
+      },
+      {
+        "label": "Etc/Universal",
+        "name": "Etc/Universal",
+        "expected": true
+      },
+      {
+        "label": "Etc/Zulu",
+        "name": "Etc/Zulu",
+        "expected": true
+      },
+      {
+        "label": "Europe/Amsterdam",
+        "name": "Europe/Amsterdam",
+        "expected": true
+      },
+      {
+        "label": "Europe/Andorra",
+        "name": "Europe/Andorra",
+        "expected": true
+      },
+      {
+        "label": "Europe/Astrakhan",
+        "name": "Europe/Astrakhan",
+        "expected": true
+      },
+      {
+        "label": "Europe/Athens",
+        "name": "Europe/Athens",
+        "expected": true
+      },
+      {
+        "label": "Europe/Belfast",
+        "name": "Europe/Belfast",
+        "expected": true
+      },
+      {
+        "label": "Europe/Belgrade",
+        "name": "Europe/Belgrade",
+        "expected": true
+      },
+      {
+        "label": "Europe/Berlin",
+        "name": "Europe/Berlin",
+        "expected": true
+      },
+      {
+        "label": "Europe/Bratislava",
+        "name": "Europe/Bratislava",
+        "expected": true
+      },
+      {
+        "label": "Europe/Brussels",
+        "name": "Europe/Brussels",
+        "expected": true
+      },
+      {
+        "label": "Europe/Bucharest",
+        "name": "Europe/Bucharest",
+        "expected": true
+      },
+      {
+        "label": "Europe/Budapest",
+        "name": "Europe/Budapest",
+        "expected": true
+      },
+      {
+        "label": "Europe/Busingen",
+        "name": "Europe/Busingen",
+        "expected": true
+      },
+      {
+        "label": "Europe/Chisinau",
+        "name": "Europe/Chisinau",
+        "expected": true
+      },
+      {
+        "label": "Europe/Copenhagen",
+        "name": "Europe/Copenhagen",
+        "expected": true
+      },
+      {
+        "label": "Europe/Dublin",
+        "name": "Europe/Dublin",
+        "expected": true
+      },
+      {
+        "label": "Europe/Gibraltar",
+        "name": "Europe/Gibraltar",
+        "expected": true
+      },
+      {
+        "label": "Europe/Guernsey",
+        "name": "Europe/Guernsey",
+        "expected": true
+      },
+      {
+        "label": "Europe/Helsinki",
+        "name": "Europe/Helsinki",
+        "expected": true
+      },
+      {
+        "label": "Europe/Isle_of_Man",
+        "name": "Europe/Isle_of_Man",
+        "expected": true
+      },
+      {
+        "label": "Europe/Istanbul",
+        "name": "Europe/Istanbul",
+        "expected": true
+      },
+      {
+        "label": "Europe/Jersey",
+        "name": "Europe/Jersey",
+        "expected": true
+      },
+      {
+        "label": "Europe/Kaliningrad",
+        "name": "Europe/Kaliningrad",
+        "expected": true
+      },
+      {
+        "label": "Europe/Kiev",
+        "name": "Europe/Kiev",
+        "expected": true
+      },
+      {
+        "label": "Europe/Kirov",
+        "name": "Europe/Kirov",
+        "expected": true
+      },
+      {
+        "label": "Europe/Kyiv",
+        "name": "Europe/Kyiv",
+        "expected": true
+      },
+      {
+        "label": "Europe/Lisbon",
+        "name": "Europe/Lisbon",
+        "expected": true
+      },
+      {
+        "label": "Europe/Ljubljana",
+        "name": "Europe/Ljubljana",
+        "expected": true
+      },
+      {
+        "label": "Europe/London",
+        "name": "Europe/London",
+        "expected": true
+      },
+      {
+        "label": "Europe/Luxembourg",
+        "name": "Europe/Luxembourg",
+        "expected": true
+      },
+      {
+        "label": "Europe/Madrid",
+        "name": "Europe/Madrid",
+        "expected": true
+      },
+      {
+        "label": "Europe/Malta",
+        "name": "Europe/Malta",
+        "expected": true
+      },
+      {
+        "label": "Europe/Mariehamn",
+        "name": "Europe/Mariehamn",
+        "expected": true
+      },
+      {
+        "label": "Europe/Minsk",
+        "name": "Europe/Minsk",
+        "expected": true
+      },
+      {
+        "label": "Europe/Monaco",
+        "name": "Europe/Monaco",
+        "expected": true
+      },
+      {
+        "label": "Europe/Moscow",
+        "name": "Europe/Moscow",
+        "expected": true
+      },
+      {
+        "label": "Europe/Nicosia",
+        "name": "Europe/Nicosia",
+        "expected": true
+      },
+      {
+        "label": "Europe/Oslo",
+        "name": "Europe/Oslo",
+        "expected": true
+      },
+      {
+        "label": "Europe/Paris",
+        "name": "Europe/Paris",
+        "expected": true
+      },
+      {
+        "label": "Europe/Podgorica",
+        "name": "Europe/Podgorica",
+        "expected": true
+      },
+      {
+        "label": "Europe/Prague",
+        "name": "Europe/Prague",
+        "expected": true
+      },
+      {
+        "label": "Europe/Riga",
+        "name": "Europe/Riga",
+        "expected": true
+      },
+      {
+        "label": "Europe/Rome",
+        "name": "Europe/Rome",
+        "expected": true
+      },
+      {
+        "label": "Europe/Samara",
+        "name": "Europe/Samara",
+        "expected": true
+      },
+      {
+        "label": "Europe/San_Marino",
+        "name": "Europe/San_Marino",
+        "expected": true
+      },
+      {
+        "label": "Europe/Sarajevo",
+        "name": "Europe/Sarajevo",
+        "expected": true
+      },
+      {
+        "label": "Europe/Saratov",
+        "name": "Europe/Saratov",
+        "expected": true
+      },
+      {
+        "label": "Europe/Simferopol",
+        "name": "Europe/Simferopol",
+        "expected": true
+      },
+      {
+        "label": "Europe/Skopje",
+        "name": "Europe/Skopje",
+        "expected": true
+      },
+      {
+        "label": "Europe/Sofia",
+        "name": "Europe/Sofia",
+        "expected": true
+      },
+      {
+        "label": "Europe/Stockholm",
+        "name": "Europe/Stockholm",
+        "expected": true
+      },
+      {
+        "label": "Europe/Tallinn",
+        "name": "Europe/Tallinn",
+        "expected": true
+      },
+      {
+        "label": "Europe/Tirane",
+        "name": "Europe/Tirane",
+        "expected": true
+      },
+      {
+        "label": "Europe/Tiraspol",
+        "name": "Europe/Tiraspol",
+        "expected": true
+      },
+      {
+        "label": "Europe/Ulyanovsk",
+        "name": "Europe/Ulyanovsk",
+        "expected": true
+      },
+      {
+        "label": "Europe/Uzhgorod",
+        "name": "Europe/Uzhgorod",
+        "expected": true
+      },
+      {
+        "label": "Europe/Vaduz",
+        "name": "Europe/Vaduz",
+        "expected": true
+      },
+      {
+        "label": "Europe/Vatican",
+        "name": "Europe/Vatican",
+        "expected": true
+      },
+      {
+        "label": "Europe/Vienna",
+        "name": "Europe/Vienna",
+        "expected": true
+      },
+      {
+        "label": "Europe/Vilnius",
+        "name": "Europe/Vilnius",
+        "expected": true
+      },
+      {
+        "label": "Europe/Volgograd",
+        "name": "Europe/Volgograd",
+        "expected": true
+      },
+      {
+        "label": "Europe/Warsaw",
+        "name": "Europe/Warsaw",
+        "expected": true
+      },
+      {
+        "label": "Europe/Zagreb",
+        "name": "Europe/Zagreb",
+        "expected": true
+      },
+      {
+        "label": "Europe/Zaporozhye",
+        "name": "Europe/Zaporozhye",
+        "expected": true
+      },
+      {
+        "label": "Europe/Zurich",
+        "name": "Europe/Zurich",
+        "expected": true
+      },
+      {
+        "label": "Indian/Antananarivo",
+        "name": "Indian/Antananarivo",
+        "expected": true
+      },
+      {
+        "label": "Indian/Chagos",
+        "name": "Indian/Chagos",
+        "expected": true
+      },
+      {
+        "label": "Indian/Christmas",
+        "name": "Indian/Christmas",
+        "expected": true
+      },
+      {
+        "label": "Indian/Cocos",
+        "name": "Indian/Cocos",
+        "expected": true
+      },
+      {
+        "label": "Indian/Comoro",
+        "name": "Indian/Comoro",
+        "expected": true
+      },
+      {
+        "label": "Indian/Kerguelen",
+        "name": "Indian/Kerguelen",
+        "expected": true
+      },
+      {
+        "label": "Indian/Mahe",
+        "name": "Indian/Mahe",
+        "expected": true
+      },
+      {
+        "label": "Indian/Maldives",
+        "name": "Indian/Maldives",
+        "expected": true
+      },
+      {
+        "label": "Indian/Mauritius",
+        "name": "Indian/Mauritius",
+        "expected": true
+      },
+      {
+        "label": "Indian/Mayotte",
+        "name": "Indian/Mayotte",
+        "expected": true
+      },
+      {
+        "label": "Indian/Reunion",
+        "name": "Indian/Reunion",
+        "expected": true
+      },
+      {
+        "label": "Mexico/BajaNorte",
+        "name": "Mexico/BajaNorte",
+        "expected": true
+      },
+      {
+        "label": "Mexico/BajaSur",
+        "name": "Mexico/BajaSur",
+        "expected": true
+      },
+      {
+        "label": "Mexico/General",
+        "name": "Mexico/General",
+        "expected": true
+      },
+      {
+        "label": "Pacific/Apia",
+        "name": "Pacific/Apia",
+        "expected": true
+      },
+      {
+        "label": "Pacific/Auckland",
+        "name": "Pacific/Auckland",
+        "expected": true
+      },
+      {
+        "label": "Pacific/Bougainville",
+        "name": "Pacific/Bougainville",
+        "expected": true
+      },
+      {
+        "label": "Pacific/Chatham",
+        "name": "Pacific/Chatham",
+        "expected": true
+      },
+      {
+        "label": "Pacific/Chuuk",
+        "name": "Pacific/Chuuk",
+        "expected": true
+      },
+      {
+        "label": "Pacific/Easter",
+        "name": "Pacific/Easter",
+        "expected": true
+      },
+      {
+        "label": "Pacific/Efate",
+        "name": "Pacific/Efate",
+        "expected": true
+      },
+      {
+        "label": "Pacific/Enderbury",
+        "name": "Pacific/Enderbury",
+        "expected": true
+      },
+      {
+        "label": "Pacific/Fakaofo",
+        "name": "Pacific/Fakaofo",
+        "expected": true
+      },
+      {
+        "label": "Pacific/Fiji",
+        "name": "Pacific/Fiji",
+        "expected": true
+      },
+      {
+        "label": "Pacific/Funafuti",
+        "name": "Pacific/Funafuti",
+        "expected": true
+      },
+      {
+        "label": "Pacific/Galapagos",
+        "name": "Pacific/Galapagos",
+        "expected": true
+      },
+      {
+        "label": "Pacific/Gambier",
+        "name": "Pacific/Gambier",
+        "expected": true
+      },
+      {
+        "label": "Pacific/Guadalcanal",
+        "name": "Pacific/Guadalcanal",
+        "expected": true
+      },
+      {
+        "label": "Pacific/Guam",
+        "name": "Pacific/Guam",
+        "expected": true
+      },
+      {
+        "label": "Pacific/Honolulu",
+        "name": "Pacific/Honolulu",
+        "expected": true
+      },
+      {
+        "label": "Pacific/Johnston",
+        "name": "Pacific/Johnston",
+        "expected": true
+      },
+      {
+        "label": "Pacific/Kanton",
+        "name": "Pacific/Kanton",
+        "expected": true
+      },
+      {
+        "label": "Pacific/Kiritimati",
+        "name": "Pacific/Kiritimati",
+        "expected": true
+      },
+      {
+        "label": "Pacific/Kosrae",
+        "name": "Pacific/Kosrae",
+        "expected": true
+      },
+      {
+        "label": "Pacific/Kwajalein",
+        "name": "Pacific/Kwajalein",
+        "expected": true
+      },
+      {
+        "label": "Pacific/Majuro",
+        "name": "Pacific/Majuro",
+        "expected": true
+      },
+      {
+        "label": "Pacific/Marquesas",
+        "name": "Pacific/Marquesas",
+        "expected": true
+      },
+      {
+        "label": "Pacific/Midway",
+        "name": "Pacific/Midway",
+        "expected": true
+      },
+      {
+        "label": "Pacific/Nauru",
+        "name": "Pacific/Nauru",
+        "expected": true
+      },
+      {
+        "label": "Pacific/Niue",
+        "name": "Pacific/Niue",
+        "expected": true
+      },
+      {
+        "label": "Pacific/Norfolk",
+        "name": "Pacific/Norfolk",
+        "expected": true
+      },
+      {
+        "label": "Pacific/Noumea",
+        "name": "Pacific/Noumea",
+        "expected": true
+      },
+      {
+        "label": "Pacific/Pago_Pago",
+        "name": "Pacific/Pago_Pago",
+        "expected": true
+      },
+      {
+        "label": "Pacific/Palau",
+        "name": "Pacific/Palau",
+        "expected": true
+      },
+      {
+        "label": "Pacific/Pitcairn",
+        "name": "Pacific/Pitcairn",
+        "expected": true
+      },
+      {
+        "label": "Pacific/Pohnpei",
+        "name": "Pacific/Pohnpei",
+        "expected": true
+      },
+      {
+        "label": "Pacific/Ponape",
+        "name": "Pacific/Ponape",
+        "expected": true
+      },
+      {
+        "label": "Pacific/Port_Moresby",
+        "name": "Pacific/Port_Moresby",
+        "expected": true
+      },
+      {
+        "label": "Pacific/Rarotonga",
+        "name": "Pacific/Rarotonga",
+        "expected": true
+      },
+      {
+        "label": "Pacific/Saipan",
+        "name": "Pacific/Saipan",
+        "expected": true
+      },
+      {
+        "label": "Pacific/Samoa",
+        "name": "Pacific/Samoa",
+        "expected": true
+      },
+      {
+        "label": "Pacific/Tahiti",
+        "name": "Pacific/Tahiti",
+        "expected": true
+      },
+      {
+        "label": "Pacific/Tarawa",
+        "name": "Pacific/Tarawa",
+        "expected": true
+      },
+      {
+        "label": "Pacific/Tongatapu",
+        "name": "Pacific/Tongatapu",
+        "expected": true
+      },
+      {
+        "label": "Pacific/Truk",
+        "name": "Pacific/Truk",
+        "expected": true
+      },
+      {
+        "label": "Pacific/Wake",
+        "name": "Pacific/Wake",
+        "expected": true
+      },
+      {
+        "label": "Pacific/Wallis",
+        "name": "Pacific/Wallis",
+        "expected": true
+      },
+      {
+        "label": "Pacific/Yap",
+        "name": "Pacific/Yap",
+        "expected": true
+      },
+      {
+        "label": "US/Alaska",
+        "name": "US/Alaska",
+        "expected": true
+      },
+      {
+        "label": "US/Aleutian",
+        "name": "US/Aleutian",
+        "expected": true
+      },
+      {
+        "label": "US/Arizona",
+        "name": "US/Arizona",
+        "expected": true
+      },
+      {
+        "label": "US/Central",
+        "name": "US/Central",
+        "expected": true
+      },
+      {
+        "label": "US/East-Indiana",
+        "name": "US/East-Indiana",
+        "expected": true
+      },
+      {
+        "label": "US/Eastern",
+        "name": "US/Eastern",
+        "expected": true
+      },
+      {
+        "label": "US/Hawaii",
+        "name": "US/Hawaii",
+        "expected": true
+      },
+      {
+        "label": "US/Indiana-Starke",
+        "name": "US/Indiana-Starke",
+        "expected": true
+      },
+      {
+        "label": "US/Michigan",
+        "name": "US/Michigan",
+        "expected": true
+      },
+      {
+        "label": "US/Mountain",
+        "name": "US/Mountain",
+        "expected": true
+      },
+      {
+        "label": "US/Pacific",
+        "name": "US/Pacific",
+        "expected": true
+      },
+      {
+        "label": "US/Samoa",
+        "name": "US/Samoa",
+        "expected": true
+      },
+      {
+        "label": "UTC",
+        "name": "UTC",
+        "expected": true
+      },
+      {
+        "label": "america/new_york (another spelling)",
+        "name": "america/new_york",
+        "expected": false
+      },
+      {
+        "label": "AMERICA/NEW_YORK (another spelling)",
+        "name": "AMERICA/NEW_YORK",
+        "expected": false
+      },
+      {
+        "label": "America/New_york (another spelling)",
+        "name": "America/New_york",
+        "expected": false
+      },
+      {
+        "label": "america/new_York (another spelling)",
+        "name": "america/new_York",
+        "expected": false
+      },
+      {
+        "label": "america/sao_paulo (another spelling)",
+        "name": "america/sao_paulo",
+        "expected": false
+      },
+      {
+        "label": "AMERICA/SAO_PAULO (another spelling)",
+        "name": "AMERICA/SAO_PAULO",
+        "expected": false
+      },
+      {
+        "label": "America/Sao_paulo (another spelling)",
+        "name": "America/Sao_paulo",
+        "expected": false
+      },
+      {
+        "label": "america/sao_Paulo (another spelling)",
+        "name": "america/sao_Paulo",
+        "expected": false
+      },
+      {
+        "label": "america/chicago (another spelling)",
+        "name": "america/chicago",
+        "expected": false
+      },
+      {
+        "label": "AMERICA/CHICAGO (another spelling)",
+        "name": "AMERICA/CHICAGO",
+        "expected": false
+      },
+      {
+        "label": "europe/london (another spelling)",
+        "name": "europe/london",
+        "expected": false
+      },
+      {
+        "label": "EUROPE/LONDON (another spelling)",
+        "name": "EUROPE/LONDON",
+        "expected": false
+      },
+      {
+        "label": "utc (another spelling)",
+        "name": "utc",
+        "expected": false
+      },
+      {
+        "label": "Utc (another spelling)",
+        "name": "Utc",
+        "expected": false
+      },
+      {
+        "label": "uTC (another spelling)",
+        "name": "uTC",
+        "expected": false
+      },
+      {
+        "label": "etc/utc (another spelling)",
+        "name": "etc/utc",
+        "expected": false
+      },
+      {
+        "label": "ETC/UTC (another spelling)",
+        "name": "ETC/UTC",
+        "expected": false
+      },
+      {
+        "label": "Etc/Utc (another spelling)",
+        "name": "Etc/Utc",
+        "expected": false
+      },
+      {
+        "label": "etc/uTC (another spelling)",
+        "name": "etc/uTC",
+        "expected": false
+      },
+      {
+        "label": "us/eastern (another spelling)",
+        "name": "us/eastern",
+        "expected": false
+      },
+      {
+        "label": "US/EASTERN (another spelling)",
+        "name": "US/EASTERN",
+        "expected": false
+      },
+      {
+        "label": "Us/Eastern (another spelling)",
+        "name": "Us/Eastern",
+        "expected": false
+      },
+      {
+        "label": "uS/eastern (another spelling)",
+        "name": "uS/eastern",
+        "expected": false
+      },
+      {
+        "label": "asia/kolkata (another spelling)",
+        "name": "asia/kolkata",
+        "expected": false
+      },
+      {
+        "label": "ASIA/KOLKATA (another spelling)",
+        "name": "ASIA/KOLKATA",
+        "expected": false
+      },
+      {
+        "label": "asia/calcutta (another spelling)",
+        "name": "asia/calcutta",
+        "expected": false
+      },
+      {
+        "label": "ASIA/CALCUTTA (another spelling)",
+        "name": "ASIA/CALCUTTA",
+        "expected": false
+      },
+      {
+        "label": "europe/kyiv (another spelling)",
+        "name": "europe/kyiv",
+        "expected": false
+      },
+      {
+        "label": "EUROPE/KYIV (another spelling)",
+        "name": "EUROPE/KYIV",
+        "expected": false
+      },
+      {
+        "label": "europe/kiev (another spelling)",
+        "name": "europe/kiev",
+        "expected": false
+      },
+      {
+        "label": "EUROPE/KIEV (another spelling)",
+        "name": "EUROPE/KIEV",
+        "expected": false
+      },
+      {
+        "label": "america/port-au-prince (another spelling)",
+        "name": "america/port-au-prince",
+        "expected": false
+      },
+      {
+        "label": "AMERICA/PORT-AU-PRINCE (another spelling)",
+        "name": "AMERICA/PORT-AU-PRINCE",
+        "expected": false
+      },
+      {
+        "label": "America/Port-au-prince (another spelling)",
+        "name": "America/Port-au-prince",
+        "expected": false
+      },
+      {
+        "label": "america/port-au-Prince (another spelling)",
+        "name": "america/port-au-Prince",
+        "expected": false
+      },
+      {
+        "label": "america/argentina/comodrivadavia (another spelling)",
+        "name": "america/argentina/comodrivadavia",
+        "expected": false
+      },
+      {
+        "label": "AMERICA/ARGENTINA/COMODRIVADAVIA (another spelling)",
+        "name": "AMERICA/ARGENTINA/COMODRIVADAVIA",
+        "expected": false
+      },
+      {
+        "label": "America/Argentina/Comodrivadavia (another spelling)",
+        "name": "America/Argentina/Comodrivadavia",
+        "expected": false
+      },
+      {
+        "label": "america/argentina/comodRivadavia (another spelling)",
+        "name": "america/argentina/comodRivadavia",
+        "expected": false
+      },
+      {
+        "label": "antarctica/dumontdurville (another spelling)",
+        "name": "antarctica/dumontdurville",
+        "expected": false
+      },
+      {
+        "label": "ANTARCTICA/DUMONTDURVILLE (another spelling)",
+        "name": "ANTARCTICA/DUMONTDURVILLE",
+        "expected": false
+      },
+      {
+        "label": "Antarctica/Dumontdurville (another spelling)",
+        "name": "Antarctica/Dumontdurville",
+        "expected": false
+      },
+      {
+        "label": "antarctica/dumontDUrville (another spelling)",
+        "name": "antarctica/dumontDUrville",
+        "expected": false
+      },
+      {
+        "label": "etc/gmt+5 (another spelling)",
+        "name": "etc/gmt+5",
+        "expected": false
+      },
+      {
+        "label": "ETC/GMT+5 (another spelling)",
+        "name": "ETC/GMT+5",
+        "expected": false
+      },
+      {
+        "label": "Etc/Gmt+5 (another spelling)",
+        "name": "Etc/Gmt+5",
+        "expected": false
+      },
+      {
+        "label": "etc/gMT+5 (another spelling)",
+        "name": "etc/gMT+5",
+        "expected": false
+      },
+      {
+        "label": "etc/gmt-14 (another spelling)",
+        "name": "etc/gmt-14",
+        "expected": false
+      },
+      {
+        "label": "ETC/GMT-14 (another spelling)",
+        "name": "ETC/GMT-14",
+        "expected": false
+      },
+      {
+        "label": "Etc/Gmt-14 (another spelling)",
+        "name": "Etc/Gmt-14",
+        "expected": false
+      },
+      {
+        "label": "etc/gMT-14 (another spelling)",
+        "name": "etc/gMT-14",
+        "expected": false
+      },
+      {
+        "label": "pacific/kanton (another spelling)",
+        "name": "pacific/kanton",
+        "expected": false
+      },
+      {
+        "label": "PACIFIC/KANTON (another spelling)",
+        "name": "PACIFIC/KANTON",
+        "expected": false
+      },
+      {
+        "label": "america/nuuk (another spelling)",
+        "name": "america/nuuk",
+        "expected": false
+      },
+      {
+        "label": "AMERICA/NUUK (another spelling)",
+        "name": "AMERICA/NUUK",
+        "expected": false
+      },
+      {
+        "label": "asia/ho_chi_minh (another spelling)",
+        "name": "asia/ho_chi_minh",
+        "expected": false
+      },
+      {
+        "label": "ASIA/HO_CHI_MINH (another spelling)",
+        "name": "ASIA/HO_CHI_MINH",
+        "expected": false
+      },
+      {
+        "label": "Asia/Ho_chi_minh (another spelling)",
+        "name": "Asia/Ho_chi_minh",
+        "expected": false
+      },
+      {
+        "label": "asia/ho_Chi_Minh (another spelling)",
+        "name": "asia/ho_Chi_Minh",
+        "expected": false
+      },
+      {
+        "label": "US/EAstern (another spelling)",
+        "name": "US/EAstern",
+        "expected": false
+      },
+      {
+        "label": "GMT (another spelling)",
+        "name": "GMT",
+        "expected": true
+      },
+      {
+        "label": "EST5EDT (another spelling)",
+        "name": "EST5EDT",
+        "expected": true
+      },
+      {
+        "label": "Factory (another spelling)",
+        "name": "Factory",
+        "expected": true
+      },
+      {
+        "label": "posixrules (another spelling)",
+        "name": "posixrules",
+        "expected": false
+      },
+      {
+        "label": "Mars/Base (another spelling)",
+        "name": "Mars/Base",
+        "expected": false
+      },
+      {
+        "label": "America/Sao_Pualo (another spelling)",
+        "name": "America/Sao_Pualo",
+        "expected": false
+      },
+      {
+        "label": "-03:00 (another spelling)",
+        "name": "-03:00",
+        "expected": false
+      },
+      {
+        "label": "EST (another spelling)",
+        "name": "EST",
+        "expected": true
+      },
+      {
+        "label": "Brasilia (another spelling)",
+        "name": "Brasilia",
+        "expected": false
+      }
+    ]
+  },
+  "positions": {
+    "about": "import_stage(futures account, 'modelo', zone, rows): the rows each position (grp) folds, as lists of lines",
+    "cases": [
+      {
+        "label": "two exits of one entry fold; another price or side does not",
+        "tz": "America/New_York",
+        "rows": [
+          {
+            "line": "2",
+            "external_id": null,
+            "symbol": "MESZ6",
+            "asset_type": null,
+            "direction": "long",
+            "local_entry": "2026-10-01T09:30:00",
+            "local_exit": "2026-10-01T09:35:00",
+            "utc_offset": null,
+            "entry_price": "6800.00",
+            "exit_price": "6801.00",
+            "quantity": "1",
+            "stake_amount": null,
+            "payout_percent": null,
+            "duration_seconds": null,
+            "timeframe": null,
+            "result": "win",
+            "pnl": "5.00",
+            "commission": null,
+            "stop_price": null,
+            "target_price": null,
+            "pnl_basis": "file"
+          },
+          {
+            "line": "3",
+            "external_id": null,
+            "symbol": "MESZ6",
+            "asset_type": null,
+            "direction": "long",
+            "local_entry": "2026-10-01T09:30:00",
+            "local_exit": "2026-10-01T09:40:00",
+            "utc_offset": null,
+            "entry_price": "6800.00",
+            "exit_price": "6802.00",
+            "quantity": "1",
+            "stake_amount": null,
+            "payout_percent": null,
+            "duration_seconds": null,
+            "timeframe": null,
+            "result": "win",
+            "pnl": "10.00",
+            "commission": null,
+            "stop_price": null,
+            "target_price": null,
+            "pnl_basis": "file"
+          },
+          {
+            "line": "4",
+            "external_id": null,
+            "symbol": "MESZ6",
+            "asset_type": null,
+            "direction": "long",
+            "local_entry": "2026-10-01T09:30:00",
+            "local_exit": "2026-10-01T09:45:00",
+            "utc_offset": null,
+            "entry_price": "6800.25",
+            "exit_price": "6801.00",
+            "quantity": "1",
+            "stake_amount": null,
+            "payout_percent": null,
+            "duration_seconds": null,
+            "timeframe": null,
+            "result": "win",
+            "pnl": "3.75",
+            "commission": null,
+            "stop_price": null,
+            "target_price": null,
+            "pnl_basis": "file"
+          },
+          {
+            "line": "5",
+            "external_id": null,
+            "symbol": "MESZ6",
+            "asset_type": null,
+            "direction": "short",
+            "local_entry": "2026-10-01T09:30:00",
+            "local_exit": "2026-10-01T09:45:00",
+            "utc_offset": null,
+            "entry_price": "6800.00",
+            "exit_price": "6801.00",
+            "quantity": "1",
+            "stake_amount": null,
+            "payout_percent": null,
+            "duration_seconds": null,
+            "timeframe": null,
+            "result": "loss",
+            "pnl": "-5.00",
+            "commission": null,
+            "stop_price": null,
+            "target_price": null,
+            "pnl_basis": "file"
+          },
+          {
+            "line": "6",
+            "external_id": null,
+            "symbol": "MESZ6",
+            "asset_type": null,
+            "direction": "long",
+            "local_entry": "2026-10-01T09:30:00",
+            "local_exit": null,
+            "utc_offset": null,
+            "entry_price": "6800.00",
+            "exit_price": null,
+            "quantity": "1",
+            "stake_amount": null,
+            "payout_percent": null,
+            "duration_seconds": null,
+            "timeframe": null,
+            "result": "breakeven",
+            "pnl": "0.00",
+            "commission": null,
+            "stop_price": null,
+            "target_price": null,
+            "pnl_basis": "file"
+          },
+          {
+            "line": "7",
+            "external_id": null,
+            "symbol": "MESZ6",
+            "asset_type": null,
+            "direction": "long",
+            "local_entry": "2026-10-01T09:30:00",
+            "local_exit": null,
+            "utc_offset": null,
+            "entry_price": "6800.00",
+            "exit_price": null,
+            "quantity": "1",
+            "stake_amount": null,
+            "payout_percent": null,
+            "duration_seconds": null,
+            "timeframe": null,
+            "result": "breakeven",
+            "pnl": "0.00",
+            "commission": null,
+            "stop_price": null,
+            "target_price": null,
+            "pnl_basis": "file"
+          }
+        ],
+        "expected": [
+          [
+            2,
+            3
+          ],
+          [
+            4
+          ],
+          [
+            5
+          ],
+          [
+            6
+          ],
+          [
+            7
+          ]
+        ]
+      },
+      {
+        "label": "an offset and a wall clock that name one instant fold (New York)",
+        "tz": "America/New_York",
+        "rows": [
+          {
+            "line": "2",
+            "external_id": null,
+            "symbol": "MESZ6",
+            "asset_type": null,
+            "direction": "long",
+            "local_entry": "2026-10-01T09:30:00",
+            "local_exit": "2026-10-01T09:35:00",
+            "utc_offset": "-04:00",
+            "entry_price": "6800.00",
+            "exit_price": "6801.00",
+            "quantity": "1",
+            "stake_amount": null,
+            "payout_percent": null,
+            "duration_seconds": null,
+            "timeframe": null,
+            "result": "win",
+            "pnl": "5.00",
+            "commission": null,
+            "stop_price": null,
+            "target_price": null,
+            "pnl_basis": "file"
+          },
+          {
+            "line": "3",
+            "external_id": null,
+            "symbol": "MESZ6",
+            "asset_type": null,
+            "direction": "long",
+            "local_entry": "2026-10-01T09:30:00",
+            "local_exit": "2026-10-01T09:40:00",
+            "utc_offset": null,
+            "entry_price": "6800.00",
+            "exit_price": "6802.00",
+            "quantity": "1",
+            "stake_amount": null,
+            "payout_percent": null,
+            "duration_seconds": null,
+            "timeframe": null,
+            "result": "win",
+            "pnl": "10.00",
+            "commission": null,
+            "stop_price": null,
+            "target_price": null,
+            "pnl_basis": "file"
+          }
+        ],
+        "expected": [
+          [
+            2,
+            3
+          ]
+        ]
+      },
+      {
+        "label": "the same rows in Chicago are two instants",
+        "tz": "America/Chicago",
+        "rows": [
+          {
+            "line": "2",
+            "external_id": null,
+            "symbol": "MESZ6",
+            "asset_type": null,
+            "direction": "long",
+            "local_entry": "2026-10-01T09:30:00",
+            "local_exit": "2026-10-01T09:35:00",
+            "utc_offset": "-04:00",
+            "entry_price": "6800.00",
+            "exit_price": "6801.00",
+            "quantity": "1",
+            "stake_amount": null,
+            "payout_percent": null,
+            "duration_seconds": null,
+            "timeframe": null,
+            "result": "win",
+            "pnl": "5.00",
+            "commission": null,
+            "stop_price": null,
+            "target_price": null,
+            "pnl_basis": "file"
+          },
+          {
+            "line": "3",
+            "external_id": null,
+            "symbol": "MESZ6",
+            "asset_type": null,
+            "direction": "long",
+            "local_entry": "2026-10-01T09:30:00",
+            "local_exit": "2026-10-01T09:40:00",
+            "utc_offset": null,
+            "entry_price": "6800.00",
+            "exit_price": "6802.00",
+            "quantity": "1",
+            "stake_amount": null,
+            "payout_percent": null,
+            "duration_seconds": null,
+            "timeframe": null,
+            "result": "win",
+            "pnl": "10.00",
+            "commission": null,
+            "stop_price": null,
+            "target_price": null,
+            "pnl_basis": "file"
+          }
+        ],
+        "expected": [
+          [
+            2
+          ],
+          [
+            3
+          ]
+        ]
+      },
+      {
+        "label": "a skipped 02:30 is 03:30 EDT",
+        "tz": "America/New_York",
+        "rows": [
+          {
+            "line": "2",
+            "external_id": null,
+            "symbol": "MESZ6",
+            "asset_type": null,
+            "direction": "long",
+            "local_entry": "2026-03-08T02:30:00",
+            "local_exit": "2026-03-08T04:00:00",
+            "utc_offset": null,
+            "entry_price": "6800.00",
+            "exit_price": "6801.00",
+            "quantity": "1",
+            "stake_amount": null,
+            "payout_percent": null,
+            "duration_seconds": null,
+            "timeframe": null,
+            "result": "win",
+            "pnl": "5.00",
+            "commission": null,
+            "stop_price": null,
+            "target_price": null,
+            "pnl_basis": "file"
+          },
+          {
+            "line": "3",
+            "external_id": null,
+            "symbol": "MESZ6",
+            "asset_type": null,
+            "direction": "long",
+            "local_entry": "2026-03-08T03:30:00",
+            "local_exit": "2026-03-08T04:10:00",
+            "utc_offset": null,
+            "entry_price": "6800.00",
+            "exit_price": "6802.00",
+            "quantity": "1",
+            "stake_amount": null,
+            "payout_percent": null,
+            "duration_seconds": null,
+            "timeframe": null,
+            "result": "win",
+            "pnl": "10.00",
+            "commission": null,
+            "stop_price": null,
+            "target_price": null,
+            "pnl_basis": "file"
+          }
+        ],
+        "expected": [
+          [
+            2,
+            3
+          ]
+        ]
+      },
+      {
+        "label": "an exit before its entry as instants stays apart",
+        "tz": "America/New_York",
+        "rows": [
+          {
+            "line": "2",
+            "external_id": null,
+            "symbol": "MESZ6",
+            "asset_type": null,
+            "direction": "long",
+            "local_entry": "2026-03-08T02:50:00",
+            "local_exit": "2026-03-08T03:10:00",
+            "utc_offset": null,
+            "entry_price": "6800.00",
+            "exit_price": "6801.00",
+            "quantity": "1",
+            "stake_amount": null,
+            "payout_percent": null,
+            "duration_seconds": null,
+            "timeframe": null,
+            "result": "win",
+            "pnl": "5.00",
+            "commission": null,
+            "stop_price": null,
+            "target_price": null,
+            "pnl_basis": "file"
+          },
+          {
+            "line": "3",
+            "external_id": null,
+            "symbol": "MESZ6",
+            "asset_type": null,
+            "direction": "long",
+            "local_entry": "2026-03-08T02:50:00",
+            "local_exit": "2026-03-08T04:10:00",
+            "utc_offset": null,
+            "entry_price": "6800.00",
+            "exit_price": "6802.00",
+            "quantity": "1",
+            "stake_amount": null,
+            "payout_percent": null,
+            "duration_seconds": null,
+            "timeframe": null,
+            "result": "win",
+            "pnl": "10.00",
+            "commission": null,
+            "stop_price": null,
+            "target_price": null,
+            "pnl_basis": "file"
+          }
+        ],
+        "expected": [
+          [
+            2
+          ],
+          [
+            3
+          ]
+        ]
+      },
+      {
+        "label": "the repeated 01:30 is read once (EST)",
+        "tz": "America/New_York",
+        "rows": [
+          {
+            "line": "2",
+            "external_id": null,
+            "symbol": "MESZ6",
+            "asset_type": null,
+            "direction": "long",
+            "local_entry": "2026-11-01T01:30:00",
+            "local_exit": "2026-11-01T01:40:00",
+            "utc_offset": null,
+            "entry_price": "6800.00",
+            "exit_price": "6801.00",
+            "quantity": "1",
+            "stake_amount": null,
+            "payout_percent": null,
+            "duration_seconds": null,
+            "timeframe": null,
+            "result": "win",
+            "pnl": "5.00",
+            "commission": null,
+            "stop_price": null,
+            "target_price": null,
+            "pnl_basis": "file"
+          },
+          {
+            "line": "3",
+            "external_id": null,
+            "symbol": "MESZ6",
+            "asset_type": null,
+            "direction": "long",
+            "local_entry": "2026-11-01T06:30:00",
+            "local_exit": "2026-11-01T06:45:00",
+            "utc_offset": "+00:00",
+            "entry_price": "6800.00",
+            "exit_price": "6802.00",
+            "quantity": "1",
+            "stake_amount": null,
+            "payout_percent": null,
+            "duration_seconds": null,
+            "timeframe": null,
+            "result": "win",
+            "pnl": "10.00",
+            "commission": null,
+            "stop_price": null,
+            "target_price": null,
+            "pnl_basis": "file"
+          },
+          {
+            "line": "4",
+            "external_id": null,
+            "symbol": "MESZ6",
+            "asset_type": null,
+            "direction": "long",
+            "local_entry": "2026-11-01T05:30:00",
+            "local_exit": "2026-11-01T05:50:00",
+            "utc_offset": "+00:00",
+            "entry_price": "6800.00",
+            "exit_price": "6803.00",
+            "quantity": "1",
+            "stake_amount": null,
+            "payout_percent": null,
+            "duration_seconds": null,
+            "timeframe": null,
+            "result": "win",
+            "pnl": "15.00",
+            "commission": null,
+            "stop_price": null,
+            "target_price": null,
+            "pnl_basis": "file"
+          }
+        ],
+        "expected": [
+          [
+            2,
+            3
+          ],
+          [
+            4
+          ]
+        ]
+      },
+      {
+        "label": "fractions of a second count",
+        "tz": "UTC",
+        "rows": [
+          {
+            "line": "2",
+            "external_id": null,
+            "symbol": "MESZ6",
+            "asset_type": null,
+            "direction": "long",
+            "local_entry": "2026-10-01T09:30:00.5",
+            "local_exit": "2026-10-01T09:35:00",
+            "utc_offset": null,
+            "entry_price": "6800.00",
+            "exit_price": "6801.00",
+            "quantity": "1",
+            "stake_amount": null,
+            "payout_percent": null,
+            "duration_seconds": null,
+            "timeframe": null,
+            "result": "win",
+            "pnl": "5.00",
+            "commission": null,
+            "stop_price": null,
+            "target_price": null,
+            "pnl_basis": "file"
+          },
+          {
+            "line": "3",
+            "external_id": null,
+            "symbol": "MESZ6",
+            "asset_type": null,
+            "direction": "long",
+            "local_entry": "2026-10-01T09:30:00.500000",
+            "local_exit": "2026-10-01T09:40:00",
+            "utc_offset": null,
+            "entry_price": "6800.00",
+            "exit_price": "6802.00",
+            "quantity": "1",
+            "stake_amount": null,
+            "payout_percent": null,
+            "duration_seconds": null,
+            "timeframe": null,
+            "result": "win",
+            "pnl": "10.00",
+            "commission": null,
+            "stop_price": null,
+            "target_price": null,
+            "pnl_basis": "file"
+          },
+          {
+            "line": "4",
+            "external_id": null,
+            "symbol": "MESZ6",
+            "asset_type": null,
+            "direction": "long",
+            "local_entry": "2026-10-01T09:30:00.500001",
+            "local_exit": "2026-10-01T09:40:00",
+            "utc_offset": null,
+            "entry_price": "6800.00",
+            "exit_price": "6802.00",
+            "quantity": "1",
+            "stake_amount": null,
+            "payout_percent": null,
+            "duration_seconds": null,
+            "timeframe": null,
+            "result": "win",
+            "pnl": "10.00",
+            "commission": null,
+            "stop_price": null,
+            "target_price": null,
+            "pnl_basis": "file"
+          }
+        ],
+        "expected": [
+          [
+            2,
+            3
+          ],
+          [
+            4
+          ]
+        ]
       }
     ]
   }

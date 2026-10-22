@@ -57,6 +57,17 @@ describe('the names and the signature', () => {
     expect(normaliseHeaders([long, long])[1].endsWith('#2')).toBe(true);
   });
 
+  it('a name cut at 80 never ends in a space (the database refuses it, and «Salvar como modelo» with it)', () => {
+    const raw = ['a'.repeat(79) + ' ' + 'b'.repeat(10), 'Ativo', 'Data', 'Qtd', 'Resultado'];
+    const names = normaliseHeaders(raw);
+    expect(names[0]).toBe('a'.repeat(79));
+    // Cut before its «#n» too, and never onto another column's name
+    expect(normaliseHeaders([raw[0], raw[0], 'a'.repeat(79)])).toEqual(['a'.repeat(79), `${'a'.repeat(78)}#2`, `${'a'.repeat(78)}#3`]);
+    expect(normaliseHeaders(['x'.repeat(77) + ' yy', 'x'.repeat(77) + ' yy'])).toEqual(['x'.repeat(77) + ' yy', 'x'.repeat(77) + '#2']);
+    const p = templatePayload({ ...CHOICES, headers: names, columns: [null, 'symbol', 'entry_time', 'quantity', 'pnl'], resultIsNet: null, name: 'Longo' });
+    expect(checkTemplate(p)).toBeNull();
+  });
+
   it('sorted by code point, as collate "C" over UTF-8 (not by UTF-16 unit)', () => {
     // U+FF5E sorts before U+1D49C by code point; by UTF-16 unit (0xD835) it would come after
     expect(['𝒜', '～'].sort(compareCodePoints)).toEqual(['～', '𝒜']);
@@ -203,6 +214,16 @@ describe('the payload of import_template_save (JSON v1)', () => {
     expect(checkTemplate(payload, { batch: BATCH, templates: [...others.slice(1), { id: 'mine', sig: BATCH.sig }] })).toBeNull();
     expect(checkTemplate(payload, { batch: BATCH, templates: [{ id: 'mine', sig: BATCH.sig }], replaces: 'other' })).toEqual({ code: 'bad_template', field: 'header_sig' });
     expect(checkTemplate(payload, { batch: BATCH, templates: [{ id: 'mine', sig: BATCH.sig }], replaces: 'mine' })).toBeNull();
+  });
+
+  it('the zone hint as the database knows it: its case too («america/new_york» is no zone there)', () => {
+    const p = templatePayload({ ...CHOICES, name: 'Profit' });
+    for (const tz of ['America/New_York', 'America/Sao_Paulo', 'UTC', 'Etc/GMT+5', 'America/Port-au-Prince', null]) {
+      expect(checkTemplate({ ...p, tz_hint: tz })).toBeNull();
+    }
+    for (const tz of ['america/new_york', 'AMERICA/SAO_PAULO', 'America/new_york', 'us/eastern', 'Us/Eastern', 'US/EASTERN', 'utc', 'Mars/Base', '-03:00', 'EST']) {
+      expect(checkTemplate({ ...p, tz_hint: tz })).toEqual({ code: 'bad_template', field: 'tz_hint' });
+    }
   });
 
   it('the 16 KB as the database prints the JSON («, » and «: »)', () => {

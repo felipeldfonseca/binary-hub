@@ -113,7 +113,11 @@ export function readMoney(cell: string, mark: DecimalMark, market: AccountMarket
   return integerDigits(d) > MONEY_DIGITS.int ? 'bad' : numeric(d);
 }
 
-/** Σ |cost| over commission and every «Outra taxa» column; null when all are empty */
+/**
+ * Σ |cost| over commission and every «Outra taxa» column; null when all are empty. Refused
+ * (bad_number on «commission», or «fee» without it) when the sum, to the cent, passes the 16
+ * integer digits a commission is stored with, though each cell fits.
+ */
 export function readCosts(
   rec: CsvRecord,
   index: ColumnIndex,
@@ -136,6 +140,7 @@ export function readCosts(
     }
     total = add(total ?? ZERO_N, abs(v));
   }
+  if (total !== null && integerDigits(numericText(round(total, 2))) > MONEY_DIGITS.int) return { ok: false, field: c >= 0 ? 'commission' : 'fee' };
   return { ok: true, total, other };
 }
 

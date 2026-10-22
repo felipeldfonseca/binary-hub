@@ -19,12 +19,14 @@
  *             the key of a row without an ID (tests and the shared cases only)
  */
 import type { AccountMarket } from '../../markets';
-import { add, numeric, plainText } from '../../registro/numeric';
+import { abs, add, numeric, plainText } from '../../registro/numeric';
+import { assertZoneName, localToUtc } from '../../tempo';
 import { RowCollector } from '../collect';
 import type { CsvRecord } from '../csv';
-import type { ImportRow, Notice, RowErrorCode, RowIssue, RowWarningCode } from '../types';
+import { MONEY_DIGITS, PRICE_DIGITS, integerDigits } from '../decimal';
+import type { ImportRow, LocalStamp, Notice, RowErrorCode, RowIssue, RowWarningCode, UtcOffset } from '../types';
 import { ZERO_N, cents, columnClocks, headerSaysUtc, stampKey, text } from './cells';
-import { parseMappedFills } from './fills';
+import { parseMappedFills, type FillsResult } from './fills';
 import { headerSignature, type MappingChoices } from './template';
 import { mappedContext, readTradeRecord } from './trades';
 import type { EndOfFileAnswer, EndOfFileQuestion, MappedOutcome, MappedPosition } from './types';
@@ -45,6 +47,7 @@ export {
   suggestColumns,
   suggestRowKind,
   synonymName,
+  unknownOpenCloseWords,
   unknownSideWords,
   type ColumnCheck,
   type ColumnMap,
@@ -130,7 +133,7 @@ export {
   type SniffedFile,
 } from './sniff';
 export { mappedContext, netQuestion, readTradeRecord, sideLooksInverted, type MappedContext, type NetQuestion, type TradeFacts } from './trades';
-export { endOfFileKey, parseMappedFills, type FillsResult } from './fills';
+export { endOfFileKey, parseMappedFills, sliceId, type FillsOptions, type FillsResult } from './fills';
 export { sha256Text, utf8Bytes } from './hash';
 
 export interface MappedInput {
@@ -148,44 +151,80 @@ export interface MappedInput {
   templateId?: string | null;
   /** The model's zone hint, pre-selected in «Em que fuso…» when no header names UTC */
   tzHint?: string | null;
+  /**
+   * The file's zone once «Em que fuso…» has it (p_file_tz): the rows without an offset are placed in
+   * it as the database places them, so the trades drawn and the database's limits checked are the
+   * database's (a row with an offset and one without naming one instant; a time the clock skipped).
+   * Absent or null: their wall clocks. Throws RangeError unless it is a zone name (isZoneName).
+   */
+  fileTz?: string | null;
 }
 
-/** The 3c position key of a row: symbol as written, side, entry instant, entry price (rows with an exit) */
-function positionKey(r: ImportRow): string | null {
+const MICRO = 1000000;
+
+/** The instants of the wall clocks placed in a zone so far (localToUtc reads the zone a few times per call) */
+const placed = new Map<string, number>();
+function inZone(local: LocalStamp, tz: string): number {
+  const k = `${tz}|${local}`;
+  let ms = placed.get(k);
+  if (ms === undefined) {
+    const p = local.split(/[-T:]/).map(Number);
+    ms = localToUtc({ year: p[0], month: p[1], day: p[2], hour: p[3], minute: p[4], second: p[5] }, tz).getTime();
+    if (placed.size >= 50000) placed.clear();
+    placed.set(k, ms);
+  }
+  return ms;
+}
+
+/**
+ * A row's time as the database places it, in microseconds: with its offset when it states one; else
+ * in the file's zone (`timestamp AT TIME ZONE`, as ../../tempo's localToUtc); else, without a zone,
+ * its wall clock, tagged apart so it never meets an instant.
+ */
+function instantOf(local: LocalStamp, offset: UtcOffset | null, tz: string | null): { tag: 'w' | 'u'; us: number } {
+  const m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.(\d{1,6}))?$/.exec(local);
+  if (!m) throw new RangeError('Invalid date');
+  const frac = m[7] ? Number(m[7].padEnd(6, '0')) : 0;
+  if (offset === null && tz !== null) return { tag: 'u', us: (inZone(local.slice(0, 19), tz) / 1000) * MICRO + frac };
+  const secs = stampKey({ local: local.slice(0, 19), offset });
+  return { tag: offset === null ? 'w' : 'u', us: secs * MICRO + frac };
+}
+
+/**
+ * The 3c position key of a row (import_stage's grp): symbol as written, side, entry instant, entry
+ * price, for a row with an exit and an entry price whose exit is not before its entry; null (a
+ * trade of its own) otherwise
+ */
+function positionKey(r: ImportRow, tz: string | null): string | null {
   if (r.local_exit === null || r.entry_price === null) return null;
-  const at = stampKey({ local: r.local_entry, offset: r.utc_offset });
-  return [r.symbol, r.direction, r.utc_offset === null ? 'w' : 'u', at, plainText(numeric(r.entry_price))].join('|');
+  const entry = instantOf(r.local_entry, r.utc_offset, tz);
+  if (instantOf(r.local_exit, r.utc_offset, tz).us < entry.us) return null;
+  return [r.symbol, r.direction, entry.tag, entry.us, plainText(numeric(r.entry_price))].join('|');
 }
 
 const plus = (a: string, b: string) => text(add(numeric(a), numeric(b)));
 
-/**
- * The trades the rows make in the database (import_stage's grp, Phase 3c): rows with an exit that
- * share the symbol as written, the side, the entry instant and the entry price are one position,
- * the size adding up, one exit per row; any other row is its own trade. In order of entry.
- */
-export function groupPositions(rows: readonly ImportRow[]): MappedPosition[] {
-  const out: MappedPosition[] = [];
-  const byKey: Record<string, MappedPosition> = {};
+/** The trades the rows make, each with the positions of its rows in `rows` */
+function group(rows: readonly ImportRow[], fileTz: string | null): { position: MappedPosition; rows: number[] }[] {
+  const out: { position: MappedPosition; rows: number[] }[] = [];
+  const byKey: Record<string, { position: MappedPosition; rows: number[] }> = {};
   const order = rows
-    .map((r, i) => ({ r, i }))
-    .sort((a, b) => {
-      const x = stampKey({ local: a.r.local_entry, offset: a.r.utc_offset });
-      const y = stampKey({ local: b.r.local_entry, offset: b.r.utc_offset });
-      return x !== y ? x - y : a.r.line - b.r.line || a.i - b.i;
-    });
-  for (const { r } of order) {
+    .map((r, i) => ({ r, i, at: instantOf(r.local_entry, r.utc_offset, fileTz).us }))
+    .sort((a, b) => (a.at !== b.at ? a.at - b.at : a.r.line - b.r.line || a.i - b.i));
+  for (const { r, i } of order) {
     const exit = { line: r.line, local_exit: r.local_exit, exit_price: r.exit_price, quantity: r.quantity, pnl: r.pnl };
-    const k = positionKey(r);
-    const p = k === null ? undefined : byKey[k];
-    if (p) {
+    const k = positionKey(r, fileTz);
+    const g = k === null ? undefined : byKey[k];
+    if (g) {
+      const p = g.position;
       p.quantity = plainText(add(numeric(p.quantity), numeric(r.quantity)));
       p.pnl = plus(p.pnl, r.pnl);
       p.commission = p.commission === null && r.commission === null ? null : plus(p.commission ?? '0.00', r.commission ?? '0.00');
       p.exits.push(exit);
+      g.rows.push(i);
       continue;
     }
-    const q: MappedPosition = {
+    const position: MappedPosition = {
       symbol: r.symbol,
       direction: r.direction === 'short' ? 'short' : 'long',
       local_entry: r.local_entry,
@@ -196,11 +235,40 @@ export function groupPositions(rows: readonly ImportRow[]): MappedPosition[] {
       commission: r.commission,
       exits: [exit],
     };
-    out.push(q);
-    if (k !== null) byKey[k] = q;
+    const n = { position, rows: [i] };
+    out.push(n);
+    if (k !== null) byKey[k] = n;
   }
-  for (const p of out) p.exits.sort((a, b) => (a.local_exit ?? '').localeCompare(b.local_exit ?? '') || a.line - b.line);
+  for (const { position } of out) position.exits.sort((a, b) => (a.local_exit ?? '').localeCompare(b.local_exit ?? '') || a.line - b.line);
   return out;
+}
+
+/**
+ * The trades the rows make in the database (import_stage's grp, Phase 3c): rows with an exit that
+ * share the symbol as written, the side, the entry instant and the entry price are one position,
+ * the size adding up, one exit per row, unless the exit is before the entry; any other row is its
+ * own trade. In order of entry. `fileTz` places the rows without an offset (MappedInput.fileTz).
+ */
+export function groupPositions(rows: readonly ImportRow[], fileTz: string | null = null): MappedPosition[] {
+  return group(rows, fileTz).map((g) => g.position);
+}
+
+/**
+ * The database's columns (trades: quantity numeric(18, 8), result and commission numeric(18, 2)):
+ * a row the reader sends fits them, and so do the sums of the position it is folded into, or the
+ * commit would fail after a preview that said nothing
+ */
+const fits = (d: string | null, digits: number) => d === null || integerDigits(text(abs(numeric(d)))) <= digits;
+const fitsColumns = (x: { quantity: string; pnl: string; commission: string | null }) =>
+  fits(x.quantity, PRICE_DIGITS.int) && fits(x.pnl, MONEY_DIGITS.int) && fits(x.commission, MONEY_DIGITS.int);
+
+/** The positions in `rows` of the rows of a trade that would not fit the database's columns */
+function oversized(rows: readonly ImportRow[], fileTz: string | null): number[] {
+  const out: number[] = [];
+  for (const g of group(rows, fileTz)) {
+    if (!fitsColumns(g.position) || g.rows.some((i) => !fitsColumns(rows[i]))) out.push(...g.rows);
+  }
+  return out.sort((a, b) => a - b);
 }
 
 /** Facts → the trade file's notices */
@@ -247,6 +315,8 @@ function identicalRows(rows: readonly ImportRow[]): number {
 export function parseMappedRecords(input: MappedInput): MappedOutcome {
   const { choices, market, records } = input;
   if (choices.columns.length !== choices.headers.length) throw new RangeError('Columns do not match the headers');
+  const fileTz = input.fileTz ?? null;
+  if (fileTz !== null) assertZoneName(fileTz);
   const clocks = columnClocks(choices.headers, choices.columns);
   const ctx = mappedContext(choices, market, clocks, input.accountValue);
 
@@ -257,11 +327,12 @@ export function parseMappedRecords(input: MappedInput): MappedOutcome {
   let notImported = 0;
   let unfilled = 0;
   let executions = 0;
+  let executionTimes: FillsResult['executionTimes'] = [];
   let endOfFile: EndOfFileQuestion[] = [];
 
   if (choices.rowKind === 'trade') {
     const out = new RowCollector();
-    const facts: { normalised: boolean; converted: boolean; swap: boolean; other: string | null }[] = [];
+    let facts: { normalised: boolean; converted: boolean; swap: boolean; other: string | null }[] = [];
     for (const rec of records) {
       const read = readTradeRecord(rec, ctx);
       if (read.kind === 'other_account') {
@@ -282,13 +353,34 @@ export function parseMappedRecords(input: MappedInput): MappedOutcome {
       });
     }
     rows = out.rows;
-    errors = out.errors.slice().sort((a, b) => a.line - b.line);
-    warnings = out.warnings.slice().sort((a, b) => a.line - b.line);
+    errors = out.errors.slice();
+    warnings = out.warnings.slice();
+    // The rows of a trade that would not fit the database's columns stay out, every one of them
+    const over = oversized(rows, fileTz);
+    if (over.length > 0) {
+      const out = new Set(over);
+      const lines = new Set(over.map((i) => rows[i].line));
+      lines.forEach((line) => errors.push({ line, code: 'position_too_large' }));
+      rows = rows.filter((_, i) => !out.has(i));
+      facts = facts.filter((_, i) => !out.has(i));
+      warnings = warnings.filter((w) => !lines.has(w.line));
+    }
+    errors.sort((a, b) => a.line - b.line);
+    warnings.sort((a, b) => a.line - b.line);
     notices = tradeNotices(rows, facts, identicalRows(rows));
     executions = 0;
   } else {
-    const f = parseMappedFills(records, ctx, input.endOfFile);
+    let f = parseMappedFills(records, ctx, input.endOfFile);
     if (f.failure) return { ok: false, error: f.failure.error };
+    // A symbol with a trade that would not fit the database's columns stays out whole (its
+    // executions pair with one another)
+    const over = oversized(f.rows, fileTz);
+    if (over.length > 0) {
+      const refuse: Record<string, RowErrorCode> = {};
+      for (const i of over) refuse[f.rowKeys[i]] = 'position_too_large';
+      f = parseMappedFills(records, ctx, input.endOfFile, { refuse });
+      if (f.failure) return { ok: false, error: f.failure.error };
+    }
     rows = f.rows;
     errors = f.errors;
     warnings = f.warnings;
@@ -296,6 +388,7 @@ export function parseMappedRecords(input: MappedInput): MappedOutcome {
     notImported = f.notImported;
     unfilled = f.unfilled;
     executions = f.executions;
+    executionTimes = f.executionTimes;
     endOfFile = f.endOfFile;
   }
 
@@ -336,7 +429,8 @@ export function parseMappedRecords(input: MappedInput): MappedOutcome {
     notImported,
     executions,
     unfilled,
+    executionTimes,
     endOfFile,
-    positions: groupPositions(rows),
+    positions: groupPositions(rows, fileTz),
   };
 }

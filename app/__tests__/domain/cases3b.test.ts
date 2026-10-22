@@ -14,17 +14,21 @@
  *   instrument  tradeInstrument / tradeMatchKey = trade_instrument / trade_match_key for mapped symbols
  *   pnl         pnlFromPrices = trade_pnl
  *   rows        mappedRowCodes = import_checked_rows('modelo'): code, asset type, basis, the key of a
- *               row without an ID; the reader's rows of every board file are accepted as sent
+ *               row without an ID (whole); keys left out, white space outside ASCII, the columns'
+ *               sizes; the reader's rows of every board file are accepted as sent
  *   format      formatProblem = import_check_format (bad_format)
  *   template    checkTemplate = import_template_save (bad_template and its HINT); templatePayload's
  *               model of every board file is saved
  *   links       assignImportLinks = import_stage('modelo'): never a trade with an option contract
+ *   zones       isZoneName ⊆ pg_timezone_names (name = …): never a name the database refuses
+ *   positions   groupPositions = import_stage's grp on the zone's instants
  */
 import fs from 'node:fs';
 import path from 'node:path';
 import {
   checkTemplate,
   formatProblem,
+  groupPositions,
   headerSignature,
   mappedRowCodes,
   normaliseHeaders,
@@ -36,6 +40,8 @@ import {
 } from '@/lib/domain/import';
 import { assignImportLinks, pnlFromPrices, tradeInstrument, tradeMatchKey, type MatchRow, type MatchTrade } from '@/lib/domain/registro';
 import type { AccountMarket } from '@/lib/domain';
+import { isZoneName } from '@/lib/domain/tempo';
+import { ALL_FILE_ZONES } from '@/lib/hub/contas';
 import { SAMPLES, readSample, sampleChoices } from '@/testing/mappedFiles';
 
 const DUMP = process.env.BH_CASES3B_DUMP;
@@ -99,6 +105,8 @@ if (DUMP) {
         expected: Record<string, string>;
       }>[];
     };
+    zones: { cases: Case<{ name: string; expected: boolean }>[] };
+    positions: { cases: Case<{ tz: string; rows: Record<string, unknown>[]; expected: number[][] }>[] };
   }
   const CASES: Cases = JSON.parse(fs.readFileSync(FILE, 'utf8'));
 
@@ -159,7 +167,8 @@ if (DUMP) {
         asset_type: r.asset_type,
         pnl_basis: r.pnl_basis,
         key_kind: r.key_kind,
-        key: r.key_kind === 'synthetic' ? null : r.external_id,
+        // The whole key: the file's ID, or the one the database derives ('@' + 32 hex + '.' + n)
+        key: r.external_id,
         hash: r.key_kind === 'synthetic' ? (r.external_id as string).slice(0, 33) : null,
         n: r.key_kind === 'synthetic' ? Number((r.external_id as string).split('.')[1]) : null,
       }));
@@ -190,7 +199,11 @@ if (DUMP) {
   describe('«Salvar como modelo» (import_template_save, without a batch)', () => {
     it.each(CASES.template.cases.map((c) => [c.label, c] as const))('%s', (_label, c) => {
       const p = checkTemplate(c.payload);
-      expect(p === null ? { code: null, hint: null } : p.code === 'bad_template' ? { code: p.code, hint: p.field } : { code: p.code, hint: null }).toEqual(c.expected);
+      const got = p === null ? { code: null, hint: null } : p.code === 'bad_template' ? { code: p.code, hint: p.field } : { code: p.code, hint: null };
+      // Stricter than the database in one place only: a zone alias Intl rewrites ('US/Eastern'), never offered
+      const tz = (c.payload as { tz_hint?: unknown }).tz_hint;
+      const alias = typeof tz === 'string' && c.expected.code === null && new Intl.DateTimeFormat('en-US', { timeZone: tz }).resolvedOptions().timeZone !== tz;
+      expect(got).toEqual(alias ? { code: 'bad_template', hint: 'tz_hint' } : c.expected);
     });
 
     it('the model of every board file is saved as the screens would send it', () => {
@@ -230,6 +243,45 @@ if (DUMP) {
       }));
       const links = assignImportLinks('stocks', rows, trades);
       expect(Object.fromEntries(Array.from(links.entries(), ([rn, id]) => [String(rn), id]))).toEqual(c.expected);
+    });
+  });
+
+  describe('zone names (pg_timezone_names, name = …)', () => {
+    it('isZoneName never takes a name the database refuses', () => {
+      const laxer = CASES.zones.cases.filter((c) => !c.expected && isZoneName(c.name)).map((c) => c.name);
+      expect(laxer).toEqual([]);
+      // Other spellings of names the database knows are among the cases, and refused
+      expect(CASES.zones.cases.filter((c) => !c.expected).length).toBeGreaterThan(60);
+    });
+
+    it('takes every name of the database\'s list that Intl writes as it is (stricter only for the aliases Intl rewrites)', () => {
+      const spelled = (tz: string) => {
+        try {
+          return new Intl.DateTimeFormat('en-US', { timeZone: tz }).resolvedOptions().timeZone === tz;
+        } catch {
+          return false;
+        }
+      };
+      // 'GMT', 'EST5EDT', 'CET'… are refused on purpose (Postgres reads some as fixed offsets): tempo's formatter
+      const shaped = (tz: string) => tz === 'UTC' || /^[A-Za-z][\w+-]*(\/[\w+-]+)+$/.test(tz);
+      const known = CASES.zones.cases.filter((c) => c.expected && shaped(c.name));
+      expect(known.length).toBeGreaterThan(500);
+      expect(known.filter((c) => spelled(c.name) && !isZoneName(c.name)).map((c) => c.name)).toEqual([]);
+    });
+
+    it('every zone the import offers is one', () => {
+      for (const z of ALL_FILE_ZONES) {
+        expect(CASES.zones.cases.find((c) => c.name === z.tz)?.expected).toBe(true);
+        expect(isZoneName(z.tz)).toBe(true);
+      }
+    });
+  });
+
+  describe('positions (import_stage\'s grp on the zone\'s instants)', () => {
+    it.each(CASES.positions.cases.map((c) => [c.label, c] as const))('%s', (_label, c) => {
+      const rows = c.rows.map((r) => ({ ...(r as unknown as ImportRow), line: Number(r.line) }));
+      const got = groupPositions(rows, c.tz).map((p) => p.exits.map((e) => e.line).sort((a, b) => a - b));
+      expect(got.sort((a, b) => a[0] - b[0])).toEqual(c.expected);
     });
   });
 }

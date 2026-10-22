@@ -178,6 +178,9 @@ export function PassoErro({ headingRef, failed, parsed }: { headingRef: HeadingR
     case 'too_many_rows':
       detail = ERRO.tooManyRows
       break
+    case 'spreadsheet':
+      detail = ERRO.spreadsheet
+      break
   }
   return (
     <div className="hub-passo">

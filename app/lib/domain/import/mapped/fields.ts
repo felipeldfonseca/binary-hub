@@ -441,10 +441,30 @@ export function quantityIsSigned(records: readonly CsvRecord[], index: number, m
   });
 }
 
-/** Whether every cell of an open/close column is understood (else the unknown ones pair without the guard) */
-export function openCloseUnknown(records: readonly CsvRecord[], index: number, words: Readonly<Record<string, 'open' | 'close'>> = {}): number {
-  return records.filter((r) => {
+/**
+ * The «Abre ou fecha» words the app does not know, with how many rows hold each, for the question
+ * «O que quer dizer “{valor}”?» (answers saved in open_close_words): a symbol with a fill whose
+ * value is not understood pairs as a file without the column (the end-of-file question), so these
+ * are worth asking. `word` is the key the answer is saved under; `text` the first spelling.
+ */
+export function unknownOpenCloseWords(
+  records: readonly CsvRecord[],
+  index: number,
+  words: Readonly<Record<string, 'open' | 'close'>> = {},
+): { word: string; text: string; rows: number }[] {
+  const out: { word: string; text: string; rows: number }[] = [];
+  for (const r of records) {
     const c = (r.cells[index] ?? '').trim();
-    return c !== '' && readOpenClose(c, words) === null;
-  }).length;
+    if (!c || readOpenClose(c, words) !== null) continue;
+    const w = wordKey(c);
+    const e = out.find((x) => x.word === w);
+    if (e) e.rows++;
+    else out.push({ word: w, text: c.replace(/\s+/g, ' '), rows: 1 });
+  }
+  return out;
+}
+
+/** How many filled cells of an open/close column the app does not understand (unknownOpenCloseWords' rows) */
+export function openCloseUnknown(records: readonly CsvRecord[], index: number, words: Readonly<Record<string, 'open' | 'close'>> = {}): number {
+  return unknownOpenCloseWords(records, index, words).reduce((n, w) => n + w.rows, 0);
 }

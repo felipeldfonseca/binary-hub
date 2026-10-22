@@ -1229,6 +1229,14 @@ describe('ImportSheet · errors', () => {
     expect(within(dialog).getByRole('button', { name: 'Voltar' })).toBeInTheDocument()
   })
 
+  it('a spreadsheet: the approved board\'s «Salve como CSV…» (Phase 3b, scenario 9)', async () => {
+    readFile.mockResolvedValue({ fileName: 'Performance.xlsx', size: 10, sha256: 'ab'.repeat(32), outcome: { ok: false, error: 'spreadsheet' } })
+    const dialog = await openSheet({ accountId: topOne.id })
+    await chooseFile(dialog)
+    expect(await within(dialog).findByRole('heading', { name: 'Não conseguimos ler o arquivo.' })).toHaveFocus()
+    expect(within(dialog).getByText('Salve como CSV na sua plataforma ou no Excel e tente de novo.')).toBeInTheDocument()
+  })
+
   it('names the columns a file is missing', async () => {
     readFile.mockResolvedValue({
       fileName: 'x.csv',

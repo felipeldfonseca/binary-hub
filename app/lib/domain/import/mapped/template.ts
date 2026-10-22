@@ -10,14 +10,14 @@
  * them, so a model the screens send is never refused for its shape.
  */
 import type { AccountMarket } from '../../markets';
-import { assertTimeZone } from '../../tempo';
+import { isZoneName } from '../../tempo';
 import type { CsvDelimiter } from '../csv';
 import type { DecimalMark } from '../decimal';
 import { normalizeHeader } from '../text';
 import { MAX_COLUMNS, TRADE_FIELDS, type FieldKey } from '../types';
 import { REPEATABLE_FIELD, isFieldOf, type ColumnMap, type RowKind } from './fields';
 import { sha256Text, utf8Bytes } from './hash';
-import type { DateOrder } from './values';
+import type { DateOrder, SideWordAnswer } from './values';
 
 /** A header name, normalised, at most this many characters (normaliseHeaders: a «#n» suffix included; the database allows the suffix beyond) */
 export const MAX_HEADER_CHARS = 80;
@@ -50,13 +50,16 @@ function modelName(h: string): string {
   return normalizeHeader(h.replace(CONTROL, ' ')).normalize('NFD').replace(COMBINING, '');
 }
 
+/** A name cut to `n` characters, without the space a cut may leave at its end (the database refuses it) */
+const cut = (name: string, n: number) => chars(name).slice(0, n).join('').replace(/ +$/, '');
+
 /**
  * The file's header names as a model keeps them: normalizeHeader (accents, quotes and BOM gone,
- * single spaces, lower case), at most 80 characters, and a repeated name with «#2», «#3»… in file
- * order (a suffix never makes a name equal to another column's).
+ * single spaces, lower case), at most 80 characters (never ending in a space), and a repeated name
+ * with «#2», «#3»… in file order (a suffix never makes a name equal to another column's).
  */
 export function normaliseHeaders(raw: readonly string[]): string[] {
-  const base = raw.map((h) => chars(modelName(h)).slice(0, MAX_HEADER_CHARS).join(''));
+  const base = raw.map((h) => cut(modelName(h), MAX_HEADER_CHARS));
   const taken: Record<string, true> = {};
   const out: string[] = [];
   const reserved: Record<string, true> = {};
@@ -69,7 +72,7 @@ export function normaliseHeaders(raw: readonly string[]): string[] {
     }
     for (let n = 2; ; n++) {
       const suffix = `#${n}`;
-      const name = chars(b).slice(0, MAX_HEADER_CHARS - suffix.length).join('') + suffix;
+      const name = cut(b, MAX_HEADER_CHARS - suffix.length) + suffix;
       if (!taken[name] && !reserved[name]) {
         taken[name] = true;
         out.push(name);
@@ -118,8 +121,11 @@ export interface MappingChoices {
    * every mapped cost (commission, other fees, swap); null when not asked
    */
   resultIsNet: boolean | null;
-  /** Answers to «O que quer dizer “{valor}”?», keyed by wordKey */
-  sideWords: Record<string, 'buy' | 'sell'>;
+  /**
+   * Answers to «O que quer dizer “{valor}”?», keyed by wordKey; «Pular essas linhas» ('skip')
+   * belongs to this file and never reaches a model (templatePayload, templateFromRow)
+   */
+  sideWords: Record<string, SideWordAnswer>;
   /** Execution files: answers for «Abre ou fecha» words, keyed by wordKey */
   openCloseWords: Record<string, 'open' | 'close'>;
 }
@@ -168,7 +174,7 @@ export function templatePayload(
   });
   const sideWords: Record<string, 'buy' | 'sell'> = {};
   for (const k of Object.keys(t.sideWords)) {
-    const v = t.sideWords[k] as string;
+    const v = t.sideWords[k];
     // «Pular essas linhas» belongs to this file only
     if (v === 'buy' || v === 'sell') sideWords[k] = v;
   }
@@ -308,15 +314,6 @@ export function jsonbTextBytes(x: unknown): number {
   return 0;
 }
 
-function validZone(tz: string): boolean {
-  try {
-    assertTimeZone(tz);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
 /** A word map of «O que quer dizer “{valor}”?» answers: an object, at most `max` words of 1–40 characters, each one of `values` */
 function wordsOk(x: unknown, max: number, values: readonly string[]): boolean {
   if (x === undefined) return true;
@@ -402,7 +399,7 @@ export function checkTemplate(p: unknown, ctx: TemplateContext = {}): TemplatePr
 
   if (!wordsOk(o.side_words, MAX_WORDS, ['buy', 'sell'])) return bad('side_words');
   if (!wordsOk(o.open_close_words, kind === 'fill' ? MAX_WORDS : 0, ['open', 'close'])) return bad('open_close_words');
-  if (o.tz_hint !== undefined && o.tz_hint !== null && (typeof o.tz_hint !== 'string' || chars(o.tz_hint).length > 64 || !validZone(o.tz_hint))) {
+  if (o.tz_hint !== undefined && o.tz_hint !== null && (typeof o.tz_hint !== 'string' || chars(o.tz_hint).length > 64 || !isZoneName(o.tz_hint))) {
     return bad('tz_hint');
   }
 

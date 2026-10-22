@@ -13,7 +13,7 @@ import type { AccountMarket } from '../../markets';
 import { TRADE_CAPS, tradeInstrument, tradeMatchKey } from '../../registro/caps';
 import { pnlFromPrices } from '../../registro/pnl';
 import { cmp, numeric, plainText, sign } from '../../registro/numeric';
-import type { ImportRow, LocalStamp, UtcOffset } from '../types';
+import { IMPORT_ROW_KEYS, type ImportRow, type LocalStamp, type UtcOffset } from '../types';
 import { sha256Text } from './hash';
 
 /** The codes import_checked_rows refuses a mapped row with (bad_line rows are dropped, never answered) */
@@ -44,16 +44,26 @@ const MONEY_NON_NEGATIVE = /^\d{1,16}(\.\d{1,2})?$/;
 const PAYOUT = /^\d{1,4}(\.\d{1,4})?$/;
 const DURATION = /^\d{1,6}$/;
 const TIMEFRAME = /^[A-Za-z0-9]{1,8}$/;
+/**
+ * The database's «\s» and «\S» as the clusters the shared cases are recorded on read them
+ * (initdb --no-locale): ASCII white space only, so a non-breaking or an ideographic space is not
+ * one. A database with another LC_CTYPE may count more characters as space. The reader is stricter
+ * than either (isValidExternalId and isOccSymbol take every Unicode space as one), so no row it
+ * sends meets the difference.
+ */
+const SPACE = '[ \\t\\n\\r\\f\\v]';
+/** An ID: 1–80 characters, none of them white space (the database's '^\S{1,80}$', counted below) */
+const NO_SPACE = new RegExp(`^(?:(?!${SPACE})[\\s\\S])+$`, 'u');
 /** OCC, as the database tests upper(btrim(symbol)) */
-const OCC = /^[A-Z.]{1,6}\s*\d{6}[CP]\d{8}$/;
+const OCC = new RegExp(`^[A-Z.]{1,6}${SPACE}*\\d{6}[CP]\\d{8}$`);
 
-/** A row as jsonb_to_recordset reads it: each key's text (a JSON number as written), null when absent */
-type Wire = Record<string, string | null>;
+/** A row as jsonb_to_recordset reads it: each key's text (a JSON number as written); null when the key is null or absent */
+type Wire = Record<(typeof IMPORT_ROW_KEYS)[number], string | null>;
 
 function wire(row: Readonly<Record<string, unknown>>): Wire {
-  const out: Wire = {};
-  for (const k of Object.keys(row)) {
-    const v = row[k];
+  const out = {} as Wire;
+  for (const k of IMPORT_ROW_KEYS) {
+    const v = Object.prototype.hasOwnProperty.call(row, k) ? row[k] : null;
     out[k] = v === null || v === undefined ? null : typeof v === 'string' ? v : typeof v === 'object' ? JSON.stringify(v) : String(v);
   }
   return out;
@@ -162,7 +172,7 @@ export function mappedRowCode(market: AccountMarket, row: Readonly<Record<string
   const t = wire(row);
   const basis = t.pnl_basis ?? 'file';
   if (t.line === null || !LINE.test(t.line)) return 'bad_line';
-  if (t.external_id !== null && (!/^\S+$/.test(t.external_id) || chars(t.external_id).length > 80 || t.external_id.charAt(0) === '@')) return 'bad_id';
+  if (t.external_id !== null && (!NO_SPACE.test(t.external_id) || chars(t.external_id).length > 80 || t.external_id.charAt(0) === '@')) return 'bad_id';
   if (t.symbol === null || chars(btrim(t.symbol)).length < 1 || chars(btrim(t.symbol)).length > 40) return 'missing_symbol';
   if (t.asset_type !== null || (t.direction !== 'long' && t.direction !== 'short')) return 'bad_direction';
   if (tryTimestamp(t.local_entry) === null) return 'bad_date';
