@@ -47,19 +47,29 @@ function sqlCaps(text = newestCaps().text): Record<string, unknown> {
 }
 
 describe('MARKET_SPEC = market_caps_all() (the newest migration that defines it)', () => {
-  it('reads the literal of Phase 3c (20261023000001: + rules.breakeven)', () => {
-    expect(newestCaps().file >= '20261023000001').toBe(true);
+  it('reads the literal of Phase 3b (20261024000001: + mapping)', () => {
+    expect(newestCaps().file >= '20261024000001').toBe(true);
   });
 
-  it('changed only rules.breakeven since 20261019000001 (every price market, never binaries)', () => {
+  it('changed only rules.breakeven (3c) and mapping (3b) since 20261019000001 (every market but binaries)', () => {
     const old = sqlCaps(fs.readFileSync(path.join(MIGRATIONS, '20261019000001_markets.sql'), 'utf8')) as Record<
       string,
       { rules: Record<string, boolean> }
     >;
     expect(sqlCaps()).toEqual(
       Object.fromEntries(
-        Object.entries(old).map(([m, c]) => [m, { ...c, rules: { ...c.rules, breakeven: m !== 'binary' } }]),
+        Object.entries(old).map(([m, c]) => [
+          m,
+          { ...c, mapping: m !== 'binary', rules: { ...c.rules, breakeven: m !== 'binary' } },
+        ]),
       ),
+    );
+  });
+
+  it('changed only mapping since Phase 3c (20261023000001)', () => {
+    const c3 = sqlCaps(fs.readFileSync(path.join(MIGRATIONS, '20261023000001_regra_breakeven.sql'), 'utf8'));
+    expect(sqlCaps()).toEqual(
+      Object.fromEntries(Object.entries(c3).map(([m, c]) => [m, { ...(c as object), mapping: m !== 'binary' }])),
     );
   });
 
@@ -73,6 +83,7 @@ describe('MARKET_SPEC = market_caps_all() (the newest migration that defines it)
     expect(marketCapsJson(MARKET_SPEC.forex)).toEqual({
       creatable: true,
       reader: false,
+      mapping: true,
       currency: 'USD',
       day: { tz: 'America/New_York', start_min: 1020 },
       rules: { block: false, states: false, soma: false, padrao: false, breakeven: true },
@@ -111,6 +122,10 @@ describe('the descriptor', () => {
     const fileMarket: ImportMarket = 'futures';
     const accountMarket: AccountMarket = fileMarket;
     expect(accountMarket).toBe('futures');
+  });
+
+  it('imports a file by its columns in every market but binaries (Phase 3b)', () => {
+    expect(ACCOUNT_MARKETS.filter((m) => !MARKET_SPEC[m].mapping)).toEqual(['binary']);
   });
 
   it.each([

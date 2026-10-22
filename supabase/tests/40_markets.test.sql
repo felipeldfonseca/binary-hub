@@ -53,8 +53,9 @@ grant execute on all functions in schema tests to anon, authenticated;
 -- 1. The descriptor
 -- =============================================================================================
 
--- Phase 3c (20261023000001) adds rules.breakeven to every market; 80_regra_breakeven tests it
-select tests.eq((select jsonb_object_agg(m.key, m.value #- '{rules,breakeven}') from jsonb_each(public.market_caps_all()) m), (
+-- Phase 3c (20261023000001) adds rules.breakeven to every market; 80_regra_breakeven tests it. Phase 3b
+-- (20261024000001) adds "mapping"; 82_importacao_colunas tests it
+select tests.eq((select jsonb_object_agg(m.key, (m.value #- '{rules,breakeven}') - 'mapping') from jsonb_each(public.market_caps_all()) m), (
   select jsonb_object_agg(m, jsonb_build_object(
            'creatable', creatable, 'reader', reader, 'currency', currency,
            'day', jsonb_build_object('tz', tz, 'start_min', day_start),
