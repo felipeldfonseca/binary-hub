@@ -46,7 +46,7 @@ import { abs, add, cmp, div, mul, numeric, pow10, round, sign, sub, type Numeric
 import type { FileStamp } from '../clock';
 import { issue } from '../collect';
 import type { CsvRecord } from '../csv';
-import { MAX_RECORDS, type FieldKey, type ImportPnlBasis, type ImportRow, type Notice, type RowErrorCode, type RowIssue, type RowWarningCode } from '../types';
+import { MAX_SLICES, type FieldKey, type ImportPnlBasis, type ImportRow, type Notice, type RowErrorCode, type RowIssue, type RowWarningCode } from '../types';
 import { ZERO_N, exitOnEntryClock, readCosts, readMoney, readPrice, readQuantity, readStamp, recordReader, stampKey, text } from './cells';
 import type { MappedContext } from './trades';
 import type { EndOfFileAnswer, EndOfFileQuestion } from './types';
@@ -661,7 +661,7 @@ export function parseMappedFills(
     }
   }
 
-  if (rows.length > MAX_RECORDS) {
+  if (rows.length > MAX_SLICES) {
     return { ...base, rows: [], errors: [], notices: [], endOfFile, failure: { error: 'too_many_rows' } };
   }
   rows.sort((a, b) => a.line - b.line || a.local_entry.localeCompare(b.local_entry));

@@ -576,11 +576,11 @@ describe('keys and limits', () => {
     expect(out.rows).toHaveLength(1);
   });
 
-  it('more than 10 000 slices: too_many_rows', () => {
+  it('more than 5 000 slices: too_many_rows (C26: one transaction stays near 3 s)', () => {
     const { choices } = choicesOf(file(fill('2026-10-14 10:00:00', 'AAPL', 'Buy', '1', '100')), SMALL_FIELDS);
-    const records = [{ line: 2, cells: fill('2026-10-14 10:00:00', 'AAPL', 'Sell', '10001', '100').split(',') }];
+    const records = [{ line: 2, cells: fill('2026-10-14 10:00:00', 'AAPL', 'Sell', '5001', '100').split(',') }];
     const two = (n: number) => String(n).padStart(2, '0');
-    for (let i = 0; i < 10001; i++) {
+    for (let i = 0; i < 5001; i++) {
       // One buy a second, so none merges: each closes one share of the short
       const t = 10 * 3600 + 1 + i;
       const time = `2026-10-14 ${two(Math.floor(t / 3600))}:${two(Math.floor((t % 3600) / 60))}:${two(t % 60)}`;
@@ -588,5 +588,10 @@ describe('keys and limits', () => {
     }
     const ctx = mappedContext(choices, 'stocks', columnClocks(choices.headers, choices.columns));
     expect(parseMappedFills(records, ctx).failure).toEqual({ error: 'too_many_rows' });
+    // 5 000 slices are sent
+    const fewer = records.slice(0, records.length - 1);
+    fewer[0] = { line: 2, cells: fill('2026-10-14 10:00:00', 'AAPL', 'Sell', '5000', '100').split(',') };
+    const ok = parseMappedFills(fewer, ctx);
+    expect([ok.failure, ok.rows.length]).toEqual([null, 5000]);
   });
 });

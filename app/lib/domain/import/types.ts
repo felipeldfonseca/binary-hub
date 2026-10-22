@@ -393,8 +393,15 @@ export const PLATFORM_FILE_TZ_HINT: Readonly<Record<ReaderPlatform, string>> = {
 /** 5 MB. The largest real export is about 54 KB. */
 export const MAX_FILE_BYTES = 5 * 1024 * 1024;
 
-/** Data records per file (header excluded). Also the most rows (trades or exits) a mapped file sends. */
+/** Data records per file (header excluded). Also the most rows a trade file (a reader's or a mapped one) sends. */
 export const MAX_RECORDS = 10000;
+
+/**
+ * The most slices (exits) an execution file sends (C26): 10 000 slices took 3.9 s in one
+ * transaction on the local PG15 (2.1 s for import_commit, 1.7 s for 3c's exit checks at commit),
+ * past the design's 3 s; 10 000 one-row trades took 1.8 s.
+ */
+export const MAX_SLICES = 5000;
 
 /** Columns of a mapped file (a phone's «mapa» of 100 selects is already the edge) */
 export const MAX_COLUMNS = 100;
