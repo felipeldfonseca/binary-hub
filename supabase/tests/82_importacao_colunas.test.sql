@@ -953,6 +953,51 @@ select tests.eq((select string_agg(coalesce(e->>'message', 'ok') || coalesce(':'
                 'every rule of a model, with its field');
 rollback;
 
+-- 6.2b The buy and the sell in columns (the approved board's Performance.csv, model «Tradovate»): the two times stand
+--      for the entry (and the side), the two prices for the result; one of a pair alone stands for nothing, and a
+--      fill model has no such fields
+begin;
+select set_config('request.jwt.claim.sub', :X, true);
+set local role authenticated;
+select tests.eq((select string_agg(coalesce(e->>'message', 'ok') || coalesce(':' || (e->>'hint'), ''), ' ' order by x.ord)
+                 from unnest(array[
+                   -- the board's columns: symbol, qty, the two prices, pnl, the two times (buyFillId / sellFillId ignored)
+                   tests.tpl('Tradovate', '["symbol", "qty", "buyprice", "sellprice", "pnl", "boughttimestamp", "soldtimestamp", "duration"]',
+                             '{"symbol": "symbol", "qty": "quantity", "buyprice": "buy_price", "sellprice": "sell_price", "pnl": "pnl",
+                               "boughttimestamp": "buy_time", "soldtimestamp": "sell_time"}'),
+                   -- without the result: the buy and sell prices give it
+                   tests.tpl('b', '["symbol", "qty", "buyprice", "sellprice", "boughttimestamp", "soldtimestamp"]',
+                             '{"symbol": "symbol", "qty": "quantity", "buyprice": "buy_price", "sellprice": "sell_price",
+                               "boughttimestamp": "buy_time", "soldtimestamp": "sell_time"}'),
+                   -- an entry column and the pair together
+                   tests.tpl('c', '["entry", "symbol", "qty", "pnl", "boughttimestamp", "soldtimestamp"]',
+                             '{"entry": "entry_time", "symbol": "symbol", "qty": "quantity", "pnl": "pnl",
+                               "boughttimestamp": "buy_time", "soldtimestamp": "sell_time"}'),
+                   -- the buy time alone is no entry
+                   tests.tpl('d', '["symbol", "qty", "pnl", "boughttimestamp"]',
+                             '{"symbol": "symbol", "qty": "quantity", "pnl": "pnl", "boughttimestamp": "buy_time"}'),
+                   -- the buy price alone is no result
+                   tests.tpl('e', '["symbol", "qty", "buyprice", "boughttimestamp", "soldtimestamp"]',
+                             '{"symbol": "symbol", "qty": "quantity", "buyprice": "buy_price",
+                               "boughttimestamp": "buy_time", "soldtimestamp": "sell_time"}'),
+                   -- a buy price and an exit price are not a pair either
+                   tests.tpl('f', '["symbol", "qty", "buyprice", "exitprice", "boughttimestamp", "soldtimestamp"]',
+                             '{"symbol": "symbol", "qty": "quantity", "buyprice": "buy_price", "exitprice": "exit_price",
+                               "boughttimestamp": "buy_time", "soldtimestamp": "sell_time"}'),
+                   -- each once
+                   tests.tpl('g', '["symbol", "qty", "pnl", "boughttimestamp", "soldtimestamp", "bought2"]',
+                             '{"symbol": "symbol", "qty": "quantity", "pnl": "pnl", "boughttimestamp": "buy_time",
+                               "soldtimestamp": "sell_time", "bought2": "buy_time"}'),
+                   -- never in a fill model
+                   tests.tpl('h', '["time", "symbol", "qty", "price", "boughttimestamp"]',
+                             '{"time": "time", "symbol": "symbol", "qty": "quantity", "price": "price", "boughttimestamp": "buy_time"}',
+                             '{"row_kind": "fill"}')
+                 ]) with ordinality x(p, ord),
+                 lateral (select tests.err(format('select public.import_template_save(%L)', x.p)) as e) z),
+                'ok ok ok bad_template:columns bad_template:columns bad_template:columns bad_template:columns bad_template:columns',
+                'the buy and the sell in columns stand for the entry, the side and the result');
+rollback;
+
 -- 6.3 The batch: the caller's, done, a mapped file of the same columns
 begin;
 select set_config('request.jwt.claim.sub', :Y, true);

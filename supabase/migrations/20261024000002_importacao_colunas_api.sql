@@ -20,9 +20,13 @@
 --     accent, no leading, trailing or double space, at most 80 characters plus a «#n» suffix for a
 --     repeat, unique. Fields per row kind (each at most once, «fee» on several columns):
 --       trade  entry_time, exit_time, symbol, side, quantity, pnl, entry_price, exit_price,
+--              buy_time, sell_time, buy_price, sell_price («Compra / Venda (data e hora)», «Preço
+--              de compra / de venda»: a file with the buy and the sell in columns, Tradovate's
+--              Performance.csv; the first of the two times is the entry and gives the side),
 --              commission, fee («Outra taxa (soma na comissão)»), swap («Swap ou funding»), stop,
---              target, trade_id, account. Required: entry_time, symbol, quantity, and pnl or both
---              prices (side may be left to a signed quantity). swap only with pnl.
+--              target, trade_id, account. Required: entry_time (or both buy_time and sell_time),
+--              symbol, quantity, and pnl or both prices (entry and exit, or buy and sell); side may
+--              be left to a signed quantity or to the buy and sell times. swap only with pnl.
 --       fill   time, symbol, side, quantity, price, commission, fee, swap, fill_id, order_id,
 --              open_close, realized, account. Required: time, symbol, quantity, price. swap only with
 --              realized.
@@ -1422,10 +1426,12 @@ begin
   kind := p->>'row_kind';
 
   -- The columns: {name of the file: field}, names of this file, fields of the row kind, each once («fee»,
-  -- «Outra taxa (soma na comissão)», may take several columns), the required ones present
+  -- «Outra taxa (soma na comissão)», may take several columns), the required ones present. A trade file
+  -- may give the entry by its buy and sell in columns (the first of the two times is the entry)
   cols := p->'columns';
   vocab := case kind
     when 'trade' then array['entry_time', 'exit_time', 'symbol', 'side', 'quantity', 'pnl', 'entry_price', 'exit_price',
+                            'buy_time', 'sell_time', 'buy_price', 'sell_price',
                             'commission', 'fee', 'swap', 'stop', 'target', 'trade_id', 'account']
     else array['time', 'symbol', 'side', 'quantity', 'price', 'commission', 'fee', 'swap', 'fill_id', 'order_id',
                'open_close', 'realized', 'account'] end;
@@ -1437,8 +1443,10 @@ begin
   end if;
   select coalesce(array_agg(c.value #>> '{}'), '{}') into mapped from jsonb_each(cols) c;
   if exists (select 1 from unnest(mapped) f where f <> 'fee' group by f having count(*) > 1)
-     or (kind = 'trade' and not (mapped @> array['entry_time', 'symbol', 'quantity']
-                                 and ('pnl' = any (mapped) or mapped @> array['entry_price', 'exit_price'])))
+     or (kind = 'trade' and not (mapped @> array['symbol', 'quantity']
+                                 and ('entry_time' = any (mapped) or mapped @> array['buy_time', 'sell_time'])
+                                 and ('pnl' = any (mapped) or mapped @> array['entry_price', 'exit_price']
+                                      or mapped @> array['buy_price', 'sell_price'])))
      or (kind = 'fill' and not mapped @> array['time', 'symbol', 'quantity', 'price'])
      or ('swap' = any (mapped) and not (case kind when 'trade' then 'pnl' else 'realized' end) = any (mapped)) then
     raise exception 'bad_template' using errcode = '22023', hint = 'columns';
