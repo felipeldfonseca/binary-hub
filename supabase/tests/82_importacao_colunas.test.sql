@@ -286,7 +286,9 @@ create temp table f2m as select
     tests.mrow(2, null, 'ETHBTC', 'long', '2026-10-01T09:00:00', '2026-10-01T09:30:00', '0.05', '0.06', '1', '0.01'),
     tests.mrow(3, null, 'BTCUSD_PERP', 'long', '2026-10-01T09:01:00', '2026-10-01T09:30:00', '60000', '60100', '1', '100.00'),
     tests.mrow(4, null, 'BTC/USDT', 'long', '2026-10-01T09:02:00', '2026-10-01T09:30:00', '60000', '60100', '0.5', '50.00', 'prices'),
-    tests.mrow(5, null, 'SOLUSDC', 'short', '2026-10-01T09:03:00', '2026-10-01T09:30:00', '150', '149', '2', '2.00')) as cry,
+    tests.mrow(5, null, 'SOLUSDC', 'short', '2026-10-01T09:03:00', '2026-10-01T09:30:00', '150', '149', '2', '2.00'),
+    -- a dollar coin alone is no pair
+    tests.mrow(6, null, 'USDT', 'long', '2026-10-01T09:04:00', '2026-10-01T09:30:00', '1.0000', '1.0010', '100', '0.10')) as cry,
   jsonb_build_array(
     tests.mrow(2, null, 'AAPL  261120C00150000', 'long', '2026-10-01T10:00:00', '2026-10-01T10:30:00', '1.85', '2.10', '2', '50.00'),
     tests.mrow(3, null, 'AAPL', 'long', '2026-10-01T10:01:00', '2026-10-01T10:30:00', '230.00', '231.50', '10', '15.00', 'prices')) as stk,
@@ -307,8 +309,8 @@ select tests.eq((tests.imp82(:'fx', 'fx.csv', :'rfx'::jsonb)->'errors'),
                 '[{"line": 3, "code": "no_price_result"}, {"line": 5, "code": "no_price_result"}]'::jsonb,
                 'forex: USD-base pairs are estimates (÷ the exit), the majors exact, the crosses take the file''s result');
 select tests.eq((tests.imp82(:'cry', 'cry.csv', :'rcry'::jsonb)->'errors'),
-                '[{"line": 2, "code": "not_dollar_quote"}, {"line": 3, "code": "not_dollar_quote"}]'::jsonb,
-                'crypto: only pairs quoted in a dollar coin (COIN-M refused)');
+                '[{"line": 2, "code": "not_dollar_quote"}, {"line": 3, "code": "not_dollar_quote"}, {"line": 6, "code": "not_dollar_quote"}]'::jsonb,
+                'crypto: only pairs quoted in a dollar coin (COIN-M refused, and a dollar coin alone)');
 select tests.eq((tests.imp82(:'stk', 'stk.csv', :'rstk'::jsonb)->'errors'), '[{"line": 2, "code": "bad_option"}]'::jsonb,
                 'stocks: an OCC option symbol is refused (registered in the app instead)');
 select tests.eq((tests.imp82(:'b3', 'b3.csv', :'rb3'::jsonb)->'errors'), '[{"line": 4, "code": "no_price_result"}]'::jsonb,
@@ -327,6 +329,24 @@ select tests.eq((select jsonb_agg(jsonb_build_object('sym', t.symbol, 'type', t.
                   {"sym": "SPY", "type": "option", "basis": "prices"},
                   {"sym": "AAPL", "type": "stock", "basis": "prices"}]'::jsonb,
                 'asset_type as Registrar stores it (B3 futures roots are futures), the basis as sent');
+
+-- A position of several estimated rows (two exits of USDJPY, ÷ the exit price) is an estimate: trade_exits_sum's
+-- precedence, file, typed, estimate, prices
+begin;
+select set_config('request.jwt.claim.sub', :X, true);
+set local role authenticated;
+select tests.eq(tests.imp82(:'fx', 'fx-est.csv', jsonb_build_array(
+                  tests.mrow(2, null, 'USDJPY', 'long', '2026-10-17T09:00:00', '2026-10-17T09:30:00', '150.000', '150.500', '0.10', '33.22', 'estimate'),
+                  tests.mrow(3, null, 'USDJPY', 'long', '2026-10-17T09:00:00', '2026-10-17T09:45:00', '150.000', '150.500', '0.10', '33.22', 'estimate')))
+                  - 'batch_id' - 'errors',
+                '{"inserted": 2, "duplicate": 0, "completed": 0, "other_account": 0, "linked": 0, "trades": 1, "grouped": 1, "attached": 0}'::jsonb,
+                'two estimated exits of one position: one trade');
+commit;
+select tests.eq((select jsonb_build_object('q', t.quantity, 'pnl', t.pnl, 'basis', t.pnl_basis,
+                                           'exits', (select jsonb_agg(e.pnl_basis order by e.line) from public.trade_exits e where e.trade_id = t.id))
+                 from public.trades t where t.account_id = :'fx' and t.entry_time = '2026-10-17 13:00Z'),
+                '{"q": 0.20, "pnl": 66.44, "basis": "estimate", "exits": ["estimate", "estimate"]}'::jsonb,
+                'the trade and its exits are estimates, never «from the prices»');
 
 -- A reader's row is the file's result: another basis is refused, as is any for 'modelo' other than the three
 begin;
@@ -507,6 +527,92 @@ select tests.eq(public.import_preview(:'same', 'modelo', null, :NY,
 select tests.eq(public.import_preview(:'same', 'modelo', null, :NY, jsonb_build_array(
                   tests.mrow(2, null, 'MNQZ6', 'short', '2026-10-06T11:00:00', '2026-10-06T11:05:00', '21000.00', '20990.00', '1', '20.00',
                              'prices')), '[]', null, tests.fmt('w'))->>'new', '1', 'the wall clock and the instant are two keys');
+-- Nor at the same written clock: S-4 is 15:00 +00:00; 15:00 on New York's wall clock is another trade (19:00 UTC)
+select tests.eq(public.import_preview(:'same', 'modelo', null, :NY, jsonb_build_array(
+                  tests.mrow(2, null, 'MNQZ6', 'short', '2026-10-06T15:00:00', '2026-10-06T15:05:00', '21000.00', '20990.00', '1', '20.00',
+                             'prices')), '[]', null, tests.fmt('w2')) - array['first_day', 'last_day', 'account_tz', 'tz_confirmed', 'tz_status',
+                                                                              'already_imported', 'day_changes', 'rows_total', 'errors', 'other_source'],
+                '{"new": 1, "duplicate": 0, "completable": 0, "other_account": 0, "linked": 0, "linked_differs": 0}'::jsonb,
+                'a wall clock and an instant written alike are two keys (tagged)');
+commit;
+
+-- 3.7 Each part of the tuple is in the key: rows that differ in one part only (the entry, to the microsecond, the
+--     symbol, the side, the quantity, a price, the exit, a wall clock or an instant written alike) get keys of their
+--     own; money never changes it; the occurrence counts the rows without an ID only
+create temp table f37 as select jsonb_build_array(
+  tests.mrow(2, 'K-1', 'MESZ6', 'long', '2026-10-20T09:30:00', '2026-10-20T09:40:00', '6800.00', '6802.00', '1', '10.00'),
+  tests.mrow(3, null, 'MESZ6', 'long', '2026-10-20T09:30:00', '2026-10-20T09:40:00', '6800.00', '6802.00', '1', '10.00'),
+  tests.mrow(4, null, 'MESZ6', 'long', '2026-10-20T09:31:00', '2026-10-20T09:40:00', '6800.00', '6802.00', '1', '10.00'),
+  tests.mrow(5, null, 'MESZ6', 'long', '2026-10-20T09:30:00.5', '2026-10-20T09:40:00', '6800.00', '6802.00', '1', '10.00'),
+  tests.mrow(6, null, 'MESH7', 'long', '2026-10-20T09:30:00', '2026-10-20T09:40:00', '6800.00', '6802.00', '1', '10.00'),
+  tests.mrow(7, null, 'MESZ6', 'short', '2026-10-20T09:30:00', '2026-10-20T09:40:00', '6800.00', '6802.00', '1', '-10.00'),
+  tests.mrow(8, null, 'MESZ6', 'long', '2026-10-20T09:30:00', '2026-10-20T09:40:00', '6800.00', '6802.00', '2', '20.00'),
+  tests.mrow(9, null, 'MESZ6', 'long', '2026-10-20T09:30:00', '2026-10-20T09:40:00', '6800.25', '6802.00', '1', '8.75'),
+  tests.mrow(10, null, 'MESZ6', 'long', '2026-10-20T09:30:00', '2026-10-20T09:41:00', '6800.00', '6802.00', '1', '10.00'),
+  tests.mrow(11, null, 'MESZ6', 'long', '2026-10-20T09:30:00', '2026-10-20T09:40:00', '6800.00', '6802.25', '1', '11.25'),
+  tests.mrow(12, null, 'MESZ6', 'long', '2026-10-20T09:30:00', null, '6800.00', null, '1', '10.00'),
+  tests.mrow(13, null, 'MESZ6', 'long', '2026-10-20T09:30:00', '2026-10-20T09:40:00', '6800.00', '6802.00', '1', '10.00', 'file', null, '+00:00'),
+  tests.mrow(14, null, 'MESZ6', 'long', '2026-10-20T09:30:00', '2026-10-20T09:40:00', '6800.00', '6802.00', '1', '12.50', 'file', '0.62')) as rows;
+select rows as f37 from f37 \gset
+-- (import_checked_rows is internal: called here as the database's owner)
+select tests.eq((with c as (select * from public.import_checked_rows((select a from public.trading_accounts a where a.id = :'same'), 'modelo',
+                                                                    :NY, :'f37'::jsonb))
+                 select jsonb_object_agg(c.line::text,
+                          coalesce(c.code,
+                                   case when c.tuple_hash = b.tuple_hash then 'same ' else 'own ' end
+                                   || case when c.key_kind = 'real' then c.external_id
+                                           when left(c.external_id, 33) = '@' || left(c.tuple_hash, 32)
+                                             then substring(c.external_id from '\.[0-9]+$') else 'bad key' end))
+                 from c, (select tuple_hash from c where line = 3) b),
+                '{"2": "same K-1", "3": "same .1", "4": "own .1", "5": "own .1", "6": "own .1", "7": "own .1", "8": "own .1", "9": "own .1",
+                  "10": "own .1", "11": "own .1", "12": "own .1", "13": "own .1", "14": "same .2"}'::jsonb,
+                'one key per tuple: every part counts, money does not; the n-th row without an ID of a tuple ends in «.n»');
+-- An instant is written in UTC whatever the session's zone
+select external_id as k13 from public.import_checked_rows((select a from public.trading_accounts a where a.id = :'same'), 'modelo', :NY,
+                                                          jsonb_build_array(:'f37'::jsonb->11)) \gset
+begin;
+set local timezone to 'Asia/Kolkata';
+select tests.eq((select external_id from public.import_checked_rows((select a from public.trading_accounts a where a.id = :'same'), 'modelo', :NY,
+                                                                    jsonb_build_array(:'f37'::jsonb->11))),
+                :'k13', 'the key of a row with an offset does not depend on the session''s zone');
+rollback;
+
+-- 3.8 «Mesma hora e preço» counts copies, and only for a position wholly new: a trade with one exit of a tuple never
+--     answers a position of two such rows; a position with rows already in the account (by key) is never 'same'
+begin;
+select set_config('request.jwt.claim.sub', :X, true);
+set local role authenticated;
+select tests.eq(tests.imp82(:'same', 'c1', jsonb_build_array(
+                  tests.mrow(2, null, 'MESZ6', 'long', '2026-10-15T09:30:00', '2026-10-15T09:35:00', '6800.00', '6802.00', '1', '10.00', 'prices')))
+                  ->'inserted', '1'::jsonb, 'one row without an ID');
+select tests.eq(public.import_preview(:'same', 'modelo', null, :NY, jsonb_build_array(
+                  tests.mrow(2, 'D-1', 'MESZ6', 'long', '2026-10-15T09:30:00', '2026-10-15T09:35:00', '6800.00', '6802.00', '1', '10.00', 'prices'),
+                  tests.mrow(3, 'D-2', 'MESZ6', 'long', '2026-10-15T09:30:00', '2026-10-15T09:35:00', '6800.00', '6802.00', '1', '10.00', 'prices')),
+                  '[]', null, tests.fmt('c2')) - array['first_day', 'last_day', 'account_tz', 'tz_confirmed', 'tz_status', 'already_imported',
+                                                       'day_changes', 'rows_total', 'errors', 'other_source'],
+                '{"new": 2, "duplicate": 0, "completable": 0, "other_account": 0, "linked": 0, "linked_differs": 0, "trades_new": 1, "grouped": 1,
+                  "attached": 0}'::jsonb,
+                'two such rows with IDs: one stored copy is not two, so the position is new');
+-- P (one row, T1), then R (three rows of one position, T1 T2 T3, with IDs): R is new, P answers only T1
+select tests.eq(tests.imp82(:'same', 'p1', jsonb_build_array(
+                  tests.mrow(2, null, 'MESZ6', 'long', '2026-10-16T09:30:00', '2026-10-16T09:35:00', '6800.00', '6802.00', '1', '10.00', 'prices')))
+                  ->'inserted', '1'::jsonb, 'P');
+select tests.eq(tests.imp82(:'same', 'r1', jsonb_build_array(
+                  tests.mrow(2, 'R-1', 'MESZ6', 'long', '2026-10-16T09:30:00', '2026-10-16T09:35:00', '6800.00', '6802.00', '1', '10.00', 'prices'),
+                  tests.mrow(3, 'R-2', 'MESZ6', 'long', '2026-10-16T09:30:00', '2026-10-16T09:40:00', '6800.00', '6803.00', '1', '15.00', 'prices'),
+                  tests.mrow(4, 'R-3', 'MESZ6', 'long', '2026-10-16T09:30:00', '2026-10-16T09:45:00', '6800.00', '6804.00', '1', '20.00', 'prices')))
+                  - 'batch_id' - 'errors',
+                '{"inserted": 3, "duplicate": 0, "completed": 0, "other_account": 0, "linked": 0, "trades": 1, "grouped": 2, "attached": 0}'::jsonb,
+                'R: one trade with three exits');
+-- T1 without an ID is P (by key), R-2 is R's exit (by key), C-3 is new: R's exits hold all three tuples, yet the row is new
+select tests.eq(public.import_preview(:'same', 'modelo', null, :NY, jsonb_build_array(
+                  tests.mrow(2, null, 'MESZ6', 'long', '2026-10-16T09:30:00', '2026-10-16T09:35:00', '6800.00', '6802.00', '1', '10.00', 'prices'),
+                  tests.mrow(3, 'R-2', 'MESZ6', 'long', '2026-10-16T09:30:00', '2026-10-16T09:40:00', '6800.00', '6803.00', '1', '15.00', 'prices'),
+                  tests.mrow(4, 'C-3', 'MESZ6', 'long', '2026-10-16T09:30:00', '2026-10-16T09:45:00', '6800.00', '6804.00', '1', '20.00', 'prices')),
+                  '[]', null, tests.fmt('mixed')) - array['first_day', 'last_day', 'account_tz', 'tz_confirmed', 'tz_status', 'already_imported',
+                                                          'day_changes', 'rows_total', 'errors', 'other_source'],
+                '{"new": 1, "duplicate": 2, "completable": 0, "other_account": 0, "linked": 0, "linked_differs": 0}'::jsonb,
+                'a position partly in the account by key is never «mesma hora e preço»');
 commit;
 
 -- =============================================================================================
@@ -536,6 +642,32 @@ select set_config('request.jwt.claim.sub', :Y, true);
 set local role authenticated;
 select tests.eq(public.import_preview(:'tray', 'modelo', null, :NY, :'f4one'::jsonb, '[]', null, tests.fmt('f4'))->>'other_account', '0',
                 'another user''s IDs are never «em outra conta»');
+commit;
+
+-- «Outra» and «Não sei» name no platform: two such accounts never share IDs. Acoes X and Opcoes X are both IBKR, in
+-- two markets: a stock's ID (its trade's, or a file exit's ticket) is not an option's. A NinjaTrader file exit's
+-- ticket is not a Tradovate one.
+create temp table f4b as select
+  jsonb_build_array(tests.mrow(2, 'OU-1', 'MESZ6', 'long', '2026-10-08T15:00:00', '2026-10-08T15:05:00', '6820.00', '6821.00', '1', '5.00', 'prices')) as ou,
+  jsonb_build_array(tests.mrow(2, 'NS-1', 'MESZ6', 'long', '2026-10-08T15:10:00', '2026-10-08T15:15:00', '6820.00', '6821.00', '1', '5.00', 'prices')) as ns,
+  jsonb_build_array(tests.mrow(2, 'AX-1', 'AAPL', 'long', '2026-10-08T10:00:00', '2026-10-08T10:30:00', '230.00', '231.00', '10', '10.00'),
+                    tests.mrow(3, 'AX-2', 'AAPL', 'long', '2026-10-08T10:00:00', '2026-10-08T10:40:00', '230.00', '232.00', '10', '20.00')) as ax,
+  jsonb_build_array(tests.mrow(2, 'NX-1', 'MESZ6', 'long', '2026-10-08T15:20:00', '2026-10-08T15:25:00', '6820.00', '6821.00', '1', '5.00', 'prices'),
+                    tests.mrow(3, 'NX-2', 'MESZ6', 'long', '2026-10-08T15:20:00', '2026-10-08T15:30:00', '6820.00', '6822.00', '1', '10.00', 'prices')) as nx;
+select ou as f4ou, ns as f4ns, ax as f4ax, nx as f4nx from f4b \gset
+begin;
+select set_config('request.jwt.claim.sub', :X, true);
+set local role authenticated;
+select tests.eq(concat_ws(' ', tests.imp82(:'outra', 'f4b', :'f4ou'::jsonb)->>'inserted', tests.imp82(:'nao', 'f4b', :'f4ns'::jsonb)->>'inserted',
+                          tests.imp82(:'stk', 'f4b', :'f4ax'::jsonb)->>'inserted', tests.imp82(:'ninja', 'f4b', :'f4nx'::jsonb)->>'inserted'),
+                '1 1 2 2', 'OU-1 in Outra X, NS-1 in Nao X, AX-1/AX-2 one stock trade in Acoes X, NX-1/NX-2 one trade in Ninja X');
+select tests.eq(concat_ws(' ',
+                  public.import_preview(:'outra2', 'modelo', null, :NY, :'f4ou'::jsonb, '[]', null, tests.fmt('f4b'))->>'other_account',
+                  public.import_preview(:'nao2', 'modelo', null, :NY, :'f4ns'::jsonb, '[]', null, tests.fmt('f4b'))->>'other_account',
+                  public.import_preview(:'opc', 'modelo', null, :NY, jsonb_build_array(:'f4ax'::jsonb->0), '[]', null, tests.fmt('f4b'))->>'other_account',
+                  public.import_preview(:'opc', 'modelo', null, :NY, jsonb_build_array(:'f4ax'::jsonb->1), '[]', null, tests.fmt('f4b'))->>'other_account',
+                  public.import_preview(:'trad2', 'modelo', null, :NY, jsonb_build_array(:'f4nx'::jsonb->1), '[]', null, tests.fmt('f4b'))->>'other_account'),
+                '0 0 0 0 0', 'never «em outra conta»: Outra X2, Nao X2, Opcoes X (the trade''s ID and the ticket), Trad X2 (NinjaTrader''s ticket)');
 commit;
 
 -- =============================================================================================
@@ -594,6 +726,20 @@ begin;
 select set_config('request.jwt.claim.sub', :X, true);
 set local role authenticated;
 select tests.eq(tests.imp82(:'lnk', 'l1', :'f51'::jsonb)->'duplicate', '2'::jsonb, 'the file again: two duplicates');
+-- A registered trade is never «já estava (mesma hora e preço)» (its entry is the app's): rows equal to its stored
+-- entry and file exits, with IDs, are new
+select tests.eq(public.import_preview(:'lnk', 'modelo', null, :NY,
+                  (select jsonb_agg(tests.mrow(e.line, 'RX-' || e.line, t.symbol, t.direction,
+                                               to_char(t.entry_time at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US'),
+                                               to_char(e.file_exit_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US'),
+                                               t.entry_price::text, e.exit_price::text, e.quantity::text, e.pnl::text, 'file', null, '+00:00')
+                                    order by e.line)
+                   from public.trades t join public.trade_exits e on e.trade_id = t.id and e.origin = 'file' where t.id = :'a1'),
+                  '[]', null, tests.fmt('l1')) - array['first_day', 'last_day', 'account_tz', 'tz_confirmed', 'tz_status', 'already_imported',
+                                                       'day_changes', 'rows_total', 'errors', 'other_source'],
+                '{"new": 2, "duplicate": 0, "completable": 0, "other_account": 0, "linked": 0, "linked_differs": 0, "trades_new": 1, "grouped": 1,
+                  "attached": 0}'::jsonb,
+                'a registered trade''s file exits are never «mesma hora e preço»');
 select public.import_undo((:'c51'::jsonb->>'batch_id')::uuid);
 commit;
 select tests.eq(tests.fp82(:'a1'), :'fpa1', 'undo: the trade and its exits exactly as registered');
@@ -653,6 +799,23 @@ select tests.eq(tests.imp82(:'stk', 'opt', jsonb_build_array(
 commit;
 select tests.ok((select t.status = 'open' and t.external_id is null from public.trades t where t.id = (select v::uuid from tests.p82 where k = 'o1')),
                 'the registered option is untouched');
+-- Nor is it the other registered trade that splits a position (3c's pass 2): a stock position of two rows onto a
+-- registered SPY of another size stays one link, though the option has the same entry price
+begin;
+select set_config('request.jwt.claim.sub', :X, true);
+set local role authenticated;
+select public.register_entry(:'stk', tests.entry82('SPY', 'long', '3', '1.85', -10))->>'trade_id' as s2 \gset
+select entry_time as s2_entry from public.trades where id = :'s2' \gset
+select tests.eq(public.import_preview(:'stk', 'modelo', null, :NY, jsonb_build_array(
+                  tests.mrow(2, null, 'SPY', 'long', tests.wc(:'s2_entry'::timestamptz + interval '5 seconds'), tests.wc(now() - interval '3 minutes'),
+                             '1.85', '2.00', '1', '0.15'),
+                  tests.mrow(3, null, 'SPY', 'long', tests.wc(:'s2_entry'::timestamptz + interval '5 seconds'), tests.wc(now() - interval '2 minutes'),
+                             '1.85', '2.10', '1', '0.25')), '[]', null, tests.fmt('spy'))
+                  - array['first_day', 'last_day', 'account_tz', 'tz_confirmed', 'tz_status', 'already_imported', 'day_changes', 'rows_total',
+                          'errors', 'other_source', 'linked_differs'],
+                '{"new": 0, "duplicate": 0, "completable": 0, "other_account": 0, "linked": 1, "trades_new": 0, "grouped": 1, "attached": 0}'::jsonb,
+                'the position links the stock trade whole');
+rollback;
 
 -- 5.4 A longer export: the new exit joins the imported trade; undo gives it back
 create temp table f54 as select
@@ -691,25 +854,34 @@ select tests.eq(public.import_template_sig('["b", "a", "", "á", "#2", "a#2", "�
                 encode(sha256(convert_to(E'\n#2\na\na#2\nb\ná\n😀', 'UTF8')), 'hex'), 'an empty name, a repeat, an accent and a non-BMP character');
 select tests.eq(public.import_template_sig('["b", "a"]'::jsonb), public.import_template_sig('["a", "b"]'::jsonb), 'the order of the file does not matter');
 
--- 6.1 A batch read with these columns, then the model saved from it; saved again, it is touched
+-- 6.1 A batch read with these columns, then the model saved from it; saved again (later), it is touched
 begin;
 select set_config('request.jwt.claim.sub', :X, true);
 set local role authenticated;
 select tests.imp82(:'fmt', 'm1', jsonb_build_array(
   tests.mrow(2, null, 'MESZ6', 'long', '2026-10-10T09:30:00', '2026-10-10T09:35:00', '6800.00', '6801.00', '1', '5.00', 'prices')),
   :NY, jsonb_build_object('sig', :'sig1', 'template', null)) as cm1 \gset
-select public.import_template_save(tests.tpl('Tradovate', null, null, jsonb_build_object('tz_hint', :NY, 'side_words', '{"c": "buy", "v": "sell"}'::jsonb)),
+select public.import_template_save(tests.tpl('Tradovate', null, null, jsonb_build_object('tz_hint', :NY, 'side_words', '{"c": "buy", "v": "sell"}'::jsonb,
+                                                                                         'header_skip', 2)),
                                    (:'cm1'::jsonb->>'batch_id')::uuid) as t1 \gset
 select tests.eq((:'t1'::jsonb) - 'template_id', jsonb_build_object('header_sig', :'sig1', 'created', true), 'a new model');
+commit;
+select (:'t1'::jsonb)->>'template_id' as tpl1 \gset
+select tests.eq((select jsonb_build_object('skip', header_skip, 'tz', tz_hint, 'used', last_used_at = created_at and updated_at = created_at)
+                 from public.import_templates where id = :'tpl1'),
+                jsonb_build_object('skip', 2, 'tz', :NY, 'used', true), 'stored as sent, used when saved');
+begin;
+select set_config('request.jwt.claim.sub', :X, true);
+set local role authenticated;
 select tests.eq((public.import_template_save(tests.tpl('Tradovate (Apex)'), (:'cm1'::jsonb->>'batch_id')::uuid) - 'template_id'),
                 jsonb_build_object('header_sig', :'sig1', 'created', false), 'the same columns again: the same model, updated');
 commit;
-select (:'t1'::jsonb)->>'template_id' as tpl1 \gset
 select tests.eq((select jsonb_build_object('n', count(*), 'name', min(name), 'net', bool_and(result_is_net), 'tz', min(tz_hint),
-                                           'used', bool_and(last_used_at is not null), 'words', min(side_words::text))
+                                           'skip', min(header_skip), 'words', min(side_words::text),
+                                           'touched', bool_and(updated_at > created_at and last_used_at > created_at))
                  from public.import_templates where user_id = :X),
-                '{"n": 1, "name": "Tradovate (Apex)", "net": true, "tz": null, "used": true, "words": "{}"}'::jsonb,
-                'one row, its choices replaced by the last save');
+                '{"n": 1, "name": "Tradovate (Apex)", "net": true, "tz": null, "skip": 0, "words": "{}", "touched": true}'::jsonb,
+                'one row, its choices replaced by the last save, updated and used now');
 select tests.eq((select template_id::text || ' ' || template_name from public.import_batches where id = (:'cm1'::jsonb->>'batch_id')::uuid),
                 :'tpl1' || ' Tradovate (Apex)', 'the batch names its model');
 
@@ -752,6 +924,7 @@ select tests.eq((select string_agg(coalesce(e->>'message', 'ok') || coalesce(':'
                    tests.tpl('a', null, '{"ativo": "symbol", "data": "entry_time", "qtd": "quantity", "res. liq.": "pnl"}', '{"result_is_net": false}'),
                    tests.tpl('a') || '{"side_words": {"c": "compra"}}',
                    tests.tpl('a') || jsonb_build_object('side_words', (select jsonb_object_agg('w' || i, 'buy') from generate_series(1, 21) i)),
+                   tests.tpl('a') || jsonb_build_object('side_words', jsonb_build_object(repeat('w', 41), 'buy')),
                    tests.tpl('a') || '{"open_close_words": {"a": "open"}}',
                    tests.tpl('a') || '{"tz_hint": "Mars/Base"}',
                    tests.tpl('a') || jsonb_build_object('pad', repeat('x', 17000)),
@@ -765,7 +938,8 @@ select tests.eq((select string_agg(coalesce(e->>'message', 'ok') || coalesce(':'
                    tests.tpl('c', '["fill time", "symbol", "b/s", "filled qty", "avg fill price", "order id", "realized", "fees"]',
                              '{"fill time": "time", "symbol": "symbol", "b/s": "side", "filled qty": "quantity", "avg fill price": "price",
                                "order id": "order_id", "realized": "realized", "fees": "commission"}',
-                             '{"row_kind": "fill", "result_is_net": true, "open_close_words": {"o": "open"}}')
+                             '{"row_kind": "fill", "result_is_net": true, "open_close_words": {"o": "open"}}'),
+                   tests.tpl('d') || jsonb_build_object('side_words', jsonb_build_object(repeat('w', 40), 'sell', 'c', 'buy'))
                  ]) with ordinality x(p, ord),
                  lateral (select tests.err(format('select public.import_template_save(%L)', x.p)) as e) z),
                 'bad_template:payload bad_template:v bad_template:keys bad_template:name bad_template:name bad_template:headers '
@@ -774,7 +948,8 @@ select tests.eq((select string_agg(coalesce(e->>'message', 'ok') || coalesce(':'
                 || 'bad_template:delimiter bad_template:decimal_mark bad_template:date_order bad_template:row_kind bad_template:columns '
                 || 'bad_template:columns bad_template:columns bad_template:columns bad_template:columns bad_template:columns bad_template:columns '
                 || 'bad_template:result_is_net bad_template:result_is_net bad_template:side_words bad_template:side_words '
-                || 'bad_template:open_close_words bad_template:tz_hint bad_template:payload bad_template:account_routes ok ok ok',
+                || 'bad_template:side_words bad_template:open_close_words bad_template:tz_hint bad_template:payload bad_template:account_routes '
+                || 'ok ok ok ok',
                 'every rule of a model, with its field');
 rollback;
 
@@ -820,6 +995,21 @@ select tests.eq((select string_agg(coalesce(tests.err(format('select public.impo
                       with ordinality x(p, ord)),
                 'account_routes account_routes account_routes account_routes account_routes ok',
                 'routes need the «Conta» column, hashed keys, and the caller''s open accounts of the batch''s market');
+-- The batch's market decides: a forex batch routes to the forex account, never to a futures one
+select (tests.imp82(:'fx', 'fx-rotas', jsonb_build_array(
+  tests.mrow(2, null, 'EURGBP', 'short', '2026-10-18T09:00:00', '2026-10-18T09:30:00', '0.86500', '0.86400', '0.10', '11.50')),
+  :NY, jsonb_build_object('sig', :'sig1', 'template', null))->>'batch_id') as fxb \gset
+select tests.eq((select string_agg(coalesce(tests.err(format('select public.import_template_save(%L, %L)', x.p, :'fxb'))->>'hint', 'ok'),
+                                   ' ' order by x.ord)
+                 from unnest(array[
+                   tests.tpl('a', '["data", "ativo", "lado", "qtd", "entrada", "saida", "res. liq.", "comissao"]',
+                             '{"data": "entry_time", "ativo": "symbol", "qtd": "quantity", "res. liq.": "pnl", "lado": "account"}',
+                             jsonb_build_object('account_routes', jsonb_build_object(repeat('a', 64), :'fx'))),
+                   tests.tpl('a', '["data", "ativo", "lado", "qtd", "entrada", "saida", "res. liq.", "comissao"]',
+                             '{"data": "entry_time", "ativo": "symbol", "qtd": "quantity", "res. liq.": "pnl", "lado": "account"}',
+                             jsonb_build_object('account_routes', jsonb_build_object(repeat('a', 64), :'trad')))])
+                      with ordinality x(p, ord)),
+                'ok account_routes', 'a forex batch: the forex account, not a futures one');
 rollback;
 
 -- 6.4 «Atualizar o modelo»: the same row takes the new columns
@@ -1187,6 +1377,16 @@ select tests.ok(has_table_privilege('authenticated', 'public.import_templates', 
                 'models: the API reads and deletes its own, writes none; anon nothing');
 select tests.eq((select count(*) from public.trades where source_platform = 'modelo' and notes is not null), 0::bigint,
                 'no mapped trade carries the legacy notes key');
+-- The batch checks (the functions never trip them): a mapped batch records its format; a reader's batch has neither
+-- a format nor a model
+select tests.eq(concat_ws(' ',
+                  tests.err(format($$insert into public.import_batches (user_id, account_id, platform, file_tz) values (%L, %L, 'modelo', 'UTC')$$,
+                                   :X, :'trad'))->>'message' ~ 'import_batches_modelo_format',
+                  tests.err(format($$insert into public.import_batches (user_id, account_id, platform, file_tz, header_sig)
+                                     values (%L, %L, 'topone', 'UTC', %L)$$, :X, :'top', repeat('a', 64)))->>'message' ~ 'import_batches_modelo_format',
+                  tests.err(format($$insert into public.import_batches (user_id, account_id, platform, file_tz, template_name)
+                                     values (%L, %L, 'topone', 'UTC', 'x')$$, :X, :'top'))->>'message' ~ 'import_batches_modelo_template'),
+                't t t', 'a mapped batch without its format, a reader''s batch with a format or a model: refused');
 select tests.eq((select count(*) from public.trades where source = 'import' and source_platform in ('ebinex', 'topone')
                    and pnl_basis is distinct from 'file' and import_batch_id is not null and registered_at > now() - interval '1 day'
                    and user_id = :X), 0::bigint, 'the readers'' trades are the file''s result');
