@@ -3,7 +3,7 @@
  * own names (a, b, c, d, f, g, i1, i2, solte, erro, fim…), plus `conf`: the count of what a
  * file zone change moves, shown before the zone is confirmed (owner's decision, no board).
  */
-import { PLATFORM_MARKET, type FileVariant, type ParsedFile, type Platform, type ReadImportFileResult } from '@/lib/domain/import'
+import { PLATFORM_MARKET, type FileVariant, type ParsedFile, type ReaderPlatform, type ReadImportFileResult } from '@/lib/domain/import'
 import { fileDays, tzConfirmed, type TradingAccount } from '@/lib/hub/contas'
 import { formatDateRange } from '@/lib/hub/formato'
 import { ARQUIVO, MARKET_LABEL, ops } from '@/components/hub/contas/copy'
@@ -107,7 +107,7 @@ export function fileSummary(parsed: ParsedFile, currentYear: number): string {
 export function emptyFileSummary(file: ReadImportFileResult | null): string | null {
   const outcome = file?.outcome
   if (!outcome) return null
-  let platform: Platform
+  let platform: ReaderPlatform
   let variant: FileVariant
   if (outcome.ok) {
     if (outcome.rows.length > 0) return null

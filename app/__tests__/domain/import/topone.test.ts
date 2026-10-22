@@ -70,6 +70,7 @@ describe('Top One rows', () => {
       commission: '2.68',
       stop_price: null,
       target_price: null,
+      pnl_basis: 'file',
     });
     expect(out.warnings).toEqual([]);
     expect(out.notices).toEqual([{ code: 'commission_in_file', gross: '10.00', commission: '2.68' }, { code: 'sl_tp_empty' }]);

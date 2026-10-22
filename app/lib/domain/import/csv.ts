@@ -25,9 +25,14 @@ export class CsvError extends Error {
   }
 }
 
+/** The cell separators a file may use: comma (the default), semicolon (Excel in pt-BR) or tab */
+export type CsvDelimiter = ',' | ';' | '\t';
+
 export interface ReadCsvOptions {
   /** Most records accepted, header included. Default: MAX_RECORDS data records + the header. */
   maxRecords?: number;
+  /** The cell separator. Default ','. Quoting rules are the same for every separator. */
+  delimiter?: CsvDelimiter;
 }
 
 /**
@@ -35,13 +40,14 @@ export interface ReadCsvOptions {
  * - Strips a leading BOM.
  * - Line ends may be CRLF, LF or CR, mixed.
  * - A quote opens a quoted cell only at the start of a cell; `""` inside it is one quote, and
- *   commas and line ends inside it are part of the cell. A quote anywhere else is kept as text.
- * - Blank lines (empty or only spaces) are skipped. A line of only commas is a record.
+ *   separators and line ends inside it are part of the cell. A quote anywhere else is kept as text.
+ * - Blank lines (empty or only spaces) are skipped. A line of only separators is a record.
  * Throws CsvError: 'malformed_csv' for a quote that never closes (line where it opened),
  * 'too_many_rows' at the first record over the limit.
  */
 export function readCsv(text: string, opts: ReadCsvOptions = {}): CsvRecord[] {
   const maxRecords = opts.maxRecords ?? MAX_RECORDS + 1;
+  const delimiter = opts.delimiter ?? ',';
   const src = text.charCodeAt(0) === 0xfeff ? text.slice(1) : text;
   const out: CsvRecord[] = [];
 
@@ -87,7 +93,7 @@ export function readCsv(text: string, opts: ReadCsvOptions = {}): CsvRecord[] {
       quoteLine = line;
       continue;
     }
-    if (c === ',') {
+    if (c === delimiter) {
       cells.push(cell);
       cell = '';
       quoted = false;

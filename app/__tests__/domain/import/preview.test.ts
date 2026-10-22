@@ -41,6 +41,7 @@ function row(local_entry: string, utc_offset: string | null = null, extra: Parti
     commission: '0.00',
     stop_price: null,
     target_price: null,
+    pnl_basis: 'file',
     ...extra,
   };
 }

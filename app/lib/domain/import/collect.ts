@@ -27,8 +27,8 @@ export function issue<C extends string>(line: number, code: C, column?: Canonica
   return column ? { line, code, column } : { line, code };
 }
 
-export class RowCollector {
-  readonly rows: ImportRow[] = [];
+export class RowCollector<R extends ImportRow = ImportRow> {
+  readonly rows: R[] = [];
   readonly errors: RowIssue<RowErrorCode>[] = [];
   readonly warnings: RowIssue<RowWarningCode>[] = [];
   private readonly firstLineOf = new Map<string, number>();
@@ -40,15 +40,17 @@ export class RowCollector {
   /**
    * Keeps a valid row and its warnings, unless an earlier row of the file has the same ID:
    * then the row becomes a `duplicate_in_file` error pointing at the first one, and its
-   * warnings are dropped. Returns whether the row was kept.
+   * warnings are dropped. A row without an ID (a mapped file with no ID column) is never a
+   * duplicate here: the database keys it by its times and prices. Returns whether the row was kept.
    */
-  accept(row: ImportRow, warnings: RowIssue<RowWarningCode>[]): boolean {
-    const first = this.firstLineOf.get(row.external_id);
+  accept(row: R, warnings: RowIssue<RowWarningCode>[]): boolean {
+    const id = row.external_id;
+    const first = id === null ? undefined : this.firstLineOf.get(id);
     if (first !== undefined) {
       this.errors.push({ line: row.line, code: 'duplicate_in_file', firstLine: first });
       return false;
     }
-    this.firstLineOf.set(row.external_id, row.line);
+    if (id !== null) this.firstLineOf.set(id, row.line);
     this.rows.push(row);
     for (const w of warnings) this.warnings.push(w);
     return true;
