@@ -331,8 +331,14 @@ export type Notice =
   | { code: 'split_entries'; positions: number; trades: number }
   /** No «Abre ou fecha» column, and these symbols' buys and sells close in the file: taken as flat at its start */
   | { code: 'flat_start_assumed'; symbols: string[] }
-  /** Executions only partly left out (part of each closes a position from before the file) */
-  | { code: 'opened_before_file'; fills: number };
+  /**
+   * Executions only partly left out, by the reason for the part left out (not error lines): part of
+   * each closes a position from before the file; opens a position still open at the end; or belongs
+   * to a trade with no result
+   */
+  | { code: 'opened_before_file'; fills: number }
+  | { code: 'open_at_end'; fills: number }
+  | { code: 'no_price_result'; fills: number };
 
 /** What one broker's reader returns for the data records of a file. */
 export interface PlatformParse<R extends ImportRow = ImportRow> {

@@ -50,6 +50,7 @@ export { parseImportText, readImportFile, sha256Hex, type ReadImportFileResult }
 export { entryHistogram, entrySpan, previewInstant, totals } from './preview';
 export {
   buildImportArgs,
+  countUnit,
   previewArgs,
   toRpcErrors,
   toRpcRow,

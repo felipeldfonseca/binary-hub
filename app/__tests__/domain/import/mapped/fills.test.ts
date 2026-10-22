@@ -8,6 +8,7 @@
  */
 import type { AccountMarket } from '@/lib/domain';
 import {
+  countUnit,
   endOfFileKey,
   parseMappedFills,
   parseMappedRecords,
@@ -48,10 +49,10 @@ function parse(
   text: string,
   fields: Record<string, FieldKey>,
   market: AccountMarket,
-  opts: { over?: Partial<MappingChoices>; answers?: Record<string, EndOfFileAnswer> } = {},
+  opts: { over?: Partial<MappingChoices>; answers?: Record<string, EndOfFileAnswer>; accountValue?: string } = {},
 ): MappedFile {
   const { s, choices } = choicesOf(text, fields, opts.over);
-  const out = parseMappedRecords({ records: s.records, choices, market, endOfFile: opts.answers });
+  const out = parseMappedRecords({ records: s.records, choices, market, endOfFile: opts.answers, accountValue: opts.accountValue });
   if (!out.ok) throw new Error(`file error ${out.error}`);
   return out;
 }
@@ -59,6 +60,10 @@ function parse(
 const brief = (rows: ImportRow[]) => rows.map((r) => `L${r.line} ${r.direction} ${r.quantity} ${r.entry_price}→${r.exit_price} ${r.pnl}`);
 const errs = (out: MappedFile) => out.errors.map((e) => `L${e.line} ${e.code}`);
 const total = (xs: (string | null)[]) => xs.reduce((s, x) => s + (x === null ? 0 : Math.round(Number(x) * 100)), 0) / 100;
+/** A trade as «conferir» draws it: symbol, side, size, each exit's result, the trade's result */
+const trade = (p: MappedFile['positions'][number]) => `${p.symbol} ${p.direction} ${p.quantity} [${p.exits.map((e) => e.pnl).join(' ')}] ${p.pnl}`;
+/** The rows without their line (a re-export moves lines, never the rows) */
+const unlined = (rows: ImportRow[]) => rows.map(({ line: _line, ...rest }) => rest);
 
 // ---------------------------------------------------------------------------------------------
 // Tradovate «Orders» (scenario 16): one order per row, cancelled legs, no commission
@@ -114,6 +119,16 @@ describe('Tradovate Orders (scenario 16)', () => {
       ['MNQZ6', 'long', '1', 1, '17.00'],
       ['MESZ6', 'short', '3', 2, '23.75'],
     ]);
+    // The board: «As 6 saídas viram 4 operações.», «2 saídas parciais juntadas às suas operações.»
+    expect([out.rows.length, out.positions.length, out.rows.length - out.positions.length]).toEqual([6, 4, 2]);
+    expect(out.positions.map(trade)).toEqual([
+      'MESZ6 long 2 [18.75 36.25] 55.00',
+      'MNQZ6 long 1 [7.50] 7.50',
+      'MNQZ6 long 1 [17.00] 17.00',
+      'MESZ6 short 3 [37.50 -13.75] 23.75',
+    ]);
+    // Counted in exits («saídas»), never in lines
+    expect([out.countUnit, countUnit(out), out.records]).toEqual(['exit', 'exit', 6]);
     // No commission column: unknown, never zero
     expect(out.rows.every((r) => r.commission === null && r.pnl_basis === 'prices')).toBe(true);
     expect(out.notices).toEqual([
@@ -137,9 +152,12 @@ describe('Tradovate Orders (scenario 16)', () => {
 
   it('ending positioned (R1): «Não sei» (pre-selected) leaves every MESZ6 execution out', () => {
     const out = parse(TRADOVATE_OPEN, TV_FIELDS, 'futures');
-    expect(out.endOfFile).toEqual([{ symbol: 'MESZ6', net: '-1', fills: 7, answer: 'unknown' }]);
+    // «No fim do arquivo, MESZ6 ficou posicionado?» · «Pelas execuções do arquivo, sobram 1 contrato vendido.»
+    expect(out.endOfFile).toEqual([{ key: 'MESZ6', symbol: 'MESZ6', account: null, net: '-1', fills: 7, answer: 'unknown' }]);
     expect(errs(out)).toEqual(['L2 unbalanced_symbol', 'L4 unbalanced_symbol', 'L5 unbalanced_symbol', 'L10 unbalanced_symbol', 'L11 unbalanced_symbol', 'L12 unbalanced_symbol', 'L13 unbalanced_symbol']);
     expect(brief(out.rows)).toEqual(['L8 long 1 25240.75→25244.50 7.50', 'L8 long 1 25236.00→25244.50 17.00']);
+    // «As 2 saídas viram 2 operações.»
+    expect([out.rows.length, out.positions.length]).toEqual([2, 2]);
     expect(out).toMatchObject({ unfilled: 3, executions: 10, records: 9 });
     expect(out.notices).toContainEqual({ code: 'flat_start_assumed', symbols: ['MNQZ6'] });
   });
@@ -148,7 +166,9 @@ describe('Tradovate Orders (scenario 16)', () => {
     const out = parse(TRADOVATE_OPEN, TV_FIELDS, 'futures', { answers: { [endOfFileKey('MESZ6')]: 'yes' } });
     expect(out.endOfFile[0].answer).toBe('yes');
     expect(errs(out)).toEqual(['L13 open_at_end']);
-    expect(out.positions).toHaveLength(4);
+    expect(out.positions.map((p) => p.pnl)).toEqual(['55.00', '7.50', '17.00', '23.75']);
+    // The longer export gives the same slices, keys included, so a re-import finds them all
+    expect(out.rows).toEqual(parse(TRADOVATE, TV_FIELDS, 'futures').rows);
   });
 
   it('«Não, terminou zerado»: the file began long 1; the sell that closes it stays out, the rest pairs right', () => {
@@ -161,7 +181,17 @@ describe('Tradovate Orders (scenario 16)', () => {
       'MESZ6 short 2 2@6817.25 37.50',
       'MESZ6 long 1 1@6824.50 3.75',
     ]);
+    // «As 6 saídas viram 5 operações.», «1 saída parcial juntada à sua operação.»
+    expect([out.rows.length, out.positions.length]).toEqual([6, 5]);
     expect(out.records).toBe(7);
+  });
+
+  it('a file that starts with the close of a position from before it: «Não» pairs the rest as a flat start would', () => {
+    const lines = TRADOVATE.split('\n');
+    const pre = [lines[0], tv('8801190', 'Sell', 'MESZ6', '1', '1', '6809.00', '10/13/2026 10:20:00', 'Filled'), ...lines.slice(1)].join('\n');
+    const out = parse(pre, TV_FIELDS, 'futures', { answers: { MESZ6: 'no' } });
+    expect(errs(out)).toEqual(['L2 opened_before_file']);
+    expect(unlined(out.rows)).toEqual(unlined(parse(TRADOVATE, TV_FIELDS, 'futures').rows));
   });
 });
 
@@ -199,23 +229,37 @@ describe('Binance (scenario 16)', () => {
     const out = parse(BINANCE, BN_FIELDS, 'crypto');
     expect(out.needsFileTz).toBe(false);
     expect(out.rows.every((r) => r.utc_offset === '+00:00')).toBe(true);
-    expect(out.endOfFile).toEqual([{ symbol: 'ETHUSDT', net: '0.1000', fills: 3, answer: 'unknown' }]);
+    // «Pelas execuções do arquivo, sobram 0,1 ETH comprados.»
+    expect(out.endOfFile).toEqual([{ key: 'ETHUSDT', symbol: 'ETHUSDT', account: null, net: '0.1000', fills: 3, answer: 'unknown' }]);
     expect(errs(out)).toEqual(['L3 unbalanced_symbol', 'L5 unbalanced_symbol', 'L6 unbalanced_symbol']);
-    expect(out.records).toBe(6);
+    expect([out.executions, out.records]).toEqual([8, 6]);
+    // «Viram 2 operações: 1 com uma saída e 1 com saídas parciais.» · «Bruto +US$ 7,55 · comissões −US$ 2,82.»
+    expect(out.positions.map(trade)).toEqual(['BTCUSDT long 0.0125 [6.90] 6.90', 'BTCUSDT long 0.02 [2.40 -1.75] 0.65']);
     expect(sums(out)).toEqual({ gross: 7.55, commission: 2.82 });
     expect(out.notices).toContainEqual({ code: 'commission_other_asset', trades: 1, assets: ['BNB'] });
+    // «Em BTCUSDT, supomos que o arquivo começa sem posição aberta.»
+    expect(out.notices).toContainEqual({ code: 'flat_start_assumed', symbols: ['BTCUSDT'] });
   });
 
   it('«Sim»: the last buy stays out (open at the end); «Não»: the first buy closed a sale from before', () => {
     const yes = parse(BINANCE, BN_FIELDS, 'crypto', { answers: { ETHUSDT: 'yes' } });
     expect(errs(yes)).toEqual(['L6 open_at_end']);
-    expect(yes.positions).toHaveLength(3);
+    expect(yes.positions.map((p) => [p.symbol, p.pnl, p.commission])).toEqual([
+      ['BTCUSDT', '6.90', '2.82'],
+      ['ETHUSDT', '1.45', null],
+      ['BTCUSDT', '0.65', null],
+    ]);
     expect(sums(yes)).toEqual({ gross: 9, commission: 2.82 });
     expect(yes.notices).toContainEqual({ code: 'commission_other_asset', trades: 2, assets: ['BNB'] });
 
     const no = parse(BINANCE, BN_FIELDS, 'crypto', { answers: { ETHUSDT: 'no' } });
     expect(errs(no)).toEqual(['L3 opened_before_file']);
     expect(brief(no.rows.filter((r) => r.symbol === 'ETHUSDT'))).toEqual(['L6 short 0.1000 4135.00→4108.00 2.70']);
+    expect(no.positions.map((p) => [p.symbol, p.direction, p.pnl, p.commission])).toEqual([
+      ['BTCUSDT', 'long', '6.90', '2.82'],
+      ['ETHUSDT', 'short', '2.70', '0.82'],
+      ['BTCUSDT', 'long', '0.65', null],
+    ]);
     expect(sums(no)).toEqual({ gross: 10.25, commission: 3.64 });
   });
 
@@ -224,6 +268,78 @@ describe('Binance (scenario 16)', () => {
     const b2 = out.positions.find((p) => p.local_entry === '2026-10-12T14:05:00');
     expect(b2).toMatchObject({ quantity: '0.02', pnl: '0.65', commission: null });
     expect(b2?.exits.map((e) => e.pnl)).toEqual(['2.40', '-1.75']);
+  });
+});
+
+// ---------------------------------------------------------------------------------------------
+// Binance USDⓈ-M futures trade history: a realized result on each closing fill (gross of fees)
+// ---------------------------------------------------------------------------------------------
+
+const BN_FUT = [
+  'Date(UTC),Symbol,Side,Price,Quantity,Amount,Fee,Realized Profit',
+  '2026-10-15 13:02:11,XRPUSDT,SELL,2.5120,400,1004.80,0.40192000USDT,18.40000000', // L2 a long from before the file
+  '2026-10-15 13:05:40,BTCUSDT,BUY,111850.0,0.010,1118.50,0.44740000USDT,0', // L3
+  '2026-10-15 13:05:40,BTCUSDT,BUY,111850.0,0.004,447.40,0.17896000USDT,0', // L4 the same second: merged with L3
+  '2026-10-15 13:20:03,BTCUSDT,BUY,111700.0,0.006,670.20,0.26808000USDT,0', // L5 adds: its own trade
+  '2026-10-15 13:41:27,BTCUSDT,SELL,112050.0,0.020,2241.00,0.89640000USDT,4.90000000', // L6 closes both
+  '2026-10-15 14:10:00,ETHUSDT,SELL,4110.00,0.500,2055.00,0.82200000USDT,0', // L7 short
+  '2026-10-15 14:25:30,ETHUSDT,BUY,4095.50,0.300,1228.65,0.49146000USDT,4.35000000', // L8
+  '2026-10-15 14:52:10,ETHUSDT,BUY,4102.25,0.200,820.45,0.00090000BNB,1.55000000', // L9 its fee in BNB
+  '2026-10-15 15:30:00,SOLUSDT,BUY,182.40,10,1824.00,0.72960000USDT,0', // L10
+  '2026-10-15 15:44:00,SOLUSDT,SELL,183.10,10,1831.00,0.73240000USDT,7.20000000', // L11 the file says 7.20, the prices 7.00
+].join('\n');
+const BF_FIELDS: Record<string, FieldKey> = {
+  'date(utc)': 'time',
+  symbol: 'symbol',
+  side: 'side',
+  price: 'price',
+  quantity: 'quantity',
+  fee: 'commission',
+  'realized profit': 'realized',
+};
+
+describe('Binance USDⓈ-M (realized profit per closing fill)', () => {
+  const out = parse(BN_FUT, BF_FIELDS, 'crypto');
+
+  it('the file\'s result wins, split over the slices by their prices; a sell that only opens yet realized: before the file', () => {
+    expect(errs(out)).toEqual(['L2 opened_before_file']);
+    expect(brief(out.rows)).toEqual([
+      'L6 long 0.014 111850.00000000→112050.0 2.80',
+      'L6 long 0.006 111700.0→112050.0 2.10',
+      'L8 short 0.300 4110.00→4095.50 4.35',
+      'L9 short 0.200 4110.00→4102.25 1.55',
+      'L11 long 10 182.40→183.10 7.20',
+    ]);
+    expect(out.rows.every((r) => r.pnl_basis === 'file' && r.utc_offset === '+00:00')).toBe(true);
+    // Only where the file and the prices disagree by more than a cent
+    expect(out.warnings).toEqual([{ line: 11, code: 'result_differs_from_prices' }]);
+    expect(out.endOfFile).toEqual([]);
+  });
+
+  it('commissions to the cent per fill; a fee in BNB on one exit leaves the whole trade without commission', () => {
+    expect(out.rows.map((r) => r.commission)).toEqual(['1.26', '0.54', null, null, '1.46']);
+    expect(out.positions.map((p) => [trade(p), p.commission])).toEqual([
+      ['BTCUSDT long 0.014 [2.80] 2.80', '1.26'],
+      ['BTCUSDT long 0.006 [2.10] 2.10', '0.54'],
+      ['ETHUSDT short 0.5 [4.35 1.55] 5.90', null],
+      ['SOLUSDT long 10 [7.20] 7.20', '1.46'],
+    ]);
+    expect(out.notices).toEqual([
+      { code: 'file_has_offset', offsets: ['+00:00'], rows: 5 },
+      { code: 'commission_in_file', gross: '18.00', commission: '3.26' },
+      { code: 'merged_fills', fills: 2, into: 1 },
+      { code: 'split_entries', positions: 1, trades: 2 },
+      { code: 'flat_start_assumed', symbols: ['BTCUSDT', 'ETHUSDT', 'SOLUSDT'] },
+      { code: 'commission_other_asset', trades: 1, assets: ['BNB'] },
+    ]);
+  });
+
+  it('newest first (as Binance exports): the same trades', () => {
+    const lines = BN_FUT.split('\n');
+    const reversed = parse([lines[0], ...lines.slice(1).reverse()].join('\n'), BF_FIELDS, 'crypto');
+    const key = (rows: ImportRow[]) => unlined(rows).map((r) => JSON.stringify(r)).sort();
+    expect(key(reversed.rows)).toEqual(key(out.rows));
+    expect(errs(reversed)).toEqual(['L11 opened_before_file']);
   });
 });
 
@@ -261,8 +377,31 @@ describe('IBKR (scenario 16)', () => {
       ['NVDA', 'long', '300', 1, '204.00', '3.00'],
       ['AAPL', 'short', '100', 2, '79.00', '2.00'],
     ]);
-    // A model without «Abre ou fecha» assumes nothing about the start: no notice here
+    // «As 3 saídas viram 2 operações.» · «3 execuções ficaram de fora.» · «Bruto +US$ 283,00»
+    expect([out.executions, out.rows.length, out.positions.length, out.errors.length]).toEqual([8, 3, 2, 3]);
+    // The kept trades' costs: 3.00 + 2.00 (the left-out fills' costs are not theirs)
+    expect(out.notices).toContainEqual({ code: 'commission_in_file', gross: '283.00', commission: '5.00' });
+    // With «Abre ou fecha» the start is proven: no notice here
     expect(out.notices.find((n) => n.code === 'flat_start_assumed')).toBeUndefined();
+  });
+
+  it('«FifoPnlRealized» (net of every commission) mapped: it wins, made gross, and agrees with the prices', () => {
+    const header = 'Symbol,DateTime,Quantity,TradePrice,IBCommission,AssetClass,Open/CloseIndicator,FifoPnlRealized,TradeID';
+    const realized = ['288.50', '0', '201.00', '0', '49.80', '0', '27.20', '0'];
+    const text = [header, ...IBKR.split('\n').slice(1).map((l, i) => {
+      const c = l.split(',');
+      return [...c.slice(0, 7), realized[i], c[7]].join(',');
+    })].join('\n');
+    const out = parse(text, { ...IB_FIELDS, fifopnlrealized: 'realized' }, 'stocks', { over: { resultIsNet: true } });
+    expect(errs(out)).toEqual(['L2 opened_before_file', 'L7 option_symbol', 'L9 open_at_end']);
+    expect(out.rows.map((r) => [r.pnl, r.commission, r.pnl_basis])).toEqual([
+      ['204.00', '3.00', 'file'],
+      ['51.00', '1.20', 'file'],
+      ['28.00', '0.80', 'file'],
+    ]);
+    expect(out.positions.map((p) => p.pnl)).toEqual(['204.00', '79.00']);
+    expect(out.warnings).toEqual([]);
+    expect(out.notices).toContainEqual({ code: 'result_net_converted', rows: 3 });
   });
 });
 
@@ -385,6 +524,82 @@ describe('merging, ordering, guards', () => {
     const out = parse(file(fill('2026-10-14 10:00:00', 'BTCUSDT', 'Sell', '1', '100000', { realized: '120.00' }), fill('2026-10-14 10:05:00', 'BTCUSDT', 'Buy', '2', '99000', { realized: '0' }), fill('2026-10-14 10:10:00', 'BTCUSDT', 'Sell', '2', '99500', { realized: '1000.00' })), fields, 'crypto');
     expect(errs(out)).toEqual(['L2 opened_before_file']);
     expect(brief(out.rows)).toEqual(['L4 long 2 99000→99500 1000.00']);
+  });
+});
+
+describe('«Conta» with several accounts, all read', () => {
+  const ACC = [
+    'Time,Account,Symbol,Side,Qty,Price',
+    '2026-10-14 10:00:00,A-1,MESZ6,Buy,1,6800.00',
+    '2026-10-14 10:01:00,B-2,MESZ6,Sell,1,6805.00',
+    '2026-10-14 10:02:00,A-1,MESZ6,Sell,1,6810.00',
+    '2026-10-14 10:03:00,B-2,MESZ6,Buy,1,6801.00',
+    '2026-10-14 10:04:00,B-2,MESZ6,Buy,1,6802.00',
+  ].join('\n');
+  const fields: Record<string, FieldKey> = { time: 'time', account: 'account', symbol: 'symbol', side: 'side', qty: 'quantity', price: 'price' };
+
+  it('two accounts\' executions never pair; the question names the account', () => {
+    const out = parse(ACC, fields, 'futures');
+    expect(out.endOfFile).toEqual([{ key: endOfFileKey('MESZ6', 'B-2'), symbol: 'MESZ6', account: 'B-2', net: '1', fills: 3, answer: 'unknown' }]);
+    expect(brief(out.rows)).toEqual(['L4 long 1 6800.00→6810.00 50.00']);
+    expect(errs(out)).toEqual(['L3 unbalanced_symbol', 'L5 unbalanced_symbol', 'L6 unbalanced_symbol']);
+    const yes = parse(ACC, fields, 'futures', { answers: { [endOfFileKey('MESZ6', ' b-2 ')]: 'yes' } });
+    expect(brief(yes.rows)).toEqual(['L4 long 1 6800.00→6810.00 50.00', 'L5 short 1 6805.00→6801.00 20.00']);
+    expect(errs(yes)).toEqual(['L6 open_at_end']);
+  });
+
+  it('one value chosen: only its rows, keyed by the symbol alone', () => {
+    const out = parse(ACC, fields, 'futures', { accountValue: 'a-1' });
+    expect([out.notImported, out.executions, out.endOfFile]).toEqual([3, 2, []]);
+    expect(brief(out.rows)).toEqual(['L4 long 1 6800.00→6810.00 50.00']);
+  });
+});
+
+describe('a fill that also closed a position from before the file (R7 with a part of unknown entry)', () => {
+  const fields = { ...SMALL_FIELDS, exec: 'open_close' as FieldKey, realized: 'realized' as FieldKey };
+
+  it('where the prices compute: its trades take the prices, not the file\'s whole value', () => {
+    // Long 100 from before the file; the sell of 150 closes it and our 50: the file's 800.00 holds both
+    const out = parse(file(fill('2026-10-14 10:00:00', 'AMD', 'Buy', '50', '160', { exec: 'O' }), fill('2026-10-14 10:30:00', 'AMD', 'Sell', '150', '162', { exec: 'C', realized: '800.00' })), fields, 'stocks');
+    expect(out.rows.map((r) => [r.quantity, r.pnl, r.pnl_basis])).toEqual([['50', '100.00', 'prices']]);
+    expect([out.errors, out.warnings]).toEqual([[], []]);
+    expect(out.notices).toContainEqual({ code: 'opened_before_file', fills: 1 });
+  });
+
+  it('where they do not: a share by quantity of everything it closed', () => {
+    const out = parse(file(fill('2026-10-14 10:00:00', 'ZNZ6', 'Buy', '1', '110.5', { exec: 'O' }), fill('2026-10-14 10:30:00', 'ZNZ6', 'Sell', '3', '111', { exec: 'C', realized: '300.00' })), fields, 'futures');
+    expect(out.rows.map((r) => [r.quantity, r.pnl, r.pnl_basis])).toEqual([['1', '100.00', 'file']]);
+  });
+
+  it('«Não»: the slice that closes the seeded position takes no money from the trade', () => {
+    const f2 = { ...SMALL_FIELDS, realized: 'realized' as FieldKey };
+    // Long 1 from before the file: the buy opens ours, the sell of 2 closes both (the file's 900.00 holds both)
+    const text = file(
+      fill('2026-10-14 10:00:00', 'BTCUSDT', 'Buy', '1', '100000', { realized: '0' }),
+      fill('2026-10-14 10:10:00', 'BTCUSDT', 'Sell', '2', '100500', { realized: '900.00' }),
+    );
+    const no = parse(text, f2, 'crypto', { answers: { BTCUSDT: 'no' } });
+    expect(no.endOfFile.map((q) => q.net)).toEqual(['-1']);
+    expect(no.rows.map((r) => [r.direction, r.quantity, r.pnl, r.pnl_basis])).toEqual([['long', '1', '500.00', 'prices']]);
+    expect(no.notices).toContainEqual({ code: 'opened_before_file', fills: 1 });
+  });
+});
+
+describe('«Abre ou fecha» at the edges', () => {
+  const fields = { ...SMALL_FIELDS, exec: 'open_close' as FieldKey };
+
+  it('«C;O» with nothing to close: what it opened has an unknown size, so all of it stays out', () => {
+    const out = parse(file(fill('2026-10-14 10:00:00', 'AAPL', 'Sell', '3', '101', { exec: 'C;O' }), fill('2026-10-14 10:05:00', 'AAPL', 'Buy', '2', '99', { exec: 'C' })), fields, 'stocks');
+    expect(out.rows).toEqual([]);
+    expect(errs(out)).toEqual(['L2 opened_before_file', 'L3 opened_before_file']);
+  });
+
+  it('a flip whose new side is still open at the end: the closed part enters, the notice counts the fill', () => {
+    const out = parse(file(fill('2026-10-14 10:00:00', 'AAPL', 'Buy', '1', '100', { exec: 'O' }), fill('2026-10-14 10:05:00', 'AAPL', 'Sell', '3', '101', { exec: 'C;O' })), fields, 'stocks');
+    expect(brief(out.rows)).toEqual(['L3 long 1 100→101 1.00']);
+    expect(out.errors).toEqual([]);
+    expect(out.notices).toContainEqual({ code: 'open_at_end', fills: 1 });
+    expect(out.notices.find((n) => n.code === 'opened_before_file')).toBeUndefined();
   });
 });
 

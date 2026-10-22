@@ -16,6 +16,7 @@ import {
   ROW_WARNING_CODES,
   TOPONE_COLUMNS,
   buildImportArgs,
+  countUnit,
   decodeCsvBytes,
   parseImportText,
   parseMappedRecords,
@@ -313,6 +314,15 @@ describe('mapped files (Phase 3b): p_platform modelo and p_format', () => {
       mappedFile('Open Time,Symbol,Side,Volume,Open Price,Close Price\n2026-10-14 08:40:12,USDJPY,BUY,0.50,151.200,151.350\n2026-10-14 08:41:12,EURUSD,SELL,1.00,1.08710,1.08745', 'trade', 'forex'),
     ],
     [
+      'executions with a realized result (Binance USDⓈ-M), merged fills and a fee in BNB',
+      mappedFile(
+        'Date(UTC),Symbol,Side,Price,Quantity,Amount,Fee,Realized Profit\n2026-10-15 13:05:40,BTCUSDT,BUY,111850.1,0.010,1118.50,0.44740000USDT,0\n2026-10-15 13:05:40,BTCUSDT,BUY,111850.7,0.003,335.55,0.13420000USDT,0\n2026-10-15 13:41:27,BTCUSDT,SELL,112050.0,0.013,1456.65,0.0005BNB,2.59123456',
+        'fill',
+        'crypto',
+        { 'Realized Profit': 'realized' },
+      ),
+    ],
+    [
       'executions with UTC in the header',
       mappedFile('Date(UTC),Pair,Side,Price,Executed,Fee,Trade ID\n2026-10-11 00:05:12,BTCUSDT,BUY,112400.00,0.0125BTC,1.41USDT,8812001\n2026-10-11 00:21:40,BTCUSDT,SELL,112952.00,0.0125BTC,1.41USDT,8812003\n2026-10-11 00:22:00,ETHUSDT,SELL,4100,0.1ETH,0.4USDT,8812004', 'fill', 'crypto'),
     ],
@@ -332,7 +342,7 @@ describe('mapped files (Phase 3b): p_platform modelo and p_format', () => {
   });
 
   it('commit and preview carry the format; the slices count, never the lines', () => {
-    const out = files[2][1];
+    const out = files[3][1];
     const a = args(out);
     expect(a.p_platform).toBe('modelo');
     expect(a.p_format).toEqual({ sig: out.format.sig, template: '11111111-2222-4333-8444-555555555555' });
@@ -340,6 +350,17 @@ describe('mapped files (Phase 3b): p_platform modelo and p_format', () => {
     expect(a.p_rows_total).toBe(out.rows.length + out.errors.length);
     expect(a.p_rows.map((r) => r.external_id)).toEqual(['8812001>8812003']);
     expect(a.p_errors).toEqual([{ line: 4, code: 'unbalanced_symbol' }]);
+  });
+
+  it('what the counts are in: lines for a reader\'s file and a trade file, exits for executions', () => {
+    const reader = parseImportText(fs.readFileSync(path.join(DIR, 'ebinex_atual_erros.csv'), 'utf8'));
+    if (!reader.ok) throw new Error(reader.error);
+    expect([countUnit(reader), countUnit(files[0][1]), countUnit(files[2][1]), countUnit(files[3][1])]).toEqual(['line', 'line', 'exit', 'exit']);
+  });
+
+  it('a merged average price and a realized result to the cent', () => {
+    const out = files[2][1];
+    expect(out.rows.map((r) => [r.entry_price, r.quantity, r.pnl, r.pnl_basis, r.commission])).toEqual([['111850.23846154', '0.013', '2.59', 'file', null]]);
   });
 
   it('refuses a mapped file whose format is not a signature and a model id', () => {

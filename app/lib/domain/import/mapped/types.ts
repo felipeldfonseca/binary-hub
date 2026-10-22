@@ -36,8 +36,12 @@ export interface ImportFormat {
 export type EndOfFileAnswer = 'yes' | 'no' | 'unknown';
 
 export interface EndOfFileQuestion {
+  /** The key its answer is given under (endOfFileKey): the symbol in upper case, with the «Conta» value when every account's rows are read */
+  key: string;
   /** The symbol as the trades take it */
   symbol: string;
+  /** The «Conta» value as the file writes it, when the file holds several accounts' rows and all are read; else null */
+  account: string | null;
   /** What the file's executions leave: positive = bought («sobram … compradas»), negative = sold */
   net: Decimal;
   /** Executions of the symbol in the file */
@@ -74,6 +78,14 @@ export interface MappedPosition {
   exits: MappedExit[];
 }
 
+/**
+ * What a mapped file's counts are in: `records`, `rows` and the database's preview and batch counts
+ * (rows_total, new, duplicate…). A trade file's are lines ('line'); an execution file's are exits,
+ * one per slice of a position ('exit': «saídas», never «linhas»), and its left-out executions are
+ * lines of the file.
+ */
+export type CountUnit = 'line' | 'exit';
+
 export interface MappedFile {
   ok: true;
   platform: 'modelo';
@@ -85,6 +97,8 @@ export interface MappedFile {
   format: ImportFormat;
   /** What p_rows_total carries: rows + errors (an execution file sends slices, never «linhas») */
   records: number;
+  /** The unit of `records`, `rows` and the database's counts: 'exit' for an execution file */
+  countUnit: CountUnit;
   rows: ImportRow[];
   errors: RowIssue<RowErrorCode>[];
   warnings: RowIssue<RowWarningCode>[];

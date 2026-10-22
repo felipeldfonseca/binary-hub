@@ -6,7 +6,7 @@
  * model, R3); a reader's file never sends p_format, so today's calls stay as they are.
  */
 import { assertTimeZone } from '../tempo';
-import type { ImportFormat, MappedFile } from './mapped/types';
+import type { CountUnit, ImportFormat, MappedFile } from './mapped/types';
 import {
   IMPORT_ROW_KEYS,
   type ImportRow,
@@ -47,6 +47,14 @@ export type ImportRpcArgs = ImportCommitArgs;
 
 /** A file ready to import: read by a reader, or by a column mapping */
 export type ImportFile = ParsedFile | MappedFile;
+
+/**
+ * What the file's counts are in (`records`, its rows and the preview's and the batch's counts): a
+ * reader's and a mapped trade file's are lines; an execution file's are exits («saídas»).
+ */
+export function countUnit(file: ImportFile): CountUnit {
+  return file.platform === 'modelo' ? file.countUnit : 'line';
+}
 
 const SHA256 = /^[0-9a-f]{64}$/;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;

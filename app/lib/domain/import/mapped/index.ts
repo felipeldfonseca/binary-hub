@@ -121,7 +121,7 @@ export interface MappedInput {
   market: AccountMarket;
   /** With a «Conta» column: the one value imported now (R9); null or absent: every row */
   accountValue?: string | null;
-  /** Execution files: «No fim do arquivo, {ativo} ficou posicionado?», keyed by endOfFileKey(symbol) */
+  /** Execution files: «No fim do arquivo, {ativo} ficou posicionado?», keyed by each question's `key` (endOfFileKey) */
   endOfFile?: Readonly<Record<string, EndOfFileAnswer>>;
   /** The model the file is read with (exact or changed match), for p_format */
   templateId?: string | null;
@@ -305,6 +305,7 @@ export function parseMappedRecords(input: MappedInput): MappedOutcome {
     rowKind: choices.rowKind,
     format: { sig: headerSignature(choices.headers), template: input.templateId ?? null },
     records: rows.length + errors.length,
+    countUnit: choices.rowKind === 'trade' ? 'line' : 'exit',
     rows,
     errors,
     warnings,

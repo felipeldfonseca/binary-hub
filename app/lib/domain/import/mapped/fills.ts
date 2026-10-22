@@ -10,13 +10,15 @@
  *  3. merge  consecutive fills of a symbol with the same side and «Abre ou fecha», and the same
  *            order ID or the same second: quantities and costs summed, the price their
  *            quantity-weighted average (Postgres numeric, 8 decimals)
- *  4. pair   per symbol as written (MESZ6 never pairs with MESH7): a fill on the side of the open
- *            lots, or with none open, opens a lot of its own (each entry its own trade); a fill on
- *            the other side closes the oldest lots first, each take a slice; what is left of it
- *            opens a lot on its side (a flip). With «Abre ou fecha», a closing fill with nothing to
- *            close, or the rest of one larger than the open lots, closes a position from before the
- *            file (opened_before_file); with «Resultado realizado», a fill that would only open a lot
- *            while carrying a realized result does too
+ *  4. pair   per symbol as written (MESZ6 never pairs with MESH7), and per «Conta» value when the
+ *            file's accounts are all read: a fill on the side of the open lots, or with none open,
+ *            opens a lot of its own (each entry its own trade); a fill on the other side closes the
+ *            oldest lots first, each take a slice; what is left of it opens a lot on its side (a
+ *            flip). With «Abre ou fecha», a closing fill with nothing to close, or the rest of one
+ *            larger than the open lots, closes a position from before the file (opened_before_file),
+ *            and so does a «C;O» with nothing to close (the size of what it opened is unknown); with
+ *            «Resultado realizado», a fill that would only open a lot while carrying a realized
+ *            result does too
  *  5. end    with «Abre ou fecha», a lot still open is left out whole (open_at_end); without it, a
  *            symbol whose buys and sells do not close is asked about (R1): «Sim» leaves the open
  *            lots out, «Não» seeds the position the file began with (its closing fills left out),
@@ -28,9 +30,15 @@
  * Money (R7): a closing fill's «Resultado realizado» wins (gross: + its slices' commissions when the
  * model says net), shared over its slices by their price results plus a share, by quantity, of the
  * difference (by quantity alone where the instrument does not compute), to the cent, so the slices
- * add up to the file's value; without it, the prices where the instrument computes them. Each
- * fill's commission is shared over its slices by quantity, to the cent, so it is never counted
- * twice or lost; a cost in another asset leaves the trade's commission unknown.
+ * add up to the file's value; without it, the prices where the instrument computes them. When the
+ * fill also closed a position from before the file, its value holds that part too, which has no
+ * entry price: its trades then take the prices (or, where the instrument does not compute, a share
+ * by quantity of everything it closed). Each fill's commission is shared over its parts by
+ * quantity, to the cent, so it is never counted twice or lost; a cost in another asset on any fill
+ * of a trade leaves that trade's commission unknown (every exit of it).
+ *
+ * Every left-out execution is a row error on each of its lines («Ver linhas»); one only partly
+ * left out is not, and the notice of its reason counts it. The counts of the rows are in exits.
  */
 import { tradeInstrument } from '../../registro/caps';
 import { pnlFromPrices } from '../../registro/pnl';
@@ -54,7 +62,9 @@ interface Fill {
   lines: number[];
   /** As the trades take it (the first fill's, normalised) */
   symbol: string;
-  /** Pairing key: the symbol in upper case */
+  /** The «Conta» cell, when the file holds several accounts' rows and all are read (no value chosen); else null */
+  account: string | null;
+  /** Pairing key (endOfFileKey): the symbol in upper case, with the account when there is one */
   key: string;
   side: Side;
   qty: Numeric;
@@ -156,7 +166,9 @@ function readFillRecord(rec: CsvRecord, c: MappedContext): FillRead {
       line,
       lines: [line],
       symbol: sym.symbol,
-      key: sym.symbol.toUpperCase(),
+      // Set once every row is read (accountKeys)
+      account: c.account === null && index.has('account') ? r.cell('account') : null,
+      key: endOfFileKey(sym.symbol),
       side,
       qty: q.qty,
       price,
@@ -171,6 +183,24 @@ function readFillRecord(rec: CsvRecord, c: MappedContext): FillRead {
       normalised: sym.normalised,
     },
   };
+}
+
+/**
+ * Two accounts' executions never pair: when a «Conta» column holds several values and all are read
+ * (no value chosen), each fill's lots and its end-of-file answer are keyed by account and symbol;
+ * with one value, by the symbol alone, as a file without the column.
+ */
+function accountKeys(fills: Fill[]): void {
+  const seen: string[] = [];
+  for (const f of fills) {
+    if (f.account === null) continue;
+    const k = accountKey(f.account);
+    if (seen.indexOf(k) < 0) seen.push(k);
+  }
+  for (const f of fills) {
+    if (seen.length < 2) f.account = null;
+    f.key = endOfFileKey(f.symbol, f.account);
+  }
 }
 
 const sameSecond = (a: Fill, b: Fill) => a.stamp.local.slice(0, 19) === b.stamp.local.slice(0, 19) && a.stamp.offset === b.stamp.offset;
@@ -262,7 +292,9 @@ function pair(fills: readonly Fill[], opts: { openClose: boolean; realized: bool
       }
       const rem = closeAgainst(f, f.qty);
       if (!isZeroN(rem)) {
-        if (f.openClose === 'flip') openLot(f, f.side, rem);
+        // «C;O» opens what is left once it closed ours; with nothing of ours to close, it closed a
+        // position from before the file, so the size it opened is unknown too: all of it stays out
+        if (f.openClose === 'flip' && cmp(rem, f.qty) < 0) openLot(f, f.side, rem);
         else partsOf(f).push({ kind: 'drop', code: 'opened_before_file', qty: rem });
       }
       continue;
@@ -320,7 +352,8 @@ export interface FillsResult {
 
 /**
  * An execution file, read, paired and emitted. `answers`: «No fim do arquivo, {ativo} ficou
- * posicionado?» per symbol (the key is the symbol in upper case); 'unknown' when not given.
+ * posicionado?» per symbol, under its question's `key` (endOfFileKey: the symbol in upper case, with
+ * the account when the file holds several and all are read); 'unknown' («Não sei») when not given.
  */
 export function parseMappedFills(
   records: readonly CsvRecord[],
@@ -356,6 +389,7 @@ export function parseMappedFills(
   }
   const executions = fills.length + readErrors;
   const base = { warnings, unfilled, notImported, executions };
+  accountKeys(fills);
 
   const withOffset = fills.filter((f) => f.stamp.offset !== null).length;
   if (withOffset > 0 && withOffset < fills.length) {
@@ -417,8 +451,9 @@ export function parseMappedFills(
         for (const lot of book.open) lot.dropped = 'open_at_end';
       } else {
         const net = book.open.reduce((s, lot) => add(s, lot.side === 'buy' ? lot.remaining : sub(ZERO_N, lot.remaining)), ZERO_N);
-        const answer: EndOfFileAnswer = answers[k] ?? 'unknown';
-        endOfFile.push({ symbol: sf[0].symbol, net: text(net), fills: sf.reduce((s, f) => s + f.lines.length, 0), answer });
+        const given = Object.prototype.hasOwnProperty.call(answers, k) ? answers[k] : undefined;
+        const answer: EndOfFileAnswer = given === 'yes' || given === 'no' ? given : 'unknown';
+        endOfFile.push({ key: k, symbol: sf[0].symbol, account: sf[0].account, net: text(net), fills: sf.reduce((s, f) => s + f.lines.length, 0), answer });
         if (answer === 'yes') {
           for (const lot of book.open) lot.dropped = 'open_at_end';
         } else if (answer === 'no') {
@@ -431,7 +466,7 @@ export function parseMappedFills(
           for (const lot of book.lots) lot.dropped = 'unbalanced_symbol';
         }
       }
-    } else if (!openCloseMapped && book.lots.length > 0) {
+    } else if (!openCloseMapped && book.lots.length > 0 && flatStart.indexOf(sf[0].symbol) < 0) {
       flatStart.push(sf[0].symbol);
     }
     books.push({ key: k, fills: sf, book });
@@ -444,7 +479,8 @@ export function parseMappedFills(
   const otherAssets: string[] = [];
   let splitPositions = 0;
   let splitTrades = 0;
-  let partial = 0;
+  /** Executions only partly left out, by the reason of the part left out */
+  const partial: Partial<Record<RowErrorCode, number>> = {};
 
   for (const { fills: sf, book } of books) {
     const spec = tradeInstrument(c.market, sf[0].symbol);
@@ -454,6 +490,8 @@ export function parseMappedFills(
     // Commission shares: each fill's cents over its parts by quantity; a lot's opening share over its slices
     const closeShare = new Map<Slice, bigint>();
     const openShare = new Map<Slice, bigint>();
+    /** What a fill's commission put on its parts left out (the rest of a close from before the file) */
+    const dropShare = new Map<Fill, bigint>();
     for (const f of sf) {
       const ps = book.parts.get(f) ?? [];
       if (f.commission === null || ps.length === 0) continue;
@@ -461,6 +499,7 @@ export function parseMappedFills(
       const shares = allocate(toCents(f.commission), units(qtys));
       ps.forEach((p, i) => {
         if (p.kind === 'close') closeShare.set(p.slice, shares[i]);
+        if (p.kind === 'drop') dropShare.set(f, (dropShare.get(f) ?? ZERO) + shares[i]);
         if (p.kind === 'open') {
           const lot = p.lot;
           const takes = lot.slices.map((s) => s.take);
@@ -470,9 +509,14 @@ export function parseMappedFills(
         }
       });
     }
-    const unknownCommission = (s: Slice) => (s.lot.open?.otherAsset ?? null) !== null || s.close.otherAsset !== null;
+    // A cost in another asset on any fill of a trade: the trade's commission is unknown, every exit of
+    // it (the database sums the exits it knows, which would show part of the cost as all of it)
+    const unknownLots = new Set<Lot>();
+    for (const lot of book.lots) {
+      if ((lot.open?.otherAsset ?? null) !== null || lot.slices.some((s) => s.close.otherAsset !== null)) unknownLots.add(lot);
+    }
     const commissionOf = (s: Slice): bigint | null => {
-      if (unknownCommission(s)) return null;
+      if (unknownLots.has(s.lot)) return null;
       const known = [s.lot.open?.commission ?? null, s.close.commission].some((x) => x !== null);
       return known ? (closeShare.get(s) ?? ZERO) + (openShare.get(s) ?? ZERO) : null;
     };
@@ -486,9 +530,37 @@ export function parseMappedFills(
       return v === null ? null : numeric(v).units * pow10(2 - numeric(v).scale);
     };
     for (const f of sf) {
-      const slices = (book.parts.get(f) ?? []).filter((p): p is { kind: 'close'; slice: Slice } => p.kind === 'close').map((p) => p.slice);
+      const ps = book.parts.get(f) ?? [];
+      const slices = ps.filter((p): p is { kind: 'close'; slice: Slice } => p.kind === 'close').map((p) => p.slice);
       if (slices.length === 0) continue;
-      if (realizedMapped && f.realized !== null) {
+      // What else the fill closed: a position from before the file (a seeded lot's slices, the rest of a close)
+      const restBefore = ps.filter((p): p is { kind: 'drop'; code: RowErrorCode; qty: Numeric } => p.kind === 'drop').map((p) => p.qty);
+      const before = restBefore.length > 0 || slices.some((s) => !s.lot.open);
+      if (realizedMapped && f.realized !== null && before) {
+        if (computes) {
+          // The file's value also holds the part from before the file, which has no entry price: the
+          // prices give this fill's trades their result
+          for (const s of slices) {
+            const p = priceCents(s);
+            if (p === null) continue;
+            pnlOf.set(s, p);
+            basisOf.set(s, basis);
+          }
+        } else {
+          // By quantity alone, over everything the fill closed (the stated limit of §6.3)
+          let realized = f.realized;
+          if (c.choices.resultIsNet === true) {
+            const costs = slices.reduce((s, x) => s + (x.lot.open ? commissionOf(x) ?? ZERO : closeShare.get(x) ?? ZERO), dropShare.get(f) ?? ZERO);
+            realized = add(realized, fromCents(costs));
+            if (costs !== ZERO) netConverted++;
+          }
+          const shares = allocate(toCents(realized), units([...slices.map((s) => s.take), ...restBefore]));
+          slices.forEach((s, i) => {
+            pnlOf.set(s, shares[i]);
+            basisOf.set(s, 'file');
+          });
+        }
+      } else if (realizedMapped && f.realized !== null) {
         let realized = f.realized;
         if (c.choices.resultIsNet === true) {
           // Gross = net + the commissions of this fill's slices (opening and closing shares)
@@ -531,7 +603,7 @@ export function parseMappedFills(
     for (const lot of book.lots) {
       if (lot.dropped || !lot.open || lot.slices.length === 0) continue;
       episodes[lot.episode] = (episodes[lot.episode] ?? 0) + 1;
-      if (lot.slices.some(unknownCommission)) {
+      if (unknownLots.has(lot)) {
         otherAssetTrades++;
         const a = lot.open.otherAsset ?? lot.slices.map((s) => s.close.otherAsset).find((x) => x !== null) ?? null;
         if (a && otherAssets.indexOf(a) < 0) otherAssets.push(a);
@@ -574,16 +646,17 @@ export function parseMappedFills(
       }
     }
 
-    // Fills with nothing kept are errors (each of their lines); partly kept ones only count
+    // Fills with nothing kept are errors (each of their lines); partly kept ones only count, by reason
     for (const f of sf) {
       const ps = book.parts.get(f) ?? [];
-      const kept = ps.some((p) => (p.kind === 'close' ? !p.slice.lot.dropped : p.kind === 'open' ? !p.lot.dropped : false));
-      if (kept) {
-        if (ps.some((p) => p.kind === 'drop' || (p.kind === 'close' && !!p.slice.lot.dropped) || (p.kind === 'open' && !!p.lot.dropped))) partial++;
+      const codes = ps.map((p) => (p.kind === 'drop' ? p.code : p.kind === 'close' ? p.slice.lot.dropped : p.lot.dropped));
+      if (codes.some((x) => x === null)) {
+        const reasons: RowErrorCode[] = [];
+        for (const x of codes) if (x !== null && reasons.indexOf(x) < 0) reasons.push(x);
+        for (const x of reasons) partial[x] = (partial[x] ?? 0) + 1;
         continue;
       }
-      const codes = ps.map((p) => (p.kind === 'drop' ? p.code : p.kind === 'close' ? p.slice.lot.dropped : p.lot.dropped));
-      const code = (codes.indexOf('unbalanced_symbol') >= 0 ? 'unbalanced_symbol' : codes.find((x) => !!x)) ?? 'unbalanced_symbol';
+      const code = (codes.indexOf('unbalanced_symbol') >= 0 ? 'unbalanced_symbol' : codes.find((x) => x !== null)) ?? 'unbalanced_symbol';
       for (const line of f.lines) errors.push({ line, code });
     }
   }
@@ -599,7 +672,9 @@ export function parseMappedFills(
   if (mergedInto > 0) notices.push({ code: 'merged_fills', fills: mergedFrom, into: mergedInto });
   if (splitPositions > 0) notices.push({ code: 'split_entries', positions: splitPositions, trades: splitTrades });
   if (flatStart.length > 0) notices.push({ code: 'flat_start_assumed', symbols: flatStart });
-  if (partial > 0) notices.push({ code: 'opened_before_file', fills: partial });
+  if (partial.opened_before_file) notices.push({ code: 'opened_before_file', fills: partial.opened_before_file });
+  if (partial.open_at_end) notices.push({ code: 'open_at_end', fills: partial.open_at_end });
+  if (partial.no_price_result) notices.push({ code: 'no_price_result', fills: partial.no_price_result });
   if (netConverted > 0) notices.push({ code: 'result_net_converted', rows: netConverted });
   if (otherAssetTrades > 0) notices.push({ code: 'commission_other_asset', trades: otherAssetTrades, assets: otherAssets });
   const normalised = fills.filter((f) => f.normalised);
@@ -611,5 +686,12 @@ export function parseMappedFills(
   return { rows, errors, warnings, notices, unfilled, notImported, executions, endOfFile, failure: null };
 }
 
-/** The key a symbol's end-of-file answer is given under: the symbol in upper case */
-export const endOfFileKey = (symbol: string): string => symbol.toUpperCase();
+/**
+ * The key a symbol's end-of-file answer is given under, which is also the key its executions pair
+ * under: the symbol in upper case; with a «Conta» column whose values are all read (no value
+ * chosen), the account and the symbol, so two accounts' executions never pair.
+ */
+export function endOfFileKey(symbol: string, account: string | null = null): string {
+  const s = symbol.toUpperCase();
+  return account === null ? s : JSON.stringify([accountKey(account), s]);
+}
