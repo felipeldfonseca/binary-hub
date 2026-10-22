@@ -864,6 +864,19 @@ with d as (delete from public.import_templates where id = :'ytpl' returning 1) s
 commit;
 select tests.eq((select coalesce(template_id::text, 'none') || ' ' || template_name from public.import_batches where id = :'yb'),
                 'none Modelo de Y', 'the batch keeps the name of its deleted model');
+select id as ytpl1 from public.import_templates where user_id = :Y order by name limit 1 \gset
+begin;
+select set_config('request.jwt.claim.sub', :X, true);
+set local role authenticated;
+select tests.fails(format($$select public.import_preview(%L, 'modelo', null, 'UTC', '[]', '[]', null, %L)$$, :'trad',
+                          jsonb_build_object('sig', repeat('a', 64), 'template', :'ytpl1')),
+                   'bad_format', null, 'a file is never read with another user''s model');
+select tests.fails(format('select public.import_template_save(%L, null, %L)', tests.tpl('a'), :'ytpl1'),
+                   'unknown_template', null, '«Atualizar o modelo» never reaches another user''s model');
+select tests.eq(public.import_preview(:'trad', 'modelo', null, 'UTC', '[]', '[]', null,
+                                      jsonb_build_object('sig', repeat('a', 64), 'template', :'tpl1'))->>'new', '0',
+                'with the caller''s model');
+commit;
 begin;
 select set_config('request.jwt.claim.sub', :X, true);
 set local role authenticated;
