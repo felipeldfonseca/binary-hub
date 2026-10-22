@@ -114,7 +114,9 @@ insert into public.trading_accounts (user_id, market, label, platform) values
   (:X, 'stocks', 'Acoes X', 'ibkr'), (:X, 'crypto', 'Cripto X', 'binance'), (:X, 'b3', 'B3 X', 'profit'),
   (:X, 'binary', 'Ebx X', 'ebinex'), (:X, 'futures', 'Fuso X', 'tradovate'), (:X, 'futures', 'G2 X', 'topone'),
   (:X, 'futures', 'Link X', 'tradovate'), (:X, 'futures', 'Fmt X', 'tradovate'), (:X, 'futures', 'Arq X', 'tradovate'),
-  (:X, 'futures', 'Same X', 'tradovate'), (:X, 'futures', 'Undo X', 'tradovate');
+  (:X, 'futures', 'Same X', 'tradovate'), (:X, 'futures', 'Undo X', 'tradovate'), (:X, 'futures', 'Outra X2', 'outra'),
+  (:X, 'futures', 'Nao X', 'naosei'), (:X, 'futures', 'Nao X2', 'naosei'), (:X, 'futures', 'Liga Top X', 'topone'),
+  (:X, 'futures', 'Liga Map X', 'tradovate');
 update public.trading_accounts set archived_at = now() where user_id = :X and label = 'Arq X';
 commit;
 begin;
@@ -146,6 +148,11 @@ select id as arq from public.trading_accounts where user_id = :X and label = 'Ar
 select id as same from public.trading_accounts where user_id = :X and label = 'Same X' \gset
 select id as und from public.trading_accounts where user_id = :X and label = 'Undo X' \gset
 select id as opc from public.trading_accounts where user_id = :X and label = 'Opcoes X' \gset
+select id as outra2 from public.trading_accounts where user_id = :X and label = 'Outra X2' \gset
+select id as nao from public.trading_accounts where user_id = :X and label = 'Nao X' \gset
+select id as nao2 from public.trading_accounts where user_id = :X and label = 'Nao X2' \gset
+select id as ligt from public.trading_accounts where user_id = :X and label = 'Liga Top X' \gset
+select id as ligm from public.trading_accounts where user_id = :X and label = 'Liga Map X' \gset
 select id as tray from public.trading_accounts where user_id = :Y and label = 'Trad Y' \gset
 
 -- Rules where trades are registered in the app (versions moved one month back)
@@ -154,8 +161,10 @@ select set_config('request.jwt.claim.sub', :X, true);
 set local role authenticated;
 select tests.eq(jsonb_array_length(public.save_rules(jsonb_build_object('v', 1, 'accounts', jsonb_build_object(
   :'lnk', jsonb_build_object('rules', '{"v": 1}'::jsonb, 'window', tests.win(:NY, -90, 90), 'version', 'force'),
-  :'stk', jsonb_build_object('rules', '{"v": 1}'::jsonb, 'window', tests.win(:NY, -90, 90), 'version', 'force'))))->'versions'),
-  2, 'two accounts with rules');
+  :'stk', jsonb_build_object('rules', '{"v": 1}'::jsonb, 'window', tests.win(:NY, -90, 90), 'version', 'force'),
+  :'ligt', jsonb_build_object('rules', '{"v": 1}'::jsonb, 'window', tests.win(:NY, -90, 90), 'version', 'force'),
+  :'ligm', jsonb_build_object('rules', '{"v": 1}'::jsonb, 'window', tests.win(:NY, -90, 90), 'version', 'force'))))->'versions'),
+  4, 'four accounts with rules');
 commit;
 alter table public.account_rule_versions disable trigger account_rule_versions_guard;
 update public.account_rule_versions v set effective_from = v.effective_from - interval '30 days' where v.user_id = :X;
@@ -1004,6 +1013,85 @@ select tests.eq(public.import_preview(:'fmt', 'modelo', null, :NY, :'f8m'::jsonb
 select tests.ok(not public.import_preview(:'fmt', 'modelo', null, :NY, :'f8m'::jsonb, '[]', null,
                                           jsonb_build_object('sig', :'sig1', 'template', null)) ? 'other_source',
                 'the model''s first columns: the same format');
+commit;
+
+-- 8.2 A trade registered in the app takes the format of the file that linked it (the one that gave it its key): it is
+--     no longer a link candidate, so a file of another format would insert it again. Both directions; the rows a file
+--     links never count; a file of the linking format does not warn.
+begin;
+select set_config('request.jwt.claim.sub', :X, true);
+set local role authenticated;
+insert into tests.p82 values ('g1a', public.register_entry(:'ligt', tests.entry82('MESZ6', 'long', '2', '7000.00', -10))->>'trade_id');
+insert into tests.p82 values ('g1b', public.register_entry(:'ligt', tests.entry82('MNQZ6', 'short', '1', '21000.00', -9))->>'trade_id');
+insert into tests.p82 values ('g1c', public.register_entry(:'ligm', tests.entry82('MESZ6', 'long', '2', '7000.00', -10))->>'trade_id');
+commit;
+select (select v from tests.p82 where k = 'g1a') as g1a, (select v from tests.p82 where k = 'g1b') as g1b,
+       (select v from tests.p82 where k = 'g1c') as g1c \gset
+begin;
+select set_config('request.jwt.claim.sub', :X, true);
+set local role authenticated;
+select public.register_exit(:'g1a', '{"v": 1, "exit_price": "7002.00"}') is not null as exit_a;
+select public.register_exit(:'g1c', '{"v": 1, "exit_price": "7002.00"}') is not null as exit_c;
+commit;
+select (select entry_time from public.trades where id = :'g1a') as g1a_entry, (select entry_time from public.trades where id = :'g1b') as g1b_entry,
+       (select entry_time from public.trades where id = :'g1c') as g1c_entry \gset
+
+-- Top One first (Liga Top X), then a mapped file
+begin;
+select set_config('request.jwt.claim.sub', :X, true);
+set local role authenticated;
+select tests.eq(tests.imp82(:'ligt', 'ligt-top.csv', jsonb_build_array(
+                  tests.row(2, 'LT/1', 'MESZ6', 'futures', 'long', :'g1a_entry'::timestamptz + interval '5 seconds', now() - interval '1 minute',
+                            '7000.00', '7002.00', '2', null, null, 'win', '20.00', null)), 'UTC', null, 'topone')->'linked', '1'::jsonb,
+                'the Top One file links the registered MES (its key is Top One''s now)');
+select tests.eq(public.import_preview(:'ligt', 'modelo', null, 'UTC', jsonb_build_array(
+                  tests.mrow(2, null, 'MESZ6', 'long', tests.wc(:'g1a_entry'::timestamptz, 'UTC'), tests.wc(now() - interval '1 minute', 'UTC'),
+                             '7000.00', '7002.00', '2', '20.00', 'prices', null, '+00:00'),
+                  tests.mrow(3, null, 'MNQZ6', 'short', tests.wc(:'g1b_entry'::timestamptz + interval '5 seconds', 'UTC'),
+                             tests.wc(now() - interval '1 minute', 'UTC'), '21000.00', '20990.00', '1', '20.00', 'prices', null, '+00:00')),
+                  '[]', null, tests.fmt('tradovate'))
+                  - array['first_day', 'last_day', 'account_tz', 'tz_confirmed', 'tz_status', 'already_imported', 'day_changes', 'rows_total', 'errors'],
+                '{"new": 1, "duplicate": 0, "completable": 0, "other_account": 0, "linked": 1, "linked_differs": 0, "other_source": 1}'::jsonb,
+                'a mapped file of the same trades: the MES copy counts, the registered MNQ it links does not');
+select tests.eq(public.import_preview(:'ligt', 'topone', null, 'UTC', jsonb_build_array(
+                  tests.row(2, 'LT/2', 'MESZ6', 'futures', 'long', :'g1a_entry'::timestamptz + interval '30 seconds', now() - interval '1 minute',
+                            '7001.00', '7002.00', '1', null, null, 'win', '5.00', null)))
+                  - array['first_day', 'last_day', 'account_tz', 'tz_confirmed', 'tz_status', 'already_imported', 'day_changes', 'rows_total', 'errors'],
+                '{"new": 1, "duplicate": 0, "completable": 0, "other_account": 0, "linked": 0, "linked_differs": 0}'::jsonb,
+                'another Top One trade on that day: the same format, no warning');
+commit;
+
+-- A mapped file first (Liga Map X), then a Top One file
+begin;
+select set_config('request.jwt.claim.sub', :X, true);
+set local role authenticated;
+select tests.eq(tests.imp82(:'ligm', 'tradovate', jsonb_build_array(
+                  tests.mrow(2, null, 'MESZ6', 'long', tests.wc(:'g1c_entry'::timestamptz + interval '5 seconds', 'UTC'),
+                             tests.wc(now() - interval '1 minute', 'UTC'), '7000.00', '7002.00', '2', '20.00', 'prices', null, '+00:00')), 'UTC')
+                  ->'linked', '1'::jsonb, 'the mapped file links the registered MES');
+select tests.eq(public.import_preview(:'ligm', 'topone', null, 'UTC', jsonb_build_array(
+                  tests.row(2, 'LM/1', 'MESZ6', 'futures', 'long', :'g1c_entry'::timestamptz, now() - interval '1 minute',
+                            '7000.00', '7002.00', '2', null, null, 'win', '20.00', null)))
+                  - array['first_day', 'last_day', 'account_tz', 'tz_confirmed', 'tz_status', 'already_imported', 'day_changes', 'rows_total', 'errors'],
+                '{"new": 1, "duplicate": 0, "completable": 0, "other_account": 0, "linked": 0, "linked_differs": 0, "other_source": 1}'::jsonb,
+                'a Top One file of the same trade: its copy counts');
+select tests.eq(public.import_preview(:'ligm', 'modelo', null, 'UTC', jsonb_build_array(
+                  tests.mrow(2, null, 'MNQZ6', 'short', tests.wc(:'g1c_entry'::timestamptz, 'UTC'), tests.wc(now() - interval '1 minute', 'UTC'),
+                             '21000.00', '20990.00', '1', '20.00', 'prices', null, '+00:00')), '[]', null, tests.fmt('tradovate'))
+                  - array['first_day', 'last_day', 'account_tz', 'tz_confirmed', 'tz_status', 'already_imported', 'day_changes', 'rows_total', 'errors'],
+                '{"new": 1, "duplicate": 0, "completable": 0, "other_account": 0, "linked": 0, "linked_differs": 0}'::jsonb,
+                'a new trade in the linking file''s format: no warning');
+-- A registered trade is never «já estava (mesma hora e preço)» (its times are the app's): a row equal to its stored
+-- entry and exit, with an ID, is new
+select tests.eq(public.import_preview(:'ligm', 'modelo', null, 'UTC',
+                  (select jsonb_build_array(tests.mrow(2, 'RG-1', t.symbol, t.direction,
+                                                       to_char(t.entry_time at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US'),
+                                                       to_char(t.exit_time at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US'),
+                                                       t.entry_price::text, t.exit_price::text, t.quantity::text, t.pnl::text, 'file', null, '+00:00'))
+                   from public.trades t where t.id = :'g1c'), '[]', null, tests.fmt('tradovate'))
+                  - array['first_day', 'last_day', 'account_tz', 'tz_confirmed', 'tz_status', 'already_imported', 'day_changes', 'rows_total', 'errors'],
+                '{"new": 1, "duplicate": 0, "completable": 0, "other_account": 0, "linked": 0, "linked_differs": 0}'::jsonb,
+                'a registered trade linked by a mapped file is never «mesma hora e preço»');
 commit;
 
 -- =============================================================================================

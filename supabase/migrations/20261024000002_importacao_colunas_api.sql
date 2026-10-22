@@ -69,8 +69,9 @@
 --       - zone: tz_not_confirmed answers tz_mismatch (a mapped file never moves the account's other
 --         trades); every 'modelo' batch stores header_sig.
 --     Every platform: "other_source" (preview, only when > 0): the trades the file would insert whose
---     day already holds an imported trade of this account from another format (another platform, or a
---     'modelo' batch of another header signature and not of the same model). "duplicate_same" only
+--     day already holds a trade of this account from another format (another platform, or a 'modelo'
+--     batch of another header signature and not of the same model): an imported trade by its batch, a
+--     trade registered in the app by the batch that linked it and gave it its key. "duplicate_same" only
 --     when > 0 (preview and commit). Links never join a trade that has an option contract (a mapped
 --     row carries none). A reader file answers exactly as before.
 --
@@ -907,8 +908,9 @@ $$;
 -- What importing this file would do. Writes nothing (20261023000003's keys, counted as the commit
 -- counts them). Phase 3b: p_format (above); 'same' rows count in "duplicate" and in "duplicate_same"
 -- (only when > 0); "other_source" (only when > 0): the trades the file would insert (positions new and
--- not linked: the trades_new unit) whose day already holds an imported trade of this account whose
--- batch is of another format; 'modelo': tz_not_confirmed answers tz_mismatch.
+-- not linked: the trades_new unit) whose day already holds a trade of this account of another format
+-- (an imported trade's batch, or the batch that linked a registered trade and set its key); 'modelo':
+-- tz_not_confirmed answers tz_mismatch.
 drop function public.import_preview(uuid, text, text, text, jsonb, jsonb, int);
 create function public.import_preview(
   p_account uuid,
@@ -965,15 +967,22 @@ begin
               order by r.grp, r.rn) g) x
   where x.res is not null;
 
-  -- The trades the file would insert on days that already hold imports of another format (G1)
+  -- The trades the file would insert on days that already hold trades of another format (G1). A trade's
+  -- format is its file's: an imported trade's batch, or, for a trade registered in the app that a file
+  -- linked, the batch that gave it its key (its earliest link with set_key; an undo deletes its links).
+  -- A linked trade is no longer a link candidate, so a file of another format would insert it again.
   select count(distinct r.grp) into n_other_source
   from pg_temp.import_rows r
   where r.path in ('row', 'group') and r.link_id is null
     and exists (
       select 1
       from public.trades t
-      join public.import_batches b on b.id = t.import_batch_id
-      where t.account_id = acc.id and t.user_id = acc.user_id and t.source = 'import' and t.trading_day = r.trading_day
+      join public.import_batches b
+        on b.id = coalesce(t.import_batch_id,
+                           (select l.batch_id from public.trade_import_links l
+                            where l.trade_id = t.id and l.set_key
+                            order by l.linked_at, l.batch_id limit 1))
+      where t.account_id = acc.id and t.user_id = acc.user_id and t.trading_day = r.trading_day
         and not (b.platform = p_platform
                  and (p_platform <> 'modelo' or b.header_sig = fmt->>'sig'
                       or coalesce(b.template_id = (fmt->>'template')::uuid, false))));
