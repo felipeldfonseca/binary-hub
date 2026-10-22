@@ -18,6 +18,7 @@ import {
   buildImportArgs,
   countUnit,
   decodeCsvBytes,
+  formatProblem,
   parseImportText,
   parseMappedRecords,
   previewArgs,
@@ -370,5 +371,18 @@ describe('mapped files (Phase 3b): p_platform modelo and p_format', () => {
     expect(() => buildImportArgs({ ...base, outcome: { ...out, format: { sig: out.format.sig, template: 'model-1' } } })).toThrow(RangeError);
     expect(buildImportArgs({ ...base, outcome: { ...out, format: { sig: out.format.sig, template: null } } }).p_format).toEqual({ sig: out.format.sig, template: null });
     expect(() => buildImportArgs({ ...base, platform: 'topone', outcome: out })).toThrow(RangeError);
+    // Never into binaries (import_check_platform's wrong_market)
+    expect(() => buildImportArgs({ ...base, outcome: { ...out, market: 'binary' } })).toThrow(RangeError);
+  });
+
+  it('formatProblem is import_check_format\'s refusal', () => {
+    const sig = 'a'.repeat(64);
+    const id = '11111111-2222-4333-8444-555555555555';
+    expect([formatProblem({ sig }), formatProblem({ sig, template: null }), formatProblem({ sig, template: id }), formatProblem({ sig, template: id.toUpperCase() }, [id])]).toEqual([null, null, null, null]);
+    for (const bad of [null, [], 'x', { template: null }, { sig: sig.toUpperCase() }, { sig: sig.slice(1) }, { sig, other: 1 }, { sig, template: 'x' }, { sig, template: 1 }]) {
+      expect(formatProblem(bad)).toBe('bad_format');
+    }
+    // The caller's models only
+    expect(formatProblem({ sig, template: id }, [])).toBe('bad_format');
   });
 });

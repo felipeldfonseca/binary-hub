@@ -15,6 +15,8 @@
  *   trades    one trade (or exit) per row → ImportRow; the net question; the closing-side check
  *   fills     one execution per row → merged fills → FIFO lots → slices → ImportRow
  *   hash      SHA-256 of a text (the signature, the «Conta» routes)
+ *   server    the database's twin for a mapped row: import_checked_rows' code, asset type, basis and
+ *             the key of a row without an ID (tests and the shared cases only)
  */
 import type { AccountMarket } from '../../markets';
 import { add, numeric, plainText } from '../../registro/numeric';
@@ -78,26 +80,45 @@ export {
 export {
   CHANGED_SHARE,
   MAX_HEADER_CHARS,
+  MAX_ROUTES,
   MAX_TEMPLATES,
   MAX_TEMPLATE_BYTES,
   MAX_TEMPLATE_NAME,
+  MAX_TITLE_SKIP,
   MAX_WORDS,
   MAX_WORD_CHARS,
+  TEMPLATE_FIELDS,
   checkTemplate,
   columnsFromTemplate,
   compareCodePoints,
   headerSignature,
+  jsonbTextBytes,
   matchTemplate,
+  netAsked,
   normaliseHeaders,
   templateFromRow,
   templateMisfits,
   templatePayload,
   type MappingChoices,
   type Template,
+  type TemplateContext,
+  type TemplateField,
   type TemplateMatch,
   type TemplatePayloadV1,
   type TemplateProblem,
 } from './template';
+export {
+  derivedKeys,
+  mappedRowCode,
+  mappedRowCodes,
+  scaleFree,
+  timeKey,
+  tryTimestamp,
+  tupleHash,
+  type KeyedRow,
+  type ServerRow,
+  type ServerRowCode,
+} from './server';
 export {
   findHeader,
   headerClocks,

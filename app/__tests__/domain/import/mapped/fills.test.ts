@@ -23,6 +23,18 @@ import {
 } from '@/lib/domain/import';
 import { mappedContext } from '@/lib/domain/import/mapped/trades';
 import { columnClocks } from '@/lib/domain/import/mapped/cells';
+import {
+  BF_FIELDS,
+  BINANCE,
+  BN_FIELDS,
+  BN_FUT,
+  IBKR,
+  IB_FIELDS,
+  TRADOVATE,
+  TRADOVATE_OPEN,
+  TV_FIELDS,
+  tv,
+} from '@/testing/mappedFiles';
 
 function choicesOf(text: string, fields: Record<string, FieldKey>, over: Partial<MappingChoices> = {}) {
   const s = sniffFile(text);
@@ -69,37 +81,6 @@ const unlined = (rows: ImportRow[]) => rows.map(({ line: _line, ...rest }) => re
 // Tradovate «Orders» (scenario 16): one order per row, cancelled legs, no commission
 // ---------------------------------------------------------------------------------------------
 
-const TV_HEADER = 'orderId,Account,B/S,Contract,avgPrice,filledQty,Fill Time,Status,Timestamp,Quantity,Limit Price,Filled Qty,Avg Fill Price';
-const tv = (id: string, side: string, contract: string, qty: string, filled: string, price: string, time: string, status: string) =>
-  [id, 'LT50K-0193', side, contract, price, filled, time, status, time, qty, price, filled, price].join(',');
-const TRADOVATE = [
-  TV_HEADER,
-  tv('8801201', 'Buy', 'MESZ6', '2', '2', '6812.25', '10/13/2026 10:31:05', 'Filled'), // L2
-  tv('8801202', 'Sell', 'MESZ6', '2', '0', '', '', 'Canceled'), // L3 the stop, never filled
-  tv('8801203', 'Sell', 'MESZ6', '1', '1', '6816.00', '10/13/2026 10:38:40', 'Filled'), // L4
-  tv('8801204', 'Sell', 'MESZ6', '1', '1', '6819.50', '10/13/2026 10:44:12', 'Filled'), // L5
-  tv('8801205', 'Buy', 'MNQZ6', '1', '1', '25240.75', '10/13/2026 11:02:18', 'Filled'), // L6
-  tv('8801206', 'Buy', 'MNQZ6', '1', '1', '25236.00', '10/13/2026 11:05:40', 'Filled'), // L7
-  tv('8801207', 'Sell', 'MNQZ6', '2', '2', '25244.50', '10/13/2026 11:09:51', 'Filled'), // L8
-  tv('8801208', 'Buy', 'MNQZ6', '2', '', '', '', 'Canceled'), // L9
-  tv('8801209', 'Sell', 'MESZ6', '3', '3', '6821.00', '10/13/2026 11:20:14', 'Filled'), // L10
-  tv('8801210', 'Buy', 'MESZ6', '3', '2', '6817.25', '10/13/2026 11:26:37', 'Canceled'), // L11 executed 2 of 3
-  tv('8801211', 'Buy', 'MESZ6', '1', '1', '6823.75', '10/13/2026 11:31:02', 'Filled'), // L12
-].join('\n');
-const TRADOVATE_OPEN = [
-  TRADOVATE,
-  tv('8801212', 'Sell', 'MESZ6', '1', '1', '6824.50', '10/13/2026 11:48:20', 'Filled'), // L13
-  tv('8801213', 'Buy', 'MESZ6', '1', '0', '', '', 'Working'), // L14
-].join('\n');
-const TV_FIELDS: Record<string, FieldKey> = {
-  orderid: 'fill_id',
-  account: 'account',
-  'b/s': 'side',
-  contract: 'symbol',
-  'fill time': 'time',
-  'filled qty': 'quantity',
-  'avg fill price': 'price',
-};
 
 describe('Tradovate Orders (scenario 16)', () => {
   it('9 executions, 2 orders with nothing executed skipped (R2); 6 exits make 4 trades', () => {
@@ -199,26 +180,6 @@ describe('Tradovate Orders (scenario 16)', () => {
 // Binance spot trade history: UTC in the header, quantity and fee with the asset in the cell
 // ---------------------------------------------------------------------------------------------
 
-const BINANCE = [
-  'Date(UTC),Pair,Side,Price,Executed,Amount,Fee,Trade ID',
-  '2026-10-11 00:05:12,BTCUSDT,BUY,112400.00,0.0125BTC,1405.00USDT,1.41USDT,8812001',
-  '2026-10-11 00:20:05,ETHUSDT,BUY,4120.50,0.1000ETH,412.05USDT,0.0003BNB,8812002',
-  '2026-10-11 00:21:40,BTCUSDT,SELL,112952.00,0.0125BTC,1411.90USDT,1.41USDT,8812003',
-  '2026-10-11 01:02:00,ETHUSDT,SELL,4135.00,0.1000ETH,413.50USDT,0.41USDT,8812004',
-  '2026-10-11 01:40:00,ETHUSDT,BUY,4108.00,0.1000ETH,410.80USDT,0.41USDT,8812005',
-  '2026-10-12 14:05:00,BTCUSDT,BUY,113180.00,0.0200BTC,2263.60USDT,0.0004BNB,8812006',
-  '2026-10-12 14:30:00,BTCUSDT,SELL,113420.00,0.0100BTC,1134.20USDT,1.13USDT,8812007',
-  '2026-10-12 15:10:00,BTCUSDT,SELL,113005.00,0.0100BTC,1130.05USDT,1.13USDT,8812008',
-].join('\n');
-const BN_FIELDS: Record<string, FieldKey> = {
-  'date(utc)': 'time',
-  pair: 'symbol',
-  side: 'side',
-  price: 'price',
-  executed: 'quantity',
-  fee: 'commission',
-  'trade id': 'fill_id',
-};
 const sums = (out: MappedFile) => ({
   gross: total(out.positions.map((p) => p.pnl)),
   commission: total(out.positions.map((p) => p.commission)),
@@ -275,28 +236,6 @@ describe('Binance (scenario 16)', () => {
 // Binance USDⓈ-M futures trade history: a realized result on each closing fill (gross of fees)
 // ---------------------------------------------------------------------------------------------
 
-const BN_FUT = [
-  'Date(UTC),Symbol,Side,Price,Quantity,Amount,Fee,Realized Profit',
-  '2026-10-15 13:02:11,XRPUSDT,SELL,2.5120,400,1004.80,0.40192000USDT,18.40000000', // L2 a long from before the file
-  '2026-10-15 13:05:40,BTCUSDT,BUY,111850.0,0.010,1118.50,0.44740000USDT,0', // L3
-  '2026-10-15 13:05:40,BTCUSDT,BUY,111850.0,0.004,447.40,0.17896000USDT,0', // L4 the same second: merged with L3
-  '2026-10-15 13:20:03,BTCUSDT,BUY,111700.0,0.006,670.20,0.26808000USDT,0', // L5 adds: its own trade
-  '2026-10-15 13:41:27,BTCUSDT,SELL,112050.0,0.020,2241.00,0.89640000USDT,4.90000000', // L6 closes both
-  '2026-10-15 14:10:00,ETHUSDT,SELL,4110.00,0.500,2055.00,0.82200000USDT,0', // L7 short
-  '2026-10-15 14:25:30,ETHUSDT,BUY,4095.50,0.300,1228.65,0.49146000USDT,4.35000000', // L8
-  '2026-10-15 14:52:10,ETHUSDT,BUY,4102.25,0.200,820.45,0.00090000BNB,1.55000000', // L9 its fee in BNB
-  '2026-10-15 15:30:00,SOLUSDT,BUY,182.40,10,1824.00,0.72960000USDT,0', // L10
-  '2026-10-15 15:44:00,SOLUSDT,SELL,183.10,10,1831.00,0.73240000USDT,7.20000000', // L11 the file says 7.20, the prices 7.00
-].join('\n');
-const BF_FIELDS: Record<string, FieldKey> = {
-  'date(utc)': 'time',
-  symbol: 'symbol',
-  side: 'side',
-  price: 'price',
-  quantity: 'quantity',
-  fee: 'commission',
-  'realized profit': 'realized',
-};
 
 describe('Binance USDⓈ-M (realized profit per closing fill)', () => {
   const out = parse(BN_FUT, BF_FIELDS, 'crypto');
@@ -347,32 +286,12 @@ describe('Binance USDⓈ-M (realized profit per closing fill)', () => {
 // IBKR Flex «Executions»: signed quantity, negative commission, «Abre ou fecha»
 // ---------------------------------------------------------------------------------------------
 
-const IBKR = [
-  'Symbol,DateTime,Quantity,TradePrice,IBCommission,AssetClass,Open/CloseIndicator,TradeID',
-  'MSFT,20261014;094512,-50,512.30,-1.00,STK,C,551230011',
-  'NVDA,20261014;101502,300,187.42,-1.50,STK,O,551230017',
-  'NVDA,20261014;103348,-300,188.10,-1.50,STK,C,551230018',
-  'AAPL,20261014;111200,-100,247.80,-1.00,STK,O,551230021',
-  'AAPL,20261014;113000,60,246.95,-0.60,STK,C,551230022',
-  'NVDA  261120C00190000,20261014;120000,2,4.10,-1.30,OPT,O,551230025',
-  'AAPL,20261014;140000,40,247.10,-0.40,STK,C,551230027',
-  'TSLA,20261014;153500,50,438.20,-1.00,STK,O,551230030',
-].join('\n');
-const IB_FIELDS: Record<string, FieldKey> = {
-  symbol: 'symbol',
-  datetime: 'time',
-  quantity: 'quantity',
-  tradeprice: 'price',
-  ibcommission: 'commission',
-  'open/closeindicator': 'open_close',
-  tradeid: 'fill_id',
-};
 
 describe('IBKR (scenario 16)', () => {
   it('a closing fill with nothing open, an option and a position open at the end stay out; no question', () => {
     const out = parse(IBKR, IB_FIELDS, 'stocks');
     expect(out.endOfFile).toEqual([]);
-    expect(errs(out)).toEqual(['L2 opened_before_file', 'L7 option_symbol', 'L9 open_at_end']);
+    expect(errs(out)).toEqual(['L2 opened_before_file', 'L7 bad_option', 'L9 open_at_end']);
     expect(out.positions.map((p) => [p.symbol, p.direction, p.quantity, p.exits.length, p.pnl, p.commission])).toEqual([
       ['NVDA', 'long', '300', 1, '204.00', '3.00'],
       ['AAPL', 'short', '100', 2, '79.00', '2.00'],
@@ -393,7 +312,7 @@ describe('IBKR (scenario 16)', () => {
       return [...c.slice(0, 7), realized[i], c[7]].join(',');
     })].join('\n');
     const out = parse(text, { ...IB_FIELDS, fifopnlrealized: 'realized' }, 'stocks', { over: { resultIsNet: true } });
-    expect(errs(out)).toEqual(['L2 opened_before_file', 'L7 option_symbol', 'L9 open_at_end']);
+    expect(errs(out)).toEqual(['L2 opened_before_file', 'L7 bad_option', 'L9 open_at_end']);
     expect(out.rows.map((r) => [r.pnl, r.commission, r.pnl_basis])).toEqual([
       ['204.00', '3.00', 'file'],
       ['51.00', '1.20', 'file'],

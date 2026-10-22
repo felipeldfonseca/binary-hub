@@ -21,6 +21,18 @@ import {
   type MappingChoices,
 } from '@/lib/domain/import';
 import { columnClocks } from '@/lib/domain/import/mapped/cells';
+import {
+  B3,
+  B3_FIELDS,
+  BLACKARROW,
+  BLACKARROW_FIELDS,
+  FOREX,
+  FOREX_FIELDS,
+  NINJA,
+  NINJA_FIELDS,
+  PERFORMANCE,
+  PERFORMANCE_FIELDS,
+} from '@/testing/mappedFiles';
 
 /** «mapa» filled by hand: the header names (normalised) → fields; the rest as sniffed */
 function mapped(text: string, fields: Record<string, FieldKey>, over: Partial<MappingChoices> = {}) {
@@ -58,24 +70,7 @@ const codes = (out: MappedFile) => out.errors.map((e) => `${e.line}:${e.code}${e
 // Scenario 8: the board's BlackArrow sample (pt-BR, ';', decimal comma, net result, no exit time)
 // ---------------------------------------------------------------------------------------------
 
-const BLACKARROW = [
-  'Data/Hora;Papel;C/V;Qtd;Pr. Entrada;Pr. Saída;Res. Líq.;Corretagem;Nº Negócio',
-  '01/10/2026 09:34:31;MESZ6;C;2;6.801,00;6.797,25;-39,98;2,48;83395',
-  '01/10/2026 09:35:54;MNQZ6;V;1;25.129,50;25.124,75;8,26;1,24;49089',
-  '01/10/2026 10:31:07;MESZ6;C;1;6.826,50;6.832,00;26,26;1,24;74476',
-].join('\r\n');
 
-const BLACKARROW_FIELDS: Record<string, FieldKey> = {
-  'data/hora': 'entry_time',
-  papel: 'symbol',
-  'c/v': 'side',
-  qtd: 'quantity',
-  'pr. entrada': 'entry_price',
-  'pr. saida': 'exit_price',
-  'res. liq.': 'pnl',
-  corretagem: 'commission',
-  'nº negocio': 'trade_id',
-};
 
 describe('the board sample (scenario 8)', () => {
   it('sniffs «;», decimal comma (by «-39,98» and «6.801,00») and day first', () => {
@@ -170,25 +165,6 @@ describe('the board sample (scenario 8)', () => {
 // Scenario 17: NinjaTrader's Trades grid (gross, «Conta», month first, «MNQ 12-26»)
 // ---------------------------------------------------------------------------------------------
 
-const NINJA = [
-  'Trade number,Instrument,Account,Market pos.,Qty,Entry price,Exit price,Entry time,Exit time,Profit,Commission',
-  '1,MNQ 12-26,APX-0001,Short,1,25140.25,25131.75,10/1/2026 9:31:05 AM,10/1/2026 9:38:40 AM,17.00,1.24',
-  '2,MES 12-26,APX-0002,Long,2,6803.50,6809.75,10/1/2026 9:52:10 AM,10/1/2026 10:04:33 AM,62.50,2.48',
-  '3,MNQ 12-26,APX-0001,Long,1,25160.00,25151.25,10/1/2026 10:15:02 AM,10/1/2026 10:21:47 AM,-17.50,1.24',
-  '4,MES 12-26,APX-0002,Short,1,6812.00,6810.00,10/14/2026 1:05:00 PM,10/14/2026 1:09:30 PM,10.00,1.24',
-].join('\n');
-const NINJA_FIELDS: Record<string, FieldKey> = {
-  instrument: 'symbol',
-  account: 'account',
-  'market pos.': 'side',
-  qty: 'quantity',
-  'entry price': 'entry_price',
-  'exit price': 'exit_price',
-  'entry time': 'entry_time',
-  'exit time': 'exit_time',
-  profit: 'pnl',
-  commission: 'commission',
-};
 
 describe('NinjaTrader (scenario 17)', () => {
   it('month first (10/14 shows it), AM/PM, «MNQ 12-26» stored as MNQZ26', () => {
@@ -227,25 +203,6 @@ describe('NinjaTrader (scenario 17)', () => {
 // Scenario 18: Forex closed positions (gross Profit, Swap, negative Commission, dd.mm.yyyy)
 // ---------------------------------------------------------------------------------------------
 
-const FOREX = [
-  'Position ID,Open Time,Close Time,Symbol,Side,Volume,Open Price,Close Price,Swap,Commission,Profit',
-  '4410023,14.10.2026 08:40:12,14.10.2026 10:05:47,EURUSD,BUY,0.50,1.08520,1.08635,0.00,-3.50,57.50',
-  '4410031,14.10.2026 09:12:30,14.10.2026 09:58:02,EURGBP,SELL,0.25,0.86410,0.86350,0.00,-1.75,19.84',
-  '4409988,13.10.2026 17:48:55,14.10.2026 17:20:10,EURUSD,SELL,1.00,1.08710,1.08745,-6.20,-7.00,-35.00',
-].join('\n');
-const FOREX_FIELDS: Record<string, FieldKey> = {
-  'position id': 'trade_id',
-  'open time': 'entry_time',
-  'close time': 'exit_time',
-  symbol: 'symbol',
-  side: 'side',
-  volume: 'quantity',
-  'open price': 'entry_price',
-  'close price': 'exit_price',
-  swap: 'swap',
-  commission: 'commission',
-  profit: 'pnl',
-};
 
 describe('Forex with swap (scenario 18, R8)', () => {
   it('the question names the swap, and the prices answer «bruto»', () => {
@@ -293,26 +250,6 @@ describe('Forex with swap (scenario 18, R8)', () => {
 // Scenario 19: B3 (R$, «131.250» beside «88,50», fees summed into the commission, «X»)
 // ---------------------------------------------------------------------------------------------
 
-const B3 = [
-  'Data/Hora;Papel;C/V;Qtd;Pr. Entrada;Pr. Saída;Res. Líq.;Corretagem;Emolumentos;Nº Negócio',
-  '14/10/2026 10:02:11;WINZ26;V;3;131.250;131.100;88,50;0,90;0,60;77120',
-  '14/10/2026 10:15:40;WINZ26;C;2;131.400;131.325;-31,00;0,60;0,40;77134',
-  '14/10/2026 11:20:05;WDOX26;C;1;5.412,5;5.419,0;64,25;0,50;0,25;77152',
-  '14/10/2026 11:30:00;WINZ26;X;1;131.000;131.100;19,00;0,30;0,20;77160',
-  '14/10/2026 11:45:00;WINZ26;C;1;131.002;131.100;19,00;0,30;0,20;77170',
-].join('\n');
-const B3_FIELDS: Record<string, FieldKey> = {
-  'data/hora': 'entry_time',
-  papel: 'symbol',
-  'c/v': 'side',
-  qtd: 'quantity',
-  'pr. entrada': 'entry_price',
-  'pr. saida': 'exit_price',
-  'res. liq.': 'pnl',
-  corretagem: 'commission',
-  emolumentos: 'fee',
-  'nº negocio': 'trade_id',
-};
 
 describe('B3 (scenario 19, R6, C4)', () => {
   it('«88,50» settles the comma for the whole file: «131.250» is 131250', () => {
@@ -373,22 +310,6 @@ describe('B3 (scenario 19, R6, C4)', () => {
 // Scenario 8, variant: Tradovate's Performance.csv (no side: the first of buy and sell)
 // ---------------------------------------------------------------------------------------------
 
-const PERFORMANCE = [
-  'symbol,qty,buyPrice,sellPrice,pnl,boughtTimestamp,soldTimestamp,duration,buyFillId,sellFillId',
-  'MESZ6,2,6817.25,6821.00,$37.50,10/13/2026 11:26:37,10/13/2026 11:20:14,6min 23sec,9912011,9912010',
-  'MESZ6,1,6823.75,6821.00,$(13.75),10/13/2026 11:31:02,10/13/2026 11:20:14,10min 48sec,9912012,9912010',
-  'MNQZ6,1,25240.75,25244.50,$7.50,10/13/2026 11:02:18,10/13/2026 11:09:51,7min 33sec,9912006,9912008',
-  'MNQZ6,1,25236.00,25244.50,$17.00,10/13/2026 11:05:40,10/13/2026 11:09:51,4min 11sec,9912007,9912008',
-].join('\n');
-const PERFORMANCE_FIELDS: Record<string, FieldKey> = {
-  symbol: 'symbol',
-  qty: 'quantity',
-  buyprice: 'buy_price',
-  sellprice: 'sell_price',
-  pnl: 'pnl',
-  boughttimestamp: 'buy_time',
-  soldtimestamp: 'sell_time',
-};
 
 describe('Performance.csv (buy and sell in columns)', () => {
   it('sold first is a short; «$(13.75)» is −13.75; rows with one entry make one trade of two exits', () => {
@@ -427,7 +348,7 @@ const GENERIC_FIELDS: Record<string, FieldKey> = {
 describe('refusals', () => {
   it('an OCC option in a stocks account (C8), crypto outside the dollar (Q6), a typed instrument with no result', () => {
     const stocks = parse([GENERIC, '2026-10-14 10:00:00,AAPL  261120C00150000,Buy,1,2.10,2.50,40', '2026-10-14 10:05:00,AAPL,Buy,10,250.10,251.00,9'].join('\n'), GENERIC_FIELDS, 'stocks');
-    expect(codes(stocks)).toEqual(['2:option_symbol']);
+    expect(codes(stocks)).toEqual(['2:bad_option']);
     expect(stocks.rows[0]).toMatchObject({ symbol: 'AAPL', pnl: '9.00', result: 'win' });
 
     const crypto = parse([GENERIC, '2026-10-14 10:00:00,ETHBTC,Buy,1,0.03,0.031,0.001', '2026-10-14 10:00:00,BTCUSD_PERP,Buy,1,1,2,1', '2026-10-14 10:00:00,BTC/USDT,Buy,0.5,100000,100100,50'].join('\n'), GENERIC_FIELDS, 'crypto');

@@ -375,11 +375,15 @@ export function normaliseB3Continuous(text: string): string | null {
   return m ? m[1].toUpperCase() : null;
 }
 
-/** A US listed option in OCC form: root (1–6 letters, padded or not), YYMMDD, C or P, strike × 1000 in 8 digits */
+/**
+ * A US listed option in OCC form: root (1–6 letters, padded or not), YYMMDD, C or P, strike × 1000 in
+ * 8 digits, in any case (import_checked_rows tests upper(btrim(symbol)) against the same pattern:
+ * bad_option)
+ */
 const OCC = /^[A-Z.]{1,6}\s*\d{6}[CP]\d{8}$/;
 
 export function isOccSymbol(text: string): boolean {
-  return OCC.test(text.trim());
+  return OCC.test(text.trim().toUpperCase());
 }
 
 /** Crypto: a pair is in dollars only when its key ends in a dollar coin (USDT, USDC, USD) after a base */
@@ -390,18 +394,18 @@ export function isDollarQuoted(symbol: string): boolean {
 
 export type SymbolRead =
   | { ok: true; symbol: string; normalised: boolean }
-  | { ok: false; code: 'missing_symbol' | 'option_symbol' | 'not_dollar_quote' };
+  | { ok: false; code: 'missing_symbol' | 'bad_option' | 'not_dollar_quote' };
 
 /**
  * A symbol cell for an account of `market`: trimmed, 1–40 characters, stored as written, except
  * futures (and B3 futures) written another way, normalised; an OCC option in a stocks or options
- * account is refused (C8: «opção, fica de fora»); a crypto pair outside the dollar is refused
- * (Q6: its result would be in coin).
+ * account is refused (C8: «opção, fica de fora»; the database's bad_option); a crypto pair outside
+ * the dollar is refused (Q6: its result would be in coin; the database's not_dollar_quote).
  */
 export function readSymbol(text: string, market: AccountMarket): SymbolRead {
   const t = text.trim();
   if (!isValidSymbol(t)) return { ok: false, code: 'missing_symbol' };
-  if ((market === 'stocks' || market === 'options') && isOccSymbol(t)) return { ok: false, code: 'option_symbol' };
+  if ((market === 'stocks' || market === 'options') && isOccSymbol(t)) return { ok: false, code: 'bad_option' };
   if (market === 'crypto' && !isDollarQuoted(t)) return { ok: false, code: 'not_dollar_quote' };
   if (market === 'futures' || market === 'b3') {
     const n = normaliseFuturesSymbol(t) ?? (market === 'b3' ? normaliseB3Continuous(t) : null);

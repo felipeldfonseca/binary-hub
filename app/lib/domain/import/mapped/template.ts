@@ -9,16 +9,22 @@
  * and for every check of a saved model; templatePayload / checkTemplate are the browser's side of
  * them, so a model the screens send is never refused for its shape.
  */
+import type { AccountMarket } from '../../markets';
+import { assertTimeZone } from '../../tempo';
 import type { CsvDelimiter } from '../csv';
 import type { DecimalMark } from '../decimal';
 import { normalizeHeader } from '../text';
-import { MAX_COLUMNS, type FieldKey } from '../types';
-import { REPEATABLE_FIELD, isFieldOf, missingRequirements, type ColumnMap, type RowKind } from './fields';
-import { sha256Text } from './hash';
+import { MAX_COLUMNS, TRADE_FIELDS, type FieldKey } from '../types';
+import { REPEATABLE_FIELD, isFieldOf, type ColumnMap, type RowKind } from './fields';
+import { sha256Text, utf8Bytes } from './hash';
 import type { DateOrder } from './values';
 
-/** A header name, normalised, at most this many characters (a «#n» suffix included) */
+/** A header name, normalised, at most this many characters (normaliseHeaders: a «#n» suffix included; the database allows the suffix beyond) */
 export const MAX_HEADER_CHARS = 80;
+/** «Conta» routes a model keeps */
+export const MAX_ROUTES = 50;
+/** Records skipped before the header line a model keeps (header_skip) */
+export const MAX_TITLE_SKIP = 20;
 /** Models per user (import_template_save: too_many_templates) */
 export const MAX_TEMPLATES = 50;
 /** A model's JSON payload, in bytes */
@@ -33,13 +39,24 @@ export const CHANGED_SHARE = 0.6;
 
 const chars = (s: string) => Array.from(s);
 
+const COMBINING = /[\u0300-\u036f]/g;
+const CONTROL = /[\u0000-\u001f\u007f-\u009f]/g;
+
+/**
+ * A header name as a model keeps it: normalizeHeader, then what import_template_save also refuses
+ * taken out (a control character; a combining accent that lower-casing brings back, as «İ» → «i̇»)
+ */
+function modelName(h: string): string {
+  return normalizeHeader(h.replace(CONTROL, ' ')).normalize('NFD').replace(COMBINING, '');
+}
+
 /**
  * The file's header names as a model keeps them: normalizeHeader (accents, quotes and BOM gone,
  * single spaces, lower case), at most 80 characters, and a repeated name with «#2», «#3»… in file
  * order (a suffix never makes a name equal to another column's).
  */
 export function normaliseHeaders(raw: readonly string[]): string[] {
-  const base = raw.map((h) => chars(normalizeHeader(h)).slice(0, MAX_HEADER_CHARS).join(''));
+  const base = raw.map((h) => chars(modelName(h)).slice(0, MAX_HEADER_CHARS).join(''));
   const taken: Record<string, true> = {};
   const out: string[] = [];
   const reserved: Record<string, true> = {};
@@ -149,6 +166,12 @@ export function templatePayload(
     const f = t.columns[i];
     if (f) columns[h] = f;
   });
+  const sideWords: Record<string, 'buy' | 'sell'> = {};
+  for (const k of Object.keys(t.sideWords)) {
+    const v = t.sideWords[k] as string;
+    // «Pular essas linhas» belongs to this file only
+    if (v === 'buy' || v === 'sell') sideWords[k] = v;
+  }
   return {
     v: 1,
     name: t.name.trim(),
@@ -159,12 +182,24 @@ export function templatePayload(
     date_order: t.dateOrder,
     row_kind: t.rowKind,
     columns,
-    result_is_net: t.resultIsNet,
-    side_words: { ...t.sideWords },
-    open_close_words: { ...t.openCloseWords },
+    // Answered only when it was asked (a result and a cost mapped); null otherwise, as the database keeps it
+    result_is_net: netAsked(t.rowKind, t.columns) ? t.resultIsNet : null,
+    side_words: sideWords,
+    // «Abre ou fecha» exists in execution files only
+    open_close_words: t.rowKind === 'fill' ? { ...t.openCloseWords } : {},
     account_routes: { ...(t.accountRoutes ?? {}) },
     tz_hint: t.tzHint ?? null,
   };
+}
+
+/**
+ * «O resultado do arquivo já desconta a comissão?» is asked (and a model keeps its answer) exactly
+ * when a result («Resultado», or an execution's «Resultado realizado») and a cost («Comissão»,
+ * «Outra taxa», «Swap ou funding») are mapped: import_template_save's rule for result_is_net.
+ */
+export function netAsked(rowKind: RowKind, columns: ColumnMap): boolean {
+  const result = rowKind === 'trade' ? 'pnl' : 'realized';
+  return columns.indexOf(result) >= 0 && columns.some((f) => f === 'commission' || f === 'fee' || f === 'swap');
 }
 
 const isObject = (x: unknown): x is Record<string, unknown> => typeof x === 'object' && x !== null && !Array.isArray(x);
@@ -218,59 +253,182 @@ export function templateFromRow(row: unknown): Template | null {
   };
 }
 
-/** Bad template, and the field the database's HINT would name (never a value) */
-export interface TemplateProblem {
-  code: 'bad_template';
-  field: keyof TemplatePayloadV1;
+/**
+ * import_template_save's fields per row kind (its vocabulary): a trade model takes TRADE_FIELDS; a
+ * fill model also takes «swap» (with «realized»), which the app does not offer (FILL_FIELDS).
+ */
+export const TEMPLATE_FIELDS: Readonly<Record<RowKind, readonly string[]>> = {
+  trade: TRADE_FIELDS,
+  fill: ['time', 'symbol', 'side', 'quantity', 'price', 'commission', 'fee', 'swap', 'fill_id', 'order_id', 'open_close', 'realized', 'account'],
+};
+
+/** The HINT of import_template_save's bad_template: the payload's field it refused (never a value) */
+export type TemplateField = keyof TemplatePayloadV1 | 'payload' | 'keys' | 'header_sig';
+
+/** What import_template_save refuses a model with */
+export type TemplateProblem = { code: 'bad_template'; field: TemplateField } | { code: 'too_many_templates' };
+
+/** What the database knows besides the payload; each check runs only when its part is given */
+export interface TemplateContext {
+  /** p_batch: the import the model is saved from (its file's header signature and its account's market); null: none */
+  batch?: { sig: string; market: AccountMarket } | null;
+  /** The caller's accounts: a route goes to an open one of the batch account's market */
+  accounts?: readonly { id: string; market: AccountMarket; archived: boolean }[];
+  /** The caller's models (id and header signature): fifty at most, one per header set */
+  templates?: readonly { id: string; sig: string }[];
+  /** p_replaces: «Atualizar o modelo “{nome}”» re-keys this model */
+  replaces?: string | null;
 }
 
-/** Already as normaliseHeaders writes it: lower case, no quote, single inner spaces, none at the ends */
-const NORMALISED = (h: string) => h === normalizeHeader(h);
+const PAYLOAD_KEYS = ['v', 'name', 'headers', 'header_skip', 'delimiter', 'decimal_mark', 'date_order', 'row_kind', 'columns', 'result_is_net', 'side_words', 'open_close_words', 'account_routes', 'tz_hint'];
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const SHA256 = /^[0-9a-f]{64}$/;
+/** btrim: spaces only */
+const btrim = (x: string) => x.replace(/^ +| +$/g, '');
+const has = (o: Record<string, unknown>, k: string) => Object.prototype.hasOwnProperty.call(o, k);
+const jsonType = (x: unknown): 'null' | 'string' | 'number' | 'boolean' | 'array' | 'object' =>
+  x === null ? 'null' : Array.isArray(x) ? 'array' : (typeof x as 'string' | 'number' | 'boolean' | 'object');
 
 /**
- * The checks import_template_save makes on a payload (§4.5), in the browser: the name, the headers
- * (normalised, unique, 2..100, ≤ 80 characters), the columns (headers of the file, fields of the
- * row kind, each once except «Outra taxa», the required set), the words, the routes (64-hex keys)
- * and the size. The database is canonical; this keeps the screens from sending what it refuses.
+ * The bytes of a JSON value as the database prints it (jsonb's text: «, » between items and «: »
+ * after a key; a string escaped as JSON.stringify escapes it; an integer as written): what
+ * import_template_save's 16 KB limit counts (octet_length(p::text)).
  */
-export function checkTemplate(p: TemplatePayloadV1): TemplateProblem | null {
-  const bad = (field: keyof TemplatePayloadV1): TemplateProblem => ({ code: 'bad_template', field });
-  const name = p.name.trim();
-  if (chars(name).length < 1 || chars(name).length > MAX_TEMPLATE_NAME) return bad('name');
-  const seen: Record<string, true> = {};
-  if (p.headers.length < 2 || p.headers.length > MAX_COLUMNS) return bad('headers');
-  for (const h of p.headers) {
-    if (chars(h).length > MAX_HEADER_CHARS || !NORMALISED(h) || seen[h]) return bad('headers');
-    seen[h] = true;
+export function jsonbTextBytes(x: unknown): number {
+  if (x === null || x === undefined) return 4;
+  if (typeof x === 'boolean') return x ? 4 : 5;
+  if (typeof x === 'number') return String(x).length;
+  if (typeof x === 'string') return utf8Bytes(JSON.stringify(x)).length;
+  if (Array.isArray(x)) return 2 + x.reduce((n: number, e) => n + jsonbTextBytes(e), 0) + 2 * Math.max(0, x.length - 1);
+  if (typeof x === 'object') {
+    const o = x as Record<string, unknown>;
+    const ks = Object.keys(o).filter((k) => o[k] !== undefined);
+    return 2 + ks.reduce((n, k) => n + utf8Bytes(JSON.stringify(k)).length + 2 + jsonbTextBytes(o[k]), 0) + 2 * Math.max(0, ks.length - 1);
   }
-  if (!Number.isInteger(p.header_skip) || p.header_skip < 0 || p.header_skip > 20) return bad('header_skip');
-  const keys = Object.keys(p.columns);
-  const count: Record<string, number> = {};
-  for (const k of keys) {
-    const f = p.columns[k];
-    if (!seen[k] || !isFieldOf(p.row_kind, f)) return bad('columns');
-    count[f] = (count[f] ?? 0) + 1;
-    if (f !== REPEATABLE_FIELD && count[f] > 1) return bad('columns');
+  return 0;
+}
+
+function validZone(tz: string): boolean {
+  try {
+    assertTimeZone(tz);
+    return true;
+  } catch {
+    return false;
   }
-  // The template cannot know whether the quantity is signed: a missing side is allowed (a signed quantity)
-  const columns: ColumnMap = p.headers.map((h) => p.columns[h] ?? null);
-  if (missingRequirements(p.row_kind, columns, true).length > 0) return bad('columns');
-  for (const [field, words, values] of [
-    ['side_words', p.side_words, ['buy', 'sell']],
-    ['open_close_words', p.open_close_words, ['open', 'close']],
-  ] as const) {
-    const ks = Object.keys(words);
-    if (ks.length > MAX_WORDS) return bad(field);
-    for (const k of ks) {
-      const v = (words as Record<string, string>)[k];
-      if (!k || chars(k).length > MAX_WORD_CHARS || (values as readonly string[]).indexOf(v) < 0) return bad(field);
+}
+
+/** A word map of «O que quer dizer “{valor}”?» answers: an object, at most `max` words of 1–40 characters, each one of `values` */
+function wordsOk(x: unknown, max: number, values: readonly string[]): boolean {
+  if (x === undefined) return true;
+  if (jsonType(x) !== 'object') return false;
+  const o = x as Record<string, unknown>;
+  const ks = Object.keys(o);
+  if (ks.length > max) return false;
+  return ks.every((k) => chars(k).length >= 1 && chars(k).length <= MAX_WORD_CHARS && typeof o[k] === 'string' && values.indexOf(o[k] as string) >= 0);
+}
+
+/**
+ * import_template_save's checks, in its order, with the HINT it would give (the browser's twin; the
+ * database is canonical and __tests__/domain/cases3b.json holds both to the same answers): the
+ * payload (an object of at most 16 KB as jsonb prints it), v 1, no other key, the name (1–60
+ * characters after the spaces at its ends), the headers (2..100 distinct strings, lower case, no
+ * '"', BOM, control character, combining accent, double space or space at an end, ≤ 80 characters
+ * plus a «#n» suffix), header_skip 0..20, the delimiter, the decimal mark, the date order, the row
+ * kind, the columns (names of the file, fields of the row kind, each once except «fee», the
+ * required set, «swap» only with the result), result_is_net exactly when asked (netAsked), the
+ * words, the zone; with the context, the batch's signature, the routes (64-hex keys, open accounts
+ * of the batch's market, the «account» field mapped), the re-key and the fifty models.
+ */
+export function checkTemplate(p: unknown, ctx: TemplateContext = {}): TemplateProblem | null {
+  const bad = (field: TemplateField): TemplateProblem => ({ code: 'bad_template', field });
+  if (jsonType(p) !== 'object' || jsonbTextBytes(p) > MAX_TEMPLATE_BYTES) return bad('payload');
+  const o = p as Record<string, unknown>;
+  if (o.v !== 1) return bad('v');
+  if (Object.keys(o).some((k) => PAYLOAD_KEYS.indexOf(k) < 0)) return bad('keys');
+
+  if (typeof o.name !== 'string' || chars(btrim(o.name)).length < 1 || chars(btrim(o.name)).length > MAX_TEMPLATE_NAME) return bad('name');
+
+  const hs = o.headers;
+  if (!Array.isArray(hs) || hs.length < 2 || hs.length > MAX_COLUMNS || hs.some((h) => typeof h !== 'string')) return bad('headers');
+  const headers = hs as string[];
+  for (const h of headers) {
+    if (
+      chars(h.replace(/#[0-9]{1,3}$/, '')).length > MAX_HEADER_CHARS ||
+      h !== h.toLowerCase() ||
+      h !== btrim(h) ||
+      h.indexOf('  ') >= 0 ||
+      /["\ufeff]/.test(h) ||
+      /[\u0000-\u001f\u007f-\u009f]/.test(h) ||
+      /[\u0300-\u036f]/.test(h)
+    ) {
+      return bad('headers');
     }
   }
-  for (const k of Object.keys(p.account_routes)) {
-    if (!/^[0-9a-f]{64}$/.test(k) || typeof p.account_routes[k] !== 'string') return bad('account_routes');
+  if (new Set(headers).size !== headers.length) return bad('headers');
+
+  if (has(o, 'header_skip') && (typeof o.header_skip !== 'number' || !Number.isInteger(o.header_skip) || o.header_skip < 0 || o.header_skip > MAX_TITLE_SKIP)) {
+    return bad('header_skip');
   }
-  if (p.tz_hint !== null && (p.tz_hint.length === 0 || p.tz_hint.length > 64)) return bad('tz_hint');
-  if (new TextEncoder().encode(JSON.stringify(p)).length > MAX_TEMPLATE_BYTES) return bad('headers');
+  if (o.delimiter !== 'comma' && o.delimiter !== 'semicolon' && o.delimiter !== 'tab') return bad('delimiter');
+  if (o.decimal_mark !== 'point' && o.decimal_mark !== 'comma') return bad('decimal_mark');
+  if (o.date_order !== undefined && o.date_order !== null && o.date_order !== 'dmy' && o.date_order !== 'mdy') return bad('date_order');
+  if (o.row_kind !== 'trade' && o.row_kind !== 'fill') return bad('row_kind');
+  const kind: RowKind = o.row_kind;
+
+  const cols = o.columns;
+  if (jsonType(cols) !== 'object') return bad('columns');
+  const byName = cols as Record<string, unknown>;
+  const vocab = TEMPLATE_FIELDS[kind];
+  const mapped: string[] = [];
+  for (const k of Object.keys(byName)) {
+    const f = byName[k];
+    if (typeof f !== 'string' || vocab.indexOf(f) < 0 || headers.indexOf(k) < 0) return bad('columns');
+    mapped.push(f);
+  }
+  const is = (f: string) => mapped.indexOf(f) >= 0;
+  const twice = mapped.some((f, i) => f !== REPEATABLE_FIELD && mapped.indexOf(f) !== i);
+  const tradeOk =
+    is('symbol') &&
+    is('quantity') &&
+    (is('entry_time') || (is('buy_time') && is('sell_time'))) &&
+    (is('pnl') || (is('entry_price') && is('exit_price')) || (is('buy_price') && is('sell_price')));
+  const fillOk = is('time') && is('symbol') && is('quantity') && is('price');
+  const result = kind === 'trade' ? 'pnl' : 'realized';
+  if (twice || (kind === 'trade' ? !tradeOk : !fillOk) || (is('swap') && !is(result))) return bad('columns');
+
+  const asked = is(result) && (is('commission') || is('fee') || is('swap'));
+  const net = o.result_is_net === undefined ? null : o.result_is_net;
+  if ((asked && typeof net !== 'boolean') || (!asked && net !== null)) return bad('result_is_net');
+
+  if (!wordsOk(o.side_words, MAX_WORDS, ['buy', 'sell'])) return bad('side_words');
+  if (!wordsOk(o.open_close_words, kind === 'fill' ? MAX_WORDS : 0, ['open', 'close'])) return bad('open_close_words');
+  if (o.tz_hint !== undefined && o.tz_hint !== null && (typeof o.tz_hint !== 'string' || chars(o.tz_hint).length > 64 || !validZone(o.tz_hint))) {
+    return bad('tz_hint');
+  }
+
+  const sig = headerSignature(headers);
+  if (ctx.batch && ctx.batch.sig !== sig) return bad('header_sig');
+
+  const routes = o.account_routes === undefined ? {} : o.account_routes;
+  if (jsonType(routes) !== 'object') return bad('account_routes');
+  const r = routes as Record<string, unknown>;
+  const rk = Object.keys(r);
+  if (rk.length > MAX_ROUTES) return bad('account_routes');
+  for (const k of rk) {
+    const v = r[k];
+    if (!SHA256.test(k) || typeof v !== 'string' || !UUID.test(v) || !ctx.batch) return bad('account_routes');
+    const market = ctx.batch.market;
+    if (ctx.accounts && !ctx.accounts.some((a) => a.id.toLowerCase() === v.toLowerCase() && !a.archived && a.market === market)) return bad('account_routes');
+  }
+  if (rk.length > 0 && !is('account')) return bad('account_routes');
+
+  if (ctx.templates) {
+    if (ctx.replaces) {
+      if (ctx.templates.some((t) => t.sig === sig && t.id !== ctx.replaces)) return bad('header_sig');
+    } else if (!ctx.templates.some((t) => t.sig === sig) && ctx.templates.length >= MAX_TEMPLATES) {
+      return { code: 'too_many_templates' };
+    }
+  }
   return null;
 }
 

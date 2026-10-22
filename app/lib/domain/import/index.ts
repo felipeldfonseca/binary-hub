@@ -51,6 +51,7 @@ export { entryHistogram, entrySpan, previewInstant, totals } from './preview';
 export {
   buildImportArgs,
   countUnit,
+  formatProblem,
   previewArgs,
   toRpcErrors,
   toRpcRow,

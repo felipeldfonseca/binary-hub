@@ -162,8 +162,8 @@ describe('symbols (C8, C10, Q6)', () => {
     expect(readSymbol('MESZ6', 'futures')).toEqual({ ok: true, symbol: 'MESZ6', normalised: false });
     expect(readSymbol('WIN 12-26', 'b3')).toEqual({ ok: true, symbol: 'WINZ26', normalised: true });
     expect(readSymbol('MES 12-26', 'stocks')).toEqual({ ok: true, symbol: 'MES 12-26', normalised: false });
-    expect(readSymbol('AAPL  261120C00150000', 'stocks')).toEqual({ ok: false, code: 'option_symbol' });
-    expect(readSymbol('AAPL261120P00150000', 'options')).toEqual({ ok: false, code: 'option_symbol' });
+    expect(readSymbol('AAPL  261120C00150000', 'stocks')).toEqual({ ok: false, code: 'bad_option' });
+    expect(readSymbol('AAPL261120P00150000', 'options')).toEqual({ ok: false, code: 'bad_option' });
     expect(readSymbol('ETHBTC', 'crypto')).toEqual({ ok: false, code: 'not_dollar_quote' });
     expect(readSymbol('BTCUSD_PERP', 'crypto')).toEqual({ ok: false, code: 'not_dollar_quote' });
     expect(readSymbol('BTC/USDC', 'crypto')).toEqual({ ok: true, symbol: 'BTC/USDC', normalised: false });

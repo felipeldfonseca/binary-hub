@@ -5,6 +5,7 @@
  * A mapped file (Phase 3b) goes with p_platform 'modelo' and p_format (its header signature and its
  * model, R3); a reader's file never sends p_format, so today's calls stay as they are.
  */
+import { MARKET_SPEC } from '../markets';
 import { assertTimeZone } from '../tempo';
 import type { CountUnit, ImportFormat, MappedFile } from './mapped/types';
 import {
@@ -60,6 +61,24 @@ const SHA256 = /^[0-9a-f]{64}$/;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const MAX_FILE_NAME = 255;
 
+/**
+ * import_check_format's refusal of a mapped file's p_format (bad_format), the browser's twin: an
+ * object of exactly {sig: 64 lower-case hex, template: a model id or null (or absent)}; with the
+ * caller's model ids given, the model must be one of them (the database looks it up by the account's
+ * user). Null when the database takes it.
+ */
+export function formatProblem(format: unknown, templateIds?: readonly string[]): 'bad_format' | null {
+  if (typeof format !== 'object' || format === null || Array.isArray(format)) return 'bad_format';
+  const f = format as Record<string, unknown>;
+  if (Object.keys(f).some((k) => k !== 'sig' && k !== 'template')) return 'bad_format';
+  if (typeof f.sig !== 'string' || !SHA256.test(f.sig)) return 'bad_format';
+  const t = f.template;
+  if (t === undefined || t === null) return null;
+  if (typeof t !== 'string' || !UUID.test(t)) return 'bad_format';
+  if (templateIds && !templateIds.some((id) => id.toLowerCase() === t.toLowerCase())) return 'bad_format';
+  return null;
+}
+
 export function toRpcErrors(errors: RowIssue<RowErrorCode>[]): RpcRowError[] {
   return errors.map((e) => ({ line: e.line, code: e.code }));
 }
@@ -74,8 +93,8 @@ export function toRpcRow(row: ImportRow): ImportRow {
 /**
  * Builds the RPC arguments for a file. Throws RangeError (with no file content in the message)
  * when the account is missing, the platform differs from the file's, the hash is not a SHA-256,
- * the zone is not 'UTC' or an IANA Area/Location name, or a mapped file's format is not a
- * signature and a model id.
+ * the zone is not 'UTC' or an IANA Area/Location name, or a mapped file is for a market without
+ * mapping (binaries) or its format is not a signature and a model id (formatProblem).
  */
 export function buildImportArgs(i: {
   accountId: string;
@@ -100,10 +119,11 @@ export function buildImportArgs(i: {
     p_rows_total: i.outcome.records,
   };
   if (i.outcome.platform === 'modelo') {
-    const f = i.outcome.format;
-    if (!SHA256.test(f.sig)) throw new RangeError('Invalid header signature');
-    if (f.template !== null && !UUID.test(f.template)) throw new RangeError('Invalid model id');
-    args.p_format = { sig: f.sig, template: f.template };
+    // import_check_platform: a mapped file only where market_caps_all() says "mapping" (wrong_market)
+    if (!MARKET_SPEC[i.outcome.market].mapping) throw new RangeError('Mapped files are not imported in this market');
+    const f = { sig: i.outcome.format.sig, template: i.outcome.format.template };
+    if (formatProblem(f)) throw new RangeError('Invalid file format');
+    args.p_format = f;
   }
   return args;
 }

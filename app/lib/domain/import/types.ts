@@ -239,8 +239,11 @@ export const ROW_ERROR_CODES = [
   'no_price_result',
   /** A crypto pair not quoted in a dollar coin (USDT, USDC, USD): its result would not be in US$ */
   'not_dollar_quote',
-  /** A US listed option (an OCC symbol): left out, registered in «Registrar operação» instead */
-  'option_symbol',
+  /**
+   * A US listed option (an OCC symbol): left out, registered in «Registrar operação» instead (the
+   * database's code for the same symbol)
+   */
+  'bad_option',
   /** A price off the instrument's tick (WIN in steps of 5): usually a number read with the wrong decimal mark */
   'off_tick',
   /** An execution with a quantity and no price */
