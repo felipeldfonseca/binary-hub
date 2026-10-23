@@ -9,6 +9,7 @@ import { resolveContaAtual, visibleAccounts, type TradingAccount } from '@/lib/h
 import {
   fetchAccounts,
   fetchActivity,
+  fetchBatchUndo,
   fetchBatches,
   fetchImportFormats,
   fetchPreferences,
@@ -125,6 +126,19 @@ export function useImportBatches(accountId: string) {
     queryKey: hubKeys.importacoes(userId, accountId),
     queryFn: () => fetchBatches(db, accountId),
     enabled: !!userId,
+  });
+}
+
+/**
+ * What «Desfazer» of the batch being confirmed does, in trades (fetchBatchUndo); read when the
+ * confirmation opens (null: none open), under the account's Importações so a write refreshes it.
+ */
+export function useBatchUndo(accountId: string, batchId: string | null) {
+  const { db, userId } = useHubDb();
+  return useQuery({
+    queryKey: [...hubKeys.importacoes(userId, accountId), 'desfazer', batchId],
+    queryFn: () => fetchBatchUndo(db, batchId as string),
+    enabled: !!userId && !!batchId,
   });
 }
 

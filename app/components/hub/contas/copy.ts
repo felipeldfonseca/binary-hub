@@ -221,39 +221,84 @@ export const IMPORTACOES = {
   undo: UNDO,
   undoAria: (when: string) => `Desfazer a importação de ${when}`, // NEW
   /**
-   * NEW. Fase 3 (D29): a batch that completed trades registered in the app also says that undoing
-   * gives them back (import_undo reverts what it wrote, reopens what it closed, never deletes them)
+   * NEW. What undoing does, in trades (fetchBatchUndo; never the file's lines, rows_inserted and
+   * rows_linked): the trades it deletes, «em N saídas» when a position came in several rows (the
+   * import's own words, «As 6 saídas viram 4 operações.»); Fase 3 (D29): the trades registered in the
+   * app it gives back (import_undo reverts what it wrote, reopens what it closed, never deletes them);
+   * Fase 3c: the trades already there that its rows joined as more exits, given back the same way
    */
-  confirm: (count: number, linked = 0) => {
-    if (linked === 0) {
-      return count === 1 ? 'Desfazer apaga a operação desta importação.' : `Desfazer apaga as ${formatInt(count)} operações desta importação.`
+  confirm: (c: UndoCounts) => {
+    const { trades, registered = 0, existing = 0 } = c
+    const exits = c.exits ?? trades
+    const back = registered + existing
+    if (trades === 0) {
+      if (back === 0) return 'Desfazer não apaga nada: as operações desta importação já foram apagadas.'
+      if (existing === 0) {
+        return registered === 1
+          ? 'Desfazer não apaga nada: a operação registrada por você volta a ser como estava antes desta importação.'
+          : `Desfazer não apaga nada: as ${formatInt(registered)} operações registradas por você voltam a ser como estavam antes desta importação.`
+      }
+      return back === 1
+        ? 'Desfazer não apaga nada: a operação que já estava volta a ser como era antes desta importação.'
+        : `Desfazer não apaga nada: as ${formatInt(back)} operações que já estavam voltam a ser como eram antes desta importação.`
     }
-    if (count === 0) {
-      return linked === 1
-        ? 'Desfazer não apaga nada: a operação registrada por você volta a ser como estava antes desta importação.'
-        : `Desfazer não apaga nada: as ${formatInt(linked)} operações registradas por você voltam a ser como estavam antes desta importação.`
+    const apaga =
+      (trades === 1 ? 'Desfazer apaga a operação desta importação' : `Desfazer apaga as ${formatInt(trades)} operações desta importação`) +
+      (exits > trades ? `, em ${formatInt(exits)} saídas` : '')
+    if (back === 0) return `${apaga}.`
+    if (existing === 0) {
+      return registered === 1
+        ? `${apaga}, e a registrada por você volta a ser como estava antes dela.`
+        : `${apaga}, e as ${formatInt(registered)} registradas por você voltam a ser como estavam antes dela.`
     }
-    const apaga = count === 1 ? 'Desfazer apaga a operação desta importação' : `Desfazer apaga as ${formatInt(count)} operações desta importação`
-    return linked === 1
-      ? `${apaga}, e a registrada por você volta a ser como estava antes dela.`
-      : `${apaga}, e as ${formatInt(linked)} registradas por você voltam a ser como estavam antes dela.`
+    return back === 1
+      ? `${apaga}, e a que já estava volta a ser como era antes dela.`
+      : `${apaga}, e as ${formatInt(back)} que já estavam voltam a ser como eram antes dela.`
   },
-  /** NEW; «Desfazer» alone when nothing is deleted (a batch that only completed registered trades) */
-  confirmYes: (count: number) => (count === 0 ? UNDO : 'Desfazer e apagar'),
+  /** NEW; «Desfazer» alone when no trade is deleted (a batch that only completed trades already there) */
+  confirmYes: (trades: number) => (trades === 0 ? UNDO : 'Desfazer e apagar'),
   confirmNo: 'Manter', // NEW
-  /** NEW; Fase 3 (D29): with the registered trades the batch had completed (`linked`) */
-  undone: (deleted: number, linked = 0) => {
+  /** NEW: the counts of the confirmation could not be read (undoing waits for them) */
+  countError: 'Não foi possível ver o que esta importação apagaria.',
+  /**
+   * NEW; Fase 3 (D29): with the trades the batch had completed (import_undo answers only `deleted`;
+   * the others are the confirmation's counts)
+   */
+  undone: (deleted: number, c: Pick<UndoCounts, 'registered' | 'existing'> = {}) => {
+    const { registered = 0, existing = 0 } = c
+    const back = registered + existing
     const apagadas = deleted === 1 ? '1 operação apagada' : `${formatInt(deleted)} operações apagadas`
-    if (linked === 0) return `Importação desfeita: ${apagadas}.`
+    if (back === 0) return deleted === 0 ? 'Importação desfeita: nenhuma operação apagada.' : `Importação desfeita: ${apagadas}.`
     if (deleted === 0) {
-      return linked === 1
-        ? 'Importação desfeita: a operação registrada por você voltou a ser como estava.'
-        : `Importação desfeita: as ${formatInt(linked)} operações registradas por você voltaram a ser como estavam.`
+      if (existing === 0) {
+        return registered === 1
+          ? 'Importação desfeita: a operação registrada por você voltou a ser como estava.'
+          : `Importação desfeita: as ${formatInt(registered)} operações registradas por você voltaram a ser como estavam.`
+      }
+      return back === 1
+        ? 'Importação desfeita: a operação que já estava voltou a ser como era.'
+        : `Importação desfeita: as ${formatInt(back)} operações que já estavam voltaram a ser como eram.`
     }
-    return linked === 1
-      ? `Importação desfeita: ${apagadas}, e a registrada por você voltou a ser como estava.`
-      : `Importação desfeita: ${apagadas}, e as ${formatInt(linked)} registradas por você voltaram a ser como estavam.`
+    if (existing === 0) {
+      return registered === 1
+        ? `Importação desfeita: ${apagadas}, e a registrada por você voltou a ser como estava.`
+        : `Importação desfeita: ${apagadas}, e as ${formatInt(registered)} registradas por você voltaram a ser como estavam.`
+    }
+    return back === 1
+      ? `Importação desfeita: ${apagadas}, e a que já estava voltou a ser como era.`
+      : `Importação desfeita: ${apagadas}, e as ${formatInt(back)} que já estavam voltaram a ser como eram.`
   },
+}
+
+/**
+ * What undoing a batch does, in trades (lib/hub/contasDb's BatchUndo): `trades` deleted, in `exits`
+ * file lines (missing: one each), `registered` (in the app) and `existing` (imported earlier) given back
+ */
+export interface UndoCounts {
+  trades: number
+  exits?: number
+  registered?: number
+  existing?: number
 }
 
 // ------------------------------------------------------------------------------------------------

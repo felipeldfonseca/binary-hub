@@ -255,6 +255,95 @@ export async function fetchBatches(db: SupabaseClient, accountId: string): Promi
 }
 
 /**
+ * What «Desfazer» does to a batch's trades, counted in trades (import_undo's unit). rows_inserted and
+ * rows_linked count the file's lines: a Top One position in two rows is 2, an execution file's 6 exits
+ * of 4 trades are 6. Read with the user's session, from what import_undo works on (no database change):
+ */
+export interface BatchUndo {
+  /** The trades with this import_batch_id: import_undo deletes them, and answers their count («deleted») */
+  trades: number;
+  /**
+   * Their lines in the file: one per trade without this batch's file exits, and each file exit of this
+   * batch on them (a position's rows). More than `trades` when a position came in several rows.
+   */
+  exits: number;
+  /**
+   * The trades the batch wrote on without creating them (its trade_import_links, one row per trade),
+   * which import_undo gives back as they were: registered in the app (`registered`; rows_linked counts
+   * their lines), or imported earlier, that its rows joined as more exits (`existing`; rows_inserted
+   * counts those lines, and import_undo deletes none of these trades)
+   */
+  registered: number;
+  existing: number;
+}
+
+/** A page of a full read (the API's row limit); a page the limit cuts shorter is followed by the next */
+const UNDO_PAGE = 1000;
+/** Trade ids per `in` filter (the request's URL stays short) */
+const UNDO_ID_CHUNK = 100;
+
+/** Every row of a read, page after page from what came, until the exact count is there */
+async function readAll<T>(page: (from: number, to: number) => PromiseLike<Result<T[]>>): Promise<T[]> {
+  const out: T[] = [];
+  for (;;) {
+    let result: Result<T[]>;
+    try {
+      result = await page(out.length, out.length + UNDO_PAGE - 1);
+    } catch (e) {
+      throw toHubError(e);
+    }
+    if (result.error) throw toHubError(result.error);
+    const rows = result.data ?? [];
+    out.push(...rows);
+    if (rows.length === 0 || out.length >= (result.count ?? 0)) return out;
+  }
+}
+
+export async function fetchBatchUndo(db: SupabaseClient, batchId: string): Promise<BatchUndo> {
+  const [counted, links, exits] = await Promise.all([
+    (async () => {
+      let result: Result<unknown>;
+      try {
+        result = await db.from('trades').select('id', { count: 'exact', head: true }).eq('import_batch_id', batchId);
+      } catch (e) {
+        throw toHubError(e);
+      }
+      if (result.error) throw toHubError(result.error);
+      return result.count ?? 0;
+    })(),
+    readAll<{ trade_id: string }>((from, to) =>
+      db.from('trade_import_links').select('trade_id', { count: 'exact' }).eq('batch_id', batchId).order('trade_id').range(from, to),
+    ),
+    readAll<{ trade_id: string }>((from, to) =>
+      db.from('trade_exits').select('trade_id', { count: 'exact' }).eq('batch_id', batchId).order('id').range(from, to),
+    ),
+  ]);
+  // The trades those rows are on: the batch's own (a position's exits), or one it wrote on
+  const ids = Array.from(new Set([...links, ...exits].map((r) => r.trade_id)));
+  const chunks: string[][] = [];
+  for (let i = 0; i < ids.length; i += UNDO_ID_CHUNK) chunks.push(ids.slice(i, i + UNDO_ID_CHUNK));
+  const trades = new Map<string, { import_batch_id: string | null; source: string | null }>();
+  for (const rows of await Promise.all(
+    chunks.map((chunk) =>
+      run<{ id: string; import_batch_id: string | null; source: string | null }[]>(
+        db.from('trades').select('id, import_batch_id, source').in('id', chunk),
+      ),
+    ),
+  )) {
+    for (const r of rows ?? []) trades.set(r.id, r);
+  }
+  const own = exits.filter((e) => trades.get(e.trade_id)?.import_batch_id === batchId);
+  const linked = links.map((l) => trades.get(l.trade_id)).filter((t): t is { import_batch_id: string | null; source: string | null } => !!t);
+  const existing = linked.filter((t) => t.source === 'import').length;
+  return {
+    trades: counted,
+    exits: counted - new Set(own.map((e) => e.trade_id)).size + own.length,
+    registered: linked.length - existing,
+    existing,
+  };
+}
+
+/**
  * profiles.preferences. Written only by merge_preferences (theme, conta_atual) and save_rules
  * (display_tz, calendars); see lib/hub/regrasDb.ts. Never written whole: a stale copy would erase
  * what another tab saved.
