@@ -84,6 +84,27 @@ export function assertTimeZone(tz: string): void {
   formatter(tz);
 }
 
+/**
+ * A zone name the database knows as written: assertTimeZone's, spelled as Intl spells it. The
+ * database looks names up in pg_timezone_names, case and all (`name = p_file_tz`: 'invalid_tz'),
+ * while Intl reads any case ('america/new_york' is New York to it, and it writes 'America/New_York'
+ * back). A name Intl writes otherwise is refused: any other case, and an alias Intl rewrites to its
+ * target ('US/Eastern' → 'America/New_York' today), which is stricter than the database but never
+ * looser. The zones the import offers are written as Intl writes them.
+ */
+export function isZoneName(tz: string): boolean {
+  try {
+    return formatter(tz).resolvedOptions().timeZone === tz;
+  } catch {
+    return false;
+  }
+}
+
+/** Throws RangeError unless isZoneName(tz) */
+export function assertZoneName(tz: string): void {
+  if (!isZoneName(tz)) throw new RangeError(`Unsupported time zone: ${String(tz)}`);
+}
+
 export function utcToLocal(instant: Date, tz: string): LocalParts {
   if (Number.isNaN(instant.getTime())) throw new RangeError('Invalid date');
   const parts: Record<string, string> = {};

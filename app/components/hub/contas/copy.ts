@@ -323,6 +323,8 @@ export const ERRO = {
   malformed: (line?: number) => (line ? `A linha ${formatInt(line)} tem aspas sem fechar.` : 'O arquivo tem aspas sem fechar.'), // NEW
   tooLarge: 'O arquivo passa de 5 MB.', // NEW
   tooManyRows: 'O arquivo passa de 10.000 operações.', // NEW
+  // FROM the approved board of Phase 3b (scenario 9, «Planilha do Excel»)
+  spreadsheet: 'Salve como CSV na sua plataforma ou no Excel e tente de novo.',
 }
 
 export const PASSO_A = {

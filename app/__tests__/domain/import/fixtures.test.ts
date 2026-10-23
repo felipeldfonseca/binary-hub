@@ -90,6 +90,7 @@ describe('ebinex_atual_ok: current format, valid rows', () => {
       commission: '0.00',
       stop_price: null,
       target_price: null,
+      pnl_basis: 'file',
     });
     expect(instant(row(out, 2), SP)).toBe('2026-03-15T23:14:52.000Z');
   });
@@ -332,6 +333,7 @@ describe('topone_ok: every cell quoted', () => {
       commission: '2.68',
       stop_price: '21400.25',
       target_price: '21550.75',
+      pnl_basis: 'file',
     });
   });
 

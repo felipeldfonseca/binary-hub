@@ -85,7 +85,24 @@ export interface ReadImportFileResult {
   outcome: ParseOutcome;
 }
 
-/** Reads a File from an <input type="file"> or a drop: size check, hash, decoding, parsing. */
+const ZIP = [0x50, 0x4b, 0x03, 0x04];
+const OLE2 = [0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1];
+const SPREADSHEET_NAME = /\.(xlsx|xlsm|xlsb|xls|ods|numbers)$/i;
+
+/**
+ * A spreadsheet rather than a CSV (the board's «Planilha do Excel», scenario 9): a workbook's bytes
+ * (.xlsx, .ods and .numbers are zip files; .xls is an OLE2 file), or a spreadsheet's name (some
+ * brokers write an HTML table and call it .xls)
+ */
+export function isSpreadsheet(bytes: Uint8Array, fileName: string): boolean {
+  const starts = (magic: number[]) => bytes.length >= magic.length && magic.every((b, i) => bytes[i] === b);
+  return starts(ZIP) || starts(OLE2) || SPREADSHEET_NAME.test(fileName.trim());
+}
+
+/**
+ * Reads a File from an <input type="file"> or a drop: size check, hash, a spreadsheet refused
+ * («Salve como CSV na sua plataforma ou no Excel e tente de novo.»), decoding, parsing.
+ */
 export async function readImportFile(file: Blob): Promise<ReadImportFileResult> {
   const name = (file as { name?: unknown }).name;
   const fileName = typeof name === 'string' ? name : '';
@@ -93,5 +110,6 @@ export async function readImportFile(file: Blob): Promise<ReadImportFileResult> 
   if (size > MAX_FILE_BYTES) return { fileName, size, sha256: '', outcome: { ok: false, error: 'too_large' } };
   const bytes = new Uint8Array(await file.arrayBuffer());
   const sha256 = await sha256Hex(bytes);
+  if (isSpreadsheet(bytes, fileName)) return { fileName, size, sha256, outcome: { ok: false, error: 'spreadsheet' } };
   return { fileName, size, sha256, outcome: parseImportText(decodeCsvBytes(bytes)) };
 }
