@@ -14,7 +14,9 @@
  *
  * USDT and USDC count as US$. Accounts in different markets are never summed. Every market has
  * the window and the daily limit; the data block, the state rule, «somando» and the «Padrão»
- * entity are futures only (until Phase 5).
+ * entity are futures only (until Phase 5). Files: Top One's reader for futures, Ebinex's for
+ * binaries, and every market but binaries imports another platform's file by its columns (`mapping`,
+ * Phase 3b; the database's newest market_caps_all() is 20261024000001_importacao_colunas.sql).
  *
  * `day` is the clock of an account not created yet (the database's insert trigger sets it). An
  * existing account's clock is its own (trading_accounts.day_tz / day_start_min, or its version's
@@ -48,6 +50,11 @@ export interface MarketSpec {
   creatable: boolean;
   /** A broker file reader exists (Top One for futures, Ebinex for binaries) */
   reader: boolean;
+  /**
+   * A file of another platform can be imported by its columns («importação por colunas», Phase 3b):
+   * every market but binaries (the database accepts p_platform 'modelo' only where this is true)
+   */
+  mapping: boolean;
   currency: Currency;
   /** trading_accounts.day_tz / day_start_min for a new account (set by the database's insert trigger) */
   day: DayClock;
@@ -92,6 +99,7 @@ export const MARKET_SPEC: Readonly<Record<AccountMarket, MarketSpec>> = deepFree
   futures: {
     creatable: true,
     reader: true,
+    mapping: true,
     currency: 'USD',
     day: { tz: NY, startMin: 1080 },
     rules: { block: true, states: true, soma: true, padrao: true, breakeven: true },
@@ -103,6 +111,7 @@ export const MARKET_SPEC: Readonly<Record<AccountMarket, MarketSpec>> = deepFree
   binary: {
     creatable: true,
     reader: true,
+    mapping: false,
     currency: 'USD',
     day: { tz: SP, startMin: 0 },
     rules: { ...ONLY_WINDOW_AND_LIMIT, breakeven: false },
@@ -114,6 +123,7 @@ export const MARKET_SPEC: Readonly<Record<AccountMarket, MarketSpec>> = deepFree
   forex: {
     creatable: true,
     reader: false,
+    mapping: true,
     currency: 'USD',
     day: { tz: NY, startMin: 1020 },
     rules: { ...ONLY_WINDOW_AND_LIMIT },
@@ -125,6 +135,7 @@ export const MARKET_SPEC: Readonly<Record<AccountMarket, MarketSpec>> = deepFree
   stocks: {
     creatable: true,
     reader: false,
+    mapping: true,
     currency: 'USD',
     day: { tz: NY, startMin: 1200 },
     rules: { ...ONLY_WINDOW_AND_LIMIT },
@@ -136,6 +147,7 @@ export const MARKET_SPEC: Readonly<Record<AccountMarket, MarketSpec>> = deepFree
   crypto: {
     creatable: true,
     reader: false,
+    mapping: true,
     currency: 'USD',
     day: { tz: SP, startMin: 0 },
     rules: { ...ONLY_WINDOW_AND_LIMIT },
@@ -147,6 +159,7 @@ export const MARKET_SPEC: Readonly<Record<AccountMarket, MarketSpec>> = deepFree
   b3: {
     creatable: true,
     reader: false,
+    mapping: true,
     currency: 'BRL',
     day: { tz: SP, startMin: 0 },
     rules: { ...ONLY_WINDOW_AND_LIMIT },
@@ -159,6 +172,7 @@ export const MARKET_SPEC: Readonly<Record<AccountMarket, MarketSpec>> = deepFree
   options: {
     creatable: false,
     reader: false,
+    mapping: true,
     currency: 'USD',
     day: { tz: NY, startMin: 1200 },
     rules: { ...ONLY_WINDOW_AND_LIMIT },
@@ -188,6 +202,7 @@ export function marketCapsJson(s: MarketSpec): Record<string, unknown> {
   return {
     creatable: s.creatable,
     reader: s.reader,
+    mapping: s.mapping,
     currency: s.currency,
     day: { tz: s.day.tz, start_min: s.day.startMin },
     rules: {
