@@ -1,0 +1,5 @@
+/*
+ * Phase 3b · lane L1: the column-mapping steps of the import sheet («mapa», «conferir», the model chip's row).
+ * Every rule is scoped to .hub (tokens from styles/hub.css), never on a class another stylesheet defines.
+ * Imported by app/(hub)/layout.tsx after hub-importar.css; only lane L1 edits this file (contract §5.9).
+ */

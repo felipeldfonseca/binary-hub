@@ -1,0 +1,6 @@
+/*
+ * Phase 3b · lane L2: the import sheet around the column mapping («Para qual conta?» for an unrecognised
+ * file, «N contas neste arquivo», the zone step for every market, the preview's new lines). Every rule is
+ * scoped to .hub (tokens from styles/hub.css), never on a class another stylesheet defines. Imported by
+ * app/(hub)/layout.tsx after hub-registrar-parciais.css; only lane L2 edits this file (contract §6.12).
+ */
