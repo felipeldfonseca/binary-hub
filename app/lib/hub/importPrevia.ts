@@ -24,7 +24,7 @@ import { tradeInstrument, tradeMatchKey } from '@/lib/domain/registro'
 import { FILE_ZONES, OTHER_FILE_ZONES, fileDays, tzConfirmed, zoneKeyOf, type TradingAccount, type ZoneKey } from '@/lib/hub/contas'
 import type { ImportPreviewResult } from '@/lib/hub/contasDb'
 import { formatDateRange, formatMoney, formatOffset } from '@/lib/hub/formato'
-import { arquivoDoMapeamento, escolhasDe, type ArquivoMapeavel, type Mapeamento } from '@/lib/hub/importMapeado'
+import { arquivoDoMapeamento, escolhasDe, fusoDoModelo, type ArquivoMapeavel, type Mapeamento } from '@/lib/hub/importMapeado'
 import { ARQUIVO, FIM_MODELO, MARKET_LABEL, PASSO_C, PASSO_D, ops, rowErrorReason, type PalavraFuso } from '@/components/hub/contas/copy'
 import type { Passo } from '@/components/hub/importar/flow'
 
@@ -119,12 +119,13 @@ export function zonaDaConta(account: Pick<TradingAccount, 'id' | 'file_tz' | 'tz
  */
 export function mostrarFuso(
   f: Pick<MappedFile, 'needsFileTz'>,
-  m: Pick<Mapeamento, 'match'>,
+  m: Pick<Mapeamento, 'match' | 'outroMercado'>,
   account: Pick<TradingAccount, 'id' | 'file_tz' | 'tz_applied_at'>,
   formats: FormatosDasContas,
 ): boolean {
   if (!f.needsFileTz) return false
-  const tzHint = m.match.kind !== 'none' ? m.match.template.tzHint : null
+  // Another market's model gives no zone (owner decision, 23 Oct)
+  const tzHint = fusoDoModelo(m)
   return !(tzHint !== null && tzHint === zonaDaConta(account, formats))
 }
 

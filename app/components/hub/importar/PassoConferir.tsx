@@ -106,10 +106,22 @@ export default function PassoConferir({ headingRef, mapeamento: m, market, onCha
 
       {v.modelo && (
         <div className="hub-bloco">
-          <label className="hub-check">
-            <input type="checkbox" checked={v.modelo.salvar} onChange={(e) => onChange(comSalvar(m, e.target.checked))} />
-            {v.modelo.rotulo}
-          </label>
+          {v.modelo.caixa && (
+            <label className="hub-check">
+              <input
+                type="checkbox"
+                checked={v.modelo.salvar}
+                aria-describedby={v.modelo.aviso ? 'm-aviso' : undefined}
+                onChange={(e) => onChange(comSalvar(m, e.target.checked))}
+              />
+              {v.modelo.rotulo}
+            </label>
+          )}
+          {v.modelo.aviso && (
+            <span id="m-aviso" className="hub-nota">
+              {v.modelo.aviso}
+            </span>
+          )}
           {v.modelo.comNome && (
             <div className="hub-campo">
               <label htmlFor="m-nome" className="hub-rot-campo">
@@ -126,7 +138,7 @@ export default function PassoConferir({ headingRef, mapeamento: m, market, onCha
               />
             </div>
           )}
-          <span className="hub-nota">{v.modelo.nota}</span>
+          {v.modelo.caixa && <span className="hub-nota">{v.modelo.nota}</span>}
         </div>
       )}
     </div>

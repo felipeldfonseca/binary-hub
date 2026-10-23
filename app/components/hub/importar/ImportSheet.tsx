@@ -33,7 +33,7 @@ import {
   type ImportCommitResult,
   type ImportPreviewResult,
 } from '@/lib/hub/contasDb'
-import { useAccounts, useHubDb, useImportFormats, useImportTemplates, useRefreshAfterWrite } from '@/hooks/useContas'
+import { useAccounts, useHubDb, useImportFormats, useImportTemplates, useRefreshAfterWrite, useTemplateMarkets } from '@/hooks/useContas'
 import { useAgora } from '@/hooks/useAgora'
 import { useRulesConfig, useSaveRules } from '@/hooks/useRegras'
 import { buildNewAccountPayload, type NewAccountRules, type RulesConfig } from '@/lib/hub/regras'
@@ -64,6 +64,7 @@ import {
   nomePadraoDoModelo,
   type ArquivoMapeavel,
   type Mapeamento,
+  type MercadosDosModelos,
 } from '@/lib/hub/importMapeado'
 import {
   chaveDasLinhas,
@@ -332,6 +333,8 @@ export default function ImportSheet({ mode, accountId, onClose }: { mode: SheetM
   const formats = useImportFormats()
   // Phase 3b: the column-mapping models, read only when a file needs the mapping (never for a reader's file)
   const templatesQuery = useImportTemplates(false)
+  // …and each model's markets (owner decision, 23 Oct: another market's model is offered, never overwritten)
+  const mercadosQuery = useTemplateMarkets(false)
   const refresh = useRefreshAfterWrite()
   // The saved rules: step b's copy sources and market windows, v1's base_rev, step d's «desde»
   const rulesConfig = useRulesConfig()
@@ -552,16 +555,19 @@ export default function ImportSheet({ mode, accountId, onClose }: { mode: SheetM
   const comecarMapeamento = async (target: TradingAccount, arquivo: ArquivoMapeavel, patch: Partial<Flow> = {}) => {
     setBusy(true)
     let templates: Template[] = []
+    // A failed read of the markets is «unknown»: every model then counts as another market's (never written over)
+    let mercados: MercadosDosModelos | null = null
     try {
-      const r = await templatesQuery.refetch()
+      const [r, rm] = await Promise.all([templatesQuery.refetch(), mercadosQuery.refetch()])
       templates = r.status === 'success' && r.data ? r.data : []
+      mercados = rm.status === 'success' && rm.data ? rm.data : null
     } catch {
       templates = []
     }
     if (!alive.current) return
     setBusy(false)
     const base: Partial<Flow> = { ...patch, accountId: target.id, recusados: [], modelo: null, motivoErro: null }
-    const r = iniciarMapeamento(arquivo, { market: target.market, templates, nomePadrao: nomePadraoDoModelo(target.platform) })
+    const r = iniciarMapeamento(arquivo, { market: target.market, templates, nomePadrao: nomePadraoDoModelo(target.platform), mercados })
     if (!r.ok) {
       move('erro', { ...base, mapeado: { arquivo, mapeamento: null, cartao: null }, motivoErro: { error: r.error, line: r.line } })
       return
@@ -810,11 +816,14 @@ export default function ImportSheet({ mode, accountId, onClose }: { mode: SheetM
    */
   const salvarModelo = async (m: Mapeamento, file: MappedFile, target: TradingAccount, zoneUsed: string, result: ImportCommitResult): Promise<ModeloDoFim> => {
     const modelo = m.match.kind !== 'none' ? m.match.template : null
+    // Another market's model saved anew keeps no zone of its own (that market's); updated, it keeps its hint
+    const novoNoMercado = !!m.outroMercado && !m.salvar
     const s = modeloASalvar(m, {
-      tzHint: file.needsFileTz ? zoneUsed : modelo ? modelo.tzHint : null,
+      tzHint: file.needsFileTz ? zoneUsed : modelo && !novoNoMercado ? modelo.tzHint : null,
       rota: m.accountValue ? { valor: m.accountValue, contaId: target.id } : null,
     })
-    if (s === null) return { tipo: 'naoSalvo', nome: m.nome.trim() || m.nomePadrao }
+    // Nothing to save: «Colunas usadas só neste arquivo.»; another market's model taken as is is only read (no touch, no line)
+    if (s === null) return { tipo: m.porModelo ? 'tocado' : 'naoSalvo', nome: m.nome.trim() || m.nomePadrao }
     let payload = s.payload
     if (result.batch_id === null) {
       if (s.tipo === 'tocado') return { tipo: 'tocado', nome: s.nome }

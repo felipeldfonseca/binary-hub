@@ -418,6 +418,29 @@ export async function fetchTemplates(db: SupabaseClient): Promise<Template[]> {
   return (rows ?? []).map(templateFromRow).filter((t): t is Template => t !== null);
 }
 
+/**
+ * The market(s) each model was used in (owner decision, 23 Oct: a model of another market is offered, never overwritten):
+ * its batches (import_batches.template_id, set by import_template_save, «Desfazer» keeps it) → each batch's account →
+ * trading_accounts.market, read with the user's session (RLS: own rows; archived accounts included). A model with no batch
+ * is absent: it fits every market. Two plain reads, no embedding: the database has no column for it (no change in 3b).
+ */
+export async function fetchTemplateMarkets(db: SupabaseClient): Promise<Record<string, AccountMarket[]>> {
+  const [batches, accounts] = await Promise.all([
+    run<{ template_id: string | null; account_id: string }[]>(db.from('import_batches').select('template_id, account_id').eq('platform', 'modelo')),
+    run<{ id: string; market: AccountMarket }[]>(db.from('trading_accounts').select('id, market')),
+  ]);
+  const market: Record<string, AccountMarket> = {};
+  for (const a of accounts ?? []) market[a.id] = a.market;
+  const out: Record<string, AccountMarket[]> = {};
+  for (const b of batches ?? []) {
+    const m = market[b.account_id];
+    if (!b.template_id || !m) continue;
+    const list = (out[b.template_id] ??= []);
+    if (!list.includes(m)) list.push(m);
+  }
+  return out;
+}
+
 /** import_template_save's answer */
 export interface TemplateSaved {
   template_id: string;

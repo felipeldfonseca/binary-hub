@@ -12,6 +12,7 @@ import {
   fetchBatches,
   fetchImportFormats,
   fetchPreferences,
+  fetchTemplateMarkets,
   fetchTemplates,
   type HubPreferences,
 } from '@/lib/hub/contasDb';
@@ -28,6 +29,8 @@ export const hubKeys = {
   preferencias: (uid: string | undefined) => ['hub', uid, 'preferencias'] as const,
   /** Phase 3b: the column-mapping models (import_templates) */
   templates: (uid: string | undefined) => ['hub', uid, 'templates'] as const,
+  /** Phase 3b (owner decision, 23 Oct): each model's markets, from its batches */
+  mercadosDosModelos: (uid: string | undefined) => ['hub', uid, 'templates', 'mercados'] as const,
 };
 
 /**
@@ -96,6 +99,21 @@ export function useImportTemplates(enabled = true) {
   return useQuery({
     queryKey: hubKeys.templates(userId),
     queryFn: () => fetchTemplates(db),
+    enabled: !!userId && enabled,
+    retry: false,
+  });
+}
+
+/**
+ * Phase 3b (owner decision, 23 Oct): each model's markets (fetchTemplateMarkets), read with the models and as they are
+ * (only once a file needs the mapping; not retried). The sheet treats a failed read as «unknown»: every model then counts
+ * as another market's, so no import writes over a model it cannot place.
+ */
+export function useTemplateMarkets(enabled = true) {
+  const { db, userId } = useHubDb();
+  return useQuery({
+    queryKey: hubKeys.mercadosDosModelos(userId),
+    queryFn: () => fetchTemplateMarkets(db),
     enabled: !!userId && enabled,
     retry: false,
   });

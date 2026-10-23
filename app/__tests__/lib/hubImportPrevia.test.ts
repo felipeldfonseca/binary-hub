@@ -134,6 +134,25 @@ describe('the zone rule (G2)', () => {
     expect(mostrarFuso(naParede(mb, 'crypto'), mb, CONTAS_QUADRO.binance, {})).toBe(false)
   })
 
+  it('owner decision (23 Oct): another market’s model gives the file no zone (neither the skip nor the pre-selection)', () => {
+    // «BlackArrow» used in B3 only, read in Ylos 50k (New York): the zone is asked, nothing pre-selected from the model
+    const r = iniciarMapeamento(arquivoMapeavelQuadro('f15'), {
+      market: 'futures',
+      templates: [modeloBlackArrow()],
+      nomePadrao: 'Ylos',
+      mercados: { [modeloBlackArrow().id]: ['b3'] },
+    })
+    if (!r.ok) throw new Error(r.error)
+    const m = r.mapeamento
+    expect([m.match.kind, m.porModelo, m.outroMercado]).toEqual(['exact', true, ['b3']])
+    expect(mostrarFuso(naParede(m, 'futures'), m, CONTAS_QUADRO.ylosDepois, {})).toBe(true)
+    expect(naParede(m, 'futures').fileTzHint).toBeNull()
+    expect(fusoPreSelecionado(naParede(m, 'futures'), CONTAS_QUADRO.ylos, {})).toBeNull()
+    // The same model of this market: its zone skips the step (15) and is the hint
+    const proprio = mapear('f15', 'futures', [modeloBlackArrow()])
+    expect(naParede(proprio, 'futures').fileTzHint).toBe(NY)
+  })
+
   it('fusoPreSelecionado: the import zone, else the file’s hint, else UTC for an exchange; a zone outside the five: none', () => {
     const f8 = naParede(mapear('f8', 'futures'), 'futures')
     expect(fusoPreSelecionado(f8, CONTAS_QUADRO.ylos, {})).toBeNull()

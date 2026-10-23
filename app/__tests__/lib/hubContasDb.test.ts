@@ -9,6 +9,7 @@ import {
   fetchActivity,
   fetchImportFormats,
   fetchPreferences,
+  fetchTemplateMarkets,
   fetchTemplates,
   importFixTz,
   importPreview,
@@ -232,6 +233,32 @@ describe('Phase 3b · the column-mapping models (import_templates)', () => {
     // Never the owner or the dates the screens do not read
     expect(TEMPLATE_COLUMNS).not.toMatch(/user_id|created_at|updated_at/);
     await expect(fetchTemplates(fakeDb(() => ({ data: null })).db)).resolves.toEqual([]);
+  });
+
+  it('fetchTemplateMarkets: each model’s markets from its batches’ accounts (owner decision, 23 Oct); a model with no batch is absent', async () => {
+    const { db, log } = fakeDb((target) =>
+      target === 'import_batches'
+        ? {
+            data: [
+              { template_id: 't-ba', account_id: 'a-fut' },
+              { template_id: 't-ba', account_id: 'a-fut-2' },
+              { template_id: 't-ba', account_id: 'a-b3' },
+              { template_id: 't-tv', account_id: 'a-fut' },
+              // A batch saved under no model, and one whose account the read does not hold
+              { template_id: null, account_id: 'a-b3' },
+              { template_id: 't-x', account_id: 'a-outra' },
+            ],
+          }
+        : { data: [{ id: 'a-fut', market: 'futures' }, { id: 'a-fut-2', market: 'futures' }, { id: 'a-b3', market: 'b3' }] },
+    );
+    await expect(fetchTemplateMarkets(db)).resolves.toEqual({ 't-ba': ['futures', 'b3'], 't-tv': ['futures'] });
+    expect(log).toEqual([
+      [['from', 'import_batches'], ['select', 'template_id, account_id'], ['eq', 'platform', 'modelo']],
+      [['from', 'trading_accounts'], ['select', 'id, market']],
+    ]);
+    await expect(fetchTemplateMarkets(fakeDb(() => ({ data: null })).db)).resolves.toEqual({});
+    const falha = await fetchTemplateMarkets(fakeDb((t) => (t === 'import_batches' ? { error: { message: 'TypeError: Failed to fetch' } } : { data: [] })).db).catch((e: unknown) => e);
+    expect((falha as HubDataError).code).toBe('network');
   });
 
   it('saveTemplate calls import_template_save with its argument names and answers what it saved', async () => {

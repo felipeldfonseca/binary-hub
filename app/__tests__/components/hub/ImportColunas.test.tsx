@@ -7,9 +7,10 @@
  * through their own pills, selects, checkbox and name field, and «Mudar colunas» is the model chip's.
  */
 import React from 'react'
-import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import * as data from '@/lib/hub/contasDb'
+import type { AccountMarket } from '@/lib/domain/markets'
 import * as regrasDb from '@/lib/hub/regrasDb'
 import { MAX_TEMPLATE_NAME, accountRouteHash, readImportFile, toRpcRow, type EndOfFileAnswer, type SideWordAnswer, type Template } from '@/lib/domain/import'
 import { useImportSheet } from '@/components/hub/importar/ImportSheetProvider'
@@ -19,6 +20,7 @@ import {
   CONTAS_QUADRO,
   HOJE_QUADRO,
   MODELO_BLACKARROW_LINHA,
+  MODELO_TRADOVATE_LINHA,
   arquivoQuadro,
   contasQuadro,
   lidoQuadro,
@@ -40,6 +42,7 @@ jest.mock('@/lib/hub/contasDb', () => ({
   fetchAccounts: jest.fn(),
   fetchImportFormats: jest.fn(),
   fetchTemplates: jest.fn(),
+  fetchTemplateMarkets: jest.fn(),
   createAccount: jest.fn(),
   importPreview: jest.fn(),
   importCommit: jest.fn(),
@@ -65,6 +68,7 @@ jest.mock('@/lib/hub/importMapeado', () => {
 const fetchAccounts = data.fetchAccounts as jest.MockedFunction<typeof data.fetchAccounts>
 const fetchImportFormats = data.fetchImportFormats as jest.MockedFunction<typeof data.fetchImportFormats>
 const fetchTemplates = data.fetchTemplates as jest.MockedFunction<typeof data.fetchTemplates>
+const fetchTemplateMarkets = data.fetchTemplateMarkets as jest.MockedFunction<typeof data.fetchTemplateMarkets>
 const createAccount = data.createAccount as jest.MockedFunction<typeof data.createAccount>
 const importPreview = data.importPreview as jest.MockedFunction<typeof data.importPreview>
 const importCommit = data.importCommit as jest.MockedFunction<typeof data.importCommit>
@@ -176,12 +180,14 @@ async function escolherZona(dialog: HTMLElement, tz: string) {
 }
 
 beforeEach(() => {
-  for (const m of [fetchAccounts, fetchImportFormats, fetchTemplates, createAccount, importPreview, importCommit, importUndo, saveTemplate, readFile, fetchRulesConfig, saveRules]) {
+  for (const m of [fetchAccounts, fetchImportFormats, fetchTemplates, fetchTemplateMarkets, createAccount, importPreview, importCommit, importUndo, saveTemplate, readFile, fetchRulesConfig, saveRules]) {
     m.mockReset()
   }
   fetchAccounts.mockResolvedValue(contasQuadro())
   fetchImportFormats.mockResolvedValue({ [CONTAS_QUADRO.topOne.id]: ['topone'] })
   fetchTemplates.mockResolvedValue([])
+  // The board's models are its futures accounts' (owner decision, 23 Oct: the market of a model comes from its batches)
+  fetchTemplateMarkets.mockResolvedValue({ [MODELO_BLACKARROW_LINHA.id]: ['futures'], [MODELO_TRADOVATE_LINHA.id]: ['futures'] })
   fetchRulesConfig.mockResolvedValue(regrasQuadro())
   saveTemplate.mockResolvedValue({ template_id: '3b0c0a00-0000-4000-8000-0000000000f1', header_sig: 'ab'.repeat(32), created: true })
   modeloASalvar.mockClear()
@@ -259,6 +265,7 @@ describe('reading and routing a file', () => {
     expect(importPreview.mock.calls[0][1]).not.toHaveProperty('p_format')
     expect(importPreview.mock.calls[0][1].p_platform).toBe('topone')
     expect(fetchTemplates).not.toHaveBeenCalled()
+    expect(fetchTemplateMarkets).not.toHaveBeenCalled()
     // The card's ⓘ: both of the board's sentences, for a reader's file too (E1)
     await userEvent.click(within(dialog).getByRole('button', { name: 'Como ler: arquivo' }))
     expect(dialog.querySelector('#info-arq')).toHaveTextContent(
@@ -272,6 +279,7 @@ describe('reading and routing a file', () => {
     expect(cardOf(dialog)).toBe('Arquivo não reconhecido · 18 linhas')
     expect(indicatorOf(dialog)).toBe('Passo 1 de 4')
     expect(fetchTemplates).toHaveBeenCalledTimes(1)
+    expect(fetchTemplateMarkets).toHaveBeenCalledTimes(1)
     expect(importPreview).not.toHaveBeenCalled()
   })
 
@@ -314,6 +322,7 @@ describe('reading and routing a file', () => {
     expect(within(dialog).getByText('Em contas de binárias, lemos só o CSV da Ebinex.')).toBeInTheDocument()
     expect(cardOf(dialog)).toBe('Arquivo não reconhecido · 18 linhas')
     expect(fetchTemplates).not.toHaveBeenCalled()
+    expect(fetchTemplateMarkets).not.toHaveBeenCalled()
     await userEvent.click(within(dialog).getByRole('button', { name: 'Escolher outro arquivo' }))
     expect(within(dialog).getByRole('heading', { name: 'Escolha outro arquivo' })).toHaveFocus()
     expect(dialog.querySelector('.hub-arq')).toBeNull()
@@ -389,6 +398,7 @@ describe('a2 · «Para qual conta?» for an unrecognised file (19)', () => {
     expect(primaryOf(dialog)).toHaveAttribute('aria-disabled', 'true')
     expect(primaryOf(dialog)).toHaveAccessibleDescription('Escolha a conta.')
     expect(fetchTemplates).not.toHaveBeenCalled()
+    expect(fetchTemplateMarkets).not.toHaveBeenCalled()
 
     await userEvent.click(within(dialog).getByRole('button', { name: 'Mini-índice' }))
     expect(within(dialog).getByRole('button', { name: 'Mini-índice' })).toHaveAttribute('aria-pressed', 'true')
@@ -425,6 +435,7 @@ describe('a2 · «Para qual conta?» for an unrecognised file (19)', () => {
     expect(await within(dialog).findByRole('heading', { name: 'Não reconhecemos este arquivo. Diga o que é cada coluna.' })).toHaveFocus()
     expect(createAccount.mock.calls[0][2]).toMatchObject({ market: 'b3', label: 'Clear B3', platform: 'profit' })
     expect(fetchTemplates).toHaveBeenCalledTimes(1)
+    expect(fetchTemplateMarkets).toHaveBeenCalledTimes(1)
   })
 
   it('once «+ Nova conta» created the account, «Voltar» lands on a2 with it chosen, never on «Qual mercado?» or «Onde você opera?» (review 2 #1)', async () => {
@@ -585,6 +596,140 @@ describe('15 · «As mesmas colunas» (Ylos 50k, model BlackArrow)', () => {
     await within(dialog).findByRole('heading', { name: 'Importação feita' })
     expect(saveTemplate.mock.calls[0].slice(2)).toEqual(['lote-15b', MODELO_BLACKARROW_LINHA.id])
     expect(within(dialog).getByText('Modelo “BlackArrow” atualizado: os próximos arquivos com estas colunas entram direto.')).toBeInTheDocument()
+  })
+})
+
+describe('owner decision (23 Oct): a model saved in another market is offered, never overwritten', () => {
+  const BA = MODELO_BLACKARROW_LINHA.id
+  const AVISO = 'O modelo “BlackArrow” é de Futuros. Sem atualizá-lo, estas colunas viram um modelo novo.'
+
+  /** b3.csv (BlackArrow’s columns + «Emolumentos») on Mini-índice, after «BlackArrow» of Futuros: up to «conferir» */
+  async function b3AteConferir() {
+    fetchTemplates.mockResolvedValue([modeloBlackArrow()])
+    importPreview.mockResolvedValue(previaQuadro('19'))
+    importCommit.mockResolvedValue(commitQuadro('19'))
+    const dialog = await abrir('mini', 'f19')
+    expect(await within(dialog).findByRole('heading', { name: 'Este arquivo mudou desde o modelo “BlackArrow”. Confira as colunas.' })).toHaveFocus()
+    expect(cardOf(dialog)).toBe('Parecido com o modelo “BlackArrow” · 18 linhas')
+    await responderLado(dialog, 'X', 'sell')
+    await continuar(dialog)
+    await within(dialog).findByRole('heading', { name: 'Confira 3 linhas' })
+    return dialog
+  }
+
+  async function daZonaAoFim(dialog: HTMLElement) {
+    await usar(dialog)
+    await within(dialog).findByRole('heading', { name: 'Em que fuso estão os horários deste arquivo?' })
+    // Another market’s model gives no zone: nothing pressed (the futures model’s New York is no hint for a B3 file)
+    expect(within(dialog).getAllByRole('radio').filter((r) => (r as HTMLInputElement).checked)).toHaveLength(0)
+    await escolherZona(dialog, 'America/Sao_Paulo')
+    await continuar(dialog)
+    await within(dialog).findByRole('heading', { name: 'Prévia' })
+    expect(importPreview.mock.calls[0][1]).toMatchObject({ p_platform: 'modelo', p_file_tz: 'America/Sao_Paulo', p_format: { template: BA } })
+    await userEvent.click(primaryOf(dialog))
+    await within(dialog).findByRole('heading', { name: 'Importação feita' })
+  }
+
+  it('left unchecked: a NEW model «BlackArrow · B3» (no p_replaces, its own columns and zone); «BlackArrow» untouched', async () => {
+    const dialog = await b3AteConferir()
+    const caixa = within(dialog).getByRole('checkbox', { name: 'Atualizar o modelo “BlackArrow”' })
+    expect(caixa).not.toBeChecked()
+    expect(caixa).toHaveAccessibleDescription(AVISO)
+    expect(within(dialog).getByText(AVISO)).toBeInTheDocument()
+    expect(within(dialog).getByRole('textbox', { name: 'Nome do modelo' })).toHaveValue('BlackArrow · B3')
+    await daZonaAoFim(dialog)
+    expect(saveTemplate).toHaveBeenCalledTimes(1)
+    const [, payload, lote, replaces] = saveTemplate.mock.calls[0]
+    expect([lote, replaces]).toEqual([commitQuadro('19').batch_id, null])
+    expect(payload).toMatchObject({ name: 'BlackArrow · B3', tz_hint: 'America/Sao_Paulo', side_words: { x: 'sell' }, account_routes: {} })
+    expect(payload.headers).toContain('emolumentos')
+    expect(within(dialog).getByText('Modelo “BlackArrow · B3” salvo: os próximos arquivos com estas colunas entram direto.')).toBeInTheDocument()
+  })
+
+  it('a name typed in «Nome do modelo» is the new model’s', async () => {
+    const dialog = await b3AteConferir()
+    await nomeDoModelo(dialog, 'Clear B3')
+    await daZonaAoFim(dialog)
+    expect(saveTemplate.mock.calls[0][1]).toMatchObject({ name: 'Clear B3' })
+    expect(within(dialog).getByText('Modelo “Clear B3” salvo: os próximos arquivos com estas colunas entram direto.')).toBeInTheDocument()
+  })
+
+  it('checked by the owner: «BlackArrow» updated (p_replaces) under its own name, no name field', async () => {
+    const dialog = await b3AteConferir()
+    await userEvent.click(within(dialog).getByRole('checkbox', { name: 'Atualizar o modelo “BlackArrow”' }))
+    expect(within(dialog).queryByRole('textbox', { name: 'Nome do modelo' })).not.toBeInTheDocument()
+    expect(within(dialog).getByText(AVISO)).toBeInTheDocument()
+    await daZonaAoFim(dialog)
+    expect(saveTemplate.mock.calls[0].slice(2)).toEqual([commitQuadro('19').batch_id, BA])
+    expect(saveTemplate.mock.calls[0][1]).toMatchObject({ name: 'BlackArrow' })
+    expect(within(dialog).getByText('Modelo “BlackArrow” atualizado: os próximos arquivos com estas colunas entram direto.')).toBeInTheDocument()
+  })
+
+  it('the markets cannot be read: the model counts as another market’s («é de outro mercado»), never written over', async () => {
+    fetchTemplateMarkets.mockRejectedValue(new data.HubDataError('network'))
+    const dialog = await b3AteConferir()
+    expect(within(dialog).getByRole('checkbox', { name: 'Atualizar o modelo “BlackArrow”' })).not.toBeChecked()
+    expect(within(dialog).getByText('O modelo “BlackArrow” é de outro mercado. Sem atualizá-lo, estas colunas viram um modelo novo.')).toBeInTheDocument()
+  })
+
+  it('in its own market (or with no batch yet) it is as on the board: «Atualizar o modelo “BlackArrow”» checked, no line', async () => {
+    const casos: Record<string, AccountMarket[]>[] = [{ [BA]: ['b3'] }, {}]
+    for (const mercados of casos) {
+      fetchTemplateMarkets.mockResolvedValue(mercados)
+      const dialog = await b3AteConferir()
+      expect(within(dialog).getByRole('checkbox', { name: 'Atualizar o modelo “BlackArrow”' })).toBeChecked()
+      expect(within(dialog).queryByText(/é de Futuros/)).not.toBeInTheDocument()
+      expect(within(dialog).queryByRole('textbox', { name: 'Nome do modelo' })).not.toBeInTheDocument()
+      cleanup()
+    }
+  })
+
+  it('the very columns of another market’s model (15 in Ylos 50k, «BlackArrow» used in B3): taken as is, the zone asked, no touch, no line', async () => {
+    fetchTemplateMarkets.mockResolvedValue({ [BA]: ['b3'] })
+    fetchAccounts.mockResolvedValue(contasQuadro(true))
+    fetchTemplates.mockResolvedValue([modeloBlackArrow()])
+    importPreview.mockResolvedValue(previaQuadro('15'))
+    importCommit.mockResolvedValue(commitQuadro('15'))
+    const dialog = await abrir('ylosDepois', 'f15')
+    // The model’s zone is no hint here, so the zone step comes first (Ylos 50k’s own zone pressed)
+    await within(dialog).findByRole('heading', { name: 'Em que fuso estão os horários deste arquivo?' })
+    expect(radioDe(dialog, /^Nova York/)).toBeChecked()
+    expect(cardOf(dialog)).toBe(CARTAO_15)
+    await continuar(dialog)
+    await within(dialog).findByRole('heading', { name: 'Prévia' })
+    expect(dialog.querySelector('.hub-ler .hub-chip-dado')).toHaveTextContent('Colunas do modelo “BlackArrow”')
+    await userEvent.click(primaryOf(dialog))
+    await within(dialog).findByRole('heading', { name: 'Importação feita' })
+    expect(saveTemplate).not.toHaveBeenCalled()
+    expect(linhas(dialog).some((l) => l.startsWith('Modelo') || l.startsWith('O modelo') || l.startsWith('Colunas usadas'))).toBe(false)
+  })
+
+  it('…and through «Mudar colunas»: no checkbox, the line, nothing saved («Colunas usadas só neste arquivo.»)', async () => {
+    fetchTemplateMarkets.mockResolvedValue({ [BA]: ['b3'] })
+    fetchAccounts.mockResolvedValue(contasQuadro(true))
+    fetchTemplates.mockResolvedValue([modeloBlackArrow()])
+    importPreview.mockResolvedValue(previaQuadro('15'))
+    importCommit.mockResolvedValue(commitQuadro('15'))
+    const dialog = await abrir('ylosDepois', 'f15')
+    await within(dialog).findByRole('heading', { name: 'Em que fuso estão os horários deste arquivo?' })
+    await continuar(dialog)
+    await within(dialog).findByRole('heading', { name: 'Prévia' })
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Mudar colunas' }))
+    await within(dialog).findByRole('heading', { name: 'Mude as colunas do modelo “BlackArrow”.' })
+    await continuar(dialog)
+    await within(dialog).findByRole('heading', { name: 'Confira 3 linhas' })
+    expect(within(dialog).queryByRole('checkbox')).not.toBeInTheDocument()
+    expect(within(dialog).getByText('O modelo “BlackArrow” é de B3 e fica como está: as mudanças valem só para este arquivo.')).toBeInTheDocument()
+    await usar(dialog)
+    const h = await within(dialog).findByRole('heading', { level: 3, name: /^(Prévia|Em que fuso)/ })
+    if (h.textContent !== 'Prévia') {
+      await continuar(dialog)
+      await within(dialog).findByRole('heading', { name: 'Prévia' })
+    }
+    await userEvent.click(primaryOf(dialog))
+    await within(dialog).findByRole('heading', { name: 'Importação feita' })
+    expect(saveTemplate).not.toHaveBeenCalled()
+    expect(within(dialog).getByText('Colunas usadas só neste arquivo.')).toBeInTheDocument()
   })
 })
 

@@ -72,6 +72,17 @@ export const MODELO = {
   /** B IC l.1614 */ atualizar: (nome: string) => `Atualizar o modelo “${nome}”`,
   /** B IC l.570 */ nome: 'Nome do modelo',
   /** B IC l.571 */ nota: 'O modelo guarda os nomes das colunas e as suas escolhas, nunca as operações.',
+  /**
+   * N (owner decision, 23 Oct): a model of another market whose columns changed, under «Atualizar o modelo “{nome}”»
+   * (unchecked: a new model is saved under «Nome do modelo»)
+   */
+  outroMercado: (nome: string, mercados: string) =>
+    `O modelo “${nome}” é de ${mercados}. Sem atualizá-lo, estas colunas viram um modelo novo.`,
+  /** N (owner decision, 23 Oct): a model of another market with the file's very columns: never written, no checkbox */
+  outroMercadoExato: (nome: string, mercados: string) =>
+    `O modelo “${nome}” é de ${mercados} e fica como está: as mudanças valem só para este arquivo.`,
+  /** N: the model's markets could not be read */
+  outroMercadoDesconhecido: 'outro mercado',
 }
 
 export const CHIP_MODELO = {

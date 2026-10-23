@@ -6,7 +6,7 @@
  */
 import fs from 'fs'
 import path from 'path'
-import { endOfFileKey, type RowKind, type Template } from '@/lib/domain/import'
+import { endOfFileKey, headerSignature, templateFromRow, type RowKind, type Template } from '@/lib/domain/import'
 import type { AccountMarket } from '@/lib/domain/markets'
 import {
   comColuna,
@@ -19,6 +19,7 @@ import {
   comSalvar,
   comSeparador,
   iniciarMapeamento,
+  modeloASalvar,
   mudarColunas,
   nomePadraoDoModelo,
   type ArquivoMapeavel,
@@ -58,6 +59,15 @@ const mapa = (m: Mapeamento, k: ArquivoQuadroKey): VistaMapa => vistaMapa(m, arq
 const conferir = (m: Mapeamento, k: ArquivoQuadroKey): VistaConferir => vistaConferir(m, mercado(k))
 const linhas = (v: VistaConferir) => v.linhas.map((l) => t(l.join(' · ')))
 const pills = (opcoes: { rotulo: string; pressionada: boolean }[]) => opcoes.map((o) => `${o.rotulo}${o.pressionada ? ' *' : ''}`)
+
+/** A model saved from a mapping (named «B3 antigo»), as import_templates would hand it back */
+function mapeadoModelo(m: Mapeamento): Template {
+  const s = modeloASalvar({ ...m, nome: 'B3 antigo' }, { tzHint: null, rota: null })
+  if (!s) throw new Error('nothing to save')
+  const t = templateFromRow({ ...s.payload, id: '3b0c0a00-0000-4000-8000-0000000000c1', header_sig: headerSignature(s.payload.headers), last_used_at: null })
+  if (!t) throw new Error('model row not usable')
+  return t
+}
 const SUGERIMOS = 'Já sugerimos pelo nome de cada coluna. Confira.'
 const SEM_SAIDA = 'Sem hora de saída, o resultado conta no limite do dia na hora da entrada.'
 const SEM_ID = 'Sem coluna de ID, reconhecemos a reimportação pela mesma hora e preço.'
@@ -485,10 +495,12 @@ describe('«conferir» · trade files', () => {
     expect(pills(v.liquido?.opcoes ?? [])).toEqual(['Sim, é líquido *', 'Não, é bruto'])
     expect(t(v.liquido?.nota)).toBe('Conferido pelos preços na 1ª linha: −US$ 37,50 − US$ 2,48 = −US$ 39,98.')
     expect(v.modelo).toEqual({
+      caixa: true,
       rotulo: 'Salvar como modelo',
       salvar: true,
       comNome: true,
       nome: 'BlackArrow',
+      aviso: null,
       nota: 'O modelo guarda os nomes das colunas e as suas escolhas, nunca as operações.',
     })
     // «Não, é bruto» pressed: the evidence stays; unchecked: no name field
@@ -512,8 +524,71 @@ describe('«conferir» · trade files', () => {
 
   it('15: «Atualizar o modelo “BlackArrow”» (no name field), for a changed model and after «Mudar colunas»', () => {
     for (const m of [mapear('f15b', [modeloBlackArrow()]), mudarColunas(mapear('f15', [modeloBlackArrow()]))]) {
-      expect(vistaConferir(m, 'futures').modelo).toMatchObject({ rotulo: 'Atualizar o modelo “BlackArrow”', salvar: true, comNome: false })
+      expect(vistaConferir(m, 'futures').modelo).toMatchObject({ rotulo: 'Atualizar o modelo “BlackArrow”', salvar: true, comNome: false, caixa: true, aviso: null })
     }
+    // A model of this market by its batches, or with none yet: the same
+    for (const mercados of [{ [modeloBlackArrow().id]: ['futures' as const] }, {}]) {
+      const r = iniciarMapeamento(arquivo('f15b'), { market: 'futures', templates: [modeloBlackArrow()], nomePadrao: 'Ylos', mercados })
+      if (!r.ok) throw new Error(r.error)
+      expect(vistaConferir(r.mapeamento, 'futures').modelo).toMatchObject({ rotulo: 'Atualizar o modelo “BlackArrow”', salvar: true, aviso: null })
+    }
+  })
+
+  describe('owner decision (23 Oct): a model saved in another market', () => {
+    const naB3 = (k: ArquivoQuadroKey, mercados: Record<string, AccountMarket[]> | null, templates = [modeloBlackArrow()]) => {
+      const r = iniciarMapeamento(arquivo(k), { market: 'b3', templates, nomePadrao: 'Profit (Nelogica)', mercados })
+      if (!r.ok) throw new Error(r.error)
+      return r.mapeamento
+    }
+    const futuros = { [modeloBlackArrow().id]: ['futures' as AccountMarket] }
+
+    it('a changed one (b3.csv: BlackArrow’s columns + «Emolumentos»): «Atualizar» unchecked, the line, «Nome do modelo» «BlackArrow · B3»', () => {
+      const m = comPalavraDeLado(naB3('f19', futuros), 'x', 'sell', 'b3')
+      expect(vistaMapa(m, arquivo('f19'), 'b3').titulo).toBe('Este arquivo mudou desde o modelo “BlackArrow”. Confira as colunas.')
+      expect(vistaConferir(m, 'b3').modelo).toEqual({
+        caixa: true,
+        rotulo: 'Atualizar o modelo “BlackArrow”',
+        salvar: false,
+        comNome: true,
+        nome: 'BlackArrow · B3',
+        aviso: 'O modelo “BlackArrow” é de Futuros. Sem atualizá-lo, estas colunas viram um modelo novo.',
+        nota: 'O modelo guarda os nomes das colunas e as suas escolhas, nunca as operações.',
+      })
+      // Checked: «Atualizar» that model (no name field); the line stays
+      expect(vistaConferir(comSalvar(m, true), 'b3').modelo).toMatchObject({ salvar: true, comNome: false, aviso: expect.stringContaining('é de Futuros') })
+    })
+
+    it('several markets, or markets that could not be read', () => {
+      expect(vistaConferir(naB3('f19', { [modeloBlackArrow().id]: ['futures', 'forex'] }), 'b3').modelo?.aviso).toBe(
+        'O modelo “BlackArrow” é de Futuros e Forex. Sem atualizá-lo, estas colunas viram um modelo novo.',
+      )
+      expect(vistaConferir(naB3('f19', null), 'b3').modelo?.aviso).toBe(
+        'O modelo “BlackArrow” é de outro mercado. Sem atualizá-lo, estas colunas viram um modelo novo.',
+      )
+    })
+
+    it('one with the file’s very columns, through «mapa» (a side word the model does not know): no checkbox, only the line', () => {
+      const b3 = naB3('f19', null, [])
+      const proprio = { ...b3, sideWords: {} }
+      // A model with b3.csv's own columns, saved in Futuros
+      const s = mapeadoModelo(proprio)
+      const m = naB3('f19', { [s.id]: ['futures'] }, [s])
+      expect([m.match.kind, m.porModelo, m.inicio]).toEqual(['exact', false, 'mapa'])
+      const v = vistaConferir(comPalavraDeLado(m, 'x', 'sell', 'b3'), 'b3')
+      expect(v.modelo).toEqual({
+        caixa: false,
+        rotulo: 'Atualizar o modelo “B3 antigo”',
+        salvar: false,
+        comNome: false,
+        nome: 'B3 antigo · B3',
+        aviso: 'O modelo “B3 antigo” é de Futuros e fica como está: as mudanças valem só para este arquivo.',
+        nota: 'O modelo guarda os nomes das colunas e as suas escolhas, nunca as operações.',
+      })
+      // Taken as is (its «X» known): the chip, no block
+      const venda = mapeadoModelo({ ...proprio, sideWords: { x: 'sell' } })
+      const direto = naB3('f19', { [venda.id]: ['futures'] }, [venda])
+      expect([direto.porModelo, direto.inicio, vistaConferir(direto, 'b3').modelo, vistaConferir(direto, 'b3').chipModelo]).toEqual([true, 'previa', null, 'B3 antigo'])
+    })
   })
 
   it('17: the symbols as written, «Não, é bruto» with «… antes da comissão de US$ 1,24.», «NinjaTrader»', () => {

@@ -6,6 +6,7 @@
  * «Continuar» and «Usar estas colunas» come in §5.6's order, and a mapping both let through always saves.
  */
 import {
+  MAX_TEMPLATE_NAME,
   accountRouteHash,
   checkTemplate,
   endOfFileKey,
@@ -45,10 +46,15 @@ import {
   iniciarMapeamento,
   lerArquivoMapeavel,
   marcaDeLeitura,
+  mercadosDeOutroMercado,
   modeloASalvar,
+  modeloSoParaLer,
   mudarColunas,
+  fusoDoModelo,
+  nomeNoMercado,
   nomePadraoDoModelo,
   notaDeLeitura,
+  type MercadosDosModelos,
   type ArquivoMapeavel,
   type ColunaUi,
   type Mapeamento,
@@ -452,6 +458,144 @@ describe('modeloASalvar', () => {
     const s = modeloASalvar(m, { tzHint: conta(k).file_tz, rota: null })
     expect(s).not.toBeNull()
     expect(checkTemplate(s?.payload)).toBeNull()
+  })
+})
+
+describe('owner decision (23 Oct): a model saved in another market', () => {
+  const BA = MODELO_BLACKARROW_LINHA.id
+  const futuros: MercadosDosModelos = { [BA]: ['futures'] }
+
+  /** b3.csv (BlackArrow’s columns + «Emolumentos») in Mini-índice (B3), with «X» = Venda */
+  function naB3(mercados: MercadosDosModelos | null | undefined, templates: readonly Template[] = [modeloBlackArrow()]): Mapeamento {
+    const c = CONTAS_QUADRO.mini
+    const r = iniciarMapeamento(arquivo('f19'), { market: 'b3', templates, nomePadrao: nomePadraoDoModelo(c.platform), mercados })
+    if (!r.ok) throw new Error(r.error)
+    return comPalavraDeLado(r.mapeamento, 'x', 'sell', 'b3')
+  }
+
+  it('mercadosDeOutroMercado: the batches’ markets without this one; none for a model of this market or with no batch; unknown counts as another', () => {
+    const t = modeloBlackArrow()
+    expect(mercadosDeOutroMercado(t, 'b3', futuros)).toEqual(['futures'])
+    expect(mercadosDeOutroMercado(t, 'b3', { [BA]: ['futures', 'forex'] })).toEqual(['futures', 'forex'])
+    expect(mercadosDeOutroMercado(t, 'futures', futuros)).toBeUndefined()
+    expect(mercadosDeOutroMercado(t, 'b3', { [BA]: ['futures', 'b3'] })).toBeUndefined()
+    // No batch yet: fits every market
+    expect(mercadosDeOutroMercado(t, 'b3', {})).toBeUndefined()
+    expect(mercadosDeOutroMercado(t, 'b3', { [BA]: [] })).toBeUndefined()
+    // Not given (as before the decision): fits; the read failed: another market's, markets unknown
+    expect(mercadosDeOutroMercado(t, 'b3', undefined)).toBeUndefined()
+    expect(mercadosDeOutroMercado(t, 'b3', null)).toEqual([])
+  })
+
+  it('nomeNoMercado: «{model} · {market}», never past 60 characters, a market suffix replaced', () => {
+    expect(nomeNoMercado('BlackArrow', 'b3')).toBe('BlackArrow · B3')
+    expect(nomeNoMercado('  Tradovate ', 'stocks')).toBe('Tradovate · Ações')
+    expect(nomeNoMercado('BlackArrow · B3', 'futures')).toBe('BlackArrow · Futuros')
+    const longo = 'M'.repeat(MAX_TEMPLATE_NAME)
+    const n = nomeNoMercado(longo, 'forex')
+    expect(Array.from(n)).toHaveLength(MAX_TEMPLATE_NAME)
+    expect(n.endsWith(' · Forex')).toBe(true)
+    expect(nomeNoMercado(`${'M'.repeat(40)}${'ã'.repeat(30)}`, 'crypto').length).toBeLessThanOrEqual(MAX_TEMPLATE_NAME)
+  })
+
+  it('a changed match (b3.csv after «BlackArrow» of Futuros): offered, «Atualizar» unchecked, the new model’s name ready', () => {
+    const m = naB3(futuros)
+    expect(m.match).toMatchObject({ kind: 'changed', template: { id: BA }, shared: 9 })
+    expect([m.origem, m.inicio, m.porModelo, m.salvar, m.nome, m.nomePadrao, m.outroMercado]).toEqual([
+      'modelo',
+      'mapa',
+      false,
+      false,
+      'BlackArrow · B3',
+      'BlackArrow · B3',
+      ['futures'],
+    ])
+    expect(modeloSoParaLer(m)).toBe(false)
+    // The model’s columns as on the board (the same pre-fill)
+    expect(m.colunas.trade).toEqual(naB3({}).colunas.trade)
+    expect(bloqueioDoMapa(m, 'b3')).toBeNull()
+    expect(bloqueioDoConferir(m, 'b3')).toBeNull()
+  })
+
+  it('the same file with the model of this market (or with no batch, or the markets not given): as on the board, «Atualizar» checked', () => {
+    const casos: (MercadosDosModelos | undefined)[] = [{ [BA]: ['b3'] }, { [BA]: ['futures', 'b3'] }, {}, undefined]
+    for (const mercados of casos) {
+      const m = naB3(mercados)
+      expect([m.salvar, m.nome, m.outroMercado]).toEqual([true, 'BlackArrow', undefined])
+      expect(modeloASalvar(m, { tzHint: 'America/Sao_Paulo', rota: null })).toMatchObject({ tipo: 'atualizado', replaces: BA, nome: 'BlackArrow' })
+    }
+  })
+
+  it('left unchecked, the import saves a NEW model: «salvo», no p_replaces, «BlackArrow · B3», the file’s own columns', () => {
+    const m = naB3(futuros)
+    const s = modeloASalvar(m, { tzHint: 'America/Sao_Paulo', rota: null })
+    expect(s).toMatchObject({ tipo: 'salvo', replaces: null, nome: 'BlackArrow · B3' })
+    expect(s?.payload).toMatchObject({ name: 'BlackArrow · B3', headers: m.lido.headers, side_words: { x: 'sell' }, tz_hint: 'America/Sao_Paulo', account_routes: {} })
+    expect(headerSignature(s?.payload.headers ?? [])).not.toBe(MODELO_BLACKARROW_LINHA.header_sig)
+    expect(checkTemplate(s?.payload)).toBeNull()
+    // A name typed in «Nome do modelo»; emptied, the default
+    expect(modeloASalvar(comNome(m, 'Clear B3'), { tzHint: null, rota: null })?.payload.name).toBe('Clear B3')
+    expect(modeloASalvar(comNome(m, '  '), { tzHint: null, rota: null })?.payload.name).toBe('BlackArrow · B3')
+  })
+
+  it('checked, it updates that model under its own name; neither way keeps that market’s «Conta» routes', () => {
+    const m = comSalvar(naB3(futuros), true)
+    expect(modeloASalvar(m, { tzHint: 'America/Sao_Paulo', rota: null })).toMatchObject({ tipo: 'atualizado', replaces: BA, nome: 'BlackArrow', payload: { name: 'BlackArrow' } })
+    // NinjaTrader with a route to Apex A (Futuros), read in a Forex account: the routes go
+    const apex = CONTAS_QUADRO.apexA
+    const s0 = modeloASalvar(mapear('f17'), { tzHint: 'America/New_York', rota: { valor: 'APX-0001', contaId: apex.id } })
+    if (!s0) throw new Error('nothing to save')
+    const ninja = templateFromRow({ ...s0.payload, id: UUID_19, header_sig: headerSignature(s0.payload.headers) })
+    if (!ninja) throw new Error('model row not usable')
+    const r = iniciarMapeamento(arquivo('f17'), { market: 'forex', templates: [ninja], nomePadrao: 'x', mercados: { [UUID_19]: ['futures'] } })
+    if (!r.ok) throw new Error(r.error)
+    expect([r.mapeamento.match.kind, modeloSoParaLer(r.mapeamento)]).toEqual(['exact', true])
+    const changed = { ...r.mapeamento, match: { kind: 'changed' as const, template: ninja, shared: 10 } }
+    for (const x of [changed, comSalvar(changed, true)]) {
+      expect(modeloASalvar(x, { tzHint: null, rota: { valor: 'APX-0001', contaId: CONTAS_QUADRO.e8.id } })?.payload.account_routes).toEqual({
+        [accountRouteHash('APX-0001')]: CONTAS_QUADRO.e8.id,
+      })
+    }
+  })
+
+  it('an exact match of another market is only read: taken as is (or through «mapa»), never touched, updated or saved again', () => {
+    const t = modeloBlackArrow()
+    const r = iniciarMapeamento(arquivo('f15'), { market: 'futures', templates: [t], nomePadrao: 'Ylos', mercados: { [BA]: ['b3'] } })
+    if (!r.ok) throw new Error(r.error)
+    const m = r.mapeamento
+    expect([m.match.kind, m.porModelo, m.inicio, m.salvar, m.outroMercado]).toEqual(['exact', true, 'previa', false, ['b3']])
+    expect(modeloSoParaLer(m)).toBe(true)
+    expect(modeloASalvar(m, { tzHint: 'America/New_York', rota: null })).toBeNull()
+    // «Mudar colunas»: still only read («Atualizar» unchecked, nothing saved)
+    const mudou = mudarColunas(m)
+    expect([mudou.salvar, mudou.porModelo, modeloSoParaLer(mudou)]).toEqual([false, false, true])
+    expect(modeloASalvar(mudou, { tzHint: null, rota: null })).toBeNull()
+    expect(modeloASalvar(comSalvar(mudou, true), { tzHint: null, rota: null })).toBeNull()
+    // Its zone is no hint here; the same model of this market’s is
+    expect([fusoDoModelo(m), ler(m, 'f15').fileTzHint]).toEqual([null, null])
+    expect(fusoDoModelo(mapear('f15', [t]))).toBe('America/New_York')
+    // The model’s id still names the file’s format (p_format.template)
+    expect(ler(m, 'f15').format).toEqual({ sig: t.sig, template: BA })
+  })
+
+  it('«Mudar colunas» of a model of this market checks «Atualizar» as before; of another market’s changed one, unchecked', () => {
+    expect(mudarColunas(mapear('f15', [modeloBlackArrow()])).salvar).toBe(true)
+    expect(mudarColunas(naB3(futuros)).salvar).toBe(false)
+  })
+
+  it('«Separador» keeps another market’s model while the re-read file still matches it; one it no longer matches is a new model', () => {
+    const r = iniciarMapeamento(arquivo('f15'), { market: 'futures', templates: [modeloBlackArrow()], nomePadrao: 'Ylos', mercados: { [BA]: ['b3'] } })
+    if (!r.ok) throw new Error(r.error)
+    const m = mudarColunas(r.mapeamento)
+    expect([m.outroMercado, m.salvar, m.nome]).toEqual([['b3'], false, 'BlackArrow · Futuros'])
+    const virgula = ARQUIVOS_QUADRO.f15.texto
+      .split(/\r?\n/)
+      .map((l) => l.replace(/\.(?=\d{3}[,;])/g, '').replace(/,/g, '.').replace(/;/g, ','))
+      .join('\n')
+    const igual = comSeparador(m, { ...arquivo('f15'), text: virgula }, ',', 'futures')
+    expect([igual.lido.delimiter, igual.origem, igual.outroMercado, igual.salvar, igual.nome]).toEqual([',', 'modelo', ['b3'], false, 'BlackArrow · Futuros'])
+    const outro = comSeparador(m, { ...arquivo('f15'), text: ['Data/Hora;Papel,C/V;Qtd', '01/10/2026 09:34:31;MESZ6,C;2'].join('\n') }, ',', 'futures')
+    expect([outro.lido.delimiter, outro.origem, outro.outroMercado, outro.salvar, outro.nome]).toEqual([',', 'nomes', undefined, true, 'BlackArrow · Futuros'])
   })
 })
 

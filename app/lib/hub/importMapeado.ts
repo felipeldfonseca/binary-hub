@@ -69,7 +69,7 @@ import {
 import type { AccountMarket } from '@/lib/domain/markets'
 import { tradeInstrument, tradeMatchKey } from '@/lib/domain/registro'
 import { CONFERIR, DICA_MAPA, LER, MODELO } from '@/components/hub/importar/copyMapa'
-import { PLATFORM_LABEL } from '@/components/hub/contas/copy'
+import { MARKET_LABEL, PLATFORM_LABEL } from '@/components/hub/contas/copy'
 
 /** A file no reader took, read again as text */
 export interface ArquivoMapeavel {
@@ -139,7 +139,20 @@ export interface Mapeamento {
   datasEscolhidas?: boolean
   /** L1: the owner pressed a pill of the net question (no new pre-answer after that) */
   liquidoEscolhido?: boolean
+  /**
+   * Owner decision (23 Oct): the model matched was saved in another market than the account's: the markets of its batches
+   * (empty when they could not be read). It is offered as any model, but «Atualizar o modelo» starts unchecked and, so
+   * left, the import saves a new model (nome = «{model} · {market}»); a model with the file's very columns (exact) is
+   * taken as is and never written (modeloSoParaLer). Absent: no model, or one of this market (or with no batch yet).
+   */
+  outroMercado?: AccountMarket[]
 }
+
+/**
+ * Each model's markets (contasDb.fetchTemplateMarkets: its batches' accounts); a model absent has no batch yet and fits
+ * every market
+ */
+export type MercadosDosModelos = Readonly<Record<string, readonly AccountMarket[]>>
 
 // ------------------------------------------------------------------------------------------------
 // Reading the file again
@@ -175,6 +188,43 @@ const NO_NAME_PLATFORMS: readonly string[] = ['naosei', 'outra']
 export function nomePadraoDoModelo(platform: string | null): string {
   if (!platform || READER_PLATFORMS.indexOf(platform) >= 0 || NO_NAME_PLATFORMS.indexOf(platform) >= 0) return MODELO.nomePadrao
   return Object.prototype.hasOwnProperty.call(PLATFORM_LABEL, platform) ? PLATFORM_LABEL[platform] : MODELO.nomePadrao
+}
+
+/**
+ * Owner decision (23 Oct): the markets of `modelo` when it was saved in another market than `market` (its batches' markets,
+ * none of them `market`), or undefined when it fits: a model with no batch yet, or one used in `market`. `mercados`
+ * undefined: not given (every model fits); null: their read failed, so every model counts as another market's (empty
+ * list), and no import writes over a model it cannot place.
+ */
+export function mercadosDeOutroMercado(
+  modelo: Pick<Template, 'id'>,
+  market: AccountMarket,
+  mercados: MercadosDosModelos | null | undefined,
+): AccountMarket[] | undefined {
+  if (mercados === undefined) return undefined
+  if (mercados === null) return []
+  const usados = mercados[modelo.id] ?? []
+  return usados.length === 0 || usados.indexOf(market) >= 0 ? undefined : usados.slice()
+}
+
+/**
+ * The name a model of another market's columns is saved under in `market` (owner decision, 23 Oct): «{model} · {market}»
+ * («BlackArrow · B3»), a market suffix the model's name already ends with dropped first, the model's part cut so the whole
+ * fits MAX_TEMPLATE_NAME characters (import_template_save: 1–60 after trim). Names need not be unique (the database keys
+ * models by their header set).
+ */
+export function nomeNoMercado(nome: string, market: AccountMarket): string {
+  const sufixo = ` · ${MARKET_LABEL[market]}`
+  let base = nome.trim()
+  for (const rotulo of Object.values(MARKET_LABEL)) {
+    if (base.endsWith(` · ${rotulo}`)) {
+      base = base.slice(0, base.length - rotulo.length - 3).trim()
+      break
+    }
+  }
+  const cabe = MAX_TEMPLATE_NAME - Array.from(sufixo).length
+  const corte = Array.from(base).slice(0, cabe).join('').trim()
+  return corte ? `${corte}${sufixo}` : MARKET_LABEL[market]
 }
 
 export type InicioMapeamento = { ok: true; mapeamento: Mapeamento } | { ok: false; error: FileErrorCode; line?: number }
@@ -357,8 +407,17 @@ function lidoDe(s: SniffedFile): SniffedFile {
   }
 }
 
+/** What iniciarMapeamento needs besides the file */
+export interface ContextoDoMapeamento {
+  market: AccountMarket
+  templates: readonly Template[]
+  nomePadrao: string
+  /** Each model's markets (owner decision, 23 Oct); undefined: not given (every model fits); null: the read failed */
+  mercados?: MercadosDosModelos | null
+}
+
 /** iniciarMapeamento's rules over a file already read (also «Separador»'s fresh mapping of a re-read file) */
-function mapear(lido: SniffedFile, ctx: { market: AccountMarket; templates: readonly Template[]; nomePadrao: string }): Mapeamento {
+function mapear(lido: SniffedFile, ctx: ContextoDoMapeamento): Mapeamento {
   const { market } = ctx
   const match = matchTemplate(lido.headers, ctx.templates)
   const values = valoresDoArquivo(lido)
@@ -383,8 +442,12 @@ function mapear(lido: SniffedFile, ctx: { market: AccountMarket; templates: read
     const colunas: Record<RowKind, ColunaUi[]> = { ...doNome, [rowKind]: doModelo }
     const sugeridas: Record<RowKind, ColunaUi[]> = { trade: colunas.trade.slice(), fill: colunas.fill.slice() }
     const { decimal, datas } = decisoes(lido, paraODominio(doModelo))
+    // Another market's model: offered, «Atualizar o modelo» unchecked, a new model's name ready (owner decision, 23 Oct)
+    const outro = mercadosDeOutroMercado(modelo, market, ctx.mercados)
+    const nome = outro ? nomeNoMercado(modelo.name, market) : modelo.name
     let m: Mapeamento = {
       ...base,
+      ...(outro ? { outroMercado: outro, salvar: false } : {}),
       rowKind,
       colunas,
       sugeridas,
@@ -399,8 +462,8 @@ function mapear(lido: SniffedFile, ctx: { market: AccountMarket; templates: read
       porModelo: false,
       inicio: 'mapa',
       origem: 'modelo',
-      nome: modelo.name,
-      nomePadrao: modelo.name,
+      nome,
+      nomePadrao: nome,
     }
     m = { ...m, resultIsNet: modelo.resultIsNet ?? preResposta(m, market) }
     return m
@@ -458,11 +521,10 @@ function colunasDoModelo(headers: readonly string[], template: Template): { colu
  *                                         nomePadrao = ctx.nomePadrao.
  * endOfFile {}, accountValue null, mudando false, sideWords/openCloseWords {} (or the model's), separador = lido.delimiter;
  * inicio 'mapa' and porModelo false but for the first case.
+ * A model saved in another market (ctx.mercados, owner decision 23 Oct) is matched and taken the same way, with
+ * `outroMercado` set, salvar false and nome = nomePadrao = nomeNoMercado(the model's name, market).
  */
-export function iniciarMapeamento(
-  arquivo: ArquivoMapeavel,
-  ctx: { market: AccountMarket; templates: readonly Template[]; nomePadrao: string },
-): InicioMapeamento {
+export function iniciarMapeamento(arquivo: ArquivoMapeavel, ctx: ContextoDoMapeamento): InicioMapeamento {
   const s = sniffFile(arquivo.text)
   if (!s.ok) return s
   const lido = lidoDe(s)
@@ -560,9 +622,27 @@ export function arquivoDoMapeamento(m: Mapeamento, market: AccountMarket, fileTz
     accountValue: m.accountValue,
     endOfFile: respostasDoFim(m),
     templateId: modelo ? modelo.id : null,
-    tzHint: modelo ? modelo.tzHint : null,
+    tzHint: fusoDoModelo(m),
     fileTz,
   })
+}
+
+/**
+ * The model's zone as a hint for this file (the zone step's pre-selection, mostrarFuso): the zone its last import used,
+ * unless the model is another market's (owner decision, 23 Oct: a futures model's New York is no hint for a B3 file)
+ */
+export function fusoDoModelo(m: Pick<Mapeamento, 'match' | 'outroMercado'>): string | null {
+  const modelo = modeloDe(m.match)
+  return modelo && !m.outroMercado ? modelo.tzHint : null
+}
+
+/**
+ * Owner decision (23 Oct): another market's model with the file's very columns (an exact match) is only read: taken as is,
+ * never touched nor updated, and no model is saved beside it (the database keeps one model per header set, so a «new»
+ * one would overwrite it). The edits of «mapa» stay with this file.
+ */
+export function modeloSoParaLer(m: Pick<Mapeamento, 'match' | 'outroMercado'>): boolean {
+  return !!m.outroMercado && m.match.kind === 'exact'
 }
 
 /** arquivoDeTodasAsContas's answer per state (a read of the whole file); a Mapeamento is never changed in place */
@@ -585,7 +665,8 @@ export function arquivoDeTodasAsContas(m: Mapeamento, market: AccountMarket): Ma
  * do modelo “{nome}”.»), the model block «Atualizar o modelo “{nome}”» checked; every answer kept
  */
 export function mudarColunas(m: Mapeamento): Mapeamento {
-  return { ...m, porModelo: false, origem: 'modelo', mudando: true, salvar: true }
+  // Another market's model: «Atualizar o modelo» unchecked (owner decision, 23 Oct)
+  return { ...m, porModelo: false, origem: 'modelo', mudando: true, salvar: !m.outroMercado }
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -654,12 +735,16 @@ export function comSeparador(m: Mapeamento, arquivo: ArquivoMapeavel, d: CsvDeli
   if (!inteira(s)) return { ...m, separador: d }
   const modelo = modeloDe(m.match)
   const novo = mapear(lidoDe(s), { market, templates: modelo ? [modelo] : [], nomePadrao: m.nomePadrao })
+  // Another market's model stays another market's while the re-read file still matches it; a file it no longer matches
+  // is a new model's (checked, under the name already given)
+  const outro = novo.origem === 'modelo' ? m.outroMercado : undefined
   return {
     ...novo,
+    outroMercado: outro,
     inicio: m.inicio,
     porModelo: false,
     mudando: m.mudando && novo.origem === 'modelo',
-    salvar: m.salvar,
+    salvar: m.outroMercado && !outro ? true : m.salvar,
     nome: m.nome,
     nomePadrao: m.nomePadrao,
   }
@@ -705,12 +790,18 @@ export function comNome(m: Mapeamento, text: string): Mapeamento {
 // What the model keeps
 // ------------------------------------------------------------------------------------------------
 
-/** What to save after the commit (E46), or null when nothing is saved («Salvar …» unchecked: «Colunas usadas só neste arquivo.») */
+/**
+ * What to save after the commit (E46), or null when nothing is saved («Salvar …» unchecked: «Colunas usadas só neste
+ * arquivo.»; another market's model only read, modeloSoParaLer: none, or no line when it was taken as is)
+ */
 export interface ModeloASalvar {
   payload: TemplatePayloadV1
   /** p_replaces: the model «Atualizar o modelo» re-keys; null for a new model and for a touch */
   replaces: string | null
-  /** 'salvo' (origem 'nomes'), 'atualizado' (origem 'modelo', not porModelo), 'tocado' (porModelo: no end line) */
+  /**
+   * 'salvo' (origem 'nomes', or another market's model left unchecked: a new model), 'atualizado' (origem 'modelo', not
+   * porModelo, checked), 'tocado' (porModelo: no end line)
+   */
   tipo: 'salvo' | 'atualizado' | 'tocado'
   nome: string
 }
@@ -742,19 +833,27 @@ function palavrasDoModelo(m: Mapeamento): Record<string, SideWordAnswer> {
  * the model's routes + the one for `rota` (accountRouteHash(valor) → contaId; routes only when a column is «Conta», at
  * most 50: a 51st is not added), tzHint). checkTemplate(payload) must be null for any mapping bloqueioDoMapa /
  * bloqueioDoConferir let through (tested).
+ * Another market's model (owner decision, 23 Oct): only read when exact (null); else unchecked → 'salvo', a new model
+ * (no p_replaces: the file's header set differs from the model's, so the upsert creates one) under m.nome; checked →
+ * 'atualizado' under the model's own name. Neither keeps that model's routes (another market's accounts).
  */
 export function modeloASalvar(
   m: Mapeamento,
   ctx: { tzHint: string | null; rota: { valor: string; contaId: string } | null },
 ): ModeloASalvar | null {
-  if (!m.salvar) return null
+  if (modeloSoParaLer(m)) return null
+  // Another market's model (owner decision, 23 Oct): unchecked saves a new model under the name shown; checked updates it
+  const novoNoMercado = !!m.outroMercado && !m.salvar
+  if (!m.salvar && !novoNoMercado) return null
   const choices = escolhasDe(m)
   const modelo = modeloDe(m.match)
-  const tipo: ModeloASalvar['tipo'] = m.porModelo ? 'tocado' : m.origem === 'nomes' ? 'salvo' : 'atualizado'
-  const name = m.nome.trim() || m.nomePadrao
+  const tipo: ModeloASalvar['tipo'] = m.porModelo ? 'tocado' : m.origem === 'nomes' || novoNoMercado ? 'salvo' : 'atualizado'
+  // An update keeps the model's own name (the name field shows only for a new model)
+  const name = m.outroMercado && !novoNoMercado && modelo ? modelo.name : m.nome.trim() || m.nomePadrao
   const routes: Record<string, string> = {}
   if (choices.columns.indexOf('account') >= 0) {
-    if (modelo) Object.assign(routes, modelo.accountRoutes)
+    // Another market's routes point at that market's accounts, which import_template_save refuses for this batch
+    if (modelo && !m.outroMercado) Object.assign(routes, modelo.accountRoutes)
     if (ctx.rota) {
       const hash = accountRouteHash(ctx.rota.valor)
       if (Object.prototype.hasOwnProperty.call(routes, hash) || Object.keys(routes).length < MAX_ROUTES) routes[hash] = ctx.rota.contaId

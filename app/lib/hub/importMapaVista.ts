@@ -48,12 +48,14 @@ import {
   foraDoPasso,
   idsQueSeRepetem,
   marcaDeLeitura,
+  modeloSoParaLer,
   notaDeLeitura,
   perguntaDoLiquido,
   quantidadeComSinal,
   type ArquivoMapeavel,
   type Mapeamento,
 } from '@/lib/hub/importMapeado'
+import { MARKET_LABEL } from '@/components/hub/contas/copy'
 import {
   CAMPO,
   CHECAGEM,
@@ -165,12 +167,19 @@ export interface PareamentoVista {
 }
 
 export interface ModeloVista {
+  /**
+   * The checkbox shown; false for another market's model with the file's very columns (only read, owner decision 23 Oct):
+   * no checkbox and no name, only `aviso`
+   */
+  caixa: boolean
   /** «Salvar como modelo» / «Atualizar o modelo “…”» */
   rotulo: string
   salvar: boolean
   /** «Nome do modelo» shown (a new model being saved) */
   comNome: boolean
   nome: string
+  /** N (owner decision, 23 Oct): «O modelo “…” é de Futuros. …» for another market's model; null otherwise */
+  aviso: string | null
   nota: string
 }
 
@@ -300,6 +309,39 @@ const SEPARADORES: [CsvDelimiter, string, string][] = [
 
 /** The model's name (a matched model), or the name typed */
 const nomeDoModelo = (m: Mapeamento) => (m.match.kind === 'none' ? m.nome : m.match.template.name)
+
+/** «Futuros», «Futuros e Forex», «Futuros, Forex e B3»; «outro mercado» when they could not be read */
+function nomesDosMercados(mercados: readonly AccountMarket[]): string {
+  const nomes = mercados.map((x) => MARKET_LABEL[x])
+  if (nomes.length === 0) return MODELO.outroMercadoDesconhecido
+  return nomes.length === 1 ? nomes[0] : `${nomes.slice(0, -1).join(', ')} e ${nomes[nomes.length - 1]}`
+}
+
+/**
+ * E27: «Salvar como modelo» / «Atualizar o modelo “{nome}”» and «Nome do modelo»; for another market's model (owner
+ * decision, 23 Oct) the line saying so, «Nome do modelo» while «Atualizar» is unchecked (a new model), and no checkbox
+ * when it has the file's very columns (only read). None for a model taken as is (the chip)
+ */
+function modeloVista(m: Mapeamento): ModeloVista | null {
+  if (m.porModelo) return null
+  const nome = nomeDoModelo(m)
+  if (m.outroMercado) {
+    const mercados = nomesDosMercados(m.outroMercado)
+    if (modeloSoParaLer(m)) {
+      return { caixa: false, rotulo: MODELO.atualizar(nome), salvar: false, comNome: false, nome: m.nome, aviso: MODELO.outroMercadoExato(nome, mercados), nota: MODELO.nota }
+    }
+    return { caixa: true, rotulo: MODELO.atualizar(nome), salvar: m.salvar, comNome: !m.salvar, nome: m.nome, aviso: MODELO.outroMercado(nome, mercados), nota: MODELO.nota }
+  }
+  return {
+    caixa: true,
+    rotulo: m.origem === 'nomes' ? MODELO.salvar : MODELO.atualizar(nome),
+    salvar: m.salvar,
+    comNome: m.origem === 'nomes' && m.salvar,
+    nome: m.nome,
+    aviso: null,
+    nota: MODELO.nota,
+  }
+}
 
 /** E7 */
 function tituloDoMapa(m: Mapeamento): string {
@@ -885,15 +927,7 @@ export function vistaConferir(m: Mapeamento, market: AccountMarket): VistaConfer
     perguntasFim,
     pareamento: f && !trade ? pareamento(m, f, market) : null,
     liquido: perguntaDoLiquidoVista(m, market),
-    modelo: m.porModelo
-      ? null
-      : {
-          rotulo: m.origem === 'nomes' ? MODELO.salvar : MODELO.atualizar(nomeDoModelo(m)),
-          salvar: m.salvar,
-          comNome: m.origem === 'nomes' && m.salvar,
-          nome: m.nome,
-          nota: MODELO.nota,
-        },
+    modelo: modeloVista(m),
     chipModelo: m.porModelo ? nomeDoModelo(m) : null,
     bloqueio: bloqueioDoConferir(m, market),
   }
