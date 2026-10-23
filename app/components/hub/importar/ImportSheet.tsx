@@ -66,6 +66,7 @@ import {
   type Mapeamento,
 } from '@/lib/hub/importMapeado'
 import {
+  chaveDasLinhas,
   contasDoArquivo,
   escolhaDaZona,
   fusoPreSelecionado,
@@ -77,6 +78,7 @@ import {
   palavraDoFuso,
   planoMapeado,
   recusaLocal,
+  valorImportado,
   valorPreSelecionado,
   zonaDaConta,
   type ModeloDoFim,
@@ -536,12 +538,14 @@ export default function ImportSheet({ mode, accountId, onClose }: { mode: SheetM
 
   const depoisDoConferir = async (target: TradingAccount, m: Mapeamento, mapeado: NonNullable<Flow['mapeado']>, patch: Partial<Flow> = {}) => {
     if (contasDoArquivo(m, target.market).length >= 2) {
-      // The value chosen before (Voltar and back) stays; else the account's number, or the model's route
-      const accountValue = m.accountValue ?? valorPreSelecionado(m, target)
+      // The value chosen before (Voltar and back) stays while the «Conta» column still holds it; else the account's
+      // number, or the model's route
+      const accountValue = valorImportado(m, target.market) ?? valorPreSelecionado(m, target)
       move('hc', { ...patch, accountId: target.id, mapeado: { ...mapeado, mapeamento: { ...m, accountValue } } })
       return
     }
-    await depoisDasContas(target, m, mapeado, patch)
+    // One «Conta» value or none: no hc, every row is imported (a value chosen before «Voltar» no longer applies)
+    await depoisDasContas(target, m.accountValue === null ? m : { ...m, accountValue: null }, mapeado, patch)
   }
 
   /** The mapping of a file once its account is known: the user's models first (none when they cannot be read) */
@@ -896,8 +900,12 @@ export default function ImportSheet({ mode, accountId, onClose }: { mode: SheetM
   // Back and close
   // --------------------------------------------------------------------------------------------
 
-  /** Steps "Voltar" skips: the form of an account already created, and a zone already applied. */
-  const skipOnBack = (p: Passo, f: Flow) => (p === 'b' && !!f.created) || ((p === 'conf' || p === 'c') && f.fixApplied)
+  /**
+   * Steps "Voltar" skips: the form of an account already created (Phase 3b: and, from a2's «+ Nova conta», its market and
+   * platform: that account exists in them), and a zone already applied.
+   */
+  const skipOnBack = (p: Passo, f: Flow) =>
+    (p === 'b' && !!f.created) || ((p === 'i1' || p === 'i2') && !!f.created && f.createdFromForm) || ((p === 'conf' || p === 'c') && f.fixApplied)
 
   const backIndex = (() => {
     for (let i = flow.history.length - 1; i >= 0; i--) {
@@ -916,8 +924,8 @@ export default function ImportSheet({ mode, accountId, onClose }: { mode: SheetM
       const passo = f.history[backIndex]
       const skipped = [...f.history.slice(backIndex + 1), f.passo]
       // Back past the form that created an account: that account is now the one chosen, so
-      // "Continuar" never opens a second "Nova conta"
-      const choice = passo === 'a' && f.created && f.createdFromForm && skipped.includes('b') ? f.created.id : f.choice
+      // "Continuar" never opens a second "Nova conta" (Phase 3b: on a2 too, for a file no reader takes)
+      const choice = (passo === 'a' || passo === 'a2') && f.created && f.createdFromForm && skipped.includes('b') ? f.created.id : f.choice
       return { ...f, passo, history: f.history.slice(0, backIndex), undone: false, choice }
     })
     setFocusTick((t) => t + 1)
@@ -1066,7 +1074,8 @@ export default function ImportSheet({ mode, accountId, onClose }: { mode: SheetM
       primary = {
         label: FOLHA.next,
         run: () => void depoisDasContas(account, m, mapeado),
-        blocked: m.accountValue === null ? PASSO_HC.hint(account.label) : undefined,
+        // No value of the «Conta» column goes to the account
+        blocked: valorImportado(m, account.market) === null ? PASSO_HC.hint(account.label) : undefined,
       }
       break
     }
@@ -1318,6 +1327,7 @@ export default function ImportSheet({ mode, accountId, onClose }: { mode: SheetM
           onConfirmZone={() => move('c', { fixOnly: true, zone: { key: parsed ? zoneKeyOf(parsed.fileTzHint) : null, other: null } })}
           mapeado={!!mapeamento}
           unidade={mapeadoNoFuso?.rowKind === 'fill' ? 'saida' : 'linha'}
+          chave={mapeadoNoFuso ? chaveDasLinhas(mapeadoNoFuso) : 'id'}
         />
       )
       primary = closeAction

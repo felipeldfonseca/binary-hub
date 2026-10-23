@@ -64,8 +64,16 @@ export function linhaDoArquivoMapeado(
     nome,
     MARKET_LABEL[market],
     porOperacao ? ops(f.rows.length) : ARQUIVO.rows(n),
-    dias ? formatDateRange(dias.first, dias.last, anoAtual) : '',
+    dias ? semQuebraNoTraco(formatDateRange(dias.first, dias.last, anoAtual)) : '',
   )
+}
+
+/**
+ * A day range that never breaks at its dash («1–» / «15 out»): a word joiner (U+2060, zero-width, not read aloud) after
+ * each en dash. The line may still break at a space («1–15» / «out», as the board's card wraps).
+ */
+export function semQuebraNoTraco(dias: string): string {
+  return dias.replace(/–/g, '–\u2060')
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -80,7 +88,8 @@ export function linhaDoArquivoMapeado(
 export function planoMapeado(passo: Passo, m: Mapeamento | null, account: TradingAccount | null, formats: FormatosDasContas): Passo[] {
   if (passo === 'a2' || !m || !account) return ['mapa', 'conferir', 'c', 'd']
   const hc = contasDoArquivo(m, account.market).length >= 2
-  const f = arquivoDoMapeamento(m, account.market, null)
+  // A «Conta» value chosen before «Voltar» that the column no longer holds reads no row: the file as a whole instead
+  const f = arquivoDoMapeamento(valorImportado(m, account.market) === m.accountValue ? m : { ...m, accountValue: null }, account.market, null)
   const c = f.ok ? mostrarFuso(f, m, account, formats) : true
   const resto: Passo[] = [...(hc ? (['hc'] as Passo[]) : []), ...(c ? (['c'] as Passo[]) : []), 'd']
   switch (passo) {
@@ -300,6 +309,16 @@ export function contasDoArquivo(m: Mapeamento, market: AccountMarket = 'futures'
 }
 
 /**
+ * The «Conta» value the mapping imports, when it is still one of the file's values (contasDoArquivo); null when none is
+ * chosen, or when the one chosen before «Voltar» is no longer in the «Conta» column (it moved, or went)
+ */
+export function valorImportado(m: Mapeamento, market: AccountMarket): string | null {
+  if (m.accountValue === null) return null
+  const chave = accountKey(m.accountValue)
+  return contasDoArquivo(m, market).some((c) => c.chave === chave) ? m.accountValue : null
+}
+
+/**
  * The value hc imports at first: the one written as the account's «Número na plataforma»; else the one the model routes to
  * this account; else none («Não importar» everywhere: blocked)
  */
@@ -353,32 +372,61 @@ export function motivoDaLinha(
   return rowErrorReason(e.code, { column: local?.column, firstLine: local?.firstLine, mapeado: true, raiz, passo })
 }
 
-/** symbol_normalised's pairs: each spelling the file writes and the symbol it becomes, in first-seen order */
+/**
+ * symbol_normalised's pairs: each spelling the file writes and the symbol it becomes, in the order the whole file first
+ * writes them (the board's line is the same whichever «Conta» value is imported, IC l.1003); with a «Conta» value
+ * imported, only the spellings of its rows (the others are not imported)
+ */
 export function paresDeAtivos(m: Mapeamento | null, file: ImportFile): { escrito: string; como: string }[] {
   const notice = file.notices.find((n): n is Extract<Notice, { code: 'symbol_normalised' }> => n.code === 'symbol_normalised')
   if (!notice || !m || file.platform !== 'modelo') return []
   const columns = escolhasDe(m).columns
   const i = columns.indexOf('symbol')
   if (i < 0) return []
-  // With a «Conta» value imported, only its rows (the others are not imported)
   const c = columns.indexOf('account')
   const conta = c >= 0 && m.accountValue !== null ? accountKey(m.accountValue) : null
-  const out: { escrito: string; como: string }[] = []
+  const naOrdem: string[] = []
+  const importados = new Set<string>()
   for (const rec of m.lido.records) {
-    if (conta !== null && accountKey(rec.cells[c] ?? '') !== conta) continue
     const escrito = (rec.cells[i] ?? '').trim()
-    if (!escrito || out.some((p) => p.escrito === escrito)) continue
+    if (!escrito) continue
+    if (naOrdem.indexOf(escrito) < 0) naOrdem.push(escrito)
+    if (conta === null || accountKey(rec.cells[c] ?? '') === conta) importados.add(escrito)
+  }
+  const out: { escrito: string; como: string }[] = []
+  for (const escrito of naOrdem) {
+    if (!importados.has(escrito)) continue
     const s = readSymbol(escrito, file.market)
     if (s.ok && s.normalised && notice.symbols.indexOf(s.symbol) >= 0) out.push({ escrito, como: s.symbol })
   }
   return out
 }
 
-/** The «já estavam» words: (mesma hora e preço) when every one was found so, (mesmo ID) for any other, none at 0 */
-export function palavraJaEstavam(p: Pick<ImportPreviewResult, 'duplicate' | 'duplicate_same'>): string {
+/**
+ * How the database finds the file's rows again (the «já estavam» words): 'id' by each row's ID (a reader's file; a mapped
+ * file with an ID column), 'hora' by its time and prices (a mapped file without an ID: the database derives each row's
+ * key from them, owner's choice for Performance.csv, D11), 'misto' when some rows have an ID and others not
+ */
+export type ChaveDasLinhas = 'id' | 'hora' | 'misto'
+
+export function chaveDasLinhas(file: Pick<ImportFile, 'platform' | 'rows'>): ChaveDasLinhas {
+  if (file.platform !== 'modelo') return 'id'
+  const comId = file.rows.filter((r) => r.external_id !== null).length
+  if (comId === file.rows.length) return 'id'
+  return comId === 0 ? 'hora' : 'misto'
+}
+
+/**
+ * The «já estavam» words: none at 0; (mesma hora e preço) when every one was found by its time and prices (the rows have no
+ * ID, or the database matched each across the two key methods: duplicate_same), (mesmo ID) when every one was found by its
+ * ID; else none (some each way)
+ */
+export function palavraJaEstavam(p: Pick<ImportPreviewResult, 'duplicate' | 'duplicate_same'>, chave: ChaveDasLinhas = 'id'): string {
   const same = p.duplicate_same ?? 0
-  if (p.duplicate === 0 || (same > 0 && same < p.duplicate)) return PASSO_D.already
-  return same === p.duplicate ? PASSO_D.alreadySame : PASSO_D.alreadyId
+  if (p.duplicate === 0) return PASSO_D.already
+  if (same === p.duplicate) return PASSO_D.alreadySame
+  if (same > 0) return PASSO_D.already
+  return chave === 'hora' ? PASSO_D.alreadySame : chave === 'id' ? PASSO_D.alreadyId : PASSO_D.already
 }
 
 export interface LinhaPulada {
@@ -424,6 +472,7 @@ export function linhasDaPrevia(
   const execucao = mapeado && file.rowKind === 'fill'
   const linked = preview.linked ?? 0
   const erros = preview.errors.length
+  const jaEstavam = palavraJaEstavam(preview, chaveDasLinhas(file))
 
   // E36
   const contagem: [number, string][] = []
@@ -432,7 +481,7 @@ export function linhasDaPrevia(
     contagem.push([saidas, PASSO_D.saidas(saidas)], [preview.new, PASSO_D.fresh])
     if (linked > 0) contagem.push([linked, PASSO_D.linkedCount(linked)])
     if (preview.other_account > 0) contagem.push([preview.other_account, PASSO_D.otherAccount])
-    contagem.push([preview.duplicate, palavraJaEstavam(preview)])
+    contagem.push([preview.duplicate, jaEstavam])
   } else {
     const naoImportadas = mapeado ? file.notImported : 0
     contagem.push([preview.rows_total + naoImportadas, PASSO_D.lines], [preview.new, PASSO_D.fresh])
@@ -443,9 +492,9 @@ export function linhasDaPrevia(
       const outras = contasDoArquivo(m, conta.market)
         .filter((c) => c.chave !== chave)
         .map((c) => c.valor)
-      contagem.push([naoImportadas, PASSO_D.naoImportadas(outras)])
+      contagem.push([naoImportadas, PASSO_D.naoImportadas(naoImportadas, outras)])
     }
-    contagem.push([preview.duplicate, palavraJaEstavam(preview)], [erros, PASSO_D.errors])
+    contagem.push([preview.duplicate, jaEstavam], [erros, PASSO_D.errors])
   }
 
   // E37

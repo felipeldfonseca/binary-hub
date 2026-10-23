@@ -98,6 +98,7 @@ export type EstadoQuadro =
   | '8-de-novo'
   | '8g'
   | '8p'
+  | '8p-de-novo'
   | '15'
   | '15b'
   | '16t'
@@ -146,6 +147,7 @@ export const ESTADOS_QUADRO: Readonly<Record<EstadoQuadro, EstadoDef>> = {
   '8-de-novo': { conta: 'ylosDepois', arquivo: 'f8', tz: NY, respostas: {} },
   '8g': { conta: 'topOne', arquivo: 'f8', tz: 'UTC', respostas: {} },
   '8p': { conta: 'lucid', arquivo: 'f8p', tz: NY, respostas: {} },
+  '8p-de-novo': { conta: 'lucid', arquivo: 'f8p', tz: NY, respostas: {} },
   '15': { conta: 'ylosDepois', arquivo: 'f15', tz: NY, respostas: {}, modelo: 'blackarrow' },
   '15b': { conta: 'ylosDepois', arquivo: 'f15b', tz: NY, respostas: {}, modelo: 'blackarrow' },
   '16t': { conta: 'lucid', arquivo: 'f16t', tz: NY, respostas: {} },
@@ -218,6 +220,11 @@ const FIX: Readonly<Record<EstadoQuadro, Composta>> = {
   '8p': {
     previa: { new: 6, linked: 0, linked_differs: 0, trades_new: 4, grouped: 2, attached: 0, first_day: '2026-10-13', last_day: '2026-10-13', account_tz: 'America/New_York', rows_total: 6 },
     commit: { batch_id: 'lote-8p', inserted: 6, duplicate: 0, completed: 0, other_account: 0, linked: 0, trades: 4, grouped: 2, attached: 0, errors: [] },
+  },
+  // No ID column: the database finds the rows again by their derived key (times and prices), so no duplicate_same
+  '8p-de-novo': {
+    previa: { duplicate: 6, linked: 0, linked_differs: 0, first_day: '2026-10-13', last_day: '2026-10-13', already_imported: true, account_tz: 'America/New_York', tz_confirmed: true, rows_total: 6 },
+    commit: null,
   },
   '15': {
     previa: { new: 5, duplicate: 18, linked: 1, linked_differs: 0, first_day: '2026-10-01', last_day: '2026-10-15', account_tz: 'America/New_York', tz_confirmed: true, rows_total: 24 },

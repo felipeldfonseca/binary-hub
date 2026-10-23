@@ -9,6 +9,7 @@ import path from 'path'
 import { accountRouteHash, endOfFileKey, type ImportRow, type MappedFile } from '@/lib/domain/import'
 import { arquivoDoMapeamento, iniciarMapeamento, type Mapeamento } from '@/lib/hub/importMapeado'
 import {
+  chaveDasLinhas,
   contasDoArquivo,
   escolhaDaZona,
   faixaToda,
@@ -25,11 +26,14 @@ import {
   planoMapeado,
   recusaLocal,
   relogioDoMercado,
+  semQuebraNoTraco,
+  valorImportado,
   valorPreSelecionado,
   zonaDaConta,
 } from '@/lib/hub/importPrevia'
 import { displaySpan } from '@/lib/hub/contas'
-import { rowErrorReason } from '@/components/hub/contas/copy'
+import { PASSO_D, rowErrorReason } from '@/components/hub/contas/copy'
+import { BINANCE, NINJA, TV_HEADER, tv } from '@/testing/mappedFiles'
 import { CONTAS_QUADRO, modeloBlackArrow, modeloTradovate, type ArquivoQuadroKey } from '@/testing/mapeadoTelas'
 import { arquivoDoEstado, arquivoMapeavelQuadro, mapeamentoDoEstado, previaQuadro, type EstadoQuadro } from '@/testing/mapeadoRespostas'
 
@@ -37,6 +41,12 @@ const NY = 'America/New_York'
 
 function mapear(key: ArquivoQuadroKey, market: Parameters<typeof iniciarMapeamento>[1]['market'], templates = [] as ReturnType<typeof modeloBlackArrow>[]): Mapeamento {
   const r = iniciarMapeamento(arquivoMapeavelQuadro(key), { market, templates, nomePadrao: 'Minha plataforma' })
+  if (!r.ok) throw new Error(r.error)
+  return r.mapeamento
+}
+/** An invented file read as the sheet reads it again (never a broker export) */
+function mapearTexto(texto: string, market: Parameters<typeof iniciarMapeamento>[1]['market'], templates = [] as ReturnType<typeof modeloBlackArrow>[]): Mapeamento {
+  const r = iniciarMapeamento({ fileName: 'inventado.csv', size: texto.length, sha256: 'cd'.repeat(32), text: texto }, { market, templates, nomePadrao: 'Minha plataforma' })
   if (!r.ok) throw new Error(r.error)
   return r.mapeamento
 }
@@ -60,9 +70,30 @@ describe('linhaDoArquivoMapeado (E1)', () => {
   it('a model taken as is: «Modelo “BlackArrow” · Futuros · 24 operações · 1–15 out»; an execution file in lines', () => {
     const m15 = mapear('f15', 'futures', [modeloBlackArrow()])
     expect(m15.porModelo).toBe(true)
-    expect(linhaDoArquivoMapeado(arquivoMapeavelQuadro('f15'), m15, 'futures', 2026)).toBe('Modelo “BlackArrow” · Futuros · 24 operações · 1–15 out')
+    // The days never break at their dash (review 1 #2): a word joiner after it
+    expect(linhaDoArquivoMapeado(arquivoMapeavelQuadro('f15'), m15, 'futures', 2026)).toBe('Modelo “BlackArrow” · Futuros · 24 operações · 1–\u206015 out')
     const m16 = mapear('f16ta', 'futures', [modeloTradovate()])
     expect(linhaDoArquivoMapeado(arquivoMapeavelQuadro('f16ta'), m16, 'futures', 2026)).toBe('Modelo “Tradovate” · Futuros · 13 linhas · 13 out')
+  })
+
+  it('the days keep whole: a word joiner after each dash, no other change («1–15 out», «28 set–3 out»)', () => {
+    expect(semQuebraNoTraco('1–15 out')).toBe('1–\u206015 out')
+    expect(semQuebraNoTraco('28 set–3 out')).toBe('28 set–\u20603 out')
+    expect(semQuebraNoTraco('13 out')).toBe('13 out')
+  })
+
+  it('a model taken as is whose file has a line with an error counts its lines, never «N operações» (its rows are not its trades)', () => {
+    const { ARQUIVOS_QUADRO } = require('@/testing/mapeadoTelas')
+    const linhas15 = (ARQUIVOS_QUADRO.f15.texto as string).split('\r\n')
+    const cells = linhas15[2].split(';')
+    cells[4] = '6.8x1,00'
+    linhas15[2] = cells.join(';')
+    const texto = linhas15.join('\r\n')
+    const m = mapearTexto(texto, 'futures', [modeloBlackArrow()])
+    expect([m.porModelo, (naParede(m, 'futures') as MappedFile).errors.length]).toEqual([true, 1])
+    expect(linhaDoArquivoMapeado({ fileName: 'b.csv', size: texto.length, sha256: 'cd'.repeat(32), text: texto }, m, 'futures', 2026)).toBe(
+      'Modelo “BlackArrow” · Futuros · 24 linhas · 1–\u206015 out',
+    )
   })
 
   it('another match: «Parecido com o modelo “BlackArrow” · 24 linhas»', () => {
@@ -179,6 +210,22 @@ describe('«N contas neste arquivo» (E30)', () => {
     }
     expect(valorPreSelecionado(comRota, { ...CONTAS_QUADRO.apexA, external_ref: null })).toBe('APX-0002')
   })
+
+  it('valorImportado: the chosen value while the «Conta» column holds it; none once the column moved or went (review 2 #4)', () => {
+    const m = { ...mapear('f17', 'futures'), accountValue: 'APX-0002' }
+    expect(valorImportado(m, 'futures')).toBe('APX-0002')
+    expect(valorImportado({ ...m, accountValue: ' apx-0002 ' }, 'futures')).toBe(' apx-0002 ')
+    expect(valorImportado({ ...m, accountValue: null }, 'futures')).toBeNull()
+    const i = m.colunas.trade.indexOf('account')
+    const movida: Mapeamento = { ...m, colunas: { ...m.colunas, trade: m.colunas.trade.map((c, k) => (k === 0 ? 'account' : k === i ? 'ignorar' : c)) } }
+    expect(contasDoArquivo(movida).length).toBeGreaterThan(2)
+    expect(valorImportado(movida, 'futures')).toBeNull()
+    const sem: Mapeamento = { ...m, colunas: { ...m.colunas, trade: m.colunas.trade.map((c) => (c === 'account' ? 'ignorar' : c)) } }
+    expect(valorImportado(sem, 'futures')).toBeNull()
+    // The steps ahead of a stale value count on the whole file (its zone step still shows)
+    expect(planoMapeado('conferir', movida, CONTAS_QUADRO.apexA, {})).toEqual(['hc', 'c', 'd'])
+    expect(planoMapeado('conferir', sem, CONTAS_QUADRO.apexA, {})).toEqual(['c', 'd'])
+  })
 })
 
 describe('the preview’s lines (E35–E43)', () => {
@@ -247,16 +294,83 @@ describe('the preview’s lines (E35–E43)', () => {
     ])
   })
 
-  it('17: «não importadas (APX-0002)» and the pairs of the imported value only', () => {
+  it('17: «não importadas (APX-0002)»; the pairs in the file’s order whichever value is imported (IC l.1003, review 1 #1)', () => {
     const l = linhas('17')
     expect(l.contagem[2]).toEqual([26, 'não importadas (APX-0002)'])
     const l2 = linhas('17-apx2')
     expect(l2.contagem[2]).toEqual([31, 'não importadas (APX-0001)'])
-    const m = { ...mapeamentoDoEstado('17-apx2'), accountValue: 'APX-0002' }
-    expect(paresDeAtivos(m, arquivoDoEstado('17-apx2'))).toEqual([
-      { escrito: 'MES 12-26', como: 'MESZ26' },
+    const quadro = [
       { escrito: 'MNQ 12-26', como: 'MNQZ26' },
+      { escrito: 'MES 12-26', como: 'MESZ26' },
+    ]
+    // APX-0002's first row is MES (file line 2); the board's line still reads MNQ first
+    expect(paresDeAtivos(mapeamentoDoEstado('17-apx2'), arquivoDoEstado('17-apx2'))).toEqual(quadro)
+    expect(paresDeAtivos(mapeamentoDoEstado('17'), arquivoDoEstado('17'))).toEqual(quadro)
+    expect(l2.antes.map((a) => a.texto)).toContain('Ativos escritos como “MNQ 12-26” e “MES 12-26” ficam como “MNQZ26” e “MESZ26”.')
+  })
+
+  it('paresDeAtivos: a spelling only in the rows of a value not imported stays out, even when it becomes an imported symbol', () => {
+    // NINJA's four rows (APX-0001: «MNQ 12-26»; APX-0002: «MES 12-26») and a fifth on APX-0002 that writes MNQ as «MNQ Dec26»
+    const texto = [NINJA, '5,MNQ Dec26,APX-0002,Long,1,25100.00,25104.00,10/2/2026 9:40:00 AM,10/2/2026 9:45:00 AM,8.00,1.24'].join('\n')
+    const m1 = { ...mapearTexto(texto, 'futures'), resultIsNet: false, accountValue: 'APX-0001' }
+    const f1 = arquivoDoMapeamento(m1, 'futures', NY) as MappedFile
+    expect(f1.ok).toBe(true)
+    // APX-0001 imports MNQZ26, written «MNQ 12-26» on its rows; «MNQ Dec26» is only on APX-0002's
+    expect(paresDeAtivos(m1, f1)).toEqual([{ escrito: 'MNQ 12-26', como: 'MNQZ26' }])
+    const m2 = { ...m1, accountValue: 'APX-0002' }
+    expect(paresDeAtivos(m2, arquivoDoMapeamento(m2, 'futures', NY) as MappedFile)).toEqual([
+      { escrito: 'MES 12-26', como: 'MESZ26' },
+      { escrito: 'MNQ Dec26', como: 'MNQZ26' },
     ])
+  })
+
+  it('«1 não importada (…)»: the count word agrees with one row of another «Conta» value (review 1 #3, review 2 #3)', () => {
+    expect(PASSO_D.naoImportadas(1, ['APX-0002'])).toBe('não importada (APX-0002)')
+    expect(PASSO_D.naoImportadas(26, ['APX-0002'])).toBe('não importadas (APX-0002)')
+    const linhasNinja = NINJA.split('\n')
+    // Three rows: APX-0001 twice, APX-0002 once
+    const texto = [linhasNinja[0], linhasNinja[1], linhasNinja[2], linhasNinja[3]].join('\n')
+    const m = { ...mapearTexto(texto, 'futures'), resultIsNet: false, accountValue: 'APX-0001' }
+    const f = arquivoDoMapeamento(m, 'futures', NY) as MappedFile
+    expect(f.notImported).toBe(1)
+    const l = linhasDaPrevia(f, { ...previaQuadro('17'), new: 2, rows_total: 2 }, m, CONTAS_QUADRO.apexA)
+    expect(l.contagem).toEqual([
+      [3, 'linhas'],
+      [2, 'novas'],
+      [1, 'não importada (APX-0002)'],
+      [0, 'já estavam'],
+      [0, 'com erro'],
+    ])
+  })
+
+  it('two symbols answered «Não sei»: the mixed headline «{n} execuções ficaram de fora.», never one symbol’s', () => {
+    const texto = [
+      TV_HEADER,
+      tv('9901', 'Buy', 'MESZ6', '2', '2', '6812.25', '10/13/2026 10:31:05', 'Filled'),
+      tv('9902', 'Sell', 'MESZ6', '1', '1', '6816.00', '10/13/2026 10:38:40', 'Filled'),
+      tv('9903', 'Buy', 'MNQZ6', '1', '1', '25100.00', '10/13/2026 10:40:00', 'Filled'),
+    ].join('\n')
+    const m = mapearTexto(texto, 'futures')
+    const f = arquivoDoMapeamento(m, 'futures', NY) as MappedFile
+    expect(f.endOfFile.map((q) => [q.symbol, q.answer])).toEqual([
+      ['MESZ6', 'unknown'],
+      ['MNQZ6', 'unknown'],
+    ])
+    const errors = f.errors.map((e) => ({ line: e.line, code: e.code }))
+    expect(errors.every((e) => e.code === 'unbalanced_symbol')).toBe(true)
+    const l = linhasDaPrevia(f, { ...previaQuadro('16ta-naosei'), new: 0, errors, rows_total: errors.length }, m, CONTAS_QUADRO.lucid)
+    expect(l.sobras?.titulo).toBe(`${errors.length} execuções ficaram de fora.`)
+  })
+
+  it('every fee in another asset: «… a taxa veio em BNB.» alone, never «Sem comissão no arquivo»', () => {
+    const linhasBn = BINANCE.split('\n')
+    // BTC bought and sold, both fees in BNB
+    const texto = [linhasBn[0], linhasBn[1].replace('1.41USDT', '0.0003BNB'), linhasBn[3].replace('1.41USDT', '0.0003BNB')].join('\n')
+    const m = mapearTexto(texto, 'crypto')
+    const f = arquivoDoMapeamento(m, 'crypto', 'UTC') as MappedFile
+    expect(f.rows.every((r) => r.commission === null)).toBe(true)
+    const l = linhasDaPrevia(f, { ...previaQuadro('16b-sim'), day_changes: 0, errors: [] }, m, CONTAS_QUADRO.binance)
+    expect(l.depois).toEqual(['1 operação fica sem comissão: a taxa veio em BNB.'])
   })
 
   it('18: the swap and the Forex day line; 19: R$, the off-tick reason with the WIN’s tick', () => {
@@ -277,6 +391,37 @@ describe('the preview’s lines (E35–E43)', () => {
     expect(palavraJaEstavam({ duplicate: 4, duplicate_same: 4 })).toBe('já estavam (mesma hora e preço)')
     expect(palavraJaEstavam({ duplicate: 4, duplicate_same: 1 })).toBe('já estavam')
     expect(palavraJaEstavam({ duplicate: 18 })).toBe('já estavam (mesmo ID)')
+    // Rows without an ID are found by their time and prices (the database's '@…' key): never «(mesmo ID)» (review 2 #2, D11)
+    expect(palavraJaEstavam({ duplicate: 6 }, 'hora')).toBe('já estavam (mesma hora e preço)')
+    expect(palavraJaEstavam({ duplicate: 6 }, 'id')).toBe('já estavam (mesmo ID)')
+    expect(palavraJaEstavam({ duplicate: 6 }, 'misto')).toBe('já estavam')
+    expect(palavraJaEstavam({ duplicate: 0 }, 'hora')).toBe('já estavam')
+    expect(palavraJaEstavam({ duplicate: 6, duplicate_same: 2 }, 'hora')).toBe('já estavam')
+  })
+
+  it('chaveDasLinhas: a reader’s file and a mapped file with an ID column by ID; Performance.csv and NinjaTrader by time and prices', () => {
+    expect(chaveDasLinhas(arquivoDoEstado('8'))).toBe('id')
+    expect(chaveDasLinhas(arquivoDoEstado('16t'))).toBe('id')
+    expect(chaveDasLinhas(arquivoDoEstado('18'))).toBe('id')
+    expect(chaveDasLinhas(arquivoDoEstado('8p'))).toBe('hora')
+    expect(chaveDasLinhas(arquivoDoEstado('17'))).toBe('hora')
+    const f8 = arquivoDoEstado('8')
+    expect(chaveDasLinhas({ ...f8, rows: f8.rows.map((r, i) => (i === 0 ? { ...r, external_id: null } : r)) })).toBe('misto')
+    const { parseImportText } = require('@/lib/domain/import')
+    const text = fs.readFileSync(path.join(__dirname, '../domain/import/fixtures/topone_ok.csv'), 'utf8')
+    expect(chaveDasLinhas(parseImportText(text))).toBe('id')
+  })
+
+  it('8 · Performance.csv again: «6 já estavam (mesma hora e preço)» (the database answers duplicate 6, no duplicate_same)', () => {
+    const p = previaQuadro('8p-de-novo')
+    expect(p).toMatchObject({ new: 0, duplicate: 6 })
+    expect(p).not.toHaveProperty('duplicate_same')
+    expect(linhas('8p-de-novo').contagem).toEqual([
+      [6, 'linhas'],
+      [0, 'novas'],
+      [6, 'já estavam (mesma hora e preço)'],
+      [0, 'com erro'],
+    ])
   })
 
   it('a reader’s file keeps its as-built paragraphs and words', () => {

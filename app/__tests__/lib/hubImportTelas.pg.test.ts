@@ -267,6 +267,10 @@ delete from public.profiles where id = '${uid}';`);
 
   it('8 · Performance.csv and 16 · Tradovate Orders (Lucid 50k): the saídas, the partial exits, the model «Tradovate», «Nada novo» in saídas', async () => {
     const p = await importar('8p');
+    // Again: found by the times and prices (no ID column), so duplicate without duplicate_same («mesma hora e preço»)
+    const p2 = await importar('8p-de-novo', { soPrevia: true });
+    expect(p2.previa).toMatchObject({ new: 0, duplicate: 6 });
+    expect(p2.previa).not.toHaveProperty('duplicate_same');
     await desfazer('lucid', p.commit);
 
     const t = await importar('16t');

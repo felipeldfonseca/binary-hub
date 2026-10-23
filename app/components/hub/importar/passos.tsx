@@ -18,7 +18,7 @@ import {
   type ZoneKey,
 } from '@/lib/hub/contas'
 import type { FixTzResult, ImportPreviewResult } from '@/lib/hub/contasDb'
-import { faixaToda, palavraJaEstavam, relogioDoMercado } from '@/lib/hub/importPrevia'
+import { faixaToda, palavraJaEstavam, relogioDoMercado, type ChaveDasLinhas } from '@/lib/hub/importPrevia'
 import {
   PROP_FIRMS_CHECKED,
   firmByName,
@@ -860,6 +860,7 @@ export function PassoNadaNovo({
   onConfirmZone,
   mapeado = false,
   unidade = 'linha',
+  chave = 'id',
 }: {
   headingRef: HeadingRef
   preview: ImportPreviewResult
@@ -871,18 +872,20 @@ export function PassoNadaNovo({
   mapeado?: boolean
   /** Phase 3b: an execution file counts exits («Nada novo: as 6 saídas já estão em …») */
   unidade?: 'linha' | 'saida'
+  /** Phase 3b: how the database found the mapped file's rows («já estavam (mesmo ID)» or «(mesma hora e preço)») */
+  chave?: ChaveDasLinhas
 }) {
   const saidas = unidade === 'saida'
   const items: [number, string][] = saidas
     ? [
         [preview.rows_total - preview.errors.length, PASSO_D.saidas(preview.rows_total - preview.errors.length)],
         [0, PASSO_D.fresh],
-        [preview.duplicate, palavraJaEstavam(preview)],
+        [preview.duplicate, palavraJaEstavam(preview, chave)],
       ]
     : [
         [preview.rows_total, PASSO_D.lines],
         [0, PASSO_D.fresh],
-        [preview.duplicate, mapeado ? palavraJaEstavam(preview) : PASSO_D.alreadyId],
+        [preview.duplicate, mapeado ? palavraJaEstavam(preview, chave) : PASSO_D.alreadyId],
       ]
   if (!saidas && preview.errors.length > 0) items.push([preview.errors.length, PASSO_D.errors])
   const title = saidas ? PASSO_F.titleSaidas(preview.duplicate, label) : PASSO_F.title(preview.duplicate, label)

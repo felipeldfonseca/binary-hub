@@ -10,7 +10,7 @@
 import { useMemo } from 'react'
 import { accountKey } from '@/lib/domain/import'
 import type { TradingAccount } from '@/lib/hub/contas'
-import { contasDoArquivo } from '@/lib/hub/importPrevia'
+import { contasDoArquivo, valorImportado } from '@/lib/hub/importPrevia'
 import type { Mapeamento } from '@/lib/hub/importMapeado'
 import { PASSO_HC } from '@/components/hub/contas/copy'
 
@@ -26,7 +26,9 @@ export interface PassoContasDoArquivoProps {
 
 export default function PassoContasDoArquivo({ headingRef, mapeamento: m, conta, onChange, onAnuncio }: PassoContasDoArquivoProps) {
   const valores = useMemo(() => contasDoArquivo(m, conta.market), [m, conta.market])
-  const escolhida = m.accountValue === null ? null : accountKey(m.accountValue)
+  // A value no longer in the «Conta» column (it moved before «Voltar») is none
+  const importado = valorImportado(m, conta.market)
+  const escolhida = importado === null ? null : accountKey(importado)
   const numero = conta.external_ref ? accountKey(conta.external_ref) : null
   const avisoDe = (chave: string | null) => (chave !== null && numero !== null && chave !== numero && conta.external_ref ? PASSO_HC.aviso(conta.label, conta.external_ref) : null)
   const aviso = avisoDe(escolhida)

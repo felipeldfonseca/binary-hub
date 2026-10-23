@@ -636,9 +636,9 @@ export const PASSO_D = {
   execucoes: (count: number) => (count === 1 ? 'execução no arquivo' : 'execuções no arquivo'),
   /** B IC l.794 «6 saídas»: an execution file counts exits, never lines (N: the singular) */
   saidas: (count: number) => (count === 1 ? 'saída' : 'saídas'),
-  /** B IC l.1002 «26 não importadas (APX-0002)» */
-  naoImportadas: (valores: readonly string[]) => `não importadas (${eJunto(valores)})`,
-  /** N (D11): a file without an ID column whose rows were all in the account by the same time and price */
+  /** B IC l.1002 «26 não importadas (APX-0002)» (N: «1 não importada (…)») */
+  naoImportadas: (count: number, valores: readonly string[]) => `${count === 1 ? 'não importada' : 'não importadas'} (${eJunto(valores)})`,
+  /** N (D11): rows found in the account by the same time and prices (a file without an ID column; or across key methods) */
   alreadySame: 'já estavam (mesma hora e preço)',
   /** B IC l.891 «As 6 saídas viram 4 operações.» (N: «A saída vira 1 operação.», «As 2 saídas viram 1 operação.») */
   saidasViram: (saidas: number, operacoes: number) =>

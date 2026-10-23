@@ -8,11 +8,11 @@
  * own props (onChange, onMudarColunas). After the rebase on L1 these become the real pills (§7.4).
  */
 import React from 'react'
-import { act, fireEvent, screen, waitFor, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import * as data from '@/lib/hub/contasDb'
 import * as regrasDb from '@/lib/hub/regrasDb'
-import { accountRouteHash, endOfFileKey, readImportFile, toRpcRow, type Template } from '@/lib/domain/import'
+import { MAX_TEMPLATE_NAME, accountRouteHash, endOfFileKey, readImportFile, toRpcRow, type Template } from '@/lib/domain/import'
 import { useImportSheet } from '@/components/hub/importar/ImportSheetProvider'
 import type { Mapeamento } from '@/lib/hub/importMapeado'
 import type { PassoMapaProps } from '@/components/hub/importar/PassoMapa'
@@ -30,7 +30,9 @@ import {
   type ArquivoQuadroKey,
   type ContaQuadro,
 } from '@/testing/mapeadoTelas'
-import { ESTADOS_QUADRO, arquivoDoEstado, commitQuadro, previaQuadro, regrasQuadro, type EstadoQuadro } from '@/testing/mapeadoRespostas'
+import { ESTADOS_QUADRO, arquivoDoEstado, arquivoMapeavelQuadro, commitQuadro, previaQuadro, regrasQuadro, type EstadoQuadro } from '@/testing/mapeadoRespostas'
+import { iniciarMapeamento } from '@/lib/hub/importMapeado'
+import PassoContasDoArquivo from '@/components/hub/importar/PassoContasDoArquivo'
 import { fixtureFile } from '@/testing/hubHarness'
 
 jest.mock('@/lib/supabase', () => ({ createDataClient: jest.fn(() => ({})) }))
@@ -112,6 +114,10 @@ const fetchRulesConfig = regrasDb.fetchRulesConfig as jest.MockedFunction<typeof
 const saveRules = regrasDb.saveRules as jest.MockedFunction<typeof regrasDb.saveRules>
 
 const NY = 'America/New_York'
+/** 15's card: the days never break at their dash (a word joiner after it, review 1 #2) */
+const CARTAO_15 = 'Modelo “BlackArrow” · Futuros · 24 operações · 1–\u206015 out'
+const MAPA_TITULO = 'Não reconhecemos este arquivo. Diga o que é cada coluna.'
+const voltar = (dialog: HTMLElement) => userEvent.click(within(dialog).getByRole('button', { name: 'Voltar' }))
 
 function Abrir({ accountId }: { accountId: string | null }) {
   const sheet = useImportSheet()
@@ -407,6 +413,70 @@ describe('a2 · «Para qual conta?» for an unrecognised file (19)', () => {
     expect(createAccount.mock.calls[0][2]).toMatchObject({ market: 'b3', label: 'Clear B3', platform: 'profit' })
     expect(fetchTemplates).toHaveBeenCalledTimes(1)
   })
+
+  it('once «+ Nova conta» created the account, «Voltar» lands on a2 with it chosen, never on «Qual mercado?» or «Onde você opera?» (review 2 #1)', async () => {
+    const nova = { ...CONTAS_QUADRO.mini, id: '3b0c0a00-0000-4000-8000-0000000000ab', label: 'Conta X', platform: 'profit', sort_order: 9 }
+    createAccount.mockResolvedValue(nova)
+    const dialog = await abrir(null, 'f19')
+    await within(dialog).findByRole('heading', { name: 'Para qual conta?' })
+    await userEvent.click(within(dialog).getByRole('button', { name: '+ Nova conta' }))
+    await continuar(dialog)
+    await userEvent.click(within(within(dialog).getByRole('group', { name: 'Qual mercado?' })).getByRole('button', { name: 'B3' }))
+    await continuar(dialog)
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Profit (Nelogica)' }))
+    await continuar(dialog)
+    await userEvent.type(within(dialog).getByLabelText('Apelido'), 'Conta X')
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Pessoal' }))
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Criar Conta X e continuar' }))
+    expect(await within(dialog).findByRole('heading', { name: MAPA_TITULO })).toHaveFocus()
+
+    await voltar(dialog)
+    expect(within(dialog).getByRole('heading', { name: 'Para qual conta?' })).toHaveFocus()
+    expect(within(within(dialog).getByRole('group', { name: 'B3' })).getByRole('button', { name: 'Conta X' })).toHaveAttribute('aria-pressed', 'true')
+    expect(primaryOf(dialog)).not.toHaveAttribute('aria-disabled')
+    // «Continuar»: the mapping of that same account, never a second one
+    await continuar(dialog)
+    expect(await within(dialog).findByRole('heading', { name: MAPA_TITULO })).toHaveFocus()
+    expect(createAccount).toHaveBeenCalledTimes(1)
+    expect(fetchTemplates).toHaveBeenCalledTimes(2)
+    // Back again: a2, then the drop step (as built, for the account chosen last); the market, platform and form steps
+    // never come back
+    await voltar(dialog)
+    expect(within(dialog).getByRole('heading', { name: 'Para qual conta?' })).toBeInTheDocument()
+    await voltar(dialog)
+    expect(within(dialog).getByRole('heading', { name: 'Importar histórico de Conta X' })).toHaveFocus()
+    for (const t of ['Qual mercado?', 'Onde você opera?', 'Nova conta da B3']) expect(within(dialog).queryByRole('heading', { name: t })).not.toBeInTheDocument()
+  })
+
+  it('a zone the preview refused for one account is not refused for the next one chosen on a2 (a new mapping starts clean)', async () => {
+    importPreview.mockResolvedValue({ ...previaQuadro('8'), tz_status: 'tz_mismatch' })
+    const dialog = await abrir(null, 'f8')
+    await within(dialog).findByRole('heading', { name: 'Para qual conta?' })
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Ylos 50k' }))
+    await continuar(dialog)
+    await within(dialog).findByTestId('stub')
+    await continuar(dialog)
+    await usar(dialog)
+    await within(dialog).findByRole('heading', { name: 'Em que fuso estão os horários deste arquivo?' })
+    await userEvent.click(radioDe(dialog, /^Brasília/))
+    expect(dialog.querySelector('.hub-passo > .hub-bloco--atencao')).toBeNull()
+    await continuar(dialog)
+    await waitFor(() => expect(dialog.querySelector('.hub-passo > .hub-bloco--atencao')).toHaveTextContent('Este fuso é diferente do fuso das importações desta conta.'))
+    // c → conferir → mapa → a2, and another account
+    await voltar(dialog)
+    await voltar(dialog)
+    await voltar(dialog)
+    expect(within(dialog).getByRole('heading', { name: 'Para qual conta?' })).toHaveFocus()
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Lucid 50k' }))
+    await continuar(dialog)
+    await within(dialog).findByTestId('stub')
+    await continuar(dialog)
+    await usar(dialog)
+    await within(dialog).findByRole('heading', { name: 'Em que fuso estão os horários deste arquivo?' })
+    await userEvent.click(radioDe(dialog, /^Brasília/))
+    expect(dialog.querySelector('.hub-passo > .hub-bloco--atencao')).toBeNull()
+    expect(primaryOf(dialog)).not.toHaveAttribute('aria-disabled')
+  })
 })
 
 // ================================================================================================
@@ -420,7 +490,7 @@ describe('15 · «As mesmas colunas» (Ylos 50k, model BlackArrow)', () => {
 
   it('straight to «Prévia» with the chip, no indicator; «Importar 5 operações» → the touch (no line), the toast', async () => {
     const dialog = await ateAPrevia('15')
-    expect(cardOf(dialog)).toBe('Modelo “BlackArrow” · Futuros · 24 operações · 1–15 out')
+    expect(cardOf(dialog)).toBe(CARTAO_15)
     expect(indicatorOf(dialog)).toBeNull()
     expect(within(dialog).queryByRole('button', { name: 'Voltar' })).toBeInTheDocument()
     expect(dialog.querySelector('.hub-ler .hub-chip-dado')).toHaveTextContent('Colunas do modelo “BlackArrow”')
@@ -452,7 +522,7 @@ describe('15 · «As mesmas colunas» (Ylos 50k, model BlackArrow)', () => {
       'Desfazer depois: Personalizar › Suas contas › Importações.',
     ])
     expect(dialog.querySelector('.hub-toast')).toHaveTextContent('5 operações em Ylos 50k.')
-    expect(cardOf(dialog)).toBe('Modelo “BlackArrow” · Futuros · 24 operações · 1–15 out')
+    expect(cardOf(dialog)).toBe(CARTAO_15)
   })
 
   it('«Mudar colunas» starts a new sequence: mapa «Passo 1 de 3» (no «Voltar») → conferir «2 de 3» → d «3 de 3» → «atualizado»', async () => {
@@ -461,7 +531,7 @@ describe('15 · «As mesmas colunas» (Ylos 50k, model BlackArrow)', () => {
     expect(await within(dialog).findByRole('heading', { name: 'Mude as colunas do modelo “BlackArrow”.' })).toHaveFocus()
     expect(indicatorOf(dialog)).toBe('Passo 1 de 3')
     expect(within(dialog).queryByRole('button', { name: 'Voltar' })).not.toBeInTheDocument()
-    expect(cardOf(dialog)).toBe('Modelo “BlackArrow” · Futuros · 24 operações · 1–15 out')
+    expect(cardOf(dialog)).toBe(CARTAO_15)
     await continuar(dialog)
     expect(await within(dialog).findByRole('heading', { name: 'Confira 3 linhas' })).toHaveFocus()
     expect(indicatorOf(dialog)).toBe('Passo 2 de 3')
@@ -477,7 +547,7 @@ describe('15 · «As mesmas colunas» (Ylos 50k, model BlackArrow)', () => {
     expect(within(dialog).getByRole('heading', { name: 'Confira 3 linhas' })).toBeInTheDocument()
     await usar(dialog)
     await within(dialog).findByRole('heading', { name: 'Prévia' })
-    expect(cardOf(dialog)).toBe('Modelo “BlackArrow” · Futuros · 24 operações · 1–15 out')
+    expect(cardOf(dialog)).toBe(CARTAO_15)
     await userEvent.click(primaryOf(dialog))
     await within(dialog).findByRole('heading', { name: 'Importação feita' })
     expect(saveTemplate.mock.calls[0].slice(2)).toEqual(['lote-15', MODELO_BLACKARROW_LINHA.id])
@@ -594,6 +664,104 @@ describe('hc · «N contas neste arquivo» (17, Apex A)', () => {
     expect(primaryOf(dialog)).toHaveAttribute('aria-disabled', 'true')
     expect(primaryOf(dialog)).toHaveAccessibleDescription('Escolha qual conta do arquivo vai para Apex A.')
     expect(within(dialog).getByText('Para importar APX-0001 e APX-0002, abra a importação na conta de cada uma: o que já entrou não duplica.')).toBeInTheDocument()
+  })
+
+  it('«Voltar» to «conferir» and «Usar estas colunas» again: the value chosen stays (APX-0002)', async () => {
+    const dialog = await ateHc()
+    await userEvent.selectOptions(within(dialog).getByRole('combobox', { name: 'O que fazer com APX-0002' }), 'importar')
+    await voltar(dialog)
+    expect(within(dialog).getByRole('heading', { name: 'Confira 3 linhas' })).toHaveFocus()
+    await usar(dialog)
+    expect(await within(dialog).findByRole('heading', { name: '2 contas neste arquivo' })).toHaveFocus()
+    expect(within(dialog).getByRole('combobox', { name: 'O que fazer com APX-0002' })).toHaveValue('importar')
+    expect(within(dialog).getByRole('combobox', { name: 'O que fazer com APX-0001' })).toHaveValue('nao')
+  })
+
+  it('the «Conta» column moved on «mapa» after a choice: hc starts again (none imported: blocked); taken out: no hc, every row (review 2 #4)', async () => {
+    const dialog = await ateHc()
+    await userEvent.selectOptions(within(dialog).getByRole('combobox', { name: 'O que fazer com APX-0002' }), 'importar')
+    await voltar(dialog)
+    await voltar(dialog)
+    expect(within(dialog).getByRole('heading', { name: MAPA_TITULO })).toHaveFocus()
+    // «Conta» moves to «Trade number» (57 values, none of them Apex A's number)
+    await responder(dialog, (m) => ({ ...m, colunas: { ...m.colunas, trade: m.colunas.trade.map((c, k) => (k === 0 ? 'account' : c === 'account' ? 'ignorar' : c)) } }))
+    await continuar(dialog)
+    await usar(dialog)
+    expect(await within(dialog).findByRole('heading', { name: '57 contas neste arquivo' })).toHaveFocus()
+    const selects = within(dialog).getAllByRole('combobox')
+    expect(selects).toHaveLength(57)
+    for (const sel of selects) expect(sel).toHaveValue('nao')
+    expect(dialog.querySelector('.hub-passo .hub-bloco--atencao')).toBeNull()
+    expect(primaryOf(dialog)).toHaveAttribute('aria-disabled', 'true')
+    expect(primaryOf(dialog)).toHaveAccessibleDescription('Escolha qual conta do arquivo vai para Apex A.')
+    await userEvent.click(primaryOf(dialog))
+    expect(importPreview).not.toHaveBeenCalled()
+
+    // No «Conta» column at all: no hc, the zone step, and the preview gets every row
+    await voltar(dialog)
+    await voltar(dialog)
+    await responder(dialog, (m) => ({ ...m, colunas: { ...m.colunas, trade: m.colunas.trade.map((c) => (c === 'account' ? 'ignorar' : c)) } }))
+    await continuar(dialog)
+    await usar(dialog)
+    expect(await within(dialog).findByRole('heading', { name: 'Em que fuso estão os horários deste arquivo?' })).toHaveFocus()
+    await escolherZona(dialog, NY)
+    await continuar(dialog)
+    await within(dialog).findByRole('heading', { name: 'Prévia' })
+    expect(importPreview.mock.calls[0][1].p_rows_total).toBe(57)
+    expect(importPreview.mock.calls[0][1].p_rows).toHaveLength(57)
+  })
+
+  it('«Conta» moved to a column that holds the account’s number: hc imports that value, never the one chosen before', async () => {
+    const numero7 = { ...CONTAS_QUADRO.apexA, external_ref: '7' }
+    fetchAccounts.mockResolvedValue(contasQuadro().map((a) => (a.id === numero7.id ? numero7 : a)))
+    const dialog = await ateHc()
+    await userEvent.selectOptions(within(dialog).getByRole('combobox', { name: 'O que fazer com APX-0002' }), 'importar')
+    await voltar(dialog)
+    await voltar(dialog)
+    await responder(dialog, (m) => ({ ...m, colunas: { ...m.colunas, trade: m.colunas.trade.map((c, k) => (k === 0 ? 'account' : c === 'account' ? 'ignorar' : c)) } }))
+    await continuar(dialog)
+    await usar(dialog)
+    expect(await within(dialog).findByRole('heading', { name: '57 contas neste arquivo' })).toBeInTheDocument()
+    expect(within(dialog).getByRole('combobox', { name: 'O que fazer com 7' })).toHaveValue('importar')
+    expect(within(dialog).getAllByRole('combobox').filter((c) => (c as HTMLSelectElement).value === 'importar')).toHaveLength(1)
+    expect(primaryOf(dialog)).not.toHaveAttribute('aria-disabled')
+  })
+
+  it('«Conta» moved to a column of one value: no hc, and every row goes (the value chosen before filters nothing)', async () => {
+    // 17's file with one «Commission» value (invented): every 2.48 written as 1.24
+    const { ARQUIVOS_QUADRO } = await import('@/testing/mapeadoTelas')
+    const texto = ARQUIVOS_QUADRO.f17.texto.replace(/,2\.48(\r?\n|$)/g, ',1.24$1')
+    expect(texto).not.toContain('2.48')
+    fetchTemplates.mockResolvedValue([])
+    importPreview.mockResolvedValue(previaQuadro('17'))
+    const dialog = await abrir('apexA', 'f17', new File([texto], 'ninjatrader.csv'))
+    await within(dialog).findByTestId('stub')
+    await continuar(dialog)
+    await usar(dialog)
+    await within(dialog).findByRole('heading', { name: '2 contas neste arquivo' })
+    await userEvent.selectOptions(within(dialog).getByRole('combobox', { name: 'O que fazer com APX-0002' }), 'importar')
+    await voltar(dialog)
+    await voltar(dialog)
+    await responder(dialog, (m) => ({ ...m, colunas: { ...m.colunas, trade: m.colunas.trade.map((c, k) => (k === 10 ? 'account' : c === 'account' ? 'ignorar' : c)) } }))
+    await continuar(dialog)
+    await usar(dialog)
+    expect(await within(dialog).findByRole('heading', { name: 'Em que fuso estão os horários deste arquivo?' })).toHaveFocus()
+    await escolherZona(dialog, NY)
+    await continuar(dialog)
+    await within(dialog).findByRole('heading', { name: 'Prévia' })
+    expect(importPreview.mock.calls[0][1].p_rows_total).toBe(57)
+  })
+
+  it('the step itself: a value the «Conta» column does not hold reads as none imported (every row «Não importar», no warning)', () => {
+    const r = iniciarMapeamento(arquivoMapeavelQuadro('f17'), { market: 'futures', templates: [], nomePadrao: 'NinjaTrader' })
+    if (!r.ok) throw new Error(r.error)
+    const onChange = jest.fn()
+    render(
+      <PassoContasDoArquivo headingRef={React.createRef()} mapeamento={{ ...r.mapeamento, accountValue: 'APX-0009' }} conta={CONTAS_QUADRO.apexA} onChange={onChange} onAnuncio={jest.fn()} />,
+    )
+    for (const c of screen.getAllByRole('combobox')) expect(c).toHaveValue('nao')
+    expect(document.querySelector('.hub-bloco--atencao')).toBeNull()
+    expect(screen.getByText('Para importar APX-0001 e APX-0002, abra a importação na conta de cada uma: o que já entrou não duplica.')).toBeInTheDocument()
   })
 
   it('by the model’s route (an account without the number): the model’s own file goes straight to hc', async () => {
@@ -823,7 +991,7 @@ const PREVIAS: [string, PreviaEsperada][] = [
   ['16 · Interactive Brokers', { estado: '16i', linhas: ['8 execuções no arquivo', '3 saídas · 3 novas · 0 já estavam', 'As 3 saídas viram 2 operações.', '1 saída parcial juntada à sua operação.', '3 execuções ficaram de fora.', COM, antes('15 out', 2), 'Fuso do arquivo: Nova York (ET) · lembrado para IBKR'], comissao: 'Bruto +US$ 283,00 · comissões −US$ 5,00.', ver: ['Linha 2: fecha uma posição aberta antes do começo do arquivo', 'Linha 7: opção, fica de fora (registre no Registrar)', 'Linha 9: posição ainda aberta no fim do arquivo'], primaria: 'Importar 2 operações' }],
   ['17 · APX-0001', { estado: '17', linhas: ['57 linhas · 31 novas · 26 não importadas (APX-0002) · 0 já estavam · 0 com erro', 'Ativos escritos como “MNQ 12-26” e “MES 12-26” ficam como “MNQZ26” e “MESZ26”.', COM, antes('14 out', 31), 'Fuso do arquivo: Nova York (ET) · lembrado para Apex A'], comissao: 'Bruto +US$ 186,50 · comissões −US$ 44,64.', primaria: 'Importar 31 operações' }],
   ['17 · APX-0001, «Sim, é líquido»', { estado: '17', liquido: true, linhas: ['57 linhas · 31 novas · 26 não importadas (APX-0002) · 0 já estavam · 0 com erro', 'Ativos escritos como “MNQ 12-26” e “MES 12-26” ficam como “MNQZ26” e “MESZ26”.', COM, '31 com resultado diferente do calculado pelos preços: vale o do arquivo.', antes('14 out', 31), 'Fuso do arquivo: Nova York (ET) · lembrado para Apex A'], comissao: 'Bruto +US$ 231,14 · comissões −US$ 44,64.', primaria: 'Importar 31 operações' }],
-  ['17 · APX-0002', { estado: '17-apx2', linhas: ['57 linhas · 26 novas · 31 não importadas (APX-0001) · 0 já estavam · 0 com erro', 'Ativos escritos como “MES 12-26” e “MNQ 12-26” ficam como “MESZ26” e “MNQZ26”.', COM, antes('14 out', 26), 'Fuso do arquivo: Nova York (ET) · lembrado para Apex A'], comissao: 'Bruto +US$ 141,25 · comissões −US$ 37,20.', primaria: 'Importar 26 operações' }],
+  ['17 · APX-0002 (the pairs in the file’s order, as the board)', { estado: '17-apx2', linhas: ['57 linhas · 26 novas · 31 não importadas (APX-0001) · 0 já estavam · 0 com erro', 'Ativos escritos como “MNQ 12-26” e “MES 12-26” ficam como “MNQZ26” e “MESZ26”.', COM, antes('14 out', 26), 'Fuso do arquivo: Nova York (ET) · lembrado para Apex A'], comissao: 'Bruto +US$ 141,25 · comissões −US$ 37,20.', primaria: 'Importar 26 operações' }],
   ['18 · Forex in New York', { estado: '18', linhas: ['14 linhas · 14 novas · 0 já estavam · 0 com erro', COM, '1 operação com swap: ele entra no resultado, antes da comissão.', '1 operação fica em outro dia que o do arquivo: o dia de Forex vira às 17:00 de Nova York.', antes('15 out', 14), 'Fuso do arquivo: Nova York (ET) · lembrado para E8 50k'], comissao: 'Bruto +US$ 212,40 · comissões −US$ 40,25.', primaria: 'Importar 14 operações' }],
   ['18 · Forex in Chicago (domain: 1, board 2)', { estado: '18-chicago', linhas: ['14 linhas · 14 novas · 0 já estavam · 0 com erro', COM, '1 operação com swap: ele entra no resultado, antes da comissão.', '1 operação fica em outro dia que o do arquivo: o dia de Forex vira às 17:00 de Nova York.', antes('15 out', 14), 'Fuso do arquivo: Chicago (CT) · lembrado para E8 50k'], comissao: 'Bruto +US$ 212,40 · comissões −US$ 40,25.', primaria: 'Importar 14 operações' }],
   ['18 · Forex in UTC: no day line', { estado: '18-utc', linhas: ['14 linhas · 14 novas · 0 já estavam · 0 com erro', COM, '1 operação com swap: ele entra no resultado, antes da comissão.', antes('15 out', 14), 'Fuso do arquivo: UTC · lembrado para E8 50k'], comissao: 'Bruto +US$ 212,40 · comissões −US$ 40,25.', primaria: 'Importar 14 operações' }],
@@ -917,6 +1085,36 @@ describe('the commit and the model’s save (§6.8)', () => {
     expect(within(dialog).getByText(linha)).toBeInTheDocument()
     expect(within(dialog).queryByRole('alert')).not.toBeInTheDocument()
     expect(dialog.querySelector('.hub-toast')).toHaveTextContent('18 operações em Ylos 50k.')
+  })
+
+  it('16 · Binance (no zone step): the model is saved without a zone (tz_hint null), never the zone the preview used', async () => {
+    importCommit.mockResolvedValue(commitQuadro('16b-naosei'))
+    const dialog = await ateAPrevia('16b-naosei')
+    expect(importPreview.mock.calls[0][1].p_file_tz).toBe('UTC')
+    await userEvent.click(primaryOf(dialog))
+    await within(dialog).findByRole('heading', { name: 'Importação feita' })
+    expect(saveTemplate).toHaveBeenCalledTimes(1)
+    expect(saveTemplate.mock.calls[0][1]).toMatchObject({ row_kind: 'fill', tz_hint: null })
+  })
+
+  it('a model the database would refuse (a name over 60 characters): the end’s «não foi salvo» line, and no call', async () => {
+    importCommit.mockResolvedValue(commitQuadro('8'))
+    importPreview.mockResolvedValue(previaQuadro('8'))
+    const nome = 'M'.repeat(MAX_TEMPLATE_NAME + 1)
+    const dialog = await abrir('ylos', 'f8')
+    await within(dialog).findByTestId('stub')
+    await responder(dialog, (m) => ({ ...m, nome }))
+    await continuar(dialog)
+    await usar(dialog)
+    await within(dialog).findByRole('heading', { name: 'Em que fuso estão os horários deste arquivo?' })
+    await escolherZona(dialog, NY)
+    await continuar(dialog)
+    await within(dialog).findByRole('heading', { name: 'Prévia' })
+    await userEvent.click(primaryOf(dialog))
+    await within(dialog).findByRole('heading', { name: 'Importação feita' })
+    expect(saveTemplate).not.toHaveBeenCalled()
+    expect(within(dialog).getByText(`O modelo “${nome}” não foi salvo. As operações já entraram; no próximo arquivo, diga de novo o que é cada coluna.`)).toBeInTheDocument()
+    expect(within(dialog).queryByRole('alert')).not.toBeInTheDocument()
   })
 
   it('«Salvar como modelo» unchecked: «Colunas usadas só neste arquivo.», no save', async () => {
@@ -1043,6 +1241,12 @@ describe('«Nada novo» of a mapped file (no zone block, G2)', () => {
     const dialog = await ateNadaNovo('16t-de-novo')
     expect(within(dialog).getByRole('heading', { name: 'Nada novo: as 6 saídas já estão em Lucid 50k.' })).toBeInTheDocument()
     expect(linhas(dialog)[1]).toBe('6 saídas · 0 novas · 6 já estavam (mesmo ID)')
+  })
+
+  it('8 · Performance.csv again (no ID column): «6 já estavam (mesma hora e preço)», never «(mesmo ID)» (review 2 #2, D11)', async () => {
+    const dialog = await ateNadaNovo('8p-de-novo')
+    expect(within(dialog).getByRole('heading', { level: 3, name: /^Nada novo/ })).toHaveFocus()
+    expect(linhas(dialog)[1]).toBe('6 linhas · 0 novas · 6 já estavam (mesma hora e preço)')
   })
 
   async function ateNadaNovo(e: EstadoQuadro) {
