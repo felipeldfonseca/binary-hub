@@ -1,0 +1,166 @@
+diff -ru -x r -x data_*.json -x __pycache__ antes/gerador/LEIAME.txt muitas/gerador/LEIAME.txt
+--- antes/gerador/LEIAME.txt	2026-10-25 23:16:26
++++ muitas/gerador/LEIAME.txt	2026-10-25 23:16:26
+@@ -8,3 +8,11 @@
+ $preview = altura do cenário padrão a 1280 (2 no quadro dez, 1 no hoje), arredondada para cima em múltiplo de 20.
+ O cenário 9b usa outro «mundo» (agora a1dezM): 35 contas (dados.py, MESAS e HOJE_MESAS); só ele tem busca e mesas no seletor
+ (a partir de 10 contas). Neste gerador já está aplicado ../gerador-revisao-final.patch (os quadros publicados vêm dele).
++Correções da revisão (25 out): «Ver todas» como era (o «somando as contas de Futuros» só na conta aberta); o «·» termina a
++parte anterior (linha quebrada nunca começa com ele); no seletor de muitas contas, cada bloco é role="group" com o nome do
++mercado e da mesa, a lista rola com max-height 372 (sem busca, corta a 7ª conta ao meio), sombra nas bordas e scroll-padding 8 px
++(o anel de foco não é cortado). harness.js confere o «somando», os «·» e os nomes dos grupos.
++Ao republicar, no project/canvas.json do canvas:
++  DiarioDezEnxuto.dc.html  h 3980 (era 4240), title «Diário · 1º dez, 11:35 ET · um dia completo, limite, calendário,
++    histórico, somando, muitas contas, semana e rodapé · 10 cenários» (era «… somando, semana e rodapé · 9 cenários»)
++  DiarioHojeEnxuto.dc.html h 3280 (era 3540), title sem mudança (os 11 cenários dele não mudaram).
+diff -ru -x r -x data_*.json -x __pycache__ antes/gerador/engine.js muitas/gerador/engine.js
+--- antes/gerador/engine.js	2026-10-25 23:16:26
++++ muitas/gerador/engine.js	2026-10-25 23:16:26
+@@ -470,25 +470,32 @@
+         set({ conta: k, dia: A.contas[k].hoje, mes: null, sem: null, aberta: null, dlg: null, contaAberta: false, busca: null, revForm: null, revVer: null, antesEd: null, contaStatus: 'Conta ' + D.contas[k].nome + '.' });
+       }
+     });
++    // each block is a group named by its headers (market, and firm when there is one), so a screen reader moving by Tab
++    // hears «Futuros · 30 Apex · 9» on entering it; the headers keep their ids across the blocks of one market
+     const gruposConta = [];
+     let achadas = 0;
+-    MERC.forEach((g) => {
++    MERC.forEach((g, i) => {
+       const ks = g[1].filter(acha);
+       if (!ks.length) return;
+       achadas += ks.length;
+       const rotMercado = muitas ? g[0] + ' · ' + ks.length : g[0];
+-      if (!muitas || g[1].length < 2) { gruposConta.push({ temMercado: true, mercado: rotMercado, temMesa: false, mesa: '', contas: ks.map(opConta) }); return; }
++      const idMercado = 'conta-g' + i;
++      if (!muitas || g[1].length < 2) { gruposConta.push({ temMercado: true, mercado: rotMercado, idMercado, temMesa: false, mesa: '', idMesa: '', rotulos: idMercado, contas: ks.map(opConta) }); return; }
+       const porMesa = [];
+       ks.forEach((k) => { const nm = D.contas[k].mesa; let b = porMesa.find((x) => x.nm === nm); if (!b) { b = { nm, ks: [] }; porMesa.push(b); } b.ks.push(k); });
+-      porMesa.forEach((b, j) => gruposConta.push({ temMercado: j === 0, mercado: rotMercado, temMesa: true, mesa: b.nm + ' · ' + b.ks.length, contas: b.ks.map(opConta) }));
++      porMesa.forEach((b, j) => {
++        const idMesa = idMercado + '-m' + j;
++        gruposConta.push({ temMercado: j === 0, mercado: rotMercado, idMercado, temMesa: true, mesa: b.nm + ' · ' + b.ks.length, idMesa, rotulos: idMercado + ' ' + idMesa, contas: b.ks.map(opConta) });
++      });
+     });
+     // «Posso operar hoje?»: only the selected account, then ONE line for the others, with «Ver todas» opening their lines
+-    const linhaPosso = (p) => ({
++    // exactly as the published list had them («somando as contas de Futuros» only on the selected account)
++    const linhaPosso = (p, sel) => ({
+       id: p.id, nome: p.nome, pal: p.pal, cls: 'tom-' + p.tom, temSub: !!p.sub, sub: p.sub || '', temAcao: !!p.acao, acao: p.acao || '', acaoAria: p.acaoAria || '',
+-      temLim: !!p.lim, limUsado: p.lim ? p.lim.usado : '', limDe: p.lim ? p.lim.de : '', temSoma: !!(p.lim && D.contas[p.id] && D.contas[p.id].soma)
++      temLim: !!p.lim, limUsado: p.lim ? p.lim.usado : '', limDe: p.lim ? p.lim.de : '', temSoma: !!(sel && p.lim && D.contas[p.id] && D.contas[p.id].soma)
+     });
+-    const possoSel = A.posso.filter((p) => p.id === contaId).map(linhaPosso);
+-    const possoOutras = A.posso.filter((p) => p.id !== contaId).map(linhaPosso);
++    const possoSel = A.posso.filter((p) => p.id === contaId).map((p) => linhaPosso(p, true));
++    const possoOutras = A.posso.filter((p) => p.id !== contaId).map((p) => linhaPosso(p, false));
+     const ESTADOS = [
+       [(p) => p.pal === 'Liberado' && p.cls === 'tom-mint', 'liberada', 'liberadas', 'tom-mint'],
+       [(p) => p.pal === 'Liberado', 'liberada com aviso', 'liberadas com aviso', 'tom-neutral'],
+@@ -501,8 +508,9 @@
+     const contagem = ESTADOS.map((st) => ({ st, n: 0 }));
+     possoOutras.forEach((p) => { contagem.find((c) => c.st[0](p)).n += 1; });
+     const comEstado = contagem.filter((c) => c.n);
++    // the «·» ends the part before it, so a wrapped line never starts with it
+     const outrasPartes = comEstado.map((c, j) => ({
+-      temSep: j > 0, cls: c.st[3],
++      temSep: j < comEstado.length - 1, cls: c.st[3],
+       txt: nOutras === 1 ? c.st[1] : comEstado.length === 1 ? 'todas ' + c.st[2] : c.n + ' ' + (c.n === 1 ? c.st[1] : c.st[2])
+     }));
+     const outrasAbertas = !!e.outras && nOutras > 0;
+diff -ru -x r -x data_*.json -x __pycache__ antes/gerador/harness.js muitas/gerador/harness.js
+--- antes/gerador/harness.js	2026-10-25 23:16:26
++++ muitas/gerador/harness.js	2026-10-25 23:16:26
+@@ -61,6 +61,12 @@
+   let vp = c.renderVals();
+   console.log(cen, '|', vp.possoSel.map((x) => x.nome + ': ' + x.pal + (x.sub ? ' · ' + x.sub : '') + (x.temLim ? ' · Limite do dia ' + x.limUsado + ' ' + x.limDe : '') + (x.temSoma ? ' · somando as contas de Futuros' : '')).join(''), '|', vp.outrasTit, vp.outrasPartes.map((o) => o.txt).join(' · '), '[' + vp.outrasBotao + ']');
+   if (vp.possoSel.length !== 1) { console.log('POSSO SEL', cen, vp.possoSel.length); fails++; }
++  // «Ver todas» lists the others as published: «somando» only on the selected account; the «·» ends every part but the last
++  if (vp.possoOutras.some((x) => x.temSoma)) { console.log('SOMA NAS OUTRAS', cen); fails++; }
++  if (vp.outrasPartes.some((o, j) => o.temSep !== (j < vp.outrasPartes.length - 1))) { console.log('SEP OUTRAS', cen); fails++; }
++  // the selector's groups are named by headers that exist in the list
++  { const ids = new Set(); vp.gruposConta.forEach((g) => { if (g.temMercado) ids.add(g.idMercado); if (g.temMesa) ids.add(g.idMesa); });
++    vp.gruposConta.forEach((g) => g.rotulos.split(' ').forEach((id) => { if (!ids.has(id)) { console.log('ROTULO', cen, id); fails++; } })); }
+   if (vp.temOutras) { const antes = vp.outrasAbertas; vp.alternarOutras(); vp = check(c, cen + ' outras'); if (vp.outrasAbertas === antes || vp.outrasBotao !== (antes ? 'Ver todas' : 'Ocultar')) { console.log('OUTRAS', cen); fails++; } vp.alternarOutras(); check(c, cen + ' outras2'); }
+   c.state = { cen, contaAberta: true };
+   vp = c.renderVals();
+@@ -72,6 +78,12 @@
+     vp.mudarBusca({ target: { value: 'apex 50k #5' } }); vp = c.renderVals();
+     vp.gruposConta[0].contas[0].escolher(); vp = check(c, cen + ' escolheu apex5');
+     console.log('  escolheu', vp.contaNome, '|', vp.possoSel[0].pal, vp.possoSel[0].sub, '|', vp.outrasTit, vp.outrasPartes.map((o) => o.txt).join(' · '), '|', vp.diaTitulo, vp.rs.res);
++    c.state = { cen, contaAberta: true }; vp = c.renderVals(); vp.mudarBusca({ target: { value: 'lucid 50k' } }); vp = c.renderVals();
++    vp.gruposConta[0].contas[0].escolher(); vp = check(c, cen + ' escolheu lucid');
++    console.log('  escolheu', vp.contaNome, '|', vp.possoSel[0].pal, vp.possoSel[0].sub, vp.possoSel[0].temSoma ? '| somando as contas de Futuros' : '', '|', vp.outrasTit, vp.outrasPartes.map((o) => o.txt).join(' · '));
++    if (vp.contaNome !== 'Lucid 50k' || !vp.possoSel[0].temSoma) { console.log('SOMA LUCID', cen); fails++; }
+   }
++  c.state = { cen }; vp = c.renderVals();
++  if (vp.contaNome === 'Lucid 50k' && vp.possoSel[0].temLim && !vp.possoSel[0].temSoma) { console.log('SOMA SEL', cen); fails++; }
+ }
+ console.log('scenarios', cens.length, 'fails', fails);
+diff -ru -x r -x data_*.json -x __pycache__ antes/gerador/template.html muitas/gerador/template.html
+--- antes/gerador/template.html	2026-10-25 23:16:26
++++ muitas/gerador/template.html	2026-10-25 23:16:26
+@@ -123,7 +123,10 @@
+ #topo .conta-op[aria-current="true"]{background:var(--mint);border-color:var(--mint)}
+ #topo .conta-op[aria-current="true"],#topo .conta-op[aria-current="true"] span{color:#26301F !important}
+ #topo .conta-blocos{display:flex;flex-direction:column;gap:2px}
+-#topo .conta-rolagem{max-height:360px;overflow-y:auto;overscroll-behavior:contain;margin:0 -6px;padding:0 6px}
++#topo .conta-bloco{display:flex;flex-direction:column;gap:2px}
++#topo .conta-rolagem{--fim:rgba(0,0,0,0.32)}
++#topo[data-tema="escuro"] .conta-rolagem{--fim:rgba(255,255,255,0.12)}
++#topo .conta-rolagem{max-height:372px;overflow-y:auto;overscroll-behavior:contain;margin:-4px -6px;padding:4px 6px;scroll-padding-block:8px;background:linear-gradient(var(--bg) 40%,rgba(0,0,0,0)) top / 100% 24px no-repeat local,linear-gradient(rgba(0,0,0,0),var(--bg) 60%) bottom / 100% 24px no-repeat local,linear-gradient(var(--fim),rgba(0,0,0,0)) top / 100% 18px no-repeat scroll,linear-gradient(rgba(0,0,0,0),var(--fim)) bottom / 100% 18px no-repeat scroll,var(--bg)}
+ #topo .conta-busca{padding:0 0 8px}
+ #topo .conta-mesa{padding:6px 10px 0;font-size:12px;font-weight:700;color:var(--text-2)}
+ #topo .conta-nada{margin:0;padding:10px;font-size:13px;color:var(--text-2)}
+@@ -133,7 +136,8 @@
+ #topo .posso-lista{flex:1 1 560px;min-width:0;margin:0;padding:0;list-style:none}
+ #topo .posso-conta{display:grid;grid-template-columns:92px minmax(0,1fr) auto;align-items:center;gap:0 16px;min-height:44px;font-size:13px}
+ #topo .posso-conta+.posso-conta{border-top:1px solid var(--border)}
+-#topo .posso-lim{display:inline-flex;flex-direction:column;align-items:flex-end;justify-self:end}
++#topo .posso-lim{display:inline-flex;align-items:center;flex-wrap:wrap;gap:0 8px;justify-self:end}
++#topo .posso-lim-col{flex-direction:column;align-items:flex-end;gap:0}
+ #topo .posso-lim-linha{display:inline-flex;align-items:center;flex-wrap:wrap;gap:0 8px}
+ #topo .posso-acao{display:inline-flex;align-items:center;min-height:44px;font-weight:700}
+ #topo .posso .info-painel{flex:1 1 100%;margin:0 0 12px}
+@@ -141,6 +145,8 @@
+ #topo .posso-largo .posso-conta{grid-template-columns:120px minmax(0,1fr) auto}
+ #topo .posso-outras{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:4px 16px;min-height:44px;padding:4px 0;border-top:1px solid var(--border);font-size:13px}
+ #topo .posso-resumo{display:flex;flex-wrap:wrap;align-items:baseline;gap:0 6px;margin:0;min-width:0}
++#topo .sep-fim{margin-left:6px;font-weight:400}
++#topo .sep-fim-esp{white-space:pre;margin-right:-6px}
+ #topo .posso-todas{border-top:1px solid var(--border)}
+ #topo .mono{font-family:var(--mono);font-variant-numeric:tabular-nums;font-weight:700}
+ #topo .tom-mint{color:var(--mint);font-weight:700}
+@@ -185,7 +191,8 @@
+ #topo .posso-conta,#topo .posso-largo .posso-conta{grid-template-columns:minmax(0,1fr);gap:0;padding:8px 0}
+ #topo .posso-estado{flex-direction:column;align-items:flex-start !important}
+ #topo .posso-estado .sep{display:none}
+-#topo .posso-lim{justify-self:start;align-items:flex-start}
++#topo .posso-lim{justify-self:start}
++#topo .posso-lim-col{align-items:flex-start}
+ }
+ @container casca (max-width:540px){
+ #topo .pagina{padding:0 16px 48px}
+@@ -258,7 +265,7 @@
+ <sc-if value="{{ contaAberta }}" hint-placeholder-val="{{ false }}"><div class="conta-fundo" aria-hidden="true" onClick="{{ fecharConta }}"></div><div id="lista-contas" class="conta-lista">
+ <sc-if value="{{ temBusca }}" hint-placeholder-val="{{ false }}"><div class="conta-busca"><label for="busca-conta" class="so-leitor">Buscar conta</label><input id="busca-conta" ref="{{ refBusca }}" type="search" autocomplete="off" class="campo" placeholder="Nome da conta ou da mesa" value="{{ busca }}" onChange="{{ mudarBusca }}"><div role="status" class="so-leitor">{{ buscaStatus }}</div></div></sc-if>
+ <div class="{{ classeBlocos }}">
+-<sc-for list="{{ gruposConta }}" as="g" hint-placeholder-count="6"><sc-if value="{{ g.temMercado }}" hint-placeholder-val="{{ true }}"><span class="conta-grupo">{{ g.mercado }}</span></sc-if><sc-if value="{{ g.temMesa }}" hint-placeholder-val="{{ false }}"><span class="conta-mesa">{{ g.mesa }}</span></sc-if><sc-for list="{{ g.contas }}" as="c" hint-placeholder-count="1"><button type="button" class="conta-op" aria-current="{{ c.sel }}" onClick="{{ c.escolher }}"><span style="font-weight: 700">{{ c.nome }}</span><span style="font-size: 12px; color: var(--text-2)">{{ c.fase }}</span></button></sc-for></sc-for>
++<sc-for list="{{ gruposConta }}" as="g" hint-placeholder-count="6"><div role="group" aria-labelledby="{{ g.rotulos }}" class="conta-bloco"><sc-if value="{{ g.temMercado }}" hint-placeholder-val="{{ true }}"><span id="{{ g.idMercado }}" class="conta-grupo">{{ g.mercado }}</span></sc-if><sc-if value="{{ g.temMesa }}" hint-placeholder-val="{{ false }}"><span id="{{ g.idMesa }}" class="conta-mesa">{{ g.mesa }}</span></sc-if><sc-for list="{{ g.contas }}" as="c" hint-placeholder-count="1"><button type="button" class="conta-op" aria-current="{{ c.sel }}" onClick="{{ c.escolher }}"><span style="font-weight: 700">{{ c.nome }}</span><span style="font-size: 12px; color: var(--text-2)">{{ c.fase }}</span></button></sc-for></div></sc-for>
+ <sc-if value="{{ semAchados }}" hint-placeholder-val="{{ false }}"><p class="conta-nada">{{ semAchadosTxt }}</p></sc-if>
+ </div>
+ <div style="display: flex; flex-direction: column; border-top: 1px solid var(--border); padding-top: 4px; margin-top: 4px"><a href="ImportarConta.dc.html" class="conta-op" style="font-weight: 700">+ Adicionar conta</a><a href="Personalizar.dc.html#contas" class="conta-op">Gerenciar contas</a></div>
+@@ -270,11 +277,11 @@
+ <div class="posso-cab"><h2 id="t-posso" class="posso-tit">Posso operar hoje?</h2><button type="button" class="info" aria-expanded="{{ i.posso.aberto }}" aria-controls="info-posso" aria-label="Como ler: Posso operar hoje?" onClick="{{ i.posso.alternar }}">i</button></div>
+ <div class="{{ classePosso }}">
+ <ul aria-labelledby="t-posso" class="posso-lista">
+-<sc-for list="{{ possoSel }}" as="p" hint-placeholder-count="1"><li class="posso-conta"><strong style="font-size: 14px; overflow-wrap: anywhere">{{ p.nome }}</strong><span class="posso-estado" style="display: flex; align-items: center; flex-wrap: wrap; gap: 0 6px; min-width: 0"><span class="{{ p.cls }}">{{ p.pal }}</span><sc-if value="{{ p.temSub }}" hint-placeholder-val="{{ true }}"><span class="tom-muted"><span aria-hidden="true" class="sep">· </span>{{ p.sub }}</span></sc-if><sc-if value="{{ p.temAcao }}" hint-placeholder-val="{{ false }}"><span aria-hidden="true" class="tom-muted sep">·</span><a href="Personalizar.dc.html" aria-label="{{ p.acaoAria }}" class="posso-acao">{{ p.acao }}</a></sc-if></span><sc-if value="{{ p.temLim }}" hint-placeholder-val="{{ true }}"><span class="posso-lim"><span class="posso-lim-linha"><span class="rotulo-dia">Limite do dia</span><span style="display: inline-flex; gap: 8px; white-space: nowrap"><span class="mono">{{ p.limUsado }}</span><span class="tom-muted">{{ p.limDe }}</span></span></span><sc-if value="{{ p.temSoma }}" hint-placeholder-val="{{ false }}"><span class="tom-muted">somando as contas de Futuros</span></sc-if></span></sc-if></li></sc-for>
++<sc-for list="{{ possoSel }}" as="p" hint-placeholder-count="1"><li class="posso-conta"><strong style="font-size: 14px; overflow-wrap: anywhere">{{ p.nome }}</strong><span class="posso-estado" style="display: flex; align-items: center; flex-wrap: wrap; gap: 0 6px; min-width: 0"><span class="{{ p.cls }}">{{ p.pal }}<sc-if value="{{ p.temSub }}" hint-placeholder-val="{{ true }}"><span aria-hidden="true" class="tom-muted sep sep-fim sep-fim-esp">· </span></sc-if><sc-if value="{{ p.temAcao }}" hint-placeholder-val="{{ false }}"><span aria-hidden="true" class="tom-muted sep sep-fim">·</span></sc-if></span><sc-if value="{{ p.temSub }}" hint-placeholder-val="{{ true }}"><span class="tom-muted">{{ p.sub }}</span></sc-if><sc-if value="{{ p.temAcao }}" hint-placeholder-val="{{ false }}"><a href="Personalizar.dc.html" aria-label="{{ p.acaoAria }}" class="posso-acao">{{ p.acao }}</a></sc-if></span><sc-if value="{{ p.temLim }}" hint-placeholder-val="{{ true }}"><span class="posso-lim posso-lim-col"><span class="posso-lim-linha"><span class="rotulo-dia">Limite do dia</span><span style="display: inline-flex; gap: 8px; white-space: nowrap"><span class="mono">{{ p.limUsado }}</span><span class="tom-muted">{{ p.limDe }}</span></span></span><sc-if value="{{ p.temSoma }}" hint-placeholder-val="{{ false }}"><span class="tom-muted">somando as contas de Futuros</span></sc-if></span></sc-if></li></sc-for>
+ </ul>
+-<sc-if value="{{ temOutras }}" hint-placeholder-val="{{ true }}"><div class="posso-outras"><p class="posso-resumo"><strong>{{ outrasTit }}</strong><sc-for list="{{ outrasPartes }}" as="o" hint-placeholder-count="2"><sc-if value="{{ o.temSep }}" hint-placeholder-val="{{ false }}"><span aria-hidden="true" class="tom-muted">·</span></sc-if><span class="{{ o.cls }}">{{ o.txt }}</span></sc-for></p><button type="button" class="btn" aria-expanded="{{ outrasAbertas }}" aria-controls="posso-outras-lista" onClick="{{ alternarOutras }}">{{ outrasBotao }}</button></div></sc-if>
++<sc-if value="{{ temOutras }}" hint-placeholder-val="{{ true }}"><div class="posso-outras"><p class="posso-resumo"><strong>{{ outrasTit }}</strong><sc-for list="{{ outrasPartes }}" as="o" hint-placeholder-count="2"><span class="{{ o.cls }}">{{ o.txt }}<sc-if value="{{ o.temSep }}" hint-placeholder-val="{{ true }}"><span aria-hidden="true" class="tom-muted sep-fim">·</span></sc-if></span></sc-for></p><button type="button" class="btn" aria-expanded="{{ outrasAbertas }}" aria-controls="posso-outras-lista" onClick="{{ alternarOutras }}">{{ outrasBotao }}</button></div></sc-if>
+ <sc-if value="{{ outrasAbertas }}" hint-placeholder-val="{{ false }}"><ul id="posso-outras-lista" aria-label="Outras contas" class="posso-lista posso-todas">
+-<sc-for list="{{ possoOutras }}" as="p" hint-placeholder-count="7"><li class="posso-conta"><strong style="font-size: 14px; overflow-wrap: anywhere">{{ p.nome }}</strong><span class="posso-estado" style="display: flex; align-items: center; flex-wrap: wrap; gap: 0 6px; min-width: 0"><span class="{{ p.cls }}">{{ p.pal }}</span><sc-if value="{{ p.temSub }}" hint-placeholder-val="{{ true }}"><span class="tom-muted"><span aria-hidden="true" class="sep">· </span>{{ p.sub }}</span></sc-if><sc-if value="{{ p.temAcao }}" hint-placeholder-val="{{ false }}"><span aria-hidden="true" class="tom-muted sep">·</span><a href="Personalizar.dc.html" aria-label="{{ p.acaoAria }}" class="posso-acao">{{ p.acao }}</a></sc-if></span><sc-if value="{{ p.temLim }}" hint-placeholder-val="{{ true }}"><span class="posso-lim"><span class="posso-lim-linha"><span class="rotulo-dia">Limite do dia</span><span style="display: inline-flex; gap: 8px; white-space: nowrap"><span class="mono">{{ p.limUsado }}</span><span class="tom-muted">{{ p.limDe }}</span></span></span><sc-if value="{{ p.temSoma }}" hint-placeholder-val="{{ false }}"><span class="tom-muted">somando as contas de Futuros</span></sc-if></span></sc-if></li></sc-for>
++<sc-for list="{{ possoOutras }}" as="p" hint-placeholder-count="7"><li class="posso-conta"><strong style="font-size: 14px; overflow-wrap: anywhere">{{ p.nome }}</strong><span class="posso-estado" style="display: flex; align-items: center; flex-wrap: wrap; gap: 0 6px; min-width: 0"><span class="{{ p.cls }}">{{ p.pal }}<sc-if value="{{ p.temSub }}" hint-placeholder-val="{{ true }}"><span aria-hidden="true" class="tom-muted sep sep-fim sep-fim-esp">· </span></sc-if><sc-if value="{{ p.temAcao }}" hint-placeholder-val="{{ false }}"><span aria-hidden="true" class="tom-muted sep sep-fim">·</span></sc-if></span><sc-if value="{{ p.temSub }}" hint-placeholder-val="{{ true }}"><span class="tom-muted">{{ p.sub }}</span></sc-if><sc-if value="{{ p.temAcao }}" hint-placeholder-val="{{ false }}"><a href="Personalizar.dc.html" aria-label="{{ p.acaoAria }}" class="posso-acao">{{ p.acao }}</a></sc-if></span><sc-if value="{{ p.temLim }}" hint-placeholder-val="{{ true }}"><span class="posso-lim"><span class="rotulo-dia">Limite do dia</span><span style="display: inline-flex; gap: 8px; white-space: nowrap"><span class="mono">{{ p.limUsado }}</span><span class="tom-muted">{{ p.limDe }}</span></span></span></sc-if></li></sc-for>
+ </ul></sc-if>
+ </div>
+ <sc-if value="{{ i.posso.aberto }}" hint-placeholder-val="{{ false }}"><div id="info-posso" class="info-painel">Aqui aparece a conta aberta no Diário; as outras ficam numa linha, e “Ver todas” mostra a resposta de cada uma. Cada conta responde pelas regras dela: janela e limite do dia. O bloqueio de dados fica ativo na Fase 5 e, por enquanto, vale só em Futuros. Limite do dia: a maior perda do dia, no pior momento, contra o limite da conta, na moeda dela (R$ na B3; US$ nos outros mercados, com USDT e USDC contados como dólar). Contas de mercados diferentes nunca são somadas. Vem das suas regras, nunca da IA.</div></sc-if>

@@ -1,0 +1,18 @@
+Gerador dos quadros do Diário (Fase 4, revisão de 23 out + «Muitas contas» de 25 out). Dados inventados.
+  python3 gera.py                      # calcula contas, dias, relógios e cenários -> data_dez.json, data_hoje.json
+  python3 monta_quadro.py '{"dez":3980,"hoje":3280}' ../project   # junta template.html + engine.js + dados nos dois .dc.html
+  node harness.js ../project/DiarioDezEnxuto.dc.html               # roda todos os cenários e cliques sem erro
+render.py precisa de uma pasta r/ com support.js e as duas fontes (de ../../render/); apague r/ e o perfil do Chrome depois.
+  python3 render.py <quadro> <cen> 1280 [tema|-] [saida.png] [altura] [y]   # 768 e 1280 direto
+  python3 render.py 375 <quadro> <cen> <tema|-> <saida.png> <altura> [y]     # 375 de verdade (zoom 2x; o Chrome não desce de ~500 px)
+$preview = altura do cenário padrão a 1280 (2 no quadro dez, 1 no hoje), arredondada para cima em múltiplo de 20.
+O cenário 9b usa outro «mundo» (agora a1dezM): 35 contas (dados.py, MESAS e HOJE_MESAS); só ele tem busca e mesas no seletor
+(a partir de 10 contas). Neste gerador já está aplicado ../gerador-revisao-final.patch (os quadros publicados vêm dele).
+Correções da revisão (25 out): «Ver todas» como era (o «somando as contas de Futuros» só na conta aberta); o «·» termina a
+parte anterior (linha quebrada nunca começa com ele); no seletor de muitas contas, cada bloco é role="group" com o nome do
+mercado e da mesa, a lista rola com max-height 372 (sem busca, corta a 7ª conta ao meio), sombra nas bordas e scroll-padding 8 px
+(o anel de foco não é cortado). harness.js confere o «somando», os «·» e os nomes dos grupos.
+Ao republicar, no project/canvas.json do canvas:
+  DiarioDezEnxuto.dc.html  h 3980 (era 4240), title «Diário · 1º dez, 11:35 ET · um dia completo, limite, calendário,
+    histórico, somando, muitas contas, semana e rodapé · 10 cenários» (era «… somando, semana e rodapé · 9 cenários»)
+  DiarioHojeEnxuto.dc.html h 3280 (era 3540), title sem mudança (os 11 cenários dele não mudaram).

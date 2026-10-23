@@ -1,0 +1,28 @@
+{
+    "contas": 49,
+    "saidas": 0,
+    "abertas": 26,
+    "depois_de": "aplicar",
+    "operacoes": 119,
+    "para_anonimos": false,
+    "gatilhos_novos": [
+        "trade_exits_guard",
+        "trade_exits_sums",
+        "trade_stop_moves_guard",
+        "trades_exits_sums"
+    ],
+    "ajustes_de_stop": 0,
+    "versoes_de_regras": 46,
+    "linhas_que_mudaram": 0,
+    "marcas_que_mudaram": 0,
+    "registradas_no_app": 57,
+    "estados_que_mudaram": 0,
+    "regras_de_breakeven": 0,
+    "regras_que_mudariam": 0,
+    "respostas_do_limite": 6450,
+    "posso_operar_que_mudou": 0,
+    "linhas_de_regras_invalidas": 0,
+    "descritor_alem_do_breakeven": 0,
+    "funcoes_novas_para_usuarios": true,
+    "respostas_do_limite_que_mudaram": 0
+}

@@ -1,0 +1,21 @@
+psql:/private/tmp/claude-502/-Users-felipefonseca-Dev-binary-hub/a0c92ab8-acd5-400d-8d52-ead30f579f54/scratchpad/fase3c/aplicar/desfazer_fase3c.sql:121: NOTICE:  drop cascades to 9 other objects
+DETAIL:  drop cascades to table backup_fase3c.funcoes
+drop cascades to table backup_fase3c.visao
+drop cascades to table backup_fase3c.linhas
+drop cascades to table backup_fase3c.limite
+drop cascades to table backup_fase3c.portas
+drop cascades to table backup_fase3c.regras
+drop cascades to table backup_fase3c.marcas
+drop cascades to table backup_fase3c.estados
+drop cascades to table backup_fase3c.descritor
+{
+    "contas": 6,
+    "abertas": 1,
+    "depois_de": "desfazer",
+    "operacoes": 631,
+    "funcoes_novas": 0,
+    "tabelas_novas": 0,
+    "versoes_de_regras": 9,
+    "copia_de_seguranca": false,
+    "registradas_no_app": 2
+}

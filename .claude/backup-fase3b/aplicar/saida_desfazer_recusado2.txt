@@ -1,0 +1,2 @@
+psql:/private/tmp/claude-502/-Users-felipefonseca-Dev-binary-hub/a0c92ab8-acd5-400d-8d52-ead30f579f54/scratchpad/fase3b/aplicar/desfazer_fase3b.sql:30: ERROR:  f3b_em_uso: 2 modelos ou importações por colunas
+CONTEXT:  PL/pgSQL function inline_code_block line 13 at RAISE

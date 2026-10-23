@@ -1,0 +1,189 @@
+{
+  "v": 3,
+  "attachments": {},
+  "boards": {
+    "AnalisesDezEnxuto.dc.html": {
+      "expand": "fill",
+      "h": 5600,
+      "is_interactive": true,
+      "title": "Análises · 1º dez, 11:35 ET · sete semanas",
+      "w": 1280,
+      "x": 2720,
+      "y": 14790
+    },
+    "AnalisesHojeEnxuto.dc.html": {
+      "expand": "fill",
+      "h": 4300,
+      "is_interactive": true,
+      "title": "Análises · 14 out, 11:40 ET · primeiro dia",
+      "w": 1280,
+      "x": 1360,
+      "y": 14790
+    },
+    "AtivoES.dc.html": {
+      "expand": "fill",
+      "h": 4640,
+      "is_interactive": true,
+      "title": "ES · análise completa, 09:05",
+      "w": 1280,
+      "x": 2720,
+      "y": 4280
+    },
+    "DiarioDezEnxuto.dc.html": {
+      "expand": "fill",
+      "h": 4200,
+      "is_interactive": true,
+      "title": "Diário · 1º dez, 11:35 ET · sete semanas",
+      "w": 1280,
+      "x": 2720,
+      "y": 9340
+    },
+    "DiarioHojeEnxuto.dc.html": {
+      "expand": "fill",
+      "h": 3700,
+      "is_interactive": true,
+      "title": "Diário · 14 out, 11:40 ET · primeiro dia",
+      "w": 1280,
+      "x": 1360,
+      "y": 9340
+    },
+    "ImportarConta.dc.html": {
+      "expand": "fill",
+      "h": 1370,
+      "is_interactive": true,
+      "title": "Adicionar ou importar conta · seis mercados e mesas · 14 cenários",
+      "w": 1280,
+      "x": 0,
+      "y": 21020
+    },
+    "Inicio.dc.html": {
+      "expand": "fill",
+      "h": 2976,
+      "is_interactive": true,
+      "title": "Início · abre no modo claro · contas em seis mercados",
+      "w": 1280,
+      "x": 0,
+      "y": 0
+    },
+    "InicioEscuro.dc.html": {
+      "expand": "fill",
+      "h": 2976,
+      "is_interactive": true,
+      "title": "Início · abre no modo escuro · contas em seis mercados",
+      "w": 1280,
+      "x": 1360,
+      "y": 0
+    },
+    "Mercado.dc.html": {
+      "expand": "fill",
+      "h": 3750,
+      "is_interactive": true,
+      "title": "Mercado · 08:12, antes do CPI",
+      "w": 1280,
+      "x": 0,
+      "y": 4280
+    },
+    "MercadoPosCPI.dc.html": {
+      "expand": "fill",
+      "h": 3930,
+      "is_interactive": true,
+      "title": "Mercado · 09:05, depois do CPI",
+      "w": 1280,
+      "x": 1360,
+      "y": 4280
+    },
+    "Personalizar.dc.html": {
+      "expand": "fill",
+      "h": 7092,
+      "is_interactive": true,
+      "title": "Personalizar · contas em seis mercados, ativos, Início, janelas, regras, leituras da IA e preferências",
+      "w": 1280,
+      "x": 0,
+      "y": 9340
+    },
+    "RegistrarOperacao.dc.html": {
+      "expand": "fill",
+      "h": 1500,
+      "is_interactive": true,
+      "title": "Registrar operação · aberta ou já fechada, parciais e stop, seis mercados e as operações do dia · 16 cenários",
+      "w": 1280,
+      "x": 1360,
+      "y": 21020
+    }
+  },
+  "createdOnFiles": {
+    "at": "2026-10-11T03:37:39Z",
+    "v": 1
+  },
+  "designSystems": [],
+  "launch": {
+    "file": "Inicio.dc.html",
+    "view": "focused"
+  },
+  "notes": {
+    "analises": {
+      "kind": "title1",
+      "maxW": 2640,
+      "text": "Diário · um pregão de cada vez: calendário, o dia, as operações com marcas, imagens e nota",
+      "w": 240,
+      "x": 1360,
+      "y": 9040
+    },
+    "contas": {
+      "kind": "title1",
+      "maxW": 2640,
+      "text": "Contas e registro · importar e adicionar contas, registrar operação com a hora de cada marca",
+      "w": 240,
+      "x": 0,
+      "y": 20720
+    },
+    "inicio": {
+      "kind": "title1",
+      "maxW": 2640,
+      "text": "Novo Início · claro e escuro, com switch no cabeçalho",
+      "w": 240,
+      "x": 0,
+      "y": -300
+    },
+    "mercado": {
+      "kind": "title1",
+      "maxW": 4000,
+      "text": "Mercado · antes e depois do CPI, e a análise completa do ES",
+      "w": 240,
+      "x": 0,
+      "y": 3980
+    },
+    "metricas": {
+      "kind": "title1",
+      "maxW": 2640,
+      "text": "Análises · métricas comuns, Padrões com selo de evidência e A pergunta",
+      "w": 240,
+      "x": 1360,
+      "y": 14490
+    },
+    "personalizar": {
+      "kind": "title1",
+      "maxW": 1280,
+      "text": "Personalizar · suas contas, janela por conta e regras, para qualquer mercado",
+      "w": 240,
+      "x": 0,
+      "y": 9040
+    }
+  },
+  "order": [
+    "Inicio.dc.html",
+    "InicioEscuro.dc.html",
+    "Mercado.dc.html",
+    "MercadoPosCPI.dc.html",
+    "AtivoES.dc.html",
+    "Personalizar.dc.html",
+    "DiarioHojeEnxuto.dc.html",
+    "DiarioDezEnxuto.dc.html",
+    "AnalisesHojeEnxuto.dc.html",
+    "AnalisesDezEnxuto.dc.html",
+    "ImportarConta.dc.html",
+    "RegistrarOperacao.dc.html"
+  ],
+  "pages": [],
+  "title": "Binary Hub — Market Hub"
+}

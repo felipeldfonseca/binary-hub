@@ -1,0 +1,513 @@
+diff -ru -x r -x data_*.json -x __pycache__ quadro/gerador/LEIAME.txt muitas/gerador/LEIAME.txt
+--- quadro/gerador/LEIAME.txt	2026-10-25 23:16:17
++++ muitas/gerador/LEIAME.txt	2026-10-25 23:16:26
+@@ -1,5 +1,18 @@
+-Gerador dos quadros do Diário (Fase 4, revisão de 23 out). Dados inventados.
++Gerador dos quadros do Diário (Fase 4, revisão de 23 out + «Muitas contas» de 25 out). Dados inventados.
+   python3 gera.py                      # calcula contas, dias, relógios e cenários -> data_dez.json, data_hoje.json
+-  python3 monta_quadro.py '{"dez":4240,"hoje":3540}' ../project   # junta template.html + engine.js + dados nos dois .dc.html
++  python3 monta_quadro.py '{"dez":3980,"hoje":3280}' ../project   # junta template.html + engine.js + dados nos dois .dc.html
+   node harness.js ../project/DiarioDezEnxuto.dc.html               # roda todos os cenários e cliques sem erro
+ render.py precisa de uma pasta r/ com support.js e as duas fontes (de ../../render/); apague r/ e o perfil do Chrome depois.
++  python3 render.py <quadro> <cen> 1280 [tema|-] [saida.png] [altura] [y]   # 768 e 1280 direto
++  python3 render.py 375 <quadro> <cen> <tema|-> <saida.png> <altura> [y]     # 375 de verdade (zoom 2x; o Chrome não desce de ~500 px)
++$preview = altura do cenário padrão a 1280 (2 no quadro dez, 1 no hoje), arredondada para cima em múltiplo de 20.
++O cenário 9b usa outro «mundo» (agora a1dezM): 35 contas (dados.py, MESAS e HOJE_MESAS); só ele tem busca e mesas no seletor
++(a partir de 10 contas). Neste gerador já está aplicado ../gerador-revisao-final.patch (os quadros publicados vêm dele).
++Correções da revisão (25 out): «Ver todas» como era (o «somando as contas de Futuros» só na conta aberta); o «·» termina a
++parte anterior (linha quebrada nunca começa com ele); no seletor de muitas contas, cada bloco é role="group" com o nome do
++mercado e da mesa, a lista rola com max-height 372 (sem busca, corta a 7ª conta ao meio), sombra nas bordas e scroll-padding 8 px
++(o anel de foco não é cortado). harness.js confere o «somando», os «·» e os nomes dos grupos.
++Ao republicar, no project/canvas.json do canvas:
++  DiarioDezEnxuto.dc.html  h 3980 (era 4240), title «Diário · 1º dez, 11:35 ET · um dia completo, limite, calendário,
++    histórico, somando, muitas contas, semana e rodapé · 10 cenários» (era «… somando, semana e rodapé · 9 cenários»)
++  DiarioHojeEnxuto.dc.html h 3280 (era 3540), title sem mudança (os 11 cenários dele não mudaram).
+diff -ru -x r -x data_*.json -x __pycache__ quadro/gerador/dados.py muitas/gerador/dados.py
+--- quadro/gerador/dados.py	2026-10-25 23:16:17
++++ muitas/gerador/dados.py	2026-10-25 23:16:26
+@@ -39,6 +39,10 @@
+                    giro=0, relogioDia='O pregão desta conta vai da meia-noite à meia-noite de Brasília.'),
+ }
+ ORDEM = ['top', 'lucid', 'ylos', 'ebx', 'ftmo', 'ibkr', 'bin', 'clear']
++# the firm («mesa») of each account: the selector groups by it when there are many accounts
++for _k, _mesa in {'top': 'Top One', 'lucid': 'Lucid', 'ylos': 'Ylos', 'ebx': 'Ebinex', 'ftmo': 'FTMO', 'ibkr': 'Interactive Brokers',
++                  'bin': 'Binance', 'clear': 'Clear'}.items():
++    CONTAS[_k].mesa = _mesa
+ 
+ TXT_FUNC = ['Esperei o rompimento confirmar antes de entrar.', 'Respeitei o stop na primeira perda.', 'Fiz a parcial no +8 e deixei o resto correr.',
+             'Parei depois de duas operações boas.', 'Entrei só dentro da janela.', 'Esperei o reteste da VWAP.']
+@@ -391,6 +395,11 @@
+     return dias, specs_de, hoje12, variante
+ 
+ 
++LUCID_1DEZ = [{'e': '10:12', 'a': 'MNQ', 'l': 'V', 'q': 2, 'pe': '25668.00', 'x': [(2, '25692.00', '10:20', 'final')], 'src': 'app', 'mk': {'setup': ('B', '10:12')}},
++              {'e': '10:41', 'a': 'MES', 'l': 'V', 'q': 1, 'pe': '7934.00', 'x': [(1, '7940.25', '10:47', 'final')], 'src': 'app', 'mk': {'setup': ('C', '10:41')}}]
++LUCID_ABONTEM = {'txt': '1 operação aberta de ontem: MNQ · Compra · 1 ct.', 'dia': '2026-11-30', 'link': 'Abrir 30 nov'}
++
++
+ def lucid(top_dias, top_specs):
+     c = CONTAS['lucid']
+     rng = random.Random(77)
+@@ -406,9 +415,8 @@
+             sp = [{'e': '10:21', 'a': 'MES', 'l': 'V', 'q': 1, 'pe': '7968.50', 'x': [(1, '7962.75', '10:33', 'final')], 'src': 'app', 'mk': {'setup': ('B', '10:21')}},
+                   {'e': '10:52', 'a': 'MNQ', 'l': 'C', 'q': 1, 'pe': '25702.00', 'x': [], 'src': 'app', 'stop': '40', 'alvo': '80', 'stopEm': '10:52', 'mk': {'setup': ('A', '10:52')}}]
+         elif d == '2026-12-01':
+-            sp = [{'e': '10:12', 'a': 'MNQ', 'l': 'V', 'q': 2, 'pe': '25668.00', 'x': [(2, '25692.00', '10:20', 'final')], 'src': 'app', 'mk': {'setup': ('B', '10:12')}},
+-                  {'e': '10:41', 'a': 'MES', 'l': 'V', 'q': 1, 'pe': '7934.00', 'x': [(1, '7940.25', '10:47', 'final')], 'src': 'app', 'mk': {'setup': ('C', '10:41')}}]
+-            ctx['abOntem'] = {'txt': '1 operação aberta de ontem: MNQ · Compra · 1 ct.', 'dia': '2026-11-30', 'link': 'Abrir 30 nov'}
++            sp = LUCID_1DEZ
++            ctx['abOntem'] = LUCID_ABONTEM
+         else:
+             if rng.random() < 0.35:
+                 continue
+@@ -537,3 +545,90 @@
+         ctx['antes'] = antes
+         dias[d] = monta_dia(c, d, sp, ctx)
+     return dias
++
++
++# ------------------------------------------------------------------------------------------------ Muitas contas (scenario 9b)
++# A trader with 30 futures prop accounts (Top One, Lucid 50k and Ylos 50k among them) plus the board's other markets, on
++# 1º dez at 11:35 ET. The invented accounts were added on 16 nov and only a few traded today; Apex 50k #5 and #6 copied the
++# same three MNQ trades and reached their limit. Lucid 50k sums every active futures account, so these trades enter its
++# limit too (gate.md §4.3: «somando» is all of the owner's active futures accounts).
++JAN_MESA = {'manha': ((570, 720), '09:30–12:00 ET'), 'pregao': ((570, 960), '09:30–16:00 ET'), 'hora': ((600, 660), '10:00–11:00 ET')}
++RELOGIO_FUT = 'O pregão de futuros vai das 18:00 da véspera às 17:00 ET.'
++
++
++def conta_mesa(id, nome, mesa, fase, jan, lim):
++    base = dict(id=id, nome=nome, mesa=mesa, mk='fut', grupo='Futuros', fase=fase, rel='ET', suf=' ET', moeda='US$', diasJan='util',
++                limModo='encerra', soma=False, be=None, beN=None, comissao=True, cols=5, giro=18 * 60, relogioDia=RELOGIO_FUT)
++    if jan is None:
++        return Conta(jan=None, janPlano='', janLinha='Sem janela salva', lim=None, desde=None, desdeHM=None, **base)
++    j, txt = JAN_MESA[jan]
++    return Conta(jan=j, janPlano=txt, janLinha='Janela ' + txt, lim=lim, desde='2026-11-16', desdeHM='08:30', **base)
++
++
++MESAS = [
++    ('alp1', 'Alpha 50k #1', 'Alpha Futures', 'Avaliação', 'manha', 50000),
++    ('alp2', 'Alpha 50k #2', 'Alpha Futures', 'Avaliação', 'manha', 50000),
++    ('alp3', 'Alpha 50k #3', 'Alpha Futures', 'Avaliação', 'manha', 50000),
++    ('apx1', 'Apex 50k #1', 'Apex', 'Financiada', 'manha', 50000),
++    ('apx2', 'Apex 50k #2', 'Apex', 'Financiada', 'manha', 50000),
++    ('apx3', 'Apex 50k #3', 'Apex', 'Financiada', 'manha', 50000),
++    ('apx4', 'Apex 50k #4', 'Apex', 'Financiada', 'manha', 50000),
++    ('apx5', 'Apex 50k #5', 'Apex', 'Avaliação', 'manha', 50000),
++    ('apx6', 'Apex 50k #6', 'Apex', 'Avaliação', 'manha', 50000),
++    ('apxc1', 'Apex 100k #1', 'Apex', 'Avaliação', 'pregao', 100000),
++    ('apxc2', 'Apex 100k #2', 'Apex', 'Avaliação', 'pregao', 100000),
++    ('apxc3', 'Apex 100k #3', 'Apex', 'Avaliação', 'pregao', 100000),
++    ('lucid', None, 'Lucid', None, None, None),
++    ('luc2', 'Lucid 50k #2', 'Lucid', 'Avaliação', 'manha', 40000),
++    ('luc3', 'Lucid 50k #3', 'Lucid', 'Avaliação', 'manha', 40000),
++    ('luc100', 'Lucid 100k', 'Lucid', 'Avaliação', 'manha', 80000),
++    ('mff1', 'MFFU 50k #1', 'My Funded Futures', 'Financiada', 'pregao', 50000),
++    ('mff2', 'MFFU 50k #2', 'My Funded Futures', 'Financiada', 'pregao', 50000),
++    ('mff3', 'MFFU 50k #3', 'My Funded Futures', 'Financiada', 'pregao', 50000),
++    ('top', None, 'Top One', None, None, None),
++    ('tps1', 'Topstep 50k #1', 'Topstep', 'Financiada', 'hora', 50000),
++    ('tps2', 'Topstep 50k #2', 'Topstep', 'Financiada', 'hora', 50000),
++    ('tps3', 'Topstep 50k #3', 'Topstep', 'Avaliação', 'hora', 50000),
++    ('tps4', 'Topstep 50k #4', 'Topstep', 'Avaliação', 'hora', 50000),
++    ('tps150', 'Topstep 150k', 'Topstep', 'Financiada', 'hora', 150000),
++    ('tfy1', 'Tradeify 50k #1', 'Tradeify', 'Avaliação', 'manha', 60000),
++    ('tfy2', 'Tradeify 50k #2', 'Tradeify', 'Avaliação', 'manha', 60000),
++    ('tfy3', 'Tradeify 50k #3', 'Tradeify', 'Avaliação', 'manha', 60000),
++    ('tfy4', 'Tradeify 50k #4', 'Tradeify', 'Avaliação', None, None),
++    ('ylos', None, 'Ylos', None, None, None),
++]
++for (_id, _nome, _mesa, _fase, _jan, _lim) in MESAS:
++    if _id not in CONTAS:
++        CONTAS[_id] = conta_mesa(_id, _nome, _mesa, _fase, _jan, _lim)
++# the world of scenario 9b: futures by firm (alphabetical), then the board's other markets
++MERCADOS_MUITAS = [['Futuros', [x[0] for x in MESAS]], ['Opções binárias', ['ebx']], ['Forex', ['ftmo']], ['Ações', ['ibkr']],
++                   ['Cripto', ['bin']], ['B3', ['clear']]]
++ORDEM_MUITAS = [k for _m, ks in MERCADOS_MUITAS for k in ks]
++NOVAS = [x[0] for x in MESAS if x[1]]
++
++_APEX_COPIA = [
++    {'e': '09:41', 'a': 'MNQ', 'l': 'V', 'q': 2, 'pe': '25690.00', 'x': [(2, '25718.50', '09:49', 'final')], 'src': 'app', 'stop': '30', 'alvo': '60', 'stopEm': '09:41',
++     'mk': {'setup': ('B', '09:41')}},
++    {'e': '10:13', 'a': 'MNQ', 'l': 'V', 'q': 2, 'pe': '25670.00', 'x': [(2, '25690.75', '10:19', 'final')], 'src': 'app', 'mk': {'setup': ('C', '10:13'), 'emocao': ('Ansioso', '10:14')}},
++    {'e': '10:28', 'a': 'MNQ', 'l': 'C', 'q': 4, 'pe': '25705.50', 'x': [(4, '25667.25', '10:41', 'final')], 'src': 'app', 'mk': {'setup': ('C', '10:28'), 'emocao': ('Frustrado', '10:29')}},
++]
++HOJE_MESAS = {
++    'apx1': [{'e': '09:52', 'a': 'MES', 'l': 'C', 'q': 2, 'pe': '7940.25', 'x': [(2, '7946.75', '10:03', 'final')], 'src': 'app', 'mk': {'setup': ('A', '09:52')}}],
++    'apx5': _APEX_COPIA,
++    'apx6': _APEX_COPIA,
++    'luc2': [{'e': '10:33', 'a': 'MES', 'l': 'V', 'q': 1, 'pe': '7938.50', 'x': [(1, '7929.00', '10:49', 'final')], 'src': 'app', 'stop': '12', 'alvo': '24', 'stopEm': '10:33',
++              'mk': {'setup': ('A', '10:33')}}],
++    'tfy1': [{'e': '11:02', 'a': 'MNQ', 'l': 'V', 'q': 1, 'pe': '25660.00', 'x': [(1, '25671.50', '11:10', 'final')], 'src': 'app', 'mk': {'setup': ('B', '11:02')}}],
++    'mff1': [{'e': '11:18', 'a': 'MES', 'l': 'C', 'q': 1, 'pe': '7926.00', 'x': [(1, '7933.25', '11:29', 'final')], 'src': 'app', 'mk': {'setup': ('B', '11:18')}}],
++}
++
++
++def mesas(top_dias):
++    """The invented accounts' days (only 1º dez) and Lucid 50k's 1º dez summing all 30 futures accounts"""
++    dias = {k: {} for k in NOVAS}
++    for k, sp in HOJE_MESAS.items():
++        dias[k]['2026-12-01'] = monta_dia(CONTAS[k], '2026-12-01', sp, {'arq': None, 'be': False, 'revs': []})
++    ext = evs(top_dias['2026-12-01']) + [ev for k in HOJE_MESAS for ev in evs(dias[k]['2026-12-01'])]
++    lucid_hoje = monta_dia(CONTAS['lucid'], '2026-12-01', LUCID_1DEZ,
++                           {'arq': arquivo_de('2026-12-01', ARQ_TOP[3:]), 'be': False, 'ext': ext, 'abOntem': LUCID_ABONTEM, 'revs': []})
++    return dias, lucid_hoje
+diff -ru -x r -x data_*.json -x __pycache__ quadro/gerador/engine.js muitas/gerador/engine.js
+--- quadro/gerador/engine.js	2026-10-25 23:16:17
++++ muitas/gerador/engine.js	2026-10-25 23:16:26
+@@ -3,7 +3,7 @@
+     const D = this._D || (this._D = /*__DATA__*/null);
+     const CHAVES = ['conta', 'dia', 'mes', 'sem', 'aberta', 'dlg', 'contaAberta', 'infos', 'revForm', 'revVer', 'revVers', 'rasc', 'revErro', 'revs', 'revStatus',
+       'mks', 'mkStatus', 'axs', 'axEd', 'axRasc', 'axStatus', 'antes', 'antesEd', 'antesRasc', 'antesStatus', 'estado', 'avisoFechado', 'focoCal', 'semStatus',
+-      'lotes', 'impFeito', 'contaStatus', 'diaAnunciado'];
++      'lotes', 'impFeito', 'contaStatus', 'diaAnunciado', 'outras', 'busca'];
+     const s0 = this.state || {};
+     const cenId = D.cen[s0.cen] ? s0.cen : D.cenPadrao;
+     const C = D.cen[cenId];
+@@ -11,7 +11,7 @@
+     const ini = {
+       dia: C.dia, mes: C.mes || null, sem: C.sem || null, aberta: C.aberta || null, dlg: C.dlg || null, contaAberta: !!C.contaAberta,
+       infos: C.infos || {}, revForm: C.rev === 'form' || C.rev === 'editar' ? kIni : null, revVer: C.rev === 'ver' ? kIni : null,
+-      rasc: C.rascunho || null, estado: C.estado || 'pronto', tema: C.tema || 'claro', lotes: C.lotes || {}
++      rasc: C.rascunho || null, estado: C.estado || 'pronto', tema: C.tema || 'claro', lotes: C.lotes || {}, outras: !!C.outras
+     };
+     const e = Object.assign({}, ini);
+     Object.keys(s0).forEach((k) => { if (s0[k] !== undefined) e[k] = s0[k]; });
+@@ -450,22 +450,70 @@
+     };
+     if (this._cenVisto !== cenId) { this._cenVisto = cenId; if (this._rolarPara === undefined) this._rolarPara = C.rolar || null; }
+     const rolarRef = (alvo) => (el) => { if (el && this._rolarPara === alvo) { this._rolarPara = null; setTimeout(() => el.scrollIntoView({ block: 'start' }), 0); } };
+-    const gruposConta = D.mercados.map((g) => ({
+-      rot: g[0], contas: g[1].map((k) => ({
+-        nome: D.contas[k].nome, fase: D.contas[k].fase, sel: k === contaId,
+-        escolher: () => {
+-          if (k === contaId) { this._foco = 'conta'; set({ contaAberta: false }); return; }
+-          const home = D.contas[k].home;
+-          if (home) { novoCenario(home, true); return; }
+-          this._foco = 'conta';
+-          set({ conta: k, dia: A.contas[k].hoje, mes: null, sem: null, aberta: null, dlg: null, contaAberta: false, revForm: null, revVer: null, antesEd: null, contaStatus: 'Conta ' + D.contas[k].nome + '.' });
+-        }
+-      }))
++    // The accounts of this scenario's world (scenario 9b has 35); from 10 accounts the selector gets a search field and,
++    // inside a market with more than one account, groups by firm («mesa»). The board's usual 8 accounts stay as before.
++    const MERC = A.mercados || D.mercados;
++    const nMundo = MERC.reduce((n, g) => n + g[1].length, 0);
++    const muitas = nMundo >= 10;
++    const norm = (x) => String(x || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
++    const busca = muitas && e.contaAberta ? e.busca || '' : '';
++    const q = norm(busca);
++    const acha = (k) => !q || norm(D.contas[k].nome).indexOf(q) >= 0 || norm(D.contas[k].mesa).indexOf(q) >= 0;
++    const opConta = (k) => ({
++      nome: D.contas[k].nome, fase: D.contas[k].fase, sel: k === contaId,
++      escolher: () => {
++        if (k === contaId) { this._foco = 'conta'; set({ contaAberta: false, busca: null }); return; }
++        const home = D.contas[k].home;
++        // in the world of many accounts every choice stays in it (its «Posso operar hoje?» and sums are its own)
++        if (home && !A.muitas) { novoCenario(home, true); return; }
++        this._foco = 'conta';
++        set({ conta: k, dia: A.contas[k].hoje, mes: null, sem: null, aberta: null, dlg: null, contaAberta: false, busca: null, revForm: null, revVer: null, antesEd: null, contaStatus: 'Conta ' + D.contas[k].nome + '.' });
++      }
++    });
++    // each block is a group named by its headers (market, and firm when there is one), so a screen reader moving by Tab
++    // hears «Futuros · 30 Apex · 9» on entering it; the headers keep their ids across the blocks of one market
++    const gruposConta = [];
++    let achadas = 0;
++    MERC.forEach((g, i) => {
++      const ks = g[1].filter(acha);
++      if (!ks.length) return;
++      achadas += ks.length;
++      const rotMercado = muitas ? g[0] + ' · ' + ks.length : g[0];
++      const idMercado = 'conta-g' + i;
++      if (!muitas || g[1].length < 2) { gruposConta.push({ temMercado: true, mercado: rotMercado, idMercado, temMesa: false, mesa: '', idMesa: '', rotulos: idMercado, contas: ks.map(opConta) }); return; }
++      const porMesa = [];
++      ks.forEach((k) => { const nm = D.contas[k].mesa; let b = porMesa.find((x) => x.nm === nm); if (!b) { b = { nm, ks: [] }; porMesa.push(b); } b.ks.push(k); });
++      porMesa.forEach((b, j) => {
++        const idMesa = idMercado + '-m' + j;
++        gruposConta.push({ temMercado: j === 0, mercado: rotMercado, idMercado, temMesa: true, mesa: b.nm + ' · ' + b.ks.length, idMesa, rotulos: idMercado + ' ' + idMesa, contas: b.ks.map(opConta) });
++      });
++    });
++    // «Posso operar hoje?»: only the selected account, then ONE line for the others, with «Ver todas» opening their lines
++    // exactly as the published list had them («somando as contas de Futuros» only on the selected account)
++    const linhaPosso = (p, sel) => ({
++      id: p.id, nome: p.nome, pal: p.pal, cls: 'tom-' + p.tom, temSub: !!p.sub, sub: p.sub || '', temAcao: !!p.acao, acao: p.acao || '', acaoAria: p.acaoAria || '',
++      temLim: !!p.lim, limUsado: p.lim ? p.lim.usado : '', limDe: p.lim ? p.lim.de : '', temSoma: !!(sel && p.lim && D.contas[p.id] && D.contas[p.id].soma)
++    });
++    const possoSel = A.posso.filter((p) => p.id === contaId).map((p) => linhaPosso(p, true));
++    const possoOutras = A.posso.filter((p) => p.id !== contaId).map((p) => linhaPosso(p, false));
++    const ESTADOS = [
++      [(p) => p.pal === 'Liberado' && p.cls === 'tom-mint', 'liberada', 'liberadas', 'tom-mint'],
++      [(p) => p.pal === 'Liberado', 'liberada com aviso', 'liberadas com aviso', 'tom-neutral'],
++      [(p) => p.pal === 'Encerrado por hoje', 'encerrada por hoje', 'encerradas por hoje', 'tom-red'],
++      [(p) => p.pal === 'Fora da sua janela', 'fora da janela', 'fora da janela', 'tom-amber'],
++      [(p) => p.pal === 'Sem janela salva', 'sem janela salva', 'sem janela salva', 'tom-muted'],
++      [() => true, 'com outra resposta', 'com outra resposta', 'tom-muted']
++    ];
++    const nOutras = possoOutras.length;
++    const contagem = ESTADOS.map((st) => ({ st, n: 0 }));
++    possoOutras.forEach((p) => { contagem.find((c) => c.st[0](p)).n += 1; });
++    const comEstado = contagem.filter((c) => c.n);
++    // the «·» ends the part before it, so a wrapped line never starts with it
++    const outrasPartes = comEstado.map((c, j) => ({
++      temSep: j < comEstado.length - 1, cls: c.st[3],
++      txt: nOutras === 1 ? c.st[1] : comEstado.length === 1 ? 'todas ' + c.st[2] : c.n + ' ' + (c.n === 1 ? c.st[1] : c.st[2])
+     }));
+-    const posso = A.posso.map((p) => ({
+-      nome: p.nome, pal: p.pal, cls: 'tom-' + p.tom, temSub: !!p.sub, sub: p.sub || '', temAcao: !!p.acao, acao: p.acao || '', acaoAria: p.acaoAria || '',
+-      temLim: !!p.lim, limUsado: p.lim ? p.lim.usado : '', limDe: p.lim ? p.lim.de : ''
+-    }));
++    const outrasAbertas = !!e.outras && nOutras > 0;
+     const infoCal = 'Cada pregão é pintado pelo resultado: verde ganho, vermelho perda, mais forte quanto maior (quartis do resultado diário, ganhos e perdas à parte). '
+       + K.relogio + ' Traço (—): dia sem operações. Hachurado: Histórico importado, antes das suas regras, só com resultado, nunca somado ao diário e com uma escala de cor própria. Ponto verde: hoje. Borda branca: dia aberto. Tracejado: dia do mês vizinho. A coluna Semana soma só o diário; o histórico aparece à parte, com ▨. Toque numa semana para abri-la. Passe o mouse num dia para ver operações, ganhos e perdas. Pregões sem revisão de meses anteriores ficam no mês deles: use ‹.';
+ 
+@@ -508,15 +556,22 @@
+       recomecar: () => novoCenario(cenId, false), classeCasca: C.celular ? 'celular' : '',
+       linkAnalises: D.board === 'dez' ? 'AnalisesDezEnxuto.dc.html' : 'AnalisesHojeEnxuto.dc.html',
+       dataLinha: AC.linha, contaNome: K.nome, contaJanela: K.janela, contaValores: K.valores, contaStatus: e.contaStatus || '',
+-      contaAberta: !!e.contaAberta, alternarConta: () => set({ contaAberta: !e.contaAberta }), refConta: foco('conta'),
+-      fecharConta: () => { this._foco = 'conta'; set({ contaAberta: false }); },
+-      teclaConta: (ev) => { if (e.contaAberta && ev && ev.key === 'Escape') { ev.preventDefault(); this._foco = 'conta'; set({ contaAberta: false }); } },
++      contaAberta: !!e.contaAberta, refConta: foco('conta'),
++      alternarConta: () => { if (!e.contaAberta && muitas) this._foco = 'busca'; set({ contaAberta: !e.contaAberta, busca: null }); },
++      fecharConta: () => { this._foco = 'conta'; set({ contaAberta: false, busca: null }); },
++      teclaConta: (ev) => { if (e.contaAberta && ev && ev.key === 'Escape') { ev.preventDefault(); this._foco = 'conta'; set({ contaAberta: false, busca: null }); } },
++      temBusca: muitas, busca, refBusca: foco('busca'), mudarBusca: (ev) => set({ busca: ev && ev.target ? ev.target.value : '' }),
++      buscaStatus: q ? (achadas ? pl(achadas, 'conta encontrada', 'contas encontradas') + '.' : 'Nenhuma conta encontrada.') : '',
++      semAchados: !!q && !achadas, semAchadosTxt: 'Nenhuma conta com “' + busca.trim() + '”.', classeBlocos: muitas ? 'conta-blocos conta-rolagem' : 'conta-blocos',
+       saiuConta: (ev) => {
+         const novo = ev && ev.relatedTarget;
+         if (!e.contaAberta || !novo || (ev.currentTarget && ev.currentTarget.contains(novo))) return;
+-        set({ contaAberta: false });
++        set({ contaAberta: false, busca: null });
+       },
+-      gruposConta, posso, i: I,
++      gruposConta, i: I,
++      possoSel, possoOutras, temOutras: nOutras > 0, outrasTit: nOutras === 1 ? 'Outra conta:' : 'Outras ' + nOutras + ' contas:', outrasPartes,
++      outrasAbertas, outrasBotao: outrasAbertas ? 'Ocultar' : nOutras === 1 ? 'Ver a outra conta' : 'Ver todas', alternarOutras: () => set({ outras: !outrasAbertas }),
++      classePosso: muitas ? 'posso-corpo posso-largo' : 'posso-corpo',
+       temLinhaTopo: !!linhaTopo && (estado === 'pronto' || estado === 'offline'), linhaTopo, semRegras: !K.regras,
+       temAviso: estado !== 'carregando' && estado !== 'erro' && !e.avisoFechado && pend.length > 0, avisoTexto,
+       verPendentes: () => { this._foco = 'cal'; set({ mes: pend[pend.length - 1].slice(0, 7) }); },
+diff -ru -x r -x data_*.json -x __pycache__ quadro/gerador/gera.py muitas/gerador/gera.py
+--- quadro/gerador/gera.py	2026-10-25 23:16:17
++++ muitas/gerador/gera.py	2026-10-25 23:16:26
+@@ -33,12 +33,12 @@
+     l = local(c, u)
+     m_ = l.hour * 60 + l.minute
+     if c.desde is None:
+-        return {'nome': c.nome, 'pal': 'Sem janela salva', 'tom': 'muted', 'sub': None, 'acao': 'Definir', 'acaoAria': f'Definir a janela da {c.nome} em Personalizar', 'lim': None}
++        return {'id': c.id, 'nome': c.nome, 'pal': 'Sem janela salva', 'tom': 'muted', 'sub': None, 'acao': 'Definir', 'acaoAria': f'Definir a janela da {c.nome} em Personalizar', 'lim': None}
+     lim = None
+     pior, hit = (rec['_pior'], rec['hit']) if rec else (0, None)
+     if c.lim:
+         lim = {'usado': compacto(pior, c.moeda), 'de': f'de {compacto(c.lim, c.moeda)}'}
+-    base = {'nome': c.nome, 'lim': lim, 'acao': None, 'acaoAria': ''}
++    base = {'id': c.id, 'nome': c.nome, 'lim': lim, 'acao': None, 'acaoAria': ''}
+     if hit and c.limModo == 'encerra':
+         return dict(base, pal='Encerrado por hoje', tom='red', sub=f'limite atingido às {hit}')
+     if not c.jan:
+@@ -110,6 +110,9 @@
+ def monta():
+     top, specs_top, hoje12, var19 = top_one()
+     datasets = {'top': top, 'lucid': lucid(top, specs_top), 'ylos': ylos(), 'ebx': ebinex(), 'ftmo': {}, 'ibkr': {}, 'bin': binance(), 'clear': clear()}
++    # scenario 9b: the invented prop accounts (only 1º dez) and Lucid 50k's 1º dez summing all 30 futures accounts
++    dias_mesas, lucid_muitas = mesas(top)
++    datasets.update(dias_mesas)
+     # previous journal day (for «Do pregão anterior»)
+     for k, dias in datasets.items():
+         ant = None
+@@ -121,6 +124,7 @@
+             else:
+                 r['ant'] = None
+     hoje12['ant'] = top['2026-11-12']['ant']
++    lucid_muitas['ant'] = datasets['lucid']['2026-12-01']['ant']
+     var19['ant'] = top['2026-11-19']['ant']
+     AGS = {
+         'a1dez': ag_utc('ET', '2026-12-01T11:35'),
+@@ -128,12 +132,17 @@
+         'a11nov': ag_utc('BRT', '2026-11-11T21:20'),
+         'a14nov': ag_utc('BRT', '2026-11-14T21:40'),
+         'a12b3': ag_utc('BRT', '2026-11-12T11:20'),
++        'a1dezM': ag_utc('ET', '2026-12-01T11:35'),
+     }
+-    OVER = {'a12nov': {'top': hoje12}}
++    OVER = {'a12nov': {'top': hoje12}, 'a1dezM': {'lucid': lucid_muitas}}
+     ags = {}
+     for a, u in AGS.items():
+         A = {'contas': {}, 'posso': [], 'nv': {}, 'over': {}}
+-        for k in ORDEM:
++        muitas = a == 'a1dezM'
++        if muitas:
++            A['muitas'] = True
++            A['mercados'] = MERCADOS_MUITAS
++        for k in (ORDEM_MUITAS if muitas else ORDEM):
+             c = CONTAS[k]
+             l = local(c, u)
+             hoje = dia_pregao(c, u)
+@@ -200,6 +209,8 @@
+      {'conta': 'top', 'ag': 'a1dez', 'dia': '2026-10-08', 'mes': '2026-10', 'aberta': 'top-2026-10-08-3'}),
+     ('9', 'dez', '9 · Somando as contas de Futuros · Lucid 50k, hoje 1º dez',
+      {'conta': 'lucid', 'ag': 'a1dez', 'dia': '2026-12-01', 'contaAberta': True, 'infos': {'resumo': True}}),
++    ('9b', 'dez', '9b · Muitas contas · Top One entre 35 contas, hoje 1º dez: a linha das outras, “Ver todas” e a busca do seletor',
++     {'conta': 'top', 'ag': 'a1dezM', 'dia': '2026-12-01', 'outras': True}),
+     ('11a', 'dez', '11 · Semana fechada · Top One, 23 a 27 nov (aberta pelo calendário)',
+      {'conta': 'top', 'ag': 'a1dez', 'dia': '2026-11-24', 'sem': '2026-11-23', 'mes': '2026-11', 'rolar': 'semana'}),
+     ('11b', 'dez', '11 · Semana em andamento · Top One, hoje 1º dez',
+@@ -235,10 +246,10 @@
+     dias_json, ags, meses, lotes, var19, _ = base
+     home_top = '2' if board == 'dez' else '1'
+     contas = {}
+-    for k in ORDEM:
++    for k in ORDEM_MUITAS:
+         c = CONTAS[k]
+-        home = {'top': home_top, 'lucid': '9', 'ylos': '10a', 'ebx': '6', 'ftmo': None, 'ibkr': '10b', 'bin': '7', 'clear': '8'}[k]
+-        contas[k] = {'nome': c.nome, 'grupo': c.grupo, 'fase': c.fase, 'janela': c.janLinha, 'moeda': c.moeda,
++        home = {'top': home_top, 'lucid': '9', 'ylos': '10a', 'ebx': '6', 'ftmo': None, 'ibkr': '10b', 'bin': '7', 'clear': '8'}.get(k)
++        contas[k] = {'nome': c.nome, 'mesa': c.mesa, 'grupo': c.grupo, 'fase': c.fase, 'janela': c.janLinha, 'moeda': c.moeda,
+                      'pal': 'reais' if c.moeda == 'R$' else 'dólares', 'rel': c.rel, 'suf': c.suf, 'cols': c.cols, 'regras': c.desde is not None,
+                      'desde': c.desde, 'desdeC': curto(c.desde) if c.desde else '', 'relogio': c.relogioDia, 'mk': c.mk, 'comissao': c.comissao,
+                      'lim': c.lim, 'limTxt': (f'{compacto(c.lim, c.moeda)} · encerra o dia' + (' · somando as contas de Futuros' if c.soma else '')) if c.lim else 'sem limite',
+diff -ru -x r -x data_*.json -x __pycache__ quadro/gerador/harness.js muitas/gerador/harness.js
+--- quadro/gerador/harness.js	2026-10-25 23:16:17
++++ muitas/gerador/harness.js	2026-10-25 23:16:26
+@@ -56,5 +56,34 @@
+   c.state = { cen };
+   const va = c.renderVals();
+   for (const g of va.gruposConta) for (const cc of g.contas) { c.state = { cen }; c.renderVals().gruposConta.forEach((gg) => gg.contas.forEach((x) => { if (x.nome === cc.nome) x.escolher(); })); check(c, cen + ' conta ' + cc.nome); }
++  // «Posso operar hoje?»: the others' line and «Ver todas»; the selector's search (scenario 9b) and its choices
++  c.state = { cen };
++  let vp = c.renderVals();
++  console.log(cen, '|', vp.possoSel.map((x) => x.nome + ': ' + x.pal + (x.sub ? ' · ' + x.sub : '') + (x.temLim ? ' · Limite do dia ' + x.limUsado + ' ' + x.limDe : '') + (x.temSoma ? ' · somando as contas de Futuros' : '')).join(''), '|', vp.outrasTit, vp.outrasPartes.map((o) => o.txt).join(' · '), '[' + vp.outrasBotao + ']');
++  if (vp.possoSel.length !== 1) { console.log('POSSO SEL', cen, vp.possoSel.length); fails++; }
++  // «Ver todas» lists the others as published: «somando» only on the selected account; the «·» ends every part but the last
++  if (vp.possoOutras.some((x) => x.temSoma)) { console.log('SOMA NAS OUTRAS', cen); fails++; }
++  if (vp.outrasPartes.some((o, j) => o.temSep !== (j < vp.outrasPartes.length - 1))) { console.log('SEP OUTRAS', cen); fails++; }
++  // the selector's groups are named by headers that exist in the list
++  { const ids = new Set(); vp.gruposConta.forEach((g) => { if (g.temMercado) ids.add(g.idMercado); if (g.temMesa) ids.add(g.idMesa); });
++    vp.gruposConta.forEach((g) => g.rotulos.split(' ').forEach((id) => { if (!ids.has(id)) { console.log('ROTULO', cen, id); fails++; } })); }
++  if (vp.temOutras) { const antes = vp.outrasAbertas; vp.alternarOutras(); vp = check(c, cen + ' outras'); if (vp.outrasAbertas === antes || vp.outrasBotao !== (antes ? 'Ver todas' : 'Ocultar')) { console.log('OUTRAS', cen); fails++; } vp.alternarOutras(); check(c, cen + ' outras2'); }
++  c.state = { cen, contaAberta: true };
++  vp = c.renderVals();
++  if (vp.temBusca) {
++    for (const termo of ['apex', 'funded', 'zzz', 'lúcid', '']) {
++      vp.mudarBusca({ target: { value: termo } }); vp = check(c, cen + ' busca ' + termo);
++      console.log('  busca', JSON.stringify(termo), '->', vp.buscaStatus || '(sem status)', vp.semAchados ? '| ' + vp.semAchadosTxt : '', '|', vp.gruposConta.map((g) => (g.temMercado ? g.mercado + ' > ' : '') + (g.temMesa ? g.mesa : '')).join(' ; ').slice(0, 160));
++    }
++    vp.mudarBusca({ target: { value: 'apex 50k #5' } }); vp = c.renderVals();
++    vp.gruposConta[0].contas[0].escolher(); vp = check(c, cen + ' escolheu apex5');
++    console.log('  escolheu', vp.contaNome, '|', vp.possoSel[0].pal, vp.possoSel[0].sub, '|', vp.outrasTit, vp.outrasPartes.map((o) => o.txt).join(' · '), '|', vp.diaTitulo, vp.rs.res);
++    c.state = { cen, contaAberta: true }; vp = c.renderVals(); vp.mudarBusca({ target: { value: 'lucid 50k' } }); vp = c.renderVals();
++    vp.gruposConta[0].contas[0].escolher(); vp = check(c, cen + ' escolheu lucid');
++    console.log('  escolheu', vp.contaNome, '|', vp.possoSel[0].pal, vp.possoSel[0].sub, vp.possoSel[0].temSoma ? '| somando as contas de Futuros' : '', '|', vp.outrasTit, vp.outrasPartes.map((o) => o.txt).join(' · '));
++    if (vp.contaNome !== 'Lucid 50k' || !vp.possoSel[0].temSoma) { console.log('SOMA LUCID', cen); fails++; }
++  }
++  c.state = { cen }; vp = c.renderVals();
++  if (vp.contaNome === 'Lucid 50k' && vp.possoSel[0].temLim && !vp.possoSel[0].temSoma) { console.log('SOMA SEL', cen); fails++; }
+ }
+ console.log('scenarios', cens.length, 'fails', fails);
+diff -ru -x r -x data_*.json -x __pycache__ quadro/gerador/render.py muitas/gerador/render.py
+--- quadro/gerador/render.py	2026-10-25 23:16:17
++++ muitas/gerador/render.py	2026-10-25 23:16:26
+@@ -42,7 +42,23 @@
+         chrome(['--window-size=%d,%d' % (w, h or hh), '--screenshot=' + out, 'file://' + p])
+         os.remove(p)
+     return hh, dom
++def render375(board_file, cen, tema, out, h, y=0):
++    """A true 375 px layout: headless Chrome will not lay out a window narrower than ~500 px (a 375 window is cropped,
++    not reflowed), so the copy is zoomed 2x in a 750 px window and the screenshot is scaled back to 375 px with sips"""
++    p = copia(board_file, cen, tema, f'z_{cen}.html', False)
++    s = open(p, encoding='utf-8').read()
++    extra = '<style>html{zoom:2}' + ('html body{margin-top:-%dpx !important}' % y if y else '') + '</style></head>'
++    open(p, 'w', encoding='utf-8').write(s.replace('</head>', extra))
++    big = out + '.2x.png'
++    chrome(['--window-size=750,%d' % (2 * h), '--screenshot=' + big, 'file://' + p])
++    os.remove(p)
++    subprocess.run(['sips', '--resampleWidth', '375', big, '--out', out], capture_output=True)
++    os.remove(big)
+ if __name__ == '__main__':
++    if len(sys.argv) > 1 and sys.argv[1] == '375':
++        # python3 render.py 375 <board> <cen> <tema|-> <out.png> <h> [y]
++        render375(sys.argv[2], sys.argv[3], None if sys.argv[4] == '-' else sys.argv[4], sys.argv[5], int(sys.argv[6]), int(sys.argv[7]) if len(sys.argv) > 7 else 0)
++        sys.exit(0)
+     bf, cen, w = sys.argv[1], sys.argv[2], int(sys.argv[3])
+     tema = sys.argv[4] if len(sys.argv) > 4 and sys.argv[4] != '-' else None
+     out = sys.argv[5] if len(sys.argv) > 5 else None
+diff -ru -x r -x data_*.json -x __pycache__ quadro/gerador/template.html muitas/gerador/template.html
+--- quadro/gerador/template.html	2026-10-25 23:16:17
++++ muitas/gerador/template.html	2026-10-25 23:16:26
+@@ -122,6 +122,14 @@
+ #topo .conta-op{display:flex;align-items:center;justify-content:space-between;gap:8px;min-height:44px;padding:0 10px;border-radius:10px;border:1px solid transparent;background:transparent;color:var(--text);font-family:inherit;font-size:13px;text-align:left;text-decoration:none;cursor:pointer}
+ #topo .conta-op[aria-current="true"]{background:var(--mint);border-color:var(--mint)}
+ #topo .conta-op[aria-current="true"],#topo .conta-op[aria-current="true"] span{color:#26301F !important}
++#topo .conta-blocos{display:flex;flex-direction:column;gap:2px}
++#topo .conta-bloco{display:flex;flex-direction:column;gap:2px}
++#topo .conta-rolagem{--fim:rgba(0,0,0,0.32)}
++#topo[data-tema="escuro"] .conta-rolagem{--fim:rgba(255,255,255,0.12)}
++#topo .conta-rolagem{max-height:372px;overflow-y:auto;overscroll-behavior:contain;margin:-4px -6px;padding:4px 6px;scroll-padding-block:8px;background:linear-gradient(var(--bg) 40%,rgba(0,0,0,0)) top / 100% 24px no-repeat local,linear-gradient(rgba(0,0,0,0),var(--bg) 60%) bottom / 100% 24px no-repeat local,linear-gradient(var(--fim),rgba(0,0,0,0)) top / 100% 18px no-repeat scroll,linear-gradient(rgba(0,0,0,0),var(--fim)) bottom / 100% 18px no-repeat scroll,var(--bg)}
++#topo .conta-busca{padding:0 0 8px}
++#topo .conta-mesa{padding:6px 10px 0;font-size:12px;font-weight:700;color:var(--text-2)}
++#topo .conta-nada{margin:0;padding:10px;font-size:13px;color:var(--text-2)}
+ #topo .posso{display:flex;flex-wrap:wrap;align-items:flex-start;gap:0 28px;padding:8px 24px;border-radius:20px;border:1px solid var(--border);background:var(--surface)}
+ #topo .posso-cab{flex:0 0 auto;display:flex;align-items:center;gap:8px;min-height:48px}
+ #topo .posso-tit{margin:0;font-size:11px;font-weight:700;line-height:1.5;letter-spacing:0.08em;text-transform:uppercase;color:var(--text-2)}
+@@ -129,8 +137,17 @@
+ #topo .posso-conta{display:grid;grid-template-columns:92px minmax(0,1fr) auto;align-items:center;gap:0 16px;min-height:44px;font-size:13px}
+ #topo .posso-conta+.posso-conta{border-top:1px solid var(--border)}
+ #topo .posso-lim{display:inline-flex;align-items:center;flex-wrap:wrap;gap:0 8px;justify-self:end}
++#topo .posso-lim-col{flex-direction:column;align-items:flex-end;gap:0}
++#topo .posso-lim-linha{display:inline-flex;align-items:center;flex-wrap:wrap;gap:0 8px}
+ #topo .posso-acao{display:inline-flex;align-items:center;min-height:44px;font-weight:700}
+ #topo .posso .info-painel{flex:1 1 100%;margin:0 0 12px}
++#topo .posso-corpo{flex:1 1 560px;min-width:0}
++#topo .posso-largo .posso-conta{grid-template-columns:120px minmax(0,1fr) auto}
++#topo .posso-outras{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:4px 16px;min-height:44px;padding:4px 0;border-top:1px solid var(--border);font-size:13px}
++#topo .posso-resumo{display:flex;flex-wrap:wrap;align-items:baseline;gap:0 6px;margin:0;min-width:0}
++#topo .sep-fim{margin-left:6px;font-weight:400}
++#topo .sep-fim-esp{white-space:pre;margin-right:-6px}
++#topo .posso-todas{border-top:1px solid var(--border)}
+ #topo .mono{font-family:var(--mono);font-variant-numeric:tabular-nums;font-weight:700}
+ #topo .tom-mint{color:var(--mint);font-weight:700}
+ #topo .tom-amber{color:var(--amber);font-weight:700}
+@@ -171,10 +188,11 @@
+ #topo .cal-res-curto{display:inline !important}
+ #topo .cal-dica{display:none !important}
+ #topo .cal-marcas{gap:1px;padding:0 2px;font-size:9px}
+-#topo .posso-conta{grid-template-columns:minmax(0,1fr);gap:0;padding:8px 0}
++#topo .posso-conta,#topo .posso-largo .posso-conta{grid-template-columns:minmax(0,1fr);gap:0;padding:8px 0}
+ #topo .posso-estado{flex-direction:column;align-items:flex-start !important}
+ #topo .posso-estado .sep{display:none}
+ #topo .posso-lim{justify-self:start}
++#topo .posso-lim-col{align-items:flex-start}
+ }
+ @container casca (max-width:540px){
+ #topo .pagina{padding:0 16px 48px}
+@@ -245,7 +263,11 @@
+ <button type="button" class="btn conta-btn" aria-expanded="{{ contaAberta }}" aria-controls="lista-contas" ref="{{ refConta }}" onClick="{{ alternarConta }}"><span>Conta: <strong>{{ contaNome }}</strong></span><span aria-hidden="true" style="font-size: 11px">▾</span></button>
+ <span style="font-size: 11px; color: var(--text-2); padding-left: 16px">{{ contaJanela }}</span>
+ <sc-if value="{{ contaAberta }}" hint-placeholder-val="{{ false }}"><div class="conta-fundo" aria-hidden="true" onClick="{{ fecharConta }}"></div><div id="lista-contas" class="conta-lista">
+-<sc-for list="{{ gruposConta }}" as="g" hint-placeholder-count="6"><span class="conta-grupo">{{ g.rot }}</span><sc-for list="{{ g.contas }}" as="c" hint-placeholder-count="1"><button type="button" class="conta-op" aria-current="{{ c.sel }}" onClick="{{ c.escolher }}"><span style="font-weight: 700">{{ c.nome }}</span><span style="font-size: 12px; color: var(--text-2)">{{ c.fase }}</span></button></sc-for></sc-for>
++<sc-if value="{{ temBusca }}" hint-placeholder-val="{{ false }}"><div class="conta-busca"><label for="busca-conta" class="so-leitor">Buscar conta</label><input id="busca-conta" ref="{{ refBusca }}" type="search" autocomplete="off" class="campo" placeholder="Nome da conta ou da mesa" value="{{ busca }}" onChange="{{ mudarBusca }}"><div role="status" class="so-leitor">{{ buscaStatus }}</div></div></sc-if>
++<div class="{{ classeBlocos }}">
++<sc-for list="{{ gruposConta }}" as="g" hint-placeholder-count="6"><div role="group" aria-labelledby="{{ g.rotulos }}" class="conta-bloco"><sc-if value="{{ g.temMercado }}" hint-placeholder-val="{{ true }}"><span id="{{ g.idMercado }}" class="conta-grupo">{{ g.mercado }}</span></sc-if><sc-if value="{{ g.temMesa }}" hint-placeholder-val="{{ false }}"><span id="{{ g.idMesa }}" class="conta-mesa">{{ g.mesa }}</span></sc-if><sc-for list="{{ g.contas }}" as="c" hint-placeholder-count="1"><button type="button" class="conta-op" aria-current="{{ c.sel }}" onClick="{{ c.escolher }}"><span style="font-weight: 700">{{ c.nome }}</span><span style="font-size: 12px; color: var(--text-2)">{{ c.fase }}</span></button></sc-for></div></sc-for>
++<sc-if value="{{ semAchados }}" hint-placeholder-val="{{ false }}"><p class="conta-nada">{{ semAchadosTxt }}</p></sc-if>
++</div>
+ <div style="display: flex; flex-direction: column; border-top: 1px solid var(--border); padding-top: 4px; margin-top: 4px"><a href="ImportarConta.dc.html" class="conta-op" style="font-weight: 700">+ Adicionar conta</a><a href="Personalizar.dc.html#contas" class="conta-op">Gerenciar contas</a></div>
+ <span style="padding: 4px 10px 0; font-size: 12px; color: var(--text-2)">Contas de mercados diferentes nunca são somadas.</span>
+ </div></sc-if>
+@@ -253,10 +275,16 @@
+ 
+ <section aria-labelledby="t-posso" class="posso">
+ <div class="posso-cab"><h2 id="t-posso" class="posso-tit">Posso operar hoje?</h2><button type="button" class="info" aria-expanded="{{ i.posso.aberto }}" aria-controls="info-posso" aria-label="Como ler: Posso operar hoje?" onClick="{{ i.posso.alternar }}">i</button></div>
++<div class="{{ classePosso }}">
+ <ul aria-labelledby="t-posso" class="posso-lista">
+-<sc-for list="{{ posso }}" as="p" hint-placeholder-count="8"><li class="posso-conta"><strong style="font-size: 14px; overflow-wrap: anywhere">{{ p.nome }}</strong><span class="posso-estado" style="display: flex; align-items: center; flex-wrap: wrap; gap: 0 6px; min-width: 0"><span class="{{ p.cls }}">{{ p.pal }}</span><sc-if value="{{ p.temSub }}" hint-placeholder-val="{{ true }}"><span class="tom-muted"><span aria-hidden="true" class="sep">· </span>{{ p.sub }}</span></sc-if><sc-if value="{{ p.temAcao }}" hint-placeholder-val="{{ false }}"><span aria-hidden="true" class="tom-muted sep">·</span><a href="Personalizar.dc.html" aria-label="{{ p.acaoAria }}" class="posso-acao">{{ p.acao }}</a></sc-if></span><sc-if value="{{ p.temLim }}" hint-placeholder-val="{{ true }}"><span class="posso-lim"><span class="rotulo-dia">Limite do dia</span><span style="display: inline-flex; gap: 8px; white-space: nowrap"><span class="mono">{{ p.limUsado }}</span><span class="tom-muted">{{ p.limDe }}</span></span></span></sc-if></li></sc-for>
++<sc-for list="{{ possoSel }}" as="p" hint-placeholder-count="1"><li class="posso-conta"><strong style="font-size: 14px; overflow-wrap: anywhere">{{ p.nome }}</strong><span class="posso-estado" style="display: flex; align-items: center; flex-wrap: wrap; gap: 0 6px; min-width: 0"><span class="{{ p.cls }}">{{ p.pal }}<sc-if value="{{ p.temSub }}" hint-placeholder-val="{{ true }}"><span aria-hidden="true" class="tom-muted sep sep-fim sep-fim-esp">· </span></sc-if><sc-if value="{{ p.temAcao }}" hint-placeholder-val="{{ false }}"><span aria-hidden="true" class="tom-muted sep sep-fim">·</span></sc-if></span><sc-if value="{{ p.temSub }}" hint-placeholder-val="{{ true }}"><span class="tom-muted">{{ p.sub }}</span></sc-if><sc-if value="{{ p.temAcao }}" hint-placeholder-val="{{ false }}"><a href="Personalizar.dc.html" aria-label="{{ p.acaoAria }}" class="posso-acao">{{ p.acao }}</a></sc-if></span><sc-if value="{{ p.temLim }}" hint-placeholder-val="{{ true }}"><span class="posso-lim posso-lim-col"><span class="posso-lim-linha"><span class="rotulo-dia">Limite do dia</span><span style="display: inline-flex; gap: 8px; white-space: nowrap"><span class="mono">{{ p.limUsado }}</span><span class="tom-muted">{{ p.limDe }}</span></span></span><sc-if value="{{ p.temSoma }}" hint-placeholder-val="{{ false }}"><span class="tom-muted">somando as contas de Futuros</span></sc-if></span></sc-if></li></sc-for>
+ </ul>
+-<sc-if value="{{ i.posso.aberto }}" hint-placeholder-val="{{ false }}"><div id="info-posso" class="info-painel">Cada conta responde pelas regras dela: janela e limite do dia. O bloqueio de dados fica ativo na Fase 5 e, por enquanto, vale só em Futuros. Limite do dia: a maior perda do dia, no pior momento, contra o limite da conta, na moeda dela (R$ na B3; US$ nos outros mercados, com USDT e USDC contados como dólar). Contas de mercados diferentes nunca são somadas. Vem das suas regras, nunca da IA.</div></sc-if>
++<sc-if value="{{ temOutras }}" hint-placeholder-val="{{ true }}"><div class="posso-outras"><p class="posso-resumo"><strong>{{ outrasTit }}</strong><sc-for list="{{ outrasPartes }}" as="o" hint-placeholder-count="2"><span class="{{ o.cls }}">{{ o.txt }}<sc-if value="{{ o.temSep }}" hint-placeholder-val="{{ true }}"><span aria-hidden="true" class="tom-muted sep-fim">·</span></sc-if></span></sc-for></p><button type="button" class="btn" aria-expanded="{{ outrasAbertas }}" aria-controls="posso-outras-lista" onClick="{{ alternarOutras }}">{{ outrasBotao }}</button></div></sc-if>
++<sc-if value="{{ outrasAbertas }}" hint-placeholder-val="{{ false }}"><ul id="posso-outras-lista" aria-label="Outras contas" class="posso-lista posso-todas">
++<sc-for list="{{ possoOutras }}" as="p" hint-placeholder-count="7"><li class="posso-conta"><strong style="font-size: 14px; overflow-wrap: anywhere">{{ p.nome }}</strong><span class="posso-estado" style="display: flex; align-items: center; flex-wrap: wrap; gap: 0 6px; min-width: 0"><span class="{{ p.cls }}">{{ p.pal }}<sc-if value="{{ p.temSub }}" hint-placeholder-val="{{ true }}"><span aria-hidden="true" class="tom-muted sep sep-fim sep-fim-esp">· </span></sc-if><sc-if value="{{ p.temAcao }}" hint-placeholder-val="{{ false }}"><span aria-hidden="true" class="tom-muted sep sep-fim">·</span></sc-if></span><sc-if value="{{ p.temSub }}" hint-placeholder-val="{{ true }}"><span class="tom-muted">{{ p.sub }}</span></sc-if><sc-if value="{{ p.temAcao }}" hint-placeholder-val="{{ false }}"><a href="Personalizar.dc.html" aria-label="{{ p.acaoAria }}" class="posso-acao">{{ p.acao }}</a></sc-if></span><sc-if value="{{ p.temLim }}" hint-placeholder-val="{{ true }}"><span class="posso-lim"><span class="rotulo-dia">Limite do dia</span><span style="display: inline-flex; gap: 8px; white-space: nowrap"><span class="mono">{{ p.limUsado }}</span><span class="tom-muted">{{ p.limDe }}</span></span></span></sc-if></li></sc-for>
++</ul></sc-if>
++</div>
++<sc-if value="{{ i.posso.aberto }}" hint-placeholder-val="{{ false }}"><div id="info-posso" class="info-painel">Aqui aparece a conta aberta no Diário; as outras ficam numa linha, e “Ver todas” mostra a resposta de cada uma. Cada conta responde pelas regras dela: janela e limite do dia. O bloqueio de dados fica ativo na Fase 5 e, por enquanto, vale só em Futuros. Limite do dia: a maior perda do dia, no pior momento, contra o limite da conta, na moeda dela (R$ na B3; US$ nos outros mercados, com USDT e USDC contados como dólar). Contas de mercados diferentes nunca são somadas. Vem das suas regras, nunca da IA.</div></sc-if>
+ </section>
+ 
+ <div style="display: flex; flex-direction: column; gap: 2px">

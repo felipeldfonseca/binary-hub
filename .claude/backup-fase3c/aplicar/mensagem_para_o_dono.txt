@@ -1,0 +1,23 @@
+Para registrar parciais, mover o stop e ter a regra do breakeven, o banco precisa de uma colagem. Ela:
+
+• cria duas tabelas novas: as saídas de cada operação (as parciais e a saída final) e os ajustes de stop;
+• ensina o limite do dia a contar cada parcial no minuto em que ela saiu, mesmo com a operação ainda aberta;
+• faz a importação da Top One juntar as linhas de uma mesma posição (mesmo ativo, lado, hora e preço de entrada) numa operação só, com uma saída por linha. Se você registrou as saídas de uma posição como operações separadas (o único jeito antes das parciais), cada linha continua indo para a sua operação, como hoje, mesmo que o arquivo chegue em duas exportações (uma no meio do dia, outra completa), e o dia fica com o dinheiro do arquivo;
+• aceita, em Suas regras, a regra opcional «mover para o breakeven com +N pontos», por ativo.
+
+Nenhuma operação, conta, versão de regras, configuração, marca, importação ou dia muda. O script confere isso sozinho antes de terminar: cada linha, cada resposta do limite do dia, cada «Posso operar hoje?», cada regra em vigor, cada marca e o estado de cada operação são os mesmos de antes. Se algo divergir, ele desfaz tudo.
+
+Como fazer:
+1. Abra o SQL Editor do Supabase (projeto do Binary Hub) e crie uma consulta nova.
+2. Cole todo o arquivo fase3c_aplicar.sql e clique em Run (leva alguns segundos).
+3. No fim aparece uma conferência em JSON. Copie e cole aqui na conversa.
+
+O que eu espero ver na conferência:
+• "linhas_que_mudaram": 0, "respostas_do_limite_que_mudaram": 0, "posso_operar_que_mudou": 0, "regras_que_mudariam": 0, "marcas_que_mudaram": 0, "estados_que_mudaram": 0, "linhas_de_regras_invalidas": 0 e "descritor_alem_do_breakeven": 0
+• "saidas": 0, "ajustes_de_stop": 0 e "regras_de_breakeven": 0 (nada registrado ainda)
+• "operacoes": 631, "registradas_no_app": 2, "contas": 6 e "versoes_de_regras": 9
+• "para_anonimos": false e "funcoes_novas_para_usuarios": true
+
+Se colar de novo por engano, ele para logo na primeira linha e não muda nada. Para voltar atrás existe o desfazer_fase3c.sql (outra colagem), mas só se eu pedir, e ele só funciona enquanto nenhuma parcial, ajuste de stop ou regra de breakeven tiver sido registrada.
+
+Até a colagem, as telas novas ficam desligadas: elas só entram depois dela.

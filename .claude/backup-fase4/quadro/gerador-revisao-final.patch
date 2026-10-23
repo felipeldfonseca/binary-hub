@@ -1,0 +1,411 @@
+diff -ru -x r -x data_*.json -x __pycache__ -x out quadro/gerador/dados.py final/gerador/dados.py
+--- quadro/gerador/dados.py	2026-10-23 22:44:45
++++ final/gerador/dados.py	2026-10-23 22:44:10
+@@ -186,15 +186,31 @@
+     return specs
+ 
+ 
+-def revisao(c, dia, specs, hm, func, dif, seguiu, levar, ctx, em_dia=None):
+-    """One review version: frozen facts of what the app knew at save time (trades registered by then, before any file)"""
++def registrados_ate(specs, hm):
++    """The trades the app held at hm: registered by then (live entries at their registration, «Já fechada» at its
++    registration, old-page entries at their entry), with the prices as registered (before any file corrected them)"""
+     ate = []
+     for s in specs:
+-        if s['src'] == 'app' and hm_min(s['e']) <= hm_min(hm):
+-            ate.append(s)
++        if s['src'] in ('app', 'antiga') and hm_min(s.get('regEm') or s['e']) <= hm_min(hm):
++            ate.append(dict(s, x=s['xReg']) if s.get('xReg') else s)
+         elif s['src'] == 'fechada' and s.get('regEm') and hm_min(s['regEm']) <= hm_min(hm):
+-            ate.append(s)
+-    r = monta_dia(c, dia, ate, dict(ctx, arq=None, revs=[]))
++            ate.append(dict(s, x=s['xReg']) if s.get('xReg') else s)
++    return ate
++
++
++def eventos_ate(c, dia, specs, hm):
++    """Another account's realized results as the app had them at hm (for a frozen «somando»): gross, exits by hm"""
++    r = monta_dia(c, dia, registrados_ate(specs, hm), {'arq': None, 'revs': []})
++    return [ev for ev in evs(r) if hm_min(ev[0]) <= hm_min(hm)]
++
++
++def revisao(c, dia, specs, hm, func, dif, seguiu, levar, ctx, em_dia=None, ext_ate=None):
++    """One review version: frozen facts of what the app knew at save time (trades registered by then, before any file;
++    with «somando», the other futures accounts as they stood then)"""
++    ctx = dict(ctx, arq=None, revs=[])
++    if ext_ate is not None:
++        ctx['ext'] = ext_ate(hm)
++    r = monta_dia(c, dia, registrados_ate(specs, hm), ctx)
+     em = em_dia or dia
+     return {'em': f'{em}T{hm}', 'dia': em, 'hm': hm, 'reg': r['fatos'], 'n': r['n'], 'net': r['net'],
+             'func': func, 'dif': dif, 'seguiu': seguiu, 'levar': levar}
+@@ -268,8 +284,9 @@
+             revs = [revisao(c, d, sp, '11:40', 'Esperei o rompimento confirmar antes de entrar.', 'Lancei uma venda na página antiga em vez do Registrar.', 'Em parte', 'Registrar tudo no app.', ctx)]
+         elif d == '2026-11-10':
+             sp = [
+-                {'e': '10:03', 'a': 'MES', 'l': 'V', 'q': 2, 'pe': '7862.25', 'x': [(2, '7854.00', '10:09', 'final')], 'stop': '6', 'alvo': '10', 'stopEm': '10:03', 'src': 'app',
+-                 'mk': {'setup': ('B', '10:04', ('C', '11:20')), 'execucao': ('no ponto', '10:05'), 'emocao': ('Calmo', '10:05')},
++                {'e': '10:03', 'regEm': '10:06', 'a': 'MES', 'l': 'V', 'q': 2, 'pe': '7862.25', 'x': [(2, '7854.00', '10:09', 'final')], 'stop': '6', 'alvo': '10',
++                 'stopEm': '10:06', 'src': 'app',
++                 'mk': {'setup': ('B', '10:06', ('C', '11:20')), 'execucao': ('no ponto', '10:07'), 'emocao': ('Calmo', '10:06')},
+                  'ax': {'imgs': [('MES_10-03_entrada.png', '612 KB', 1), ('MES_10-09_saida.png', '540 KB', 2)],
+                         'nota': 'Vendi o reteste da mínima da abertura e saí antes da VWAP.', 'quando': 'às 10:12'},
+                  'corretora': '10:03:18–10:10:28'},
+@@ -278,8 +295,8 @@
+                  'mk': {'setup': ('A', '10:14'), 'execucao': ('no ponto', '10:21'), 'emocao': ('Confiante', '10:16')}},
+                 {'e': '10:22', 'a': 'MNQ', 'l': 'V', 'q': 1, 'pe': '25410.50', 'x': [(1, '25441.00', '10:30', 'final')], 'src': 'fechada', 'regEm': '17:48',
+                  'mk': {'setup': ('C', '17:48'), 'emocao': ('Ansioso', '17:48')}},
+-                {'e': '10:47', 'a': 'MGC', 'l': 'C', 'q': 1, 'pe': '4112.3', 'x': [(1, '4118.6', '10:55', 'final')], 'src': 'app', 'stop': '4', 'alvo': '8', 'stopEm': '10:47',
+-                 'corr': ('saída', '4.118,4', '4.118,6'), 'mk': {'setup': ('B', '10:47'), 'execucao': ('cedo', '11:02')}},
++                {'e': '10:47', 'a': 'MGC', 'l': 'C', 'q': 1, 'pe': '4112.3', 'x': [(1, '4118.6', '10:55', 'final')], 'xReg': [(1, '4118.4', '10:55', 'final')], 'src': 'app', 'stop': '4', 'alvo': '8',
++                 'stopEm': '10:47', 'corr': ('saída', '4.118,4', '4.118,6'), 'mk': {'setup': ('B', '10:47'), 'execucao': ('cedo', '11:02')}},
+                 {'e': '11:20', 'a': 'MES', 'l': 'C', 'q': 1, 'pe': '7868.25', 'x': [(1, '7862.00', '11:26', 'final')], 'src': 'arq',
+                  'mk': {'setup': ('C', '19:20', None, '11 nov às 19:20'), 'execucao': ('tarde', '19:20', None, '11 nov às 19:20')},
+                  'ax': {'imgs': [], 'nota': 'Entrei fora da janela para recuperar a MNQ.', 'quando': 'em 11 nov, às 19:21'}},
+@@ -374,7 +391,7 @@
+     return dias, specs_de, hoje12, variante
+ 
+ 
+-def lucid(top_dias):
++def lucid(top_dias, top_specs):
+     c = CONTAS['lucid']
+     rng = random.Random(77)
+     dias = {}
+@@ -403,7 +420,9 @@
+             if rng.random() < 0.7:
+                 ult = max(hm_min(s['x'][-1][2]) for s in sp)
+                 hm = f'{(ult + 25) // 60:02d}:{(ult + 25) % 60:02d}'
+-                revs = [revisao(c, d, sp, hm, rng.choice(TXT_FUNC), rng.choice(TXT_DIF), 'Sim', rng.choice(TXT_LEVAR), ctx)]
++                top_sp = top_specs.get(d, [])
++                revs = [revisao(c, d, sp, hm, rng.choice(TXT_FUNC), rng.choice(TXT_DIF), 'Sim', rng.choice(TXT_LEVAR), ctx,
++                                ext_ate=lambda h, d=d, top_sp=top_sp: eventos_ate(CONTAS['top'], d, top_sp, h))]
+         ctx['revs'] = revs
+         dias[d] = monta_dia(c, d, sp, ctx)
+     return dias
+diff -ru -x r -x data_*.json -x __pycache__ -x out quadro/gerador/dia.py final/gerador/dia.py
+--- quadro/gerador/dia.py	2026-10-23 22:44:45
++++ final/gerador/dia.py	2026-10-23 22:44:28
+@@ -302,7 +302,7 @@
+     sub = None
+     if binario:
+         if t['aberta']:
+-            sub = f'Vence às {t["vela"][1]}.'
++            sub = f'Vence às {t["vela"][1]} de Brasília.'
+         elif t['net'] == 0:
+             sub = 'devolvida'
+     else:
+@@ -342,8 +342,8 @@
+         nota = bool(ax.get('nota'))
+         o['clip'] = 'tem imagens e nota' if n_img and nota else 'tem imagens' if n_img else 'tem nota'
+         quem = (f'{plural(n_img, "imagem", "imagens")} e nota salvas' if n_img and nota else plural(n_img, 'imagem salva', 'imagens salvas') if n_img else 'Nota salva')
+-        verbo = 'salvos' if (n_img and nota) or n_img > 1 else 'salva'
+-        o['ax'] = {'imgs': [{'nome': a, 'tam': b, 'd': IMGS[k]} for (a, b, k) in ax.get('imgs', [])], 'nota': ax.get('nota', ''),
++        verbo = 'salvas' if (n_img and nota) or n_img > 1 else 'salva'
++        o['ax'] = {'imgs': [{'nome': a, 'tam': b, 'f': k} for (a, b, k) in ax.get('imgs', [])], 'nota': ax.get('nota', ''),
+                    'quando': f'{verbo} {ax["quando"]} · {ax.get("fase", "depois do resultado")}' if n_img or nota else '', 'quem': quem}
+     else:
+         o['clip'] = None
+@@ -362,12 +362,12 @@
+         if not t['aberta']:
+             F.append(['Resultado', money(t['net'], m, bool(t['net']))])
+         if t['aberta']:
+-            L.append(f'Vence às {fim}.')
++            L.append(f'Vence às {fim} de Brasília.')
+     else:
+         s = SPEC[t['a']]
+         reg = t.get('regTipo')
+         hora = o['h'] + (' · aberta' if t['aberta'] else '')
+-        if t.get('regEm') and t['src'] == 'app':
++        if t.get('regEm') and t['src'] == 'app' and abs(hm_min(t['regEm']) - hm_min(t['e'])) >= 1:
+             hora += f' · registrada às {t["regEm"]}'
+         F.append(['Hora', hora])
+         if t['src'] == 'hist':
+diff -ru -x r -x data_*.json -x __pycache__ -x out quadro/gerador/engine.js final/gerador/engine.js
+--- quadro/gerador/engine.js	2026-10-23 22:44:45
++++ final/gerador/engine.js	2026-10-23 22:44:28
+@@ -141,11 +141,14 @@
+         let dica = '';
+         let aria = '';
+         if (temOps) {
+-          dica = r.dica + (ehDiario(r) ? (marcaRev ? ' · revisão escrita' : contaRev(r) ? ' · sem revisão' : '') : '');
+-          aria = r.aria + (marcaRev ? ', revisão escrita' : contaRev(r) ? ', sem revisão' : '') + (ehHoje ? ', hoje' : '');
+-        } else if (ehHoje) {
++          const pendente = contaRev(r) && id < hoje;
++          dica = r.dica + (ehDiario(r) ? (marcaRev ? ' · revisão escrita' : pendente ? ' · sem revisão' : '') : '');
++          aria = r.aria + (marcaRev ? ', revisão escrita' : pendente ? ', sem revisão' : '') + (ehHoje ? ', hoje' : '');
++        } else if (ehHoje && !foraMes) {
+           dica = curto(id) + ' · hoje, sem operações ainda';
+           aria = curto(id) + ', hoje, sem operações ainda';
++        } else if (ehHoje) {
++          aria = curto(id) + ', hoje';
+         } else if (semOp) {
+           dica = curto(id) + ' · sem operações';
+           aria = curto(id) + ', sem operações';
+@@ -173,11 +176,15 @@
+         classe: !st.temD && st.temH ? 'cal-imp' : '',
+         res: st.temD ? numS(st.net) : numS(st.hist), cor: st.temD ? corDe(st.net) : 'var(--text-2)',
+         n: (st.temD ? st.n : st.histN) + ' op.', temFora: !!st.fora, foraN: String(st.fora), temHist: st.temD && st.temH, hist: numS(st.hist),
+-        aria: 'Semana de ' + rotLongo + ': ' + (st.temD ? numS(st.net) + ' ' + K.pal + ', ' + st.n + ' op.' + (st.fora ? ', ' + st.fora + ' fora do plano' : '') + (st.temH ? ', histórico importado à parte: ' + numS(st.hist) : '') : 'histórico importado, ' + numS(st.hist) + ' ' + K.pal) + '. Abrir a semana.',
++        aria: ariaSem(rotLongo, st),
+         abrir: () => { this._rolarSem = true; set({ sem: s, semStatus: 'Semana aberta abaixo: ' + rotLongo + '.' }); }
+       });
+       wi++;
+     }
++    function ariaSem(rotLongo, st) {
++      const corpo = st.temD ? numS(st.net) + ' ' + K.pal + ', ' + st.n + ' op.' + (st.fora ? ', ' + st.fora + ' fora do plano' : '') + (st.temH ? ', histórico importado à parte: ' + numS(st.hist) : '') : 'histórico importado, ' + numS(st.hist) + ' ' + K.pal;
++      return 'Semana de ' + rotLongo + ': ' + corpo + (corpo.slice(-1) === '.' ? '' : '.') + ' Abrir a semana.';
++    }
+     function rangeTxt(a, b) {
+       const ma = +a.slice(5, 7) - 1, mb = +b.slice(5, 7) - 1;
+       const da = +a.slice(8, 10) === 1 ? '1º' : String(+a.slice(8, 10));
+@@ -326,7 +333,7 @@
+         const n = rascAx.imgs.length;
+         const notaOk = !!(rascAx.nota || '').trim();
+         const fase = t.ab ? 'antes da saída' : 'depois do resultado';
+-        const verbo = (n && notaOk) || n > 1 ? 'salvos' : 'salva';
++        const verbo = (n && notaOk) || n > 1 ? 'salvas' : 'salva';
+         const quem = n && notaOk ? pl(n, 'imagem', 'imagens') + ' e nota salvas' : n ? (n === 1 ? '1 imagem salva' : n + ' imagens salvas') : 'Nota salva';
+         const quandoA = ehHojeDia ? 'às ' + AC.hm : 'em ' + AC.hojeCurto + ', às ' + AC.hm;
+         const novo = { imgs: rascAx.imgs, nota: (rascAx.nota || '').trim(), quando: n || notaOk ? verbo + ' ' + quandoA + ' · ' + fase : '' };
+@@ -345,14 +352,14 @@
+         temAcao: !!t.acao, acao: t.acao || '', acaoAria: t.acaoAria || '',
+         borda: fora ? 'var(--amber-border)' : 'transparent', aberto: ab, drillId: 'drill-' + tid, tempoId: 'tempo-' + tid,
+         rot: 'Detalhes da operação: ' + lado + ' de ' + ativo + ' às ' + he,
+-        seta: ab ? 'M6 15l6-6 6 6' : 'M6 9l6 6 6-6',
++        fechado: !ab,
+         alternar: () => set({ aberta: ab ? null : tid, dlg: null, axEd: null }),
+         fatos, linhas: (t.linhas || []).concat(t.be && !tempo.length ? [t.be] : []), temTempo: !!tempo.length, tempo, temBe: !!t.be && !!tempo.length, semTempoBe: false, be: t.be || '',
+         temAx: temAxConteudo && !axEd, axQuando: ax ? ax.quando || '' : '', podeEditarAx: !hist, refAxEditar: foco('axEditar-' + tid),
+         axEditar: abrirEditor, temMinis: !!imgsVis.length && !dlgOn, temNota: !!(ax && ax.nota), nota: ax ? ax.nota : '',
+-        imgs: imgsVis.map((im, k) => ({ nome: im.nome, tam: im.tam, d: im.d, aria: 'Abrir ' + im.nome + ', imagem ' + (k + 1) + ' de ' + imgsVis.length, ref: foco('mini-' + tid + '-' + k), abrir: () => { this._foco = 'dlg-' + tid; set({ dlg: [tid, k] }); } })),
++        imgs: imgsVis.map((im, k) => ({ nome: im.nome, tam: im.tam, f1: im.f === 1, f2: im.f === 2, f3: im.f === 3, aria: 'Abrir ' + im.nome + ', imagem ' + (k + 1) + ' de ' + imgsVis.length, ref: foco('mini-' + tid + '-' + k), abrir: () => { this._foco = 'dlg-' + tid; set({ dlg: [tid, k] }); } })),
+         temDlg: dlgOn, dlgId: 'dlg-t-' + tid,
+-        dlg: dlgOn ? { titulo: 'Imagem ' + (di + 1) + ' de ' + imgsVis.length, nome: imgsVis[di].nome, tam: imgsVis[di].tam, d: imgsVis[di].d, semAnt: di === 0, semProx: di >= imgsVis.length - 1,
++        dlg: dlgOn ? { titulo: 'Imagem ' + (di + 1) + ' de ' + imgsVis.length, nome: imgsVis[di].nome, tam: imgsVis[di].tam, f1: imgsVis[di].f === 1, f2: imgsVis[di].f === 2, f3: imgsVis[di].f === 3, semAnt: di === 0, semProx: di >= imgsVis.length - 1,
+           anterior: () => irDlg(di - 1), proxima: () => irDlg(di + 1), fechar: fecharDlg, refFechar: foco('dlg-' + tid) } : {},
+         dlgTecla: (ev) => { if (!ev) return; if (ev.key === 'Escape') { ev.preventDefault(); fecharDlg(); } else if (ev.key === 'ArrowLeft') irDlg(di - 1); else if (ev.key === 'ArrowRight') irDlg(di + 1); },
+         axEd, temRascImgs: !!(axEd && rascAx.imgs.length),
+@@ -362,7 +369,7 @@
+           if (rascAx.imgs.length >= 4) return;
+           const k = rascAx.imgs.length + 1;
+           const nome = ativo.replace('/', '') + '_' + he.replace(':', '-') + '_' + k + '.png';
+-          const novas = rascAx.imgs.concat([{ nome, tam: (380 + 70 * k) + ' KB', d: ['M8 84 L28 70 L44 76 L60 52 L76 58 L92 40 L108 46 L124 30 L140 36 L160 24', 'M8 30 L24 38 L40 34 L56 52 L72 46 L88 64 L104 60 L120 76 L140 70 L160 82', 'M8 70 L24 64 L40 72 L56 50 L72 56 L88 44 L104 52 L120 36 L140 42 L160 30'][k % 3] }]);
++          const novas = rascAx.imgs.concat([{ nome, tam: (380 + 70 * k) + ' KB', f: (k % 3) + 1 }]);
+           set({ axRasc: Object.assign({}, rascAx, { imgs: novas }), axStatus: '1 imagem adicionada. ' + novas.length + ' de 4.' });
+         },
+         notaId: 'nota-campo-' + tid, refNota: foco('nota-' + tid), rascNota: rascAx.nota || '', contador: (rascAx.nota || '').length + ' de 1000',
+@@ -397,7 +404,7 @@
+     const emAndamento = sem <= hoje && hoje <= add(sem, 6);
+     const pregoesAte = Math.min(wd(hoje) + 1, colsSem);
+     const comOps = stS.ids.filter((id) => ehDiario(rec(id)) && rec(id).n > 0).length;
+-    const contaS = stS.ids.filter((id) => contaRev(rec(id)) || (ehDiario(rec(id)) && revsDe(id).length));
++    const contaS = stS.ids.filter((id) => (contaRev(rec(id)) && id < hoje) || (ehDiario(rec(id)) && revsDe(id).length));
+     const comRev = contaS.filter((id) => revsDe(id).length).length;
+     const barras = [];
+     let maxAbs = 1;
+@@ -416,7 +423,7 @@
+     const rangeSem = rangeTxt(sem, fimSem);
+     const sm = {
+       titulo: emAndamento ? 'Semana em andamento · ' + pregoesAte + ' de ' + colsSem + ' pregões' : comOps ? rangeSem + ' · ' + pl(comOps, 'pregão com operações', 'pregões com operações') : rangeSem,
+-      info: 'Pregões de ' + rangeSem + '. ' + (K.lim ? 'Fora do plano: fora da janela ou depois do limite. ' : K.temJan ? 'Fora do plano: fora da janela. ' : '') + 'Revisões: dos pregões com operação registrada no app ou com revisão, quantos têm revisão. A coluna Semana do calendário traz os mesmos números.',
++      info: 'Pregões de ' + rangeSem + '. ' + (K.lim ? 'Fora do plano: fora da janela ou depois do limite. ' : K.temJan ? 'Fora do plano: fora da janela. ' : '') + 'Revisões: dos pregões com operação registrada no app ou com revisão, quantos têm revisão; hoje só entra depois que você escrever a revisão dele. A coluna Semana do calendário traz os mesmos números.',
+       cheia: stS.temD, vazia: !stS.temD,
+       vaziaTxt: stS.temH ? 'Só Histórico importado nesta semana: ' + din(stS.hist, true) + ', à parte do diário.' : 'Nenhuma operação nesta semana.',
+       numeros: [
+@@ -469,19 +476,28 @@
+       const partes = [l.novas + (l.novas === 1 ? ' nova' : ' novas')];
+       if (l.reg) partes.push(l.reg === 1 ? '1 já registrada por você' : l.reg + ' já registradas por você');
+       partes.push('0 já estavam', '0 com erro');
++      // the built IMPORTACOES.confirm / undone / confirmYes (components/hub/contas/copy.ts), with no trade «que já estava»
+       const apaga = (l.novas === 1 ? 'Desfazer apaga a operação desta importação' : 'Desfazer apaga as ' + l.novas + ' operações desta importação');
+-      const confirma = l.reg ? apaga + (l.reg === 1 ? ', e a registrada por você volta a ser como estava antes dela.' : ', e as ' + l.reg + ' registradas por você voltam a ser como estavam antes dela.') : apaga + '.';
++      const confirma = !l.novas
++        ? (!l.reg ? 'Desfazer não apaga nada: as operações desta importação já foram apagadas.'
++          : l.reg === 1 ? 'Desfazer não apaga nada: a operação registrada por você volta a ser como estava antes desta importação.'
++            : 'Desfazer não apaga nada: as ' + l.reg + ' operações registradas por você voltam a ser como estavam antes desta importação.')
++        : !l.reg ? apaga + '.' : l.reg === 1 ? apaga + ', e a registrada por você volta a ser como estava antes dela.' : apaga + ', e as ' + l.reg + ' registradas por você voltam a ser como estavam antes dela.';
++      const apagadas = l.novas === 1 ? '1 operação apagada' : l.novas + ' operações apagadas';
++      const desfeita = !l.reg ? (!l.novas ? 'Importação desfeita: nenhuma operação apagada.' : 'Importação desfeita: ' + apagadas + '.')
++        : !l.novas ? (l.reg === 1 ? 'Importação desfeita: a operação registrada por você voltou a ser como estava.' : 'Importação desfeita: as ' + l.reg + ' operações registradas por você voltaram a ser como estavam.')
++          : l.reg === 1 ? 'Importação desfeita: ' + apagadas + ', e a registrada por você voltou a ser como estava.' : 'Importação desfeita: ' + apagadas + ', e as ' + l.reg + ' registradas por você voltaram a ser como estavam.';
+       const itens = [];
+       if (l.marcas) itens.push(pl(l.marcas, 'marca', 'marcas'));
+       if (l.imgs) itens.push(pl(l.imgs, 'imagem', 'imagens'));
+       if (l.notas) itens.push(pl(l.notas, 'nota', 'notas'));
+       return {
+         quando: l.quando, nome: l.nome, partes, podeDesfazer: !st, confirmando: st === 'confirmando', desfeita: st === 'desfeita', desfeitaTxt: 'Desfeita em 1º dez',
+-        confId: 'desfazer-' + l.id, confirma, temSaem: !!itens.length, saem: 'Saem junto: ' + listaE(itens) + ' que você pôs no Diário.',
++        confId: 'desfazer-' + l.id, confirma, simRot: l.novas ? 'Desfazer e apagar' : 'Desfazer', temSaem: !!itens.length, saem: 'Saem junto: ' + listaE(itens) + ' que você pôs no Diário.',
+         aria: 'Desfazer a importação de ' + l.quando, refDesfazer: foco('lote-' + l.id), refManter: foco('manter-' + l.id),
+         desfazer: () => { this._foco = 'manter-' + l.id; set({ lotes: Object.assign({}, lotesS, { [l.id]: 'confirmando' }) }); },
+         manter: () => { this._foco = 'lote-' + l.id; set({ lotes: Object.assign({}, lotesS, { [l.id]: '' }) }); },
+-        sim: () => set({ lotes: Object.assign({}, lotesS, { [l.id]: 'desfeita' }), impFeito: 'Importação desfeita: ' + pl(l.novas, 'operação apagada', 'operações apagadas') + (l.reg ? ', e as ' + l.reg + ' registradas por você voltaram a ser como estavam.' : '.') + ' (No protótipo, o Diário acima não muda.)' })
++        sim: () => set({ lotes: Object.assign({}, lotesS, { [l.id]: 'desfeita' }), impFeito: desfeita + ' (No protótipo, o Diário acima não muda.)' })
+       };
+     });
+ 
+@@ -494,7 +510,12 @@
+       dataLinha: AC.linha, contaNome: K.nome, contaJanela: K.janela, contaValores: K.valores, contaStatus: e.contaStatus || '',
+       contaAberta: !!e.contaAberta, alternarConta: () => set({ contaAberta: !e.contaAberta }), refConta: foco('conta'),
+       fecharConta: () => { this._foco = 'conta'; set({ contaAberta: false }); },
+-      teclaConta: (ev) => { if (ev && ev.key === 'Escape') { this._foco = 'conta'; set({ contaAberta: false }); } },
++      teclaConta: (ev) => { if (e.contaAberta && ev && ev.key === 'Escape') { ev.preventDefault(); this._foco = 'conta'; set({ contaAberta: false }); } },
++      saiuConta: (ev) => {
++        const novo = ev && ev.relatedTarget;
++        if (!e.contaAberta || !novo || (ev.currentTarget && ev.currentTarget.contains(novo))) return;
++        set({ contaAberta: false });
++      },
+       gruposConta, posso, i: I,
+       temLinhaTopo: !!linhaTopo && (estado === 'pronto' || estado === 'offline'), linhaTopo, semRegras: !K.regras,
+       temAviso: estado !== 'carregando' && estado !== 'erro' && !e.avisoFechado && pend.length > 0, avisoTexto,
+diff -ru -x r -x data_*.json -x __pycache__ -x out quadro/gerador/gera.py final/gerador/gera.py
+--- quadro/gerador/gera.py	2026-10-23 22:44:45
++++ final/gerador/gera.py	2026-10-23 22:44:10
+@@ -109,7 +109,7 @@
+ 
+ def monta():
+     top, specs_top, hoje12, var19 = top_one()
+-    datasets = {'top': top, 'lucid': lucid(top), 'ylos': ylos(), 'ebx': ebinex(), 'ftmo': {}, 'ibkr': {}, 'bin': binance(), 'clear': clear()}
++    datasets = {'top': top, 'lucid': lucid(top, specs_top), 'ylos': ylos(), 'ebx': ebinex(), 'ftmo': {}, 'ibkr': {}, 'bin': binance(), 'clear': clear()}
+     # previous journal day (for «Do pregão anterior»)
+     for k, dias in datasets.items():
+         ant = None
+diff -ru -x r -x data_*.json -x __pycache__ -x out quadro/gerador/harness.js final/gerador/harness.js
+--- quadro/gerador/harness.js	2026-10-23 22:44:45
++++ final/gerador/harness.js	2026-10-23 22:44:10
+@@ -34,7 +34,7 @@
+   const v = check(c, cen);
+   if (!v) continue;
+   // check loop items
+-  for (const t of v.trades) for (const k of ['h','op','resTxt','cor','rot','seta','plTxt']) if (t[k] === undefined) { console.log('TRADE MISSING', cen, k); fails++; }
++  for (const t of v.trades) for (const k of ['h','op','resTxt','cor','rot','fechado','plTxt']) if (t[k] === undefined) { console.log('TRADE MISSING', cen, k); fails++; }
+   // interactions: open each trade, toggle marks, open editor, save, open review form, save
+   for (const t of v.trades) { t.alternar(); const v2 = check(c, cen + ' open ' + t.id); if (v2) { const tt = v2.trades.find((x) => x.id === t.id); if (tt && tt.grupos.length) { tt.grupos[0].opcoes[1].escolher(); check(c, cen + ' mark'); } if (tt) { tt.axEditar(); const v3 = check(c, cen + ' axed'); const t3 = v3 && v3.trades.find((x) => x.id === t.id); if (t3) { t3.axEscolher(); check(c, cen+' axadd'); const v4 = c.renderVals(); const t4 = v4.trades.find((x)=>x.id===t.id); t4.axSalvar(); check(c, cen + ' axsave'); const v5 = c.renderVals(); const t5 = v5.trades.find((x)=>x.id===t.id); if (t5.imgs.length) { t5.imgs[0].abrir(); const v6 = check(c, cen+' dlg'); const t6 = v6.trades.find((x)=>x.id===t.id); t6.dlg.proxima(); check(c, cen+' dlg2'); t6.dlg.fechar(); } } } } }
+   c.state = { cen };
+diff -ru -x r -x data_*.json -x __pycache__ -x out quadro/gerador/modelo.py final/gerador/modelo.py
+--- quadro/gerador/modelo.py	2026-10-23 22:44:45
++++ final/gerador/modelo.py	2026-10-23 22:44:10
+@@ -125,9 +125,3 @@
+         partes.append(f'limite: {compacto(lim_pior, c.moeda)} de {compacto(c.lim, c.moeda)} no pior momento')
+     return ' · '.join(partes)
+ 
+-
+-IMGS = {
+-    1: 'M8 84 L28 70 L44 76 L60 52 L76 58 L92 40 L108 46 L124 30 L140 36 L160 24',
+-    2: 'M8 30 L24 38 L40 34 L56 52 L72 46 L88 64 L104 60 L120 76 L140 70 L160 82',
+-    3: 'M8 70 L24 64 L40 72 L56 50 L72 56 L88 44 L104 52 L120 36 L140 42 L160 30',
+-}
+diff -ru -x r -x data_*.json -x __pycache__ -x out quadro/gerador/template.html final/gerador/template.html
+--- quadro/gerador/template.html	2026-10-23 22:44:45
++++ final/gerador/template.html	2026-10-23 22:44:10
+@@ -94,6 +94,7 @@
+ #topo .nota-box{display:flex;flex-direction:column;gap:4px;padding:10px 14px;border-radius:12px;border:1px solid var(--border);min-width:0}
+ #topo .campo{min-height:44px;padding:0 12px;border-radius:12px;border:1px solid var(--field-border);background:var(--surface);color:var(--text);font-family:inherit;font-size:14px;box-sizing:border-box;width:100%}
+ #topo .campo-area{min-height:64px;padding:10px 12px;line-height:1.5;resize:vertical}
++#topo .nota-box .campo{background:var(--inset)}
+ #topo .tl-vaga{display:flex;align-items:center;flex-wrap:wrap;gap:6px 12px;padding:14px 16px;border-radius:14px;border:1px dashed var(--neutral-border)}
+ #topo .ops{display:flex;flex-direction:column;gap:6px}
+ #topo .op-linha{display:grid;grid-template-columns:104px minmax(170px,1.5fr) 128px minmax(170px,1.2fr) 44px;gap:6px 12px;align-items:center;padding:8px 12px;font-size:13px}
+@@ -153,8 +154,8 @@
+ #topo .op-linha>:nth-child(1){grid-column:1;grid-row:1}
+ #topo .op-linha>:nth-child(2){grid-column:1;grid-row:2}
+ #topo .op-linha>:nth-child(3){grid-column:2;grid-row:1 / 3;align-self:center;text-align:right}
+-#topo .op-linha>:nth-child(5){grid-column:3;grid-row:1 / 3;align-self:center}
+-#topo .op-linha>.op-plano{grid-column:1 / -1;grid-row:3}
++#topo .op-linha>:nth-child(5){grid-column:3;grid-row:1 / 4;align-self:end}
++#topo .op-linha>.op-plano{grid-column:1 / 3;grid-row:3}
+ #topo .drill{grid-template-columns:minmax(0,1fr)}
+ #topo .ck-linha{grid-template-columns:minmax(0,1fr) auto}
+ #topo .ck-linha>.ck-meio{grid-column:1 / -1;grid-row:2}
+@@ -169,6 +170,7 @@
+ #topo .cal-res,#topo .cal-n{display:none !important}
+ #topo .cal-res-curto{display:inline !important}
+ #topo .cal-dica{display:none !important}
++#topo .cal-marcas{gap:1px;padding:0 2px;font-size:9px}
+ #topo .posso-conta{grid-template-columns:minmax(0,1fr);gap:0;padding:8px 0}
+ #topo .posso-estado{flex-direction:column;align-items:flex-start !important}
+ #topo .posso-estado .sep{display:none}
+@@ -186,6 +188,8 @@
+ #topo .drill .full{min-width:0}
+ #topo .dlg{padding:10px}
+ #topo .demo{padding:8px 16px}
++#topo .rev .fatos{grid-template-columns:minmax(0,1fr);gap:2px 0}
++#topo .rev .fatos>span:nth-child(even){margin-bottom:8px}
+ }
+ @media (hover:none){#topo .cal-dica{display:none !important}}
+ </style>
+@@ -237,10 +241,10 @@
+ <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 8px"><a href="RegistrarOperacao.dc.html" class="btn btn-pri">Registrar operação</a><a href="ImportarConta.dc.html" class="btn">Importar arquivo</a></div>
+ </div>
+ 
+-<div class="conta-wrap" style="align-self: flex-start">
++<div class="conta-wrap" style="align-self: flex-start" onKeyDown="{{ teclaConta }}" onBlur="{{ saiuConta }}">
+ <button type="button" class="btn conta-btn" aria-expanded="{{ contaAberta }}" aria-controls="lista-contas" ref="{{ refConta }}" onClick="{{ alternarConta }}"><span>Conta: <strong>{{ contaNome }}</strong></span><span aria-hidden="true" style="font-size: 11px">▾</span></button>
+ <span style="font-size: 11px; color: var(--text-2); padding-left: 16px">{{ contaJanela }}</span>
+-<sc-if value="{{ contaAberta }}" hint-placeholder-val="{{ false }}"><div class="conta-fundo" aria-hidden="true" onClick="{{ fecharConta }}"></div><div id="lista-contas" class="conta-lista" onKeyDown="{{ teclaConta }}">
++<sc-if value="{{ contaAberta }}" hint-placeholder-val="{{ false }}"><div class="conta-fundo" aria-hidden="true" onClick="{{ fecharConta }}"></div><div id="lista-contas" class="conta-lista">
+ <sc-for list="{{ gruposConta }}" as="g" hint-placeholder-count="6"><span class="conta-grupo">{{ g.rot }}</span><sc-for list="{{ g.contas }}" as="c" hint-placeholder-count="1"><button type="button" class="conta-op" aria-current="{{ c.sel }}" onClick="{{ c.escolher }}"><span style="font-weight: 700">{{ c.nome }}</span><span style="font-size: 12px; color: var(--text-2)">{{ c.fase }}</span></button></sc-for></sc-for>
+ <div style="display: flex; flex-direction: column; border-top: 1px solid var(--border); padding-top: 4px; margin-top: 4px"><a href="ImportarConta.dc.html" class="conta-op" style="font-weight: 700">+ Adicionar conta</a><a href="Personalizar.dc.html#contas" class="conta-op">Gerenciar contas</a></div>
+ <span style="padding: 4px 10px 0; font-size: 12px; color: var(--text-2)">Contas de mercados diferentes nunca são somadas.</span>
+@@ -256,7 +260,7 @@
+ </section>
+ 
+ <div style="display: flex; flex-direction: column; gap: 2px">
+-<nav aria-label="Seções da página" style="display: flex; flex-wrap: wrap; gap: 2px 14px; font-size: 13px"><a href="#calendario" style="display: inline-flex; align-items: center; min-height: 44px; font-weight: 700">Calendário</a><a href="#dia" style="display: inline-flex; align-items: center; min-height: 44px; font-weight: 700">O dia</a><a href="#semana" style="display: inline-flex; align-items: center; min-height: 44px; font-weight: 700">Semana</a></nav>
++<nav aria-label="Seções da página" style="display: flex; flex-wrap: wrap; gap: 2px 14px; font-size: 13px"><a href="#calendario" style="display: inline-flex; align-items: center; justify-content: center; min-height: 44px; min-width: 44px; font-weight: 700">Calendário</a><a href="#dia" style="display: inline-flex; align-items: center; justify-content: center; min-height: 44px; min-width: 44px; font-weight: 700">O dia</a><a href="#semana" style="display: inline-flex; align-items: center; justify-content: center; min-height: 44px; min-width: 44px; font-weight: 700">Semana</a></nav>
+ <sc-if value="{{ temLinhaTopo }}" hint-placeholder-val="{{ true }}"><div class="linha2">{{ linhaTopo }}</div></sc-if>
+ </div>
+ <div role="status" class="so-leitor">{{ contaStatus }}</div>
+@@ -336,7 +340,7 @@
+ </sc-for>
+ </div>
+ </div>
+-<div class="legenda" aria-label="Legenda">
++<div class="legenda" role="group" aria-label="Legenda">
+ <span style="display: inline-flex; align-items: center; gap: 4px">Ganho <span aria-hidden="true" style="display: inline-flex; gap: 2px"><span style="width: 12px; height: 12px; border-radius: 3px; background: rgba(225,255,217,0.15); box-shadow: inset 0 -3px 0 rgba(225,255,217,0.95)"></span><span style="width: 12px; height: 12px; border-radius: 3px; background: rgba(225,255,217,0.72)"></span><span style="width: 12px; height: 12px; border-radius: 3px; background: rgba(225,255,217,0.9)"></span></span></span>
+ <span style="display: inline-flex; align-items: center; gap: 4px">Perda <span aria-hidden="true" style="display: inline-flex; gap: 2px"><span style="width: 12px; height: 12px; border-radius: 3px; background: rgba(255,138,138,0.15); box-shadow: inset 0 -3px 0 rgba(255,138,138,0.95)"></span><span style="width: 12px; height: 12px; border-radius: 3px; background: rgba(255,138,138,0.72)"></span><span style="width: 12px; height: 12px; border-radius: 3px; background: rgba(255,138,138,0.9)"></span></span></span>
+ <span><span style="color: var(--amber)">●</span> fora do plano</span><sc-if value="{{ temLimiteConta }}" hint-placeholder-val="{{ true }}"><span><span style="color: var(--red)">■</span> limite atingido</span></sc-if><span><span style="color: var(--mint)">✓</span> revisão</span><span>▨ histórico importado</span>
+@@ -402,8 +406,8 @@
+ <span role="cell" style="font-family: var(--mono); font-size: 12px">{{ t.h }}</span>
+ <span role="cell" style="font-weight: 700"><span>{{ t.op }}</span><sc-if value="{{ t.temClip }}" hint-placeholder-val="{{ false }}"> <svg width="13" height="13" viewBox="0 0 24 24" role="img" aria-label="{{ t.clip }}" style="vertical-align: -2px; fill: none; stroke: var(--text-2); stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round"><path d="M21 11.5l-8.6 8.6a5 5 0 0 1-7.1-7.1l8.6-8.6a3.4 3.4 0 0 1 4.8 4.8l-8.6 8.6a1.7 1.7 0 0 1-2.4-2.4l7.9-7.9"></path></svg></sc-if><sc-if value="{{ t.temChip }}" hint-placeholder-val="{{ false }}"> <span class="chip-origem">{{ t.chip }}</span></sc-if><sc-if value="{{ t.temSub }}" hint-placeholder-val="{{ false }}"><span class="op-sub">{{ t.sub }}</span></sc-if></span>
+ <span role="cell" style="font-family: var(--mono); font-variant-numeric: tabular-nums; font-weight: 700; white-space: nowrap; color: {{ t.cor }}">{{ t.resTxt }}</span>
+-<span role="cell" class="op-plano"><sc-if value="{{ t.planoOk }}" hint-placeholder-val="{{ true }}"><span class="marca marca-ok">No plano</span></sc-if><sc-if value="{{ t.planoFora }}" hint-placeholder-val="{{ false }}"><span style="font-size: 12px; color: var(--amber)" aria-label="{{ t.plAria }}">{{ t.plTxt }}</span></sc-if><sc-if value="{{ t.planoHist }}" hint-placeholder-val="{{ false }}"><span style="font-size: 12px; color: var(--text-2)">Histórico importado · só resultado</span></sc-if><sc-if value="{{ t.planoNada }}" hint-placeholder-val="{{ false }}"><span style="color: var(--text-2)" aria-label="plano não avaliado">—</span></sc-if><sc-if value="{{ t.temAcao }}" hint-placeholder-val="{{ false }}"><a href="RegistrarOperacao.dc.html" class="btn" aria-label="{{ t.acaoAria }}" style="padding: 0 14px">{{ t.acao }}</a></sc-if></span>
+-<span role="cell" style="display: flex; justify-content: flex-end"><button type="button" aria-expanded="{{ t.aberto }}" aria-controls="{{ t.drillId }}" aria-label="{{ t.rot }}" onClick="{{ t.alternar }}" class="btn btn-x"><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true" style="fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round"><path d="{{ t.seta }}"></path></svg></button></span>
++<span role="cell" class="op-plano"><sc-if value="{{ t.planoOk }}" hint-placeholder-val="{{ true }}"><span class="marca marca-ok">No plano</span></sc-if><sc-if value="{{ t.planoFora }}" hint-placeholder-val="{{ false }}"><span style="font-size: 12px; color: var(--amber)"><span aria-hidden="true">{{ t.plTxt }}</span><span class="so-leitor">{{ t.plAria }}</span></span></sc-if><sc-if value="{{ t.planoHist }}" hint-placeholder-val="{{ false }}"><span style="font-size: 12px; color: var(--text-2)">Histórico importado · só resultado</span></sc-if><sc-if value="{{ t.planoNada }}" hint-placeholder-val="{{ false }}"><span style="color: var(--text-2)"><span aria-hidden="true">—</span><span class="so-leitor">plano não avaliado</span></span></sc-if><sc-if value="{{ t.temAcao }}" hint-placeholder-val="{{ false }}"><a href="RegistrarOperacao.dc.html" class="btn" aria-label="{{ t.acaoAria }}" style="padding: 0 14px">{{ t.acao }}</a></sc-if></span>
++<span role="cell" style="display: flex; justify-content: flex-end"><button type="button" aria-expanded="{{ t.aberto }}" aria-controls="{{ t.drillId }}" aria-label="{{ t.rot }}" onClick="{{ t.alternar }}" class="btn btn-x"><sc-if value="{{ t.aberto }}" hint-placeholder-val="{{ false }}"><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true" style="fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round"><path d="M6 15l6-6 6 6"></path></svg></sc-if><sc-if value="{{ t.fechado }}" hint-placeholder-val="{{ true }}"><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true" style="fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round"><path d="M6 9l6 6 6-6"></path></svg></sc-if></button></span>
+ </div>
+ <sc-if value="{{ t.aberto }}" hint-placeholder-val="{{ false }}">
+ <div role="row"><div role="cell" aria-colspan="5" id="{{ t.drillId }}" class="drill">
+@@ -424,12 +428,12 @@
+ <sc-if value="{{ t.temDlg }}" hint-placeholder-val="{{ false }}">
+ <div role="dialog" aria-labelledby="{{ t.dlgId }}" class="dlg" onKeyDown="{{ t.dlgTecla }}">
+ <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 6px 12px"><strong id="{{ t.dlgId }}">{{ t.dlg.titulo }}</strong><div style="display: flex; flex-wrap: wrap; gap: 6px"><button type="button" class="btn" aria-disabled="{{ t.dlg.semAnt }}" onClick="{{ t.dlg.anterior }}">Anterior</button><button type="button" class="btn" aria-disabled="{{ t.dlg.semProx }}" onClick="{{ t.dlg.proxima }}">Próxima</button><button type="button" class="btn" ref="{{ t.dlg.refFechar }}" onClick="{{ t.dlg.fechar }}">Fechar</button></div></div>
+-<svg viewBox="0 0 168 104" role="img" aria-label="{{ t.dlg.nome }}"><path d="{{ t.dlg.d }}" style="fill: none; stroke: var(--text-2); stroke-width: 1.2"></path><line x1="8" x2="160" y1="64" y2="64" style="stroke: var(--red); stroke-width: 1; stroke-dasharray: 4 3"></line><line x1="8" x2="160" y1="30" y2="30" style="stroke: var(--mint); stroke-width: 1; stroke-dasharray: 4 3"></line></svg>
++<sc-if value="{{ t.dlg.f1 }}" hint-placeholder-val="{{ true }}"><svg viewBox="0 0 168 104" role="img" aria-label="{{ t.dlg.nome }}"><path d="M8 84 L28 70 L44 76 L60 52 L76 58 L92 40 L108 46 L124 30 L140 36 L160 24" style="fill: none; stroke: var(--text-2); stroke-width: 1.2"></path><line x1="8" x2="160" y1="64" y2="64" style="stroke: var(--red); stroke-width: 1; stroke-dasharray: 4 3"></line><line x1="8" x2="160" y1="30" y2="30" style="stroke: var(--mint); stroke-width: 1; stroke-dasharray: 4 3"></line></svg></sc-if><sc-if value="{{ t.dlg.f2 }}" hint-placeholder-val="{{ false }}"><svg viewBox="0 0 168 104" role="img" aria-label="{{ t.dlg.nome }}"><path d="M8 30 L24 38 L40 34 L56 52 L72 46 L88 64 L104 60 L120 76 L140 70 L160 82" style="fill: none; stroke: var(--text-2); stroke-width: 1.2"></path><line x1="8" x2="160" y1="64" y2="64" style="stroke: var(--red); stroke-width: 1; stroke-dasharray: 4 3"></line><line x1="8" x2="160" y1="30" y2="30" style="stroke: var(--mint); stroke-width: 1; stroke-dasharray: 4 3"></line></svg></sc-if><sc-if value="{{ t.dlg.f3 }}" hint-placeholder-val="{{ false }}"><svg viewBox="0 0 168 104" role="img" aria-label="{{ t.dlg.nome }}"><path d="M8 70 L24 64 L40 72 L56 50 L72 56 L88 44 L104 52 L120 36 L140 42 L160 30" style="fill: none; stroke: var(--text-2); stroke-width: 1.2"></path><line x1="8" x2="160" y1="64" y2="64" style="stroke: var(--red); stroke-width: 1; stroke-dasharray: 4 3"></line><line x1="8" x2="160" y1="30" y2="30" style="stroke: var(--mint); stroke-width: 1; stroke-dasharray: 4 3"></line></svg></sc-if>
+ <span class="linha2" style="font-size: 12px; overflow-wrap: anywhere">{{ t.dlg.nome }} · {{ t.dlg.tam }}</span>
+ </div>
+ </sc-if>
+ <sc-if value="{{ t.temMinis }}" hint-placeholder-val="{{ false }}"><ul class="minis" aria-label="Imagens">
+-<sc-for list="{{ t.imgs }}" as="im" hint-placeholder-count="1"><li><button type="button" class="mini" ref="{{ im.ref }}" aria-label="{{ im.aria }}" onClick="{{ im.abrir }}"><svg viewBox="0 0 168 104" aria-hidden="true"><path d="{{ im.d }}" style="fill: none; stroke: var(--text-2); stroke-width: 1.5"></path><line x1="8" x2="160" y1="64" y2="64" style="stroke: var(--red); stroke-width: 1.5; stroke-dasharray: 4 3"></line><line x1="8" x2="160" y1="30" y2="30" style="stroke: var(--mint); stroke-width: 1.5; stroke-dasharray: 4 3"></line></svg><span style="overflow-wrap: anywhere">{{ im.nome }} · {{ im.tam }}</span></button></li></sc-for>
++<sc-for list="{{ t.imgs }}" as="im" hint-placeholder-count="1"><li><button type="button" class="mini" ref="{{ im.ref }}" aria-label="{{ im.aria }}" onClick="{{ im.abrir }}"><sc-if value="{{ im.f1 }}" hint-placeholder-val="{{ true }}"><svg viewBox="0 0 168 104" aria-hidden="true"><path d="M8 84 L28 70 L44 76 L60 52 L76 58 L92 40 L108 46 L124 30 L140 36 L160 24" style="fill: none; stroke: var(--text-2); stroke-width: 1.5"></path><line x1="8" x2="160" y1="64" y2="64" style="stroke: var(--red); stroke-width: 1.5; stroke-dasharray: 4 3"></line><line x1="8" x2="160" y1="30" y2="30" style="stroke: var(--mint); stroke-width: 1.5; stroke-dasharray: 4 3"></line></svg></sc-if><sc-if value="{{ im.f2 }}" hint-placeholder-val="{{ false }}"><svg viewBox="0 0 168 104" aria-hidden="true"><path d="M8 30 L24 38 L40 34 L56 52 L72 46 L88 64 L104 60 L120 76 L140 70 L160 82" style="fill: none; stroke: var(--text-2); stroke-width: 1.5"></path><line x1="8" x2="160" y1="64" y2="64" style="stroke: var(--red); stroke-width: 1.5; stroke-dasharray: 4 3"></line><line x1="8" x2="160" y1="30" y2="30" style="stroke: var(--mint); stroke-width: 1.5; stroke-dasharray: 4 3"></line></svg></sc-if><sc-if value="{{ im.f3 }}" hint-placeholder-val="{{ false }}"><svg viewBox="0 0 168 104" aria-hidden="true"><path d="M8 70 L24 64 L40 72 L56 50 L72 56 L88 44 L104 52 L120 36 L140 42 L160 30" style="fill: none; stroke: var(--text-2); stroke-width: 1.5"></path><line x1="8" x2="160" y1="64" y2="64" style="stroke: var(--red); stroke-width: 1.5; stroke-dasharray: 4 3"></line><line x1="8" x2="160" y1="30" y2="30" style="stroke: var(--mint); stroke-width: 1.5; stroke-dasharray: 4 3"></line></svg></sc-if><span style="overflow-wrap: anywhere">{{ im.nome }} · {{ im.tam }}</span></button></li></sc-for>
+ </ul></sc-if>
+ <sc-if value="{{ t.temNota }}" hint-placeholder-val="{{ false }}"><p style="margin: 0; font-size: 13px; text-wrap: pretty">{{ t.nota }}</p></sc-if>
+ </div>
+@@ -450,7 +454,7 @@
+ <div style="display: flex; align-items: center; gap: 8px"><strong style="font-size: 13px">Suas marcas</strong><button type="button" class="info" aria-expanded="{{ i.marcas.aberto }}" aria-controls="{{ t.marcasInfoId }}" aria-label="Como ler: suas marcas" onClick="{{ i.marcas.alternar }}">i</button></div>
+ <sc-if value="{{ i.marcas.aberto }}" hint-placeholder-val="{{ false }}"><div id="{{ t.marcasInfoId }}" class="info-painel">Nos Padrões de Análises, só as marcas feitas antes da saída podem chegar a Confirmada; as feitas depois do resultado aparecem, mas param em Pouco fundamentada. Mudou uma marca depois? Em Análises vale a de antes da saída, e a troca fica guardada.</div></sc-if>
+ <div style="display: flex; flex-wrap: wrap; gap: 8px 24px; align-items: flex-end">
+-<sc-for list="{{ t.grupos }}" as="g" hint-placeholder-count="3"><div style="display: flex; flex-direction: column; gap: 4px"><span id="{{ g.id }}" class="linha2" style="font-size: 12px">{{ g.rot }}<sc-if value="{{ g.temTempo }}" hint-placeholder-val="{{ false }}"><span style="display: block; font-size: 11px">{{ g.tempo }}</span></sc-if></span><div role="group" aria-labelledby="{{ g.id }}" style="display: flex; flex-wrap: wrap; gap: 6px"><sc-for list="{{ g.opcoes }}" as="o" hint-placeholder-count="3"><button type="button" class="btn" aria-pressed="{{ o.sel }}" onClick="{{ o.escolher }}" style="padding: 0 12px">{{ o.rot }}</button></sc-for></div></div></sc-for>
++<sc-for list="{{ t.grupos }}" as="g" hint-placeholder-count="3"><div style="display: flex; flex-direction: column; gap: 4px"><span id="{{ g.id }}" class="linha2" style="font-size: 12px">{{ g.rot }}<sc-if value="{{ g.temTempo }}" hint-placeholder-val="{{ false }}"><span style="display: block; font-size: 11px">{{ g.tempo }}</span></sc-if></span><div role="group" aria-labelledby="{{ g.id }}" style="display: flex; flex-wrap: wrap; gap: 6px"><sc-for list="{{ g.opcoes }}" as="o" hint-placeholder-count="3"><button type="button" class="btn" aria-pressed="{{ o.sel }}" onClick="{{ o.escolher }}" style="padding: 0 12px; min-width: 44px">{{ o.rot }}</button></sc-for></div></div></sc-for>
+ </div>
+ <div role="status" class="so-leitor">{{ t.mkStatus }}</div>
+ </div></sc-if>
+@@ -545,7 +549,7 @@
+ <div style="display: flex; flex-direction: column; gap: 2px; min-width: 0"><strong style="overflow-wrap: anywhere">{{ l.quando }} · {{ l.nome }}</strong><span class="partes"><sc-for list="{{ l.partes }}" as="pt" hint-placeholder-count="4"><span>{{ pt }}</span></sc-for></span></div>
+ <sc-if value="{{ l.podeDesfazer }}" hint-placeholder-val="{{ true }}"><button type="button" class="btn" ref="{{ l.refDesfazer }}" aria-label="{{ l.aria }}" onClick="{{ l.desfazer }}">Desfazer</button></sc-if>
+ <sc-if value="{{ l.desfeita }}" hint-placeholder-val="{{ false }}"><span class="linha2">{{ l.desfeitaTxt }}</span></sc-if>
+-<sc-if value="{{ l.confirmando }}" hint-placeholder-val="{{ false }}"><div class="atencao" role="group" aria-labelledby="{{ l.confId }}"><span id="{{ l.confId }}" style="font-weight: 700">{{ l.confirma }}</span><sc-if value="{{ l.temSaem }}" hint-placeholder-val="{{ true }}"><span style="font-size: 13px">{{ l.saem }}</span></sc-if><div style="display: flex; flex-wrap: wrap; gap: 8px"><button type="button" class="btn btn-pri" onClick="{{ l.sim }}">Desfazer e apagar</button><button type="button" class="btn" ref="{{ l.refManter }}" onClick="{{ l.manter }}">Manter</button></div></div></sc-if>
++<sc-if value="{{ l.confirmando }}" hint-placeholder-val="{{ false }}"><div class="atencao" role="group" aria-labelledby="{{ l.confId }}"><span id="{{ l.confId }}" style="font-weight: 700">{{ l.confirma }}</span><sc-if value="{{ l.temSaem }}" hint-placeholder-val="{{ true }}"><span style="font-size: 13px">{{ l.saem }}</span></sc-if><div style="display: flex; flex-wrap: wrap; gap: 8px"><button type="button" class="btn btn-pri" onClick="{{ l.sim }}">{{ l.simRot }}</button><button type="button" class="btn" ref="{{ l.refManter }}" onClick="{{ l.manter }}">Manter</button></div></div></sc-if>
+ </li></sc-for>
+ </ul>
+ </section>

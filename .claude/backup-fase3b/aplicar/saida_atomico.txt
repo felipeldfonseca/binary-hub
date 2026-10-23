@@ -1,0 +1,1 @@
+psql:/private/tmp/claude-502/-Users-felipefonseca-Dev-binary-hub/a0c92ab8-acd5-400d-8d52-ead30f579f54/scratchpad/fase3b/aplicar/fase3b_aplicar.sql:300: ERROR:  relation "trades_modelo_ext" already exists

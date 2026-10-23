@@ -1,0 +1,2 @@
+aaaaaaaa-0000-0000-0000-000000000001
+fluxos: parcial 40.00, em aberto 1.00000000, stop no breakeven com 20.00000000 pts, desfeito stop, limite vê 40.00, saída total 100.00 R 0.6250, já fechada 25.00 em 2 saídas, breakeven reconstructed

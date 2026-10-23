@@ -1,0 +1,2 @@
+psql:/private/tmp/claude-502/-Users-felipefonseca-Dev-binary-hub/a0c92ab8-acd5-400d-8d52-ead30f579f54/scratchpad/fase3c/aplicar/desfazer_fase3c.sql:31: ERROR:  f3c_em_uso: 119 saídas ou ajustes de stop registrados
+CONTEXT:  PL/pgSQL function inline_code_block line 10 at RAISE

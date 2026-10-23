@@ -1,0 +1,24 @@
+Para importar arquivos de outras plataformas dizendo o que é cada coluna, o banco precisa de uma colagem. Ela:
+
+• cria a tabela dos modelos: as colunas que você diz uma vez para um arquivo, guardadas para o próximo arquivo com as mesmas colunas entrar direto (só os nomes das colunas e as suas escolhas, nunca uma operação);
+• dá aos lotes de importação três colunas novas: o modelo, o nome dele e o formato do arquivo (para avisar quando as mesmas operações chegam em dois formatos na mesma conta);
+• ensina a importação a aceitar um arquivo lido por colunas em Futuros, Forex, Ações e opções (EUA), Cripto e B3 (binárias continuam só com o CSV da Ebinex): sem coluna de ID, «mesma hora e preço» reconhece o que já entrou; o resultado do arquivo vale, e sem ele o app calcula pelos preços onde a conta é exata; um arquivo por colunas nunca muda o horário das operações que já estão na conta;
+• deixa a importação da Top One e a da Ebinex respondendo exatamente como hoje (o app atual continua funcionando sem mudar nada).
+
+Nenhuma operação, conta, versão de regras, configuração, marca, saída, ajuste de stop, importação ou dia muda. O script confere isso sozinho antes de terminar: cada linha, cada resposta do limite do dia, cada regra em vigor, cada marca e o estado de cada operação são os mesmos de antes. Se algo divergir, ele desfaz tudo. A conferência do fim mostra também se cada «Posso operar hoje?» continua igual («posso_operar_que_mudou»).
+
+Como fazer:
+1. Abra o SQL Editor do Supabase (projeto do Binary Hub) e crie uma consulta nova.
+2. Cole todo o arquivo fase3b_aplicar.sql e clique em Run (leva alguns segundos).
+3. No fim aparece uma conferência em JSON. Copie e cole aqui na conversa.
+
+O que eu espero ver na conferência:
+• "linhas_que_mudaram": 0, "respostas_do_limite_que_mudaram": 0, "posso_operar_que_mudou": 0, "regras_que_mudariam": 0, "marcas_que_mudaram": 0, "estados_que_mudaram": 0 e "descritor_alem_do_mapping": 0
+• "modelos": 0, "lotes_por_colunas": 0, "operacoes_por_colunas": 0 e "lotes_com_modelo_ou_formato": 0 (nada importado por colunas ainda)
+• "mapping" com true em tudo menos binary
+• "operacoes", "registradas_no_app", "contas", "versoes_de_regras", "saidas" e "ajustes_de_stop": os números que o banco tem hoje (eu não sei os de agora, depois do seu teste da 3c; eles só aparecem, não mudam)
+• "uma_previa_e_um_importar": true, "funcoes_novas_para_usuarios": true e "para_anonimos": false
+
+Se colar de novo por engano, ele para logo na primeira linha (f3b_ja_aplicado) e não muda nada. Para voltar atrás existe o desfazer_fase3b.sql (outra colagem), mas só se eu pedir, e ele só funciona enquanto nenhum modelo tiver sido salvo e nenhum arquivo tiver sido importado por colunas.
+
+O app de hoje ainda não usa nada disso: as telas da importação por colunas vêm depois, e só entram no ar depois desta colagem.

@@ -1,0 +1,2 @@
+psql:/private/tmp/claude-502/-Users-felipefonseca-Dev-binary-hub/a0c92ab8-acd5-400d-8d52-ead30f579f54/scratchpad/fase3b/aplicar/fase3b_aplicar.sql:30: ERROR:  f3b_ja_aplicado: a colagem da Fase 3b já está no banco; nada foi feito
+CONTEXT:  PL/pgSQL function inline_code_block line 5 at RAISE

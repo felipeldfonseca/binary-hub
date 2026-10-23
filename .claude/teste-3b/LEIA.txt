@@ -1,0 +1,38 @@
+Teste da Fase 3b · importação por colunas
+==========================================
+
+Arquivos inventados (nenhuma operação real). Use o navegador do Mac em http://localhost:3001.
+Os passos completos, com o que aparece em cada tela, estão no PR (seção «Como testar»).
+
+Arquivo                     Conta            Passo  Para quê
+--------------------------  ---------------  -----  -------------------------------------------------------------
+blackarrow.csv              Apex #1          1      Arquivo novo: dizer o que é cada coluna e salvar o modelo
+                                                    «BlackArrow». 18 operações em 19 e 20 out.
+blackarrow.csv (de novo)    Apex #1          2      Reimportar: «Nada novo», sem aviso de outro formato.
+blackarrow-2.csv            Apex #1          3      As mesmas colunas: entra direto pela «Prévia» com o modelo
+                                                    «BlackArrow». 24 linhas, 6 novas (20 out).
+tradovate-ordens.csv        Apex #1          4      Arquivo de execuções (uma compra ou venda por linha): vira
+                                                    4 operações; salvar o modelo «Tradovate». 21 out.
+tradovate-posicionado.csv   Apex #1          4      Mesmas colunas, outro dia (22 out) e outras ordens: o modelo
+                                                    «Tradovate» lê, e pergunta se o MESZ6 ficou posicionado.
+                                                    Cada resposta mostra a sua prévia: «Não sei» 2 operações,
+                                                    «Sim» 4, «Não» 5. Importe com «Sim».
+forex.csv                   Teste 3b Forex   5      Forex com swap: modelo «Match-Trader» (ou o nome da plataforma
+                                                    da conta). 14 operações em 20 e 21 out.
+b3.csv                      Teste 3b B3      6      As colunas do «BlackArrow» + «Emolumentos», na B3: o app
+                                                    sugere «Parecido com o modelo “BlackArrow”», mas o modelo é de
+                                                    Futuros, então «Atualizar o modelo» vem desmarcado e o app
+                                                    salva um modelo novo, «BlackArrow · B3». 18 linhas (21 out).
+b3.csv (de novo)            Teste 3b B3      6      O modelo novo é reconhecido na B3: «Nada novo».
+
+Contas
+- Apex #1: a sua conta de teste de Futuros.
+- «Teste 3b Forex» (Forex) e «Teste 3b B3» (B3): crie em Personalizar › Suas contas › + Nova conta antes dos
+  passos 5 e 6. Elas nascem com regras «desde hoje», então as operações dos arquivos (de antes de hoje) vão para
+  «Histórico importado · só resultado»: é o esperado.
+- Top One e Ebinex não são usadas.
+
+No fim (passo 7): Personalizar › Suas contas › Importações de cada conta › «Desfazer» cada lote; depois arquive
+«Teste 3b Forex» e «Teste 3b B3». Os modelos ficam salvos (BlackArrow, Tradovate, o do Forex e BlackArrow · B3).
+
+Esta pasta não vai para o repositório. Pode apagar depois do teste.

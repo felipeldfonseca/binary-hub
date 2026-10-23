@@ -1,0 +1,7 @@
+aaaaaaaa-0000-0000-0000-000000000001
+psql:/private/tmp/claude-502/-Users-felipefonseca-Dev-binary-hub/a0c92ab8-acd5-400d-8d52-ead30f579f54/scratchpad/fase3c/aplicar/vivo_par_3c.sql:45: NOTICE:  table "import_rows" does not exist, skipping
+par: prévia = importação (2 registradas, cada linha na sua), o dia 40.63 + app 30.00 → + arquivo 18.76 (5 + 15 − 1,24), desfazer devolve as duas
+aaaaaaaa-0000-0000-0000-000000000001
+psql:/private/tmp/claude-502/-Users-felipefonseca-Dev-binary-hub/a0c92ab8-acd5-400d-8d52-ead30f579f54/scratchpad/fase3c/aplicar/vivo_par_3c.sql:119: NOTICE:  table "import_rows" does not exist, skipping
+{"deleted": 0}|{"deleted": 0}
+par em duas exportações: prévia = importação (a segunda linha na segunda operação), o dia + arquivo 18.76 (5 + 15 − 1,24), desfazer devolve as duas
