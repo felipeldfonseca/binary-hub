@@ -62,6 +62,7 @@ import {
   modeloASalvar,
   mudarColunas,
   nomePadraoDoModelo,
+  sobrescreveModelo,
   type ArquivoMapeavel,
   type Mapeamento,
   type MercadosDosModelos,
@@ -554,15 +555,17 @@ export default function ImportSheet({ mode, accountId, onClose }: { mode: SheetM
   /** The mapping of a file once its account is known: the user's models first (none when they cannot be read) */
   const comecarMapeamento = async (target: TradingAccount, arquivo: ArquivoMapeavel, patch: Partial<Flow> = {}) => {
     setBusy(true)
-    let templates: Template[] = []
+    // A failed read of the models is «unknown» (null): the file goes on as with none, and no new model is saved over one
+    // it never saw (sobrescreveModelo, salvarModelo)
+    let templates: Template[] | null = null
     // A failed read of the markets is «unknown»: every model then counts as another market's (never written over)
     let mercados: MercadosDosModelos | null = null
     try {
       const [r, rm] = await Promise.all([templatesQuery.refetch(), mercadosQuery.refetch()])
-      templates = r.status === 'success' && r.data ? r.data : []
+      templates = r.status === 'success' && r.data ? r.data : null
       mercados = rm.status === 'success' && rm.data ? rm.data : null
     } catch {
-      templates = []
+      templates = null
     }
     if (!alive.current) return
     setBusy(false)
@@ -809,6 +812,16 @@ export default function ImportSheet({ mode, accountId, onClose }: { mode: SheetM
         ? { tipo: 'leitor', lido: flow.file }
         : null
 
+  /** The user's models read again (salvarModelo, when the mapping's own read failed); null when this read fails too */
+  const lerModelos = async (): Promise<Template[] | null> => {
+    try {
+      const r = await templatesQuery.refetch()
+      return r.status === 'success' && r.data ? r.data : null
+    } catch {
+      return null
+    }
+  }
+
   /**
    * The model after a good commit (§6.8): saved, updated or touched through import_template_save, with the commit's
    * batch; without a batch, a touch makes no call, a new model goes without routes, and a model with routes is left as it
@@ -824,6 +837,10 @@ export default function ImportSheet({ mode, accountId, onClose }: { mode: SheetM
     })
     // Nothing to save: «Colunas usadas só neste arquivo.»; another market's model taken as is is only read (no touch, no line)
     if (s === null) return { tipo: m.porModelo ? 'tocado' : 'naoSalvo', nome: m.nome.trim() || m.nomePadrao }
+    // A new model never writes over one (import_template_save keys models by their header set): checked against the
+    // models the file was matched with or, when that read failed, a read now; still unknown, or one with these very
+    // columns → not saved (the end's «não foi salvo» line)
+    if (s.tipo === 'salvo' && sobrescreveModelo(s, m.modelos ?? (await lerModelos()))) return { tipo: 'erro', nome: s.nome }
     let payload = s.payload
     if (result.batch_id === null) {
       if (s.tipo === 'tocado') return { tipo: 'tocado', nome: s.nome }

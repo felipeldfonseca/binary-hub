@@ -14,6 +14,11 @@ export const MAPA = {
   /** B IC l.1485 */ titulo: 'Não reconhecemos este arquivo. Diga o que é cada coluna.',
   /** B IC l.1484 */ tituloMudou: (nome: string) => `Este arquivo mudou desde o modelo “${nome}”. Confira as colunas.`,
   /** B IC l.1485 */ tituloMudar: (nome: string) => `Mude as colunas do modelo “${nome}”.`,
+  /**
+   * N (owner decision, 23 Oct): «Mudar colunas» of another market's model with the file's very columns, which is only
+   * read: the changes are this file's, never the model's
+   */
+  tituloMudarSoLer: (nome: string) => `Mude as colunas deste arquivo. O modelo “${nome}” fica como está.`,
   /** B IC l.540 */ modo: 'Cada linha do arquivo é',
   /** B IC l.540 */ modoOperacao: 'uma operação (entrada e saída)',
   /** B IC l.540 */ modoExecucao: 'uma execução (compra ou venda)',

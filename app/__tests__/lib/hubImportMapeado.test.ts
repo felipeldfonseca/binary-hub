@@ -11,6 +11,7 @@ import {
   checkTemplate,
   endOfFileKey,
   headerSignature,
+  normaliseHeaders,
   parseMappedRecords,
   sniffDateOrder,
   sniffDecimalMark,
@@ -54,6 +55,7 @@ import {
   nomeNoMercado,
   nomePadraoDoModelo,
   notaDeLeitura,
+  sobrescreveModelo,
   type MercadosDosModelos,
   type ArquivoMapeavel,
   type ColunaUi,
@@ -596,6 +598,99 @@ describe('owner decision (23 Oct): a model saved in another market', () => {
     expect([igual.lido.delimiter, igual.origem, igual.outroMercado, igual.salvar, igual.nome]).toEqual([',', 'modelo', ['b3'], false, 'BlackArrow · Futuros'])
     const outro = comSeparador(m, { ...arquivo('f15'), text: ['Data/Hora;Papel,C/V;Qtd', '01/10/2026 09:34:31;MESZ6,C;2'].join('\n') }, ',', 'futures')
     expect([outro.lido.delimiter, outro.origem, outro.outroMercado, outro.salvar, outro.nome]).toEqual([',', 'nomes', undefined, true, 'BlackArrow · Futuros'])
+  })
+})
+
+describe('review (23 Oct): a new model never writes over a model the mapping did not match', () => {
+  const BA = MODELO_BLACKARROW_LINHA.id
+  const futuros: MercadosDosModelos = { [BA]: ['futures'] }
+  const linhasDe = (texto: string) => texto.split(/\r?\n/)
+  /** b3.csv (f19) without «Emolumentos»: BlackArrow’s very columns, B3 rows (invented) */
+  const COLUNAS_BA = linhasDe(ARQUIVOS_QUADRO.f19.texto)
+    .map((l) => l.split(';').filter((_, i) => i !== 8).join(';'))
+    .join('\n')
+  /** …each data line ending in «;», the header without it: the domain’s sniff reads it with «,» first */
+  const ponto = (texto: string) =>
+    linhasDe(texto)
+      .map((l, i) => (i === 0 || l === '' ? l : `${l};`))
+      .join('\n')
+  const normalisedHeadersOf = (texto: string) => normaliseHeaders(linhasDe(texto)[0].split(';'))
+  const a = (texto: string): ArquivoMapeavel => ({ fileName: 'b3-ba.csv', size: texto.length, sha256: 'ab'.repeat(32), text: texto })
+  function iniciar(texto: string, market: AccountMarket, templates: readonly Template[] | null, mercados?: MercadosDosModelos | null): Mapeamento {
+    const r = iniciarMapeamento(a(texto), { market, templates, nomePadrao: market === 'b3' ? 'Profit (Nelogica)' : 'Rithmic', mercados })
+    if (!r.ok) throw new Error(r.error)
+    return r.mapeamento
+  }
+
+  it('1 · «Separador» fixed in B3 on BlackArrow’s very columns: matched against every model, Futuros’ «BlackArrow» is only read', () => {
+    expect(headerSignature(normalisedHeadersOf(COLUNAS_BA))).toBe(MODELO_BLACKARROW_LINHA.header_sig)
+    const m = iniciar(ponto(COLUNAS_BA), 'b3', [modeloBlackArrow(), modeloTradovate()], futuros)
+    // What the owner sees first: «,», «Não reconhecemos», «Salvar como modelo» checked under the platform’s name
+    expect([m.lido.delimiter, m.match.kind, m.origem, m.salvar, m.nome]).toEqual([',', 'none', 'nomes', true, 'Profit (Nelogica)'])
+    const n = comSeparador(m, a(ponto(COLUNAS_BA)), ';', 'b3')
+    expect([n.separador, n.lido.delimiter, n.lido.headerSkip, n.lido.records.length]).toEqual([';', ';', 0, 18])
+    expect(n.match).toMatchObject({ kind: 'exact', template: { id: BA } })
+    expect([n.origem, n.outroMercado, n.salvar, n.porModelo, n.inicio, modeloSoParaLer(n)]).toEqual(['modelo', ['futures'], false, false, 'mapa', true])
+    // Nothing saved (before: a «new» model with BlackArrow’s header set, which import_template_save wrote over it)
+    const v = comPalavraDeLado(n, 'x', 'sell', 'b3')
+    expect(modeloASalvar(v, { tzHint: 'America/Sao_Paulo', rota: null })).toBeNull()
+    expect(modeloASalvar(comSalvar(v, true), { tzHint: 'America/Sao_Paulo', rota: null })).toBeNull()
+    // Its New York is no hint for this file
+    expect(fusoDoModelo(v)).toBeNull()
+    expect(bloqueioDoMapa(v, 'b3')).toBeNull()
+  })
+
+  it('1 · …in BlackArrow’s own market: «Atualizar o modelo “BlackArrow”» under its own name, never renamed after a name typed before', () => {
+    const m = comNome(iniciar(ponto(COLUNAS_BA), 'futures', [modeloBlackArrow()], futuros), 'Rithmic 2')
+    const n = comSeparador(m, a(ponto(COLUNAS_BA)), ';', 'futures')
+    expect([n.match.kind, n.origem, n.outroMercado, n.salvar, n.nome, n.nomePadrao]).toEqual(['exact', 'modelo', undefined, true, 'BlackArrow', 'BlackArrow'])
+    const s = modeloASalvar(comPalavraDeLado(n, 'x', 'sell', 'futures'), { tzHint: 'America/New_York', rota: null })
+    expect(s).toMatchObject({ tipo: 'atualizado', replaces: BA, nome: 'BlackArrow', payload: { name: 'BlackArrow' } })
+    expect(sobrescreveModelo(s!, n.modelos)).toBe(false)
+  })
+
+  it('1 · a re-read that matches another market’s model with changed columns: unchecked, its new model’s name; that one writes over none', () => {
+    const comEmol = ponto(ARQUIVOS_QUADRO.f19.texto)
+    const m = iniciar(comEmol, 'b3', [modeloBlackArrow()], futuros)
+    expect([m.lido.delimiter, m.match.kind]).toEqual([',', 'none'])
+    const n = comPalavraDeLado(comSeparador(m, a(comEmol), ';', 'b3'), 'x', 'sell', 'b3')
+    expect(n.match).toMatchObject({ kind: 'changed', template: { id: BA } })
+    expect([n.outroMercado, n.salvar, n.nome, modeloSoParaLer(n)]).toEqual([['futures'], false, 'BlackArrow · B3', false])
+    const s = modeloASalvar(comColuna(n, n.lido.headers.indexOf('emolumentos'), 'fee', 'b3'), { tzHint: 'America/Sao_Paulo', rota: null })
+    expect(s).toMatchObject({ tipo: 'salvo', replaces: null, nome: 'BlackArrow · B3' })
+    expect(sobrescreveModelo(s!, n.modelos)).toBe(false)
+  })
+
+  it('a re-read with a model gone or still none keeps the owner’s «Salvar» and name, as before', () => {
+    const m = comSalvar(comNome(iniciar(ponto(COLUNAS_BA), 'b3', [modeloTradovate()], futuros), 'Clear'), false)
+    const n = comSeparador(m, a(ponto(COLUNAS_BA)), ';', 'b3')
+    expect([n.match.kind, n.salvar, n.nome, n.nomePadrao, n.modelos]).toEqual(['none', false, 'Clear', 'Profit (Nelogica)', m.modelos])
+  })
+
+  it('2 · the models cannot be read (null): matched against none, and the «new» model counts as writing over one', () => {
+    const m = iniciar(COLUNAS_BA, 'b3', null, futuros)
+    expect([m.lido.delimiter, m.match.kind, m.origem, m.salvar, m.nome, m.modelos]).toEqual([';', 'none', 'nomes', true, 'Profit (Nelogica)', null])
+    const s = modeloASalvar(comPalavraDeLado(m, 'x', 'sell', 'b3'), { tzHint: 'America/Sao_Paulo', rota: null })
+    expect(s).toMatchObject({ tipo: 'salvo', replaces: null, nome: 'Profit (Nelogica)' })
+    // Unknown: not saved; read again at save time: BlackArrow has these very columns → not saved; none has them → saved
+    expect(sobrescreveModelo(s!, null)).toBe(true)
+    expect(sobrescreveModelo(s!, [modeloBlackArrow()])).toBe(true)
+    expect(sobrescreveModelo(s!, [])).toBe(false)
+    expect(sobrescreveModelo(s!, [modeloTradovate()])).toBe(false)
+    // «Separador» on a mapping whose models are unknown matches none
+    expect(comSeparador(iniciar(ponto(COLUNAS_BA), 'b3', null, futuros), a(ponto(COLUNAS_BA)), ';', 'b3').match.kind).toBe('none')
+  })
+
+  it('sobrescreveModelo never stops an update (the database refuses another model’s header set) or a touch', () => {
+    const s = modeloASalvar(comSalvar(comPalavraDeLado(iniciar(ARQUIVOS_QUADRO.f19.texto, 'b3', [modeloBlackArrow()], futuros), 'x', 'sell', 'b3'), true), {
+      tzHint: null,
+      rota: null,
+    })
+    expect(s?.tipo).toBe('atualizado')
+    expect(sobrescreveModelo(s!, null)).toBe(false)
+    const tocado = modeloASalvar(mapear('f15', [modeloBlackArrow()]), { tzHint: null, rota: null })
+    expect(tocado?.tipo).toBe('tocado')
+    expect(sobrescreveModelo(tocado!, [modeloBlackArrow()])).toBe(false)
   })
 })
 

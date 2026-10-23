@@ -18,11 +18,16 @@
  *      «Atualizar» unchecked → a new model «BlackArrow · B3»; «BlackArrow»'s row unchanged, byte for byte;
  *   3. b3.csv again: the new model matched exactly in its own market, taken as is; «Nada novo»;
  *   4. blackarrow-2.csv with «Emolumentos» (the B3 model's very columns) in Ylos 50k: taken as is, never touched (the
- *      batch keeps no model), «BlackArrow · B3» unchanged; «Desfazer» keeps every model's market.
+ *      batch keeps no model), «BlackArrow · B3» unchanged; «Desfazer» keeps every model's market;
+ *   5. (review) b3.csv without «Emolumentos» (BlackArrow's very columns), each data line ending in «;», in Mini-índice:
+ *      read first with «,» («Não reconhecemos»); «Separador» «;» matches it against every model: Futuros' «BlackArrow»,
+ *      only read; nothing saved, «BlackArrow» unchanged;
+ *   6. (review) the same columns with the models unread: the «new» model has BlackArrow's header set, so the sheet does
+ *      not send it (sobrescreveModelo); sent, import_template_save would update «BlackArrow»'s row (renamed, re-zoned).
  */
 import { createHash, randomUUID } from 'crypto';
 import fs from 'fs';
-import { buildImportArgs, checkTemplate, previewArgs, type MappedFile, type Template } from '@/lib/domain/import';
+import { buildImportArgs, checkTemplate, headerSignature, normaliseHeaders, previewArgs, type MappedFile, type Template } from '@/lib/domain/import';
 import type { AccountMarket } from '@/lib/domain/markets';
 import { fetchTemplateMarkets, fetchTemplates, importCommit, importPreview, importUndo, saveTemplate } from '@/lib/hub/contasDb';
 import {
@@ -30,11 +35,14 @@ import {
   bloqueioDoConferir,
   bloqueioDoMapa,
   comColuna,
+  comLiquido,
   comPalavraDeLado,
+  comSeparador,
   iniciarMapeamento,
   modeloASalvar,
   modeloSoParaLer,
   nomePadraoDoModelo,
+  sobrescreveModelo,
   type ArquivoMapeavel,
   type Mapeamento,
 } from '@/lib/hub/importMapeado';
@@ -62,6 +70,14 @@ const F15_EMOLUMENTOS = ARQUIVOS_QUADRO.f15.texto
   .split('\r\n')
   .map((l, i) => `${l};${i === 0 ? 'Emolumentos' : '0,00'}`)
   .join('\r\n');
+
+/** b3.csv (f19) without «Emolumentos»: BlackArrow's very columns, B3 rows */
+const COLUNAS_BA = ARQUIVOS_QUADRO.f19.texto.split(/\r?\n/).map((l) => l.split(';').filter((_, j) => j !== 8).join(';'));
+const B3_BA = COLUNAS_BA.join('\r\n');
+/** …each data line ending in «;», the header without it: the domain's sniff reads it with «,» first */
+const B3_BA_PV = COLUNAS_BA.map((l, i) => (i === 0 || l === '' ? l : `${l};`)).join('\r\n');
+/** BlackArrow's header set as the browser signs it (the database's import_template_sig) */
+const SIG_BA = headerSignature(normaliseHeaders(COLUNAS_BA[0].split(';')));
 
 describePg('Phase 3b · a model saved in another market (owner decision, 23 Oct) on the real SQL', () => {
   const uid = randomUUID();
@@ -215,5 +231,53 @@ delete from auth.users where id = '${uid}';`);
     await importUndo(db, commit!.batch_id as string);
     await importUndo(db, loteB3);
     await expect(fetchTemplateMarkets(db)).resolves.toEqual({ [blackArrow]: ['futures'], [blackArrowB3]: ['b3'] });
+  });
+
+  it('5 · review: BlackArrow’s very columns in Mini-índice, read first with «,»; «Separador» «;» finds Futuros’ «BlackArrow», only read; nothing written', async () => {
+    const antes = linhaDoModelo(blackArrow);
+    const nome = 'b3-ba.csv';
+    const m0 = await iniciar('mini', nome, B3_BA_PV);
+    expect([m0.lido.delimiter, m0.match.kind, m0.origem, m0.salvar, m0.nome]).toEqual([',', 'none', 'nomes', true, 'Profit (Nelogica)']);
+    let m = comSeparador(m0, arquivo(nome, B3_BA_PV), ';', 'b3');
+    expect(m.match).toMatchObject({ kind: 'exact', template: { id: blackArrow, name: 'BlackArrow' } });
+    expect([m.lido.delimiter, m.outroMercado, m.salvar, modeloSoParaLer(m)]).toEqual([';', ['futures'], false, true]);
+    m = comPalavraDeLado(m, 'x', 'sell', 'b3');
+    expect([bloqueioDoMapa(m, 'b3'), bloqueioDoConferir(m, 'b3')]).toEqual([null, null]);
+    const { f, previa, commit } = await importar(mini, 'b3', m, nome, B3_BA_PV, SP);
+    expect(f.format).toEqual({ sig: SIG_BA, template: blackArrow });
+    expect([previa.new, previa.errors.map((e) => `${e.line} ${e.code}`)]).toEqual([16, ['9 off_tick', '15 bad_direction']]);
+    expect(commit?.inserted).toBe(16);
+    // The sheet saves nothing and touches nothing: the batch keeps no model, «BlackArrow» stays Futuros' only
+    expect(modeloASalvar(m, { tzHint: SP, rota: null })).toBeNull();
+    expect(lote(commit!.batch_id as string)).toBe('-|-');
+    expect(linhaDoModelo(blackArrow)).toBe(antes);
+    await expect(fetchTemplateMarkets(db)).resolves.toEqual({ [blackArrow]: ['futures'], [blackArrowB3]: ['b3'] });
+    await importUndo(db, commit!.batch_id as string);
+  });
+
+  it('6 · review: the models unread, the «new» model of the same columns is BlackArrow’s header set: not sent; sent, the SQL writes over «BlackArrow»', async () => {
+    const antes = linhaDoModelo(blackArrow);
+    const nome = 'b3-ba.csv';
+    const c = CONTAS_QUADRO.mini;
+    const r = iniciarMapeamento(arquivo(nome, B3_BA), { market: 'b3', templates: null, nomePadrao: nomePadraoDoModelo(c.platform), mercados: await fetchTemplateMarkets(db) });
+    if (!r.ok) throw new Error(r.error);
+    const m = comLiquido(comPalavraDeLado(r.mapeamento, 'x', 'sell', 'b3'), true);
+    expect([m.match.kind, m.origem, m.salvar, m.nome, m.modelos]).toEqual(['none', 'nomes', true, 'Profit (Nelogica)', null]);
+    expect([bloqueioDoMapa(m, 'b3'), bloqueioDoConferir(m, 'b3')]).toEqual([null, null]);
+    const { commit } = await importar(mini, 'b3', m, nome, B3_BA, SP);
+    expect(commit?.inserted).toBe(16);
+    const s = modeloASalvar(m, { tzHint: SP, rota: null });
+    expect(s).toMatchObject({ tipo: 'salvo', replaces: null, nome: 'Profit (Nelogica)' });
+    // The sheet's guard: the models unknown → not sent; read again (the real rows) → «BlackArrow» has these very columns
+    expect(sobrescreveModelo(s!, null)).toBe(true);
+    expect(sobrescreveModelo(s!, await fetchTemplates(db))).toBe(true);
+    expect(linhaDoModelo(blackArrow)).toBe(antes);
+    // What it keeps from happening, on the real SQL: no new row; «BlackArrow»'s row renamed, re-zoned, now B3's too
+    const salvo = await saveTemplate(db, s!.payload, commit!.batch_id, s!.replaces);
+    expect([salvo.created, salvo.template_id]).toEqual([false, blackArrow]);
+    expect(linhaDoModelo(blackArrow)).not.toBe(antes);
+    const ba = (await fetchTemplates(db)).find((t) => t.id === blackArrow);
+    expect([ba?.name, ba?.tzHint]).toEqual(['Profit (Nelogica)', SP]);
+    await expect(fetchTemplateMarkets(db)).resolves.toEqual({ [blackArrow]: ['futures', 'b3'], [blackArrowB3]: ['b3'] });
   });
 });

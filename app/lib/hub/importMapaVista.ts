@@ -343,10 +343,14 @@ function modeloVista(m: Mapeamento): ModeloVista | null {
   }
 }
 
-/** E7 */
+/**
+ * E7; «Mudar colunas» of another market's model with the file's very columns (modeloSoParaLer: only read, owner decision
+ * 23 Oct) changes this file's columns, never the model's
+ */
 function tituloDoMapa(m: Mapeamento): string {
   if (m.origem === 'nomes') return MAPA.titulo
-  return m.mudando ? MAPA.tituloMudar(nomeDoModelo(m)) : MAPA.tituloMudou(nomeDoModelo(m))
+  if (m.mudando) return modeloSoParaLer(m) ? MAPA.tituloMudarSoLer(nomeDoModelo(m)) : MAPA.tituloMudar(nomeDoModelo(m))
+  return MAPA.tituloMudou(nomeDoModelo(m))
 }
 
 /** E11: the first mapped date cell both orders read («09.10.2026 …»), its day and month as written */

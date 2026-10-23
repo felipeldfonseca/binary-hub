@@ -589,6 +589,38 @@ describe('«conferir» · trade files', () => {
       const direto = naB3('f19', { [venda.id]: ['futures'] }, [venda])
       expect([direto.porModelo, direto.inicio, vistaConferir(direto, 'b3').modelo, vistaConferir(direto, 'b3').chipModelo]).toEqual([true, 'previa', null, 'B3 antigo'])
     })
+
+    it('review (23 Oct) · 3: «Mudar colunas» of that model says the changes are this file’s, never «Mude as colunas do modelo …»', () => {
+      const venda = mapeadoModelo({ ...naB3('f19', null, []), sideWords: { x: 'sell' } })
+      const direto = naB3('f19', { [venda.id]: ['futures'] }, [venda])
+      const mudou = mudarColunas(direto)
+      expect(vistaMapa(mudou, arquivo('f19'), 'b3').titulo).toBe('Mude as colunas deste arquivo. O modelo “B3 antigo” fica como está.')
+      expect(vistaConferir(mudou, 'b3').modelo).toMatchObject({ caixa: false, aviso: 'O modelo “B3 antigo” é de Futuros e fica como está: as mudanças valem só para este arquivo.' })
+      // Its own market’s model, and another market’s changed one, are still «Mude as colunas do modelo …» (they can be updated)
+      expect(vistaMapa(mudarColunas(naB3('f19', { [venda.id]: ['b3'] }, [venda])), arquivo('f19'), 'b3').titulo).toBe('Mude as colunas do modelo “B3 antigo”.')
+      expect(vistaMapa(mudarColunas(naB3('f19', futuros)), arquivo('f19'), 'b3').titulo).toBe('Mude as colunas do modelo “BlackArrow”.')
+    })
+
+    it('review (23 Oct) · 1: «Separador» fixed onto another market’s model’s very columns: «mudou», then the read-only line, no checkbox', () => {
+      // b3.csv without «Emolumentos» (BlackArrow’s very columns), each data line ending in «;»: read with «,» first
+      const texto = ARQUIVOS_QUADRO.f19.texto
+        .split(/\r?\n/)
+        .map((l, i) => {
+          const c = l.split(';').filter((_, j) => j !== 8).join(';')
+          return i === 0 || l === '' ? c : `${c};`
+        })
+        .join('\n')
+      const a: ArquivoMapeavel = { fileName: 'b3-ba.csv', size: texto.length, sha256: 'ab'.repeat(32), text: texto }
+      const r = iniciarMapeamento(a, { market: 'b3', templates: [modeloBlackArrow()], nomePadrao: 'Profit (Nelogica)', mercados: futuros })
+      if (!r.ok) throw new Error(r.error)
+      expect(vistaMapa(r.mapeamento, a, 'b3').titulo).toBe('Não reconhecemos este arquivo. Diga o que é cada coluna.')
+      const n = comPalavraDeLado(comSeparador(r.mapeamento, a, ';', 'b3'), 'x', 'sell', 'b3')
+      expect(vistaMapa(n, a, 'b3').titulo).toBe('Este arquivo mudou desde o modelo “BlackArrow”. Confira as colunas.')
+      expect(vistaConferir(n, 'b3').modelo).toMatchObject({
+        caixa: false,
+        aviso: 'O modelo “BlackArrow” é de Futuros e fica como está: as mudanças valem só para este arquivo.',
+      })
+    })
   })
 
   it('17: the symbols as written, «Não, é bruto» with «… antes da comissão de US$ 1,24.», «NinjaTrader»', () => {

@@ -17,6 +17,7 @@ import {
   decodeCsvBytes,
   fieldsFor,
   headerClocks,
+  headerSignature,
   mappedContext,
   mappingProblems,
   matchTemplate,
@@ -146,6 +147,15 @@ export interface Mapeamento {
    * taken as is and never written (modeloSoParaLer). Absent: no model, or one of this market (or with no batch yet).
    */
   outroMercado?: AccountMarket[]
+  /**
+   * The user's models the file was matched against (iniciarMapeamento's ctx.templates); null: their read failed. Kept so
+   * «Separador» matches a re-read file against every one of them, and so a new model is never saved over one
+   * (sobrescreveModelo: import_template_save keys models by their header set, so a «new» model with an existing model's
+   * columns would overwrite it, another market's too)
+   */
+  modelos: readonly Template[] | null
+  /** iniciarMapeamento's ctx.mercados, kept for that same match */
+  mercados: MercadosDosModelos | null | undefined
 }
 
 /**
@@ -410,7 +420,8 @@ function lidoDe(s: SniffedFile): SniffedFile {
 /** What iniciarMapeamento needs besides the file */
 export interface ContextoDoMapeamento {
   market: AccountMarket
-  templates: readonly Template[]
+  /** The user's models; null: their read failed (matched against none, and no new model is saved: sobrescreveModelo) */
+  templates: readonly Template[] | null
   nomePadrao: string
   /** Each model's markets (owner decision, 23 Oct); undefined: not given (every model fits); null: the read failed */
   mercados?: MercadosDosModelos | null
@@ -419,7 +430,7 @@ export interface ContextoDoMapeamento {
 /** iniciarMapeamento's rules over a file already read (also «Separador»'s fresh mapping of a re-read file) */
 function mapear(lido: SniffedFile, ctx: ContextoDoMapeamento): Mapeamento {
   const { market } = ctx
-  const match = matchTemplate(lido.headers, ctx.templates)
+  const match = matchTemplate(lido.headers, ctx.templates ?? [])
   const values = valoresDoArquivo(lido)
   const doNome: Record<RowKind, ColunaUi[]> = {
     trade: colunasDosNomes(lido, 'trade', market, values),
@@ -433,6 +444,8 @@ function mapear(lido: SniffedFile, ctx: ContextoDoMapeamento): Mapeamento {
     match,
     mudando: false,
     salvar: true,
+    modelos: ctx.templates,
+    mercados: ctx.mercados,
   }
 
   const modelo = modeloDe(match)
@@ -523,6 +536,7 @@ function colunasDoModelo(headers: readonly string[], template: Template): { colu
  * inicio 'mapa' and porModelo false but for the first case.
  * A model saved in another market (ctx.mercados, owner decision 23 Oct) is matched and taken the same way, with
  * `outroMercado` set, salvar false and nome = nomePadrao = nomeNoMercado(the model's name, market).
+ * Every case keeps ctx.templates and ctx.mercados (modelos, mercados) for «Separador» and the save.
  */
 export function iniciarMapeamento(arquivo: ArquivoMapeavel, ctx: ContextoDoMapeamento): InicioMapeamento {
   const s = sniffFile(arquivo.text)
@@ -725,26 +739,32 @@ const inteira = (s: ReturnType<typeof sniffFile>): s is Lida =>
  * first read that took a data row for the header is repaired (a «;» file whose data lines end in «;», read first with «,»);
  * else the same header line (sniffFile with headerSkip), so a «,» read of a «;» file never skips its one-cell header as a
  * title and takes a data row as the header (f8). A read with a header of two cells or more and every record as wide → a
- * fresh mapping of the re-read file (iniciarMapeamento's rules, the model matched before as the only candidate), keeping
- * «Salvar» and the name; otherwise the columns stay and `separador` = d (E10's note, the block).
+ * fresh mapping of the re-read file (iniciarMapeamento's rules over every model the file was matched against, m.modelos
+ * and m.mercados); otherwise the columns stay and `separador` = d (E10's note, the block).
+ * The fresh mapping keeps «Salvar» and the name while it matches the model matched before (or none, as before); a model
+ * it no longer matches leaves a new model's (checked, under the name already given); a model it matches now is that
+ * model's as iniciarMapeamento makes it (review: a re-read with the very columns of another market's model is only read,
+ * never a «new» model that import_template_save's upsert by header set would write over it; one of this market's is
+ * «Atualizar o modelo» under its own name).
  */
 export function comSeparador(m: Mapeamento, arquivo: ArquivoMapeavel, d: CsvDelimiter, market: AccountMarket): Mapeamento {
   if (d === m.lido.delimiter) return { ...m, separador: d }
   const nova = sniffFile(arquivo.text, { delimiter: d })
   const s = inteira(nova) && nova.headerLine <= m.lido.headerLine ? nova : sniffFile(arquivo.text, { delimiter: d, headerSkip: m.lido.headerSkip })
   if (!inteira(s)) return { ...m, separador: d }
-  const modelo = modeloDe(m.match)
-  const novo = mapear(lidoDe(s), { market, templates: modelo ? [modelo] : [], nomePadrao: m.nomePadrao })
-  // Another market's model stays another market's while the re-read file still matches it; a file it no longer matches
-  // is a new model's (checked, under the name already given)
-  const outro = novo.origem === 'modelo' ? m.outroMercado : undefined
+  const antes = modeloDe(m.match)
+  const novo = mapear(lidoDe(s), { market, templates: m.modelos, mercados: m.mercados, nomePadrao: m.nomePadrao })
+  const agora = modeloDe(novo.match)
+  const fixo = { inicio: m.inicio, porModelo: false }
+  // A model the re-read file matches now (none before, or another): that model's mapping, its «Salvar» and name
+  if (agora && agora.id !== antes?.id) return { ...novo, ...fixo }
+  // The same model (or none, as before): the owner's «Salvar» and name stay; a model no longer matched leaves a new
+  // model's (checked: another market's unchecked «Atualizar» no longer applies)
   return {
     ...novo,
-    outroMercado: outro,
-    inicio: m.inicio,
-    porModelo: false,
-    mudando: m.mudando && novo.origem === 'modelo',
-    salvar: m.outroMercado && !outro ? true : m.salvar,
+    ...fixo,
+    mudando: m.mudando && agora !== null,
+    salvar: m.outroMercado && !novo.outroMercado ? true : m.salvar,
     nome: m.nome,
     nomePadrao: m.nomePadrao,
   }
@@ -836,6 +856,7 @@ function palavrasDoModelo(m: Mapeamento): Record<string, SideWordAnswer> {
  * Another market's model (owner decision, 23 Oct): only read when exact (null); else unchecked → 'salvo', a new model
  * (no p_replaces: the file's header set differs from the model's, so the upsert creates one) under m.nome; checked →
  * 'atualizado' under the model's own name. Neither keeps that model's routes (another market's accounts).
+ * A 'salvo' is sent only when sobrescreveModelo says it writes over no model.
  */
 export function modeloASalvar(
   m: Mapeamento,
@@ -865,6 +886,21 @@ export function modeloASalvar(
     tipo,
     nome: name,
   }
+}
+
+/**
+ * Review (23 Oct): whether saving `s` would write over a model the mapping never matched. A new model ('salvo') goes
+ * without p_replaces, and import_template_save then updates the user's model with the payload's header set if one exists
+ * (renamed, its zone and routes replaced, its batches' markets joined by this one), another market's too. True for
+ * 'salvo' when `modelos` (the user's models: the mapping's own read, or a read at save time) is null (unknown) or one of
+ * them has the payload's header signature; never for an update (p_replaces: the database refuses another model's header
+ * set) or a touch (the model taken as is, the file's own columns).
+ */
+export function sobrescreveModelo(s: Pick<ModeloASalvar, 'tipo' | 'payload'>, modelos: readonly Pick<Template, 'sig'>[] | null): boolean {
+  if (s.tipo !== 'salvo') return false
+  if (modelos === null) return true
+  const sig = headerSignature(s.payload.headers)
+  return modelos.some((t) => t.sig === sig)
 }
 
 // ------------------------------------------------------------------------------------------------
