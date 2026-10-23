@@ -276,6 +276,11 @@ export const FIM_ARQUIVO = {
    */
   notaNaoComprado: (s: SobraTexto) =>
     `O arquivo começou com ${s.texto}, de antes dele: a venda que ${s.feminino ? (s.plural ? 'as' : 'a') : s.plural ? 'os' : 'o'} fecha fica de fora.`,
+  /** N: the file began sold and only part of a purchase closes it (the rest of that purchase opens a position, kept) */
+  notaNaoVendidoParte: (inicio: string) => `O arquivo começou com ${inicio}, de antes dele: a parte da compra que fecha essa venda fica de fora.`,
+  /** N: the file began bought and only part of a sale closes it (the rest of that sale opens a position, kept) */
+  notaNaoCompradoParte: (s: SobraTexto) =>
+    `O arquivo começou com ${s.texto}, de antes dele: a parte da venda que ${s.feminino ? (s.plural ? 'as' : 'a') : s.plural ? 'os' : 'o'} fecha fica de fora.`,
 }
 
 /** The pairing summary of an execution file (E25) */

@@ -22,6 +22,7 @@ import {
   comDatas,
   comFimDoArquivo,
   comPalavraDeLado,
+  comSeparador,
   escolhasDe,
   iniciarMapeamento,
   modeloASalvar,
@@ -171,6 +172,124 @@ delete from public.profiles where id = '${uid}';`)
       }
       if (q && resposta === 'no') expect(p.errors.filter((e) => e.code === 'opened_before_file')).toHaveLength(1)
     }
+  })
+
+  // ------------------------------------------------------------------------------------------------
+  // Reviews 1 and 2 of lane L1, on the real SQL
+  // ------------------------------------------------------------------------------------------------
+
+  /** An invented file mapped from the names, in the futures account */
+  function mapearTexto(texto: string): { m: Mapeamento; a: ArquivoMapeavel } {
+    const a: ArquivoMapeavel = { fileName: 'inventado.csv', size: texto.length, sha256: 'cd'.repeat(32), text: texto }
+    const r = iniciarMapeamento(a, { market: 'futures', templates: [], nomePadrao: 'Minha plataforma' })
+    if (!r.ok) throw new Error(r.error)
+    return { m: r.mapeamento, a }
+  }
+  const previewTexto = async (file: ImportFile) =>
+    (await importPreview(
+      db,
+      previewArgs(buildImportArgs({ accountId: acc.futures as string, platform: 'modelo', fileName: 'inventado.csv', sha256: 'cd'.repeat(32), fileTz: NY, outcome: file })),
+    )) as ImportPreviewResult
+
+  it('review 2 · 1: a «;» file first read with «,» from its first trade: after «;» every trade reaches the preview', async () => {
+    const linhas = [
+      '13/10/2026 09:30:00;MESZ6;C;1;6801,25;6802,50;6,25;',
+      '13/10/2026 09:41:12;MESZ6;V;2;6803,00;6801,75;2,50;',
+      '13/10/2026 10:02:45;MNQZ6;C;1;25140,25;25146,50;12,50;',
+      '14/10/2026 09:35:10;MESZ6;C;1;6810,00;6808,75;-6,25;',
+      '14/10/2026 10:11:30;MNQZ6;V;1;25160,00;25151,25;17,50;',
+      '15/10/2026 09:48:02;MESZ6;V;3;6799,50;6797,00;37,50;',
+      '15/10/2026 11:20:40;MNQZ6;C;2;25101,75;25099,00;-11,00;',
+      '16/10/2026 09:31:05;MESZ6;C;1;6820,25;6825,00;23,75;',
+    ]
+    const { m, a } = mapearTexto(['Data;Ativo;Lado;Qtd;Pr. Entrada;Pr. Saída;Res. Líq.', ...linhas].join('\n'))
+    expect([m.lido.delimiter, m.lido.records.length]).toEqual([',', 7])
+    const n = comSeparador(m, a, ';', 'futures')
+    expect([bloqueioDoMapa(n, 'futures'), bloqueioDoConferir(n, 'futures')]).toEqual([null, null])
+    const f = arquivoDoMapeamento(n, 'futures', NY) as MappedFile
+    const p = await previewTexto(f)
+    expect([p.trades_new ?? p.new, p.errors]).toEqual([8, []])
+    // The model it saves keeps the file's real names
+    const s = modeloASalvar(n, { tzHint: NY, rota: null })
+    const saved = await saveTemplate(s?.payload)
+    expect(saved.error).toBeNull()
+    expect((await templateRow(saved.data!.template_id)).headers).toEqual(['data', 'ativo', 'lado', 'qtd', 'pr. entrada', 'pr. saida', 'res. liq.'])
+    psql(`delete from public.import_templates where id = '${saved.data!.template_id}';`)
+  })
+
+  /** [case, executions, answer, E24's nota, E25's resumo] */
+  const SOBRA: [string, string[], EndOfFileAnswer, string, string][] = [
+    [
+      'Buy 3, Sell 2, «Sim»',
+      ['2026-10-13 10:31:05,MESZ6,Buy,3,6812.25', '2026-10-13 10:41:05,MESZ6,Sell,2,6815.25'],
+      'yes',
+      'A posição ainda aberta fica de fora (2 execuções) e entra quando você importar um arquivo que tenha a abertura e o fechamento.',
+      'Nenhuma operação: todas as execuções ficaram de fora.',
+    ],
+    [
+      'Buy 2, Sell 1, Buy 1, «Sim»',
+      ['2026-10-13 10:31:05,MESZ6,Buy,2,6812.25', '2026-10-13 10:41:05,MESZ6,Sell,1,6815.25', '2026-10-13 10:51:05,MESZ6,Buy,1,6816.25'],
+      'yes',
+      'A posição ainda aberta fica de fora (3 execuções) e entra quando você importar um arquivo que tenha a abertura e o fechamento.',
+      'Nenhuma operação: todas as execuções ficaram de fora.',
+    ],
+    [
+      'Buy 1, Sell 2, «Sim»',
+      ['2026-10-13 10:31:05,MESZ6,Buy,1,6812.25', '2026-10-13 10:41:05,MESZ6,Sell,2,6815.25'],
+      'yes',
+      'A parte ainda aberta da posição (1 contrato) fica de fora e entra quando você importar um arquivo que tenha a abertura e o fechamento.',
+      'Vira 1 operação, com uma saída.',
+    ],
+    [
+      'Sell 2, Buy 1, «Não»',
+      ['2026-10-13 10:31:05,MESZ6,Sell,2,6812.25', '2026-10-13 10:41:05,MESZ6,Buy,1,6810.25'],
+      'no',
+      'O arquivo começou com 1 contrato comprado, de antes dele: a parte da venda que o fecha fica de fora.',
+      'Vira 1 operação, com uma saída.',
+    ],
+    [
+      'Sell 1, Buy 1, Sell 1, «Não»',
+      ['2026-10-13 10:31:05,MESZ6,Sell,1,6812.25', '2026-10-13 10:41:05,MESZ6,Buy,1,6810.25', '2026-10-13 10:51:05,MESZ6,Sell,1,6811.25'],
+      'no',
+      'O arquivo começou com 1 contrato comprado, de antes dele: a venda que o fecha fica de fora.',
+      'Vira 1 operação, com uma saída.',
+    ],
+  ]
+  it.each(SOBRA)('review 2 · 2: %s: E24’s nota says what the database leaves out; E25 counts what it takes', async (_caso, linhas, resposta, nota, resumo) => {
+    const { m: m0 } = mapearTexto(['Fill Time,Contract,B/S,Filled Qty,Avg Fill Price', ...linhas].join('\n'))
+    const m = comFimDoArquivo(m0, 'MESZ6', resposta)
+    expect(m.rowKind).toBe('fill')
+    const v = vistaConferir(m, 'futures')
+    expect([v.perguntasFim[0].nota, v.pareamento?.resumo]).toEqual([nota, resumo])
+    const f = arquivoDoMapeamento(m, 'futures', NY) as MappedFile
+    const p = await previewTexto(f)
+    expect(p.trades_new ?? p.new).toBe(f.positions.length)
+    expect(p.errors).toEqual(f.errors.map((e) => ({ line: e.line, code: e.code })))
+    const code = resposta === 'yes' ? 'open_at_end' : 'opened_before_file'
+    const recusadas = p.errors.filter((e) => e.code === code).length
+    if (recusadas === 0) expect(nota).toContain('parte')
+    else expect(nota).toMatch(resposta === 'yes' ? new RegExp(`\\(${recusadas} execuç`) : /a venda que o fecha/)
+  })
+
+  it('review 2 · 3: a model of 21 answered side words, or one of 41 characters, is accepted (the rest stay this file’s)', async () => {
+    const palavras = Array.from({ length: 21 }, (_, i) => `w${String(i).padStart(2, '0')}`)
+    const longa = 'compra a mercado com stop e alvo definidos'
+    const linhas = Array.from({ length: 61 }, (_, i) => {
+      const lado = i < 39 ? (i % 2 === 0 ? 'Buy' : 'Sell') : i < 60 ? palavras[i - 39] : longa
+      const min = String(i % 60).padStart(2, '0')
+      return `2026-10-13 ${i < 60 ? '10' : '11'}:${min}:05,2026-10-13 ${i < 60 ? '10' : '11'}:${min}:45,MESZ6,${lado},1,5.00`
+    })
+    let { m } = mapearTexto(['Entry Time,Exit Time,Symbol,Side,Qty,Profit', ...linhas].join('\n'))
+    for (const w of [...palavras, longa]) m = comPalavraDeLado(m, w, 'buy', 'futures')
+    expect([bloqueioDoMapa(m, 'futures'), bloqueioDoConferir(m, 'futures')]).toEqual([null, null])
+    const s = modeloASalvar(m, { tzHint: NY, rota: null })
+    expect(Object.keys(s?.payload.side_words ?? {})).toHaveLength(20)
+    const saved = await saveTemplate(s?.payload)
+    expect(saved.error).toBeNull()
+    expect(saved.data?.created).toBe(true)
+    psql(`delete from public.import_templates where id = '${saved.data!.template_id}';`)
+    const p = await previewTexto(arquivoDoMapeamento(m, 'futures', NY) as MappedFile)
+    expect([p.trades_new ?? p.new, p.errors]).toEqual([61, []])
   })
 
   const BRUTO: [Arquivo, string, string][] = [

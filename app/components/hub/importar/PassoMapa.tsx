@@ -163,7 +163,11 @@ export default function PassoMapa({ headingRef, arquivo, mapeamento: m, market, 
             <div className="hub-col-nome">
               <span className="hub-col-tit">
                 <b>{c.nome}</b>
-                {c.tag && <span className="hub-tag hub-tag--padrao">{c.tag}</span>}
+                {c.tag && (
+                  <span className="hub-tag hub-tag--padrao">
+                    <span className="hub-col-tag">{c.tag}</span>
+                  </span>
+                )}
               </span>
               <span className="hub-col-ex">{c.amostra}</span>
             </div>

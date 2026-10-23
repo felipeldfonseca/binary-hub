@@ -15,6 +15,7 @@ import {
   columnCheck,
   columnsFromTemplate,
   decodeCsvBytes,
+  fieldsFor,
   headerClocks,
   mappedContext,
   mappingProblems,
@@ -39,6 +40,8 @@ import {
   MAX_RECORDS,
   MAX_ROUTES,
   MAX_TEMPLATE_NAME,
+  MAX_WORD_CHARS,
+  MAX_WORDS,
   PLATFORM_MARKET,
   REPEATABLE_FIELD,
   type ColumnCheck,
@@ -207,17 +210,56 @@ function relogios(headers: readonly string[], columns: ColumnMap): (string | nul
   return headerClocks(headers, columns).map((c) => (c && 'offset' in c ? c.offset : null))
 }
 
-/** Known non-field columns, by synonymName (Tradovate's Status and Limit Price, Performance.csv's duration): «Ignorar» */
-const IGNORAVEIS: readonly string[] = ['status', 'duration', 'limit price', 'stop price']
+/** Known non-field columns, by synonymName (Tradovate's Status, Performance.csv's duration): «Ignorar» in both readings */
+const IGNORAVEIS: readonly string[] = ['status', 'duration']
+/**
+ * An order's limit and stop prices (Tradovate's Limit Price): «Ignorar» in an execution file, where they are no execution's
+ * field; in one trade per row they may be the trade's stop or target, so they stay «Escolha…» (the board's Tradovate read
+ * as trades, IC l.865)
+ */
+const IGNORAVEIS_EXECUCAO: readonly string[] = ['limit price', 'stop price']
+
+/**
+ * What a field of one reading is in the other («Cada linha do arquivo é»): the entry ↔ the execution's time, the IDs, and
+ * the fields both have; prices, results, the exit and the buy/sell pair have none (the board's other-kind columns, IC
+ * l.797–1053: «Entry time» → «Data e hora», «Position ID» → «ID da execução», «Executed» → «Quantidade»)
+ */
+const NA_OUTRA: Record<RowKind, Partial<Record<FieldKey, FieldKey>>> = {
+  trade: { entry_time: 'time', symbol: 'symbol', side: 'side', quantity: 'quantity', commission: 'commission', fee: 'fee', trade_id: 'fill_id', account: 'account' },
+  fill: { time: 'entry_time', symbol: 'symbol', side: 'side', quantity: 'quantity', commission: 'commission', fee: 'fee', fill_id: 'trade_id', account: 'account' },
+}
 
 /** Why the pre-fill set a column to «Ignorar esta coluna» */
 type MotivoIgnorar = 'gemea' | 'conhecida' | 'id'
 
 /**
- * The pre-fill from the names for one row kind (§5.3): the domain's suggestion, then a column it leaves empty is
- * «Ignorar esta coluna» when its own name suggests a field another column holds (a twin: Tradovate's avgPrice,
- * filledQty, Timestamp, Quantity), when it is a known non-field, or when it is an ID that repeats (Performance.csv's
- * buyFillId, sellFillId); any other stays «Escolha…»
+ * A field for a column the domain left empty in `kind`, from the column's name read as the other kind (NA_OUTRA), when
+ * this kind offers it, no other column holds it yet and the cells fit it. An execution's own names («Fill Time», «Filled
+ * Qty», «Avg Fill Price») never become a trade's field: in one trade per row the trade's columns are the entry (Tradovate's
+ * Timestamp and Quantity, IC l.861–866)
+ */
+function daOutraLeitura(
+  lido: SniffedFile,
+  i: number,
+  kind: RowKind,
+  market: AccountMarket,
+  values: ValueContext,
+  ocupados: readonly ColunaUi[],
+): FieldKey | null {
+  const outra: RowKind = kind === 'trade' ? 'fill' : 'trade'
+  if (kind === 'trade' && synonymName(lido.rawHeaders[i] ?? lido.headers[i]).indexOf('fill') >= 0) return null
+  const la = suggestColumns([lido.headers[i]], outra, market)[0]
+  const campo = la !== null ? NA_OUTRA[outra][la] ?? null : null
+  if (campo === null || fieldsFor(kind, market).indexOf(campo) < 0) return null
+  if (campo !== REPEATABLE_FIELD && ocupados.indexOf(campo) >= 0) return null
+  return columnCheck(values, i, campo) === null ? campo : null
+}
+
+/**
+ * The pre-fill from the names for one row kind (§5.3): the domain's suggestion; a column it leaves empty takes its
+ * name's field in the other reading (daOutraLeitura), else is «Ignorar esta coluna» when its own name suggests a field
+ * another column holds (a twin: Tradovate's avgPrice, filledQty, Timestamp, Quantity), when it is a known non-field, or
+ * when it is an ID that repeats (Performance.csv's buyFillId, sellFillId); any other stays «Escolha…»
  */
 function preenchimento(
   lido: SniffedFile,
@@ -227,15 +269,26 @@ function preenchimento(
 ): { colunas: ColunaUi[]; motivos: (MotivoIgnorar | null)[] } {
   const f = suggestColumns(lido.headers, kind, market, values)
   const motivos: (MotivoIgnorar | null)[] = f.map(() => null)
-  const colunas: ColunaUi[] = f.map((campo, i) => {
-    if (campo !== null) return campo
+  const colunas: ColunaUi[] = f.slice()
+  const ignoraveis = kind === 'fill' ? [...IGNORAVEIS, ...IGNORAVEIS_EXECUCAO] : IGNORAVEIS
+  f.forEach((campo, i) => {
+    if (campo !== null) return
+    colunas[i] = daOutraLeitura(lido, i, kind, market, values, colunas)
+  })
+  colunas.forEach((campo, i) => {
+    if (campo !== null) return
+    colunas[i] = ignorar(i)
+  })
+  return { colunas, motivos }
+
+  function ignorar(i: number): ColunaUi {
     const sozinha = suggestColumns([lido.headers[i]], kind, market)[0]
-    if (sozinha !== null && sozinha !== REPEATABLE_FIELD && f.indexOf(sozinha) >= 0) {
+    if (sozinha !== null && sozinha !== REPEATABLE_FIELD && colunas.indexOf(sozinha) >= 0) {
       motivos[i] = 'gemea'
       return 'ignorar'
     }
     const nome = synonymName(lido.rawHeaders[i] ?? lido.headers[i])
-    if (IGNORAVEIS.indexOf(nome) >= 0) {
+    if (ignoraveis.indexOf(nome) >= 0) {
       motivos[i] = 'conhecida'
       return 'ignorar'
     }
@@ -244,8 +297,7 @@ function preenchimento(
       return 'ignorar'
     }
     return null
-  })
-  return { colunas, motivos }
+  }
 }
 
 /** The pre-fill from the column names, per row kind */
@@ -293,7 +345,7 @@ function decisoes(lido: SniffedFile, columns: ColumnMap): { decimal: DecimalDeci
 const modeloDe = (match: TemplateMatch): Template | null => (match.kind === 'none' ? null : match.template)
 
 /** sniffFile's success as the state keeps it */
-function lidoDe(s: Extract<ReturnType<typeof sniffFile>, { ok: true }>): SniffedFile {
+function lidoDe(s: SniffedFile): SniffedFile {
   return {
     delimiter: s.delimiter,
     headerSkip: s.headerSkip,
@@ -397,8 +449,9 @@ function colunasDoModelo(headers: readonly string[], template: Template): { colu
  *                                         ignores → 'ignorar', a new name → null + novas), the model's row kind, porModelo
  *                                         false, origem 'modelo', salvar true («Atualizar o modelo»), nome = the model's;
  *   none                                → rowKind = suggestRowKind; colunas[k] = the pre-fill of §5.3 for both kinds
- *                                         (suggestColumns, then «Ignorar esta coluna» for a twin, a known non-field or an
- *                                         ID that repeats); decimal over the mapped number columns, decimalMark = decided
+ *                                         (suggestColumns, a name of the other reading, then «Ignorar esta coluna» for a
+ *                                         twin, a known non-field or an ID that repeats); decimal over the mapped number
+ *                                         columns, decimalMark = decided
  *                                         ?? question?.preselect ?? (question ? null : fallback); datas over the mapped
  *                                         date columns, dateOrder = decided (null while `ask`); resultIsNet =
  *                                         netQuestion(…)?.preanswer ?? null; origem 'nomes', salvar true, nome =
@@ -579,17 +632,26 @@ export function comColuna(m: Mapeamento, index: number, valor: ColunaUi, market:
 const temALargura = (cells: readonly string[], largura: number) =>
   cells.length === largura || (cells.length > largura && cells.slice(largura).every((c) => c.trim() === ''))
 
+type Lida = Extract<ReturnType<typeof sniffFile>, { ok: true }>
+
+/** A read «Separador» can take: a header of two cells or more, every record as wide */
+const inteira = (s: ReturnType<typeof sniffFile>): s is Lida =>
+  s.ok && s.headers.length >= 2 && s.records.every((r) => temALargura(r.cells, s.headers.length))
+
 /**
- * «Separador» (E9): the file's own delimiter → back to it; another one re-reads the text on the same header line
- * (sniffFile with headerSkip): a header of two cells or more with every record as wide → a fresh mapping of the re-read
- * file (iniciarMapeamento's rules, the model matched before as the only candidate), keeping «Salvar» and the name;
- * otherwise the columns stay and `separador` = d (E10's note, the block). Without headerSkip a «,» read of a «;» file
- * would skip its one-cell header as a title and take a data row as the header.
+ * «Separador» (E9): the file's own delimiter → back to it, every edit kept; another one re-reads the text: first a fresh
+ * read with it (sniffFile finds the header again), taken when its header line is at or above the current one, so a wrong
+ * first read that took a data row for the header is repaired (a «;» file whose data lines end in «;», read first with «,»);
+ * else the same header line (sniffFile with headerSkip), so a «,» read of a «;» file never skips its one-cell header as a
+ * title and takes a data row as the header (f8). A read with a header of two cells or more and every record as wide → a
+ * fresh mapping of the re-read file (iniciarMapeamento's rules, the model matched before as the only candidate), keeping
+ * «Salvar» and the name; otherwise the columns stay and `separador` = d (E10's note, the block).
  */
 export function comSeparador(m: Mapeamento, arquivo: ArquivoMapeavel, d: CsvDelimiter, market: AccountMarket): Mapeamento {
   if (d === m.lido.delimiter) return { ...m, separador: d }
-  const s = sniffFile(arquivo.text, { delimiter: d, headerSkip: m.lido.headerSkip })
-  if (!s.ok || s.headers.length < 2 || !s.records.every((r) => temALargura(r.cells, s.headers.length))) return { ...m, separador: d }
+  const nova = sniffFile(arquivo.text, { delimiter: d })
+  const s = inteira(nova) && nova.headerLine <= m.lido.headerLine ? nova : sniffFile(arquivo.text, { delimiter: d, headerSkip: m.lido.headerSkip })
+  if (!inteira(s)) return { ...m, separador: d }
   const modelo = modeloDe(m.match)
   const novo = mapear(lidoDe(s), { market, templates: modelo ? [modelo] : [], nomePadrao: m.nomePadrao })
   return {
@@ -654,9 +716,32 @@ export interface ModeloASalvar {
 }
 
 /**
- * templatePayload(escolhasDe(m) + name = m.nome.trim() || m.nomePadrao, accountRoutes = the model's routes + the one for
- * `rota` (accountRouteHash(valor) → contaId; routes only when a column is «Conta», at most 50: a 51st is not added),
- * tzHint). checkTemplate(payload) must be null for any mapping bloqueioDoMapa / bloqueioDoConferir let through (tested).
+ * The side words a model can keep (import_template_save: at most MAX_WORDS words of 1–MAX_WORD_CHARS characters, each
+ * «Compra» or «Venda»): the «Lado» column's words in the file's order first, then the other answers (a model's own); a
+ * word beyond them, a longer one and «Pular essas linhas» are answers for this file only (the import reads them all)
+ */
+function palavrasDoModelo(m: Mapeamento): Record<string, SideWordAnswer> {
+  const lado = paraODominio(m.colunas[m.rowKind]).indexOf('side')
+  const doArquivo = lado >= 0 ? unknownSideWords(m.lido.records, lado).map((w) => w.word) : []
+  const tem = (w: string) => Object.prototype.hasOwnProperty.call(m.sideWords, w)
+  const ordem = [...doArquivo.filter(tem), ...Object.keys(m.sideWords).filter((w) => doArquivo.indexOf(w) < 0)]
+  const out: Record<string, SideWordAnswer> = {}
+  let n = 0
+  for (const w of ordem) {
+    const a = m.sideWords[w]
+    const tamanho = Array.from(w).length
+    if ((a !== 'buy' && a !== 'sell') || tamanho < 1 || tamanho > MAX_WORD_CHARS || n >= MAX_WORDS) continue
+    out[w] = a
+    n++
+  }
+  return out
+}
+
+/**
+ * templatePayload(escolhasDe(m) + name = m.nome.trim() || m.nomePadrao, sideWords = palavrasDoModelo(m), accountRoutes =
+ * the model's routes + the one for `rota` (accountRouteHash(valor) → contaId; routes only when a column is «Conta», at
+ * most 50: a 51st is not added), tzHint). checkTemplate(payload) must be null for any mapping bloqueioDoMapa /
+ * bloqueioDoConferir let through (tested).
  */
 export function modeloASalvar(
   m: Mapeamento,
@@ -676,7 +761,7 @@ export function modeloASalvar(
     }
   }
   return {
-    payload: templatePayload({ ...choices, name, accountRoutes: routes, tzHint: ctx.tzHint }),
+    payload: templatePayload({ ...choices, sideWords: palavrasDoModelo(m), name, accountRoutes: routes, tzHint: ctx.tzHint }),
     replaces: tipo === 'atualizado' && modelo ? modelo.id : null,
     tipo,
     nome: name,
@@ -738,9 +823,18 @@ function foraDoPassoLido(m: Mapeamento, marca: DecimalMark, market: AccountMarke
   return { raiz: tradeMatchKey(market, s.symbol), passo: passoEmTexto(spec.tick) }
 }
 
-/** What a column's check reads (E17): the domain's value checks with the mapping's mark, order and side words */
+/**
+ * The mark «mapa» reads the cells with for its checks and chips: the file's own decision, else the one in use. A pill that
+ * contradicts the file gives E10's note «Os números não fecharam com este decimal.» and the block, never a check under the
+ * number columns (the board's checks depend only on the column, IC l.1421–1430, 1446)
+ */
+export function marcaDeLeitura(m: Mapeamento): DecimalMark {
+  return m.decimal.decided ?? m.decimalMark ?? m.decimal.fallback
+}
+
+/** What a column's check reads (E17): the domain's value checks with the reading mark, the order and the side words */
 function valoresDaChecagem(m: Mapeamento): ValueContext {
-  return { records: m.lido.records, decimalMark: escolhasDe(m).decimalMark, dateOrder: m.dateOrder, sideWords: m.sideWords }
+  return { records: m.lido.records, decimalMark: marcaDeLeitura(m), dateOrder: m.dateOrder, sideWords: m.sideWords }
 }
 
 /**
@@ -760,12 +854,27 @@ export function checagemDaColuna(m: Mapeamento, index: number): ColumnCheck | 's
 export function quantidadeComSinal(m: Mapeamento): boolean {
   const columns = paraODominio(m.colunas[m.rowKind])
   const qtd = columns.indexOf('quantity')
-  return qtd >= 0 && quantityIsSigned(m.lido.records, qtd, m.decimalMark ?? m.decimal.fallback)
+  return qtd >= 0 && quantityIsSigned(m.lido.records, qtd, marcaDeLeitura(m))
+}
+
+/**
+ * The column mapped to «Lado» whose unknown words E18 asks about, or -1: only a side column, one whose cells look like
+ * sides (its check passes) or whose name says so (read alone, or the model's); another column set to «Lado» (Data/Hora,
+ * Papel) gets its check «Esta coluna não parece compra e venda.» and no question (the board asks only about the file's own
+ * side column, IC l.1440 `perguntaX`)
+ */
+export function colunaDoLado(m: Mapeamento, market: AccountMarket): number {
+  const k = m.rowKind
+  const i = paraODominio(m.colunas[k]).indexOf('side')
+  if (i < 0) return -1
+  if (checagemDaColuna(m, i) === null) return i
+  if (suggestColumns([m.lido.headers[i]], k, market)[0] === 'side') return i
+  return m.origem === 'modelo' && m.sugeridas[k][i] === 'side' ? i : -1
 }
 
 /** The first word of the «Lado» column nobody answered (E18), or null */
-function palavraSemResposta(m: Mapeamento): string | null {
-  const lado = paraODominio(m.colunas[m.rowKind]).indexOf('side')
+function palavraSemResposta(m: Mapeamento, market: AccountMarket): string | null {
+  const lado = colunaDoLado(m, market)
   if (lado < 0) return null
   const palavra = unknownSideWords(m.lido.records, lado, m.sideWords)[0]
   return palavra ? palavra.text : null
@@ -789,7 +898,7 @@ export function bloqueioDoMapa(m: Mapeamento, market: AccountMarket): string | n
   if (problems.some((p) => p.code === 'duplicate_field')) return DICA_MAPA.umaColuna
   if (problems.some((p) => p.code === 'swap_without_pnl' || p.code === 'not_a_field')) return DICA_MAPA.marcadas
   for (let i = 0; i < columns.length; i++) if (checagemDaColuna(m, i) !== null) return DICA_MAPA.marcadas
-  const palavra = palavraSemResposta(m)
+  const palavra = palavraSemResposta(m, market)
   if (palavra !== null) return DICA_MAPA.lado(palavra)
   return null
 }

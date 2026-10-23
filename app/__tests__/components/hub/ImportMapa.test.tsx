@@ -5,7 +5,7 @@
  * the tab order of contract §5.7 and the execution variant.
  */
 import React, { useRef, useState } from 'react'
-import { render, screen, within } from '@testing-library/react'
+import { fireEvent, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { AccountMarket } from '@/lib/domain/markets'
 import { bloqueioDoMapa, iniciarMapeamento, nomePadraoDoModelo, type ArquivoMapeavel, type Mapeamento } from '@/lib/hub/importMapeado'
@@ -119,7 +119,9 @@ describe('«mapa» · 8 (BlackArrow)', () => {
   it('every column «sugerida», its sample; Papel → «Quantidade»: the check, the duplicate block, «Ativo · falta», «sugerida» gone', async () => {
     const { user, onAnuncio } = montar('f8')
     const papel = linhaDa('Papel')
-    expect(within(papel).getByText('sugerida')).toHaveClass('hub-tag', 'hub-tag--padrao')
+    // The shared neutral tag; its word in the 12 px span the approved renders draw
+    expect(within(papel).getByText('sugerida')).toHaveClass('hub-col-tag')
+    expect(within(papel).getByText('sugerida').parentElement).toHaveClass('hub-tag', 'hub-tag--padrao')
     expect(within(papel).getByText('ex.: MESZ6')).toBeInTheDocument()
     expect(screen.getAllByText('sugerida')).toHaveLength(9)
     const select = screen.getByRole('combobox', { name: 'O que é a coluna Papel' })
@@ -276,5 +278,37 @@ describe('«mapa» · the questions', () => {
       'Pular essas linhas',
       'Continuar',
     ])
+  })
+})
+
+describe('«mapa» · reviews 1 and 2 of lane L1', () => {
+  it('Data/Hora → «Lado»: the check under it, no question per value (review 1 · 1)', async () => {
+    const { user } = montar('f8')
+    await user.selectOptions(screen.getByRole('combobox', { name: 'O que é a coluna Data/Hora' }), 'Lado')
+    expect(document.getElementById('chk-0')).toHaveTextContent('Esta coluna não parece compra e venda.')
+    expect(screen.queryByText(/na coluna de lado\. O que quer dizer\?$/)).toBeNull()
+    expect(screen.queryAllByRole('button', { name: 'Pular essas linhas' })).toHaveLength(0)
+  })
+
+  it('a value the select does not offer is never taken (the select’s guard)', () => {
+    const { onMapa } = montar('f8')
+    const select = screen.getByRole('combobox', { name: 'O que é a coluna Papel' }) as HTMLSelectElement
+    // An option the step never offers (as an extension or a stale DOM could put there)
+    const intrusa = document.createElement('option')
+    intrusa.value = 'stop_loss_price'
+    intrusa.textContent = 'x'
+    select.appendChild(intrusa)
+    fireEvent.change(select, { target: { value: 'stop_loss_price' } })
+    expect(onMapa).not.toHaveBeenCalled()
+  })
+
+  it('the live region hears a text once: the same note after another failing separator is not said again', async () => {
+    const { user, onAnuncio } = montar('f8')
+    await user.click(screen.getByRole('button', { name: 'Mudar' }))
+    await user.click(screen.getByRole('button', { name: 'Vírgula' }))
+    expect(onAnuncio).toHaveBeenCalledTimes(1)
+    await user.click(screen.getByRole('button', { name: 'Tabulação' }))
+    expect(screen.getByRole('button', { name: 'Tabulação' })).toHaveAttribute('aria-pressed', 'true')
+    expect(onAnuncio).toHaveBeenCalledTimes(1)
   })
 })

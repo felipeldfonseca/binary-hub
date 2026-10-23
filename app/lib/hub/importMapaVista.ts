@@ -43,9 +43,11 @@ import {
   bloqueioDoConferir,
   bloqueioDoMapa,
   checagemDaColuna,
+  colunaDoLado,
   escolhasDe,
   foraDoPasso,
   idsQueSeRepetem,
+  marcaDeLeitura,
   notaDeLeitura,
   perguntaDoLiquido,
   quantidadeComSinal,
@@ -245,17 +247,6 @@ function pow10(n: number): bigint {
   return r
 }
 
-/** A decimal string as integer units at `scale` (no rounding: callers pass the larger scale) */
-function unidades(decimal: string, scale: number): bigint {
-  const m = /^(-?)(\d+)(?:\.(\d+))?$/.exec(decimal)
-  if (!m) return ZERO
-  const frac = (m[3] ?? '').padEnd(scale, '0').slice(0, scale)
-  const v = BigInt(m[2] + frac)
-  return m[1] === '-' ? -v : v
-}
-
-const casasDe = (decimal: string) => (decimal.indexOf('.') >= 0 ? decimal.length - decimal.indexOf('.') - 1 : 0)
-
 /** Money: «+US$ 57,50», «−R$ 31,00» (signed) or «US$ 2,48» */
 const dinheiro = (decimal: string, market: AccountMarket, signed = true) => formatMoney(decimal, { signed, currency: currencyOf(market) })
 
@@ -387,7 +378,7 @@ function obrigatorias(m: Mapeamento): ObrigatoriaVista[] {
   const columns = escolhasDe(m).columns
   const faltam = missingRequirements(m.rowKind, columns, quantidadeComSinal(m))
   const par = m.rowKind === 'trade' && hasBuySellPair(columns)
-  const mark = m.decimalMark ?? m.decimal.fallback
+  const mark = marcaDeLeitura(m)
   const k = m.rowKind
   let colunaComSinal = false
   m.lido.headers.forEach((_, i) => {
@@ -520,9 +511,12 @@ function colunasDoMapa(m: Mapeamento, market: AccountMarket): ColunaVista[] {
   })
 }
 
-/** E18: one question per word of the «Lado» column the app does not know (an answered one stays, its pill pressed) */
-function perguntasDoLado(m: Mapeamento): PerguntaVista<SideWordAnswer>[] {
-  const lado = colunaDe(m, 'side')
+/**
+ * E18: one question per word of the «Lado» column the app does not know (an answered one stays, its pill pressed); none
+ * for a column set to «Lado» that is no side column (colunaDoLado: the check alone, IC l.1440)
+ */
+function perguntasDoLado(m: Mapeamento, market: AccountMarket): PerguntaVista<SideWordAnswer>[] {
+  const lado = colunaDoLado(m, market)
   if (lado < 0) return []
   return unknownSideWords(m.lido.records, lado).map((w, j) => ({
     id: `q-lado-${j}`,
@@ -599,7 +593,7 @@ export function vistaMapa(m: Mapeamento, arquivo: ArquivoMapeavel | null, market
     notas: notasDoMapa(m, market),
     duplicadas,
     colunas: colunasDoMapa(m, market),
-    perguntasLado: perguntasDoLado(m),
+    perguntasLado: perguntasDoLado(m, market),
     bloqueio: bloqueioDoMapa(m, market),
     anuncio: notaLer ?? perguntaDecimal?.nota ?? duplicadas ?? '',
   }
@@ -723,32 +717,41 @@ function sobra(qAbs: string, market: AccountMarket, symbol: string, adjetivo: 'c
   return { texto: `${um ? CONFERIR.contrato(q) : CONFERIR.contratos(q)}${adj(false, !um)}`, plural: !um, feminino: false }
 }
 
-/** E24's nota for the question's current answer */
+/** The lines of the question's symbol (and «Conta» value) the domain refused whole with `code` */
+function linhasRecusadas(m: Mapeamento, q: EndOfFileQuestion, f: MappedFile, market: AccountMarket, code: 'open_at_end' | 'opened_before_file'): number {
+  const iSimbolo = colunaDe(m, 'symbol')
+  const iConta = colunaDe(m, 'account')
+  const linhas = f.errors.filter((e) => e.code === code).map((e) => e.line)
+  return m.lido.records.filter((r) => {
+    if (linhas.indexOf(r.line) < 0) return false
+    const s = readSymbol(celula(r, iSimbolo), market)
+    if (!s.ok || s.symbol.toUpperCase() !== q.symbol.toUpperCase()) return false
+    return q.account === null || iConta < 0 || accountKey(celula(r, iConta)) === accountKey(q.account)
+  }).length
+}
+
+/**
+ * E24's nota for the question's current answer. «Sim»: the domain leaves the lots still open out whole, with the exits
+ * they already had, so the count is the symbol's executions refused as open at the end (Buy 3, Sell 2: both); only when
+ * none is refused whole does part of an execution stay out (a sale that closes and opens: the domain's file-wide
+ * `open_at_end {fills}` notice). «Não»: the executions that close the position from before the file, refused whole; none
+ * → only part of one (Sell 2, Buy 1: the sale closes the 1 bought and opens 1 sold, kept).
+ */
 function notaDoFim(m: Mapeamento, q: EndOfFileQuestion, resposta: EndOfFileAnswer, f: MappedFile, market: AccountMarket): string {
   const qAbs = absoluto(q.net)
   const comprado = !q.net.startsWith('-')
   if (resposta === 'unknown') return FIM_ARQUIVO.notaNaoSei(q.fills, q.symbol)
   if (resposta === 'no') {
-    return comprado
-      ? FIM_ARQUIVO.notaNaoVendido(sobra(qAbs, market, q.symbol, 'vendido').texto)
-      : FIM_ARQUIVO.notaNaoComprado(sobra(qAbs, market, q.symbol, 'comprado'))
+    const inteiras = linhasRecusadas(m, q, f, market, 'opened_before_file') > 0
+    if (comprado) {
+      const inicio = sobra(qAbs, market, q.symbol, 'vendido').texto
+      return inteiras ? FIM_ARQUIVO.notaNaoVendido(inicio) : FIM_ARQUIVO.notaNaoVendidoParte(inicio)
+    }
+    const inicio = sobra(qAbs, market, q.symbol, 'comprado')
+    return inteiras ? FIM_ARQUIVO.notaNaoComprado(inicio) : FIM_ARQUIVO.notaNaoCompradoParte(inicio)
   }
-  // «Sim»: the executions left out as open at the end, when they are exactly what is left
-  const mark = m.decimalMark ?? m.decimal.fallback
-  const iSimbolo = colunaDe(m, 'symbol')
-  const iConta = colunaDe(m, 'account')
-  const linhas = f.errors.filter((e) => e.code === 'open_at_end').map((e) => e.line)
-  const recs = m.lido.records.filter((r) => {
-    if (linhas.indexOf(r.line) < 0) return false
-    const s = readSymbol(celula(r, iSimbolo), market)
-    if (!s.ok || s.symbol.toUpperCase() !== q.symbol.toUpperCase()) return false
-    return q.account === null || iConta < 0 || accountKey(celula(r, iConta)) === accountKey(q.account)
-  })
-  const qtds = recs.map((r) => numeroDaCelula(celula(r, colunaDe(m, 'quantity')), mark))
-  const escala = qtds.reduce((s, x) => Math.max(s, x ? x.num.scale : 0), casasDe(qAbs))
-  const soma = qtds.reduce((s, x) => s + (x ? unidades(toDecimal({ ...x.num, neg: false }, x.num.scale), escala) : ZERO), ZERO)
-  if (recs.length > 0 && soma === unidades(qAbs, escala)) return FIM_ARQUIVO.notaSim(recs.length)
-  return FIM_ARQUIVO.notaSimParte(sobra(qAbs, market, q.symbol, null).texto)
+  const abertas = linhasRecusadas(m, q, f, market, 'open_at_end')
+  return abertas > 0 ? FIM_ARQUIVO.notaSim(abertas) : FIM_ARQUIVO.notaSimParte(sobra(qAbs, market, q.symbol, null).texto)
 }
 
 /** E25 */

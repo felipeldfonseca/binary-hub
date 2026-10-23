@@ -76,10 +76,22 @@
   color: var(--text);
   overflow-wrap: anywhere;
 }
+/*
+ * The name and the tag's word as the approved renders draw them: the board's `.col-nome span` (12 px, --text-2) reaches
+ * the text inside `b` and `.tag` (the board's runtime wraps each value in a span), so the name is mono 12 px bold grey and
+ * the tag's word 12 px. The board's tag box is padding 0 7px where hub.css's neutral tag has 1px 8px: the word's −1px
+ * margin gives the board's 72 × 20 px box without a rule on .hub-tag, so an 11-character name keeps its tag on its line
+ * at 768 and 1280 (Pr. Entrada, Limit Price, Close Price), as on the board
+ */
 .hub .hub-col-tit b {
   font-family: var(--mono);
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 700;
+  color: var(--text-2);
+}
+.hub .hub-col-tag {
+  margin: -1px;
+  font-size: 12px;
 }
 .hub .hub-col-ex {
   font-size: 12px;

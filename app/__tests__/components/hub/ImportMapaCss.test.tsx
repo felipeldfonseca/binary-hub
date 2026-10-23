@@ -98,8 +98,17 @@ describe('hub-importar-mapa.css', () => {
       '8px 0',
       '1px solid var(--border)',
     ])
+    // The name and the tag's word as the approved renders draw them (the board's `.col-nome span` reaches both): mono 12 px
+    // bold grey, and a 12 px word inside hub.css's neutral tag (never a .hub-tag rule here)
     const tit = regra('.hub .hub-col-tit b')
-    expect([tit.getPropertyValue('font-family'), tit.getPropertyValue('font-size'), tit.getPropertyValue('font-weight')]).toEqual(['var(--mono)', '13px', '700'])
+    expect([tit.getPropertyValue('font-family'), tit.getPropertyValue('font-size'), tit.getPropertyValue('font-weight'), tit.getPropertyValue('color')]).toEqual([
+      'var(--mono)',
+      '12px',
+      '700',
+      'var(--text-2)',
+    ])
+    const tag = regra('.hub .hub-col-tag')
+    expect([tag.getPropertyValue('font-size'), tag.getPropertyValue('margin')]).toEqual(['12px', '-1px'])
     expect(regra('.hub .hub-col-tit').getPropertyValue('overflow-wrap')).toBe('anywhere')
     expect(regra('.hub .hub-col-ex').getPropertyValue('overflow-wrap')).toBe('anywhere')
     const chk = regra('.hub .hub-chk')
@@ -183,10 +192,10 @@ const razao = (a: Rgba, b: Rgba) => {
 
 /** [what, text token, the layers under it from the top, the sheet's own background last] */
 const PARES: [string, string, string[]][] = [
-  ['«Obrigatórias» missing, the samples «ex.: …», the tags, the notes', '--text-2', ['folha']],
+  ['«Obrigatórias» missing, a column’s name, the samples «ex.: …», the tags, the notes', '--text-2', ['folha']],
   ['«Obrigatórias» marked', '--mint', ['folha']],
   ['the check under a select', '--amber', ['folha']],
-  ['a column’s name, the order line’s items', '--text', ['folha']],
+  ['the order line’s items', '--text', ['folha']],
   ['«Confira 3 linhas»’s rows', '--text', ['--inset', 'folha']],
   ['the reading chips and the model chip', '--text', ['--inset', 'folha']],
   ['a question, the pairing summary, the model block', '--text', ['--surface', 'folha']],

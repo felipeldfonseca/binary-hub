@@ -779,12 +779,13 @@ describe('«conferir» · the forms the board does not draw (N)', () => {
     expect(v2.perguntasFim[0].nota).toBe(
       'A posição ainda aberta fica de fora (2 execuções) e entra quando você importar um arquivo que tenha a abertura e o fechamento.',
     )
-    // Buy 3, sell 2, «Sim»: the open part is part of an execution, never «(0 execuções)»
+    // Buy 3, sell 2, «Sim»: the lot still open stays out whole with the exit it had, so both executions (review 2 · 2)
     const parte = exec('futures', ['2026-10-13 10:31:05,MESZ6,Buy,3,6812.25', '2026-10-13 10:41:05,MESZ6,Sell,2,6815.25'])
     const vp = vistaConferir(comFimDoArquivo(parte, 'MESZ6', 'yes'), 'futures')
     expect(vp.perguntasFim[0].nota).toBe(
-      'A parte ainda aberta da posição (1 contrato) fica de fora e entra quando você importar um arquivo que tenha a abertura e o fechamento.',
+      'A posição ainda aberta fica de fora (2 execuções) e entra quando você importar um arquivo que tenha a abertura e o fechamento.',
     )
+    expect(vp.pareamento?.resumo).toBe('Nenhuma operação: todas as execuções ficaram de fora.')
     // Sold 2 left over, «Não»: the file began with 2 bought
     const vendeu = exec('futures', ['2026-10-13 10:31:05,MESZ6,Sell,2,6812.25'])
     const vv = vistaConferir(comFimDoArquivo(vendeu, 'MESZ6', 'no'), 'futures')
@@ -877,5 +878,150 @@ describe('copyMapa.ts', () => {
       }
     }
     expect(chaves).toBeGreaterThan(150)
+  })
+})
+
+// ------------------------------------------------------------------------------------------------
+// Reviews 1 and 2 of lane L1: each fix, and the forms the mutation review found untested
+// ------------------------------------------------------------------------------------------------
+
+/** An invented execution file, read as one execution per row */
+const execucoes = (market: AccountMarket, linhasTexto: string[], cab = 'Time,Symbol,Side,Qty,Price') =>
+  comModo(mapearTexto([cab, ...linhasTexto].join('\n'), market), 'fill', market)
+
+describe('review 1 · 1: «Lado» on a column that is no side column shows its check, never a question per value', () => {
+  const NAO_LADO = 'Esta coluna não parece compra e venda.'
+
+  it('8 · Data/Hora → «Lado»: the check alone (the board, IC l.1440)', () => {
+    const m = comColuna(mapear('f8'), 0, 'side', 'futures')
+    const v = mapa(m, 'f8')
+    expect(v.colunas[0].checagem).toBe(NAO_LADO)
+    expect(v.perguntasLado).toEqual([])
+    expect(v.duplicadas).toBe('Lado está em mais de uma coluna.')
+  })
+
+  it('8 · Papel → «Lado» (C/V ignored): the check alone, no «10 linhas trazem “MESZ6” …»', () => {
+    const m = comColuna(comColuna(mapear('f8'), 2, 'ignorar', 'futures'), 1, 'side', 'futures')
+    const v = mapa(m, 'f8')
+    expect(v.colunas[1].checagem).toBe(NAO_LADO)
+    expect(v.perguntasLado).toEqual([])
+    expect(v.bloqueio).toBe('Marque as colunas obrigatórias.')
+  })
+
+  it('19 · the file’s own C/V still asks about «X»; a side column of unknown words is asked about too', () => {
+    expect(mapa(mapear('f19'), 'f19').perguntasLado.map((q) => q.texto)).toEqual(['2 linhas trazem “X” na coluna de lado. O que quer dizer?'])
+    const texto = ['Entry Time,Exit Time,Symbol,Side,Qty,Profit', '2026-10-13 10:31:05,2026-10-13 10:32:05,MESZ6,Kauf,1,5.00', '2026-10-13 10:41:05,2026-10-13 10:42:05,MESZ6,Verkauf,1,-2.50'].join('\n')
+    const m = comColuna(mapearTexto(texto, 'futures'), 3, 'side', 'futures')
+    const v = vistaMapa(m, null, 'futures')
+    expect(v.colunas[3].checagem).toBe(NAO_LADO)
+    expect(v.perguntasLado.map((q) => q.texto)).toEqual([
+      '1 linha traz “Kauf” na coluna de lado. O que quer dizer?',
+      '1 linha traz “Verkauf” na coluna de lado. O que quer dizer?',
+    ])
+  })
+})
+
+describe('review 1 · 2: «Mudar» → a decimal the file contradicts gives the note only', () => {
+  it.each([
+    ['f8', 'futures'],
+    ['f19', 'b3'],
+  ] as const)('%s · «ponto»: the chip, the note, the hint; no check under the number columns; every requirement still ✓', (k, mk) => {
+    const v = mapa(comDecimal(mapear(k), 'point', mk), k)
+    expect(v.lerTexto).toBe('Separador: ponto e vírgula · decimal ponto')
+    expect(v.notaLer).toBe('Os números não fecharam com este decimal. Confira.')
+    expect(v.colunas.map((c) => c.checagem)).toEqual(v.colunas.map(() => null))
+    expect(v.obrigatorias.every((r) => r.ok)).toBe(true)
+    expect(v.bloqueio).toBe('Confira como ler o arquivo.')
+  })
+})
+
+describe('review 2 · 2: E24’s nota counts what the domain refuses', () => {
+  const SIM = (n: string) => `A posição ainda aberta fica de fora (${n}) e entra quando você importar um arquivo que tenha a abertura e o fechamento.`
+
+  it('«Sim» with partial exits or several entries: every execution of the open position, as the domain refuses them', () => {
+    // Buy 2, Sell 1, Buy 1: both lots still open stay out whole, with the sale that took part of the first
+    const m = execucoes('futures', ['2026-10-13 10:31:05,MESZ6,Buy,2,6812.25', '2026-10-13 10:41:05,MESZ6,Sell,1,6815.25', '2026-10-13 10:51:05,MESZ6,Buy,1,6816.25'])
+    const v = vistaConferir(comFimDoArquivo(m, 'MESZ6', 'yes'), 'futures')
+    expect(v.perguntasFim[0].sub).toBe('Pelas execuções do arquivo, sobram 2 contratos comprados.')
+    expect(v.perguntasFim[0].nota).toBe(SIM('3 execuções'))
+    expect(v.pareamento?.resumo).toBe('Nenhuma operação: todas as execuções ficaram de fora.')
+  })
+
+  it('«Sim» where only part of an execution stays open (a sale that closes and opens): «A parte ainda aberta …»', () => {
+    const m = execucoes('futures', ['2026-10-13 10:31:05,MESZ6,Buy,1,6812.25', '2026-10-13 10:41:05,MESZ6,Sell,2,6815.25'])
+    const v = vistaConferir(comFimDoArquivo(m, 'MESZ6', 'yes'), 'futures')
+    expect(v.perguntasFim[0].nota).toBe(
+      'A parte ainda aberta da posição (1 contrato) fica de fora e entra quando você importar um arquivo que tenha a abertura e o fechamento.',
+    )
+    expect(v.pareamento?.resumo).toBe('Vira 1 operação, com uma saída.')
+  })
+
+  it('«Não» where only part of the closing execution stays out: «a parte da venda …», «a parte da compra …»', () => {
+    // Sell 2, Buy 1: the sale closes the 1 bought before the file and opens 1 sold, which the purchase closes
+    const vendeu = execucoes('futures', ['2026-10-13 10:31:05,MESZ6,Sell,2,6812.25', '2026-10-13 10:41:05,MESZ6,Buy,1,6810.25'])
+    const v = vistaConferir(comFimDoArquivo(vendeu, 'MESZ6', 'no'), 'futures')
+    expect(v.perguntasFim[0].nota).toBe('O arquivo começou com 1 contrato comprado, de antes dele: a parte da venda que o fecha fica de fora.')
+    expect(t(v.pareamento?.primeira)).toBe('1ª operação: MESZ6, venda de 1 a 6.812,25; saída de 1 a 6.810,25: +US$ 10,00.')
+    // Buy 2, Sell 1: the file began with 1 sold
+    const comprou = execucoes('futures', ['2026-10-13 10:31:05,MESZ6,Buy,2,6812.25', '2026-10-13 10:41:05,MESZ6,Sell,1,6815.25'])
+    expect(vistaConferir(comFimDoArquivo(comprou, 'MESZ6', 'no'), 'futures').perguntasFim[0].nota).toBe(
+      'O arquivo começou com 1 contrato vendido, de antes dele: a parte da compra que fecha essa venda fica de fora.',
+    )
+    // Shares, feminine
+    const acoes = execucoes('stocks', ['2026-10-14 10:31:05,AAPL,Sell,2,247.80', '2026-10-14 10:41:05,AAPL,Buy,1,247.50'])
+    expect(vistaConferir(comFimDoArquivo(acoes, 'AAPL', 'no'), 'stocks').perguntasFim[0].nota).toBe(
+      'O arquivo começou com 1 ação comprada, de antes dele: a parte da venda que a fecha fica de fora.',
+    )
+  })
+
+  it('two «Conta» values both «Sim»: each nota counts its own account’s executions', () => {
+    const m = comFimDoArquivo(comFimDoArquivo(mapear('f16c'), endOfFileKey('MESZ6', 'LT50K-0193'), 'yes'), endOfFileKey('MESZ6', 'LT50K-0194'), 'yes')
+    expect(conferir(m, 'f16c').perguntasFim.map((q) => q.nota)).toEqual([SIM('1 execução'), SIM('1 execução')])
+  })
+})
+
+describe('review 2 · 4: the forms the mutation review found untested', () => {
+  it('a loss in parentheses without a currency: «“(13.75)” é perda: lemos como −13,75.»', () => {
+    const texto = ['Entry Time,Exit Time,Symbol,Side,Qty,Profit', '2026-10-13 10:31:05,2026-10-13 10:32:05,MESZ6,Buy,1,5.00', '2026-10-13 10:41:05,2026-10-13 10:42:05,MESZ6,Sell,1,(13.75)'].join('\n')
+    expect(vistaMapa(mapearTexto(texto, 'futures'), null, 'futures').notas).toContain('“(13.75)” é perda: lemos como −13,75.')
+  })
+
+  it('Forex: «lote» below 2, «lotes» from 2, in the rows and in the sub', () => {
+    const rows = execucoes('forex', ['2026-10-14 10:31:05,EURUSD,Buy,1.99,1.08520', '2026-10-14 10:41:05,EURUSD,Buy,2.00,1.08600'])
+    const v = vistaConferir(rows, 'forex')
+    expect(linhas(v).map((l) => (l as string).split(' · ')[3])).toEqual(['1,99 lote', '2,00 lotes'])
+    expect(v.perguntasFim[0].sub).toBe('Pelas execuções do arquivo, sobram 3,99 lotes comprados.')
+    const dois = vistaConferir(execucoes('forex', ['2026-10-14 10:31:05,EURUSD,Sell,2,1.08520']), 'forex')
+    expect(dois.perguntasFim[0].sub).toBe('Pelas execuções do arquivo, sobram 2,00 lotes vendidos.')
+    const menos = vistaConferir(execucoes('forex', ['2026-10-14 10:31:05,EURUSD,Buy,1.5,1.08520']), 'forex')
+    expect(menos.perguntasFim[0].sub).toBe('Pelas execuções do arquivo, sobra 1,50 lote comprado.')
+  })
+
+  it('«Sem coluna de lado: …» only while no column is «Lado» (IBKR with AssetClass set to «Lado»)', () => {
+    const SEM_LADO = 'Sem coluna de lado: quantidade positiva é compra, negativa é venda.'
+    const m = mapear('f16i')
+    expect(mapa(m, 'f16i').notas).toContain(SEM_LADO)
+    expect(mapa(comColuna(m, 5, 'side', 'stocks'), 'f16i').notas).not.toContain(SEM_LADO)
+  })
+
+  it('the evidence’s line counts from the header (a title line above it): «na 1ª linha»', () => {
+    const f8 = ARQUIVOS_QUADRO.f8.texto.split('\r\n')
+    const m = mapearTexto(['Relatório de operações BlackArrow', ...f8].join('\n'), 'futures', 'BlackArrow')
+    expect([m.lido.headerSkip, m.lido.headerLine]).toEqual([1, 2])
+    const v = vistaConferir(m, 'futures')
+    expect(t(v.liquido?.nota)).toBe('Conferido pelos preços na 1ª linha: −US$ 37,50 − US$ 2,48 = −US$ 39,98.')
+  })
+
+  it('a merged execution’s average price shows with the column’s decimals («6.812,50», not its 8)', () => {
+    const m = execucoes('futures', ['2026-10-13 10:31:05,MESZ6,Buy,1,6812.25', '2026-10-13 10:31:05,MESZ6,Buy,1,6812.75', '2026-10-13 10:41:05,MESZ6,Sell,2,6815.00'])
+    const v = vistaConferir(m, 'futures')
+    expect(t(v.pareamento?.primeira)).toBe('1ª operação: MESZ6, compra de 2 a 6.812,50; saída de 2 a 6.815,00: +US$ 25,00.')
+  })
+
+  it('quantities: an execution of 0 is no execution (skipped), one the mapping cannot read is shown; a signed 0 has no side', () => {
+    const m = execucoes('futures', ['2026-10-13 10:31:05,MESZ6,Buy,0,6812.25', '2026-10-13 10:41:05,MESZ6,Buy,abc,6812.50', '2026-10-13 10:51:05,MESZ6,Sell,1,6815.00'])
+    expect(linhas(vistaConferir(m, 'futures')).map((l) => (l as string).split(' · ')[3])).toEqual(['abc', '1 contrato'])
+    const texto = ['Entry Time,Exit Time,Symbol,Qty,Profit', '2026-10-13 10:31:05,2026-10-13 10:32:05,MESZ6,-1,5.00', '2026-10-13 10:41:05,2026-10-13 10:42:05,MESZ6,0,0.00', '2026-10-13 10:51:05,2026-10-13 10:52:05,MESZ6,2,2.50'].join('\n')
+    expect(linhas(vistaConferir(mapearTexto(texto, 'futures'), 'futures')).map((l) => (l as string).split(' · ')[2])).toEqual(['venda', '—', 'compra'])
   })
 })
