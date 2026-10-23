@@ -34,7 +34,7 @@ interface Props {
 /**
  * "Editar conta" (no board; follows the inline forms of Suas contas and step b). Fase, Mesa and
  * «Tamanho» (in the market's money) wherever the market has firms; «Tipo: Pessoal» for binaries.
- * «Fuso do arquivo» only for a market with a file reader (Fase 2b: no file reaches the others).
+ * «Fuso do arquivo» for a market whose files the app reads (Phase 3b, E55: a reader's or the column mapping).
  * Changing or confirming the file zone of an account with trades shows what moves first
  * (import_fix_tz dry run) and waits for an explicit "Confirmar fuso".
  */
@@ -43,7 +43,7 @@ export default function EditarConta({ account, accounts, primaryId, onSaved, onC
   const refresh = useRefreshAfterWrite()
   // Fase, «Mesa» (free text, with the firms of the account's market as suggestions) and «Tamanho»
   const firms = hasFirms(account.market)
-  const reader = MARKET_SPEC[account.market].reader
+  const reader = MARKET_SPEC[account.market].reader || MARKET_SPEC[account.market].mapping
   const confirmed = tzConfirmed(account)
   const id = account.id
   const [label, setLabel] = useState(account.label)

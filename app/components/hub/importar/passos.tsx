@@ -2,9 +2,9 @@
 
 import { useMemo, useRef, useState } from 'react'
 import { Upload } from 'lucide-react'
-import type { FailedFile, ImportMarket, ParsedFile, RowIssue, RowErrorCode } from '@/lib/domain/import'
+import type { FailedFile, FileErrorCode, ImportMarket, ImportRow, ParsedFile } from '@/lib/domain/import'
 import { CREATABLE_MARKETS, MARKET_SPEC, currencyOf, type AccountMarket } from '@/lib/domain/markets'
-import { entrySpan, totals } from '@/lib/domain/import'
+import { entrySpan } from '@/lib/domain/import'
 import {
   FILE_ZONES,
   FIRM_MAX,
@@ -12,13 +12,13 @@ import {
   OTHER_FILE_ZONES,
   PHASES_FUTURES,
   REF_MAX,
-  REFERENCE_TZ,
   displaySpan,
   zoneBars,
   type AccountPhase,
   type ZoneKey,
 } from '@/lib/hub/contas'
-import type { FixTzResult, ImportPreviewResult, RowError } from '@/lib/hub/contasDb'
+import type { FixTzResult, ImportPreviewResult } from '@/lib/hub/contasDb'
+import { faixaToda, palavraJaEstavam, relogioDoMercado, type ChaveDasLinhas } from '@/lib/hub/importPrevia'
 import {
   PROP_FIRMS_CHECKED,
   firmByName,
@@ -29,7 +29,7 @@ import {
   platformsFor,
   type PropFirm,
 } from '@/lib/hub/mesas'
-import { SIMBOLO_MOEDA, formatMoney, formatOffset, formatShift } from '@/lib/hub/formato'
+import { SIMBOLO_MOEDA, formatShift } from '@/lib/hub/formato'
 import { MERCADO } from '@/components/hub/copyMercados'
 import {
   CHOOSE,
@@ -51,13 +51,15 @@ import {
   ZONE_LABEL,
   fixTzLine,
   fixTzUntouched,
-  n,
-  rowErrorReason,
   zoneName,
+  type PalavraFuso,
 } from '@/components/hub/contas/copy'
-import { ANTES_DAS_REGRAS } from '@/components/hub/contas/copyRegras'
-import { Disclosure, InfoButton, InfoPanel, useToggle } from '@/components/hub/contas/ui'
+import { InfoButton, InfoPanel, useToggle } from '@/components/hub/contas/ui'
 import { REGRAS_FORM_VAZIO, type RegrasForm } from '@/lib/hub/regrasConta'
+import { Count, ErrorLines } from './PassoPrevia'
+
+// Phase 3b: «Prévia» lives in its own file (PassoPrevia.tsx); its pieces stay importable from here
+export { Count, ErrorLines, PassoPrevia, SkippedLines } from './PassoPrevia'
 
 type HeadingRef = React.RefObject<HTMLHeadingElement>
 
@@ -149,8 +151,25 @@ export function PassoSolte({
 // erro: the file could not be read, or it has no importable row
 // ------------------------------------------------------------------------------------------------
 
-export function PassoErro({ headingRef, failed, parsed }: { headingRef: HeadingRef; failed: FailedFile | null; parsed: ParsedFile | null }) {
-  if (parsed || failed?.error === 'empty_file') {
+/**
+ * Phase 3b: `motivo` says why a file the readers did not take cannot go on, over what readImportFile answered: the
+ * column mapping's sniff failures (header_not_found «Não achamos a linha com os nomes das colunas.», too_many_columns…)
+ * and a binaries account's unknown file (unknown_format «Em contas de binárias, lemos só o CSV da Ebinex.»)
+ */
+export function PassoErro({
+  headingRef,
+  failed,
+  parsed,
+  motivo = null,
+}: {
+  headingRef: HeadingRef
+  failed: FailedFile | null
+  parsed: ParsedFile | null
+  motivo?: { error: FileErrorCode; line?: number } | null
+}) {
+  const error = motivo?.error ?? failed?.error
+  const line = motivo ? motivo.line : failed?.line
+  if (parsed || error === 'empty_file') {
     return (
       <div className="hub-passo">
         <Heading headingRef={headingRef}>{ERRO.empty}</Heading>
@@ -159,18 +178,24 @@ export function PassoErro({ headingRef, failed, parsed }: { headingRef: HeadingR
     )
   }
   let detail = ''
-  switch (failed?.error) {
+  switch (error) {
     case 'unknown_format':
       detail = ERRO.unknownFormat
       break
     case 'missing_columns':
-      detail = ERRO.missingColumns(failed.missingColumns ?? [])
+      detail = ERRO.missingColumns(failed?.missingColumns ?? [])
       break
     case 'duplicate_columns':
       detail = ERRO.duplicateColumns
       break
+    case 'header_not_found':
+      detail = ERRO.headerNotFound
+      break
+    case 'too_many_columns':
+      detail = ERRO.tooManyColumns
+      break
     case 'malformed_csv':
-      detail = ERRO.malformed(failed.line)
+      detail = ERRO.malformed(line)
       break
     case 'too_large':
       detail = ERRO.tooLarge
@@ -186,53 +211,6 @@ export function PassoErro({ headingRef, failed, parsed }: { headingRef: HeadingR
     <div className="hub-passo">
       <Heading headingRef={headingRef}>{ERRO.unreadable}</Heading>
       {detail && <p>{detail}</p>}
-    </div>
-  )
-}
-
-/** «Linha n: motivo», from the browser's issues (which know the column) and the server's. */
-function ErrorLines({
-  issues,
-  serverErrors,
-  open = false,
-}: {
-  issues: readonly RowIssue<RowErrorCode>[]
-  serverErrors: readonly RowError[] | null
-  open?: boolean
-}) {
-  const lines = (serverErrors ?? issues).map((e) => {
-    const local = issues.find((i) => i.line === e.line && i.code === e.code)
-    return { line: e.line, reason: rowErrorReason(e.code, { column: local?.column, firstLine: local?.firstLine }) }
-  })
-  if (open) {
-    return (
-      <ul className="hub-lista-linhas">
-        {lines.map((l) => (
-          <li key={`${l.line}-${l.reason}`}>{PASSO_D.line(l.line, l.reason)}</li>
-        ))}
-      </ul>
-    )
-  }
-  return <SkippedLines lines={lines} />
-}
-
-function SkippedLines({ lines }: { lines: { line: number; reason: string }[] }) {
-  const [shown, toggle] = useToggle()
-  return (
-    <div className="hub-bloco hub-bloco--atencao">
-      <div className="hub-linha" style={{ gap: '4px 12px' }}>
-        <span style={{ flex: '1 1 220px', minWidth: 0 }}>{PASSO_D.skipped(lines.length)}</span>
-        <Disclosure open={shown} controls="linhas-puladas" onToggle={toggle}>
-          {PASSO_D.seeLines}
-        </Disclosure>
-      </div>
-      {shown && (
-        <ul id="linhas-puladas" className="hub-lista-linhas">
-          {lines.map((l) => (
-            <li key={`${l.line}-${l.reason}`}>{PASSO_D.line(l.line, l.reason)}</li>
-          ))}
-        </ul>
-      )}
     </div>
   )
 }
@@ -492,13 +470,17 @@ export function PassoMercado({
   headingRef,
   market,
   onChoose,
+  mercados = CREATABLE_MARKETS,
 }: {
   headingRef: HeadingRef
   market: AccountMarket | null
   onChoose: (market: AccountMarket) => void
+  /** Phase 3b: the markets offered («+ Nova conta» of a file no reader takes: the five that import by columns) */
+  mercados?: readonly AccountMarket[]
 }) {
-  // A market whose files the app cannot read yet says so at once (board `I1.nota`); the end screen says it again
-  const semLeitor = !!market && !MARKET_SPEC[market].reader
+  // A market whose files the app cannot read says so at once (board `I1.nota`). Phase 3b: every market reads a file
+  // (a reader's, or the column mapping), so the note is kept only for a market with neither (none today)
+  const semLeitor = !!market && !MARKET_SPEC[market].reader && !MARKET_SPEC[market].mapping
   return (
     <div className="hub-passo">
       <Heading headingRef={headingRef}>{PASSO_I1.title}</Heading>
@@ -508,8 +490,8 @@ export function PassoMercado({
         aria-describedby={semLeitor ? 'nota-mercado nota-leitor' : 'nota-mercado'}
         className="hub-pills"
       >
-        {/* The six markets in the boards' order; none disabled */}
-        {CREATABLE_MARKETS.map((m) => (
+        {/* The six markets in the boards' order (Phase 3b: or the ones a mapped file can go to); none disabled */}
+        {mercados.map((m) => (
           <button key={m} type="button" className="hub-pill" aria-pressed={market === m} onClick={() => onChoose(m)}>
             {MERCADO[m].pill}
           </button>
@@ -699,29 +681,44 @@ export function chosenTz(zone: ZoneChoice): string | null {
   return key ? [...FILE_ZONES, ...OTHER_FILE_ZONES].find((z) => z.key === key)?.tz ?? null : null
 }
 
+/**
+ * Phase 3b: every market (its reference clock, session band and legend: lib/hub/importPrevia relogioDoMercado). `linhas`
+ * are what the step counts (a reader's rows; a mapped file's trades or executions, linhasDoFuso); `toda` spans a mapped
+ * file from its first to its last entry (faixaToda) where a reader's file shows its usual hours (entrySpan); `recusa`
+ * is G2's refusal of the zone pressed (E33).
+ */
 export function PassoFuso({
   headingRef,
-  parsed,
+  market,
+  linhas,
+  toda,
+  palavra,
   zone,
   onChange,
+  recusa,
 }: {
   headingRef: HeadingRef
-  parsed: ParsedFile
+  market: AccountMarket
+  linhas: ImportRow[]
+  toda: boolean
+  palavra: PalavraFuso
   zone: ZoneChoice
   onChange: (zone: ZoneChoice) => void
+  recusa: { conta: string; zona: string } | null
 }) {
   const [info, toggleInfo] = useToggle()
-  const futures = parsed.market === 'futures'
-  const refTz = REFERENCE_TZ[parsed.market]
-  const inFile = useMemo(() => entrySpan(parsed.rows), [parsed.rows])
+  const relogio = relogioDoMercado(market)
+  const refTz = relogio.tz
+  const faixa = toda ? faixaToda : entrySpan
+  const inFile = useMemo(() => faixa(linhas), [faixa, linhas])
   const strips = useMemo(() => {
     const out: Partial<Record<ZoneKey, { cap: string; bars: number[] }>> = {}
     for (const z of [...FILE_ZONES, ...OTHER_FILE_ZONES]) {
-      const s = span(displaySpan(parsed.rows, z.tz, refTz))
-      out[z.key] = { cap: futures ? PASSO_C.capFutures(s) : PASSO_C.capBinary(s), bars: zoneBars(parsed.rows, z.tz, refTz) }
+      const s = span(displaySpan(linhas, z.tz, refTz, faixa))
+      out[z.key] = { cap: PASSO_C.cap(palavra, s, relogio.relogio), bars: zoneBars(linhas, z.tz, refTz) }
     }
     return out
-  }, [parsed.rows, refTz, futures])
+  }, [linhas, refTz, faixa, palavra, relogio.relogio])
 
   const options: { key: ZoneKey | 'outro'; name: string }[] = [
     ...FILE_ZONES.map((z) => ({ key: z.key, name: ZONE_LABEL[z.key] })),
@@ -735,7 +732,7 @@ export function PassoFuso({
         <InfoButton panelId="info-fuso" label={PASSO_C.infoAria} open={info} onToggle={toggleInfo} />
       </div>
       {info && <InfoPanel id="info-fuso">{PASSO_C.info}</InfoPanel>}
-      {inFile && <p className="hub-nota">{PASSO_C.inFile(span(inFile))}</p>}
+      {inFile && <p className="hub-nota">{PASSO_C.inFile(palavra, span(inFile))}</p>}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
         <div className="hub-eixo24" aria-hidden="true">
           <span style={{ left: '0%' }}>00</span>
@@ -788,7 +785,9 @@ export function PassoFuso({
                 )}
                 {data && (
                   <div className="hub-faixa24" aria-hidden="true">
-                    {futures && <span className="hub-faixa24__banda" />}
+                    {relogio.banda && (
+                      <span className={relogio.banda === 'b3' ? 'hub-faixa24__banda hub-faixa24__banda--b3' : 'hub-faixa24__banda'} />
+                    )}
                     {data.bars.map((h, i) => (
                       <span key={i} className="hub-faixa24__barra" style={{ height: `${Math.round(h * 100)}%` }} />
                     ))}
@@ -799,15 +798,22 @@ export function PassoFuso({
           })}
         </div>
         <div id="leg-fuso" className="hub-legenda">
-          {futures && (
+          {relogio.banda && (
             <span>
               <span className="hub-sw" aria-hidden="true" />
-              {PASSO_C.session}
+              {relogio.bandaTxt}
             </span>
           )}
-          <span>{futures ? PASSO_C.legendFutures : PASSO_C.legendBinary}</span>
+          <span>{relogio.legenda}</span>
         </div>
       </div>
+      {/* G2 (board IC l.357): the zone pressed is not the account's imports' zone; the footer is blocked and says which */}
+      {recusa && (
+        <div className="hub-bloco hub-bloco--atencao">
+          <span style={{ fontWeight: 700 }}>{PASSO_C.recusaTitulo}</span>
+          <span>{PASSO_C.recusa(recusa.conta)}</span>
+        </div>
+      )}
     </div>
   )
 }
@@ -843,143 +849,6 @@ export function PassoConfirmarFuso({
 }
 
 // ------------------------------------------------------------------------------------------------
-// d: preview
-// ------------------------------------------------------------------------------------------------
-
-function Count({ items, small = false }: { items: [number, string][]; small?: boolean }) {
-  return (
-    <div className={small ? 'hub-contagem hub-contagem--menor' : 'hub-contagem'}>
-      {items.map(([count, word], i) => (
-        <span key={word}>
-          <span className="hub-num">{n(count)}</span> {word}
-          {i < items.length - 1 && (
-            <span className="hub-sep" aria-hidden="true">
-              {' ·'}
-            </span>
-          )}
-        </span>
-      ))}
-    </div>
-  )
-}
-
-export function PassoPrevia({
-  headingRef,
-  preview,
-  parsed,
-  label,
-  zoneUsed,
-  zoneChosen,
-  undone,
-  antesDasRegras = null,
-}: {
-  headingRef: HeadingRef
-  preview: ImportPreviewResult
-  parsed: ParsedFile
-  label: string
-  zoneUsed: string
-  /** Chosen in step c («lembrado para»), or the account's own («lembrado de») */
-  zoneChosen: boolean
-  undone: boolean
-  /** «Antes de {d} (início das regras): …» (lib/hub/regrasConta.linhaAntesDasRegras) */
-  antesDasRegras?: string | null
-}) {
-  const [commissionInfo, toggleCommission] = useToggle()
-  const [beforeInfo, toggleBefore] = useToggle()
-  const errors = preview.errors.length
-  const linked = preview.linked ?? 0
-  const items: [number, string][] = [
-    [preview.rows_total, PASSO_D.lines],
-    [preview.new, PASSO_D.fresh],
-  ]
-  // Phase 3 (D29): rows matched to a trade registered in the app are neither new nor already there
-  if (linked > 0) items.push([linked, PASSO_D.linkedCount(linked)])
-  if (preview.other_account > 0) items.push([preview.other_account, PASSO_D.otherAccount])
-  items.push([preview.duplicate, preview.duplicate > 0 ? PASSO_D.alreadyId : PASSO_D.already], [errors, PASSO_D.errors])
-
-  const notices: string[] = []
-  let commission: { gross: string; cost: string } | null = null
-  let slTpEmpty = false
-  for (const notice of parsed.notices) {
-    if (notice.code === 'file_has_offset') notices.push(PASSO_D.offsets(notice.offsets.map(formatOffset).join(', ')))
-    else if (notice.code === 'unsigned_losses_negated') notices.push(PASSO_D.unsignedLosses(notice.rows))
-    else if (notice.code === 'refunds_as_breakeven') notices.push(PASSO_D.refunds(notice.rows))
-    else if (notice.code === 'commission_in_file') commission = { gross: notice.gross, cost: notice.commission }
-    else if (notice.code === 'sl_tp_empty') slTpEmpty = true
-  }
-  if (!commission) {
-    // The notice carries the totals; a file where only some rows have commissions still shows them
-    const t = totals(parsed.rows)
-    if (t.commission !== null && parsed.platform === 'topone') commission = { gross: t.gross, cost: t.commission }
-  }
-  const costText = commission ? formatMoney(commission.cost === '0.00' ? '0' : `-${commission.cost}`, { signed: true }) : ''
-
-  const zoneLine = parsed.needsFileTz
-    ? zoneChosen || !preview.tz_confirmed
-      ? PASSO_D.zoneFor(zoneName(zoneUsed), label)
-      : PASSO_D.zoneFrom(zoneName(zoneUsed), label)
-    : ''
-
-  return (
-    <div className="hub-passo">
-      <Heading headingRef={headingRef}>{PASSO_D.title}</Heading>
-      {/* Announced by the sheet's status region */}
-      {undone && <div className="hub-chip-dado">{PASSO_D.undone(label)}</div>}
-      <Count items={items} />
-      {preview.other_account > 0 && <p className="hub-passo__txt">{PASSO_D.otherNote(preview.other_account)}</p>}
-      {preview.completable > 0 && <p className="hub-passo__txt">{PASSO_D.completable(preview.completable)}</p>}
-      {/* Phase 3 (D29): trades registered in the app that this file completes instead of inserting
-          them again, and those whose money the file corrects (absent before the migration: none) */}
-      {linked > 0 && <p className="hub-passo__txt">{PASSO_D.linked(linked)}</p>}
-      {(preview.linked_differs ?? 0) > 0 && <p className="hub-passo__txt">{PASSO_D.linkedDiffers(preview.linked_differs ?? 0)}</p>}
-      {/* Phase 3c (§5.12): a file with partial exits (absent keys before the migration, or in a file of one row per trade: none) */}
-      {(preview.grouped ?? 0) > 0 && <p className="hub-passo__txt">{PASSO_D.agrupadas(preview.grouped ?? 0)}</p>}
-      {(preview.attached ?? 0) > 0 && <p className="hub-passo__txt">{PASSO_D.anexadas(preview.attached ?? 0)}</p>}
-      {notices.map((text) => (
-        <div key={text} className="hub-linha-i">
-          <span>{text}</span>
-        </div>
-      ))}
-      {errors > 0 && <ErrorLines issues={parsed.errors} serverErrors={preview.errors} />}
-      {commission && (
-        <>
-          <div className="hub-linha-i">
-            <span>{PASSO_D.commission}</span>
-            <InfoButton panelId="info-com" label={PASSO_D.commissionAria} open={commissionInfo} onToggle={toggleCommission} />
-          </div>
-          {commissionInfo && (
-            <InfoPanel id="info-com">
-              {PASSO_D.commissionInfo(formatMoney(commission.gross, { signed: true }), costText)}
-              {slTpEmpty ? ` ${PASSO_D.slTpEmpty}` : ''}
-            </InfoPanel>
-          )}
-        </>
-      )}
-      {!commission && slTpEmpty && (
-        <div className="hub-linha-i">
-          <span>{PASSO_D.slTpEmpty}</span>
-        </div>
-      )}
-      {preview.day_changes > 0 && (
-        <div className="hub-linha-i">
-          <span>{PASSO_D.dayChanges(preview.day_changes, parsed.market)}</span>
-        </div>
-      )}
-      {antesDasRegras && (
-        <>
-          <div className="hub-linha-i">
-            <span>{antesDasRegras}</span>
-            <InfoButton panelId="info-antes" label={ANTES_DAS_REGRAS.infoAria} open={beforeInfo} onToggle={toggleBefore} />
-          </div>
-          {beforeInfo && <InfoPanel id="info-antes">{ANTES_DAS_REGRAS.info}</InfoPanel>}
-        </>
-      )}
-      {zoneLine && <p className="hub-nota">{zoneLine}</p>}
-    </div>
-  )
-}
-
-// ------------------------------------------------------------------------------------------------
 // f: nothing new
 // ------------------------------------------------------------------------------------------------
 
@@ -989,6 +858,9 @@ export function PassoNadaNovo({
   label,
   confirmedZone,
   onConfirmZone,
+  mapeado = false,
+  unidade = 'linha',
+  chave = 'id',
 }: {
   headingRef: HeadingRef
   preview: ImportPreviewResult
@@ -996,16 +868,38 @@ export function PassoNadaNovo({
   /** The account's zone once confirmed; null while it is still a guess */
   confirmedZone: string | null
   onConfirmZone: () => void
+  /** Phase 3b: a mapped file never confirms nor moves the account's zone (G2): no zone block */
+  mapeado?: boolean
+  /** Phase 3b: an execution file counts exits («Nada novo: as 6 saídas já estão em …») */
+  unidade?: 'linha' | 'saida'
+  /** Phase 3b: how the database found the mapped file's rows («já estavam (mesmo ID)» or «(mesma hora e preço)») */
+  chave?: ChaveDasLinhas
 }) {
-  const items: [number, string][] = [
-    [preview.rows_total, PASSO_D.lines],
-    [0, PASSO_D.fresh],
-    [preview.duplicate, PASSO_D.alreadyId],
-  ]
-  if (preview.errors.length > 0) items.push([preview.errors.length, PASSO_D.errors])
+  const saidas = unidade === 'saida'
+  const items: [number, string][] = saidas
+    ? [
+        [preview.rows_total - preview.errors.length, PASSO_D.saidas(preview.rows_total - preview.errors.length)],
+        [0, PASSO_D.fresh],
+        [preview.duplicate, palavraJaEstavam(preview, chave)],
+      ]
+    : [
+        [preview.rows_total, PASSO_D.lines],
+        [0, PASSO_D.fresh],
+        [preview.duplicate, mapeado ? palavraJaEstavam(preview, chave) : PASSO_D.alreadyId],
+      ]
+  if (!saidas && preview.errors.length > 0) items.push([preview.errors.length, PASSO_D.errors])
+  const title = saidas ? PASSO_F.titleSaidas(preview.duplicate, label) : PASSO_F.title(preview.duplicate, label)
+  if (mapeado) {
+    return (
+      <div className="hub-passo">
+        <Heading headingRef={headingRef}>{title}</Heading>
+        <Count items={items} small />
+      </div>
+    )
+  }
   return (
     <div className="hub-passo">
-      <Heading headingRef={headingRef}>{PASSO_F.title(preview.duplicate, label)}</Heading>
+      <Heading headingRef={headingRef}>{title}</Heading>
       <Count items={items} small />
       <div className="hub-bloco">
         {confirmedZone ? (

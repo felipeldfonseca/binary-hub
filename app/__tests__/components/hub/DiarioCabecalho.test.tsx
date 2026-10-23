@@ -638,7 +638,7 @@ describe('Diário header in six markets (Fase 2b)', () => {
     expect(within(list).getByText('Contas de mercados diferentes nunca são somadas.')).toBeInTheDocument()
   })
 
-  it('«Importar arquivo» with a Cripto account opens the sheet without an account (no file of that market is read yet)', async () => {
+  it('Phase 3b (E53): «Importar arquivo» with a Cripto account opens the sheet on it (the column mapping reads its file)', async () => {
     mockSearch = `conta=${im.binance}`
     renderHub(<DiarioCabecalho />)
     expect(await selectorButton()).toHaveTextContent('Conta: Binance')
@@ -646,13 +646,13 @@ describe('Diário header in six markets (Fase 2b)', () => {
     const importFile = screen.getByRole('button', { name: 'Importar arquivo' })
     await userEvent.click(importFile)
 
-    expect(mockOpen).toHaveBeenCalledWith({ mode: 'importar', accountId: null, opener: importFile })
+    expect(mockOpen).toHaveBeenCalledWith({ mode: 'importar', accountId: im.binance, opener: importFile })
     expect(screen.getByRole('dialog')).toBeInTheDocument()
     await userEvent.keyboard('{Escape}')
     expect(importFile).toHaveFocus()
   })
 
-  it.each(['ftmo', 'ibkr', 'clear'] as const)('?importar=1 with a %s account in context opens the sheet without it', async (key) => {
+  it.each(['ftmo', 'ibkr', 'clear'] as const)('Phase 3b (E53): ?importar=1 with a %s account in context opens the sheet on it', async (key) => {
     mockSearch = `importar=1&conta=${im[key]}`
     renderHub(<DiarioCabecalho />)
 
@@ -660,7 +660,7 @@ describe('Diário header in six markets (Fase 2b)', () => {
     expect(mockOpen).toHaveBeenCalledTimes(1)
     expect(mockOpen).toHaveBeenCalledWith({
       mode: 'importar',
-      accountId: null,
+      accountId: im[key],
       opener: screen.getByRole('button', { name: 'Importar arquivo', hidden: true }),
     })
     await waitFor(() => expect(mockReplace).toHaveBeenCalledWith(`/diario?conta=${im[key]}`))

@@ -2,8 +2,22 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { FileText } from 'lucide-react'
-import { buildImportArgs, previewArgs, readImportFile, type ParsedFile, type ReadImportFileResult } from '@/lib/domain/import'
-import { MARKET_SPEC, currencyOf } from '@/lib/domain/markets'
+import {
+  PLATFORM_MARKET,
+  buildImportArgs,
+  checkTemplate,
+  previewArgs,
+  readImportFile,
+  routeFile,
+  type FileErrorCode,
+  type ImportFile,
+  type MappedFile,
+  type ParsedFile,
+  type ReadImportFileResult,
+  type ReaderPlatform,
+  type Template,
+} from '@/lib/domain/import'
+import { CREATABLE_MARKETS, MARKET_SPEC, currencyOf, type AccountMarket } from '@/lib/domain/markets'
 import { FIRM_MAX, LABEL_MAX, PLATFORM_UNKNOWN, labelTaken, parseSize, zoneKeyOf, type TradingAccount } from '@/lib/hub/contas'
 import {
   HubDataError,
@@ -12,13 +26,14 @@ import {
   importFixTz,
   importPreview,
   importUndo,
+  saveTemplate,
   toHubError,
   type FixTzResult,
   type HubErrorCode,
   type ImportCommitResult,
   type ImportPreviewResult,
 } from '@/lib/hub/contasDb'
-import { useAccounts, useHubDb, useImportFormats, useRefreshAfterWrite } from '@/hooks/useContas'
+import { useAccounts, useHubDb, useImportFormats, useImportTemplates, useRefreshAfterWrite } from '@/hooks/useContas'
 import { useAgora } from '@/hooks/useAgora'
 import { useRulesConfig, useSaveRules } from '@/hooks/useRegras'
 import { buildNewAccountPayload, type NewAccountRules, type RulesConfig } from '@/lib/hub/regras'
@@ -38,6 +53,37 @@ import { formatDiaMes } from '@/lib/hub/formato'
 import { firmOfFile, hasFirms } from '@/lib/hub/mesas'
 import { podeRegistrar } from '@/lib/hub/registrar'
 import {
+  arquivoDoMapeamento,
+  bloqueioDoConferir,
+  bloqueioDoMapa,
+  cabecalhoDoLeitor,
+  iniciarMapeamento,
+  lerArquivoMapeavel,
+  modeloASalvar,
+  mudarColunas,
+  nomePadraoDoModelo,
+  type ArquivoMapeavel,
+  type Mapeamento,
+} from '@/lib/hub/importMapeado'
+import {
+  chaveDasLinhas,
+  contasDoArquivo,
+  escolhaDaZona,
+  fusoPreSelecionado,
+  linhaDoArquivoMapeado,
+  linhaDoModelo,
+  linhasDaPrevia,
+  linhasDoFuso,
+  mostrarFuso,
+  palavraDoFuso,
+  planoMapeado,
+  recusaLocal,
+  valorImportado,
+  valorPreSelecionado,
+  zonaDaConta,
+  type ModeloDoFim,
+} from '@/lib/hub/importPrevia'
+import {
   ARQUIVO,
   BUSY,
   ERRO,
@@ -47,11 +93,13 @@ import {
   FIM_FUSO,
   FOLHA,
   PASSO_A,
+  PASSO_A2,
   PASSO_B,
   PASSO_C,
   PASSO_CONF,
   PASSO_D,
   PASSO_F,
+  PASSO_HC,
   PASSO_I1,
   PASSO_I2,
   SOLTE,
@@ -67,6 +115,12 @@ import { ERRO_JANELA, REGRAS } from '@/components/hub/personalizar/copy'
 import { useRegistrarSheet } from '@/components/hub/registrar/abrir'
 import { END_STEPS, emptyFileSummary, fileSummary, needsZoneStep, parsedOf, stepIndicator, type Passo } from './flow'
 import RegrasDaConta from './RegrasDaConta'
+import ChipModelo from './ChipModelo'
+import PassoConferir from './PassoConferir'
+import PassoContaArquivo from './PassoContaArquivo'
+import PassoContasDoArquivo from './PassoContasDoArquivo'
+import PassoMapa from './PassoMapa'
+import { CONFERIR } from './copyMapa'
 import {
   EMPTY_FORM,
   PassoConfirmarFuso,
@@ -129,7 +183,38 @@ interface Flow {
    * loaded). The locked form shows this, not the rules read since, which list the new account.
    */
   rulesAtCreation: { regras: RegrasDaNovaConta; desde: string } | null
+  /**
+   * Phase 3b: a file no reader took, read again as text; its mapping (null until the account is known: a2, the binaries
+   * error) and its card (E1: constant for the file, never changed by «Mudar colunas»). Null for a reader's file.
+   */
+  mapeado: { arquivo: ArquivoMapeavel; mapeamento: Mapeamento | null; cartao: string | null } | null
+  /** Zones the preview refused for this mapped file (G2: an unconfirmed account that already holds imports) */
+  recusados: string[]
+  /** What the live region says on mapa, conferir and hc (the steps' onAnuncio); cleared on every step change */
+  anuncio: string
+  /** What became of the model after the commit (E46) */
+  modelo: ModeloDoFim | null
+  /** i1's markets when a2's «+ Nova conta» opened it (the ones that import by columns); null: every creatable market */
+  mercadosPermitidos: AccountMarket[] | null
+  /** Why the error step shows, when readImportFile's answer does not say it (a sniff failure, a binaries account) */
+  motivoErro: { error: FileErrorCode; line?: number } | null
 }
+
+/** What a preview or a commit reads: a reader's file, or a mapped file with its mapping (read on the zone given) */
+type Fonte = { tipo: 'leitor'; lido: ReadImportFileResult } | { tipo: 'mapa'; arquivo: ArquivoMapeavel; m: Mapeamento }
+
+/** The ImportFile a source makes on the zone `tz`, with its name and hash; null when it makes none */
+function arquivoDaFonte(fonte: Fonte, market: AccountMarket, tz: string): { file: ImportFile; fileName: string; sha256: string } | null {
+  if (fonte.tipo === 'leitor') {
+    const p = parsedOf(fonte.lido)
+    return p ? { file: p, fileName: fonte.lido.fileName, sha256: fonte.lido.sha256 } : null
+  }
+  const f = arquivoDoMapeamento(fonte.m, market, tz)
+  return f.ok ? { file: f, fileName: fonte.arquivo.fileName, sha256: fonte.arquivo.sha256 } : null
+}
+
+/** The markets a2's «+ Nova conta» offers: every creatable one that imports by columns (no binaries), in the boards' order */
+const MERCADOS_DO_MAPEAMENTO: AccountMarket[] = CREATABLE_MARKETS.filter((m) => MARKET_SPEC[m].mapping)
 
 /** Phase 3c: trades the file creates — trades_new when the file has partial exits, else new (one row = one trade) */
 export const operacoesDoArquivo = (p: Pick<ImportPreviewResult, 'new' | 'trades_new'>): number => p.trades_new ?? p.new
@@ -216,6 +301,12 @@ const initialFlow = (mode: SheetMode, accountId: string | null): Flow => ({
   form: EMPTY_FORM,
   rulesNotSaved: null,
   rulesAtCreation: null,
+  mapeado: null,
+  recusados: [],
+  anuncio: '',
+  modelo: null,
+  mercadosPermitidos: null,
+  motivoErro: null,
 })
 
 interface Primary {
@@ -239,6 +330,8 @@ export default function ImportSheet({ mode, accountId, onClose }: { mode: SheetM
   const { db, userId } = useHubDb()
   const { active, all } = useAccounts()
   const formats = useImportFormats()
+  // Phase 3b: the column-mapping models, read only when a file needs the mapping (never for a reader's file)
+  const templatesQuery = useImportTemplates(false)
   const refresh = useRefreshAfterWrite()
   // The saved rules: step b's copy sources and market windows, v1's base_rev, step d's «desde»
   const rulesConfig = useRulesConfig()
@@ -299,20 +392,37 @@ export default function ImportSheet({ mode, accountId, onClose }: { mode: SheetM
   const account = view(flow.accountId)
   const label = account?.label ?? ''
   /**
-   * The account a file goes to: the one in context, unless its market has no file reader (Fase 2b,
-   * Forex, Ações, Cripto, B3), whose files the sheet never takes: it then opens as «Escolha o
-   * arquivo» and asks for the account after reading the file
+   * The account a file goes to: the one in context. Phase 3b: every market takes a file (a reader's,
+   * or the column mapping), so every active account is one
    */
-  const fileTarget = (id: string | null): TradingAccount | null => {
-    const a = view(id)
-    return a && MARKET_SPEC[a.market].reader ? a : null
-  }
+  const fileTarget = (id: string | null): TradingAccount | null => view(id)
 
-  /** Moves to a step; `push` keeps the current one for "Voltar". */
+  // Phase 3b: the mapped file on wall clocks (the zone step, the indicator) and on the zone the preview used
+  const mapeamento = flow.mapeado?.mapeamento ?? null
+  const mercado = account?.market ?? null
+  const mapeadoNaParede = useMemo((): MappedFile | null => {
+    if (!mapeamento || !mercado) return null
+    const f = arquivoDoMapeamento(mapeamento, mercado, null)
+    return f.ok ? f : null
+  }, [mapeamento, mercado])
+  const mapeadoNoFuso = useMemo((): MappedFile | null => {
+    if (!mapeamento || !mercado || !flow.zoneUsed) return null
+    const f = arquivoDoMapeamento(mapeamento, mercado, flow.zoneUsed)
+    return f.ok ? f : null
+  }, [mapeamento, mercado, flow.zoneUsed])
+  const linhasDoFusoMapeado = useMemo(() => (mapeadoNaParede ? linhasDoFuso(mapeadoNaParede) : []), [mapeadoNaParede])
+
+  /** Moves to a step; `push` keeps the current one for "Voltar" (a `history` in the patch replaces it). */
   const move = useCallback((passo: Passo, patch: Partial<Flow> = {}, push = true) => {
     if (!alive.current) return
     setError(null)
-    setFlow((f) => ({ ...f, ...patch, passo, history: push ? [...f.history, f.passo] : f.history }))
+    setFlow((f) => ({
+      ...f,
+      ...patch,
+      passo,
+      history: patch.history ?? (push ? [...f.history, f.passo] : f.history),
+      anuncio: patch.anuncio ?? '',
+    }))
     setFocusTick((t) => t + 1)
   }, [])
 
@@ -322,15 +432,54 @@ export default function ImportSheet({ mode, accountId, onClose }: { mode: SheetM
     if (Object.keys(patch).length > 0) setFlow((f) => ({ ...f, ...patch }))
   }, [])
 
+  /**
+   * G2 (Phase 3b): a zone the database refused for a mapped file goes back to the zone step (or stays there) with that
+   * zone refused (E33), never the sheet's alert
+   */
+  const refuseZone = useCallback(
+    (target: TradingAccount, tz: string, patch: Partial<Flow>, push: boolean) => {
+      if (!alive.current) return
+      setFlow((f) => {
+        const recusados = f.recusados.includes(tz) ? f.recusados : [...f.recusados, tz]
+        if (f.passo === 'c') return { ...f, ...patch, accountId: target.id, recusados }
+        return {
+          ...f,
+          ...patch,
+          accountId: target.id,
+          recusados,
+          zone: escolhaDaZona(zoneKeyOf(tz)),
+          fixOnly: false,
+          passo: 'c',
+          history: push ? [...f.history, f.passo] : f.history,
+          anuncio: '',
+        }
+      })
+      setFocusTick((t) => t + 1)
+    },
+    [],
+  )
+
   const runPreview = useCallback(
-    async (target: TradingAccount, tz: string, file: ReadImportFileResult, patch: Partial<Flow> = {}, push = true) => {
-      const p = parsedOf(file)
-      if (!p) return
+    async (target: TradingAccount, tz: string, fonte: Fonte, patch: Partial<Flow> = {}, push = true) => {
+      const built = arquivoDaFonte(fonte, target.market, tz)
+      if (!built) return
       setBusy(true)
       setError(null)
       try {
-        const args = buildImportArgs({ accountId: target.id, platform: p.platform, fileName: file.fileName, sha256: file.sha256, fileTz: tz, outcome: p })
+        const args = buildImportArgs({
+          accountId: target.id,
+          platform: built.file.platform,
+          fileName: built.fileName,
+          sha256: built.sha256,
+          fileTz: tz,
+          outcome: built.file,
+        })
         const result = await importPreview(db, previewArgs(args))
+        if (fonte.tipo === 'mapa' && (result.tz_status === 'tz_mismatch' || result.tz_status === 'tz_not_confirmed')) {
+          // A mapped file never confirms nor moves the account's zone (G2)
+          refuseZone(target, tz, patch, push)
+          return
+        }
         if (result.tz_status === 'tz_not_confirmed') {
           // The account already has trades on another guess of the zone: count what moves first
           const dry = await importFixTz(db, target.id, tz, true)
@@ -353,7 +502,7 @@ export default function ImportSheet({ mode, accountId, onClose }: { mode: SheetM
         if (alive.current) setBusy(false)
       }
     },
-    [db, move, fail, setBusy],
+    [db, move, fail, setBusy, refuseZone],
   )
 
   /** With the destination known: ask the zone, or go straight to the preview. */
@@ -366,10 +515,107 @@ export default function ImportSheet({ mode, accountId, onClose }: { mode: SheetM
         move('c', { ...patch, file, accountId: target.id, zone: { key: hint, other: null }, fixOnly: false })
         return
       }
-      await runPreview(target, target.file_tz, file, { ...patch, file, zoneChosen: false })
+      await runPreview(target, target.file_tz, { tipo: 'leitor', lido: file }, { ...patch, file, zoneChosen: false })
     },
     [move, runPreview],
   )
+
+  // --------------------------------------------------------------------------------------------
+  // Phase 3b: a file the column mapping reads (§6.2)
+  // --------------------------------------------------------------------------------------------
+
+  /** After «conferir» (or a model taken as is): «N contas neste arquivo» when the file holds two «Conta» values or more */
+  const depoisDasContas = async (target: TradingAccount, m: Mapeamento, mapeado: NonNullable<Flow['mapeado']>, patch: Partial<Flow> = {}) => {
+    const f = arquivoDoMapeamento(m, target.market, null)
+    if (!f.ok) return
+    const comMapa = { ...patch, accountId: target.id, mapeado: { ...mapeado, mapeamento: m } }
+    if (mostrarFuso(f, m, target, formats.data)) {
+      move('c', { ...comMapa, zone: escolhaDaZona(fusoPreSelecionado(f, target, formats.data)), fixOnly: false })
+      return
+    }
+    await runPreview(target, zonaDaConta(target, formats.data) ?? target.file_tz, { tipo: 'mapa', arquivo: mapeado.arquivo, m }, { ...comMapa, zoneChosen: false })
+  }
+
+  const depoisDoConferir = async (target: TradingAccount, m: Mapeamento, mapeado: NonNullable<Flow['mapeado']>, patch: Partial<Flow> = {}) => {
+    if (contasDoArquivo(m, target.market).length >= 2) {
+      // The value chosen before (Voltar and back) stays while the «Conta» column still holds it; else the account's
+      // number, or the model's route
+      const accountValue = valorImportado(m, target.market) ?? valorPreSelecionado(m, target)
+      move('hc', { ...patch, accountId: target.id, mapeado: { ...mapeado, mapeamento: { ...m, accountValue } } })
+      return
+    }
+    // One «Conta» value or none: no hc, every row is imported (a value chosen before «Voltar» no longer applies)
+    await depoisDasContas(target, m.accountValue === null ? m : { ...m, accountValue: null }, mapeado, patch)
+  }
+
+  /** The mapping of a file once its account is known: the user's models first (none when they cannot be read) */
+  const comecarMapeamento = async (target: TradingAccount, arquivo: ArquivoMapeavel, patch: Partial<Flow> = {}) => {
+    setBusy(true)
+    let templates: Template[] = []
+    try {
+      const r = await templatesQuery.refetch()
+      templates = r.status === 'success' && r.data ? r.data : []
+    } catch {
+      templates = []
+    }
+    if (!alive.current) return
+    setBusy(false)
+    const base: Partial<Flow> = { ...patch, accountId: target.id, recusados: [], modelo: null, motivoErro: null }
+    const r = iniciarMapeamento(arquivo, { market: target.market, templates, nomePadrao: nomePadraoDoModelo(target.platform) })
+    if (!r.ok) {
+      move('erro', { ...base, mapeado: { arquivo, mapeamento: null, cartao: null }, motivoErro: { error: r.error, line: r.line } })
+      return
+    }
+    const m = r.mapeamento
+    const mapeado = { arquivo, mapeamento: m, cartao: linhaDoArquivoMapeado(arquivo, m, target.market) }
+    if (m.inicio === 'previa') await depoisDoConferir(target, m, mapeado, { ...base, mapeado })
+    else move(m.inicio, { ...base, mapeado })
+  }
+
+  /** «Mudar colunas» (E34, on «Prévia» or «conferir»): «mapa» starts a new sequence (IC l.1706): no «Voltar» there */
+  const mudar = () => {
+    const atual = flow.mapeado
+    if (!atual || !atual.mapeamento || busyRef.current) return
+    move('mapa', { mapeado: { ...atual, mapeamento: mudarColunas(atual.mapeamento) }, history: [], undone: false }, false)
+  }
+
+  const setMapeamento = useCallback((m: Mapeamento) => {
+    setFlow((f) => (f.mapeado ? { ...f, mapeado: { ...f.mapeado, mapeamento: m } } : f))
+  }, [])
+  const setAnuncio = useCallback((texto: string) => setFlow((f) => ({ ...f, anuncio: texto })), [])
+
+  /** The text of a file no reader took, then where it goes (§6.2 step 2) */
+  const onMappedFile = async (file: File, lido: ReadImportFileResult, platform: ReaderPlatform | undefined) => {
+    let arquivo: ArquivoMapeavel
+    try {
+      arquivo = await lerArquivoMapeavel(file, lido)
+    } catch {
+      if (alive.current) move('erro', { file: lido })
+      return
+    }
+    if (!alive.current) return
+    const header = cabecalhoDoLeitor(arquivo)
+    const context = fileTarget(flow.accountId)
+    if (context) {
+      const route = routeFile(header, context.market)
+      if (route === 'reader_error') {
+        move('erro', { file: lido })
+        return
+      }
+      if (route === 'binary_error') {
+        move('erro', { file: lido, mapeado: { arquivo, mapeamento: null, cartao: linhaDoArquivoMapeado(arquivo, null, null) }, motivoErro: { error: 'unknown_format' } })
+        return
+      }
+      await comecarMapeamento(context, arquivo, { file: lido })
+      return
+    }
+    // No account in context: a broken match of a reader stays that reader's error; else «Para qual conta?»
+    if (platform && routeFile(header, PLATFORM_MARKET[platform]) === 'reader_error') {
+      move('erro', { file: lido })
+      return
+    }
+    move('a2', { file: lido, mapeado: { arquivo, mapeamento: null, cartao: linhaDoArquivoMapeado(arquivo, null, null) }, choice: null })
+  }
 
   const onFile = async (file: File) => {
     setReading(true)
@@ -382,8 +628,16 @@ export default function ImportSheet({ mode, accountId, onClose }: { mode: SheetM
     }
     if (!alive.current) return
     setReading(false)
+    // A new file: nothing of the last one's mapping stays
+    setFlow((f) => ({ ...f, mapeado: null, recusados: [], modelo: null, motivoErro: null, mercadosPermitidos: null }))
     const p = parsedOf(result)
     if (!p) {
+      const o = result.outcome
+      if (!o.ok && (o.error === 'unknown_format' || o.error === 'missing_columns' || o.error === 'duplicate_columns')) {
+        // Phase 3b: no reader takes it, so the column mapping may
+        await onMappedFile(file, result, o.platform)
+        return
+      }
       move('erro', { file: result })
       return
     }
@@ -448,6 +702,7 @@ export default function ImportSheet({ mode, accountId, onClose }: { mode: SheetM
     if (flow.createdFromForm && flow.created) {
       // The account exists and only what followed failed (the preview): try that again, never a second account
       if (flow.file && parsed) await afterAccount(flow.created, flow.file, { accountId: flow.created.id })
+      else if (flow.mapeado) await comecarMapeamento(flow.created, flow.mapeado.arquivo, { accountId: flow.created.id })
       return
     }
     setBusy(true)
@@ -489,6 +744,10 @@ export default function ImportSheet({ mode, accountId, onClose }: { mode: SheetM
         setBusy(false)
         // The patch is kept even when the preview fails, so the sheet knows the account exists
         await afterAccount(created, flow.file, patch)
+      } else if (flow.mapeado) {
+        // Phase 3b: a2's «+ Nova conta» → the new account's mapping
+        setBusy(false)
+        await comecarMapeamento(created, flow.mapeado.arquivo, patch)
       } else {
         move('fimConta', patch)
       }
@@ -528,7 +787,7 @@ export default function ImportSheet({ mode, accountId, onClose }: { mode: SheetM
       }
       setFlow((f) => ({ ...f, fixApplied: true, confirmedTz }))
       setBusy(false)
-      await runPreview({ ...account, file_tz: tz, tz_applied_at: new Date().toISOString() }, tz, flow.file, { zoneChosen: true })
+      await runPreview({ ...account, file_tz: tz, tz_applied_at: new Date().toISOString() }, tz, { tipo: 'leitor', lido: flow.file }, { zoneChosen: true })
     } catch (e) {
       fail(e)
     } finally {
@@ -536,31 +795,80 @@ export default function ImportSheet({ mode, accountId, onClose }: { mode: SheetM
     }
   }
 
+  /** What the preview and the commit read now: the mapped file with its mapping, or the reader's file */
+  const fonteAtual = (): Fonte | null =>
+    flow.mapeado && flow.mapeado.mapeamento
+      ? { tipo: 'mapa', arquivo: flow.mapeado.arquivo, m: flow.mapeado.mapeamento }
+      : flow.file && parsed
+        ? { tipo: 'leitor', lido: flow.file }
+        : null
+
+  /**
+   * The model after a good commit (§6.8): saved, updated or touched through import_template_save, with the commit's
+   * batch; without a batch, a touch makes no call, a new model goes without routes, and a model with routes is left as it
+   * is. A failure is the end's line, never the sheet's alert.
+   */
+  const salvarModelo = async (m: Mapeamento, file: MappedFile, target: TradingAccount, zoneUsed: string, result: ImportCommitResult): Promise<ModeloDoFim> => {
+    const modelo = m.match.kind !== 'none' ? m.match.template : null
+    const s = modeloASalvar(m, {
+      tzHint: file.needsFileTz ? zoneUsed : modelo ? modelo.tzHint : null,
+      rota: m.accountValue ? { valor: m.accountValue, contaId: target.id } : null,
+    })
+    if (s === null) return { tipo: 'naoSalvo', nome: m.nome.trim() || m.nomePadrao }
+    let payload = s.payload
+    if (result.batch_id === null) {
+      if (s.tipo === 'tocado') return { tipo: 'tocado', nome: s.nome }
+      // import_template_save checks a route only against the batch's account, and its update replaces the routes
+      if (s.tipo === 'atualizado' && modelo && Object.keys(modelo.accountRoutes).length > 0) return { tipo: 'semLote', nome: s.nome }
+      payload = { ...payload, account_routes: {} }
+    }
+    // The database's own check (its routes against the batch's account and the user's open accounts of its market)
+    const problema = checkTemplate(payload, {
+      batch: result.batch_id ? { sig: file.format.sig, market: target.market } : null,
+      accounts: accounts.map((a) => ({ id: a.id, market: a.market, archived: !!a.archived_at })),
+    })
+    if (problema !== null) return { tipo: 'erro', nome: s.nome }
+    try {
+      await saveTemplate(db, payload, result.batch_id, s.replaces)
+      refresh()
+      return { tipo: s.tipo, nome: s.nome }
+    } catch (e) {
+      return { tipo: toHubError(e).code === 'too_many_templates' ? 'limite' : 'erro', nome: s.nome }
+    }
+  }
+
   const commit = async () => {
     const preview = flow.preview
-    if (!preview || !account || !flow.file || !parsed || !flow.zoneUsed) return
+    const fonte = fonteAtual()
+    if (!preview || !account || !fonte || !flow.zoneUsed) return
     if (preview.new === 0 && preview.completable === 0 && (preview.linked ?? 0) === 0 && (preview.attached ?? 0) === 0) {
       // Everything is already in another account: nothing to write
       if (flow.created) move('fim', { nothingImported: true })
       else onClose()
       return
     }
+    const built = arquivoDaFonte(fonte, account.market, flow.zoneUsed)
+    if (!built) return
+    const zoneUsed = flow.zoneUsed
     setBusy(true)
     setError(null)
     try {
       const args = buildImportArgs({
         accountId: account.id,
-        platform: parsed.platform,
-        fileName: flow.file.fileName,
-        sha256: flow.file.sha256,
-        fileTz: flow.zoneUsed,
-        outcome: parsed,
+        platform: built.file.platform,
+        fileName: built.fileName,
+        sha256: built.sha256,
+        fileTz: zoneUsed,
+        outcome: built.file,
       })
       const result = await importCommit(db, args)
       refresh()
-      move('fim', { commit: result, undone: false, nothingImported: false })
+      // One busy state covers the commit and the model's save
+      const modelo = fonte.tipo === 'mapa' && built.file.platform === 'modelo' ? await salvarModelo(fonte.m, built.file, account, zoneUsed, result) : null
+      move('fim', { commit: result, undone: false, nothingImported: false, modelo })
     } catch (e) {
-      fail(e)
+      if (fonte.tipo === 'mapa' && toHubError(e).code === 'tz_mismatch') refuseZone(account, zoneUsed, {}, true)
+      else fail(e)
     } finally {
       if (alive.current) setBusy(false)
     }
@@ -568,7 +876,8 @@ export default function ImportSheet({ mode, accountId, onClose }: { mode: SheetM
 
   const undo = async () => {
     const batch = flow.commit?.batch_id
-    if (busyRef.current || !batch || !account || !flow.file || !flow.zoneUsed) return
+    const fonte = fonteAtual()
+    if (busyRef.current || !batch || !account || !fonte || !flow.zoneUsed) return
     setBusy(true)
     setError(null)
     try {
@@ -578,7 +887,8 @@ export default function ImportSheet({ mode, accountId, onClose }: { mode: SheetM
       // Back to the preview it came from, with «Importação desfeita» and fresh counts
       setFlow((f) => ({ ...f, passo: 'd', history: f.history[f.history.length - 1] === 'd' ? f.history.slice(0, -1) : f.history, commit: null }))
       setBusy(false)
-      await runPreview(account, flow.zoneUsed, flow.file, { undone: true, commit: null }, false)
+      // The model stays (C25)
+      await runPreview(account, flow.zoneUsed, fonte, { undone: true, commit: null }, false)
     } catch (e) {
       fail(e)
     } finally {
@@ -590,8 +900,12 @@ export default function ImportSheet({ mode, accountId, onClose }: { mode: SheetM
   // Back and close
   // --------------------------------------------------------------------------------------------
 
-  /** Steps "Voltar" skips: the form of an account already created, and a zone already applied. */
-  const skipOnBack = (p: Passo, f: Flow) => (p === 'b' && !!f.created) || ((p === 'conf' || p === 'c') && f.fixApplied)
+  /**
+   * Steps "Voltar" skips: the form of an account already created (Phase 3b: and, from a2's «+ Nova conta», its market and
+   * platform: that account exists in them), and a zone already applied.
+   */
+  const skipOnBack = (p: Passo, f: Flow) =>
+    (p === 'b' && !!f.created) || ((p === 'i1' || p === 'i2') && !!f.created && f.createdFromForm) || ((p === 'conf' || p === 'c') && f.fixApplied)
 
   const backIndex = (() => {
     for (let i = flow.history.length - 1; i >= 0; i--) {
@@ -610,8 +924,8 @@ export default function ImportSheet({ mode, accountId, onClose }: { mode: SheetM
       const passo = f.history[backIndex]
       const skipped = [...f.history.slice(backIndex + 1), f.passo]
       // Back past the form that created an account: that account is now the one chosen, so
-      // "Continuar" never opens a second "Nova conta"
-      const choice = passo === 'a' && f.created && f.createdFromForm && skipped.includes('b') ? f.created.id : f.choice
+      // "Continuar" never opens a second "Nova conta" (Phase 3b: on a2 too, for a file no reader takes)
+      const choice = (passo === 'a' || passo === 'a2') && f.created && f.createdFromForm && skipped.includes('b') ? f.created.id : f.choice
       return { ...f, passo, history: f.history.slice(0, backIndex), undone: false, choice }
     })
     setFocusTick((t) => t + 1)
@@ -662,6 +976,17 @@ export default function ImportSheet({ mode, accountId, onClose }: { mode: SheetM
     }
   }
 
+  // Phase 3b: the steps still to come of a mapped file (the indicator), memoised on the mapping
+  const formatsData = formats.data
+  const planoAdiante = useMemo((): Passo[] | null => {
+    if (!flow.mapeado) return null
+    if (flow.passo === 'a2' || flow.passo === 'i1' || flow.passo === 'i2' || flow.passo === 'b') return planoMapeado('a2', null, null, undefined)
+    if (flow.passo === 'mapa' || flow.passo === 'conferir' || flow.passo === 'hc') return planoMapeado(flow.passo, mapeamento, account, formatsData)
+    return null
+    // `account` is a fresh object each render (view): its id and zone are what the plan reads
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [flow.mapeado, flow.passo, mapeamento, account?.id, account?.file_tz, account?.tz_applied_at, formatsData])
+
   // --------------------------------------------------------------------------------------------
   // The current step: body and footer
   // --------------------------------------------------------------------------------------------
@@ -681,8 +1006,77 @@ export default function ImportSheet({ mode, accountId, onClose }: { mode: SheetM
     }
     case 'erro': {
       const failed = flow.file && !flow.file.outcome.ok ? flow.file.outcome : null
-      body = <PassoErro headingRef={headingRef} failed={failed} parsed={flow.file?.outcome.ok ? flow.file.outcome : null} />
-      primary = { label: ERRO.again, run: () => move('solte', { fileAgain: true, file: null }) }
+      body = (
+        <PassoErro headingRef={headingRef} failed={failed} parsed={flow.file?.outcome.ok ? flow.file.outcome : null} motivo={flow.motivoErro} />
+      )
+      primary = { label: ERRO.again, run: () => move('solte', { fileAgain: true, file: null, mapeado: null, motivoErro: null }) }
+      break
+    }
+    case 'a2': {
+      // Phase 3b: «Para qual conta?» for a file no reader takes
+      const mapeado = flow.mapeado
+      if (!mapeado) break
+      body = <PassoContaArquivo headingRef={headingRef} accounts={accounts} choice={flow.choice} onChoose={(choice) => setFlow((f) => ({ ...f, choice }))} />
+      const chosen = flow.choice && flow.choice !== 'nova' ? view(flow.choice) : null
+      primary = {
+        label: FOLHA.next,
+        run: () => {
+          if (flow.choice === 'nova') move('i1', { form: EMPTY_FORM, createdFromForm: false, mercadosPermitidos: MERCADOS_DO_MAPEAMENTO })
+          else if (chosen) void comecarMapeamento(chosen, mapeado.arquivo, { accountId: chosen.id })
+        },
+        blocked: flow.choice ? undefined : PASSO_A2.hint,
+      }
+      break
+    }
+    case 'mapa': {
+      const mapeado = flow.mapeado
+      if (!mapeado || !mapeado.mapeamento || !account) break
+      const m = mapeado.mapeamento
+      body = (
+        <PassoMapa
+          headingRef={headingRef}
+          arquivo={mapeado.arquivo}
+          mapeamento={m}
+          market={account.market}
+          onChange={setMapeamento}
+          onAnuncio={setAnuncio}
+        />
+      )
+      primary = { label: FOLHA.next, run: () => move('conferir'), blocked: bloqueioDoMapa(m, account.market) ?? undefined }
+      break
+    }
+    case 'conferir': {
+      const mapeado = flow.mapeado
+      if (!mapeado || !mapeado.mapeamento || !account) break
+      const m = mapeado.mapeamento
+      body = (
+        <PassoConferir
+          headingRef={headingRef}
+          mapeamento={m}
+          market={account.market}
+          onChange={setMapeamento}
+          onAnuncio={setAnuncio}
+          onMudarColunas={m.porModelo ? mudar : null}
+        />
+      )
+      primary = {
+        label: CONFERIR.usar,
+        run: () => void depoisDoConferir(account, m, mapeado),
+        blocked: bloqueioDoConferir(m, account.market) ?? undefined,
+      }
+      break
+    }
+    case 'hc': {
+      const mapeado = flow.mapeado
+      if (!mapeado || !mapeado.mapeamento || !account) break
+      const m = mapeado.mapeamento
+      body = <PassoContasDoArquivo headingRef={headingRef} mapeamento={m} conta={account} onChange={setMapeamento} onAnuncio={setAnuncio} />
+      primary = {
+        label: FOLHA.next,
+        run: () => void depoisDasContas(account, m, mapeado),
+        // No value of the «Conta» column goes to the account
+        blocked: valorImportado(m, account.market) === null ? PASSO_HC.hint(account.label) : undefined,
+      }
       break
     }
     case 'a': {
@@ -716,6 +1110,7 @@ export default function ImportSheet({ mode, accountId, onClose }: { mode: SheetM
           market={form.market}
           // Changing the market starts the form again: nothing carries over to the other market
           onChoose={(market) => setForm(market === form.market ? {} : { ...EMPTY_FORM, market })}
+          mercados={flow.mercadosPermitidos ?? undefined}
         />
       )
       primary = { label: FOLHA.next, run: () => move('i2'), blocked: form.market ? undefined : PASSO_I1.hint }
@@ -742,11 +1137,11 @@ export default function ImportSheet({ mode, accountId, onClose }: { mode: SheetM
         if (firm) roLabel = PASSO_B.roFirmPlatform
         roValue = form.platform ? firmAndPlatform(firm, form.platform) : [firm, PASSO_B.platformTbd].filter(Boolean).join(' · ')
       }
-      // A market without a file reader shows its money and day turn, fixed in the account (Fase 2b)
-      const moedaDia =
-        !parsed && !MARKET_SPEC[formMarket].reader
-          ? { valor: moedaEViradaDoDia(formMarket, now), info: PASSO_B.moedaDiaInfo(formMarket, !!firm) }
-          : null
+      // A market without a file reader shows its money and day turn, fixed in the account (Fase 2b; Phase 3b: with or
+      // without a file, since a mapped file brings an account of any market here)
+      const moedaDia = !MARKET_SPEC[formMarket].reader
+        ? { valor: moedaEViradaDoDia(formMarket, now), info: PASSO_B.moedaDiaInfo(formMarket, !!firm) }
+        : null
       const sizeInvalid = firms && sizeValue === 'invalid'
       const locked = flow.createdFromForm && !!flow.created
       // Locked, the block shows what it showed at creation; «desde» is v1's own day once saved (none
@@ -812,7 +1207,7 @@ export default function ImportSheet({ mode, accountId, onClose }: { mode: SheetM
         ? // The account exists; what followed it failed and is tried again
           { label: FOLHA.next, run: () => void createFromForm() }
         : {
-            label: name ? (parsed ? PASSO_B.createAndGo(name) : PASSO_B.create(name)) : PASSO_B.createFallback,
+            label: name ? (parsed || flow.mapeado ? PASSO_B.createAndGo(name) : PASSO_B.create(name)) : PASSO_B.createFallback,
             run: () => void createFromForm(),
             blocked: basics ?? rulesBlocked,
             blockedBy: taken ? 'f-apelido-erro' : sizeInvalid ? 'f-tam-erro' : rulesBlockedBy,
@@ -822,15 +1217,61 @@ export default function ImportSheet({ mode, accountId, onClose }: { mode: SheetM
       break
     }
     case 'c': {
+      const mapeado = flow.mapeado
+      if (mapeado && mapeado.mapeamento) {
+        // Phase 3b: a mapped file's zone step, every market, with G2's refusal (§6.5)
+        if (!account || !mapeadoNaParede) break
+        const m = mapeado.mapeamento
+        const target = account
+        const tz = chosenTz(flow.zone)
+        const recusado = tz !== null && (recusaLocal(target, tz) || flow.recusados.includes(tz))
+        body = (
+          <PassoFuso
+            headingRef={headingRef}
+            market={target.market}
+            linhas={linhasDoFusoMapeado}
+            toda
+            palavra={palavraDoFuso(mapeadoNaParede)}
+            zone={flow.zone}
+            onChange={(zone) => setFlow((f) => ({ ...f, zone }))}
+            recusa={recusado ? { conta: target.label, zona: zoneName(target.file_tz) } : null}
+          />
+        )
+        primary = {
+          label: FOLHA.next,
+          run: () => {
+            if (tz && !recusado) void runPreview(target, tz, { tipo: 'mapa', arquivo: mapeado.arquivo, m }, { zoneChosen: true })
+          },
+          blocked: !tz
+            ? flow.zone.key === 'outro'
+              ? PASSO_C.needOther
+              : PASSO_C.needZone
+            : recusado
+              ? PASSO_C.recusaDica(zoneName(target.file_tz))
+              : undefined,
+        }
+        break
+      }
       if (!parsed) break
       const tz = chosenTz(flow.zone)
-      body = <PassoFuso headingRef={headingRef} parsed={parsed} zone={flow.zone} onChange={(zone) => setFlow((f) => ({ ...f, zone }))} />
+      body = (
+        <PassoFuso
+          headingRef={headingRef}
+          market={parsed.market}
+          linhas={parsed.rows}
+          toda={false}
+          palavra="entradas"
+          zone={flow.zone}
+          onChange={(zone) => setFlow((f) => ({ ...f, zone }))}
+          recusa={null}
+        />
+      )
       primary = {
         label: flow.fixOnly ? PASSO_C.confirm : FOLHA.next,
         run: () => {
           if (!tz || !account) return
           if (flow.fixOnly) void zoneDryRun(tz)
-          else if (flow.file) void runPreview(account, tz, flow.file, { zoneChosen: true })
+          else if (flow.file) void runPreview(account, tz, { tipo: 'leitor', lido: flow.file }, { zoneChosen: true })
         },
         blocked: tz ? undefined : flow.zone.key === 'outro' ? PASSO_C.needOther : PASSO_C.needZone,
       }
@@ -843,17 +1284,20 @@ export default function ImportSheet({ mode, accountId, onClose }: { mode: SheetM
       break
     case 'd': {
       const preview = flow.preview
-      if (!preview || !parsed || !flow.zoneUsed) break
+      const file: ImportFile | null = mapeamento ? mapeadoNoFuso : parsed
+      if (!preview || !file || !flow.zoneUsed || !account) break
       body = (
         <PassoPrevia
           headingRef={headingRef}
           preview={preview}
-          parsed={parsed}
+          linhas={linhasDaPrevia(file, preview, mapeamento, account)}
           label={label}
           zoneUsed={flow.zoneUsed}
           zoneChosen={flow.zoneChosen}
+          needsFileTz={file.needsFileTz}
           undone={flow.undone}
-          antesDasRegras={account ? linhaAntesDasRegras(config, account.id, parsed.rows, flow.zoneUsed, operacoesDoArquivo(preview)) : null}
+          antesDasRegras={linhaAntesDasRegras(config, account.id, file.rows, flow.zoneUsed, operacoesDoArquivo(preview))}
+          chip={mapeamento?.porModelo && mapeamento.match.kind !== 'none' ? <ChipModelo nome={mapeamento.match.template.name} onMudar={mudar} /> : null}
         />
       )
       const opsArquivo = operacoesDoArquivo(preview)
@@ -881,6 +1325,9 @@ export default function ImportSheet({ mode, accountId, onClose }: { mode: SheetM
           label={label}
           confirmedZone={confirmedZone}
           onConfirmZone={() => move('c', { fixOnly: true, zone: { key: parsed ? zoneKeyOf(parsed.fileTzHint) : null, other: null } })}
+          mapeado={!!mapeamento}
+          unidade={mapeadoNoFuso?.rowKind === 'fill' ? 'saida' : 'linha'}
+          chave={mapeadoNoFuso ? chaveDasLinhas(mapeadoNoFuso) : 'id'}
         />
       )
       primary = closeAction
@@ -919,9 +1366,10 @@ export default function ImportSheet({ mode, accountId, onClose }: { mode: SheetM
         lines = [FIM.nothingImported]
       } else if (result && (result.inserted > 0 || result.completed > 0 || (result.linked ?? 0) > 0 || (result.attached ?? 0) > 0)) {
         const opsLote = operacoesDoLote(result)
+        const rows = mapeamento ? mapeadoNoFuso?.rows ?? null : parsed?.rows ?? null
         if (opsLote > 0) {
           // After the account's rules started, imported rows are judged by them (decisoes)
-          const judged = account && parsed && flow.zoneUsed ? linhaImportadas(config, account.id, parsed.rows, flow.zoneUsed, opsLote) : null
+          const judged = account && rows && flow.zoneUsed ? linhaImportadas(config, account.id, rows, flow.zoneUsed, opsLote) : null
           lines.push(judged ?? FIM.inHistory(opsLote))
         }
         if (result.completed > 0) lines.push(FIM.completed(result.completed))
@@ -930,9 +1378,14 @@ export default function ImportSheet({ mode, accountId, onClose }: { mode: SheetM
         // Phase 3c (§5.12): exits grouped into a trade, and exits added to trades already there
         if ((result.grouped ?? 0) > 0) lines.push(FIM.agrupadas(result.grouped ?? 0))
         if ((result.attached ?? 0) > 0) lines.push(FIM.anexadas(result.attached ?? 0))
+        // Phase 3b (E46): what became of the model
+        const modelo = linhaDoModelo(flow.modelo)
+        if (modelo) lines.push(modelo)
         if (result.batch_id) lines.push(FIM.undoLater)
       } else if (result) {
-        title = PASSO_F.title(result.duplicate, label)
+        title = mapeadoNoFuso?.rowKind === 'fill' ? PASSO_F.titleSaidas(result.duplicate, label) : PASSO_F.title(result.duplicate, label)
+        const modelo = linhaDoModelo(flow.modelo)
+        if (modelo) lines.push(modelo)
       }
       body = <PassoFim headingRef={headingRef} title={title} lines={lines} />
       primary = closeAction
@@ -957,21 +1410,18 @@ export default function ImportSheet({ mode, accountId, onClose }: { mode: SheetM
       const registrarAction: Primary | null = registrarNa
         ? { label: FIM_CONTA.registrar, run: () => registrar.open({ accountId: registrarNa.id }) }
         : null
-      if (created && !MARKET_SPEC[created.market].reader) {
-        // No file reader for this market yet: no «Importar histórico»; where its trades will come from
-        body = (
-          <PassoFim
-            headingRef={headingRef}
-            title={title}
-            lines={[FIM_CONTA.semLeitor, FIM_CONTA.semLeitorArquivo(created.market, created.platform)]}
-          />
-        )
-        primary = registrarAction ?? closeAction
-        break
-      }
+      // Phase 3b (E52): every market imports a file. A MetaTrader report is neither CSV nor read yet: no «Importar
+      // histórico», the line saying so, «Registrar operação» as the primary
+      const relatorioMT = FIM_CONTA.relatorioMT(created?.platform ?? null)
       const iq = created?.platform === 'iq'
-      body = <PassoFim headingRef={headingRef} title={title} lines={[iq ? FIM_CONTA.textIq : FIM_CONTA.text]} />
-      if (iq) {
+      body = (
+        <PassoFim
+          headingRef={headingRef}
+          title={title}
+          lines={iq || relatorioMT ? [FIM_CONTA.textIq, ...(relatorioMT ? [relatorioMT] : [])] : [FIM_CONTA.text]}
+        />
+      )
+      if (iq || relatorioMT) {
         // IQ Option exports no history: «Registrar operação» is the only action (board `temLinkDepois`)
         primary = registrarAction ?? closeAction
       } else {
@@ -984,15 +1434,18 @@ export default function ImportSheet({ mode, accountId, onClose }: { mode: SheetM
   }
 
   const title = mode === 'adicionar' && !flow.file && flow.passo !== 'solte' ? FOLHA.titleAdd : FOLHA.titleImport
-  // The file card: a read file, or on the error step a known format with no trade line
+  // The file card: a read file, or on the error step a known format with no trade line; Phase 3b: a mapped file's own
+  // (E1), kept for the file
   const fileLine =
     flow.passo === 'solte'
       ? null
-      : parsed
-        ? linhaDoArquivo(parsed, new Date().getFullYear())
-        : flow.passo === 'erro'
-          ? emptyFileSummary(flow.file)
-          : null
+      : flow.mapeado
+        ? flow.mapeado.cartao
+        : parsed
+          ? linhaDoArquivo(parsed, new Date().getFullYear())
+          : flow.passo === 'erro'
+            ? emptyFileSummary(flow.file)
+            : null
   const indicator = stepIndicator({
     passo: flow.passo,
     history: flow.history,
@@ -1001,6 +1454,7 @@ export default function ImportSheet({ mode, accountId, onClose }: { mode: SheetM
     choice: flow.choice,
     choiceAccount: flow.choice && flow.choice !== 'nova' ? view(flow.choice) : null,
     fixOnly: flow.fixOnly,
+    mapeado: planoAdiante,
   })
   const showBack = !END_STEPS.includes(flow.passo) && flow.passo !== 'g' && backIndex >= 0
   const blocked = !!primary && (!!primary.blocked || !!primary.blockedBy)
@@ -1009,12 +1463,26 @@ export default function ImportSheet({ mode, accountId, onClose }: { mode: SheetM
   const rulesNotice = flow.rulesNotSaved ? REGRAS_CONTA.naoSalvas(flow.rulesNotSaved) : ''
   // Step b before the account exists: the rules could not be read, so it will be created without them
   const rulesLoadNotice = flow.passo === 'b' && !flow.createdFromForm && rulesLoad === 'erro' ? REGRAS_CONTA.carregarErro : ''
+  // Phase 3b: the mapping steps' own lines, and G2's refusal on the zone step
+  const mappedNotice = ['mapa', 'conferir', 'hc'].includes(flow.passo) ? flow.anuncio : ''
+  const zoneRefusal =
+    flow.passo === 'c' && mapeamento && account && (() => {
+      const tz = chosenTz(flow.zone)
+      return tz !== null && (recusaLocal(account, tz) || flow.recusados.includes(tz))
+    })()
+      ? `${PASSO_C.recusaTitulo} ${PASSO_C.recusa(account.label)}`
+      : ''
   const statusText =
     busy
       ? BUSY
       : reading
         ? SOLTE.reading
-        : toastText || (flow.passo === 'd' && flow.undone ? PASSO_D.undone(label) : '') || rulesNotice || rulesLoadNotice
+        : toastText ||
+          (flow.passo === 'd' && flow.undone ? PASSO_D.undone(label) : '') ||
+          mappedNotice ||
+          zoneRefusal ||
+          rulesNotice ||
+          rulesLoadNotice
 
   // A file dropped outside the drop zone must not open in the browser and lose the sheet
   const holdDrop = (event: React.DragEvent) => event.preventDefault()

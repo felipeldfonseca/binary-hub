@@ -4,14 +4,16 @@
  * ImportarConta, DiarioHojeEnxuto) unless marked:
  *   NEW      not on any board (screens or states the boards do not draw)
  *   ADAPTED  a board string changed for Phase 1 (the comment says what changed)
+ * Phase 3b additions use the telas contract markers: B (the board ImportarConta, IC l.N), A (adapted), N (new).
  */
-import type { ImportMarket } from '@/lib/domain/import'
+import type { FieldKey, ImportMarket } from '@/lib/domain/import'
 import { MARKET_SPEC, currencyOf } from '@/lib/domain/markets'
 import type { AccountMarket, AccountPhase, ZoneKey } from '@/lib/hub/contas'
 import { ALL_FILE_ZONES, LABEL_MAX, MARKET_ORDER } from '@/lib/hub/contas'
 import type { HubErrorCode } from '@/lib/hub/contasDb'
 import { SIMBOLO_MOEDA, formatInt } from '@/lib/hub/formato'
 import { MERCADO, USDT_COMO_DOLAR, viraODia } from '@/components/hub/copyMercados'
+import { CAMPO } from '@/components/hub/importar/copyMapa'
 
 // ------------------------------------------------------------------------------------------------
 // Shared
@@ -125,8 +127,9 @@ export const CONTAS = {
   // ADAPTED (board Personalizar `D.txt.infoContas`, Fase 2b): "Duplicar e arquivar valem na hora;
   // arquivar guarda…" → archive only (no duplicate yet); the sentences about the Apex examples and
   // copy groups are dropped, as in Phase 1.
-  // Fase 3 (D19; 3-4 ended D36): the four markets register, «… e, em breve, também por um CSV…» (ADAPTED)
-  info: `${INFO_CONTAS_ANTES} Nas contas de Forex, de Ações, de Cripto e da B3, as operações entram pelo “Registrar operação” e, em breve, também por um CSV em que você diz o que é cada coluna. ${INFO_CONTAS_DEPOIS}`,
+  // Fase 3 (D19; 3-4 ended D36): the four markets register. Phase 3b (A, quadro §4.2): the CSV mapping is here,
+  // so «… e, em breve, também por um CSV…» drops «em breve»
+  info: `${INFO_CONTAS_ANTES} Nas contas de Forex, de Ações, de Cripto e da B3, as operações entram pelo “Registrar operação” e também por um CSV em que você diz o que é cada coluna. ${INFO_CONTAS_DEPOIS}`,
   /**
    * Under the group of a market whose files the app cannot read yet (board Personalizar
    * `g.semLeitorTxt`). Fase 3 (D19; 3-4 ended D36): the interim phase name is gone (ADAPTED)
@@ -289,8 +292,17 @@ export const FOLHA = {
 
 export const ARQUIVO = {
   infoAria: 'Como ler: arquivo',
-  // ADAPTED: the board goes on with a prototype-only sentence
-  info: 'Reconhecemos o formato pelas colunas, nunca pelo nome do arquivo.',
+  /** B (Phase 3b, IC l.623 `D.infoArq`): both sentences, for every file (readers' too) */
+  info: 'Reconhecemos o formato pelas colunas, nunca pelo nome do arquivo. Quando não reconhecemos, você diz o que é cada coluna uma vez e salva como modelo.',
+  /** B IC l.1081 «Arquivo não reconhecido · 18 linhas» (N: the singular) */
+  naoReconhecido: (count: number) => `Arquivo não reconhecido · ${count === 1 ? '1 linha' : `${formatInt(count)} linhas`}`,
+  /** B IC l.1134 «Parecido com o modelo “BlackArrow” · 24 linhas» (N: the singular) */
+  parecido: (nome: string, count: number) => `Parecido com o modelo “${nome}” · ${count === 1 ? '1 linha' : `${formatInt(count)} linhas`}`,
+  /**
+   * B IC l.1085 «Modelo “BlackArrow” · Futuros · 24 operações · 1–15 out»: `quantas` is «{n} operações», or (N) «{n} linhas»
+   * for an execution file or a file whose rows are not its trades
+   */
+  doModelo: (nome: string, mercado: string, quantas: string, dias: string) => [`Modelo “${nome}”`, mercado, quantas, dias].filter(Boolean).join(' · '),
   format: {
     ebinex_br: 'CSV da Ebinex',
     ebinex_mixed: 'CSV da Ebinex',
@@ -307,7 +319,7 @@ export const SOLTE = {
   titleAgain: 'Escolha outro arquivo',
   titleNone: 'Escolha o arquivo', // NEW (opened with no account in context)
   drop: 'Solte para importar',
-  kinds: 'CSV', // ADAPTED: "CSV, Excel ou HTML" (Excel and HTML are Phase 2)
+  kinds: 'CSV', // ADAPTED: the board also lists Excel and HTML, which no reader takes
   choose: 'Escolher arquivo',
   reading: 'Lendo o arquivo…', // NEW
 }
@@ -316,8 +328,15 @@ export const ERRO = {
   unreadable: 'Não conseguimos ler o arquivo.',
   empty: 'O arquivo não tem operações.',
   again: 'Escolher outro arquivo',
-  // ADAPTED from the board's "No protótipo, só lemos o CSV da Ebinex e o Trade History da Top One."
-  unknownFormat: 'Por enquanto lemos o CSV da Ebinex e o Trade History da Top One.',
+  /**
+   * ADAPTED (Phase 3b, IC l.1850 «Arquivo não reconhecido em binárias»): every other market maps an unknown file, so
+   * unknown_format reaches this step only in a binaries account
+   */
+  unknownFormat: 'Em contas de binárias, lemos só o CSV da Ebinex.',
+  /** B IC l.1849 «Arquivo que não abre» (the sniff's header_not_found) */
+  headerNotFound: 'Não achamos a linha com os nomes das colunas.',
+  /** N (Phase 3b): the sniff's too_many_columns */
+  tooManyColumns: 'O arquivo passa de 100 colunas.',
   missingColumns: (cols: string[]) => `Faltam colunas: ${cols.join(', ')}.`, // NEW
   duplicateColumns: 'O cabeçalho tem colunas repetidas.', // NEW
   malformed: (line?: number) => (line ? `A linha ${formatInt(line)} tem aspas sem fechar.` : 'O arquivo tem aspas sem fechar.'), // NEW
@@ -331,6 +350,39 @@ export const PASSO_A = {
   title: 'Para qual conta?',
   newAccount: (market: ImportMarket) => (market === 'futures' ? '+ Nova conta de futuros' : '+ Nova conta de binárias'),
   sameFormat: (label: string) => `${label} já recebeu este formato.`,
+}
+
+/** «Para qual conta?» for a file no reader takes (Phase 3b, a2; board IC l.437–447, 1642–1647, 1913–1914) */
+export const PASSO_A2 = {
+  /** B IC l.439 */ title: 'Para qual conta?',
+  /** B IC l.1643 */ nota: 'Não reconhecemos este arquivo: escolha a conta, e depois você diz o que é cada coluna.',
+  /** B IC l.444 */ nova: '+ Nova conta',
+  /** B IC l.445 */ binarias: 'Contas de binárias recebem só o CSV da Ebinex.',
+  /** B IC l.1914 */ hint: 'Escolha a conta.',
+}
+
+const eJunto = (items: readonly string[]) =>
+  items.length <= 1 ? items.join('') : `${items.slice(0, -1).join(', ')} e ${items[items.length - 1]}`
+
+/** «N contas neste arquivo» (Phase 3b, hc; board IC l.449–461, 1624–1641, 1912) */
+export const PASSO_HC = {
+  /** B IC l.451 «2 contas neste arquivo» */ title: (count: number) => `${formatInt(count)} contas neste arquivo`,
+  /** B IC l.454 «APX-0001 · 31 op.»: the count part */ ops: (count: number) => `${formatInt(count)} op.`,
+  /** N: an execution file counts its executions' lines («LT50K-0193 · 4 linhas») */
+  linhas: (count: number) => (count === 1 ? '1 linha' : `${formatInt(count)} linhas`),
+  /** B IC l.1633 */ aria: (valor: string) => `O que fazer com ${valor}`,
+  /** B IC l.454 */ importarEm: (conta: string) => `Importar em ${conta}`,
+  /** B IC l.454 */ naoImportar: 'Não importar',
+  /** B IC l.457 */ escolhemos: 'Escolhemos pelo número na plataforma de cada conta.',
+  /** B IC l.1638 «O número na plataforma de Apex A é APX-0001.» */
+  aviso: (conta: string, numero: string) => `O número na plataforma de ${conta} é ${numero}.`,
+  /** B IC l.1639 «Para importar APX-0002, abra a importação na conta dela: …» / «… de cada uma: …» */
+  nota: (valores: readonly string[]) =>
+    `Para importar ${eJunto(valores)}, abra a importação na conta ${valores.length > 1 ? 'de cada uma' : 'dela'}: o que já entrou não duplica.`,
+  /** B IC l.1912 */ hint: (conta: string) => `Escolha qual conta do arquivo vai para ${conta}.`,
+  /** B IC l.1636 «APX-0001 passou para “Não importar”.» (N: the plural «passaram») */
+  passou: (valores: readonly string[]) =>
+    `${eJunto(valores)} ${valores.length > 1 ? 'passaram' : 'passou'} para “Não importar”.`,
 }
 
 /**
@@ -483,22 +535,37 @@ export function firmAndPlatform(firm: string | null, platform: string | null): s
   return [name, where].filter(Boolean).join(' · ')
 }
 
+/** What the zone step counts: a reader's and a trade file's entries, an execution file's executions (Phase 3b, B IC l.1092) */
+export type PalavraFuso = 'entradas' | 'execucoes'
+const PALAVRA_FUSO: Readonly<Record<PalavraFuso, string>> = { entradas: 'entradas', execucoes: 'execuções' }
+
 export const PASSO_C = {
   title: 'Em que fuso estão os horários deste arquivo?',
   infoAria: 'Como ler: fuso do arquivo',
   info: 'Cada faixa mostra onde as entradas do arquivo cairiam se os horários estivessem naquele fuso. Escolha o fuso que a plataforma usa. A sua janela não aparece aqui: é ela que depois confere “Fora da sua janela”.',
-  inFile: (span: string) => `No arquivo: entradas ${span}, sem fuso.`,
+  /** «No arquivo: entradas 09:31–10:58, sem fuso.»; Phase 3b (B IC l.1092): «No arquivo: execuções 10:31–11:48, sem fuso.» */
+  inFile: (palavra: PalavraFuso, span: string) => `No arquivo: ${PALAVRA_FUSO[palavra]} ${span}, sem fuso.`,
   other: 'Outro',
   whichZone: 'Qual fuso?',
-  capFutures: (span: string) => `entradas ${span} ET`,
-  capBinary: (span: string) => `entradas ${span} de Brasília`,
+  /** «entradas 09:31–10:58 ET» · «execuções 10:31–11:31 ET» · «entradas 10:02–16:40 de Brasília» (Phase 3b, B IC l.768–775) */
+  cap: (palavra: PalavraFuso, span: string, relogio: 'ny' | 'br') =>
+    `${PALAVRA_FUSO[palavra]} ${span}${relogio === 'ny' ? ' ET' : ' de Brasília'}`,
   capPending: 'escolha o fuso',
   session: 'pregão regular 09:30–16:00 ET',
+  /** B IC l.1175 (Phase 3b): the B3's session band */
+  sessionB3: 'pregão 09:00–18:30',
   legendFutures: 'Faixas no relógio de Nova York (ET).',
   legendBinary: 'Faixas no relógio de Brasília. Binárias abrem 24 h: sem faixa de pregão.',
+  /** B IC l.1169 */ legendForex: 'Faixas no relógio de Nova York (ET). Forex abre 24 h: sem faixa de pregão.',
+  /** B IC l.1173 */ legendCrypto: 'Faixas no relógio de Brasília. Cripto abre 24 h: sem faixa de pregão.',
+  /** B IC l.1175 */ legendBrasilia: 'Faixas no relógio de Brasília.',
   confirm: 'Confirmar fuso',
   needZone: 'Escolha um fuso para continuar.',
   needOther: 'Escolha qual fuso.',
+  /** B IC l.357 (Phase 3b, G2): a mapped file in another zone than the account's imports */
+  recusaTitulo: 'Este fuso é diferente do fuso das importações desta conta.',
+  /** B IC l.1128 */ recusa: (conta: string) => `Este arquivo usa outro relógio que o das importações de ${conta}. Confira o fuso na plataforma.`,
+  /** B IC l.1902 */ recusaDica: (zona: string) => `Use o fuso das importações da conta: ${zona}.`,
 }
 
 /** NEW step: the dry-run count before a file zone is confirmed (owner's decision, no board) */
@@ -545,11 +612,12 @@ export const PASSO_D = {
   skipped: (count: number) => (count === 1 ? '1 linha com erro foi pulada.' : `${formatInt(count)} linhas com erro foram puladas.`),
   seeLines: 'Ver linhas',
   line: (line: number, reason: string) => `Linha ${formatInt(line)}: ${reason}`,
-  // NEW: the day-change count (not on the board)
-  dayChanges: (count: number, market: ImportMarket) =>
-    `${count === 1 ? '1 operação fica' : `${formatInt(count)} operações ficam`} em outro dia que o do arquivo: ${
-      market === 'futures' ? 'o dia de Futuros vira às 18:00 de Nova York.' : 'o dia de binárias vira à meia-noite de Brasília.'
-    }`,
+  /**
+   * The day-change count: futures and binaries NEW (Phase 1); Phase 3b B for Forex (IC l.1038) and Cripto (IC l.936), A
+   * for Ações and the B3 (quadro §4.3)
+   */
+  dayChanges: (count: number, market: AccountMarket) =>
+    `${count === 1 ? '1 operação fica' : `${formatInt(count)} operações ficam`} em outro dia que o do arquivo: ${VIRA_O_DIA[market]}`,
   zoneFrom: (zone: string, label: string) => `Fuso do arquivo: ${zone} · lembrado de ${label}`,
   zoneFor: (zone: string, label: string) => `Fuso do arquivo: ${zone} · lembrado para ${label}`,
   importN: (count: number) => (count === 1 ? 'Importar 1 operação' : `Importar ${formatInt(count)} operações`),
@@ -562,10 +630,128 @@ export const PASSO_D = {
     count === 1 ? '1 saída a mais de uma operação que já estava.' : `${formatInt(count)} saídas a mais de operações que já estavam.`,
   // NEW (Fase 3c): the primary of a file that only adds rows to trades already in the account
   juntarN: (count: number) => (count === 1 ? 'Juntar 1 saída' : `Juntar ${formatInt(count)} saídas`),
+
+  // Phase 3b: a mapped file (board IC l.365–394)
+  /** B IC l.367 «9 execuções no arquivo»: the words after the number (N: the singular) */
+  execucoes: (count: number) => (count === 1 ? 'execução no arquivo' : 'execuções no arquivo'),
+  /** B IC l.794 «6 saídas»: an execution file counts exits, never lines (N: the singular) */
+  saidas: (count: number) => (count === 1 ? 'saída' : 'saídas'),
+  /** B IC l.1002 «26 não importadas (APX-0002)» (N: «1 não importada (…)») */
+  naoImportadas: (count: number, valores: readonly string[]) => `${count === 1 ? 'não importada' : 'não importadas'} (${eJunto(valores)})`,
+  /** N (D11): rows found in the account by the same time and prices (a file without an ID column; or across key methods) */
+  alreadySame: 'já estavam (mesma hora e preço)',
+  /** B IC l.891 «As 6 saídas viram 4 operações.» (N: «A saída vira 1 operação.», «As 2 saídas viram 1 operação.») */
+  saidasViram: (saidas: number, operacoes: number) =>
+    saidas === 1
+      ? 'A saída vira 1 operação.'
+      : `As ${formatInt(saidas)} saídas viram ${operacoes === 1 ? '1 operação' : `${formatInt(operacoes)} operações`}.`,
+  /** B IC l.891 «2 ordens sem execução ficaram de fora.» (N: the singular) */
+  ordensSemExecucao: (count: number) =>
+    count === 1 ? '1 ordem sem execução ficou de fora.' : `${formatInt(count)} ordens sem execução ficaram de fora.`,
+  /**
+   * B IC l.1003 «Ativos escritos como “MNQ 12-26” e “MES 12-26” ficam como “MNQZ26” e “MESZ26”.» (N: one, «O ativo escrito
+   * como “…” fica como “…”.», and three or more, «“a”, “b” e “c”»)
+   */
+  ativosNormalizados: (pares: readonly { escrito: string; como: string }[]) =>
+    pares.length === 1
+      ? `O ativo escrito como “${pares[0].escrito}” fica como “${pares[0].como}”.`
+      : `Ativos escritos como ${eJunto(pares.map((p) => `“${p.escrito}”`))} ficam como ${eJunto(pares.map((p) => `“${p.como}”`))}.`,
+  /** N: rows identical to an earlier one, folded into its trade as more exits (R14) */
+  linhasIguais: (count: number) =>
+    count === 1
+      ? '1 linha igual a outra do arquivo (mesma hora, ativo, lado, quantidade e preços) entrou como uma saída a mais da mesma operação.'
+      : `${formatInt(count)} linhas iguais a outras do arquivo (mesma hora, ativo, lado, quantidade e preços) entraram como saídas a mais das mesmas operações.`,
+  /** B IC l.905 «As 7 execuções de MESZ6 ficaram de fora: …» (N: the singular) */
+  sobrasNaoFecham: (count: number, ativo: string) =>
+    count === 1
+      ? `1 execução de ${ativo} ficou de fora: as compras e as vendas do arquivo não fecham.`
+      : `As ${formatInt(count)} execuções de ${ativo} ficaram de fora: as compras e as vendas do arquivo não fecham.`,
+  /** B IC l.785–786 (A, D27: the plural) */
+  sobrasAbertas: (count: number) =>
+    count === 1
+      ? '1 execução de posição ainda aberta no fim do arquivo ficou de fora. Ela entra quando você importar um arquivo que tenha a abertura e o fechamento.'
+      : `${formatInt(count)} execuções de posições ainda abertas no fim do arquivo ficaram de fora. Elas entram quando você importar um arquivo que tenha a abertura e o fechamento.`,
+  /** B IC l.787 (N: the plural) */
+  sobrasAntes: (count: number) =>
+    count === 1
+      ? '1 execução fecha uma posição aberta antes do começo do arquivo e ficou de fora.'
+      : `${formatInt(count)} execuções fecham posições abertas antes do começo do arquivo e ficaram de fora.`,
+  /** B IC l.1069 «3 execuções ficaram de fora.» (N: the singular) */
+  sobras: (count: number) => (count === 1 ? '1 execução ficou de fora.' : `${formatInt(count)} execuções ficaram de fora.`),
+  /** B IC l.783 */ semComissao: 'Sem comissão no arquivo: estas operações ficam sem comissão.',
+  /** B IC l.935 «1 operação fica sem comissão: a taxa veio em BNB.» */
+  taxaOutroAtivo: (count: number, ativos: readonly string[]) =>
+    `${count === 1 ? '1 operação fica' : `${formatInt(count)} operações ficam`} sem comissão: a taxa veio em ${eJunto(ativos)}.`,
+  /** B IC l.793 «18 com resultado diferente do calculado pelos preços: vale o do arquivo.» */
+  difere: (count: number) => `${formatInt(count)} com resultado diferente do calculado pelos preços: vale o do arquivo.`,
+  /** B IC l.1037 «1 operação com swap: …» (N: the plural) */
+  comSwap: (count: number) =>
+    count === 1
+      ? '1 operação com swap: ele entra no resultado, antes da comissão.'
+      : `${formatInt(count)} operações com swap: ele entra no resultado, antes da comissão.`,
+  /** B IC l.784 */ semSaida: 'Sem hora de saída, o resultado conta no limite do dia na hora da entrada.',
+  /** B IC l.816 (G1; N: the singular) */
+  g1: (count: number, conta: string) =>
+    `${count === 1 ? '1 operação cai' : `${formatInt(count)} operações caem`} em dias em que ${conta} já tem operações de outro formato de arquivo. Se forem as mesmas na corretora, elas vão se repetir.`,
 }
 
-/** «Linha n: …» reasons, by error code. NEW (suggested in the parsers spec; the board only has "data vazia"). */
-export function rowErrorReason(code: string, extra: { column?: string; firstLine?: number } = {}): string {
+/** The tail of PASSO_D.dayChanges: where each market's trading day turns */
+const VIRA_O_DIA: Readonly<Record<AccountMarket, string>> = {
+  futures: 'o dia de Futuros vira às 18:00 de Nova York.', // NEW (Phase 1)
+  binary: 'o dia de binárias vira à meia-noite de Brasília.', // NEW (Phase 1)
+  forex: 'o dia de Forex vira às 17:00 de Nova York.', // B IC l.1038
+  crypto: 'o dia de Cripto vira à meia-noite de Brasília.', // B IC l.936
+  stocks: 'o dia de Ações vira às 20:00 de Nova York.', // A (quadro §4.3)
+  options: 'o dia de Ações vira às 20:00 de Nova York.', // A (quadro §4.3)
+  b3: 'o dia da B3 vira à meia-noite de Brasília.', // A (quadro §4.3)
+}
+
+/**
+ * «Linha n: …» reasons, by error code. NEW (suggested in the parsers spec; the board only has "data vazia"). Phase 3b: a
+ * mapped file (`mapeado`) names a column by its field's label (CAMPO, «número inválido em Preço de entrada»), never its
+ * key, and its side is «lado desconhecido» (B IC l.1069); `raiz` and `passo` are the instrument and its tick of an off-tick
+ * price (B IC l.1069 «preço fora do passo do WIN (de 5 em 5)»).
+ */
+export function rowErrorReason(
+  code: string,
+  extra: { column?: string; firstLine?: number; mapeado?: boolean; raiz?: string; passo?: string } = {},
+): string {
+  if (extra.mapeado) {
+    switch (code) {
+      case 'bad_direction':
+        return 'lado desconhecido' // B IC l.1069
+      case 'bad_number': {
+        const campo = extra.column && Object.prototype.hasOwnProperty.call(CAMPO, extra.column) ? CAMPO[extra.column as FieldKey] : null
+        return campo ? `número inválido em ${campo}` : 'número inválido'
+      }
+    }
+  }
+  switch (code) {
+    // Phase 3b: the mapped files' codes (B where the board has them, N for the others)
+    case 'no_price_result':
+      return 'sem resultado: este ativo não tem conta pelos preços' // N
+    case 'not_dollar_quote':
+      return 'par fora do dólar (USDT, USDC ou USD)' // N
+    case 'bad_option':
+      return 'opção, fica de fora (registre no Registrar)' // B IC l.1069
+    case 'off_tick':
+      // B IC l.1069; N without a known tick
+      return extra.raiz && extra.passo ? `preço fora do passo do ${extra.raiz} (de ${extra.passo} em ${extra.passo})` : 'preço fora do passo do ativo'
+    case 'missing_price':
+      return 'execução sem preço' // N
+    case 'open_at_end':
+      return 'posição ainda aberta no fim do arquivo' // B IC l.789
+    case 'opened_before_file':
+      return 'fecha uma posição aberta antes do começo do arquivo' // B IC l.788
+    case 'unbalanced_symbol':
+      return 'as compras e as vendas do ativo não fecham no arquivo' // B IC l.790
+    case 'symbol_has_error':
+      return 'outra execução do ativo tem erro' // N
+    case 'position_too_large':
+      return 'operação grande demais para guardar' // N
+    case 'pnl_mismatch':
+      return 'resultado diferente do calculado pelos preços' // N
+  }
   switch (code) {
     case 'column_count':
       return 'número de colunas diferente do cabeçalho'
@@ -627,10 +813,27 @@ export const FIM = {
 export const PASSO_F = {
   title: (count: number, label: string) =>
     count === 1 ? `Nada novo: a operação já está em ${label}.` /* NEW (singular) */ : `Nada novo: as ${formatInt(count)} operações já estão em ${label}.`,
+  /** N (Phase 3b): an execution file's «Nada novo» counts exits */
+  titleSaidas: (count: number, label: string) =>
+    count === 1 ? `Nada novo: a saída já está em ${label}.` : `Nada novo: as ${formatInt(count)} saídas já estão em ${label}.`,
   zonePending: (label: string) => `Fuso do arquivo da ${label}: a confirmar.`,
   zoneKnown: (label: string, zone: string) => `Fuso do arquivo da ${label}: ${zone}.`,
   hidden: (label: string) => `Sem fuso, os horários da ${label} ficam escondidos.`,
   confirm: 'Confirmar fuso',
+}
+
+/** The end's model line (Phase 3b, E46; board IC l.1619–1620) */
+export const FIM_MODELO = {
+  /** B IC l.1620 */ salvo: (nome: string) => `Modelo “${nome}” salvo: os próximos arquivos com estas colunas entram direto.`,
+  /** B IC l.1619 */ atualizado: (nome: string) => `Modelo “${nome}” atualizado: os próximos arquivos com estas colunas entram direto.`,
+  /** B IC l.1620 */ naoSalvo: 'Colunas usadas só neste arquivo.',
+  /** N: the save failed after a good import */
+  erro: (nome: string) =>
+    `O modelo “${nome}” não foi salvo. As operações já entraram; no próximo arquivo, diga de novo o que é cada coluna.`,
+  /** N: too_many_templates */
+  limite: (nome: string) => `O modelo “${nome}” não foi salvo: já são 50 modelos. As operações já entraram.`,
+  /** N (§6.8): no batch, and a model with «Conta» routes the update would erase */
+  semLote: (nome: string) => `O modelo “${nome}” não foi atualizado: este arquivo não trouxe operações novas.`,
 }
 
 export const FIM_FUSO = {
@@ -681,6 +884,11 @@ export const FIM_CONTA = {
     `Ainda não lemos arquivos ${MERCADO[market].de}. ${
       (platform && RELATORIO_MT[platform]) || 'Depois vem a importação de CSV em que você diz o que é cada coluna.'
     }`,
+  /**
+   * Phase 3b (E52, board `FM` relMT): a MetaTrader account's end line, after «Nada ainda. Registre a primeira operação.»;
+   * null for any other platform. Since 3b every market imports a CSV (`semLeitor*` above are kept, never shown)
+   */
+  relatorioMT: (platform: string | null): string | null => (platform && RELATORIO_MT[platform]) || null,
 }
 
 /** What a failed request says. NEW (the boards draw no error states). Never the database's text. */
@@ -702,6 +910,12 @@ export const ERROR_TEXT: Record<HubErrorCode, string> = {
   duplicate_label: 'Já existe uma conta com esse apelido.',
   duplicate_primary: 'Outra conta já é a principal. Tente de novo.',
   invalid_field: 'Confira os campos.',
+  // NEW (Phase 3b): a mapped file's format, and the models of «Salvar como modelo» (the end screen says a failed save
+  // itself; these reach the sheet's alert only from anywhere else)
+  bad_format: 'Não conseguimos ler o formato deste arquivo. Tente de novo.',
+  bad_template: 'O modelo de colunas não pôde ser salvo.',
+  too_many_templates: 'Você já tem 50 modelos de colunas.',
+  unknown_template: 'Este modelo de colunas não foi encontrado.',
   network: 'Não foi possível falar com o servidor. Confira sua conexão e tente de novo.',
   unknown: 'Algo deu errado. Tente de novo.',
 }

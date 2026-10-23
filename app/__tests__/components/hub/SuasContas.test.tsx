@@ -844,8 +844,6 @@ describe('Suas contas · the rules of each account (Phase 2)', () => {
 
 describe('Suas contas · Fase 2b markets', () => {
   const ids = idsMercados()
-  // Since 3-4 every market registers (the end of D36): no «, na Fase 3»
-  const NOTA = (de: string) => `Ainda não lemos arquivos ${de}: as operações entram pelo “Registrar operação”.`
   const personalizar = () =>
     renderHub(
       <HubRoot>
@@ -869,41 +867,29 @@ describe('Suas contas · Fase 2b markets', () => {
     fetchTradesSince.mockResolvedValue({ [ids.topOne]: 3, [ids.ftmo]: 0, [ids.binance]: 0, [ids.clear]: 0 })
   })
 
-  it('a group per market in the boards’ order; the four without a file reader say so under their heading', async () => {
+  it('a group per market in the boards’ order; Phase 3b (E54): no group says «Ainda não lemos arquivos …» (every market reads a file)', async () => {
     renderHub(<SuasContas />)
 
     await row('Clear')
     expect(screen.getAllByRole('heading', { level: 3 }).map((h) => h.textContent)).toEqual(['Futuros', 'Opções binárias', 'Forex', 'Ações', 'Cripto', 'B3'])
-    const notes: [string, string][] = [
-      ['Forex', 'de Forex'],
-      ['Ações', 'de Ações'],
-      ['Cripto', 'de Cripto'],
-      ['B3', 'da B3'],
-    ]
-    for (const [group, de] of notes) {
-      const note = screen.getByRole('heading', { level: 3, name: group }).nextElementSibling as HTMLElement
-      expect(note).toHaveTextContent(NOTA(de))
-      expect(note).toHaveClass('hub-nota', 'hub-sem-leitor')
+    for (const group of ['Futuros', 'Opções binárias', 'Forex', 'Ações', 'Cripto', 'B3']) {
+      expect(screen.getByRole('heading', { level: 3, name: group }).nextElementSibling?.tagName).toBe('UL')
       expect(within(screen.getByRole('list', { name: group })).getAllByRole('listitem')).toHaveLength(1)
     }
-    for (const group of ['Futuros', 'Opções binárias']) {
-      expect(screen.getByRole('heading', { level: 3, name: group }).nextElementSibling?.tagName).toBe('UL')
-    }
-    expect(screen.queryAllByText(/^Ainda não lemos arquivos/)).toHaveLength(4)
+    expect(document.querySelector('.hub-sem-leitor')).toBeNull()
+    expect(screen.queryAllByText(/^Ainda não lemos arquivos/)).toHaveLength(0)
     expect(screen.queryByText(/Fase 3/)).not.toBeInTheDocument()
   })
 
-  it('no «Importar» on the accounts of those markets; the Top One and the Ebinex keep theirs', async () => {
+  it('Phase 3b (E54): «Importar» on every account, Forex, Ações, Cripto and B3 too; it opens the sheet on that account', async () => {
     renderHub(<SuasContas />)
 
-    for (const label of ['FTMO', 'IBKR', 'Binance', 'Clear']) {
+    for (const label of ['FTMO', 'IBKR', 'Binance', 'Clear', 'Top One #1', 'Ebinex']) {
       const li = await row(label)
-      expect(within(li).queryByRole('button', { name: `Importar arquivo para ${label}` })).not.toBeInTheDocument()
-      expect(within(li).getAllByRole('button').map((b) => b.getAttribute('aria-label'))).toEqual([`Mais ações: ${label}`])
+      expect(within(li).getAllByRole('button').map((b) => b.getAttribute('aria-label'))).toEqual([`Importar arquivo para ${label}`, `Mais ações: ${label}`])
     }
-    for (const label of ['Top One #1', 'Ebinex']) {
-      expect(within(await row(label)).getByRole('button', { name: `Importar arquivo para ${label}` })).toBeInTheDocument()
-    }
+    await userEvent.click(within(await row('Clear')).getByRole('button', { name: 'Importar arquivo para Clear' }))
+    expect(await screen.findByRole('heading', { name: 'Importar histórico de Clear' })).toBeInTheDocument()
   })
 
   it('their rows: phase · platform · window · rules · activity, as the board draws them', async () => {
@@ -915,13 +901,19 @@ describe('Suas contas · Fase 2b markets', () => {
     expect(parts(await row('Clear'))).toBe('Pessoal · Profit (Nelogica) · 10:00–11:00 de Brasília · regras desde 17 out · 0 op. desde então')
   })
 
-  it('on Personalizar, the ⋯ menu of a no-reader account: «Editar conta», «Editar regras», «Arquivar»', async () => {
+  it('on Personalizar, the ⋯ menu of every account (Phase 3b, E54): «Importar arquivo», «Editar conta», «Importações», «Editar regras», «Arquivar»', async () => {
     personalizar()
     await screen.findByRole('heading', { level: 3, name: 'Como fica hoje' })
 
     for (const label of ['FTMO', 'IBKR', 'Binance', 'Clear']) {
       const menu = await openMenu(label)
-      expect(within(menu).getAllByRole('button').map((b) => b.textContent)).toEqual(['Editar conta', 'Editar regras', 'Arquivar'])
+      expect(within(menu).getAllByRole('button').map((b) => b.textContent)).toEqual([
+        'Importar arquivo',
+        'Editar conta',
+        'Importações',
+        'Editar regras',
+        'Arquivar',
+      ])
       await userEvent.keyboard('{Escape}')
     }
     const top = await openMenu('Top One #1')
@@ -939,7 +931,7 @@ describe('Suas contas · Fase 2b markets', () => {
     expect(screen.queryByRole('group', { name: 'Ações de Clear' })).not.toBeInTheDocument()
   })
 
-  it('«Importações» stays for an account of such a market that already has imported trades (an old Phase 1 account)', async () => {
+  it('«Importações» and «Importar arquivo» on an account of such a market, with imported trades or none (Phase 3b, E54)', async () => {
     const antiga = makeAccount({ label: 'Forex antiga', market: 'forex', platform: null, phase: 'pessoal', sort_order: 5 })
     fetchAccounts.mockResolvedValue([...contasMercados(), antiga])
     fetchActivity.mockResolvedValue({ [antiga.id]: { total: 40, imported: 40 } })
@@ -948,22 +940,23 @@ describe('Suas contas · Fase 2b markets', () => {
     await waitFor(async () => expect(parts(await row('Forex antiga'))).toBe('Pessoal · só histórico importado'))
     const menu = await openMenu('Forex antiga')
     expect(within(menu).getByRole('button', { name: 'Importações' })).toBeInTheDocument()
-    expect(within(menu).queryByRole('button', { name: 'Importar arquivo' })).not.toBeInTheDocument()
+    expect(within(menu).getByRole('button', { name: 'Importar arquivo' })).toBeInTheDocument()
     await userEvent.keyboard('{Escape}')
-    expect(within(await openMenu('FTMO')).queryByRole('button', { name: 'Importações' })).not.toBeInTheDocument()
+    expect(within(await openMenu('FTMO')).getByRole('button', { name: 'Importações' })).toBeInTheDocument()
   })
 
   it('the ⓘ says what the app reads today, where the other markets’ trades come from, and each account’s money', async () => {
     renderHub(<SuasContas />)
     await userEvent.click(screen.getByRole('button', { name: 'Como ler: Suas contas' }))
     expect(document.getElementById('info-contas')).toHaveTextContent(
-      'Uma linha por conta. Cada conta é de um mercado só, com janela, limite e regras próprias. Arquivar vale na hora, guarda o histórico e pode ser desfeito. O Binary Hub não se conecta à sua corretora: as operações chegam por arquivo ou à mão. Por enquanto, lemos o CSV da Ebinex e o Trade History da Top One. Nas contas de Forex, de Ações, de Cripto e da B3, as operações entram pelo “Registrar operação” e, em breve, também por um CSV em que você diz o que é cada coluna. O relatório do MetaTrader sai em HTML ou PDF, não em CSV: vai precisar de um leitor próprio, que vem depois. O resultado fica na moeda da conta: R$ na B3; US$ nos outros mercados, com USDT e USDC contados como dólar.',
+      'Uma linha por conta. Cada conta é de um mercado só, com janela, limite e regras próprias. Arquivar vale na hora, guarda o histórico e pode ser desfeito. O Binary Hub não se conecta à sua corretora: as operações chegam por arquivo ou à mão. Por enquanto, lemos o CSV da Ebinex e o Trade History da Top One. Nas contas de Forex, de Ações, de Cripto e da B3, as operações entram pelo “Registrar operação” e também por um CSV em que você diz o que é cada coluna. O relatório do MetaTrader sai em HTML ou PDF, não em CSV: vai precisar de um leitor próprio, que vem depois. O resultado fica na moeda da conta: R$ na B3; US$ nos outros mercados, com USDT e USDC contados como dólar.',
     )
     expect(screen.getByText('Contas de mercados diferentes nunca são somadas.')).toBeInTheDocument()
   })
 
-  it('no interim «… na Fase 3» text is left in the account screens’ copy (3-4 ended D36)', () => {
-    expect(CONTAS.info).toContain('entram pelo “Registrar operação” e, em breve, também por um CSV')
+  it('no interim «… na Fase 3» text is left in the account screens’ copy (3-4 ended D36); Phase 3b: nor «em breve»', () => {
+    expect(CONTAS.info).toContain('entram pelo “Registrar operação” e também por um CSV')
+    expect(CONTAS.info).not.toContain('em breve')
     for (const m of ['forex', 'stocks', 'crypto', 'b3', 'options'] as const) expect(CONTAS.semLeitor(m)).not.toMatch(/Fase 3/)
   })
 })
@@ -985,7 +978,7 @@ describe('Editar conta · Fase 2b markets', () => {
     return screen.getByRole('form', { name: `Editar ${label}` })
   }
 
-  it('B3: Fase, a free-text «Mesa» with no suggestion, «Tamanho R$», and no «Fuso do arquivo»', async () => {
+  it('B3: Fase, a free-text «Mesa» with no suggestion, «Tamanho R$», and (Phase 3b, E55) «Fuso do arquivo»', async () => {
     renderHub(<SuasContas />)
     const form = await editar('Clear')
 
@@ -994,7 +987,8 @@ describe('Editar conta · Fase 2b markets', () => {
     expect(suggestions(form)).toEqual([])
     expect(within(form).getByLabelText(/^Tamanho R\$/)).toBeInTheDocument()
     expect(within(form).queryByLabelText(/^Tamanho US\$/)).not.toBeInTheDocument()
-    expect(within(form).queryByLabelText('Fuso do arquivo')).not.toBeInTheDocument()
+    // Unconfirmed: «Escolha…», and nothing is confirmed until a zone is picked
+    expect(within(form).getByLabelText('Fuso do arquivo')).toHaveValue('')
 
     await userEvent.click(within(form).getByRole('button', { name: 'Financiada' }))
     await userEvent.type(within(form).getByLabelText(/^Mesa/), 'Mesa Ômega')
@@ -1003,7 +997,7 @@ describe('Editar conta · Fase 2b markets', () => {
 
     expect(await screen.findByText('Clear salva.')).toBeInTheDocument()
     expect(updateAccount).toHaveBeenCalledWith(expect.anything(), idsMercados().clear, { phase: 'financiada', firm: 'Mesa Ômega', size: '25000' })
-    // An unconfirmed file zone is never asked of a market with no file
+    // An unconfirmed file zone left on «Escolha…» confirms nothing
     expect(importFixTz).not.toHaveBeenCalled()
   })
 
@@ -1015,7 +1009,7 @@ describe('Editar conta · Fase 2b markets', () => {
     expect(suggestions(form)).toEqual(firmNames('forex'))
     expect(suggestions(form)).toHaveLength(39)
     expect(within(form).getByLabelText(/^Tamanho US\$/)).toBeInTheDocument()
-    expect(within(form).queryByLabelText('Fuso do arquivo')).not.toBeInTheDocument()
+    expect(within(form).getByLabelText('Fuso do arquivo')).toBeInTheDocument()
     expect(within(within(form).getByRole('group', { name: 'Fase' })).getByRole('button', { name: 'Avaliação' })).toHaveAttribute('aria-pressed', 'true')
   })
 

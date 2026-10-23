@@ -12,6 +12,7 @@ import {
   fetchBatches,
   fetchImportFormats,
   fetchPreferences,
+  fetchTemplates,
   type HubPreferences,
 } from '@/lib/hub/contasDb';
 import { mergePreferences } from '@/lib/hub/regrasDb';
@@ -25,6 +26,8 @@ export const hubKeys = {
   formatos: (uid: string | undefined) => ['hub', uid, 'formatos'] as const,
   importacoes: (uid: string | undefined, accountId: string) => ['hub', uid, 'importacoes', accountId] as const,
   preferencias: (uid: string | undefined) => ['hub', uid, 'preferencias'] as const,
+  /** Phase 3b: the column-mapping models (import_templates) */
+  templates: (uid: string | undefined) => ['hub', uid, 'templates'] as const,
 };
 
 /**
@@ -79,6 +82,22 @@ export function useImportFormats(enabled = true) {
     queryKey: hubKeys.formatos(userId),
     queryFn: () => fetchImportFormats(db),
     enabled: !!userId && enabled,
+  });
+}
+
+/**
+ * Phase 3b: the user's column-mapping models, read only once a file needs the mapping (`enabled`), so a reader's file
+ * (Ebinex, Top One) never reads import_templates. The sheet waits for them with `refetch()` (which runs whatever
+ * `enabled` says); a failed read is «no model», never an error on screen, so it is not retried. Under ['hub', uid]: the
+ * refresh after an import (useRefreshAfterWrite) reads them again.
+ */
+export function useImportTemplates(enabled = true) {
+  const { db, userId } = useHubDb();
+  return useQuery({
+    queryKey: hubKeys.templates(userId),
+    queryFn: () => fetchTemplates(db),
+    enabled: !!userId && enabled,
+    retry: false,
   });
 }
 
