@@ -1,6 +1,9 @@
 /**
  * Phase 3b · telas, B0: the column-mapping import's shared state (lib/hub/importMapeado) on the board's files
- * (testing/mapeadoTelas). Lane L1 adds the edits of contract §5.2 and the pre-fill of §5.3 here.
+ * (testing/mapeadoTelas). Lane L1 adds the edits of contract §5.2 and the pre-fill of §5.3 here: the pre-fill gives the
+ * board's columns and tags on every file, «Separador» re-reads the same header line, the decimal and the dates are
+ * decided again on a column change with the pressed pills kept, each row kind keeps its own edits, the blocks of
+ * «Continuar» and «Usar estas colunas» come in §5.6's order, and a mapping both let through always saves.
  */
 import {
   accountRouteHash,
@@ -23,12 +26,26 @@ import {
   bloqueioDoConferir,
   bloqueioDoMapa,
   cabecalhoDoLeitor,
+  checagemDaColuna,
+  comColuna,
+  comDatas,
+  comDecimal,
+  comFimDoArquivo,
+  comLiquido,
+  comModo,
+  comNome,
+  comPalavraDeLado,
+  comSalvar,
+  comSeparador,
   escolhasDe,
+  foraDoPasso,
+  idsQueSeRepetem,
   iniciarMapeamento,
   lerArquivoMapeavel,
   modeloASalvar,
   mudarColunas,
   nomePadraoDoModelo,
+  notaDeLeitura,
   type ArquivoMapeavel,
   type ColunaUi,
   type Mapeamento,
@@ -74,6 +91,16 @@ const porNome = (m: Mapeamento, kind: RowKind = m.rowKind) => {
   m.lido.headers.forEach((h, i) => {
     const c = m.colunas[kind][i]
     if (c !== null) out[h] = c
+  })
+  return out
+}
+
+/** The fields only (no «Ignorar esta coluna»), by the file's normalised names */
+const campos = (m: Mapeamento, kind: RowKind = m.rowKind) => {
+  const out: Record<string, ColunaUi> = {}
+  m.lido.headers.forEach((h, i) => {
+    const c = m.colunas[kind][i]
+    if (c !== null && c !== 'ignorar') out[h] = c
   })
   return out
 }
@@ -151,13 +178,18 @@ describe('iniciarMapeamento', () => {
         e.ask ? null : e.datas,
         e.net,
       ])
-      expect(porNome(m)).toEqual(CAMPOS[k])
-      // Both kinds are the domain's pre-fill, with the file's own decimal mark and date order (§5.3 step 1)
+      expect(campos(m)).toEqual(CAMPOS[k])
+      // Both kinds start from the domain's pre-fill, with the file's own decimal mark and date order (§5.3 step 1); L1 sets
+      // «Ignorar esta coluna» only where the domain suggests nothing
       const n = m.lido.headers.length
       const dec = sniffDecimalMark(m.lido.records, Array(n).fill('quantity'), m.lido.delimiter)
       const values = { records: m.lido.records, decimalMark: dec.decided ?? dec.fallback, dateOrder: sniffDateOrder(m.lido.records, Array(n).fill('time')).decided }
       for (const kind of ['trade', 'fill'] as const) {
-        expect(m.colunas[kind]).toEqual(suggestColumns(m.lido.headers, kind, mercado(k), values))
+        const dominio = suggestColumns(m.lido.headers, kind, mercado(k), values)
+        expect(m.colunas[kind].map((c) => (c === 'ignorar' ? null : c))).toEqual(dominio)
+        m.colunas[kind].forEach((c, i) => {
+          if (c === 'ignorar') expect(dominio[i]).toBeNull()
+        })
         expect(m.sugeridas[kind]).toEqual(m.colunas[kind])
       }
       expect([m.nome, m.nomePadrao, m.origem, m.salvar, m.porModelo, m.inicio, m.mudando]).toEqual([e.nome, e.nome, 'nomes', true, false, 'mapa', false])
@@ -249,8 +281,9 @@ describe('escolhasDe', () => {
 
   it('the row kind picks its own columns', () => {
     const m = mapear('f16t')
-    expect(escolhasDe({ ...m, rowKind: 'trade' }).columns).toEqual(m.colunas.trade)
-    expect(escolhasDe(m).columns).toEqual(m.colunas.fill)
+    const dominio = (cs: ColunaUi[]) => cs.map((c) => (c === 'ignorar' ? null : c))
+    expect(escolhasDe({ ...m, rowKind: 'trade' }).columns).toEqual(dominio(m.colunas.trade))
+    expect(escolhasDe(m).columns).toEqual(dominio(m.colunas.fill))
   })
 })
 
@@ -486,5 +519,289 @@ describe('lerArquivoMapeavel', () => {
     const bytes = Buffer.from('a,b\n1,2\n', 'utf8')
     const blob = { arrayBuffer: () => Promise.resolve(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength)) } as unknown as Blob
     expect((await lerArquivoMapeavel(blob, { fileName: '', size: 8, sha256: '' })).text).toBe('a,b\n1,2\n')
+  })
+})
+
+// ------------------------------------------------------------------------------------------------
+// Lane L1 (contract §5.2, §5.3, §5.6)
+// ------------------------------------------------------------------------------------------------
+
+/** The headers as written whose select holds `valor` in `m`'s row kind */
+const comValor = (m: Mapeamento, valor: ColunaUi, kind: RowKind = m.rowKind) => m.lido.rawHeaders.filter((_, i) => m.colunas[kind][i] === valor)
+
+describe('the pre-fill (§5.3, E20): the board’s columns on every file', () => {
+  /** §2.2: the columns pre-set to «Ignorar esta coluna» (tag «sugerida») and those left at «Escolha…», in the natural row kind */
+  const QUADRO: Record<Exclude<ArquivoQuadroKey, 'f9ilegivel'>, { ignorar: string[]; escolha: string[] }> = {
+    f8: { ignorar: [], escolha: [] },
+    f8p: { ignorar: ['duration', 'buyFillId', 'sellFillId'], escolha: [] },
+    f15: { ignorar: [], escolha: [] },
+    f15b: { ignorar: [], escolha: ['Estratégia'] },
+    f16t: { ignorar: ['avgPrice', 'filledQty', 'Status', 'Timestamp', 'Quantity', 'Limit Price'], escolha: [] },
+    f16ta: { ignorar: ['avgPrice', 'filledQty', 'Status', 'Timestamp', 'Quantity', 'Limit Price'], escolha: [] },
+    f16b: { ignorar: [], escolha: ['Amount'] },
+    f16i: { ignorar: [], escolha: ['AssetClass'] },
+    f16c: { ignorar: ['avgPrice', 'filledQty', 'Status', 'Timestamp', 'Quantity', 'Limit Price'], escolha: [] },
+    f17: { ignorar: [], escolha: ['Trade number'] },
+    f18: { ignorar: [], escolha: [] },
+    f18a: { ignorar: [], escolha: [] },
+    f19: { ignorar: [], escolha: [] },
+    f19p: { ignorar: [], escolha: [] },
+  }
+
+  it.each(Object.keys(QUADRO) as (keyof typeof QUADRO)[])('%s', (k) => {
+    const m = mapear(k)
+    expect(comValor(m, 'ignorar')).toEqual(QUADRO[k].ignorar)
+    expect(comValor(m, null)).toEqual(QUADRO[k].escolha)
+    expect(m.sugeridas[m.rowKind]).toEqual(m.colunas[m.rowKind])
+  })
+
+  it('Performance.csv: the repeating IDs are the ones the note names; Tradovate’s twins and known names are not', () => {
+    const p = mapear('f8p')
+    expect(idsQueSeRepetem(p, 'futures').map((i) => p.lido.rawHeaders[i])).toEqual(['buyFillId', 'sellFillId'])
+    expect(idsQueSeRepetem(mapear('f16t'), 'futures')).toEqual([])
+    // The note stays when the owner changes the select (from the pre-fill, not the select)
+    expect(idsQueSeRepetem(comColuna(p, 8, 'trade_id', 'futures'), 'futures')).toEqual([8, 9])
+    // A model's own row kind has none
+    expect(idsQueSeRepetem(mapear('f15b', [modeloBlackArrow()]), 'futures')).toEqual([])
+  })
+
+  it('the other row kind is pre-filled by the same rule (Tradovate as one trade per row)', () => {
+    const m = mapear('f16t')
+    expect(comValor(m, 'ignorar', 'trade')).toEqual(['Status', 'Limit Price'])
+    expect(comValor(m, null, 'trade')).toEqual(['avgPrice', 'filledQty', 'Fill Time', 'Timestamp', 'Filled Qty', 'Avg Fill Price'])
+  })
+
+  it('a column whose name a changed model does not know is «Escolha…» and «nova»', () => {
+    const m = mapear('f15b', [modeloBlackArrow()])
+    expect(comValor(m, null)).toEqual(['Estratégia'])
+    expect(m.novas[9]).toBe(true)
+  })
+})
+
+describe('comColuna (E17): decimal and dates decided again, pressed pills kept, the net question pre-answered again', () => {
+  it('8 · Papel → «Quantidade»: the check, the missing «Ativo», the block; back as it was', () => {
+    const m = comColuna(mapear('f8'), 1, 'quantity', 'futures')
+    expect(m.colunas.trade[1]).toBe('quantity')
+    expect(m.sugeridas.trade[1]).toBe('symbol')
+    expect(checagemDaColuna(m, 1)).toBe('not_number')
+    expect(bloqueioDoMapa(m, 'futures')).toBe('Marque as colunas obrigatórias.')
+    const n = comColuna(m, 1, 'symbol', 'futures')
+    expect(n.colunas).toEqual(mapear('f8').colunas)
+    expect(bloqueioDoMapa(n, 'futures')).toBeNull()
+  })
+
+  it('a decimal mark decided again over the mapped number columns (19 · «Só preços» without its prices: no question)', () => {
+    const m = mapear('f19p')
+    expect(m.decimal.question).not.toBeNull()
+    const sem = comColuna(comColuna(m, 4, 'ignorar', 'b3'), 5, 'ignorar', 'b3')
+    expect(sem.decimal.question).toBeNull()
+    expect(sem.decimalMark).toBe('comma')
+    const de = comColuna(comColuna(sem, 4, 'entry_price', 'b3'), 5, 'exit_price', 'b3')
+    expect([de.decimal.question?.sample, de.decimalMark]).toEqual(['131.250', 'comma'])
+  })
+
+  it('a pressed decimal pill is kept when a column changes', () => {
+    const n = comColuna(comDecimal(mapear('f19p'), 'point', 'b3'), 6, 'ignorar', 'b3')
+    expect([n.decimalMark, n.decimalEscolhido]).toEqual(['point', true])
+  })
+
+  it('a date order decided again over the mapped date columns; a pressed one is kept', () => {
+    const sem = comColuna(comColuna(mapear('f18'), 1, 'ignorar', 'forex'), 2, 'ignorar', 'forex')
+    expect([sem.datas.decided, sem.dateOrder]).toEqual([null, null])
+    const a = comDatas(mapear('f18a'), 'mdy', 'forex')
+    expect(comColuna(a, 0, 'ignorar', 'forex').dateOrder).toBe('mdy')
+  })
+
+  it('the net question pre-answered again until the owner presses a pill', () => {
+    const m = mapear('f8')
+    expect(m.resultIsNet).toBe(true)
+    expect(comColuna(m, 7, 'ignorar', 'futures').resultIsNet).toBeNull()
+    const bruto = comLiquido(m, false)
+    expect(comColuna(comColuna(bruto, 7, 'ignorar', 'futures'), 7, 'commission', 'futures').resultIsNet).toBe(false)
+  })
+})
+
+describe('comModo (E13): each row kind keeps its own edits', () => {
+  it.each(ARQUIVOS)('%s: there and back', (k) => {
+    const m = mapear(k)
+    const outro: RowKind = m.rowKind === 'trade' ? 'fill' : 'trade'
+    const editado = comColuna(m, 0, 'ignorar', mercado(k))
+    const la = comModo(editado, outro, mercado(k))
+    expect(la.rowKind).toBe(outro)
+    expect(la.colunas[outro]).toEqual(m.colunas[outro])
+    const volta = comModo(la, m.rowKind, mercado(k))
+    expect(volta.colunas[m.rowKind][0]).toBe('ignorar')
+    expect(volta.colunas).toEqual(editado.colunas)
+    expect([volta.decimalMark, volta.dateOrder]).toEqual([editado.decimalMark, editado.dateOrder])
+  })
+
+  it('16 · Tradovate as one trade per row: the requirements missing; back to executions as it was', () => {
+    const m = comModo(mapear('f16t'), 'trade', 'futures')
+    expect(m.rowKind).toBe('trade')
+    expect(bloqueioDoMapa(m, 'futures')).toBe('Marque as colunas obrigatórias.')
+    expect(comModo(m, 'fill', 'futures')).toEqual(mapear('f16t'))
+  })
+})
+
+describe('comSeparador (E9, E10): the same header line', () => {
+  it('8 · «,»: the header is one cell (header_not_found), the columns stay, the note and the block; never a data row as names', () => {
+    const m = mapear('f8')
+    const n = comSeparador(m, arquivo('f8'), ',', 'futures')
+    expect(n.separador).toBe(',')
+    expect(n.lido).toBe(m.lido)
+    expect(n.colunas).toEqual(m.colunas)
+    expect(n.lido.rawHeaders[0]).toBe('Data/Hora')
+    expect(notaDeLeitura(n)).toBe('Com este separador, as linhas não têm o mesmo número de colunas do cabeçalho.')
+    expect(bloqueioDoMapa(n, 'futures')).toBe('Confira como ler o arquivo.')
+    expect(comSeparador(m, arquivo('f8'), '\t', 'futures').colunas).toEqual(m.colunas)
+    const volta = comSeparador(n, arquivo('f8'), ';', 'futures')
+    expect([volta.separador, notaDeLeitura(volta), bloqueioDoMapa(volta, 'futures')]).toEqual([';', null, null])
+  })
+
+  it('a «,» file read with «;»: one cell, kept', () => {
+    const m = mapear('f17')
+    const n = comSeparador(m, arquivo('f17'), ';', 'futures')
+    expect([n.separador, n.colunas]).toEqual([';', m.colunas])
+  })
+
+  it('a file whose other reading works: a fresh mapping of the re-read file, «Salvar» and the name kept', () => {
+    const texto = ['Data/Hora;Papel,C/V;Qtd', '01/10/2026 09:34:31;MESZ6,C;2', '13/10/2026 10:58:21;MNQZ6,V;1'].join('\n')
+    const a: ArquivoMapeavel = { fileName: 'x.csv', size: texto.length, sha256: 'ab'.repeat(32), text: texto }
+    const r = iniciarMapeamento(a, { market: 'futures', templates: [], nomePadrao: 'BlackArrow' })
+    if (!r.ok) throw new Error(r.error)
+    expect(r.mapeamento.lido.delimiter).toBe(';')
+    const m = comNome(comSalvar(r.mapeamento, false), 'Meu')
+    const n = comSeparador(m, a, ',', 'futures')
+    expect([n.separador, n.lido.delimiter, n.lido.rawHeaders]).toEqual([',', ',', ['Data/Hora;Papel', 'C/V;Qtd']])
+    expect([n.salvar, n.nome, n.inicio, n.porModelo]).toEqual([false, 'Meu', 'mapa', false])
+    expect(notaDeLeitura(n)).toBeNull()
+  })
+})
+
+describe('the reading pills and questions (E9, E11, E12)', () => {
+  it('8 · «Decimal» «ponto»: the decimal note; «Datas» «mês/dia»: the dates note; the separator’s note first', () => {
+    const m = mapear('f8')
+    expect(notaDeLeitura(comDecimal(m, 'point', 'futures'))).toBe('Os números não fecharam com este decimal. Confira.')
+    expect(bloqueioDoMapa(comDecimal(m, 'point', 'futures'), 'futures')).toBe('Confira como ler o arquivo.')
+    expect(notaDeLeitura(comDatas(m, 'mdy', 'futures'))).toBe('Com esta ordem, há datas que não existem. Confira.')
+    expect(notaDeLeitura({ ...comDatas(m, 'mdy', 'futures'), separador: ',' })).toBe('Com este separador, as linhas não têm o mesmo número de colunas do cabeçalho.')
+  })
+
+  it('18 · «Datas ambíguas»: «dia/mês» answers it, and the net question is pre-answered once the dates read (gross)', () => {
+    const m = mapear('f18a')
+    expect([m.dateOrder, m.resultIsNet]).toEqual([null, null])
+    const n = comDatas(m, 'dmy', 'forex')
+    expect([n.dateOrder, n.datasEscolhidas, n.resultIsNet, bloqueioDoMapa(n, 'forex'), bloqueioDoConferir(n, 'forex')]).toEqual([
+      'dmy',
+      true,
+      false,
+      null,
+      null,
+    ])
+  })
+
+  it('19 · «Só preços»: the comma reading puts nothing new off the tick; the point reading puts the WIN off its tick (de 5 em 5)', () => {
+    const m = comPalavraDeLado(mapear('f19p'), 'x', 'sell', 'b3')
+    expect(foraDoPasso(m, 'b3')).toBeNull()
+    expect(bloqueioDoMapa(m, 'b3')).toBeNull()
+    const ponto = comDecimal(m, 'point', 'b3')
+    expect(foraDoPasso(ponto, 'b3')).toEqual({ raiz: 'WIN', passo: '5' })
+    expect(bloqueioDoMapa(ponto, 'b3')).toBe('Confira como ler o arquivo.')
+    expect(bloqueioDoMapa({ ...m, decimalMark: null }, 'b3')).toBe('Escolha como ler os números.')
+  })
+
+  it('a file whose number cells decide (8) never asks: no tick note', () => {
+    expect(foraDoPasso(mapear('f8'), 'futures')).toBeNull()
+  })
+})
+
+describe('the other edits (E18, E24, E26, E27)', () => {
+  it('a side word, an end-of-file answer, the net answer, «Salvar» and the name (at most 60 characters)', () => {
+    const m = mapear('f19')
+    expect(comPalavraDeLado(m, 'x', 'skip', 'b3').sideWords).toEqual({ x: 'skip' })
+    const f = comFimDoArquivo(mapear('f16ta'), 'MESZ6', 'yes')
+    expect(f.endOfFile).toEqual({ MESZ6: 'yes' })
+    expect(ler(f, 'f16ta').endOfFile[0].answer).toBe('yes')
+    expect(comLiquido(m, false)).toMatchObject({ resultIsNet: false, liquidoEscolhido: true })
+    expect(comSalvar(m, false).salvar).toBe(false)
+    expect(comNome(m, 'x'.repeat(70)).nome).toHaveLength(60)
+    expect(Array.from(comNome(m, '\u{1F600}'.repeat(61)).nome)).toHaveLength(60)
+  })
+})
+
+describe('the blocks (§5.6)', () => {
+  it('«Continuar»: the reading, the dates, the decimal, the requirements, a field twice, a check, a side word', () => {
+    const p = mapear('f19p')
+    expect(bloqueioDoMapa({ ...p, separador: ',', datas: mapear('f18a').datas, dateOrder: null }, 'b3')).toBe('Confira como ler o arquivo.')
+    expect(bloqueioDoMapa({ ...p, datas: mapear('f18a').datas, dateOrder: null, decimalMark: null }, 'b3')).toBe('Escolha a ordem das datas.')
+    expect(bloqueioDoMapa({ ...p, decimalMark: null }, 'b3')).toBe('Escolha como ler os números.')
+    const m = mapear('f17')
+    expect(bloqueioDoMapa(comColuna(m, 1, 'ignorar', 'futures'), 'futures')).toBe('Marque as colunas obrigatórias.')
+    expect(bloqueioDoMapa(comColuna(m, 0, 'quantity', 'futures'), 'futures')).toBe('Cada campo vai em uma coluna só.')
+    // Account → «Stop»: not a number, nothing else wrong
+    const stop = comColuna(m, 2, 'stop', 'futures')
+    expect(checagemDaColuna(stop, 2)).toBe('not_number')
+    expect(bloqueioDoMapa(stop, 'futures')).toBe('Confira as colunas marcadas.')
+    // 8 · Performance: buyFillId → «ID da operação»
+    const id = comColuna(mapear('f8p'), 8, 'trade_id', 'futures')
+    expect([checagemDaColuna(id, 8), bloqueioDoMapa(id, 'futures')]).toEqual(['repeats', 'Confira as colunas marcadas.'])
+    // 18 · «Swap ou funding» without «Resultado»: the swap check under it
+    const swap = comColuna(mapear('f18'), 10, 'ignorar', 'forex')
+    expect([checagemDaColuna(swap, 8), bloqueioDoMapa(swap, 'forex')]).toEqual(['swap', 'Confira as colunas marcadas.'])
+    expect(bloqueioDoMapa(mapear('f19'), 'b3')).toBe('Diga o que quer dizer “X”.')
+  })
+
+  it('«Usar estas colunas»: a file the mapping cannot make (mixed clocks), then the net question with no answer', () => {
+    const texto = ['Time,Symbol,Side,Qty,Price', '2026-10-11T00:05:12Z,BTCUSDT,BUY,0.01,112400.00', '2026-10-11 00:21:40,BTCUSDT,SELL,0.01,112952.00'].join('\n')
+    const r = iniciarMapeamento({ fileName: 'x.csv', size: 1, sha256: '', text: texto }, { market: 'crypto', templates: [], nomePadrao: 'Binance' })
+    if (!r.ok) throw new Error(r.error)
+    expect(r.mapeamento.rowKind).toBe('fill')
+    expect(bloqueioDoConferir(r.mapeamento, 'crypto')).toBe('Este arquivo mistura horários com e sem fuso: não dá para pôr as execuções em ordem.')
+    expect(bloqueioDoConferir(mapear('f18a'), 'forex')).toBe('Responda a pergunta sobre o resultado do arquivo.')
+    expect(bloqueioDoConferir(comLiquido(mapear('f18a'), true), 'forex')).toBeNull()
+  })
+
+  it('an exact model whose file starts on «conferir» (16 ending positioned) is not blocked there', () => {
+    const m = mapear('f16ta', [modeloTradovate()])
+    expect([m.inicio, bloqueioDoConferir(m, 'futures')]).toEqual(['conferir', null])
+  })
+})
+
+describe('modeloASalvar is never refused once «mapa» and «conferir» let a mapping through', () => {
+  type Caminho = (m: Mapeamento, mk: AccountMarket) => Mapeamento
+  /** The board's answers and edit paths per file */
+  const CAMINHOS: Record<Exclude<ArquivoQuadroKey, 'f9ilegivel'>, Caminho[]> = {
+    f8: [(m) => m, (m) => comLiquido(m, false), (m, mk) => comColuna(comColuna(m, 1, 'quantity', mk), 1, 'symbol', mk), (m, mk) => comColuna(m, 8, 'ignorar', mk)],
+    f8p: [(m) => m, (m, mk) => comModo(comModo(m, 'fill', mk), 'trade', mk)],
+    f15: [(m) => m, (m) => comNome(m, '')],
+    f15b: [(m) => m, (m, mk) => comColuna(m, 9, 'ignorar', mk)],
+    f16t: [(m) => m, (m, mk) => comColuna(m, 1, 'ignorar', mk)],
+    f16ta: [(m) => m, (m) => comFimDoArquivo(m, 'MESZ6', 'yes'), (m) => comFimDoArquivo(m, 'MESZ6', 'no')],
+    f16b: [(m) => m, (m) => comFimDoArquivo(m, 'ETHUSDT', 'yes'), (m) => comFimDoArquivo(m, 'ETHUSDT', 'no')],
+    f16i: [(m) => m, (m, mk) => comColuna(m, 5, 'ignorar', mk)],
+    f16c: [(m) => m, (m) => comFimDoArquivo(m, endOfFileKey('MESZ6', 'LT50K-0193'), 'yes')],
+    f17: [(m) => m, (m) => comLiquido(m, true), (m, mk) => comColuna(m, 0, 'ignorar', mk)],
+    f18: [(m) => m, (m) => comLiquido(m, true)],
+    f18a: [(m, mk) => comDatas(m, 'dmy', mk), (m, mk) => comLiquido(comDatas(m, 'dmy', mk), true)],
+    f19: [
+      (m, mk) => comPalavraDeLado(m, 'x', 'sell', mk),
+      (m, mk) => comPalavraDeLado(m, 'x', 'skip', mk),
+      (m, mk) => comLiquido(comPalavraDeLado(m, 'x', 'buy', mk), false),
+    ],
+    f19p: [(m, mk) => comPalavraDeLado(m, 'x', 'sell', mk), (m, mk) => comPalavraDeLado(m, 'x', 'skip', mk)],
+  }
+  it.each(Object.keys(CAMINHOS) as (keyof typeof CAMINHOS)[])('%s', (k) => {
+    const mk = mercado(k)
+    const modelos = k === 'f15' || k === 'f15b' ? [modeloBlackArrow()] : []
+    for (const caminho of CAMINHOS[k]) {
+      for (const inicial of [mapear(k, modelos), mudarColunas(mapear(k, modelos))]) {
+        const m = caminho(inicial, mk)
+        expect(bloqueioDoMapa(m, mk)).toBeNull()
+        expect(bloqueioDoConferir(m, mk)).toBeNull()
+        const s = modeloASalvar(m, { tzHint: conta(k).file_tz, rota: null })
+        expect(s).not.toBeNull()
+        expect(checkTemplate(s?.payload)).toBeNull()
+      }
+    }
   })
 })
