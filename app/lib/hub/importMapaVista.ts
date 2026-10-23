@@ -39,7 +39,7 @@ import {
 import { currencyOf, type AccountMarket } from '@/lib/domain/markets'
 import { formatDayMonth, formatMoney } from '@/lib/hub/formato'
 import {
-  arquivoDoMapeamento,
+  arquivoDeTodasAsContas,
   bloqueioDoConferir,
   bloqueioDoMapa,
   checagemDaColuna,
@@ -830,7 +830,7 @@ function perguntaDoLiquidoVista(m: Mapeamento, market: AccountMarket): PerguntaV
  * the end-of-file answers are given under the all-accounts keys (§6.7)
  */
 export function vistaConferir(m: Mapeamento, market: AccountMarket): VistaConferir {
-  const lido = arquivoDoMapeamento({ ...m, accountValue: null }, market, null)
+  const lido = arquivoDeTodasAsContas(m, market)
   const f = lido.ok ? lido : null
   const trade = m.rowKind === 'trade'
   const columns = escolhasDe(m).columns

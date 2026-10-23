@@ -512,6 +512,21 @@ export function arquivoDoMapeamento(m: Mapeamento, market: AccountMarket, fileTz
   })
 }
 
+/** arquivoDeTodasAsContas's answer per state (a read of the whole file); a Mapeamento is never changed in place */
+const lidoVisto = new WeakMap<Mapeamento, { market: AccountMarket; f: MappedOutcome }>()
+
+/**
+ * What «conferir» reads (§5.5, §6.7): arquivoDoMapeamento({...m, accountValue: null}, market, null), every account's rows
+ * on their wall clocks, kept per state so the step and its block read the file once
+ */
+export function arquivoDeTodasAsContas(m: Mapeamento, market: AccountMarket): MappedOutcome {
+  const visto = lidoVisto.get(m)
+  if (visto && visto.market === market) return visto.f
+  const f = arquivoDoMapeamento({ ...m, accountValue: null }, market, null)
+  lidoVisto.set(m, { market, f })
+  return f
+}
+
 /**
  * «Mudar colunas» (E34, on «Prévia» or «conferir»): porModelo false, origem 'modelo', mudando true (title «Mude as colunas
  * do modelo “{nome}”.»), the model block «Atualizar o modelo “{nome}”» checked; every answer kept
@@ -686,6 +701,9 @@ function passoEmTexto(tick: string): string {
   return t.replace('.', ',')
 }
 
+/** foraDoPasso's answer per state (two reads of the whole file); a Mapeamento is never changed in place */
+const passoVisto = new WeakMap<Mapeamento, { market: AccountMarket; fora: { raiz: string; passo: string } | null }>()
+
 /**
  * E12's tick note: the pressed reading of the decimal question puts a row of a tick instrument off its tick that the
  * other reading keeps on it («Com este decimal, o WIN fica fora do passo (de 5 em 5).»): the root and the tick of the
@@ -694,7 +712,16 @@ function passoEmTexto(tick: string): string {
  */
 export function foraDoPasso(m: Mapeamento, market: AccountMarket): { raiz: string; passo: string } | null {
   if (!m.decimal.question || m.decimalMark === null) return null
-  const outra: DecimalMark = m.decimalMark === 'comma' ? 'point' : 'comma'
+  const visto = passoVisto.get(m)
+  if (visto && visto.market === market) return visto.fora
+  const fora = foraDoPassoLido(m, m.decimalMark, market)
+  passoVisto.set(m, { market, fora })
+  return fora
+}
+
+
+function foraDoPassoLido(m: Mapeamento, marca: DecimalMark, market: AccountMarket): { raiz: string; passo: string } | null {
+  const outra: DecimalMark = marca === 'comma' ? 'point' : 'comma'
   const lida = arquivoDoMapeamento(m, market, null)
   const alternativa = arquivoDoMapeamento({ ...m, decimalMark: outra }, market, null)
   if (!lida.ok || !alternativa.ok) return null
@@ -772,7 +799,7 @@ export function bloqueioDoMapa(m: Mapeamento, market: AccountMarket): string | n
  * error); the net question asked with no answer (CONFERIR.responda)
  */
 export function bloqueioDoConferir(m: Mapeamento, market: AccountMarket): string | null {
-  const f = arquivoDoMapeamento({ ...m, accountValue: null }, market, null)
+  const f = arquivoDeTodasAsContas(m, market)
   if (!f.ok) return CONFERIR.falha(f.error)
   const choices = escolhasDe(m)
   if (netAsked(choices.rowKind, choices.columns) && m.resultIsNet === null) return CONFERIR.responda

@@ -22,6 +22,7 @@ import {
 } from '@/lib/domain/import'
 import type { AccountMarket } from '@/lib/domain/markets'
 import {
+  arquivoDeTodasAsContas,
   arquivoDoMapeamento,
   bloqueioDoConferir,
   bloqueioDoMapa,
@@ -803,5 +804,26 @@ describe('modeloASalvar is never refused once «mapa» and «conferir» let a ma
         expect(checkTemplate(s?.payload)).toBeNull()
       }
     }
+  })
+})
+
+describe('arquivoDeTodasAsContas: what «conferir» reads, once per state', () => {
+  it('every account’s rows on their wall clocks, whatever value hc chose; the same answer for the same state, a new read for a new one', () => {
+    const m = { ...mapear('f16c'), accountValue: 'LT50K-0193' }
+    const f = arquivoDeTodasAsContas(m, 'futures')
+    if (!f.ok) throw new Error(f.error)
+    expect(f.endOfFile).toHaveLength(2)
+    expect(f).toEqual(arquivoDoMapeamento({ ...m, accountValue: null }, 'futures', null))
+    expect(arquivoDeTodasAsContas(m, 'futures')).toBe(f)
+    const n = comFimDoArquivo(m, endOfFileKey('MESZ6', 'LT50K-0193'), 'yes')
+    const g = arquivoDeTodasAsContas(n, 'futures')
+    expect(g).not.toBe(f)
+    expect(g.ok && g.endOfFile.map((q) => q.answer)).toEqual(['yes', 'unknown'])
+  })
+
+  it('foraDoPasso gives the same answer read again (kept per state)', () => {
+    const ponto = comDecimal(comPalavraDeLado(mapear('f19p'), 'x', 'sell', 'b3'), 'point', 'b3')
+    expect(foraDoPasso(ponto, 'b3')).toEqual({ raiz: 'WIN', passo: '5' })
+    expect(foraDoPasso(ponto, 'b3')).toBe(foraDoPasso(ponto, 'b3'))
   })
 })
