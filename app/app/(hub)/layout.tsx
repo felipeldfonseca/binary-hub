@@ -11,6 +11,9 @@ import '@/styles/hub-operacoes-dia.css'
 import '@/styles/hub-registrar-opcao.css'
 // Phase 3c: lane C1's partials and stop moves in the Registrar sheet
 import '@/styles/hub-registrar-parciais.css'
+// Phase 3b: lane L2's import sheet around the column mapping, then lane L1's mapping steps
+import '@/styles/hub-importar.css'
+import '@/styles/hub-importar-mapa.css'
 import ProtectedRoute from '@/components/auth/ProtectedRoute'
 import AppShell from '@/components/hub/AppShell'
 import HubGate, { HubLoading } from '@/components/hub/HubGate'

@@ -1216,14 +1216,14 @@ describe('ImportSheet · the firm of a Top One file (step b)', () => {
 })
 
 describe('ImportSheet · errors', () => {
-  it('says why a file cannot be read and lets the owner choose another', async () => {
+  it('says why a file cannot be read and lets the owner choose another (Phase 3b: an unknown file in a binaries account, E47)', async () => {
     readFile.mockResolvedValue({ fileName: 'x.csv', size: 10, sha256: 'ab'.repeat(32), outcome: { ok: false, error: 'unknown_format' } })
 
-    const dialog = await openSheet({ accountId: topOne.id })
+    const dialog = await openSheet({ accountId: ebinex.id })
     await chooseFile(dialog)
 
     expect(await within(dialog).findByRole('heading', { name: 'Não conseguimos ler o arquivo.' })).toHaveFocus()
-    expect(within(dialog).getByText('Por enquanto lemos o CSV da Ebinex e o Trade History da Top One.')).toBeInTheDocument()
+    expect(within(dialog).getByText('Em contas de binárias, lemos só o CSV da Ebinex.')).toBeInTheDocument()
     await userEvent.click(within(dialog).getByRole('button', { name: 'Escolher outro arquivo' }))
     expect(within(dialog).getByRole('heading', { name: 'Escolha outro arquivo' })).toHaveFocus()
     expect(within(dialog).getByRole('button', { name: 'Voltar' })).toBeInTheDocument()
@@ -1237,15 +1237,20 @@ describe('ImportSheet · errors', () => {
     expect(within(dialog).getByText('Salve como CSV na sua plataforma ou no Excel e tente de novo.')).toBeInTheDocument()
   })
 
-  it('names the columns a file is missing', async () => {
+  it('names the columns a file is missing (Phase 3b: a near-complete reader header in its reader\'s market, «reader_error»)', async () => {
     readFile.mockResolvedValue({
       fileName: 'x.csv',
       size: 10,
       sha256: 'ab'.repeat(32),
       outcome: { ok: false, error: 'missing_columns', platform: 'ebinex', missingColumns: ['Vela'] },
     })
-    const dialog = await openSheet({ accountId: topOne.id })
-    await chooseFile(dialog)
+    const dialog = await openSheet({ accountId: ebinex.id })
+    await waitFor(() => expect(fetchAccounts).toHaveBeenCalled())
+    // Ebinex's header without «Vela»: the reader's broken file, never the mapping
+    const header = 'ID,Data,Ativo,Tempo,Previsão,P. ABRT,P. FECH,Valor,Estornado,Executado,Status,Resultado'
+    await act(async () => {
+      fireEvent.change(within(dialog).getByTestId('arquivo'), { target: { files: [new File([`${header}\n`], 'x.csv', { type: 'text/csv' })] } })
+    })
     expect(await within(dialog).findByText('Faltam colunas: Vela.')).toBeInTheDocument()
   })
 
@@ -1265,13 +1270,17 @@ describe('ImportSheet · errors', () => {
     expect(within(dialog).getByRole('button', { name: 'Como ler: arquivo' })).toBeInTheDocument()
   })
 
-  it('shows no card for a file it could not read at all', async () => {
+  it('shows no card for a file it could not read at all (Phase 3b: no line of columns, «Arquivo que não abre»)', async () => {
     readFile.mockResolvedValue({ fileName: 'x.csv', size: 10, sha256: 'ab'.repeat(32), outcome: { ok: false, error: 'unknown_format' } })
 
     const dialog = await openSheet({ accountId: topOne.id })
-    await chooseFile(dialog)
+    await waitFor(() => expect(fetchAccounts).toHaveBeenCalled())
+    await act(async () => {
+      fireEvent.change(within(dialog).getByTestId('arquivo'), { target: { files: [new File(['Relatório\nNada aqui.\n'], 'x.csv', { type: 'text/csv' })] } })
+    })
 
     await within(dialog).findByRole('heading', { name: 'Não conseguimos ler o arquivo.' })
+    expect(within(dialog).getByText('Não achamos a linha com os nomes das colunas.')).toBeInTheDocument()
     expect(dialog.querySelector('.hub-arq')).toBeNull()
   })
 
@@ -2054,31 +2063,17 @@ describe('ImportSheet · Fase 2b · «Qual mercado?» (i1)', () => {
     expect(within(dialog).getByText('Passo 1 de 3')).toBeInTheDocument()
   })
 
-  it('a market without a file reader says so under the pills, in the live region and the group’s description', async () => {
+  it('Phase 3b (E50): every market reads a file, so no market says «Ainda não lemos arquivos …» under the pills', async () => {
     const dialog = await openSheet({ mode: 'adicionar' })
     const group = within(dialog).getByRole('group', { name: 'Qual mercado?' })
     const live = dialog.querySelector('[aria-live="polite"]') as HTMLElement
     expect(live).toHaveTextContent('Cada conta é de um mercado só.')
-
-    const notes: [string, string][] = [
-      ['Forex e CFDs', 'de Forex'],
-      ['Ações e opções (EUA)', 'de Ações'],
-      ['Cripto', 'de Cripto'],
-      ['B3', 'da B3'],
-    ]
-    for (const [pill, de] of notes) {
-      await userEvent.click(within(group).getByRole('button', { name: pill }))
-      // Since 3-4 every market registers (the end of D36): no «, na Fase 3»
-      const note = `Ainda não lemos arquivos ${de}: as operações desta conta entram pelo “Registrar operação”.`
-      expect(within(live).getByText(note)).toHaveAttribute('id', 'nota-leitor')
-      expect(group).toHaveAttribute('aria-describedby', 'nota-mercado nota-leitor')
-      expect(group).toHaveAccessibleDescription(`Cada conta é de um mercado só. ${note}`)
-    }
-    // Futuros and binaries have a reader: no note
-    for (const pill of ['Futuros (EUA)', 'Opções binárias']) {
+    for (const pill of ['Forex e CFDs', 'Ações e opções (EUA)', 'Cripto', 'B3', 'Futuros (EUA)', 'Opções binárias']) {
       await userEvent.click(within(group).getByRole('button', { name: pill }))
       expect(dialog.querySelector('#nota-leitor')).toBeNull()
+      expect(within(dialog).queryByText(/^Ainda não lemos arquivos/)).not.toBeInTheDocument()
       expect(group).toHaveAttribute('aria-describedby', 'nota-mercado')
+      expect(group).toHaveAccessibleDescription('Cada conta é de um mercado só.')
     }
   })
 
@@ -2378,13 +2373,13 @@ describe('ImportSheet · Fase 2b · «Nova conta de …» (step b) and «{conta}
       window: null,
       version: 'force',
     })
-    // The end screen: «Registrar operação» as the primary (3-4 ended D36), the MetaTrader 5 report
+    // The end screen: «Registrar operação» as the primary (3-4 ended D36), the MetaTrader 5 report (Phase 3b, E52:
+    // without «Ainda não lemos arquivos de Forex.», since every market imports a CSV)
     expect(within(dialog).getByText('Nada ainda. Registre a primeira operação.')).toBeInTheDocument()
     expect(
-      within(dialog).getByText(
-        'Ainda não lemos arquivos de Forex. O relatório do MetaTrader 5 sai em HTML ou PDF e vai precisar de um leitor próprio, que vem depois.',
-      ),
+      within(dialog).getByText('O relatório do MetaTrader 5 sai em HTML ou PDF e vai precisar de um leitor próprio, que vem depois.'),
     ).toBeInTheDocument()
+    expect(within(dialog).queryByText(/^Ainda não lemos arquivos/)).not.toBeInTheDocument()
     expect(within(dialog).queryByRole('button', { name: 'Importar histórico' })).not.toBeInTheDocument()
     expect(primaryOf(dialog)).toHaveTextContent('Registrar operação')
     await userEvent.click(primaryOf(dialog))
@@ -2393,16 +2388,15 @@ describe('ImportSheet · Fase 2b · «Nova conta de …» (step b) and «{conta}
     expect(screen.getByRole('dialog', { name: 'Registrar operação' })).toBeInTheDocument()
   })
 
-  it('the end screen names the MetaTrader 4 report, and the CSV mapping for other platforms', async () => {
+  it('the end screen names the MetaTrader 4 report; another platform imports its history (Phase 3b, E52)', async () => {
     createAccount.mockResolvedValue({ ...ftmo, platform: 'mt4' })
     const mt4 = await toNewAccountStep('Forex e CFDs', 'MetaTrader 4', 'FTMO 100k')
     await userEvent.click(within(mt4).getByRole('button', { name: 'Pessoal' }))
     await userEvent.click(within(mt4).getByRole('button', { name: 'Criar FTMO 100k' }))
     expect(
-      await within(mt4).findByText(
-        'Ainda não lemos arquivos de Forex. O relatório do MetaTrader 4 sai em HTML e vai precisar de um leitor próprio, que vem depois.',
-      ),
+      await within(mt4).findByText('O relatório do MetaTrader 4 sai em HTML e vai precisar de um leitor próprio, que vem depois.'),
     ).toBeInTheDocument()
+    expect(within(mt4).queryByRole('button', { name: 'Importar histórico' })).not.toBeInTheDocument()
     // The primary is «Registrar operação» since 3-4: close with the ×
     await userEvent.click(within(mt4).getByRole('button', { name: 'Fechar' }))
 
@@ -2416,9 +2410,9 @@ describe('ImportSheet · Fase 2b · «Nova conta de …» (step b) and «{conta}
     await userEvent.type(within(dialog).getByLabelText('Apelido'), 'FTMO 100k')
     await userEvent.click(within(dialog).getByRole('button', { name: 'Pessoal' }))
     await userEvent.click(within(dialog).getByRole('button', { name: 'Criar FTMO 100k' }))
-    expect(
-      await within(dialog).findByText('Ainda não lemos arquivos de Forex. Depois vem a importação de CSV em que você diz o que é cada coluna.'),
-    ).toBeInTheDocument()
+    expect(await within(dialog).findByText('Nada ainda. Importe o histórico ou registre a primeira operação.')).toBeInTheDocument()
+    expect(within(dialog).getByRole('button', { name: 'Importar histórico' })).toHaveClass('hub-btn--pri')
+    expect(within(dialog).queryByText(/^Ainda não lemos arquivos/)).not.toBeInTheDocument()
   })
 
   it('scenario 12 · Cripto at Binance: Brasília midnight, USDT in the ⓘ, the window with Saturday and Sunday', async () => {
@@ -2452,9 +2446,9 @@ describe('ImportSheet · Fase 2b · «Nova conta de …» (step b) and «{conta}
     await within(dialog).findByRole('heading', { name: 'Binance criada.' })
     expect(createAccount.mock.calls[0][2]).toMatchObject({ market: 'crypto', platform: 'binance', firm: null, phase: 'pessoal' })
     expect(payloadOf(0).defaults?.crypto?.windows).toEqual([{ tz: 'America/Sao_Paulo', start_min: 1200, end_min: 1320, weekdays: 127 }])
-    expect(
-      within(dialog).getByText('Ainda não lemos arquivos de Cripto. Depois vem a importação de CSV em que você diz o que é cada coluna.'),
-    ).toBeInTheDocument()
+    // Phase 3b (scenario 12, E52): «Importar histórico» (primary) after «Registrar operação»
+    expect(within(dialog).getByText('Nada ainda. Importe o histórico ou registre a primeira operação.')).toBeInTheDocument()
+    expect(within(dialog).getByRole('button', { name: 'Importar histórico' })).toHaveClass('hub-btn--pri')
   })
 
   it('scenario 13 · Ações at IBKR: «Corretora», the day turns at 20:00 ET (21:00, then 22:00 in Brasília after 1 Nov)', async () => {
@@ -2514,7 +2508,9 @@ describe('ImportSheet · Fase 2b · «Nova conta de …» (step b) and «{conta}
       window: null,
       version: 'force',
     })
-    expect(within(dialog).getByText('Ainda não lemos arquivos da B3. Depois vem a importação de CSV em que você diz o que é cada coluna.')).toBeInTheDocument()
+    // Phase 3b (scenario 14, E52): «Importar histórico» (primary) after «Registrar operação»
+    expect(within(dialog).getByText('Nada ainda. Importe o histórico ou registre a primeira operação.')).toBeInTheDocument()
+    expect(within(dialog).getByRole('button', { name: 'Importar histórico' })).toHaveClass('hub-btn--pri')
   })
 
   it('a limit in dollars keeps a B3 account’s «Criar» blocked; «R$ 400» is taken', async () => {
@@ -2598,22 +2594,23 @@ describe('ImportSheet · Fase 2b · «Nova conta de …» (step b) and «{conta}
   })
 })
 
-describe('ImportSheet · Fase 2b · an account without a file reader is never a file’s destination', () => {
-  it('«Importar» with a Forex account in context opens as «Escolha o arquivo» and asks for the account', async () => {
+describe('ImportSheet · Phase 3b · every market is a file’s destination (the 2b gate is lifted)', () => {
+  it('«Importar» with a Forex account in context opens on it; an Ebinex file there is «de binárias» (step g)', async () => {
     const forex = makeAccount({ label: 'FTMO', market: 'forex', platform: 'mt5', firm: 'FTMO', phase: 'avaliacao' })
     fetchAccounts.mockResolvedValue([topOne, ebinex, forex])
     readFile.mockResolvedValue(fixtureFile('ebinex_atual_ok'))
 
     const dialog = await openSheet({ accountId: forex.id })
     await waitFor(() => expect(fetchAccounts).toHaveBeenCalled())
-    expect(await within(dialog).findByRole('heading', { name: 'Escolha o arquivo' })).toBeInTheDocument()
-    expect(within(dialog).queryByRole('heading', { name: 'Importar histórico de FTMO' })).not.toBeInTheDocument()
+    expect(await within(dialog).findByRole('heading', { name: 'Importar histórico de FTMO' })).toBeInTheDocument()
+    expect(within(dialog).queryByRole('heading', { name: 'Escolha o arquivo' })).not.toBeInTheDocument()
 
     await chooseFile(dialog)
 
-    // Not «Este arquivo é de binárias»: the forex account was never the destination
-    expect(await within(dialog).findByRole('heading', { name: 'Para qual conta?' })).toHaveFocus()
-    expect(pillNames(within(dialog).getByRole('group', { name: 'Para qual conta?' }))).toEqual(['Ebinex', '+ Nova conta de binárias'])
+    // A reader's file of another market than the account's: as built for any account (step g)
+    expect(await within(dialog).findByRole('heading', { name: 'Este arquivo é de binárias (Ebinex).' })).toHaveFocus()
+    expect(within(dialog).getByText('A conta escolhida é de Forex.')).toBeInTheDocument()
+    expect(within(dialog).getByRole('button', { name: 'Importar em Ebinex' })).toBeInTheDocument()
   })
 
   it('names any market in «A conta escolhida é …»', () => {
@@ -2671,13 +2668,28 @@ describe('ImportSheet · Phase 3 · «Registrar operação» at the end of accou
     expect(mockRegistrarSheet).toHaveBeenLastCalledWith({ accountId: created.id, tradeId: null })
   })
 
-  describe('every new market registers since 3-4 (the end of D36)', () => {
+  describe('every new market registers since 3-4 (the end of D36); Phase 3b (E52): and imports its history', () => {
+    it('Forex at MetaTrader 5: «Nada ainda. Registre a primeira operação.», the report line and the primary «Registrar operação»', async () => {
+      const created = makeAccount({ id: 'nova', label: 'Conta nova', market: 'forex', platform: 'mt5', phase: 'pessoal' })
+      createAccount.mockResolvedValue(created)
+      const dialog = await toNewAccountStep('Forex e CFDs', 'MetaTrader 5', 'Conta nova')
+      await userEvent.click(within(within(dialog).getByRole('group', { name: 'Fase' })).getByRole('button', { name: 'Pessoal' }))
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Criar Conta nova' }))
+
+      expect(await within(dialog).findByRole('heading', { name: 'Conta nova criada.' })).toBeInTheDocument()
+      expect(within(dialog).getByText('Nada ainda. Registre a primeira operação.')).toBeInTheDocument()
+      expect(within(dialog).getByText('O relatório do MetaTrader 5 sai em HTML ou PDF e vai precisar de um leitor próprio, que vem depois.')).toBeInTheDocument()
+      expect(within(dialog).queryByText(/Fase 3/)).not.toBeInTheDocument()
+      expect(footerNames(dialog)).toEqual([['Registrar operação', true]])
+      await userEvent.click(primaryOf(dialog))
+      expect(mockRegistrarSheet).toHaveBeenLastCalledWith({ accountId: 'nova', tradeId: null })
+    })
+
     it.each([
-      ['Forex e CFDs', 'MetaTrader 5', 'forex', 'mt5', 'de Forex. O relatório do MetaTrader 5 sai em HTML ou PDF e vai precisar de um leitor próprio, que vem depois.'],
-      ['Ações e opções (EUA)', 'Interactive Brokers', 'stocks', 'ibkr', 'de Ações. Depois vem a importação de CSV em que você diz o que é cada coluna.'],
-      ['Cripto', 'Binance', 'crypto', 'binance', 'de Cripto. Depois vem a importação de CSV em que você diz o que é cada coluna.'],
-      ['B3', 'Profit (Nelogica)', 'b3', 'profit', 'da B3. Depois vem a importação de CSV em que você diz o que é cada coluna.'],
-    ])('%s: «Nada ainda. Registre a primeira operação.» and the primary «Registrar operação»', async (pill, platform, market, platformId, arquivo) => {
+      ['Ações e opções (EUA)', 'Interactive Brokers', 'stocks', 'ibkr'],
+      ['Cripto', 'Binance', 'crypto', 'binance'],
+      ['B3', 'Profit (Nelogica)', 'b3', 'profit'],
+    ])('%s: «Registrar operação» before the primary «Importar histórico» → «Importar histórico de Conta nova»', async (pill, platform, market, platformId) => {
       const created = makeAccount({ id: 'nova', label: 'Conta nova', market: market as AccountMarket, platform: platformId, phase: 'pessoal' })
       createAccount.mockResolvedValue(created)
       const dialog = await toNewAccountStep(pill, platform, 'Conta nova')
@@ -2686,19 +2698,21 @@ describe('ImportSheet · Phase 3 · «Registrar operação» at the end of accou
       await userEvent.click(within(dialog).getByRole('button', { name: 'Criar Conta nova' }))
 
       expect(await within(dialog).findByRole('heading', { name: 'Conta nova criada.' })).toBeInTheDocument()
-      expect(within(dialog).getByText('Nada ainda. Registre a primeira operação.')).toBeInTheDocument()
-      // Where the files will come from stays
-      expect(within(dialog).getByText(`Ainda não lemos arquivos ${arquivo}`)).toBeInTheDocument()
+      expect(within(dialog).getByText('Nada ainda. Importe o histórico ou registre a primeira operação.')).toBeInTheDocument()
+      expect(within(dialog).queryByText(/^Ainda não lemos arquivos/)).not.toBeInTheDocument()
       expect(within(dialog).queryByText(/Fase 3/)).not.toBeInTheDocument()
-      expect(footerNames(dialog)).toEqual([['Registrar operação', true]])
+      expect(footerNames(dialog)).toEqual([
+        ['Registrar operação', false],
+        ['Importar histórico', true],
+      ])
       await userEvent.click(primaryOf(dialog))
-      expect(mockRegistrarSheet).toHaveBeenLastCalledWith({ accountId: 'nova', tradeId: null })
+      expect(await within(dialog).findByRole('heading', { name: 'Importar histórico de Conta nova' })).toHaveFocus()
     })
 
-    it('PASSO_I1.semLeitor: «… entram pelo “Registrar operação”.» without «na Fase 3»', async () => {
+    it('Phase 3b (E50): «Qual mercado?» says «Ainda não lemos arquivos …» for no market', async () => {
       const dialog = await openSheet({ mode: 'adicionar' })
       await userEvent.click(within(within(dialog).getByRole('group', { name: 'Qual mercado?' })).getByRole('button', { name: 'B3' }))
-      expect(within(dialog).getByText('Ainda não lemos arquivos da B3: as operações desta conta entram pelo “Registrar operação”.')).toHaveAttribute('id', 'nota-leitor')
+      expect(dialog.querySelector('#nota-leitor')).toBeNull()
       expect(within(dialog).queryByText(/Fase 3/)).not.toBeInTheDocument()
     })
   })

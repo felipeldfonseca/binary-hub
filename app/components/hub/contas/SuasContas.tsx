@@ -213,8 +213,9 @@ export default function SuasContas() {
     list = (
       <>
         {groupByMarket(active).map((group) => {
-          // No file reader for this market yet (Forex, Ações, Cripto, B3): no «Importar», and the note says why
-          const reader = MARKET_SPEC[group.market].reader
+          // A market whose files the app reads (Phase 3b, E54: a reader's, or the column mapping, so every market
+          // today): «Importar» and «Importações»; the note only for a market with neither
+          const reader = MARKET_SPEC[group.market].reader || MARKET_SPEC[group.market].mapping
           return (
             <div key={group.market} className="hub-grupo">
               <h3 id={`g-${group.market}`}>{MARKET_LABEL[group.market]}</h3>

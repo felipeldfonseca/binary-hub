@@ -288,7 +288,7 @@ describe('scenario 6 · Forex (FTMO, Thu 15 Oct 08:40 ET)', () => {
 
     it('before «desde»: the column import text', () => {
       expect(m(fechada({ dia: '2026-10-12' }), false, n).visiveis.dia).toBe(
-        'Antes de 13 out esta conta não tinha regras: essas operações entram pela importação por colunas, logo depois da Fase 3.',
+        'Antes de 13 out esta conta não tinha regras: essas operações entram pela importação de arquivo.',
       )
     })
   })

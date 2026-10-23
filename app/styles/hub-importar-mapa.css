@@ -1,0 +1,175 @@
+/*
+ * Phase 3b · lane L1: the column-mapping steps of the import sheet («mapa», «conferir», the model chip's row).
+ * Every rule is scoped to .hub (tokens from styles/hub.css), never on a class another stylesheet defines.
+ * Imported by app/(hub)/layout.tsx after hub-importar.css; only lane L1 edits this file (contract §5.9).
+ * Measures from the approved board ImportarConta (IC l.162–188): .ler, .editor, .req, .col-linha, .col-nome, .chk,
+ * .pergunta .pill, .prev-lista, .prev-linha, .ops-lista. The tags «sugerida» / «nova» are hub.css's neutral
+ * .hub-tag--padrao; the pills, selects, notes, blocks and the checkbox row are hub.css's (44 px targets).
+ */
+
+/* «Separador: … · decimal …», «Datas: …» and «Mudar»; the model chip's row («Colunas do modelo “…”», «Mudar colunas») */
+.hub .hub-ler {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.hub .hub-ler .hub-chip-dado {
+  align-self: center;
+}
+
+/* «Mudar»'s panel (the board's .editor): «Separador», «Decimal», «Datas» */
+.hub .hub-ler-painel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px 14px 14px;
+  border-radius: 14px;
+  border: 1px dashed var(--neutral-border);
+}
+.hub .hub-ler-painel .hub-pill {
+  min-width: 44px;
+  text-align: center;
+}
+
+/* «Obrigatórias»: dashed while missing, mint once marked */
+.hub .hub-req {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  border-radius: 999px;
+  border: 1px dashed var(--text-2);
+  color: var(--text-2);
+  font-size: 12px;
+  font-weight: 700;
+}
+.hub .hub-req--ok {
+  border: 1px solid var(--mint-border);
+  color: var(--mint);
+}
+
+/* One row per column: the name with its tag and sample, the select with its check */
+.hub .hub-cols {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.hub .hub-col-linha {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.6fr);
+  gap: 4px 12px;
+  align-items: center;
+  padding: 8px 0;
+  border-top: 1px solid var(--border);
+}
+.hub .hub-col-nome {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.hub .hub-col-tit {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px 8px;
+  font-size: 13px;
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+/*
+ * The name and the tag's word as the approved renders draw them: the board's `.col-nome span` (12 px, --text-2) reaches
+ * the text inside `b` and `.tag` (the board's runtime wraps each value in a span), so the name is mono 12 px bold grey and
+ * the tag's word 12 px. The board's tag box is padding 0 7px where hub.css's neutral tag has 1px 8px: the word's −1px
+ * margin gives the board's 72 × 20 px box without a rule on .hub-tag, so an 11-character name keeps its tag on its line
+ * at 768 and 1280 (Pr. Entrada, Limit Price, Close Price), as on the board
+ */
+.hub .hub-col-tit b {
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-2);
+}
+.hub .hub-col-tag {
+  margin: -1px;
+  font-size: 12px;
+}
+.hub .hub-col-ex {
+  font-size: 12px;
+  color: var(--text-2);
+  overflow-wrap: anywhere;
+}
+.hub .hub-col-sel {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.hub .hub-col-sel .hub-sel {
+  width: 100%;
+  min-width: 0;
+}
+.hub .hub-chk {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--amber);
+  text-wrap: pretty;
+}
+
+/* The questions (dates, decimal, a side word, the end of the file, the net result): long pills wrap */
+.hub .hub-pergunta__tit {
+  font-weight: 700;
+}
+.hub .hub-pergunta .hub-pill {
+  padding: 8px 14px;
+  line-height: 1.35;
+  text-align: left;
+}
+
+/* «Confira 3 linhas»: the rows as the mapping reads them */
+.hub .hub-prev-lista {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.hub .hub-prev-linha {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 8px;
+  padding: 8px 12px;
+  border-radius: 12px;
+  background: var(--inset);
+  font-family: var(--mono);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+/* The pairing summary and «Ver as N operações» */
+.hub .hub-pareamento {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+}
+.hub .hub-pareamento__tit {
+  font-weight: 700;
+}
+/* The board's list keeps its bullets (the app's base styles take them off every list) */
+.hub .hub-ops-lista {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding-left: 18px;
+  list-style: disc;
+  font-size: 13px;
+}
+
+/* A phone: one column per row, the tag under the name when it does not fit */
+@media (max-width: 480px) {
+  .hub .hub-col-linha {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
