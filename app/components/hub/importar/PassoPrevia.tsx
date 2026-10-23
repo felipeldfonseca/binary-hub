@@ -81,7 +81,8 @@ export function SkippedLines({ titulo, lines }: { titulo: string; lines: readonl
         </Disclosure>
       </div>
       {shown && (
-        <ul id="linhas-puladas" className="hub-lista-linhas">
+        // The board's list (IC l.383): a bullet per line
+        <ul id="linhas-puladas" className="hub-lista-linhas hub-lista-linhas--pontos">
           {lines.map((l) => (
             <li key={`${l.line}-${l.motivo}`}>{PASSO_D.line(l.line, l.motivo)}</li>
           ))}

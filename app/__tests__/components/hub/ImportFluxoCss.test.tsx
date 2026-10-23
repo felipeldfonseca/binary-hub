@@ -48,7 +48,7 @@ describe('hub-importar.css', () => {
       if (f.endsWith('.css') && f !== 'hub-importar.css') classes(lerCss(f)).forEach((c) => outras.add(c))
     }
     const novas = Array.from(classes(css)).filter((c) => !outras.has(c))
-    expect(novas.sort()).toEqual(['hub-conta-linha', 'hub-conta-linha__txt', 'hub-contas-arquivo', 'hub-faixa24__banda--b3', 'hub-grupo-a'])
+    expect(novas.sort()).toEqual(['hub-conta-linha', 'hub-conta-linha__txt', 'hub-contas-arquivo', 'hub-faixa24__banda--b3', 'hub-grupo-a', 'hub-lista-linhas--pontos'])
     expect(css).not.toMatch(/\.hub-tag\b/)
     for (const { rule } of todas) {
       for (const s of rule.selectorText.split(',')) {
@@ -75,7 +75,7 @@ describe('hub-importar.css', () => {
     expect([g.getPropertyValue('display'), g.getPropertyValue('flex-direction'), g.getPropertyValue('gap')]).toEqual(['flex', 'column', '6px'])
   })
 
-  it('hc: rows wrap (text from 150 px, select from 170 px: stacked at 375), the board’s padding and top border', () => {
+  it('hc: rows wrap (text from 150 px, select from 170 px, one under the other below 330 px), the board’s padding and top border', () => {
     const linha = regra('.hub .hub-conta-linha')
     expect([linha.getPropertyValue('display'), linha.getPropertyValue('flex-wrap'), linha.getPropertyValue('gap'), linha.getPropertyValue('padding')]).toEqual([
       'flex',
@@ -88,8 +88,6 @@ describe('hub-importar.css', () => {
     expect([txt.getPropertyValue('flex'), txt.getPropertyValue('min-width'), txt.getPropertyValue('font-size')]).toEqual(['1 1 150px', '0', '13px'])
     const sel = regra('.hub .hub-conta-linha .hub-sel')
     expect([sel.getPropertyValue('flex'), sel.getPropertyValue('min-width')]).toEqual(['1 1 170px', '0'])
-    // 150 + 10 + 170 > 375 − 2 × 16 − the sheet's padding: one per line on a phone
-    expect(150 + 10 + 170).toBeGreaterThan(375 - 2 * 16 - 2 * 20)
   })
 
   it('c: the B3’s band, 09:00–18:30 of the 24 hours (board IC l.167), a modifier of hub.css’s band', () => {
@@ -99,6 +97,10 @@ describe('hub-importar.css', () => {
     expect((18.5 * 60 - 9 * 60) / (24 * 60)).toBeCloseTo(0.39583, 4)
     // Wins over hub.css's .hub-faixa24__banda (0,1,0) by specificity (0,2,0)
     expect(regra('.hub-faixa24__banda', rules(lerCss('hub.css'))).getPropertyValue('left')).toBe('39.583%')
+  })
+
+  it('d: «Ver linhas» lists each line with a bullet, as the board', () => {
+    expect(regra('.hub .hub-lista-linhas--pontos').getPropertyValue('list-style')).toBe('disc')
   })
 
   it('the new steps reuse the 44 px targets of the sheet (pills, selects, buttons, radios, the disclosure)', () => {

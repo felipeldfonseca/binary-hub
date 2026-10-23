@@ -44,3 +44,8 @@
   left: 37.5%;
   width: 39.583%;
 }
+
+/* d · «Ver linhas»: a bullet per line left out, as the board's list (IC l.383); a modifier of hub.css's list */
+.hub .hub-lista-linhas--pontos {
+  list-style: disc;
+}
