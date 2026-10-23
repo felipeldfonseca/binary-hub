@@ -9,7 +9,7 @@
  * they are dropped here.
  */
 import type { SupabaseClient } from '@supabase/supabase-js';
-import type { ImportCommitArgs, ImportPreviewArgs } from '@/lib/domain/import';
+import { templateFromRow, type ImportCommitArgs, type ImportPreviewArgs, type Template, type TemplatePayloadV1 } from '@/lib/domain/import';
 import { MARKET_SPEC } from '@/lib/domain/markets';
 import type { AccountMarket, AccountPhase, TradingAccount } from './contas';
 
@@ -29,6 +29,11 @@ export const RPC_ERROR_CODES = [
   'unknown_batch',
   'legacy_batch',
   'already_undone',
+  // Phase 3b (migrations 20261024000001/2): a mapped file's p_format, and import_template_save
+  'bad_format',
+  'bad_template',
+  'too_many_templates',
+  'unknown_template',
 ] as const;
 
 export const HUB_ERROR_CODES = [
@@ -319,6 +324,16 @@ export interface ImportPreviewResult {
   first_day: string | null;
   last_day: string | null;
   errors: RowError[];
+  /**
+   * Phase 3b (only when above 0): of `duplicate`, the rows of a mapped file without an ID column found by the same time and
+   * price («já estavam (mesma hora e preço)»)
+   */
+  duplicate_same?: number;
+  /**
+   * Phase 3b, G1 (only when above 0): new trades on days the account already holds trades of another file format («18
+   * operações caem em dias em que Top One já tem operações de outro formato de arquivo. …»)
+   */
+  other_source?: number;
   already_imported: boolean;
   tz_status: 'ok' | 'tz_not_confirmed' | 'tz_mismatch' | 'invalid_tz';
   account_tz: string;
@@ -341,6 +356,8 @@ export interface ImportCommitResult {
   trades?: number;
   grouped?: number;
   attached?: number;
+  /** Phase 3b (only when above 0): as the preview's */
+  duplicate_same?: number;
   errors: RowError[];
 }
 
@@ -384,3 +401,34 @@ export const importUndo = (db: SupabaseClient, batchId: string) => rpc<{ deleted
 
 export const importFixTz = (db: SupabaseClient, accountId: string, tz: string, dryRun: boolean) =>
   rpc<FixTzResult>(db, 'import_fix_tz', { p_account: accountId, p_new_tz: tz, p_dry_run: dryRun });
+
+// ---------------------------------------------------------------------------------------------
+// Column-mapping models (Phase 3b, import_templates; migration 20261024000001)
+// ---------------------------------------------------------------------------------------------
+
+/** What templateFromRow reads of an import_templates row (never user_id, created_at) */
+export const TEMPLATE_COLUMNS =
+  'id, name, header_sig, headers, header_skip, delimiter, decimal_mark, date_order, row_kind, columns, result_is_net, side_words, open_close_words, account_routes, tz_hint, last_used_at';
+
+/** The caller's models (RLS: own rows), most recently used first; a row templateFromRow cannot use is dropped */
+export async function fetchTemplates(db: SupabaseClient): Promise<Template[]> {
+  const rows = await run<unknown[]>(
+    db.from('import_templates').select(TEMPLATE_COLUMNS).order('last_used_at', { ascending: false, nullsFirst: false }),
+  );
+  return (rows ?? []).map(templateFromRow).filter((t): t is Template => t !== null);
+}
+
+/** import_template_save's answer */
+export interface TemplateSaved {
+  template_id: string;
+  header_sig: string;
+  created: boolean;
+}
+
+/**
+ * «Salvar como modelo» / «Atualizar o modelo “{nome}”», after the import's commit: `batchId` is the commit's batch (null
+ * when it made none), `replaces` the model «Atualizar o modelo» re-keys (null for a new model and for a touch). Its
+ * refusals are bad_template, too_many_templates, unknown_template, unknown_batch.
+ */
+export const saveTemplate = (db: SupabaseClient, payload: TemplatePayloadV1, batchId: string | null, replaces: string | null) =>
+  rpc<TemplateSaved>(db, 'import_template_save', { p_template: payload, p_batch: batchId, p_replaces: replaces });

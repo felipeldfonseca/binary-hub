@@ -4,3 +4,43 @@
  * scoped to .hub (tokens from styles/hub.css), never on a class another stylesheet defines. Imported by
  * app/(hub)/layout.tsx after hub-registrar-parciais.css; only lane L2 edits this file (contract §6.12).
  */
+
+/* a2 · «Para qual conta?»: one group per market, its name over its pills (board `.grupo-a`, IC l.176) */
+.hub .hub-grupo-a {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+/* hc · «N contas neste arquivo»: one row per «Conta» value (board `.conta-linha`, IC l.153–154) */
+.hub .hub-contas-arquivo {
+  display: flex;
+  flex-direction: column;
+}
+.hub .hub-conta-linha {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  padding: 6px 0;
+  border-top: 1px solid var(--border);
+}
+.hub .hub-conta-linha__txt {
+  flex: 1 1 150px;
+  min-width: 0;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+/* The select of a row: scoped under the row (hub.css's own .hub-sel is never restyled) */
+.hub .hub-conta-linha .hub-sel {
+  flex: 1 1 170px;
+  min-width: 0;
+}
+
+/* c · the B3's session band, 09:00–18:30 on Brasília's clock (board `.banda.b-b3`, IC l.167): a modifier of
+   hub.css's band, which keeps the US session (09:30–16:00 ET) */
+.hub .hub-faixa24__banda--b3 {
+  left: 37.5%;
+  width: 39.583%;
+}
