@@ -9,12 +9,20 @@ import {
   fetchActivity,
   fetchImportFormats,
   fetchPreferences,
+  fetchTemplates,
   importFixTz,
   importPreview,
   importUndo,
+  saveTemplate,
   setPrimary,
   toHubError,
+  RPC_ERROR_CODES,
+  TEMPLATE_COLUMNS,
+  type ImportCommitResult,
+  type ImportPreviewResult,
 } from '@/lib/hub/contasDb';
+import { templatePayload } from '@/lib/domain/import';
+import { MODELO_BLACKARROW_LINHA, MODELO_TRADOVATE_LINHA } from '@/testing/mapeadoTelas';
 import { CREATABLE_MARKETS, MARKET_SPEC } from '@/lib/domain/markets';
 
 type Call = unknown[];
@@ -204,5 +212,80 @@ describe('import functions', () => {
     expect(failure).toBeInstanceOf(HubDataError);
     expect((failure as HubDataError).code).toBe('tz_mismatch');
     expect((failure as HubDataError).message).not.toContain('12/03');
+  });
+});
+
+describe('Phase 3b · the column-mapping models (import_templates)', () => {
+  it('fetchTemplates reads the model columns, most recently used first, and drops a row it cannot use', async () => {
+    const quebrado = { ...MODELO_TRADOVATE_LINHA, id: 'x', row_kind: 'nada' };
+    const { db, log } = fakeDb(() => ({ data: [MODELO_BLACKARROW_LINHA, quebrado, MODELO_TRADOVATE_LINHA] }));
+    const models = await fetchTemplates(db);
+    expect(models.map((t) => [t.id, t.name])).toEqual([
+      [MODELO_BLACKARROW_LINHA.id, 'BlackArrow'],
+      [MODELO_TRADOVATE_LINHA.id, 'Tradovate'],
+    ]);
+    expect(log[0]).toEqual([
+      ['from', 'import_templates'],
+      ['select', TEMPLATE_COLUMNS],
+      ['order', 'last_used_at', { ascending: false, nullsFirst: false }],
+    ]);
+    // Never the owner or the dates the screens do not read
+    expect(TEMPLATE_COLUMNS).not.toMatch(/user_id|created_at|updated_at/);
+    await expect(fetchTemplates(fakeDb(() => ({ data: null })).db)).resolves.toEqual([]);
+  });
+
+  it('saveTemplate calls import_template_save with its argument names and answers what it saved', async () => {
+    const { db, log } = fakeDb(() => ({ data: { template_id: 't-1', header_sig: 'ab'.repeat(32), created: true } }));
+    const payload = templatePayload({
+      rowKind: 'trade',
+      headers: ['a', 'b'],
+      headerSkip: 0,
+      delimiter: ',',
+      decimalMark: 'point',
+      dateOrder: null,
+      columns: ['entry_time', 'symbol'],
+      resultIsNet: null,
+      sideWords: {},
+      openCloseWords: {},
+      name: 'Modelo',
+    });
+    await expect(saveTemplate(db, payload, 'lote-1', null)).resolves.toEqual({ template_id: 't-1', header_sig: 'ab'.repeat(32), created: true });
+    await saveTemplate(db, payload, null, 't-0');
+    expect(log[0][0]).toEqual(['rpc', 'import_template_save', { p_template: payload, p_batch: 'lote-1', p_replaces: null }]);
+    expect(log[1][0]).toEqual(['rpc', 'import_template_save', { p_template: payload, p_batch: null, p_replaces: 't-0' }]);
+  });
+
+  it.each(['bad_template', 'too_many_templates', 'unknown_template', 'unknown_batch', 'bad_format'] as const)(
+    'its refusal %s is a code of its own, never the database text',
+    async (code) => {
+      expect(RPC_ERROR_CODES).toContain(code);
+      const { db } = fakeDb(() => ({ error: { code: 'P0001', message: code, hint: 'account_routes', details: 'APX-0001' } }));
+      const failure = await saveTemplate(db, MODELO_BLACKARROW_LINHA as never, null, null).catch((e: unknown) => e);
+      expect(failure).toBeInstanceOf(HubDataError);
+      expect((failure as HubDataError).code).toBe(code);
+      expect(JSON.stringify(failure)).not.toContain('APX-0001');
+    },
+  );
+
+  it('the preview and the commit carry duplicate_same and other_source only when the database sends them', () => {
+    const preview: ImportPreviewResult = {
+      new: 18,
+      duplicate: 4,
+      duplicate_same: 4,
+      other_source: 18,
+      completable: 0,
+      other_account: 0,
+      day_changes: 0,
+      first_day: null,
+      last_day: null,
+      errors: [],
+      already_imported: false,
+      tz_status: 'ok',
+      account_tz: 'UTC',
+      tz_confirmed: true,
+      rows_total: 22,
+    };
+    const commit: ImportCommitResult = { batch_id: null, inserted: 0, duplicate: 4, duplicate_same: 4, completed: 0, other_account: 0, errors: [] };
+    expect([preview.duplicate_same, preview.other_source, commit.duplicate_same]).toEqual([4, 18, 4]);
   });
 });

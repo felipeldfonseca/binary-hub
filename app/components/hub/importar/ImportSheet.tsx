@@ -811,7 +811,6 @@ export default function ImportSheet({ mode, accountId, onClose }: { mode: SheetM
       rota: m.accountValue ? { valor: m.accountValue, contaId: target.id } : null,
     })
     if (s === null) return { tipo: 'naoSalvo', nome: m.nome.trim() || m.nomePadrao }
-    if (checkTemplate(s.payload) !== null) return { tipo: 'erro', nome: s.nome }
     let payload = s.payload
     if (result.batch_id === null) {
       if (s.tipo === 'tocado') return { tipo: 'tocado', nome: s.nome }
@@ -819,6 +818,12 @@ export default function ImportSheet({ mode, accountId, onClose }: { mode: SheetM
       if (s.tipo === 'atualizado' && modelo && Object.keys(modelo.accountRoutes).length > 0) return { tipo: 'semLote', nome: s.nome }
       payload = { ...payload, account_routes: {} }
     }
+    // The database's own check (its routes against the batch's account and the user's open accounts of its market)
+    const problema = checkTemplate(payload, {
+      batch: result.batch_id ? { sig: file.format.sig, market: target.market } : null,
+      accounts: accounts.map((a) => ({ id: a.id, market: a.market, archived: !!a.archived_at })),
+    })
+    if (problema !== null) return { tipo: 'erro', nome: s.nome }
     try {
       await saveTemplate(db, payload, result.batch_id, s.replaces)
       refresh()

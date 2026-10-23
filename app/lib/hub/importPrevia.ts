@@ -357,10 +357,15 @@ export function motivoDaLinha(
 export function paresDeAtivos(m: Mapeamento | null, file: ImportFile): { escrito: string; como: string }[] {
   const notice = file.notices.find((n): n is Extract<Notice, { code: 'symbol_normalised' }> => n.code === 'symbol_normalised')
   if (!notice || !m || file.platform !== 'modelo') return []
-  const i = escolhasDe(m).columns.indexOf('symbol')
+  const columns = escolhasDe(m).columns
+  const i = columns.indexOf('symbol')
   if (i < 0) return []
+  // With a «Conta» value imported, only its rows (the others are not imported)
+  const c = columns.indexOf('account')
+  const conta = c >= 0 && m.accountValue !== null ? accountKey(m.accountValue) : null
   const out: { escrito: string; como: string }[] = []
   for (const rec of m.lido.records) {
+    if (conta !== null && accountKey(rec.cells[c] ?? '') !== conta) continue
     const escrito = (rec.cells[i] ?? '').trim()
     if (!escrito || out.some((p) => p.escrito === escrito)) continue
     const s = readSymbol(escrito, file.market)
