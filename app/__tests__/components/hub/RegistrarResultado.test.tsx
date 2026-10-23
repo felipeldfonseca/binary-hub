@@ -197,7 +197,7 @@ describe('a server refusal under its field (FTMO, «Já fechada» at 09:01 ET)',
     await userEvent.click(screen.getByRole('button', { name: 'Registrar operação' }))
     await waitFor(() => expect(campo('Outro dia')).toHaveFocus())
     expect(db.registerAfter.mock.calls[0][2]).toMatchObject({ day: '2026-10-13', entry: '08:30', exit: '08:50' })
-    expect(screen.getByText('Antes de 13 out esta conta não tinha regras: essas operações entram pela importação por colunas, logo depois da Fase 3.')).toHaveAttribute(
+    expect(screen.getByText('Antes de 13 out esta conta não tinha regras: essas operações entram pela importação de arquivo.')).toHaveAttribute(
       'id',
       'e-dia',
     )

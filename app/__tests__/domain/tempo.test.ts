@@ -6,12 +6,14 @@ import {
   MON_TO_FRI,
   addDays,
   assertTimeZone,
+  assertZoneName,
   classifyLocalTime,
   firstLocalHmAtOrAfter,
   formatHhMm,
   hmOn,
   inWindow,
   isValidWindow,
+  isZoneName,
   isoWeekdayOf,
   localHmInTradingDay,
   localToUtc,
@@ -143,6 +145,18 @@ describe('input checks', () => {
   it('accepts UTC and Area/Location names, including Etc/GMT offsets', () => {
     for (const tz of ['UTC', 'Etc/UTC', 'Etc/GMT+3', 'America/Sao_Paulo', 'America/Argentina/Buenos_Aires', 'Europe/Paris']) {
       expect(() => assertTimeZone(tz)).not.toThrow();
+    }
+  });
+
+  it('a zone name as the database knows it, case and all (pg_timezone_names: name = …)', () => {
+    for (const tz of ['UTC', 'Etc/GMT+3', 'Etc/GMT-14', 'America/Sao_Paulo', 'America/New_York', 'America/Chicago', 'Europe/London', 'America/Port-au-Prince', 'Antarctica/DumontDUrville', 'Asia/Calcutta']) {
+      expect([tz, isZoneName(tz)]).toEqual([tz, true]);
+      expect(() => assertZoneName(tz)).not.toThrow();
+    }
+    // Intl reads any case; the database does not (an alias Intl rewrites is refused too, never looser)
+    for (const tz of ['america/new_york', 'AMERICA/SAO_PAULO', 'America/new_York', 'us/eastern', 'US/EASTERN', 'Us/Eastern', 'US/EAstern', 'utc', 'Utc', 'etc/utc', 'Etc/Utc', 'ETC/GMT+3', 'Asia/Ho_chi_minh', '', '-03:00', 'EST5EDT', 'GMT', 'Mars/Base']) {
+      expect([tz, isZoneName(tz)]).toEqual([tz, false]);
+      expect(() => assertZoneName(tz)).toThrow(RangeError);
     }
   });
 });

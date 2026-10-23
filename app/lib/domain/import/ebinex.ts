@@ -35,6 +35,7 @@ import type {
   EbinexColumn,
   EbinexIndex,
   ImportRow,
+  ReaderRow,
   LocalStamp,
   Notice,
   PlatformParse,
@@ -91,8 +92,8 @@ const cents = (n: Num) => toUnits({ ...n, neg: false }, 2);
 const exact = (n: Num, scale: number) => toUnits({ ...n, neg: false }, scale);
 const money = (units: bigint) => toDecimal(fromUnits(units, 2), 2);
 
-export function parseEbinexRecords(records: CsvRecord[], index: EbinexIndex, width: number): PlatformParse {
-  const out = new RowCollector();
+export function parseEbinexRecords(records: CsvRecord[], index: EbinexIndex, width: number): PlatformParse<ReaderRow> {
+  const out = new RowCollector<ReaderRow>();
   const offsets: UtcOffset[] = [];
   let offsetRows = 0;
   let unsignedLosses = 0;
@@ -265,7 +266,7 @@ export function parseEbinexRecords(records: CsvRecord[], index: EbinexIndex, wid
       if (exit === null) warn('vela_mismatch', 'Vela');
     }
 
-    const row: ImportRow = {
+    const row: ReaderRow = {
       line,
       external_id: id,
       symbol,
@@ -287,6 +288,7 @@ export function parseEbinexRecords(records: CsvRecord[], index: EbinexIndex, wid
       commission: '0.00',
       stop_price: null,
       target_price: null,
+      pnl_basis: 'file',
     };
     if (!out.accept(row, warnings)) continue;
 

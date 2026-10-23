@@ -21,7 +21,7 @@ import {
 } from './decimal';
 import type {
   Decimal,
-  ImportRow,
+  ReaderRow,
   LocalStamp,
   Notice,
   PlatformParse,
@@ -51,8 +51,8 @@ function level(text: string): Decimal | null | 'bad' {
   return integerDigits(d) > PRICE_DIGITS.int ? 'bad' : d;
 }
 
-export function parseTopOneRecords(records: CsvRecord[], index: TopOneIndex, width: number): PlatformParse {
-  const out = new RowCollector();
+export function parseTopOneRecords(records: CsvRecord[], index: TopOneIndex, width: number): PlatformParse<ReaderRow> {
+  const out = new RowCollector<ReaderRow>();
   let grossCents = ZERO;
   let commissionCents = ZERO;
   let anyCommission = false;
@@ -171,7 +171,7 @@ export function parseTopOneRecords(records: CsvRecord[], index: TopOneIndex, wid
     if (slash >= 0 && ticket.slice(0, slash) !== symbol) warn('ticket_symbol_mismatch');
 
     const pnlUnits = toUnits(pnlN, MONEY_DIGITS.scale);
-    const row: ImportRow = {
+    const row: ReaderRow = {
       line,
       external_id: ticket,
       symbol,
@@ -193,6 +193,7 @@ export function parseTopOneRecords(records: CsvRecord[], index: TopOneIndex, wid
       commission,
       stop_price: sl,
       target_price: tp,
+      pnl_basis: 'file',
     };
     if (!out.accept(row, warnings)) continue;
 

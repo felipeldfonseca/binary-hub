@@ -135,3 +135,192 @@ export function compareNum(a: Num, b: Num): number {
   const d = toUnits(a, scale) - toUnits(b, scale);
   return d === ZERO ? 0 : d < ZERO ? -1 : 1;
 }
+
+// ---------------------------------------------------------------------------------------------
+// Numbers of a mapped file (Phase 3b): either decimal mark, decided once per file
+// ---------------------------------------------------------------------------------------------
+
+/** The decimal mark of a file: 'point' (1,234.56) or 'comma' (1.234,56). The other mark groups thousands. */
+export type DecimalMark = 'point' | 'comma';
+
+const UNICODE_MINUS = /−/g;
+const SPACES = /[\s  ]+/g;
+// [sign] [US$ | R$ | $] [sign] body [USD | BRL]; the body is checked against the mark afterwards
+const LOCALE_NUMBER = /^([+-])?(?:US\$|R\$|\$)?([+-])?([0-9.,]+)(?:USD|BRL)?$/i;
+const PARENS = /^(?:US\$|R\$|\$)?\((.+)\)$/i;
+// A number followed by an asset code: '0.0125BTC', '1.41USDT', '(3.50) BNB'
+const ASSET_SUFFIX = /^(.*[0-9)])\s*([A-Za-z]{2,10})$/;
+// Spaces may stand between the sign, the currency and the digits (never inside the digits)
+const LEAD = /^([+-]?)\s*((?:US|R)?\$)?\s*([+-]?)\s*/i;
+const TRAIL = /\s*(USD|BRL)$/i;
+
+function markChars(mark: DecimalMark): { decimal: string; group: string } {
+  return mark === 'point' ? { decimal: '.', group: ',' } : { decimal: ',', group: '.' };
+}
+
+/** The body (digits and marks) read with `mark`: plain or grouped in threes, then decimals */
+function readBody(body: string, mark: DecimalMark): { units: string; frac: string } | null {
+  const { decimal, group } = markChars(mark);
+  const at = body.indexOf(decimal);
+  const intPart = at < 0 ? body : body.slice(0, at);
+  const frac = at < 0 ? '' : body.slice(at + 1);
+  if (at >= 0 && !/^[0-9]+$/.test(frac)) return null;
+  if (/^[0-9]+$/.test(intPart)) return { units: intPart, frac };
+  const groups = intPart.split(group);
+  if (groups.length < 2 || !/^[0-9]{1,3}$/.test(groups[0]) || groups.slice(1).some((g) => !/^[0-9]{3}$/.test(g))) {
+    return null;
+  }
+  return { units: groups.join(''), frac };
+}
+
+/** Sign, currency and body of a cell; null when it is not shaped like a number */
+function numberParts(text: string): { paren: boolean; sign: '+' | '-' | null; body: string } | null {
+  let t = text.trim();
+  if (t.length === 0 || t.length > MAX_TEXT) return null;
+  t = t.replace(UNICODE_MINUS, '-');
+  let paren = false;
+  const p = PARENS.exec(t.replace(SPACES, ''));
+  if (p) {
+    paren = true;
+    t = p[1];
+  }
+  const m = LOCALE_NUMBER.exec(t.replace(LEAD, '$1$2$3').replace(TRAIL, '$1'));
+  if (!m || (m[1] && m[2])) return null;
+  const sign = (m[1] ?? m[2] ?? null) as '+' | '-' | null;
+  if (paren && sign) return null;
+  return { paren, sign: paren ? '-' : sign, body: m[3] };
+}
+
+/**
+ * A number as a broker's CSV writes it, with the file's decimal mark: '−39,98', '(39,98)',
+ * '$(13.75)', 'R$ 1.234,56', '1,234.56 USD', '+$9.00'. Accepted: one sign (+, - or the Unicode
+ * minus), or accounting parentheses for a negative; '$', 'US$' or 'R$' before, 'USD' or 'BRL'
+ * after; thousands grouped in threes by the other mark. Refused (null): a percentage, two signs,
+ * scientific notation, a mark at either end ('.5', '5.'), spaces inside the digits, more than 64
+ * characters, empty text.
+ */
+export function parseNumLocale(text: string, mark: DecimalMark): Num | null {
+  const parts = numberParts(text);
+  if (!parts) return null;
+  const body = readBody(parts.body, mark);
+  if (!body) return null;
+  return { neg: parts.sign === '-', units: BigInt(body.units + body.frac), scale: body.frac.length, sign: parts.sign };
+}
+
+/**
+ * A cell that may end in an asset code ('0.0125BTC', '1.41USDT', '0.0003BNB'): the number with
+ * the file's mark, and the code in upper case (null when there is none). 'USD' and 'BRL' are read
+ * by parseNumLocale itself.
+ */
+export function parseAmountCell(text: string, mark: DecimalMark): { num: Num | null; asset: string | null } {
+  const t = text.trim();
+  const s = ASSET_SUFFIX.exec(t);
+  if (s && !/^(USD|BRL)$/i.test(s[2])) return { num: parseNumLocale(s[1], mark), asset: s[2].toUpperCase() };
+  return { num: parseNumLocale(t, mark), asset: null };
+}
+
+/**
+ * What one cell says about the file's decimal mark (R6):
+ * - 'point' / 'comma': the cell decides. Both marks present → the last is the decimal («1.234,56»,
+ *   «1,234.56»); one mark followed by other than exactly three digits («88,50», «1.5»); a mark
+ *   repeated groups thousands («1.234.567» → comma); a single mark and three digits with a zero
+ *   or more than three digits before it («0.250», «1234.567»);
+ * - 'ambiguous': one mark, exactly three digits after it, one to three digits before it that do
+ *   not start with 0 («131.250», «1,234»): either reading is a number, so it never decides;
+ * - 'neutral': an integer;
+ * - null: not a number at all (a date, a word).
+ */
+export function decimalEvidence(text: string): DecimalMark | 'ambiguous' | 'neutral' | null {
+  const t = text.trim();
+  const s = ASSET_SUFFIX.exec(t);
+  const parts = numberParts(s && !/^(USD|BRL)$/i.test(s[2]) ? s[1] : t);
+  if (!parts || !/[0-9]/.test(parts.body)) return null;
+  const body = parts.body;
+  const dots = body.split('.').length - 1;
+  const commas = body.split(',').length - 1;
+  if (dots === 0 && commas === 0) return 'neutral';
+  if (dots > 0 && commas > 0) {
+    const mark: DecimalMark = body.lastIndexOf('.') > body.lastIndexOf(',') ? 'point' : 'comma';
+    return readBody(body, mark) ? mark : null;
+  }
+  const char = dots > 0 ? '.' : ',';
+  const asDecimal: DecimalMark = char === '.' ? 'point' : 'comma';
+  const asThousands: DecimalMark = char === '.' ? 'comma' : 'point';
+  if (dots + commas > 1) return readBody(body, asThousands) ? asThousands : null;
+  const [before, after] = body.split(char);
+  if (!/^[0-9]+$/.test(before) || !/^[0-9]+$/.test(after)) return null;
+  if (after.length !== 3 || before.length > 3 || before[0] === '0') return asDecimal;
+  return 'ambiguous';
+}
+
+/** «Como ler os números deste arquivo?»: one of the file's own cells, read both ways */
+export interface DecimalQuestion {
+  /** A cell of the file (shown in the browser only, never sent) */
+  sample: string;
+  /** The sample read with each mark (comma first: «.» groups thousands); null when that reading is not a number */
+  readings: { mark: DecimalMark; value: Decimal | null }[];
+  /** The `;` separator pre-selects the comma (where «.» groups thousands); otherwise nothing is pre-selected */
+  preselect: DecimalMark | null;
+}
+
+export interface DecimalDecision {
+  /** The mark the deciding cells agree on; null when none decides, or when they disagree */
+  decided: DecimalMark | null;
+  /** Some cell reads as a number either way, with different values */
+  ambiguous: boolean;
+  /** Deciding cells disagree */
+  conflict: boolean;
+  /** The mark when nothing decides and nothing is ambiguous (both read the same): ';' → comma, else point */
+  fallback: DecimalMark;
+  /** Asked when nothing decides and a cell is ambiguous, or when deciding cells disagree */
+  question: DecimalQuestion | null;
+}
+
+/**
+ * The decimal mark of a file, decided once from the cells of its number columns (R6): deciding
+ * cells that agree fix it for every column; ambiguous cells («131.250») never decide; integers are
+ * neutral. Nothing decides while an ambiguous cell exists, or deciding cells disagree → the
+ * question. No ambiguous cell and nothing decides → both marks read the same numbers, and the
+ * separator picks (';' → comma).
+ */
+export function decideDecimalMark(cells: readonly string[], delimiter: ',' | ';' | '\t'): DecimalDecision {
+  let point = 0;
+  let comma = 0;
+  let ambiguousSample: string | null = null;
+  let firstPoint: string | null = null;
+  let firstComma: string | null = null;
+  for (const raw of cells) {
+    const e = decimalEvidence(raw);
+    if (e === 'point') {
+      point++;
+      if (firstPoint === null) firstPoint = raw.trim();
+    } else if (e === 'comma') {
+      comma++;
+      if (firstComma === null) firstComma = raw.trim();
+    } else if (e === 'ambiguous' && ambiguousSample === null) {
+      ambiguousSample = raw.trim();
+    }
+  }
+  const fallback: DecimalMark = delimiter === ';' ? 'comma' : 'point';
+  const conflict = point > 0 && comma > 0;
+  const decided: DecimalMark | null = conflict ? null : point > 0 ? 'point' : comma > 0 ? 'comma' : null;
+  const ambiguous = ambiguousSample !== null;
+  let question: DecimalQuestion | null = null;
+  if (decided === null && (ambiguous || conflict)) {
+    // A conflict shows a cell of the smaller side: the one a single reading would get wrong
+    const sample = ambiguousSample ?? (point <= comma ? firstPoint : firstComma) ?? '';
+    const read = (mark: DecimalMark): Decimal | null => {
+      const n = parseAmountCell(sample, mark).num;
+      return n ? toDecimal(n, n.scale) : null;
+    };
+    question = {
+      sample,
+      readings: [
+        { mark: 'comma', value: read('comma') },
+        { mark: 'point', value: read('point') },
+      ],
+      preselect: delimiter === ';' ? 'comma' : null,
+    };
+  }
+  return { decided, ambiguous, conflict, fallback, question };
+}

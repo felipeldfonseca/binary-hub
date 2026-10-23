@@ -9,7 +9,8 @@
  *               broker position (a partial exit is one row per exit); any other row (a binary, no
  *               exit, no entry price) is its own. A position speaks through its first exit (by
  *               exit, line, row) and its whole size;
- *   candidates  same account, an app trade without a broker ID, the same instrument
+ *   candidates  same account, an app trade without a broker ID and without an option contract (a
+ *               file row carries none, Phase 3b), the same instrument
  *               (tradeMatchKey: MESM6 = MES) and side, any size, and the app entry between 2
  *               minutes before and 16 minutes after the file's (a live entry is typed to the
  *               minute and may be registered up to 15 minutes late; a «Já fechada» entry, typed
@@ -38,9 +39,10 @@
  * exits), which is the database's alone.
  *
  * What a linked row writes on its app trade (import_link_patch, decision 2: the file wins on
- * money): the file's key, every money column it states otherwise, and, on an open trade, the
- * exit when it already happened, at the file's exit or, when the file exited before the typed
- * entry, at the entry.
+ * money): the file's key (and the legacy «notes» key for the Ebinex and Top One readers only, Phase
+ * 3b), every money column it states otherwise, and, on an open trade, the exit when it already
+ * happened, at the file's exit or, when the file exited before the typed entry, at the entry; the
+ * result keeps the row's basis (a mapped row's result from the prices stays 'prices' / 'estimate').
  *
  * And the other way round (trade_similar, D30 «Esta operação parece já ter vindo do arquivo»): the
  * import's match seen from the trade being registered. An imported trade of the account with the
@@ -89,6 +91,8 @@ export interface MatchTrade {
   stake: string | null;
   /** Its entry price (Postgres text): trades of the same entry share it. Absent or null: never one */
   entryPrice?: string | null;
+  /** It has an option contract (trades.option_right): never a file row's (Phase 3b) */
+  option?: boolean;
 }
 
 /** numeric equality; a null (or anything that is not a decimal) on either side never matches */
@@ -106,7 +110,7 @@ const expiryIsExit = (t: MatchTrade, r: MatchRow) => t.expiresAt !== null && r.e
 
 /** Whether a row and a trade are candidates (import_stage's join) */
 export function canLink(market: string, r: MatchRow, t: MatchTrade): boolean {
-  if (t.direction !== r.direction) return false;
+  if (t.direction !== r.direction || t.option) return false;
   const gap = t.entryTime.getTime() - r.entryTime.getTime();
   const before = t.origin === 'reconstructed' ? MATCH_BEFORE_RECONSTRUCTED_MS : MATCH_BEFORE_MS;
   if (gap < -before || gap > MATCH_AFTER_MS) return false;
@@ -201,7 +205,7 @@ function registeredPerExit(market: string, links: ReadonlyMap<Unit, MatchTrade>,
     if (!tq || !fq || cmp(tq, fq) === 0) continue;
     const p = u.first;
     const twin = trades.some((o) => {
-      if (o.id === t.id || taken.has(o.id) || o.direction !== p.direction) return false;
+      if (o.id === t.id || taken.has(o.id) || o.direction !== p.direction || o.option) return false;
       if (!sameAmount(o.entryPrice ?? null, t.entryPrice ?? null)) return false;
       const g = o.entryTime.getTime() - p.entryTime.getTime();
       const before = o.origin === 'reconstructed' ? MATCH_BEFORE_RECONSTRUCTED_MS : MATCH_BEFORE_MS;
@@ -270,6 +274,8 @@ export interface LinkTrade extends LinkValues {
 export interface LinkRow extends LinkValues {
   externalId: string;
   exitTime: Date | null;
+  /** Where its result comes from (absent: the file's, as every reader row) */
+  pnlBasis?: 'file' | 'prices' | 'estimate';
 }
 
 /** What the link writes on the trade (only the columns present change) */
@@ -280,7 +286,7 @@ export interface LinkSet extends Partial<Record<LinkMoneyColumn, string | null>>
   exit_time?: Date;
   result?: string;
   status?: 'closed';
-  pnl_basis?: 'file';
+  pnl_basis?: 'file' | 'prices' | 'estimate';
 }
 
 export interface LinkPatch {
@@ -307,10 +313,12 @@ const amount = (x: string | null) => (x === null ? null : parseNumeric(x));
 export function linkPatch(trade: LinkTrade, row: LinkRow, platform: string, now: Date): LinkPatch {
   const set: LinkSet = {};
   const differs: LinkDiffColumn[] = [];
+  const basis = row.pnlBasis ?? 'file';
   if (trade.externalId === null) {
     set.source_platform = platform;
     set.external_id = row.externalId;
-    set.notes = `${platform}:${row.externalId}`;
+    // The legacy key: the readers' only (a mapped file's trades carry none)
+    if (platform === 'ebinex' || platform === 'topone') set.notes = `${platform}:${row.externalId}`;
   }
   const money = (k: LinkMoneyColumn) => {
     const file = amount(row[k]);
@@ -329,14 +337,14 @@ export function linkPatch(trade: LinkTrade, row: LinkRow, platform: string, now:
     set.pnl = row.pnl;
     set.result = row.result!;
     set.status = 'closed';
-    set.pnl_basis = 'file';
+    set.pnl_basis = basis;
   } else if (trade.status === 'closed') {
     LINK_CLOSED_COLUMNS.forEach(money);
     if (row.result !== null && row.result !== trade.result) {
       set.result = row.result;
       if (trade.result !== null) differs.push('result');
     }
-    if ('pnl' in set || 'result' in set) set.pnl_basis = 'file';
+    if ('pnl' in set || 'result' in set) set.pnl_basis = basis;
   }
   return { set, differs, closes, setKey: trade.externalId === null };
 }

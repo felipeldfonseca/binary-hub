@@ -43,8 +43,8 @@ export function contaParaRegistrar(current: TradingAccount | null, active: reado
  * /diario?registrar=1 (a home-screen shortcut, the old dashboard's button) opens the Registrar
  * sheet, and wins when both are asked (one sheet at a time).
  *
- * Fase 2b: no file of the new markets is read yet (MARKET_SPEC[m].reader), so with such an account
- * in context the sheet opens without an account («Escolha o arquivo»), never on that account.
+ * Fase 2b kept the new markets' accounts out of the import; Phase 3b (E53): every market reads a file (a
+ * reader's, or the column mapping: MARKET_SPEC[m].mapping), so the sheet opens on the current account.
  * Phase 3: «Registrar operação» for an account that can register (podeRegistrar: every market since
  * 3-4, the end of D36); hidden while the accounts load, after a failed read and in the empty state.
  */
@@ -64,8 +64,9 @@ export default function DiarioCabecalho() {
   const wantsRegistrar = searchParams?.get('registrar') === '1'
   const currentId = conta.current?.id ?? null
   const canRegister = !conta.isLoading && !conta.isError && !!conta.current && podeRegistrar(conta.current.market)
-  // The account the import starts on: the current one, when a reader exists for its market
-  const importId = conta.current && MARKET_SPEC[conta.current.market].reader ? conta.current.id : null
+  // The account the import starts on: the current one, when its market reads a file (Phase 3b: every market)
+  const importId =
+    conta.current && (MARKET_SPEC[conta.current.market].reader || MARKET_SPEC[conta.current.market].mapping) ? conta.current.id : null
   const rulesNow = useRulesNow()
   const rulesFailed = rulesNowFailed(rulesNow)
 

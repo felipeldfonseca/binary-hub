@@ -8,7 +8,7 @@ import {
   TOPONE_COLUMNS,
   type CanonicalColumn,
   type EbinexIndex,
-  type Platform,
+  type ReaderPlatform,
   type TopOneIndex,
 } from './types';
 
@@ -24,12 +24,12 @@ export type Detection =
       platform: null;
       error: 'unknown_format' | 'missing_columns' | 'duplicate_columns';
       /** The platform the header matched best, when at least half of its columns were found */
-      best?: Platform;
+      best?: ReaderPlatform;
       missing?: CanonicalColumn[];
     };
 
 interface Match {
-  platform: Platform;
+  platform: ReaderPlatform;
   total: number;
   index: Partial<Record<CanonicalColumn, number>>;
   found: number;
@@ -37,7 +37,7 @@ interface Match {
   duplicated: boolean;
 }
 
-function match(platform: Platform, columns: readonly CanonicalColumn[], header: string[]): Match {
+function match(platform: ReaderPlatform, columns: readonly CanonicalColumn[], header: string[]): Match {
   const index: Partial<Record<CanonicalColumn, number>> = {};
   const missing: CanonicalColumn[] = [];
   let found = 0;
@@ -56,6 +56,29 @@ function match(platform: Platform, columns: readonly CanonicalColumn[], header: 
     }
   }
   return { platform, total: columns.length, index, found, missing, duplicated };
+}
+
+/** How close a header comes to a reader's columns: the best of the two, by share of names found */
+export interface ReaderMatch {
+  platform: ReaderPlatform;
+  /** Our names the header lacks */
+  missing: CanonicalColumn[];
+  /** How many of our names appear more than once */
+  repeated: number;
+  found: number;
+  total: number;
+}
+
+export function bestReaderMatch(header: string[]): ReaderMatch {
+  const names = header.map((h) => {
+    const n = normalizeHeader(h);
+    return ALIASES[n] ?? n;
+  });
+  const candidates = [match('ebinex', EBINEX_COLUMNS, names), match('topone', TOPONE_COLUMNS, names)];
+  const best = candidates.reduce((a, b) => (b.found / b.total > a.found / a.total ? b : a));
+  const columns = best.platform === 'ebinex' ? EBINEX_COLUMNS : TOPONE_COLUMNS;
+  const repeated = (columns as readonly CanonicalColumn[]).filter((c) => names.filter((h) => h === normalizeHeader(c)).length > 1).length;
+  return { platform: best.platform, missing: best.missing, repeated, found: best.found, total: best.total };
 }
 
 /**

@@ -175,15 +175,22 @@ const pad = (n: number) => String(n).padStart(2, '0');
 
 /**
  * «entradas HH:MM–HH:MM» if the file's times were on `fileTz`, read on `displayTz`'s clock.
- * Rows that state their own offset are placed by it.
+ * Rows that state their own offset are placed by it. `faixa` is the span rule: the readers' usual
+ * hours (entrySpan, p10–p90); Phase 3b's mapped files pass the first to the last entry
+ * (lib/hub/importPrevia faixaToda, as the board's captions).
  */
-export function displaySpan(rows: readonly ImportRow[], fileTz: string, displayTz: string): { from: string; to: string } | null {
+export function displaySpan(
+  rows: readonly ImportRow[],
+  fileTz: string,
+  displayTz: string,
+  faixa: (rows: ImportRow[]) => { from: string; to: string } | null = entrySpan,
+): { from: string; to: string } | null {
   const shifted = rows.map((row) => {
     const l = utcToLocal(previewInstant(row, fileTz).instant, displayTz);
     const local_entry = `${l.year}-${pad(l.month)}-${pad(l.day)}T${pad(l.hour)}:${pad(l.minute)}:${pad(l.second)}`;
     return { ...row, local_entry, utc_offset: null };
   });
-  return entrySpan(shifted);
+  return faixa(shifted);
 }
 
 /** The 48 half-hour bars of a zone option, as heights from 0 to 1. */

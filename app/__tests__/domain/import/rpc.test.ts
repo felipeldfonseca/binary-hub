@@ -16,13 +16,24 @@ import {
   ROW_WARNING_CODES,
   TOPONE_COLUMNS,
   buildImportArgs,
+  countUnit,
   decodeCsvBytes,
+  formatProblem,
   parseImportText,
+  parseMappedRecords,
   previewArgs,
+  sniffDateOrder,
+  sniffDecimalMark,
+  sniffFile,
+  suggestColumns,
+  type FieldKey,
   type ImportRow,
+  type ImportFile,
+  type MappedFile,
   type ParsedFile,
   type Platform,
 } from '@/lib/domain/import';
+import type { AccountMarket } from '@/lib/domain';
 
 const DIR = path.join(__dirname, 'fixtures');
 const SHA = 'a'.repeat(64);
@@ -50,13 +61,21 @@ function serverRejects(platform: Platform, r: ImportRow): string[] {
   };
   const text = (v: unknown) => (v === null || v === undefined ? null : String(v));
   check('line', LINE.test(String(r.line)));
-  check('external_id', EXTERNAL_ID.test(r.external_id));
+  // A mapped row may come without an ID (the database derives one); a real one never starts with «@»
+  check(
+    'external_id',
+    r.external_id === null ? platform === 'modelo' : EXTERNAL_ID.test(r.external_id) && !(platform === 'modelo' && r.external_id.startsWith('@')),
+  );
   check('symbol', r.symbol.trim().length >= 1 && Array.from(r.symbol.trim()).length <= 40);
   if (platform === 'ebinex') {
     check('asset_type', r.asset_type === 'binary_option' && (r.direction === 'call' || r.direction === 'put'));
-  } else {
+  } else if (platform === 'topone') {
     check('asset_type', r.asset_type === 'futures' && (r.direction === 'long' || r.direction === 'short'));
+  } else {
+    // 'modelo': the database derives asset_type from the instrument
+    check('asset_type', r.asset_type === null && (r.direction === 'long' || r.direction === 'short'));
   }
+  check('pnl_basis', platform === 'modelo' ? ['file', 'prices', 'estimate'].indexOf(r.pnl_basis) >= 0 : r.pnl_basis === 'file');
   check('local_entry', STAMP.test(r.local_entry));
   check('local_exit', r.local_exit === null || STAMP.test(r.local_exit));
   check('utc_offset', r.utc_offset === null || OFFSET.test(r.utc_offset));
@@ -75,7 +94,7 @@ function serverRejects(platform: Platform, r: ImportRow): string[] {
   return bad;
 }
 
-function args(out: ParsedFile, fileTz = out.fileTzHint) {
+function args(out: ImportFile, fileTz = out.fileTzHint ?? 'UTC') {
   return buildImportArgs({
     accountId: ACCOUNT,
     platform: out.platform,
@@ -86,7 +105,7 @@ function args(out: ParsedFile, fileTz = out.fileTzHint) {
   });
 }
 
-function assertServerAccepts(out: ParsedFile) {
+function assertServerAccepts(out: ImportFile) {
   const a = args(out);
   // What actually travels is JSON
   const sent = JSON.parse(JSON.stringify(a));
@@ -243,5 +262,127 @@ describe('buildImportArgs', () => {
     expect(() => buildImportArgs({ ...base, fileTz: '-03:00' })).toThrow(RangeError);
     expect(() => buildImportArgs({ ...base, fileTz: 'Mars/Olympus' })).toThrow(RangeError);
     expect(() => buildImportArgs({ ...base, accountId: '' })).toThrow(RangeError);
+  });
+
+  it('a reader\'s file never sends p_format: today\'s calls stay as they are', () => {
+    expect(args(out)).not.toHaveProperty('p_format');
+    expect(previewArgs(args(out))).not.toHaveProperty('p_format');
+  });
+});
+
+/** A mapped file, read with the pre-fill from its names (and a few choices) */
+function mappedFile(text: string, kind: 'trade' | 'fill', market: AccountMarket, over: Partial<Record<string, FieldKey>> = {}, net: boolean | null = null): MappedFile {
+  const s = sniffFile(text);
+  if (!s.ok) throw new Error(s.error);
+  const suggested = suggestColumns(s.headers, kind, market);
+  const columns = s.headers.map((h, i) => (h in over ? over[h] ?? null : suggested[i]));
+  const dec = sniffDecimalMark(s.records, columns, s.delimiter);
+  const out = parseMappedRecords({
+    records: s.records,
+    choices: {
+      rowKind: kind,
+      headers: s.headers,
+      headerSkip: s.headerSkip,
+      delimiter: s.delimiter,
+      decimalMark: dec.decided ?? dec.fallback,
+      dateOrder: sniffDateOrder(s.records, columns).decided ?? 'dmy',
+      columns,
+      resultIsNet: net,
+      sideWords: {},
+      openCloseWords: {},
+    },
+    market,
+    templateId: '11111111-2222-4333-8444-555555555555',
+  });
+  if (!out.ok) throw new Error(out.error);
+  return out;
+}
+
+describe('mapped files (Phase 3b): p_platform modelo and p_format', () => {
+  const files: [string, MappedFile][] = [
+    [
+      'the board sample, net, no exit time',
+      mappedFile(
+        'Data/Hora;Papel;C/V;Qtd;Pr. Entrada;Pr. Saída;Res. Líq.;Corretagem;Nº Negócio\n01/10/2026 09:34:31;MESZ6;C;2;6.801,00;6.797,25;-39,98;2,48;83395\n01/10/2026 09:35:54;MNQZ6;V;1;25.129,50;25.124,75;8,26;1,24;49089\n13/10/2026 10:00:00;MESZ6;C;1;bad;6.797,25;-39,98;2,48;83396',
+        'trade',
+        'futures',
+        {},
+        true,
+      ),
+    ],
+    [
+      'prices only, no ID (the database keys), forex estimate',
+      mappedFile('Open Time,Symbol,Side,Volume,Open Price,Close Price\n2026-10-14 08:40:12,USDJPY,BUY,0.50,151.200,151.350\n2026-10-14 08:41:12,EURUSD,SELL,1.00,1.08710,1.08745', 'trade', 'forex'),
+    ],
+    [
+      'executions with a realized result (Binance USDⓈ-M), merged fills and a fee in BNB',
+      mappedFile(
+        'Date(UTC),Symbol,Side,Price,Quantity,Amount,Fee,Realized Profit\n2026-10-15 13:05:40,BTCUSDT,BUY,111850.1,0.010,1118.50,0.44740000USDT,0\n2026-10-15 13:05:40,BTCUSDT,BUY,111850.7,0.003,335.55,0.13420000USDT,0\n2026-10-15 13:41:27,BTCUSDT,SELL,112050.0,0.013,1456.65,0.0005BNB,2.59123456',
+        'fill',
+        'crypto',
+        { 'Realized Profit': 'realized' },
+      ),
+    ],
+    [
+      'executions with UTC in the header',
+      mappedFile('Date(UTC),Pair,Side,Price,Executed,Fee,Trade ID\n2026-10-11 00:05:12,BTCUSDT,BUY,112400.00,0.0125BTC,1.41USDT,8812001\n2026-10-11 00:21:40,BTCUSDT,SELL,112952.00,0.0125BTC,1.41USDT,8812003\n2026-10-11 00:22:00,ETHUSDT,SELL,4100,0.1ETH,0.4USDT,8812004', 'fill', 'crypto'),
+    ],
+  ];
+
+  it.each(files)('%s: every row passes the server\'s patterns', (_, out) => {
+    expect(out.rows.length).toBeGreaterThan(0);
+    assertServerAccepts(out);
+  });
+
+  it('the bases: the file\'s result, the prices, an estimate', () => {
+    expect(files[0][1].rows.map((r) => r.pnl_basis)).toEqual(['file', 'file']);
+    expect(files[1][1].rows.map((r) => [r.pnl_basis, r.external_id])).toEqual([
+      ['estimate', null],
+      ['prices', null],
+    ]);
+  });
+
+  it('commit and preview carry the format; the slices count, never the lines', () => {
+    const out = files[3][1];
+    const a = args(out);
+    expect(a.p_platform).toBe('modelo');
+    expect(a.p_format).toEqual({ sig: out.format.sig, template: '11111111-2222-4333-8444-555555555555' });
+    expect(previewArgs(a).p_format).toEqual(a.p_format);
+    expect(a.p_rows_total).toBe(out.rows.length + out.errors.length);
+    expect(a.p_rows.map((r) => r.external_id)).toEqual(['8812001>8812003']);
+    expect(a.p_errors).toEqual([{ line: 4, code: 'unbalanced_symbol' }]);
+  });
+
+  it('what the counts are in: lines for a reader\'s file and a trade file, exits for executions', () => {
+    const reader = parseImportText(fs.readFileSync(path.join(DIR, 'ebinex_atual_erros.csv'), 'utf8'));
+    if (!reader.ok) throw new Error(reader.error);
+    expect([countUnit(reader), countUnit(files[0][1]), countUnit(files[2][1]), countUnit(files[3][1])]).toEqual(['line', 'line', 'exit', 'exit']);
+  });
+
+  it('a merged average price and a realized result to the cent', () => {
+    const out = files[2][1];
+    expect(out.rows.map((r) => [r.entry_price, r.quantity, r.pnl, r.pnl_basis, r.commission])).toEqual([['111850.23846154', '0.013', '2.59', 'file', null]]);
+  });
+
+  it('refuses a mapped file whose format is not a signature and a model id', () => {
+    const out = files[0][1];
+    const base = { accountId: ACCOUNT, platform: 'modelo' as Platform, fileName: 'f.csv', sha256: SHA, fileTz: 'UTC' };
+    expect(() => buildImportArgs({ ...base, outcome: { ...out, format: { sig: 'x', template: null } } })).toThrow(RangeError);
+    expect(() => buildImportArgs({ ...base, outcome: { ...out, format: { sig: out.format.sig, template: 'model-1' } } })).toThrow(RangeError);
+    expect(buildImportArgs({ ...base, outcome: { ...out, format: { sig: out.format.sig, template: null } } }).p_format).toEqual({ sig: out.format.sig, template: null });
+    expect(() => buildImportArgs({ ...base, platform: 'topone', outcome: out })).toThrow(RangeError);
+    // Never into binaries (import_check_platform's wrong_market)
+    expect(() => buildImportArgs({ ...base, outcome: { ...out, market: 'binary' } })).toThrow(RangeError);
+  });
+
+  it('formatProblem is import_check_format\'s refusal', () => {
+    const sig = 'a'.repeat(64);
+    const id = '11111111-2222-4333-8444-555555555555';
+    expect([formatProblem({ sig }), formatProblem({ sig, template: null }), formatProblem({ sig, template: id }), formatProblem({ sig, template: id.toUpperCase() }, [id])]).toEqual([null, null, null, null]);
+    for (const bad of [null, [], 'x', { template: null }, { sig: sig.toUpperCase() }, { sig: sig.slice(1) }, { sig, other: 1 }, { sig, template: 'x' }, { sig, template: 1 }]) {
+      expect(formatProblem(bad)).toBe('bad_format');
+    }
+    // The caller's models only
+    expect(formatProblem({ sig, template: id }, [])).toBe('bad_format');
   });
 });

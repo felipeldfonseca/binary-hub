@@ -9,7 +9,7 @@
  * they are dropped here.
  */
 import type { SupabaseClient } from '@supabase/supabase-js';
-import type { ImportCommitArgs, ImportPreviewArgs } from '@/lib/domain/import';
+import { templateFromRow, type ImportCommitArgs, type ImportPreviewArgs, type Template, type TemplatePayloadV1 } from '@/lib/domain/import';
 import { MARKET_SPEC } from '@/lib/domain/markets';
 import type { AccountMarket, AccountPhase, TradingAccount } from './contas';
 
@@ -29,6 +29,11 @@ export const RPC_ERROR_CODES = [
   'unknown_batch',
   'legacy_batch',
   'already_undone',
+  // Phase 3b (migrations 20261024000001/2): a mapped file's p_format, and import_template_save
+  'bad_format',
+  'bad_template',
+  'too_many_templates',
+  'unknown_template',
 ] as const;
 
 export const HUB_ERROR_CODES = [
@@ -250,6 +255,101 @@ export async function fetchBatches(db: SupabaseClient, accountId: string): Promi
 }
 
 /**
+ * What «Desfazer» does to a batch's trades, counted in trades (import_undo's unit). rows_inserted and
+ * rows_linked count the file's lines: a Top One position in two rows is 2, an execution file's 6 exits
+ * of 4 trades are 6. Read with the user's session, from what import_undo works on (no database change):
+ */
+export interface BatchUndo {
+  /** The trades with this import_batch_id: import_undo deletes them, and answers their count («deleted») */
+  trades: number;
+  /**
+   * Their lines in the file: one per trade without this batch's file exits, and each file exit of this
+   * batch on them (a position's rows). More than `trades` when a position came in several rows.
+   */
+  exits: number;
+  /**
+   * The trades the batch wrote on without creating them (its trade_import_links, one row per trade),
+   * which import_undo gives back as they were: registered in the app (`registered`; rows_linked counts
+   * their lines), or imported earlier, that its rows joined as more exits (`existing`; rows_inserted
+   * counts those lines, and import_undo deletes none of these trades)
+   */
+  registered: number;
+  existing: number;
+}
+
+/**
+ * A page of a full read (the API's row limit, supabase/config.toml max_rows); a page the limit cuts shorter is followed
+ * by the next. Used by fetchBatchUndo and fetchTemplateMarkets.
+ */
+const READ_PAGE = 1000;
+/** Trade ids per `in` filter (the request's URL stays short) */
+const UNDO_ID_CHUNK = 100;
+
+/**
+ * Every row of a read, page after page from what came, until the exact count is there. `page` asks for a stable order
+ * (a unique column) and { count: 'exact' }; a failed page fails the whole read (never a part of it).
+ */
+async function readAll<T>(page: (from: number, to: number) => PromiseLike<Result<T[]>>): Promise<T[]> {
+  const out: T[] = [];
+  for (;;) {
+    let result: Result<T[]>;
+    try {
+      result = await page(out.length, out.length + READ_PAGE - 1);
+    } catch (e) {
+      throw toHubError(e);
+    }
+    if (result.error) throw toHubError(result.error);
+    const rows = result.data ?? [];
+    out.push(...rows);
+    if (rows.length === 0 || out.length >= (result.count ?? 0)) return out;
+  }
+}
+
+export async function fetchBatchUndo(db: SupabaseClient, batchId: string): Promise<BatchUndo> {
+  const [counted, links, exits] = await Promise.all([
+    (async () => {
+      let result: Result<unknown>;
+      try {
+        result = await db.from('trades').select('id', { count: 'exact', head: true }).eq('import_batch_id', batchId);
+      } catch (e) {
+        throw toHubError(e);
+      }
+      if (result.error) throw toHubError(result.error);
+      return result.count ?? 0;
+    })(),
+    readAll<{ trade_id: string }>((from, to) =>
+      db.from('trade_import_links').select('trade_id', { count: 'exact' }).eq('batch_id', batchId).order('trade_id').range(from, to),
+    ),
+    readAll<{ trade_id: string }>((from, to) =>
+      db.from('trade_exits').select('trade_id', { count: 'exact' }).eq('batch_id', batchId).order('id').range(from, to),
+    ),
+  ]);
+  // The trades those rows are on: the batch's own (a position's exits), or one it wrote on
+  const ids = Array.from(new Set([...links, ...exits].map((r) => r.trade_id)));
+  const chunks: string[][] = [];
+  for (let i = 0; i < ids.length; i += UNDO_ID_CHUNK) chunks.push(ids.slice(i, i + UNDO_ID_CHUNK));
+  const trades = new Map<string, { import_batch_id: string | null; source: string | null }>();
+  for (const rows of await Promise.all(
+    chunks.map((chunk) =>
+      run<{ id: string; import_batch_id: string | null; source: string | null }[]>(
+        db.from('trades').select('id, import_batch_id, source').in('id', chunk),
+      ),
+    ),
+  )) {
+    for (const r of rows ?? []) trades.set(r.id, r);
+  }
+  const own = exits.filter((e) => trades.get(e.trade_id)?.import_batch_id === batchId);
+  const linked = links.map((l) => trades.get(l.trade_id)).filter((t): t is { import_batch_id: string | null; source: string | null } => !!t);
+  const existing = linked.filter((t) => t.source === 'import').length;
+  return {
+    trades: counted,
+    exits: counted - new Set(own.map((e) => e.trade_id)).size + own.length,
+    registered: linked.length - existing,
+    existing,
+  };
+}
+
+/**
  * profiles.preferences. Written only by merge_preferences (theme, conta_atual) and save_rules
  * (display_tz, calendars); see lib/hub/regrasDb.ts. Never written whole: a stale copy would erase
  * what another tab saved.
@@ -319,6 +419,16 @@ export interface ImportPreviewResult {
   first_day: string | null;
   last_day: string | null;
   errors: RowError[];
+  /**
+   * Phase 3b (only when above 0): of `duplicate`, the rows of a mapped file without an ID column found by the same time and
+   * price («já estavam (mesma hora e preço)»)
+   */
+  duplicate_same?: number;
+  /**
+   * Phase 3b, G1 (only when above 0): new trades on days the account already holds trades of another file format («18
+   * operações caem em dias em que Top One já tem operações de outro formato de arquivo. …»)
+   */
+  other_source?: number;
   already_imported: boolean;
   tz_status: 'ok' | 'tz_not_confirmed' | 'tz_mismatch' | 'invalid_tz';
   account_tz: string;
@@ -341,6 +451,8 @@ export interface ImportCommitResult {
   trades?: number;
   grouped?: number;
   attached?: number;
+  /** Phase 3b (only when above 0): as the preview's */
+  duplicate_same?: number;
   errors: RowError[];
 }
 
@@ -384,3 +496,64 @@ export const importUndo = (db: SupabaseClient, batchId: string) => rpc<{ deleted
 
 export const importFixTz = (db: SupabaseClient, accountId: string, tz: string, dryRun: boolean) =>
   rpc<FixTzResult>(db, 'import_fix_tz', { p_account: accountId, p_new_tz: tz, p_dry_run: dryRun });
+
+// ---------------------------------------------------------------------------------------------
+// Column-mapping models (Phase 3b, import_templates; migration 20261024000001)
+// ---------------------------------------------------------------------------------------------
+
+/** What templateFromRow reads of an import_templates row (never user_id, created_at) */
+export const TEMPLATE_COLUMNS =
+  'id, name, header_sig, headers, header_skip, delimiter, decimal_mark, date_order, row_kind, columns, result_is_net, side_words, open_close_words, account_routes, tz_hint, last_used_at';
+
+/** The caller's models (RLS: own rows), most recently used first; a row templateFromRow cannot use is dropped */
+export async function fetchTemplates(db: SupabaseClient): Promise<Template[]> {
+  const rows = await run<unknown[]>(
+    db.from('import_templates').select(TEMPLATE_COLUMNS).order('last_used_at', { ascending: false, nullsFirst: false }),
+  );
+  return (rows ?? []).map(templateFromRow).filter((t): t is Template => t !== null);
+}
+
+/**
+ * The market(s) each model was used in (owner decision, 23 Oct: a model of another market is offered, never overwritten):
+ * its batches (import_batches.template_id, set by import_template_save, «Desfazer» keeps it) → each batch's account →
+ * trading_accounts.market, read with the user's session (RLS: own rows; archived accounts included). A model with no batch
+ * is absent: it fits every market. Two plain reads, no embedding: the database has no column for it (no change in 3b).
+ * Both are read whole, page after page past the API's row limit (readAll, in id order): a model whose batches a cut read
+ * missed would look batch-less and so fit every market, and «Atualizar o modelo» would come checked over another
+ * market's model. A failed page fails the read: the sheet then takes the markets as unknown (useTemplateMarkets).
+ */
+export async function fetchTemplateMarkets(db: SupabaseClient): Promise<Record<string, AccountMarket[]>> {
+  const [batches, accounts] = await Promise.all([
+    readAll<{ template_id: string | null; account_id: string }>((from, to) =>
+      db.from('import_batches').select('template_id, account_id', { count: 'exact' }).eq('platform', 'modelo').order('id').range(from, to),
+    ),
+    readAll<{ id: string; market: AccountMarket }>((from, to) =>
+      db.from('trading_accounts').select('id, market', { count: 'exact' }).order('id').range(from, to),
+    ),
+  ]);
+  const market: Record<string, AccountMarket> = {};
+  for (const a of accounts) market[a.id] = a.market;
+  const out: Record<string, AccountMarket[]> = {};
+  for (const b of batches) {
+    const m = market[b.account_id];
+    if (!b.template_id || !m) continue;
+    const list = (out[b.template_id] ??= []);
+    if (!list.includes(m)) list.push(m);
+  }
+  return out;
+}
+
+/** import_template_save's answer */
+export interface TemplateSaved {
+  template_id: string;
+  header_sig: string;
+  created: boolean;
+}
+
+/**
+ * «Salvar como modelo» / «Atualizar o modelo “{nome}”», after the import's commit: `batchId` is the commit's batch (null
+ * when it made none), `replaces` the model «Atualizar o modelo» re-keys (null for a new model and for a touch). Its
+ * refusals are bad_template, too_many_templates, unknown_template, unknown_batch.
+ */
+export const saveTemplate = (db: SupabaseClient, payload: TemplatePayloadV1, batchId: string | null, replaces: string | null) =>
+  rpc<TemplateSaved>(db, 'import_template_save', { p_template: payload, p_batch: batchId, p_replaces: replaces });

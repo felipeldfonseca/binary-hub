@@ -706,9 +706,11 @@ export const ERROS_PRECOS = {
   resVazio: 'Informe o resultado.', // B l.951
   resNumero: 'Use só números, como −57,50.', // B l.951
   custosNumero: 'Use só números, como 7,00.', // B l.954
-  /** «Antes de 13 out esta conta não tinha regras: essas operações entram pela importação por colunas, logo depois da Fase 3.» */
-  antesRegras: (desde: string) =>
-    `Antes de ${desde} esta conta não tinha regras: essas operações entram pela importação por colunas, logo depois da Fase 3.`, // B l.1022–1023
+  /**
+   * «Antes de 13 out esta conta não tinha regras: essas operações entram pela importação de arquivo.» (Phase 3b, A, quadro
+   * S22: the column mapping is here; was «… pela importação por colunas, logo depois da Fase 3.», B l.1022–1023)
+   */
+  antesRegras: (desde: string) => `Antes de ${desde} esta conta não tinha regras: essas operações entram pela importação de arquivo.`
 }
 
 /** Steps 2 and 3 of a price market (RO l.1247–1260, 1316–1338) */

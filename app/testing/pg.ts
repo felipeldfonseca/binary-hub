@@ -173,34 +173,43 @@ function orFilter(expr: string): string {
     .join(' or ')})`;
 }
 
-/** PostgREST's table reads (select, eq, in, or, gte, order, limit, maybeSingle) as the user, under row-level security */
+/**
+ * PostgREST's table reads (select with { count: 'exact', head }, eq, in, or, gte, order, limit, range, maybeSingle) as
+ * the user, under row-level security. The count is every matching row, whatever the page.
+ */
 export function pgFrom(uid: string) {
   return (table: string) => {
     let cols = '*';
     let single = false;
     let limit: number | null = null;
+    let offset = 0;
+    let count = false;
+    let head = false;
     const where: string[] = [];
     const order: string[] = [];
     const chain: Record<string, unknown> = {
-      select: (c: string) => ((cols = c), chain),
+      select: (c: string, o?: { count?: 'exact'; head?: boolean }) => ((cols = c), (count = o?.count === 'exact'), (head = !!o?.head), chain),
       eq: (c: string, v: unknown) => (where.push(`${c} = ${sqlArg(v)}`), chain),
       gte: (c: string, v: unknown) => (where.push(`${c} >= ${sqlArg(v)}`), chain),
       in: (c: string, v: unknown[]) => (where.push(`${c} in (${v.map(sqlArg).join(', ')})`), chain),
       or: (expr: string) => (where.push(orFilter(expr)), chain),
       order: (c: string, o?: { ascending?: boolean }) => (order.push(`${c}${o?.ascending === false ? ' desc' : ''}`), chain),
       limit: (n: number) => ((limit = n), chain),
+      range: (from: number, to: number) => ((offset = from), (limit = to - from + 1), chain),
       maybeSingle: () => ((single = true), chain),
       then: (resolve: (v: PgAnswer) => unknown, reject: (e: unknown) => unknown) =>
         Promise.resolve()
           .then(() => {
-            const sql =
-              `(select coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) from (select ${cols} from public.${table}` +
-              `${where.length ? ` where ${where.join(' and ')}` : ''}${order.length ? ` order by ${order.join(', ')}` : ''}` +
-              `${limit !== null ? ` limit ${limit}` : ''}) t)`;
-            const r = callAs(uid, sql);
+            const filter = where.length ? ` where ${where.join(' and ')}` : '';
+            const rowsSql = head
+              ? `'[]'::jsonb`
+              : `(select coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) from (select ${cols} from public.${table}${filter}` +
+                `${order.length ? ` order by ${order.join(', ')}` : ''}${limit !== null ? ` limit ${limit}` : ''}${offset ? ` offset ${offset}` : ''}) t)`;
+            const countSql = count ? `(select count(*) from public.${table}${filter})` : 'null';
+            const r = callAs(uid, `jsonb_build_object('rows', ${rowsSql}, 'count', ${countSql})`);
             if (r.error) return r;
-            const rows = r.data as unknown[];
-            return { data: single ? (rows[0] ?? null) : rows, error: null };
+            const { rows, count: n } = r.data as { rows: unknown[]; count: number | null };
+            return { data: head ? null : single ? (rows[0] ?? null) : rows, error: null, ...(count ? { count: n } : {}) };
           })
           .then(resolve, reject),
     };
@@ -213,12 +222,27 @@ export function pgFrom(uid: string) {
  * (PostgREST's named arguments); Storage uploads insert the object row as the Storage API does
  * (owner, size, mimetype), removes delete it. `log` keeps every rpc's raw answer.
  */
+/** The jsonb parameters of a public function (cached): an empty array bound to one is '[]', as PostgREST binds it */
+const jsonbParams = new Map<string, Set<string>>();
+function jsonbParamsOf(name: string): Set<string> {
+  let p = jsonbParams.get(name);
+  if (!p) {
+    const out = psql(`select coalesce(string_agg(distinct a.n, ','), '') from pg_catalog.pg_proc f,
+  unnest(f.proargnames[1:f.pronargs], f.proargtypes::oid[]) as a(n, t)
+where f.pronamespace = 'public'::regnamespace and f.proname = ${sqlValue(name)} and a.t = 'jsonb'::regtype;`).trim();
+    p = new Set(out ? out.split(',') : []);
+    jsonbParams.set(name, p);
+  }
+  return p;
+}
+
 export function pgClient(uid: string, log: { name: string; args: Record<string, unknown>; answer: PgAnswer }[] = []): SupabaseClient {
   return {
     from: pgFrom(uid),
     rpc: (name: string, args: Record<string, unknown> = {}) => {
       const run = () => {
-        const answer = callAs(uid, `public.${name}(${Object.entries(args).map(([k, v]) => `${k} => ${sqlArg(v)}`).join(', ')})`);
+        const arg = (k: string, v: unknown) => (Array.isArray(v) && v.length === 0 && jsonbParamsOf(name).has(k) ? `'[]'::jsonb` : sqlArg(v));
+        const answer = callAs(uid, `public.${name}(${Object.entries(args).map(([k, v]) => `${k} => ${arg(k, v)}`).join(', ')})`);
         log.push({ name, args, answer });
         return answer;
       };

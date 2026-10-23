@@ -4,19 +4,22 @@ import { useEffect, useRef, useState } from 'react'
 import type { TradingAccount } from '@/lib/hub/contas'
 import { importUndo, toHubError, type HubErrorCode, type ImportBatch } from '@/lib/hub/contasDb'
 import { formatDay, formatWhen } from '@/lib/hub/formato'
-import { useHubDb, useImportBatches, useRefreshAfterWrite } from '@/hooks/useContas'
+import { useBatchUndo, useHubDb, useImportBatches, useRefreshAfterWrite } from '@/hooks/useContas'
 import { BUSY, CLOSE, CONTAS, ERROR_TEXT, IMPORTACOES, LOADING, TRY_AGAIN, ops } from './copy'
 
 /**
  * "Importações" of an account (no board): its batches, newest first, each undoable once.
- * Undoing deletes the batch's trades and gives back the trades registered in the app that it
- * completed (Phase 3, rows_linked); the confirmation says how many of each.
+ * Undoing deletes the batch's trades and gives back the trades it completed (registered in the app,
+ * Phase 3; imported earlier, Phase 3c); the confirmation says how many of each, in trades, read when it
+ * opens (useBatchUndo: the batch's counts are the file's lines, and a position can take several).
  */
 export default function Importacoes({ account, onClose }: { account: TradingAccount; onClose: () => void }) {
   const { db } = useHubDb()
   const refresh = useRefreshAfterWrite()
   const batches = useImportBatches(account.id)
   const [confirming, setConfirming] = useState<string | null>(null)
+  const counts = useBatchUndo(account.id, confirming)
+  const undoCounts = confirming ? counts.data : undefined
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<HubErrorCode | null>(null)
   const [done, setDone] = useState('')
@@ -41,14 +44,14 @@ export default function Importacoes({ account, onClose }: { account: TradingAcco
     setRefocus(null)
   }, [refocus])
 
-  const undo = async (batch: ImportBatch) => {
+  const undo = async (batch: ImportBatch, back: { registered: number; existing: number }) => {
     setBusy(true)
     setError(null)
     try {
       const { deleted } = await importUndo(db, batch.id)
       setConfirming(null)
-      // import_undo answers only the deleted count; the registered trades it gave back are the batch's
-      setDone(IMPORTACOES.undone(deleted, batch.rows_linked ?? 0))
+      // import_undo answers only the deleted count; the trades it gave back are the confirmation's
+      setDone(IMPORTACOES.undone(deleted, back))
       refresh()
       titleRef.current?.focus()
     } catch (e) {
@@ -139,20 +142,28 @@ export default function Importacoes({ account, onClose }: { account: TradingAcco
               )}
               {confirming === batch.id && (
                 <div className="hub-bloco hub-bloco--atencao" role="group" aria-labelledby={`desfazer-${batch.id}`} style={{ flex: '1 1 100%' }}>
-                  <span id={`desfazer-${batch.id}`} style={{ fontWeight: 700 }}>
-                    {IMPORTACOES.confirm(batch.rows_inserted, linked)}
+                  {/* Live: the counts arrive after «Manter» took focus */}
+                  <span id={`desfazer-${batch.id}`} style={{ fontWeight: 700 }} aria-live="polite">
+                    {undoCounts ? IMPORTACOES.confirm(undoCounts) : counts.isError ? IMPORTACOES.countError : LOADING}
                   </span>
                   <div className="hub-acoes">
-                    <button
-                      type="button"
-                      className="hub-btn hub-btn--pri"
-                      aria-disabled={busy || undefined}
-                      onClick={() => {
-                        if (!busy) void undo(batch)
-                      }}
-                    >
-                      {IMPORTACOES.confirmYes(batch.rows_inserted)}
-                    </button>
+                    {undoCounts && (
+                      <button
+                        type="button"
+                        className="hub-btn hub-btn--pri"
+                        aria-disabled={busy || undefined}
+                        onClick={() => {
+                          if (!busy) void undo(batch, { registered: undoCounts.registered, existing: undoCounts.existing })
+                        }}
+                      >
+                        {IMPORTACOES.confirmYes(undoCounts.trades)}
+                      </button>
+                    )}
+                    {!undoCounts && counts.isError && (
+                      <button type="button" className="hub-btn" onClick={() => void counts.refetch()}>
+                        {TRY_AGAIN}
+                      </button>
+                    )}
                     <button ref={keepRef} type="button" className="hub-btn" onClick={() => keep(batch.id)}>
                       {IMPORTACOES.confirmNo}
                     </button>

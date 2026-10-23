@@ -9,9 +9,12 @@ import { resolveContaAtual, visibleAccounts, type TradingAccount } from '@/lib/h
 import {
   fetchAccounts,
   fetchActivity,
+  fetchBatchUndo,
   fetchBatches,
   fetchImportFormats,
   fetchPreferences,
+  fetchTemplateMarkets,
+  fetchTemplates,
   type HubPreferences,
 } from '@/lib/hub/contasDb';
 import { mergePreferences } from '@/lib/hub/regrasDb';
@@ -25,6 +28,10 @@ export const hubKeys = {
   formatos: (uid: string | undefined) => ['hub', uid, 'formatos'] as const,
   importacoes: (uid: string | undefined, accountId: string) => ['hub', uid, 'importacoes', accountId] as const,
   preferencias: (uid: string | undefined) => ['hub', uid, 'preferencias'] as const,
+  /** Phase 3b: the column-mapping models (import_templates) */
+  templates: (uid: string | undefined) => ['hub', uid, 'templates'] as const,
+  /** Phase 3b (owner decision, 23 Oct): each model's markets, from its batches */
+  mercadosDosModelos: (uid: string | undefined) => ['hub', uid, 'templates', 'mercados'] as const,
 };
 
 /**
@@ -82,12 +89,56 @@ export function useImportFormats(enabled = true) {
   });
 }
 
+/**
+ * Phase 3b: the user's column-mapping models, read only once a file needs the mapping (`enabled`), so a reader's file
+ * (Ebinex, Top One) never reads import_templates. The sheet waits for them with `refetch()` (which runs whatever
+ * `enabled` says); a failed read is «no model», never an error on screen, so it is not retried. Under ['hub', uid]: the
+ * refresh after an import (useRefreshAfterWrite) reads them again.
+ */
+export function useImportTemplates(enabled = true) {
+  const { db, userId } = useHubDb();
+  return useQuery({
+    queryKey: hubKeys.templates(userId),
+    queryFn: () => fetchTemplates(db),
+    enabled: !!userId && enabled,
+    retry: false,
+  });
+}
+
+/**
+ * Phase 3b (owner decision, 23 Oct): each model's markets (fetchTemplateMarkets), read with the models and as they are
+ * (only once a file needs the mapping; not retried). The sheet treats a failed read as «unknown»: every model then counts
+ * as another market's, so no import writes over a model it cannot place.
+ */
+export function useTemplateMarkets(enabled = true) {
+  const { db, userId } = useHubDb();
+  return useQuery({
+    queryKey: hubKeys.mercadosDosModelos(userId),
+    queryFn: () => fetchTemplateMarkets(db),
+    enabled: !!userId && enabled,
+    retry: false,
+  });
+}
+
 export function useImportBatches(accountId: string) {
   const { db, userId } = useHubDb();
   return useQuery({
     queryKey: hubKeys.importacoes(userId, accountId),
     queryFn: () => fetchBatches(db, accountId),
     enabled: !!userId,
+  });
+}
+
+/**
+ * What «Desfazer» of the batch being confirmed does, in trades (fetchBatchUndo); read when the
+ * confirmation opens (null: none open), under the account's Importações so a write refreshes it.
+ */
+export function useBatchUndo(accountId: string, batchId: string | null) {
+  const { db, userId } = useHubDb();
+  return useQuery({
+    queryKey: [...hubKeys.importacoes(userId, accountId), 'desfazer', batchId],
+    queryFn: () => fetchBatchUndo(db, batchId as string),
+    enabled: !!userId && !!batchId,
   });
 }
 

@@ -9,13 +9,23 @@ import {
   fetchActivity,
   fetchImportFormats,
   fetchPreferences,
+  fetchTemplateMarkets,
+  fetchTemplates,
   importFixTz,
   importPreview,
   importUndo,
+  saveTemplate,
   setPrimary,
   toHubError,
+  RPC_ERROR_CODES,
+  TEMPLATE_COLUMNS,
+  type ImportCommitResult,
+  type ImportPreviewResult,
 } from '@/lib/hub/contasDb';
+import { templatePayload } from '@/lib/domain/import';
+import { MODELO_BLACKARROW_LINHA, MODELO_TRADOVATE_LINHA } from '@/testing/mapeadoTelas';
 import { CREATABLE_MARKETS, MARKET_SPEC } from '@/lib/domain/markets';
+import { apiPaginada } from '@/testing/apiPaginada';
 
 type Call = unknown[];
 type Answer = { data?: unknown; error?: unknown; count?: number };
@@ -30,7 +40,7 @@ function fakeDb(answer: (target: string, calls: Call[]) => Answer = () => ({ dat
     const calls: Call[] = [first];
     log.push(calls);
     const chain: Record<string, unknown> = {};
-    for (const method of ['select', 'eq', 'order', 'insert', 'update', 'single', 'maybeSingle', 'abortSignal']) {
+    for (const method of ['select', 'eq', 'order', 'range', 'insert', 'update', 'single', 'maybeSingle', 'abortSignal']) {
       chain[method] = (...args: unknown[]) => {
         calls.push([method, ...args]);
         return chain;
@@ -204,5 +214,148 @@ describe('import functions', () => {
     expect(failure).toBeInstanceOf(HubDataError);
     expect((failure as HubDataError).code).toBe('tz_mismatch');
     expect((failure as HubDataError).message).not.toContain('12/03');
+  });
+});
+
+describe('Phase 3b · the column-mapping models (import_templates)', () => {
+  it('fetchTemplates reads the model columns, most recently used first, and drops a row it cannot use', async () => {
+    const quebrado = { ...MODELO_TRADOVATE_LINHA, id: 'x', row_kind: 'nada' };
+    const { db, log } = fakeDb(() => ({ data: [MODELO_BLACKARROW_LINHA, quebrado, MODELO_TRADOVATE_LINHA] }));
+    const models = await fetchTemplates(db);
+    expect(models.map((t) => [t.id, t.name])).toEqual([
+      [MODELO_BLACKARROW_LINHA.id, 'BlackArrow'],
+      [MODELO_TRADOVATE_LINHA.id, 'Tradovate'],
+    ]);
+    expect(log[0]).toEqual([
+      ['from', 'import_templates'],
+      ['select', TEMPLATE_COLUMNS],
+      ['order', 'last_used_at', { ascending: false, nullsFirst: false }],
+    ]);
+    // Never the owner or the dates the screens do not read
+    expect(TEMPLATE_COLUMNS).not.toMatch(/user_id|created_at|updated_at/);
+    await expect(fetchTemplates(fakeDb(() => ({ data: null })).db)).resolves.toEqual([]);
+  });
+
+  it('fetchTemplateMarkets: each model’s markets from its batches’ accounts (owner decision, 23 Oct); a model with no batch is absent', async () => {
+    const { db, log } = fakeDb((target) =>
+      target === 'import_batches'
+        ? {
+            data: [
+              { template_id: 't-ba', account_id: 'a-fut' },
+              { template_id: 't-ba', account_id: 'a-fut-2' },
+              { template_id: 't-ba', account_id: 'a-b3' },
+              { template_id: 't-tv', account_id: 'a-fut' },
+              // A batch saved under no model, and one whose account the read does not hold
+              { template_id: null, account_id: 'a-b3' },
+              { template_id: 't-x', account_id: 'a-outra' },
+            ],
+          }
+        : { data: [{ id: 'a-fut', market: 'futures' }, { id: 'a-fut-2', market: 'futures' }, { id: 'a-b3', market: 'b3' }] },
+    );
+    await expect(fetchTemplateMarkets(db)).resolves.toEqual({ 't-ba': ['futures', 'b3'], 't-tv': ['futures'] });
+    // Each read whole: in id order, page by page (one page here: no count past it)
+    expect(log).toEqual([
+      [['from', 'import_batches'], ['select', 'template_id, account_id', { count: 'exact' }], ['eq', 'platform', 'modelo'], ['order', 'id'], ['range', 0, 999]],
+      [['from', 'trading_accounts'], ['select', 'id, market', { count: 'exact' }], ['order', 'id'], ['range', 0, 999]],
+    ]);
+    await expect(fetchTemplateMarkets(fakeDb(() => ({ data: null })).db)).resolves.toEqual({});
+    const falha = await fetchTemplateMarkets(fakeDb((t) => (t === 'import_batches' ? { error: { message: 'TypeError: Failed to fetch' } } : { data: [] })).db).catch((e: unknown) => e);
+    expect((falha as HubDataError).code).toBe('network');
+  });
+
+  describe('fetchTemplateMarkets past the API’s row limit (max_rows 1000): every page, or no answer', () => {
+    const lote = (n: number, template_id: string | null, account_id: string) => ({ id: `lote-${String(n).padStart(5, '0')}`, platform: 'modelo', template_id, account_id });
+
+    it('1 200 mapped-file batches: the model whose only batch is past the first page keeps its market', async () => {
+      // 1 199 batches of «Tradovate» in Futuros, then «BlackArrow»'s only one (Futuros), last in id order
+      const lotes = [...Array.from({ length: 1199 }, (_, i) => lote(i, 't-tv', 'a-fut')), lote(1199, 't-ba', 'a-fut')];
+      // A reader's batch (another platform) is never read
+      lotes.push({ id: 'lote-00000-ebinex', platform: 'ebinex', template_id: 't-ba', account_id: 'a-b3' });
+      const contas = [{ id: 'a-b3', market: 'b3' }, { id: 'a-fut', market: 'futures' }];
+      const { db, calls } = apiPaginada({ import_batches: lotes, trading_accounts: contas });
+      await expect(fetchTemplateMarkets(db)).resolves.toEqual({ 't-tv': ['futures'], 't-ba': ['futures'] });
+      expect(calls.filter((c) => c.table === 'import_batches').map((c) => [c.order, c.range])).toEqual([[['id'], [0, 999]], [['id'], [1000, 1999]]]);
+      expect(calls.filter((c) => c.table === 'trading_accounts').map((c) => [c.order, c.range])).toEqual([[['id'], [0, 999]]]);
+    });
+
+    it('a lowered page size (the API answers 2 rows): every page of both reads, from what came', async () => {
+      const lotes = [lote(0, 't-tv', 'a-1'), lote(1, null, 'a-2'), lote(2, 't-tv', 'a-2'), lote(3, 't-tv', 'a-1'), lote(4, 't-ba', 'a-5')];
+      const contas = [1, 2, 3, 4, 5].map((n) => ({ id: `a-${n}`, market: n === 5 ? 'b3' : 'futures' }));
+      const { db, calls } = apiPaginada({ import_batches: lotes, trading_accounts: contas }, 2);
+      // «BlackArrow»'s only batch is on the last page, in the account on the accounts' last page
+      await expect(fetchTemplateMarkets(db)).resolves.toEqual({ 't-tv': ['futures'], 't-ba': ['b3'] });
+      expect(calls.filter((c) => c.table === 'import_batches').map((c) => c.range)).toEqual([[0, 999], [2, 1001], [4, 1003]]);
+      expect(calls.filter((c) => c.table === 'trading_accounts').map((c) => c.range)).toEqual([[0, 999], [2, 1001], [4, 1003]]);
+      expect(calls.every((c) => c.count && c.order.join() === 'id')).toBe(true);
+    });
+
+    it('a page that fails fails the read (never the pages before it): the sheet then takes the markets as unknown', async () => {
+      const lotes = [...Array.from({ length: 1199 }, (_, i) => lote(i, 't-tv', 'a-fut')), lote(1199, 't-ba', 'a-fut')];
+      for (const [table, desde] of [['import_batches', 1000], ['trading_accounts', 2]] as const) {
+        const { db } = apiPaginada(
+          { import_batches: lotes, trading_accounts: [{ id: 'a-b3', market: 'b3' }, { id: 'a-fut', market: 'futures' }, { id: 'a-x', market: 'forex' }] },
+          table === 'import_batches' ? 1000 : 2,
+          (c) => (c.table === table && (c.range?.[0] ?? 0) >= desde ? { message: 'TypeError: Failed to fetch' } : undefined),
+        );
+        const falha = await fetchTemplateMarkets(db).catch((e: unknown) => e);
+        expect(falha).toBeInstanceOf(HubDataError);
+        expect((falha as HubDataError).code).toBe('network');
+      }
+    });
+  });
+
+  it('saveTemplate calls import_template_save with its argument names and answers what it saved', async () => {
+    const { db, log } = fakeDb(() => ({ data: { template_id: 't-1', header_sig: 'ab'.repeat(32), created: true } }));
+    const payload = templatePayload({
+      rowKind: 'trade',
+      headers: ['a', 'b'],
+      headerSkip: 0,
+      delimiter: ',',
+      decimalMark: 'point',
+      dateOrder: null,
+      columns: ['entry_time', 'symbol'],
+      resultIsNet: null,
+      sideWords: {},
+      openCloseWords: {},
+      name: 'Modelo',
+    });
+    await expect(saveTemplate(db, payload, 'lote-1', null)).resolves.toEqual({ template_id: 't-1', header_sig: 'ab'.repeat(32), created: true });
+    await saveTemplate(db, payload, null, 't-0');
+    expect(log[0][0]).toEqual(['rpc', 'import_template_save', { p_template: payload, p_batch: 'lote-1', p_replaces: null }]);
+    expect(log[1][0]).toEqual(['rpc', 'import_template_save', { p_template: payload, p_batch: null, p_replaces: 't-0' }]);
+  });
+
+  it.each(['bad_template', 'too_many_templates', 'unknown_template', 'unknown_batch', 'bad_format'] as const)(
+    'its refusal %s is a code of its own, never the database text',
+    async (code) => {
+      expect(RPC_ERROR_CODES).toContain(code);
+      const { db } = fakeDb(() => ({ error: { code: 'P0001', message: code, hint: 'account_routes', details: 'APX-0001' } }));
+      const failure = await saveTemplate(db, MODELO_BLACKARROW_LINHA as never, null, null).catch((e: unknown) => e);
+      expect(failure).toBeInstanceOf(HubDataError);
+      expect((failure as HubDataError).code).toBe(code);
+      expect(JSON.stringify(failure)).not.toContain('APX-0001');
+    },
+  );
+
+  it('the preview and the commit carry duplicate_same and other_source only when the database sends them', () => {
+    const preview: ImportPreviewResult = {
+      new: 18,
+      duplicate: 4,
+      duplicate_same: 4,
+      other_source: 18,
+      completable: 0,
+      other_account: 0,
+      day_changes: 0,
+      first_day: null,
+      last_day: null,
+      errors: [],
+      already_imported: false,
+      tz_status: 'ok',
+      account_tz: 'UTC',
+      tz_confirmed: true,
+      rows_total: 22,
+    };
+    const commit: ImportCommitResult = { batch_id: null, inserted: 0, duplicate: 4, duplicate_same: 4, completed: 0, other_account: 0, errors: [] };
+    expect([preview.duplicate_same, preview.other_source, commit.duplicate_same]).toEqual([4, 18, 4]);
   });
 });

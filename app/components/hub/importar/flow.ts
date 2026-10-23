@@ -2,8 +2,10 @@
  * The import sheet's steps and the rules that link them. Step keys are the ImportarConta board's
  * own names (a, b, c, d, f, g, i1, i2, solte, erro, fim…), plus `conf`: the count of what a
  * file zone change moves, shown before the zone is confirmed (owner's decision, no board).
+ * Phase 3b adds the column mapping's: a2 («Para qual conta?» for a file no reader takes), mapa,
+ * conferir and hc («N contas neste arquivo»).
  */
-import { PLATFORM_MARKET, type FileVariant, type ParsedFile, type Platform, type ReadImportFileResult } from '@/lib/domain/import'
+import { PLATFORM_MARKET, type FileVariant, type ParsedFile, type ReaderPlatform, type ReadImportFileResult } from '@/lib/domain/import'
 import { fileDays, tzConfirmed, type TradingAccount } from '@/lib/hub/contas'
 import { formatDateRange } from '@/lib/hub/formato'
 import { ARQUIVO, MARKET_LABEL, ops } from '@/components/hub/contas/copy'
@@ -23,9 +25,14 @@ export type Passo =
   | 'fim'
   | 'fimFuso'
   | 'fimConta'
+  // Phase 3b
+  | 'a2'
+  | 'mapa'
+  | 'conferir'
+  | 'hc'
 
 /** Steps of a linear sequence, counted by "Passo k de n". */
-const COUNTED: readonly Passo[] = ['a', 'b', 'i1', 'i2', 'c', 'conf', 'd']
+const COUNTED: readonly Passo[] = ['a', 'b', 'i1', 'i2', 'c', 'conf', 'd', 'a2', 'mapa', 'conferir', 'hc']
 /** Choice and end screens: what follows them is a new sequence with its own count. */
 const BREAKS: readonly Passo[] = ['solte', 'erro', 'f', 'g', 'fim', 'fimFuso', 'fimConta']
 export const END_STEPS: readonly Passo[] = ['fim', 'fimFuso', 'fimConta']
@@ -49,21 +56,33 @@ export interface PlanInput {
   choice: string | null
   choiceAccount: TradingAccount | null
   fixOnly: boolean
+  /**
+   * Phase 3b, a file the column mapping reads: the steps still to come after a2, mapa, conferir and hc
+   * (lib/hub/importPrevia planoMapeado), and after the new account's i1, i2 and b of a2's «+ Nova
+   * conta». Null for a reader's file and with no file.
+   */
+  mapeado?: Passo[] | null
 }
 
 /** Steps still to come after the current one, as far as they can be told now. */
 function ahead(p: PlanInput): Passo[] {
   const thenPreview = (account: TradingAccount | null): Passo[] =>
     p.parsed ? [...(needsZoneStep(p.parsed, account) ? (['c'] as Passo[]) : []), 'd'] : []
+  const mapeado = p.mapeado ?? []
   switch (p.passo) {
     case 'i1':
-      return ['i2', 'b']
+      return ['i2', 'b', ...mapeado]
     case 'i2':
-      return ['b']
+      return ['b', ...mapeado]
     case 'a':
       return p.choice === 'nova' ? ['b', ...thenPreview(null)] : thenPreview(p.choiceAccount)
     case 'b':
-      return p.parsed ? thenPreview(null) : []
+      return p.parsed ? thenPreview(null) : mapeado
+    case 'a2':
+    case 'mapa':
+    case 'conferir':
+    case 'hc':
+      return mapeado
     case 'c':
       return p.fixOnly ? ['conf'] : ['d']
     case 'conf':
@@ -107,7 +126,7 @@ export function fileSummary(parsed: ParsedFile, currentYear: number): string {
 export function emptyFileSummary(file: ReadImportFileResult | null): string | null {
   const outcome = file?.outcome
   if (!outcome) return null
-  let platform: Platform
+  let platform: ReaderPlatform
   let variant: FileVariant
   if (outcome.ok) {
     if (outcome.rows.length > 0) return null

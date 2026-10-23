@@ -46,7 +46,7 @@ describe('which accounts get «Registrar operação» (3-4 ends D36)', () => {
     expect(sobra).toEqual([]);
     // The approved texts that name a phase stay: the before-«desde» text of the new markets and the Diário's placeholder
     const registrarCopy = fs.readFileSync(path.join(raiz, 'components/hub/registrar/copy.ts'), 'utf8');
-    expect(registrarCopy).toContain('essas operações entram pela importação por colunas, logo depois da Fase 3.');
+    expect(registrarCopy).toContain('essas operações entram pela importação de arquivo.');
     expect(fs.readFileSync(path.join(raiz, 'app/(hub)/diario/page.tsx'), 'utf8')).toContain('O Diário chega na Fase 4.');
   });
 });
