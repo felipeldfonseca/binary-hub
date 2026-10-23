@@ -3,20 +3,17 @@
  * §2.2, §6, §8.2), in the board's world (testing/mapeadoTelas, B0) with the database's answers composed in
  * testing/mapeadoRespostas (each proven against the real SQL by hubImportTelas.pg.test.ts). Invented data only.
  *
- * Until lane L1's steps are merged, «mapa» and «conferir» are B0's placeholders (their title only); a stand-in control
- * under each («stub: responder», «stub: Mudar colunas») gives the answers the board gives on them, through the steps'
- * own props (onChange, onMudarColunas). After the rebase on L1 these become the real pills (§7.4).
+ * «mapa» and «conferir» are lane L1's real steps (after the rebase on L1, contract §7.4): the board's answers are given
+ * through their own pills, selects, checkbox and name field, and «Mudar colunas» is the model chip's.
  */
 import React from 'react'
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import * as data from '@/lib/hub/contasDb'
 import * as regrasDb from '@/lib/hub/regrasDb'
-import { MAX_TEMPLATE_NAME, accountRouteHash, endOfFileKey, readImportFile, toRpcRow, type Template } from '@/lib/domain/import'
+import { MAX_TEMPLATE_NAME, accountRouteHash, readImportFile, toRpcRow, type EndOfFileAnswer, type SideWordAnswer, type Template } from '@/lib/domain/import'
 import { useImportSheet } from '@/components/hub/importar/ImportSheetProvider'
-import type { Mapeamento } from '@/lib/hub/importMapeado'
-import type { PassoMapaProps } from '@/components/hub/importar/PassoMapa'
-import type { PassoConferirProps } from '@/components/hub/importar/PassoConferir'
+import * as mapeado from '@/lib/hub/importMapeado'
 import { renderHub } from '@/testing/hubHarness'
 import {
   CONTAS_QUADRO,
@@ -59,46 +56,10 @@ jest.mock('@/lib/hub/regrasDb', () => ({
 }))
 jest.mock('@/hooks/useAgora', () => ({ useAgora: () => new Date('2026-10-15T15:00:00Z') }))
 
-/** What «stub: responder» does to the mapping (the answers the board gives on «mapa» and «conferir») */
-let mockAplicar: ((m: Mapeamento) => Mapeamento) | null = null
-/** The stand-in controls under B0's placeholders (replaced by L1's pills after the rebase) */
-function mockControles(p: { mapeamento: Mapeamento; onChange: (m: Mapeamento) => void; onMudarColunas?: (() => void) | null }) {
-  return (
-    <div data-testid="stub">
-      <button type="button" onClick={() => mockAplicar && p.onChange(mockAplicar(p.mapeamento))}>
-        stub: responder
-      </button>
-      {p.onMudarColunas && (
-        <button type="button" onClick={() => p.onMudarColunas?.()}>
-          stub: Mudar colunas
-        </button>
-      )}
-    </div>
-  )
-}
-jest.mock('@/components/hub/importar/PassoMapa', () => {
-  const real = jest.requireActual('@/components/hub/importar/PassoMapa')
-  return {
-    __esModule: true,
-    default: (p: PassoMapaProps) => (
-      <>
-        {real.default(p)}
-        {mockControles(p)}
-      </>
-    ),
-  }
-})
-jest.mock('@/components/hub/importar/PassoConferir', () => {
-  const real = jest.requireActual('@/components/hub/importar/PassoConferir')
-  return {
-    __esModule: true,
-    default: (p: PassoConferirProps) => (
-      <>
-        {real.default(p)}
-        {mockControles(p)}
-      </>
-    ),
-  }
+// The model the sheet saves is the real one; one test hands the sheet a model no screen can make (its own check)
+jest.mock('@/lib/hub/importMapeado', () => {
+  const real = jest.requireActual('@/lib/hub/importMapeado')
+  return { ...real, modeloASalvar: jest.fn(real.modeloASalvar) }
 })
 
 const fetchAccounts = data.fetchAccounts as jest.MockedFunction<typeof data.fetchAccounts>
@@ -112,6 +73,7 @@ const saveTemplate = data.saveTemplate as jest.MockedFunction<typeof data.saveTe
 const readFile = readImportFile as jest.MockedFunction<typeof readImportFile>
 const fetchRulesConfig = regrasDb.fetchRulesConfig as jest.MockedFunction<typeof regrasDb.fetchRulesConfig>
 const saveRules = regrasDb.saveRules as jest.MockedFunction<typeof regrasDb.saveRules>
+const modeloASalvar = mapeado.modeloASalvar as jest.MockedFunction<typeof mapeado.modeloASalvar>
 
 const NY = 'America/New_York'
 /** 15's card: the days never break at their dash (a word joiner after it, review 1 #2) */
@@ -156,13 +118,48 @@ const linhas = (dialog: HTMLElement) =>
     .map(texto)
     .filter(Boolean)
 
-async function responder(dialog: HTMLElement, aplicar: (m: Mapeamento) => Mapeamento) {
-  mockAplicar = aplicar
-  await userEvent.click(within(dialog).getByRole('button', { name: 'stub: responder' }))
-  mockAplicar = null
+/** «mapa» (any of its three titles) or «conferir»: lane L1's steps, once the file is read */
+const PASSO_DO_MAPEAMENTO = /Diga o que é cada coluna\.$|^Mude as colunas do modelo|Confira as colunas\.$|^Confira 3 linhas$/
+const noMapeamento = (dialog: HTMLElement) => within(dialog).findByRole('heading', { level: 3, name: PASSO_DO_MAPEAMENTO })
+
+/** A question block's pill (E18, E24, E26): the group its question names, then the pill */
+async function pilula(dialog: HTMLElement, pergunta: string | RegExp, rotulo: string) {
+  const grupo = within(dialog).getByRole('group', { name: pergunta })
+  await userEvent.click(within(grupo).getByRole('button', { name: rotulo }))
+  expect(within(grupo).getByRole('button', { name: rotulo })).toHaveAttribute('aria-pressed', 'true')
+}
+const escape = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+const LADO: Record<SideWordAnswer, string> = { buy: 'Compra', sell: 'Venda', skip: 'Pular essas linhas' }
+const FIM: Record<EndOfFileAnswer, string> = { yes: 'Sim, ficou posicionado', no: 'Não, terminou zerado', unknown: 'Não sei' }
+
+/** E18 on «mapa»: what a side word means */
+const responderLado = (dialog: HTMLElement, palavra: string, a: SideWordAnswer) =>
+  pilula(dialog, new RegExp(`“${escape(palavra)}” na coluna de lado`, 'i'), LADO[a])
+/** E24 on «conferir»: the symbol (and the «Conta» value) at the end of the file */
+const responderFim = (dialog: HTMLElement, simbolo: string, a: EndOfFileAnswer, conta?: string) =>
+  pilula(dialog, `No fim do arquivo, ${simbolo}${conta ? ` (${conta})` : ''} ficou posicionado?`, FIM[a])
+/** E26 on «conferir»: net or gross */
+const responderLiquido = (dialog: HTMLElement, liquido: boolean) =>
+  pilula(dialog, /^O resultado do arquivo já/, liquido ? 'Sim, é líquido' : 'Não, é bruto')
+
+/** «mapa»'s selects, in the file's column order */
+const selectsDoMapa = (dialog: HTMLElement) => Array.from(dialog.querySelectorAll('.hub-cols select')) as HTMLSelectElement[]
+/** Moves «Conta» on «mapa» to column `k` (null: no «Conta» column); the old «Conta» column → «Ignorar esta coluna» */
+async function moverConta(dialog: HTMLElement, k: number | null) {
+  const atual = selectsDoMapa(dialog).findIndex((s) => s.value === 'account')
+  if (atual >= 0) await userEvent.selectOptions(selectsDoMapa(dialog)[atual], 'ignorar')
+  if (k !== null) await userEvent.selectOptions(selectsDoMapa(dialog)[k], 'account')
+  expect(selectsDoMapa(dialog).map((s) => s.value).filter((v) => v === 'account')).toHaveLength(k === null ? 0 : 1)
 }
 
-const continuar = (dialog: HTMLElement) => userEvent.click(within(dialog).getByRole('button', { name: 'Continuar' }))
+/** «Nome do modelo» on «conferir» */
+async function nomeDoModelo(dialog: HTMLElement, nome: string) {
+  const campo = within(dialog).getByRole('textbox', { name: 'Nome do modelo' })
+  await userEvent.clear(campo)
+  await userEvent.type(campo, nome)
+}
+
+const continuar =(dialog: HTMLElement) => userEvent.click(within(dialog).getByRole('button', { name: 'Continuar' }))
 const usar = (dialog: HTMLElement) => userEvent.click(within(dialog).getByRole('button', { name: 'Usar estas colunas' }))
 
 /** The zone radio of a zone name */
@@ -187,13 +184,13 @@ beforeEach(() => {
   fetchTemplates.mockResolvedValue([])
   fetchRulesConfig.mockResolvedValue(regrasQuadro())
   saveTemplate.mockResolvedValue({ template_id: '3b0c0a00-0000-4000-8000-0000000000f1', header_sig: 'ab'.repeat(32), created: true })
-  mockAplicar = null
+  modeloASalvar.mockClear()
   expect(HOJE_QUADRO.toISOString()).toBe('2026-10-15T15:00:00.000Z')
 })
 
 /**
- * Drives the sheet to the state's «Prévia» as the board does: the account in context, the file, the answers on «mapa»
- * (side words, dates, the net and end-of-file answers kept for «conferir»), hc, the zone
+ * Drives the sheet to the state's «Prévia» as the board does: the account in context, the file, the side words on
+ * «mapa», the end-of-file and net answers on «conferir», hc, the zone
  */
 async function ateAPrevia(e: EstadoQuadro, extra: { liquido?: boolean; templates?: Template[] } = {}) {
   const d = ESTADOS_QUADRO[e]
@@ -207,10 +204,7 @@ async function ateAPrevia(e: EstadoQuadro, extra: { liquido?: boolean; templates
   // The step after the file is read (never the drop step)
   const primeiro = await within(dialog).findByRole('heading', { level: 3, name: (n) => !/^(Importar histórico|Escolha)/.test(n) })
   if (primeiro.textContent !== 'Prévia') {
-    await within(dialog).findByTestId('stub')
-    await responder(dialog, (m) => ({ ...m, ...r }))
-    if (within(dialog).queryByRole('button', { name: 'Continuar' })) await continuar(dialog)
-    await usar(dialog)
+    await responderNoQuadro(dialog, r)
     if (accountValue) {
       const linha = await within(dialog).findByRole('combobox', { name: `O que fazer com ${accountValue}` })
       await userEvent.selectOptions(linha, 'importar')
@@ -224,6 +218,25 @@ async function ateAPrevia(e: EstadoQuadro, extra: { liquido?: boolean; templates
   }
   await within(dialog).findByRole('heading', { level: 3, name: 'Prévia' })
   return dialog
+}
+
+/**
+ * The board's answers on lane L1's steps, from «mapa» (or «conferir» for a model that starts there) to «Usar estas
+ * colunas»: the side words on «mapa», then the end-of-file and net answers on «conferir»
+ */
+async function responderNoQuadro(
+  dialog: HTMLElement,
+  r: { sideWords?: Record<string, SideWordAnswer>; endOfFile?: Record<string, EndOfFileAnswer>; resultIsNet?: boolean | null },
+) {
+  const passo = await noMapeamento(dialog)
+  if (passo.textContent !== 'Confira 3 linhas') {
+    for (const [palavra, a] of Object.entries(r.sideWords ?? {})) await responderLado(dialog, palavra, a)
+    await continuar(dialog)
+    await within(dialog).findByRole('heading', { level: 3, name: 'Confira 3 linhas' })
+  }
+  for (const [simbolo, a] of Object.entries(r.endOfFile ?? {})) await responderFim(dialog, simbolo, a)
+  if (typeof r.resultIsNet === 'boolean') await responderLiquido(dialog, r.resultIsNet)
+  await usar(dialog)
 }
 
 // ================================================================================================
@@ -454,7 +467,7 @@ describe('a2 · «Para qual conta?» for an unrecognised file (19)', () => {
     await within(dialog).findByRole('heading', { name: 'Para qual conta?' })
     await userEvent.click(within(dialog).getByRole('button', { name: 'Ylos 50k' }))
     await continuar(dialog)
-    await within(dialog).findByTestId('stub')
+    await noMapeamento(dialog)
     await continuar(dialog)
     await usar(dialog)
     await within(dialog).findByRole('heading', { name: 'Em que fuso estão os horários deste arquivo?' })
@@ -469,7 +482,7 @@ describe('a2 · «Para qual conta?» for an unrecognised file (19)', () => {
     expect(within(dialog).getByRole('heading', { name: 'Para qual conta?' })).toHaveFocus()
     await userEvent.click(within(dialog).getByRole('button', { name: 'Lucid 50k' }))
     await continuar(dialog)
-    await within(dialog).findByTestId('stub')
+    await noMapeamento(dialog)
     await continuar(dialog)
     await usar(dialog)
     await within(dialog).findByRole('heading', { name: 'Em que fuso estão os horários deste arquivo?' })
@@ -586,7 +599,7 @@ describe('16 · «termina posicionado» read by the saved model «Tradovate» (o
     expect(cardOf(dialog)).toBe('Modelo “Tradovate” · Futuros · 13 linhas · 13 out')
     expect(indicatorOf(dialog)).toBe('Passo 1 de 2')
     // The chip's «Mudar colunas» is the step's (L1 places it); the sheet hands it over only for a model taken as is
-    expect(within(dialog).getByRole('button', { name: 'stub: Mudar colunas' })).toBeInTheDocument()
+    expect(within(dialog).getByRole('button', { name: 'Mudar colunas' })).toBeInTheDocument()
     await usar(dialog)
     expect(await within(dialog).findByRole('heading', { name: 'Prévia' })).toBeInTheDocument()
     expect(indicatorOf(dialog)).toBe('Passo 2 de 2')
@@ -602,13 +615,13 @@ describe('16 · «termina posicionado» read by the saved model «Tradovate» (o
     fetchTemplates.mockResolvedValue([modeloTradovate()])
     const dialog = await abrir('lucid', 'f16ta')
     await within(dialog).findByRole('heading', { name: 'Confira 3 linhas' })
-    await userEvent.click(within(dialog).getByRole('button', { name: 'stub: Mudar colunas' }))
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Mudar colunas' }))
     expect(await within(dialog).findByRole('heading', { name: 'Mude as colunas do modelo “Tradovate”.' })).toHaveFocus()
     expect(indicatorOf(dialog)).toBe('Passo 1 de 3')
     expect(within(dialog).queryByRole('button', { name: 'Voltar' })).not.toBeInTheDocument()
     await continuar(dialog)
     expect(await within(dialog).findByRole('heading', { name: 'Confira 3 linhas' })).toBeInTheDocument()
-    expect(within(dialog).queryByRole('button', { name: 'stub: Mudar colunas' })).not.toBeInTheDocument()
+    expect(within(dialog).queryByRole('button', { name: 'Mudar colunas' })).not.toBeInTheDocument()
   })
 })
 
@@ -621,7 +634,7 @@ describe('hc · «N contas neste arquivo» (17, Apex A)', () => {
     fetchTemplates.mockResolvedValue(templates)
     importPreview.mockResolvedValue(previaQuadro('17'))
     const dialog = await abrir(conta, 'f17')
-    await within(dialog).findByTestId('stub')
+    await noMapeamento(dialog)
     await continuar(dialog)
     await usar(dialog)
     expect(await within(dialog).findByRole('heading', { name: '2 contas neste arquivo' })).toHaveFocus()
@@ -684,7 +697,7 @@ describe('hc · «N contas neste arquivo» (17, Apex A)', () => {
     await voltar(dialog)
     expect(within(dialog).getByRole('heading', { name: MAPA_TITULO })).toHaveFocus()
     // «Conta» moves to «Trade number» (57 values, none of them Apex A's number)
-    await responder(dialog, (m) => ({ ...m, colunas: { ...m.colunas, trade: m.colunas.trade.map((c, k) => (k === 0 ? 'account' : c === 'account' ? 'ignorar' : c)) } }))
+    await moverConta(dialog, 0)
     await continuar(dialog)
     await usar(dialog)
     expect(await within(dialog).findByRole('heading', { name: '57 contas neste arquivo' })).toHaveFocus()
@@ -700,7 +713,7 @@ describe('hc · «N contas neste arquivo» (17, Apex A)', () => {
     // No «Conta» column at all: no hc, the zone step, and the preview gets every row
     await voltar(dialog)
     await voltar(dialog)
-    await responder(dialog, (m) => ({ ...m, colunas: { ...m.colunas, trade: m.colunas.trade.map((c) => (c === 'account' ? 'ignorar' : c)) } }))
+    await moverConta(dialog, null)
     await continuar(dialog)
     await usar(dialog)
     expect(await within(dialog).findByRole('heading', { name: 'Em que fuso estão os horários deste arquivo?' })).toHaveFocus()
@@ -718,7 +731,7 @@ describe('hc · «N contas neste arquivo» (17, Apex A)', () => {
     await userEvent.selectOptions(within(dialog).getByRole('combobox', { name: 'O que fazer com APX-0002' }), 'importar')
     await voltar(dialog)
     await voltar(dialog)
-    await responder(dialog, (m) => ({ ...m, colunas: { ...m.colunas, trade: m.colunas.trade.map((c, k) => (k === 0 ? 'account' : c === 'account' ? 'ignorar' : c)) } }))
+    await moverConta(dialog, 0)
     await continuar(dialog)
     await usar(dialog)
     expect(await within(dialog).findByRole('heading', { name: '57 contas neste arquivo' })).toBeInTheDocument()
@@ -735,14 +748,14 @@ describe('hc · «N contas neste arquivo» (17, Apex A)', () => {
     fetchTemplates.mockResolvedValue([])
     importPreview.mockResolvedValue(previaQuadro('17'))
     const dialog = await abrir('apexA', 'f17', new File([texto], 'ninjatrader.csv'))
-    await within(dialog).findByTestId('stub')
+    await noMapeamento(dialog)
     await continuar(dialog)
     await usar(dialog)
     await within(dialog).findByRole('heading', { name: '2 contas neste arquivo' })
     await userEvent.selectOptions(within(dialog).getByRole('combobox', { name: 'O que fazer com APX-0002' }), 'importar')
     await voltar(dialog)
     await voltar(dialog)
-    await responder(dialog, (m) => ({ ...m, colunas: { ...m.colunas, trade: m.colunas.trade.map((c, k) => (k === 10 ? 'account' : c === 'account' ? 'ignorar' : c)) } }))
+    await moverConta(dialog, 10)
     await continuar(dialog)
     await usar(dialog)
     expect(await within(dialog).findByRole('heading', { name: 'Em que fuso estão os horários deste arquivo?' })).toHaveFocus()
@@ -797,9 +810,10 @@ describe('hc · «N contas neste arquivo» (17, Apex A)', () => {
     fetchTemplates.mockResolvedValue([])
     importPreview.mockResolvedValue(previaQuadro('16c-sim'))
     const dialog = await abrir('lucid', 'f16c')
-    await within(dialog).findByTestId('stub')
+    await noMapeamento(dialog)
     await continuar(dialog)
-    await responder(dialog, (m) => ({ ...m, endOfFile: { [endOfFileKey('MESZ6', 'LT50K-0193')]: 'yes' } }))
+    await within(dialog).findByRole('heading', { level: 3, name: 'Confira 3 linhas' })
+    await responderFim(dialog, 'MESZ6', 'yes', 'LT50K-0193')
     await usar(dialog)
     expect(await within(dialog).findByRole('heading', { name: '2 contas neste arquivo' })).toBeInTheDocument()
     // An execution file counts its executions' lines; no number on Lucid 50k: nothing pre-imported
@@ -845,10 +859,10 @@ function ninjaLinha() {
 // ================================================================================================
 
 describe('the zone step: every market, G2', () => {
-  async function ateFuso(conta: ContaQuadro, key: ArquivoQuadroKey, aplicar?: (m: Mapeamento) => Mapeamento) {
+  async function ateFuso(conta: ContaQuadro, key: ArquivoQuadroKey, lado: Record<string, SideWordAnswer> = {}) {
     const dialog = await abrir(conta, key)
-    await within(dialog).findByTestId('stub')
-    if (aplicar) await responder(dialog, aplicar)
+    await noMapeamento(dialog)
+    for (const [palavra, a] of Object.entries(lado)) await responderLado(dialog, palavra, a)
     await continuar(dialog)
     await usar(dialog)
     expect(await within(dialog).findByRole('heading', { name: 'Em que fuso estão os horários deste arquivo?' })).toHaveFocus()
@@ -934,7 +948,7 @@ describe('the zone step: every market, G2', () => {
   })
 
   it('19 · B3: the B3 band and legend, captions «de Brasília»', async () => {
-    const dialog = await ateFuso('mini', 'f19', (m) => ({ ...m, sideWords: { x: 'sell' } }))
+    const dialog = await ateFuso('mini', 'f19', { x: 'sell' })
     expect(within(dialog).getByText('No arquivo: entradas 10:02–16:40, sem fuso.')).toBeInTheDocument()
     await escolherZona(dialog, 'America/Sao_Paulo')
     expect(caps(dialog)[1]).toBe('entradas 10:02–16:40 de Brasília')
@@ -946,7 +960,7 @@ describe('the zone step: every market, G2', () => {
   it('16 · Binance (Date(UTC): every row with its offset): no zone step, «Passo 3 de 3» on «Prévia», no zone line', async () => {
     importPreview.mockResolvedValue(previaQuadro('16b-naosei'))
     const dialog = await abrir('binance', 'f16b')
-    await within(dialog).findByTestId('stub')
+    await noMapeamento(dialog)
     expect(indicatorOf(dialog)).toBe('Passo 1 de 3')
     await continuar(dialog)
     await usar(dialog)
@@ -1102,9 +1116,17 @@ describe('the commit and the model’s save (§6.8)', () => {
     importPreview.mockResolvedValue(previaQuadro('8'))
     const nome = 'M'.repeat(MAX_TEMPLATE_NAME + 1)
     const dialog = await abrir('ylos', 'f8')
-    await within(dialog).findByTestId('stub')
-    await responder(dialog, (m) => ({ ...m, nome }))
+    await noMapeamento(dialog)
     await continuar(dialog)
+    // «Nome do modelo» keeps 60 characters, so no screen makes this name: the model is handed to the sheet as is, and
+    // the sheet's own check (the database's) refuses it before any call
+    await within(dialog).findByRole('heading', { level: 3, name: 'Confira 3 linhas' })
+    await nomeDoModelo(dialog, nome)
+    expect(within(dialog).getByRole('textbox', { name: 'Nome do modelo' })).toHaveValue('M'.repeat(MAX_TEMPLATE_NAME))
+    modeloASalvar.mockImplementationOnce((m, ctx) => {
+      const s = jest.requireActual('@/lib/hub/importMapeado').modeloASalvar(m, ctx)
+      return s && { ...s, nome, payload: { ...s.payload, name: nome } }
+    })
     await usar(dialog)
     await within(dialog).findByRole('heading', { name: 'Em que fuso estão os horários deste arquivo?' })
     await escolherZona(dialog, NY)
@@ -1122,9 +1144,10 @@ describe('the commit and the model’s save (§6.8)', () => {
     fetchAccounts.mockResolvedValue(contasQuadro())
     importPreview.mockResolvedValue(previaQuadro('8'))
     const dialog = await abrir('ylos', 'f8')
-    await within(dialog).findByTestId('stub')
+    await noMapeamento(dialog)
     await continuar(dialog)
-    await responder(dialog, (m) => ({ ...m, salvar: false }))
+    await userEvent.click(await within(dialog).findByRole('checkbox', { name: 'Salvar como modelo' }))
+    expect(within(dialog).getByRole('checkbox', { name: 'Salvar como modelo' })).not.toBeChecked()
     await usar(dialog)
     await within(dialog).findByRole('heading', { name: 'Em que fuso estão os horários deste arquivo?' })
     await escolherZona(dialog, NY)
@@ -1175,7 +1198,7 @@ describe('the commit and the model’s save (§6.8)', () => {
     await continuar(dialog)
     await within(dialog).findByRole('heading', { name: 'Prévia' })
     await userEvent.click(within(dialog).getByRole('button', { name: 'Mudar colunas' }))
-    await within(dialog).findByTestId('stub')
+    await noMapeamento(dialog)
     await continuar(dialog)
     await usar(dialog)
     await within(dialog).findByRole('heading', { name: '2 contas neste arquivo' })
@@ -1214,7 +1237,7 @@ describe('the commit and the model’s save (§6.8)', () => {
     await act(async () => {
       fireEvent.change(within(dialog).getByTestId('arquivo'), { target: { files: [new File([text], 'blackarrow.csv')] } })
     })
-    await within(dialog).findByTestId('stub')
+    await noMapeamento(dialog)
     await continuar(dialog)
     await usar(dialog)
     await escolherZona(dialog, NY)
@@ -1254,7 +1277,7 @@ describe('«Nada novo» of a mapped file (no zone block, G2)', () => {
     fetchAccounts.mockResolvedValue(contasQuadro(d.conta === 'ylosDepois'))
     importPreview.mockResolvedValue(previaQuadro(e))
     const dialog = await abrir(d.conta, d.arquivo)
-    await within(dialog).findByTestId('stub')
+    await noMapeamento(dialog)
     await continuar(dialog)
     await usar(dialog)
     const h = await within(dialog).findByRole('heading', { level: 3, name: /Em que fuso|Nada novo/ })
@@ -1271,13 +1294,13 @@ describe('the indicator and «Voltar»', () => {
   it('8: mapa 1/4 → conferir 2/4 → c 3/4 → d 4/4; «Voltar» back the same way, every edit kept', async () => {
     importPreview.mockResolvedValue(previaQuadro('8'))
     const dialog = await abrir('ylos', 'f8')
-    await within(dialog).findByTestId('stub')
+    await noMapeamento(dialog)
     expect(indicatorOf(dialog)).toBe('Passo 1 de 4')
-    // The mapa step's answer is kept through «Voltar»
-    await responder(dialog, (m) => ({ ...m, nome: 'Plataforma X' }))
     await continuar(dialog)
     expect(await within(dialog).findByRole('heading', { name: 'Confira 3 linhas' })).toHaveFocus()
     expect(indicatorOf(dialog)).toBe('Passo 2 de 4')
+    // The name given on «conferir» is kept through «Voltar»
+    await nomeDoModelo(dialog, 'Plataforma X')
     await usar(dialog)
     await within(dialog).findByRole('heading', { name: 'Em que fuso estão os horários deste arquivo?' })
     expect(indicatorOf(dialog)).toBe('Passo 3 de 4')
@@ -1290,6 +1313,7 @@ describe('the indicator and «Voltar»', () => {
     expect(radioDe(dialog, /^Nova York/)).toBeChecked()
     await userEvent.click(within(dialog).getByRole('button', { name: 'Voltar' }))
     expect(within(dialog).getByRole('heading', { name: 'Confira 3 linhas' })).toHaveFocus()
+    expect(within(dialog).getByRole('textbox', { name: 'Nome do modelo' })).toHaveValue('Plataforma X')
     await userEvent.click(within(dialog).getByRole('button', { name: 'Voltar' }))
     expect(within(dialog).getByRole('heading', { name: 'Não reconhecemos este arquivo. Diga o que é cada coluna.' })).toHaveFocus()
     await userEvent.click(within(dialog).getByRole('button', { name: 'Voltar' }))
@@ -1299,13 +1323,13 @@ describe('the indicator and «Voltar»', () => {
 
   it('17: «Passo 1 de 5» on mapa (hc and c ahead)', async () => {
     const dialog = await abrir('apexA', 'f17')
-    await within(dialog).findByTestId('stub')
+    await noMapeamento(dialog)
     expect(indicatorOf(dialog)).toBe('Passo 1 de 5')
   })
 
   it('a mapped file is no form: closing never asks «Fechar sem salvar?»', async () => {
     const dialog = await abrir('ylos', 'f8')
-    await within(dialog).findByTestId('stub')
+    await noMapeamento(dialog)
     await userEvent.keyboard('{Escape}')
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
