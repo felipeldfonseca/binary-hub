@@ -277,18 +277,24 @@ export interface BatchUndo {
   existing: number;
 }
 
-/** A page of a full read (the API's row limit); a page the limit cuts shorter is followed by the next */
-const UNDO_PAGE = 1000;
+/**
+ * A page of a full read (the API's row limit, supabase/config.toml max_rows); a page the limit cuts shorter is followed
+ * by the next. Used by fetchBatchUndo and fetchTemplateMarkets.
+ */
+const READ_PAGE = 1000;
 /** Trade ids per `in` filter (the request's URL stays short) */
 const UNDO_ID_CHUNK = 100;
 
-/** Every row of a read, page after page from what came, until the exact count is there */
+/**
+ * Every row of a read, page after page from what came, until the exact count is there. `page` asks for a stable order
+ * (a unique column) and { count: 'exact' }; a failed page fails the whole read (never a part of it).
+ */
 async function readAll<T>(page: (from: number, to: number) => PromiseLike<Result<T[]>>): Promise<T[]> {
   const out: T[] = [];
   for (;;) {
     let result: Result<T[]>;
     try {
-      result = await page(out.length, out.length + UNDO_PAGE - 1);
+      result = await page(out.length, out.length + READ_PAGE - 1);
     } catch (e) {
       throw toHubError(e);
     }
@@ -512,16 +518,23 @@ export async function fetchTemplates(db: SupabaseClient): Promise<Template[]> {
  * its batches (import_batches.template_id, set by import_template_save, «Desfazer» keeps it) → each batch's account →
  * trading_accounts.market, read with the user's session (RLS: own rows; archived accounts included). A model with no batch
  * is absent: it fits every market. Two plain reads, no embedding: the database has no column for it (no change in 3b).
+ * Both are read whole, page after page past the API's row limit (readAll, in id order): a model whose batches a cut read
+ * missed would look batch-less and so fit every market, and «Atualizar o modelo» would come checked over another
+ * market's model. A failed page fails the read: the sheet then takes the markets as unknown (useTemplateMarkets).
  */
 export async function fetchTemplateMarkets(db: SupabaseClient): Promise<Record<string, AccountMarket[]>> {
   const [batches, accounts] = await Promise.all([
-    run<{ template_id: string | null; account_id: string }[]>(db.from('import_batches').select('template_id, account_id').eq('platform', 'modelo')),
-    run<{ id: string; market: AccountMarket }[]>(db.from('trading_accounts').select('id, market')),
+    readAll<{ template_id: string | null; account_id: string }>((from, to) =>
+      db.from('import_batches').select('template_id, account_id', { count: 'exact' }).eq('platform', 'modelo').order('id').range(from, to),
+    ),
+    readAll<{ id: string; market: AccountMarket }>((from, to) =>
+      db.from('trading_accounts').select('id, market', { count: 'exact' }).order('id').range(from, to),
+    ),
   ]);
   const market: Record<string, AccountMarket> = {};
-  for (const a of accounts ?? []) market[a.id] = a.market;
+  for (const a of accounts) market[a.id] = a.market;
   const out: Record<string, AccountMarket[]> = {};
-  for (const b of batches ?? []) {
+  for (const b of batches) {
     const m = market[b.account_id];
     if (!b.template_id || !m) continue;
     const list = (out[b.template_id] ??= []);

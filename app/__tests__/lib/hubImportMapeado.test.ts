@@ -553,9 +553,11 @@ describe('owner decision (23 Oct): a model saved in another market', () => {
     if (!r.ok) throw new Error(r.error)
     expect([r.mapeamento.match.kind, modeloSoParaLer(r.mapeamento)]).toEqual(['exact', true])
     const changed = { ...r.mapeamento, match: { kind: 'changed' as const, template: ninja, shared: 10 } }
+    // A value the model has no route for (APX-0002): only its route is saved, never APX-0001's to Apex A
+    expect(ninja.accountRoutes).toEqual({ [accountRouteHash('APX-0001')]: apex.id })
     for (const x of [changed, comSalvar(changed, true)]) {
-      expect(modeloASalvar(x, { tzHint: null, rota: { valor: 'APX-0001', contaId: CONTAS_QUADRO.e8.id } })?.payload.account_routes).toEqual({
-        [accountRouteHash('APX-0001')]: CONTAS_QUADRO.e8.id,
+      expect(modeloASalvar(x, { tzHint: null, rota: { valor: 'APX-0002', contaId: CONTAS_QUADRO.e8.id } })?.payload.account_routes).toEqual({
+        [accountRouteHash('APX-0002')]: CONTAS_QUADRO.e8.id,
       })
     }
   })

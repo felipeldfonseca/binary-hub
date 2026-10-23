@@ -34,6 +34,7 @@ import { ESTADOS_QUADRO, arquivoDoEstado, arquivoMapeavelQuadro, commitQuadro, p
 import { iniciarMapeamento } from '@/lib/hub/importMapeado'
 import PassoContasDoArquivo from '@/components/hub/importar/PassoContasDoArquivo'
 import { fixtureFile } from '@/testing/hubHarness'
+import { apiPaginada } from '@/testing/apiPaginada'
 
 jest.mock('@/lib/supabase', () => ({ createDataClient: jest.fn(() => ({})) }))
 jest.mock('@/hooks/useAuth', () => ({ useAuth: () => ({ user: { id: 'user-1' }, session: { access_token: 'user-jwt' } }) }))
@@ -671,6 +672,34 @@ describe('owner decision (23 Oct): a model saved in another market is offered, n
     const dialog = await b3AteConferir()
     expect(within(dialog).getByRole('checkbox', { name: 'Atualizar o modelo “BlackArrow”' })).not.toBeChecked()
     expect(within(dialog).getByText('O modelo “BlackArrow” é de outro mercado. Sem atualizá-lo, estas colunas viram um modelo novo.')).toBeInTheDocument()
+  })
+
+  it('past the API’s row limit (max_rows 1000): «BlackArrow»’s only batch on the second page keeps it of Futuros, unchecked; a failed page is «unknown»', async () => {
+    // The real read on an API that answers 1 000 rows at most: 1 000 batches of «Tradovate» in Ylos 50k, then
+    // «BlackArrow»'s only one (Ylos 50k, Futuros), last in id order
+    const real = (jest.requireActual('@/lib/hub/contasDb') as typeof data).fetchTemplateMarkets
+    const ylos = CONTAS_QUADRO.ylos.id
+    const lotes = [
+      ...Array.from({ length: 1000 }, (_, i) => ({ id: `lote-${String(i).padStart(5, '0')}`, platform: 'modelo', template_id: MODELO_TRADOVATE_LINHA.id, account_id: ylos })),
+      { id: 'lote-01000', platform: 'modelo', template_id: BA, account_id: ylos },
+    ]
+    const tabelas = { import_batches: lotes, trading_accounts: contasQuadro().map((c) => ({ id: c.id, market: c.market })) }
+    const casos = [
+      { falha: false, linha: AVISO },
+      { falha: true, linha: 'O modelo “BlackArrow” é de outro mercado. Sem atualizá-lo, estas colunas viram um modelo novo.' },
+    ]
+    for (const { falha, linha } of casos) {
+      const api = apiPaginada(tabelas, 1000, (c) => (falha && c.table === 'import_batches' && (c.range?.[0] ?? 0) > 0 ? { message: 'TypeError: Failed to fetch' } : undefined))
+      fetchTemplateMarkets.mockImplementation(() => real(api.db))
+      const dialog = await b3AteConferir()
+      const caixa = within(dialog).getByRole('checkbox', { name: 'Atualizar o modelo “BlackArrow”' })
+      expect(caixa).not.toBeChecked()
+      expect(caixa).toHaveAccessibleDescription(linha)
+      expect(within(dialog).getByRole('textbox', { name: 'Nome do modelo' })).toHaveValue('BlackArrow · B3')
+      // Both pages asked (the second one's failure is the «unknown» case)
+      expect(api.calls.filter((c) => c.table === 'import_batches').map((c) => c.range)).toEqual([[0, 999], [1000, 1999]])
+      cleanup()
+    }
   })
 
   it('in its own market (or with no batch yet) it is as on the board: «Atualizar o modelo “BlackArrow”» checked, no line', async () => {
