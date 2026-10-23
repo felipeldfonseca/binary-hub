@@ -29,6 +29,7 @@
 }
 .hub .hub-ler-painel .hub-pill {
   min-width: 44px;
+  text-align: center;
 }
 
 /* «Obrigatórias»: dashed while missing, mint once marked */
@@ -143,12 +144,14 @@
 .hub .hub-pareamento__tit {
   font-weight: 700;
 }
+/* The board's list keeps its bullets (the app's base styles take them off every list) */
 .hub .hub-ops-lista {
   display: flex;
   flex-direction: column;
   gap: 6px;
   margin: 0;
   padding-left: 18px;
+  list-style: disc;
   font-size: 13px;
 }
 

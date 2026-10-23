@@ -116,7 +116,7 @@ describe('hub-importar-mapa.css', () => {
     ])
     expect(regra('.hub .hub-prev-lista').getPropertyValue('list-style')).toBe('none')
     const ops = regra('.hub .hub-ops-lista')
-    expect([ops.getPropertyValue('padding-left'), ops.getPropertyValue('font-size')]).toEqual(['18px', '13px'])
+    expect([ops.getPropertyValue('padding-left'), ops.getPropertyValue('font-size'), ops.getPropertyValue('list-style')]).toEqual(['18px', '13px', 'disc'])
   })
 
   it('a phone: one column per row at ≤ 480 px; the selects take the row’s width', () => {
@@ -127,7 +127,8 @@ describe('hub-importar-mapa.css', () => {
   })
 
   it('44 px targets: the separator pills; the pills, «Mudar», «Mudar colunas», «Ver …», the selects, the checkbox row and the name field from hub.css', () => {
-    expect(regra('.hub .hub-ler-painel .hub-pill').getPropertyValue('min-width')).toBe('44px')
+    const sep = regra('.hub .hub-ler-painel .hub-pill')
+    expect([sep.getPropertyValue('min-width'), sep.getPropertyValue('text-align')]).toEqual(['44px', 'center'])
     const hub = rules(lerCss('hub.css'))
     for (const s of ['.hub .hub-pill', '.hub .hub-btn', '.hub .hub-sel', '.hub-check', '.hub .hub-entrada', '.hub .hub-abre']) {
       expect(regra(s, hub).getPropertyValue('min-height')).toBe('44px')
