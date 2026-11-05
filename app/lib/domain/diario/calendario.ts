@@ -18,7 +18,7 @@ import type { AccountMarket } from '../markets';
 import { abs, cmp, numeric, sign, type Numeric } from '../registro/numeric';
 import { addDays, isoWeekdayOf } from '../tempo';
 import { isPendingReview, weekReviews } from './revisao';
-import type { CalendarDay, CalendarWeek, Day, ForaSum, Money, MonthDay, MonthWeek } from './tipos';
+import type { CalendarDay, CalendarWeek, Day, DayKind, ForaSum, Money, MonthDay, MonthWeek } from './tipos';
 
 // ---------------------------------------------------------------------------------------------
 // Dates (calendar arithmetic on 'YYYY-MM-DD', never the device clock)
@@ -27,6 +27,15 @@ import type { CalendarDay, CalendarWeek, Day, ForaSum, Money, MonthDay, MonthWee
 /** The Monday of a day's ISO week */
 export function weekOf(day: Day): Day {
   return addDays(day, 1 - isoWeekdayOf(day));
+}
+
+/**
+ * The twin of diario_week_closed: a week (its Monday) is closed once today is after its last
+ * possible trading day, Sunday where trading days fall on weekends (binary, Cripto), Friday
+ * elsewhere (a Sunday evening session already counts on Monday)
+ */
+export function isWeekClosed(market: AccountMarket, week: Day, today: Day): boolean {
+  return today > addDays(week, market === 'binary' || market === 'crypto' ? 6 : 4);
 }
 
 /** 'YYYY-MM' of a day */
@@ -81,6 +90,23 @@ export function calendarMonths(firstDay: Day | null, today: Day): string[] {
     m = addMonths(m, 1);
   }
   return out;
+}
+
+// ---------------------------------------------------------------------------------------------
+// History and the day's kind (the database decides them; these pin its rule, cases4.json)
+// ---------------------------------------------------------------------------------------------
+
+/**
+ * A trade is history («Histórico importado · só resultado») when it entered before the account's
+ * version 1 took effect, or the account has no rules
+ */
+export const isHistoryEntry = (entry: Date, desde: Date | null): boolean => desde === null || entry.getTime() < desde.getTime();
+
+/** A day's kind from its diário and history trades */
+export function dayKindOf(n: number, history: number): DayKind {
+  if (n === 0 && history === 0) return 'vazio';
+  if (n === 0) return 'historico';
+  return history === 0 ? 'diario' : 'misto';
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -265,6 +291,8 @@ export function monthGrid(input: MonthGridInput): MonthGrid {
       const future = day > today;
       const data = inMonth && !future ? byDay[day] ?? null : null;
       const withTrades = !!data && hasTrades(data);
+      // A written review on a day without trades (a 'vazio' row) still shows ✓ and opens the day
+      const reviewed = !!data && data.kind !== 'historico' && data.review !== null;
       const isToday = day === today;
       const m = data && data.kind !== 'historico' ? mesDay[day] : undefined;
       cells.push({
@@ -275,12 +303,12 @@ export function monthGrid(input: MonthGridInput): MonthGrid {
         weekend: isWeekend(day),
         data: withTrades ? data : null,
         hasTrades: withTrades,
-        clickable: inMonth && !future && (withTrades || isToday),
+        clickable: inMonth && !future && (withTrades || isToday || reviewed),
         noTrades: inMonth && !future && !withTrades && !isToday,
         historyOnly: withTrades && data?.kind === 'historico',
         level: withTrades ? levels[day] ?? 0 : 0,
         loss: withTrades && sign(numeric(dayMoney(data as CalendarDay))) < 0,
-        reviewed: withTrades && data?.kind !== 'historico' && data?.review !== null,
+        reviewed,
         pendingReview: withTrades && isPendingReview(data as CalendarDay, today),
         fora: m && m.fora.n > 0 ? m.fora : null,
         limitHitAt: m?.limit?.hitAt ?? null,
@@ -288,7 +316,7 @@ export function monthGrid(input: MonthGridInput): MonthGrid {
     }
     const w = weekRow[s];
     const diario = w && (w.n > 0 || w.days > 0) ? { n: w.n, net: w.net } : null;
-    const history = w?.history && w.history.n > 0 ? w.history : null;
+    const history = w?.history && w.history.n > 0 ? { n: w.history.n, net: w.history.net } : null;
     const fw = mesWeek[s];
     weeks.push({
       weekOf: s,
@@ -322,7 +350,7 @@ export interface WeekCard {
   weekOf: Day;
   columns: 5 | 7;
   lastShown: Day;
-  /** Today falls inside it: «Semana em andamento · {pregoesAte} de {columns} pregões» */
+  /** It started and is not closed (isWeekClosed): «Semana em andamento · {pregoesAte} de {columns} pregões» */
   inProgress: boolean;
   /** Days of the week up to today that the columns show */
   pregoesAte: number;
@@ -380,7 +408,7 @@ export function weekCard(input: {
     bars.push({ day, net: d ? d.net : null, future: day > today, height, loss: v !== undefined && sign(v) < 0 });
   }
 
-  const inProgress = s <= today && today <= end;
+  const inProgress = s <= today && !isWeekClosed(market, s, today);
   return {
     weekOf: s,
     columns,
@@ -389,7 +417,7 @@ export function weekCard(input: {
     pregoesAte: Math.min(isoWeekdayOf(today), columns),
     withTrades: diarioDays.length,
     diario: row && (row.n > 0 || row.days > 0) ? { n: row.n, net: row.net } : null,
-    history: row?.history && row.history.n > 0 ? row.history : null,
+    history: row?.history && row.history.n > 0 ? { n: row.history.n, net: row.history.net } : null,
     fora: fw && fw.fora.n > 0 ? fw.fora : null,
     reviews: weekReviews(inWeek, today),
     bars,

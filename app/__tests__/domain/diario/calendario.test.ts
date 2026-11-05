@@ -8,7 +8,10 @@
 import {
   addMonths,
   calendarMonths,
+  dayKindOf,
   heatLevels,
+  isHistoryEntry,
+  isWeekClosed,
   monthBounds,
   monthColumns,
   monthGrid,
@@ -171,7 +174,7 @@ describe('the month grid (board scenario 4: Top One in October, today 1º dez)',
     expect([cell('2026-10-08').historyOnly, cell('2026-10-08').level, cell('2026-10-08').loss]).toEqual([true, 4, true]);
     expect([cell('2026-10-14').historyOnly, cell('2026-10-14').data?.kind, cell('2026-10-14').reviewed]).toEqual([false, 'misto', true]);
     expect([cell('2026-10-30').noTrades, cell('2026-10-30').clickable, cell('2026-10-07').noTrades]).toEqual([true, false, true]);
-    expect(cell('2026-10-26').fora).toEqual({ n: 1, net: '-37.48' });
+    expect(cell('2026-10-26').fora).toEqual({ n: 1, net: '-37.48', open: 0 });
   });
 
   it('20 and 27 out are due a review; 28 out came only from the file (no ✓, not pending)', () => {
@@ -184,7 +187,7 @@ describe('the month grid (board scenario 4: Top One in October, today 1º dez)',
     const w = grid.weeks[2];
     expect(w.diario).toEqual({ n: 8, net: '-42.68' });
     expect(w.history).toEqual({ n: 4, net: '163.29' });
-    expect(w.fora).toEqual({ n: 1, net: '-34.64' });
+    expect(w.fora).toEqual({ n: 1, net: '-34.64', open: 0 });
     // 28 set–2 out: only history (28 set, 1º and 2 out)
     expect([grid.weeks[0].diario, grid.weeks[0].history]).toEqual([null, { n: 11, net: '-18.26' }]);
   });
@@ -255,5 +258,45 @@ describe('the «Semana» card: the week of the open day', () => {
     const bin = binanceDays();
     const w = weekCard({ day: '2026-11-14', today: '2026-11-14', market: 'crypto', days: bin, weeks: calendarWeeks(bin) });
     expect([w.columns, w.inProgress, w.pregoesAte, w.withTrades]).toEqual([7, true, 6, 2]);
+  });
+});
+
+describe('the answers\' own rules (cases4.json pins them against the SQL)', () => {
+  it('a week closes after Friday, or after Sunday where trading days fall on weekends', () => {
+    expect([isWeekClosed('futures', '2026-11-23', '2026-11-27'), isWeekClosed('futures', '2026-11-23', '2026-11-28')]).toEqual([false, true]);
+    expect([isWeekClosed('binary', '2026-11-23', '2026-11-29'), isWeekClosed('crypto', '2026-11-23', '2026-11-30')]).toEqual([false, true]);
+  });
+
+  it('«Semana em andamento» until the week is closed: a futures Saturday shows the week whole, Cripto\'s goes on', () => {
+    const days = topOneDays();
+    const card = weekCard({ day: '2026-11-27', today: '2026-11-28', market: 'futures', days, weeks: calendarWeeks(days) });
+    expect([card.inProgress, card.columns]).toEqual([false, 5]);
+    expect(weekCard({ day: '2026-11-12', today: '2026-11-14', market: 'crypto', days: binanceDays() }).inProgress).toBe(true);
+  });
+
+  it('the kind of a day, and a written review on a day without trades (✓, opens the day)', () => {
+    expect([dayKindOf(0, 0), dayKindOf(0, 2), dayKindOf(3, 0), dayKindOf(3, 1)]).toEqual(['vazio', 'historico', 'diario', 'misto']);
+    expect([isHistoryEntry(et('2026-10-14 09:00'), et('2026-10-14 09:12')), isHistoryEntry(et('2026-10-14 09:12'), et('2026-10-14 09:12')), isHistoryEntry(et('2026-10-14 09:12'), null)]).toEqual([true, false, true]);
+    const vazio: CalendarDay = {
+      day: '2026-11-11',
+      weekday: 3,
+      kind: 'vazio',
+      n: 0,
+      app: 0,
+      open: 0,
+      wins: 0,
+      losses: 0,
+      even: 0,
+      net: '0',
+      gross: '0',
+      commission: null,
+      review: { firstSavedAt: et('2026-11-11 18:00'), savedAt: et('2026-11-11 18:00'), versions: 1 },
+      history: null,
+      importedAt: null,
+    };
+    const days = [...topOneDays().filter((d) => d.day !== '2026-11-11'), vazio];
+    const grid = monthGrid({ month: '2026-11', today: '2026-12-01', market: 'futures', days });
+    const cell = grid.weeks.flatMap((w) => w.cells).find((c) => c.day === '2026-11-11')!;
+    expect([cell.data, cell.hasTrades, cell.reviewed, cell.clickable, cell.pendingReview, cell.level]).toEqual([null, false, true, true, false, 0]);
   });
 });

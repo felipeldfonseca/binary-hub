@@ -13,7 +13,7 @@
  */
 import { addDays } from '../tempo';
 import { cmp, numeric } from '../registro/numeric';
-import type { CalendarDay, Day, DayFacts, DayReview, ReviewVersion } from './tipos';
+import type { CalendarDay, Day, DayFacts, DayKind, DayReview, ReviewVersion } from './tipos';
 
 /** «nas últimas 4 semanas» */
 export const RECENT_REVIEW_DAYS = 28;
@@ -69,4 +69,24 @@ export type FactsCore = Pick<DayFacts, 'trades' | 'net'>;
  */
 export function dayChanged(frozen: FactsCore, live: FactsCore): boolean {
   return frozen.trades !== live.trades || cmp(numeric(frozen.net), numeric(live.net)) !== 0;
+}
+
+/**
+ * The twin of diario_dia's carry_in («Do pregão anterior»): the newest day before `day` whose
+ * CURRENT review (its newest version) carries a «Levar para o próximo pregão»; a newer version that
+ * cleared it hides that day's older text. None on a history day, nor before «desde»'s day.
+ * `reviews`: each day's current carry-over (null when the current version has none).
+ */
+export function carryInOf(
+  reviews: readonly { day: Day; carryForward: string | null }[],
+  day: Day,
+  desdeDay: Day | null,
+  kind: DayKind,
+): { day: Day; text: string } | null {
+  if (kind === 'historico' || desdeDay === null || day < desdeDay) return null;
+  let best: { day: Day; text: string } | null = null;
+  for (const r of reviews) {
+    if (r.day < day && r.carryForward !== null && (best === null || r.day > best.day)) best = { day: r.day, text: r.carryForward };
+  }
+  return best;
 }

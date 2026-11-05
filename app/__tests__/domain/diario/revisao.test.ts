@@ -60,6 +60,7 @@ describe('the saved versions', () => {
   const v = (id: number, at: string) => ({
     id,
     savedAt: et(at),
+    written: true,
     worked: 'Esperei o reteste da mínima para vender.',
     differently: null,
     followed: 'sim' as const,

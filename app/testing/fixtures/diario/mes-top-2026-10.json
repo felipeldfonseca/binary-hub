@@ -1,0 +1,180 @@
+{
+  "v": 1,
+  "to": "2026-11-01",
+  "days": [
+    {
+      "day": "2026-10-14",
+      "fora": {
+        "n": 1,
+        "net": 8.76,
+        "open": 0
+      },
+      "limit": {
+        "net": 40.04,
+        "scope": "conta",
+        "worst": 0,
+        "amount": 400,
+        "hit_at": null,
+        "trades": 4,
+        "at_limit": "encerrar",
+        "worst_at_hit": null
+      },
+      "weekday": 3,
+      "recalculated": 3
+    },
+    {
+      "day": "2026-10-15",
+      "fora": {
+        "n": 0,
+        "net": 0,
+        "open": 0
+      },
+      "limit": {
+        "net": 60,
+        "scope": "conta",
+        "worst": 0,
+        "amount": 400,
+        "hit_at": null,
+        "trades": 1,
+        "at_limit": "encerrar",
+        "worst_at_hit": null
+      },
+      "weekday": 4,
+      "recalculated": 0
+    },
+    {
+      "day": "2026-10-21",
+      "fora": {
+        "n": 1,
+        "net": -38.74,
+        "open": 0
+      },
+      "limit": {
+        "net": -465.4,
+        "scope": "conta",
+        "worst": -465.4,
+        "amount": 400,
+        "hit_at": "2026-10-21T14:38:00+00:00",
+        "trades": 4,
+        "at_limit": "encerrar",
+        "worst_at_hit": -426.66
+      },
+      "weekday": 3,
+      "recalculated": 4
+    },
+    {
+      "day": "2026-10-22",
+      "fora": {
+        "n": 0,
+        "net": 0,
+        "open": 0
+      },
+      "limit": {
+        "net": 175,
+        "scope": "conta",
+        "worst": 0,
+        "amount": 400,
+        "hit_at": null,
+        "trades": 1,
+        "at_limit": "encerrar",
+        "worst_at_hit": null
+      },
+      "weekday": 4,
+      "recalculated": 0
+    },
+    {
+      "day": "2026-10-23",
+      "fora": {
+        "n": 0,
+        "net": 0,
+        "open": 0
+      },
+      "limit": {
+        "net": 0,
+        "scope": "conta",
+        "worst": 0,
+        "amount": 400,
+        "hit_at": null,
+        "trades": 0,
+        "at_limit": "encerrar",
+        "worst_at_hit": null
+      },
+      "weekday": 5,
+      "recalculated": 0
+    }
+  ],
+  "from": "2026-09-28",
+  "desde": "2026-10-14T13:12:04.806342+00:00",
+  "month": "2026-10",
+  "today": "2026-10-26",
+  "weeks": [
+    {
+      "fora": {
+        "n": 1,
+        "net": 8.76,
+        "open": 0
+      },
+      "week_of": "2026-10-12"
+    },
+    {
+      "fora": {
+        "n": 1,
+        "net": -38.74,
+        "open": 0
+      },
+      "week_of": "2026-10-19"
+    }
+  ],
+  "account": {
+    "id": "ab278fe9-7bda-4b37-abd7-fdf642bc0c36",
+    "day": {
+      "tz": "America/New_York",
+      "start_min": 1080
+    },
+    "label": "Top One #1",
+    "market": "futures",
+    "file_tz": "UTC",
+    "archived": false,
+    "currency": "USD",
+    "platform": "topone",
+    "is_example": false,
+    "tz_confirmed": true,
+    "guessed_clock": 0
+  },
+  "desde_day": "2026-10-14",
+  "server_now": "2026-10-26T13:00:04.690646+00:00",
+  "fora_trades": [
+    {
+      "day": "2026-10-14",
+      "net": 8.76,
+      "breaks": [
+        "fora_da_janela"
+      ],
+      "status": "closed",
+      "symbol": "MESZ6",
+      "quantity": 1,
+      "realized": true,
+      "trade_id": "e1aebf36-d45a-4b13-8fa5-d9df6ac1a0d1",
+      "direction": "long",
+      "plan_kind": "recalculado",
+      "asset_type": "futures",
+      "entry_time": "2026-10-14T15:20:00+00:00"
+    },
+    {
+      "day": "2026-10-21",
+      "net": -38.74,
+      "breaks": [
+        "depois_do_limite"
+      ],
+      "status": "closed",
+      "symbol": "MESZ6",
+      "quantity": 1,
+      "realized": true,
+      "trade_id": "65226469-a75e-49d0-b131-b39dd9182f95",
+      "direction": "long",
+      "plan_kind": "recalculado",
+      "asset_type": "futures",
+      "entry_time": "2026-10-21T14:52:00+00:00"
+    }
+  ]
+}

@@ -192,7 +192,7 @@ export function calendarWeeks(days: readonly CalendarDay[]): CalendarWeek[] {
     const w = weekOf(d.day);
     let row = out.find((x) => x.weekOf === w);
     if (!row) {
-      row = { weekOf: w, days: 0, n: 0, net: '0', gross: '0', history: null };
+      row = { weekOf: w, closed: false, days: 0, n: 0, net: '0', gross: '0', commission: null, history: null };
       out.push(row);
     }
     if (d.kind !== 'historico' && d.n > 0) {
@@ -202,7 +202,11 @@ export function calendarWeeks(days: readonly CalendarDay[]): CalendarWeek[] {
       row.gross = plus(row.gross, d.gross);
     }
     if (d.history && d.history.n > 0) {
-      row.history = { n: (row.history?.n ?? 0) + d.history.n, net: plus(row.history?.net ?? '0', d.history.net) };
+      row.history = {
+        n: (row.history?.n ?? 0) + d.history.n,
+        net: plus(row.history?.net ?? '0', d.history.net),
+        gross: plus(row.history?.gross ?? '0', d.history.gross),
+      };
     }
   }
   return out;
@@ -216,9 +220,19 @@ export function monthMarks(rows: readonly BoardRow[], wall: (text: string) => Da
     const [n, net, hit, worst] = mes;
     days.push({
       day,
-      fora: { n, net },
+      weekday: isoWeekdayOf(day),
+      fora: { n, net, open: 0 },
       recalculated: 0,
-      limit: { amount: '400', scope: 'conta', atLimit: 'encerrar', worst, hitAt: hit ? wall(`${day} ${hit}`) : null },
+      limit: {
+        amount: '400',
+        scope: 'conta',
+        atLimit: 'encerrar',
+        worst,
+        hitAt: hit ? wall(`${day} ${hit}`) : null,
+        worstAtHit: null,
+        net: '0',
+        trades: 0,
+      },
     });
   }
   const weeks: MonthWeek[] = [];
@@ -230,7 +244,7 @@ export function monthMarks(rows: readonly BoardRow[], wall: (text: string) => Da
       n += d.fora.n;
       net = plus(net, d.fora.net);
     }
-    weeks.push({ weekOf: s, fora: { n, net } });
+    weeks.push({ weekOf: s, fora: { n, net, open: 0 } });
   }
   return { days, weeks };
 }
@@ -238,6 +252,23 @@ export function monthMarks(rows: readonly BoardRow[], wall: (text: string) => Da
 export const topOneDays = () => calendarDays(TOP_ONE_ROWS, et, et('2026-10-13 19:08'));
 export const binanceDays = () => calendarDays(BINANCE_ROWS, brt);
 export const ebinexDays = () => calendarDays(EBINEX_ROWS, brt, brt('2026-10-13 20:30'));
+
+/** A day's limit as diario_fatos answers it: Top One's US$ 400 that ends the day, by default untouched */
+export function limitOf(over: Partial<NonNullable<DayFacts['limit']>>): NonNullable<DayFacts['limit']> {
+  return {
+    amount: '400',
+    scope: 'conta',
+    atLimit: 'encerrar',
+    worst: '0',
+    hitAt: null,
+    worstAtHit: null,
+    net: '0',
+    trades: 0,
+    after: [],
+    afterNet: null,
+    ...over,
+  };
+}
 
 /** A day's facts as diario_fatos answers them, with what the boards' days hold by default */
 export function facts(over: Partial<DayFacts>): DayFacts {
@@ -254,12 +285,13 @@ export function facts(over: Partial<DayFacts>): DayFacts {
     net: '0',
     gross: '0',
     commission: null,
+    firstEntryAt: null,
     window: { rule: true, evaluated: 0, inside: 0, outside: [] },
-    limit: { amount: '400', scope: 'conta', atLimit: 'encerrar', worst: '0', hitAt: null, after: [] },
-    fora: { n: 0, net: '0' },
+    limit: limitOf({}),
+    fora: { n: 0, net: '0', open: 0 },
     othersNet: '0',
     recalculated: 0,
-    history: { n: 0, net: '0' },
+    history: { n: 0, net: '0', gross: '0' },
     breakeven: null,
     version: { id: '00000000-0000-4000-8000-0000000000a1', versionNo: 2 },
     changes: 0,
@@ -281,17 +313,16 @@ export const f19 = (): DayFacts =>
     gross: '-453',
     commission: '12.4',
     window: { rule: true, evaluated: 5, inside: 5, outside: [] },
-    limit: {
-      amount: '400',
-      scope: 'conta',
-      atLimit: 'encerrar',
+    limit: limitOf({
       worst: '-465.4',
       hitAt: et('2026-11-19 10:38'),
-      lossAtHit: '426.66',
+      worstAtHit: '-426.66',
+      net: '-465.4',
+      trades: 5,
       after: [{ tradeId: 't5', at: et('2026-11-19 10:52') }],
       afterNet: '-38.74',
-    },
-    fora: { n: 1, net: '-38.74' },
+    }),
+    fora: { n: 1, net: '-38.74', open: 0 },
     othersNet: '-426.66',
     breakeven: { by: { MES: { n: '8', un: 'pts' }, MNQ: { n: '30', un: 'pts' } }, trades: 0, moved: 0 },
   });
@@ -308,8 +339,8 @@ export const f10 = (): DayFacts =>
     gross: '278.25',
     commission: '10.32',
     window: { rule: true, evaluated: 5, inside: 4, outside: [{ tradeId: 't5', at: et('2026-11-10 11:20') }] },
-    limit: { amount: '400', scope: 'conta', atLimit: 'encerrar', worst: '0', hitAt: null, after: [] },
-    fora: { n: 1, net: '-32.49' },
+    limit: limitOf({ net: '267.93', trades: 5 }),
+    fora: { n: 1, net: '-32.49', open: 0 },
     othersNet: '300.42',
     recalculated: 1,
     breakeven: { by: { MES: { n: '8', un: 'pts' }, MNQ: { n: '30', un: 'pts' } }, trades: 2, moved: 1 },

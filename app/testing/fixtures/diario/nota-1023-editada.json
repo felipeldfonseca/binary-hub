@@ -1,0 +1,14 @@
+{
+  "v": 1,
+  "note": {
+    "id": 4,
+    "text": "Só compro acima da VWAP; parcial no +8. Nada depois das 10:45.",
+    "written": true,
+    "saved_at": "2026-10-23T14:42:04.559269+00:00",
+    "versions": 2,
+    "first_saved_at": "2026-10-23T13:40:05.50633+00:00"
+  },
+  "dry_run": false,
+  "repeated": false,
+  "server_now": "2026-10-23T14:42:04.559269+00:00"
+}

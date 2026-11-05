@@ -297,7 +297,7 @@ export function linhaDoTopo(desdeDay: Day | null, days: readonly CalendarDay[], 
   let pregoes = 0;
   let hist = 0;
   for (const d of days) {
-    if (d.day > today) continue;
+    if (d.day > today || d.kind === 'vazio') continue;
     if (d.kind === 'historico') hist += d.history?.n ?? 0;
     else {
       n += d.n;
@@ -577,11 +577,11 @@ export function linhasDoPlano(rules: Rules, f: DayFacts, conta: ContaDiario): Li
     const perda = abs(numeric(l.worst));
     let fato: string;
     if (l.hitAt) {
-      fato = `atingido às ${hora(l.hitAt, conta.tz)}` + (l.lossAtHit ? `, com ${dinheiro(l.lossAtHit.replace(/^-/, ''), m, false)} de perda` : '');
+      fato = `atingido às ${hora(l.hitAt, conta.tz)}` + (l.worstAtHit ? `, com ${dinheiro(l.worstAtHit.replace(/^-/, ''), m, false)} de perda` : '');
       if (l.after.length) {
         fato +=
           ` · ${l.after.length} depois, às ${listaE(l.after.map((a) => hora(a.at, conta.tz)))}` +
-          (l.afterNet !== undefined && l.afterNet !== null ? `: ${dinheiro(l.afterNet, m)}` : '');
+          (l.afterNet !== null ? `: ${dinheiro(l.afterNet, m)}` : '');
       }
     } else fato = sign(perda) > 0 ? `pior momento: ${dinheiroCompacto(l.worst, m)}` : n ? 'nenhuma perda acumulada' : 'nenhuma operação ainda';
     rows.push({

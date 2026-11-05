@@ -1,0 +1,137 @@
+{
+  "v": 1,
+  "review": {
+    "id": 4,
+    "worked": "Esperei o reteste da mínima.",
+    "written": true,
+    "followed": "em_parte",
+    "saved_at": "2026-10-22T22:05:05.295556+00:00",
+    "versions": 2,
+    "differently": "Parar depois do alvo.",
+    "auto_summary": {
+      "v": 1,
+      "day": "2026-10-22",
+      "net": 175,
+      "even": 0,
+      "fora": {
+        "n": 0,
+        "net": 0,
+        "open": 0
+      },
+      "kind": "diario",
+      "open": 0,
+      "wins": 1,
+      "gross": 175,
+      "limit": {
+        "net": 175,
+        "after": [],
+        "scope": "conta",
+        "worst": 0,
+        "amount": 400,
+        "hit_at": null,
+        "trades": 1,
+        "at_limit": "encerrar",
+        "after_net": null,
+        "worst_at_hit": null
+      },
+      "closed": 1,
+      "losses": 0,
+      "trades": 1,
+      "window": {
+        "rule": true,
+        "inside": 1,
+        "outside": [],
+        "evaluated": 1
+      },
+      "changes": 0,
+      "history": {
+        "n": 0,
+        "net": 0,
+        "gross": 0
+      },
+      "version": {
+        "id": "c8f22e6e-6644-4f3d-9080-24a8dad21671",
+        "version_no": 1
+      },
+      "breakeven": {
+        "by": {
+          "MES": {
+            "n": 8,
+            "un": "pts"
+          }
+        },
+        "moved": 1,
+        "trades": 1
+      },
+      "commission": null,
+      "others_net": 175,
+      "recalculated": 0,
+      "first_entry_at": "2026-10-22T14:05:05.052725+00:00"
+    },
+    "carry_forward": "Esperar o reteste antes de comprar.",
+    "first_saved_at": "2026-10-22T15:40:05.233178+00:00"
+  },
+  "dry_run": false,
+  "repeated": false,
+  "facts_now": {
+    "v": 1,
+    "day": "2026-10-22",
+    "net": 175,
+    "even": 0,
+    "fora": {
+      "n": 0,
+      "net": 0,
+      "open": 0
+    },
+    "kind": "diario",
+    "open": 0,
+    "wins": 1,
+    "gross": 175,
+    "limit": {
+      "net": 175,
+      "after": [],
+      "scope": "conta",
+      "worst": 0,
+      "amount": 400,
+      "hit_at": null,
+      "trades": 1,
+      "at_limit": "encerrar",
+      "after_net": null,
+      "worst_at_hit": null
+    },
+    "closed": 1,
+    "losses": 0,
+    "trades": 1,
+    "window": {
+      "rule": true,
+      "inside": 1,
+      "outside": [],
+      "evaluated": 1
+    },
+    "changes": 0,
+    "history": {
+      "n": 0,
+      "net": 0,
+      "gross": 0
+    },
+    "version": {
+      "id": "c8f22e6e-6644-4f3d-9080-24a8dad21671",
+      "version_no": 1
+    },
+    "breakeven": {
+      "by": {
+        "MES": {
+          "n": 8,
+          "un": "pts"
+        }
+      },
+      "moved": 1,
+      "trades": 1
+    },
+    "commission": null,
+    "others_net": 175,
+    "recalculated": 0,
+    "first_entry_at": "2026-10-22T14:05:05.052725+00:00"
+  },
+  "server_now": "2026-10-22T22:05:05.295556+00:00"
+}

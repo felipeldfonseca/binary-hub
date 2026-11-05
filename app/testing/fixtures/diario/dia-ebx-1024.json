@@ -1,0 +1,428 @@
+{
+  "v": 1,
+  "day": "2026-10-24",
+  "kind": "diario",
+  "note": null,
+  "plan": {
+    "at": "2026-10-25T02:59:59.999999+00:00",
+    "rules": {
+      "v": 1,
+      "day": {
+        "tz": "America/Sao_Paulo",
+        "start_min": 0
+      },
+      "block": null,
+      "limit": {
+        "usd": 100,
+        "mode": "conta",
+        "at_limit": "avisar"
+      },
+      "market": "binary",
+      "states": null,
+      "windows": [
+        {
+          "tz": "America/Sao_Paulo",
+          "end_min": 720,
+          "weekdays": 127,
+          "start_min": 540
+        }
+      ],
+      "window_rule": {
+        "on": true,
+        "outside": "fora"
+      },
+      "windows_from": "account"
+    },
+    "changes": [],
+    "version": {
+      "id": "600c7691-1141-42b0-adba-c389354f23d2",
+      "origin": "criar",
+      "version_no": 1,
+      "effective_from": "2026-10-14T13:12:04.806342+00:00"
+    },
+    "windows_today": [
+      {
+        "tz": "America/Sao_Paulo",
+        "opens_at": "2026-10-24T12:00:00+00:00",
+        "closes_at": "2026-10-24T15:00:00+00:00"
+      }
+    ]
+  },
+  "desde": "2026-10-14T13:12:04.806342+00:00",
+  "facts": {
+    "v": 1,
+    "day": "2026-10-24",
+    "net": -1.2,
+    "even": 0,
+    "fora": {
+      "n": 0,
+      "net": 0,
+      "open": 0
+    },
+    "kind": "diario",
+    "open": 0,
+    "wins": 1,
+    "gross": -1.2,
+    "limit": {
+      "net": -1.2,
+      "after": [],
+      "scope": "conta",
+      "worst": -1.2,
+      "amount": 100,
+      "hit_at": null,
+      "trades": 2,
+      "at_limit": "avisar",
+      "after_net": null,
+      "worst_at_hit": null
+    },
+    "closed": 2,
+    "losses": 1,
+    "trades": 2,
+    "window": {
+      "rule": true,
+      "inside": 2,
+      "outside": [],
+      "evaluated": 2
+    },
+    "changes": 0,
+    "history": {
+      "n": 0,
+      "net": 0,
+      "gross": 0
+    },
+    "version": {
+      "id": "600c7691-1141-42b0-adba-c389354f23d2",
+      "version_no": 1
+    },
+    "breakeven": null,
+    "commission": 0,
+    "others_net": -1.2,
+    "recalculated": 2,
+    "first_entry_at": "2026-10-24T13:15:10+00:00"
+  },
+  "today": "2026-10-26",
+  "bounds": {
+    "end": "2026-10-25T03:00:00+00:00",
+    "start": "2026-10-24T03:00:00+00:00"
+  },
+  "review": null,
+  "trades": [
+    {
+      "gate": null,
+      "plan": null,
+      "exits": [],
+      "links": [],
+      "marks": [],
+      "money": {
+        "net": 8.8,
+        "gross": 8.8,
+        "realized": true,
+        "commission": 0
+      },
+      "trade": {
+        "id": "489de9f7-6877-47af-9c30-ffdfbef546bc",
+        "pnl": 8.8,
+        "note": null,
+        "option": null,
+        "result": "win",
+        "source": "import",
+        "status": "closed",
+        "symbol": "BTC/USDT",
+        "quantity": 1,
+        "direction": "call",
+        "exit_time": "2026-10-24T13:17:00+00:00",
+        "pnl_basis": "file",
+        "timeframe": "M1",
+        "account_id": "2f98554d-8539-4d62-a1d2-54cb074f4dc3",
+        "asset_type": "binary_option",
+        "commission": 0,
+        "entry_time": "2026-10-24T13:15:10+00:00",
+        "exit_price": 64233.1,
+        "expires_at": null,
+        "stop_price": null,
+        "entry_price": 64210.55,
+        "trading_day": "2026-10-24",
+        "stake_amount": 10,
+        "target_price": null,
+        "note_saved_at": null,
+        "registered_at": "2026-10-26T02:00:04.617953+00:00",
+        "payout_percent": 88,
+        "duration_seconds": 60,
+        "exit_registered_at": null
+      },
+      "images": [],
+      "import": {
+        "batch_id": "045693e4-83d3-467b-9111-5fb1664d55cf",
+        "platform": "ebinex",
+        "file_name": "operacoes_fim_de_semana.csv",
+        "created_at": "2026-10-26T02:00:04.617953+00:00"
+      },
+      "context": null,
+      "history": false,
+      "version": null,
+      "entry_at": "2026-10-24T13:15:10+00:00",
+      "gate_now": {
+        "at": "2026-10-24T13:15:10+00:00",
+        "block": {
+          "state": "nao_avaliado",
+          "reason": "so_futuros"
+        },
+        "desde": "2026-10-14T13:12:04.806342+00:00",
+        "label": "Ebinex",
+        "limit": {
+          "usd": 100,
+          "mode": "conta",
+          "near": false,
+          "used": 0,
+          "state": "ok",
+          "hit_at": null,
+          "reason": null,
+          "trades": 0,
+          "net_usd": 0,
+          "at_limit": "avisar",
+          "worst_usd": 0
+        },
+        "today": {
+          "trades": 0,
+          "net_usd": 0,
+          "worst_usd": 0
+        },
+        "market": "binary",
+        "status": "liberado",
+        "window": {
+          "next": {
+            "opens_at": "2026-10-25T12:00:00+00:00",
+            "closes_at": "2026-10-25T15:00:00+00:00",
+            "trading_day": "2026-10-25"
+          },
+          "state": "dentro",
+          "reason": null,
+          "current": {
+            "opens_at": "2026-10-24T12:00:00+00:00",
+            "closes_at": "2026-10-24T15:00:00+00:00"
+          },
+          "position": "dentro"
+        },
+        "version": {
+          "id": "600c7691-1141-42b0-adba-c389354f23d2",
+          "origin": "criar",
+          "version_no": 1,
+          "effective_from": "2026-10-14T13:12:04.806342+00:00"
+        },
+        "warnings": [],
+        "desde_day": "2026-10-14",
+        "account_id": "2f98554d-8539-4d62-a1d2-54cb074f4dc3",
+        "changes_at": "2026-10-24T15:00:00+00:00",
+        "state_rule": {
+          "state": "nao_avaliado",
+          "reason": "so_futuros"
+        },
+        "trading_day": "2026-10-24",
+        "checks_evaluated": [
+          "janela",
+          "limite"
+        ]
+      },
+      "plan_now": {
+        "breaks": [],
+        "verdict": "no_plano",
+        "checks_evaluated": [
+          "janela",
+          "limite"
+        ]
+      },
+      "position": {
+        "r": null,
+        "open": 0,
+        "undo": null,
+        "exits": 0,
+        "closed": 1,
+        "partials": 0,
+        "quantity": 1,
+        "stop_now": null,
+        "stop_kind": null,
+        "realized_pnl": 8.8,
+        "stop_initial": null
+      },
+      "trade_id": "489de9f7-6877-47af-9c30-ffdfbef546bc",
+      "breakeven": null,
+      "marks_now": [],
+      "plan_kind": "recalculado",
+      "stop_moves": [],
+      "imported_at": "2026-10-26T02:00:04.617953+00:00",
+      "trading_day": "2026-10-24",
+      "clock_guessed": false,
+      "registered_at": "2026-10-26T02:00:04.617953+00:00"
+    },
+    {
+      "gate": null,
+      "plan": null,
+      "exits": [],
+      "links": [],
+      "marks": [],
+      "money": {
+        "net": -10,
+        "gross": -10,
+        "realized": true,
+        "commission": 0
+      },
+      "trade": {
+        "id": "7fef2713-4b30-4e97-bd5a-3e7e930e4acd",
+        "pnl": -10,
+        "note": null,
+        "option": null,
+        "result": "loss",
+        "source": "import",
+        "status": "closed",
+        "symbol": "BTC/USDT",
+        "quantity": 1,
+        "direction": "put",
+        "exit_time": "2026-10-24T13:33:00+00:00",
+        "pnl_basis": "file",
+        "timeframe": "M1",
+        "account_id": "2f98554d-8539-4d62-a1d2-54cb074f4dc3",
+        "asset_type": "binary_option",
+        "commission": 0,
+        "entry_time": "2026-10-24T13:31:40+00:00",
+        "exit_price": 64230,
+        "expires_at": null,
+        "stop_price": null,
+        "entry_price": 64190,
+        "trading_day": "2026-10-24",
+        "stake_amount": 10,
+        "target_price": null,
+        "note_saved_at": null,
+        "registered_at": "2026-10-26T02:00:04.617953+00:00",
+        "payout_percent": null,
+        "duration_seconds": 60,
+        "exit_registered_at": null
+      },
+      "images": [],
+      "import": {
+        "batch_id": "045693e4-83d3-467b-9111-5fb1664d55cf",
+        "platform": "ebinex",
+        "file_name": "operacoes_fim_de_semana.csv",
+        "created_at": "2026-10-26T02:00:04.617953+00:00"
+      },
+      "context": null,
+      "history": false,
+      "version": null,
+      "entry_at": "2026-10-24T13:31:40+00:00",
+      "gate_now": {
+        "at": "2026-10-24T13:31:40+00:00",
+        "block": {
+          "state": "nao_avaliado",
+          "reason": "so_futuros"
+        },
+        "desde": "2026-10-14T13:12:04.806342+00:00",
+        "label": "Ebinex",
+        "limit": {
+          "usd": 100,
+          "mode": "conta",
+          "near": false,
+          "used": 0,
+          "state": "ok",
+          "hit_at": null,
+          "reason": null,
+          "trades": 1,
+          "net_usd": 8.8,
+          "at_limit": "avisar",
+          "worst_usd": 0
+        },
+        "today": {
+          "trades": 1,
+          "net_usd": 8.8,
+          "worst_usd": 0
+        },
+        "market": "binary",
+        "status": "liberado",
+        "window": {
+          "next": {
+            "opens_at": "2026-10-25T12:00:00+00:00",
+            "closes_at": "2026-10-25T15:00:00+00:00",
+            "trading_day": "2026-10-25"
+          },
+          "state": "dentro",
+          "reason": null,
+          "current": {
+            "opens_at": "2026-10-24T12:00:00+00:00",
+            "closes_at": "2026-10-24T15:00:00+00:00"
+          },
+          "position": "dentro"
+        },
+        "version": {
+          "id": "600c7691-1141-42b0-adba-c389354f23d2",
+          "origin": "criar",
+          "version_no": 1,
+          "effective_from": "2026-10-14T13:12:04.806342+00:00"
+        },
+        "warnings": [],
+        "desde_day": "2026-10-14",
+        "account_id": "2f98554d-8539-4d62-a1d2-54cb074f4dc3",
+        "changes_at": "2026-10-24T15:00:00+00:00",
+        "state_rule": {
+          "state": "nao_avaliado",
+          "reason": "so_futuros"
+        },
+        "trading_day": "2026-10-24",
+        "checks_evaluated": [
+          "janela",
+          "limite"
+        ]
+      },
+      "plan_now": {
+        "breaks": [],
+        "verdict": "no_plano",
+        "checks_evaluated": [
+          "janela",
+          "limite"
+        ]
+      },
+      "position": {
+        "r": null,
+        "open": 0,
+        "undo": null,
+        "exits": 0,
+        "closed": 1,
+        "partials": 0,
+        "quantity": 1,
+        "stop_now": null,
+        "stop_kind": null,
+        "realized_pnl": -10,
+        "stop_initial": null
+      },
+      "trade_id": "7fef2713-4b30-4e97-bd5a-3e7e930e4acd",
+      "breakeven": null,
+      "marks_now": [],
+      "plan_kind": "recalculado",
+      "stop_moves": [],
+      "imported_at": "2026-10-26T02:00:04.617953+00:00",
+      "trading_day": "2026-10-24",
+      "clock_guessed": false,
+      "registered_at": "2026-10-26T02:00:04.617953+00:00"
+    }
+  ],
+  "account": {
+    "id": "2f98554d-8539-4d62-a1d2-54cb074f4dc3",
+    "day": {
+      "tz": "America/Sao_Paulo",
+      "start_min": 0
+    },
+    "label": "Ebinex",
+    "market": "binary",
+    "file_tz": "America/Sao_Paulo",
+    "archived": false,
+    "currency": "USD",
+    "platform": "ebinex",
+    "is_example": false,
+    "tz_confirmed": true,
+    "guessed_clock": 0
+  },
+  "deleted": [],
+  "weekday": 6,
+  "carry_in": null,
+  "desde_day": "2026-10-14",
+  "server_now": "2026-10-26T13:00:05.069012+00:00",
+  "open_elsewhere": [],
+  "review_history": []
+}

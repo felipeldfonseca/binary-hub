@@ -1,0 +1,179 @@
+{
+  "v": 1,
+  "day": "2026-10-26",
+  "kind": "vazio",
+  "note": null,
+  "plan": {
+    "at": "2026-10-26T13:00:04.989591+00:00",
+    "rules": {
+      "v": 1,
+      "day": {
+        "tz": "America/New_York",
+        "start_min": 1080
+      },
+      "block": {
+        "on": true,
+        "after_min": 10,
+        "calendars": [
+          "us"
+        ],
+        "before_min": 5
+      },
+      "limit": {
+        "usd": 400,
+        "mode": "conta",
+        "at_limit": "encerrar"
+      },
+      "market": "futures",
+      "states": {
+        "alinhadas": null,
+        "so_tecnica": null,
+        "em_conflito": null,
+        "sem_direcao": null,
+        "so_fundamentos": null
+      },
+      "windows": [
+        {
+          "tz": "America/New_York",
+          "end_min": 660,
+          "weekdays": 31,
+          "start_min": 600
+        }
+      ],
+      "breakeven": {
+        "by": {
+          "MES": {
+            "n": 8,
+            "un": "pts"
+          }
+        }
+      },
+      "window_rule": {
+        "on": true,
+        "outside": "fora"
+      },
+      "windows_from": "account"
+    },
+    "changes": [],
+    "version": {
+      "id": "c8f22e6e-6644-4f3d-9080-24a8dad21671",
+      "origin": "criar",
+      "version_no": 1,
+      "effective_from": "2026-10-14T13:12:04.806342+00:00"
+    },
+    "windows_today": [
+      {
+        "tz": "America/New_York",
+        "opens_at": "2026-10-26T14:00:00+00:00",
+        "closes_at": "2026-10-26T15:00:00+00:00"
+      }
+    ]
+  },
+  "desde": "2026-10-14T13:12:04.806342+00:00",
+  "facts": {
+    "v": 1,
+    "day": "2026-10-26",
+    "net": 0,
+    "even": 0,
+    "fora": {
+      "n": 0,
+      "net": 0,
+      "open": 0
+    },
+    "kind": "vazio",
+    "open": 0,
+    "wins": 0,
+    "gross": 0,
+    "limit": {
+      "net": 0,
+      "after": [],
+      "scope": "conta",
+      "worst": 0,
+      "amount": 400,
+      "hit_at": null,
+      "trades": 0,
+      "at_limit": "encerrar",
+      "after_net": null,
+      "worst_at_hit": null
+    },
+    "closed": 0,
+    "losses": 0,
+    "trades": 0,
+    "window": {
+      "rule": true,
+      "inside": 0,
+      "outside": [],
+      "evaluated": 0
+    },
+    "changes": 0,
+    "history": {
+      "n": 0,
+      "net": 0,
+      "gross": 0
+    },
+    "version": {
+      "id": "c8f22e6e-6644-4f3d-9080-24a8dad21671",
+      "version_no": 1
+    },
+    "breakeven": {
+      "by": {
+        "MES": {
+          "n": 8,
+          "un": "pts"
+        }
+      },
+      "moved": 0,
+      "trades": 0
+    },
+    "commission": null,
+    "others_net": 0,
+    "recalculated": 0,
+    "first_entry_at": null
+  },
+  "today": "2026-10-26",
+  "bounds": {
+    "end": "2026-10-26T22:00:00+00:00",
+    "start": "2026-10-25T22:00:00+00:00"
+  },
+  "review": null,
+  "trades": [],
+  "account": {
+    "id": "ab278fe9-7bda-4b37-abd7-fdf642bc0c36",
+    "day": {
+      "tz": "America/New_York",
+      "start_min": 1080
+    },
+    "label": "Top One #1",
+    "market": "futures",
+    "file_tz": "UTC",
+    "archived": false,
+    "currency": "USD",
+    "platform": "topone",
+    "is_example": false,
+    "tz_confirmed": true,
+    "guessed_clock": 0
+  },
+  "deleted": [],
+  "weekday": 1,
+  "carry_in": {
+    "day": "2026-10-22",
+    "text": "Esperar o reteste antes de comprar.",
+    "saved_at": "2026-10-22T22:05:05.295556+00:00"
+  },
+  "desde_day": "2026-10-14",
+  "server_now": "2026-10-26T13:00:04.989591+00:00",
+  "open_elsewhere": [
+    {
+      "app": true,
+      "symbol": "MES",
+      "quantity": 1,
+      "trade_id": "25a54fe6-1f73-4cbe-bc6b-b8e656712423",
+      "direction": "long",
+      "asset_type": "futures",
+      "entry_time": "2026-10-23T14:04:04.528982+00:00",
+      "expires_at": null,
+      "trading_day": "2026-10-23"
+    }
+  ],
+  "review_history": []
+}

@@ -197,6 +197,8 @@ describe('useSaveRules', () => {
         JSON.stringify(hubKeys.contas('user-1')),
         JSON.stringify(['hub', 'user-1', 'atividade']),
         JSON.stringify(hubKeys.preferencias('user-1')),
+        // Phase 4: today's plan and limit, «desde» on a version 1
+        JSON.stringify(['hub', 'user-1', 'diario']),
       ]),
     )
   })

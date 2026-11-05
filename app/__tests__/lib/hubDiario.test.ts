@@ -67,6 +67,7 @@ import {
   f10,
   f19,
   facts,
+  limitOf,
   monthMarks,
   TOP_ONE_ROWS,
   topOneDays,
@@ -224,6 +225,11 @@ describe('the calendar (board «Diário · 1º dez», Top One, today 1º dez)', 
     expect(avisoDeRevisoes(days.filter((d) => d.day <= '2026-10-19'), '2026-12-01')).toBeNull();
     expect(linhaDoTopo('2026-10-14', days, '2026-12-01')).toBe('Diário desde 14 out: 110 operações em 32 pregões · 85 antes, em Histórico importado · só resultado');
     expect(linhaDoTopo('2026-10-14', days.filter((d) => d.kind === 'historico'), '2026-12-01')).toBe('Diário desde 14 out: nenhuma operação ainda.');
+    // A day with only a written review (vazio) is no «pregão»
+    const vazio = { ...days[days.length - 1], day: '2026-11-11', kind: 'vazio' as const, n: 0, app: 0, open: 0, wins: 0, losses: 0, even: 0, net: '0', gross: '0', commission: null };
+    expect(linhaDoTopo('2026-10-14', [...days.filter((d) => d.day !== '2026-11-11'), vazio], '2026-12-01')).toBe(
+      linhaDoTopo('2026-10-14', days.filter((d) => d.day !== '2026-11-11'), '2026-12-01'),
+    );
     expect(linhaDoTopo(null, days, '2026-12-01')).toBeNull();
   });
 
@@ -350,9 +356,9 @@ describe('the open day', () => {
       gross: '88.5',
       commission: '5.36',
       window: { rule: true, evaluated: 3, inside: 2, outside: [{ tradeId: 't3', at: et('2026-10-14 11:12') }] },
-      fora: { n: 1, net: '-34.64' },
+      fora: { n: 1, net: '-34.64', open: 0 },
       othersNet: '117.78',
-      history: { n: 1, net: '20.01' },
+      history: { n: 1, net: '20.01', gross: '21.25' },
     });
     expect(sp(comoLerOsNumeros(dayTiles(f, 'futures'), TOP, f))).toBe(
       'Resultado líquido. Bruto +US$ 88,50 · comissões −US$ 5,36. Limite do dia: a maior perda acumulada no pregão, no pior momento, já com a comissão quando o arquivo a trouxe, contra o seu limite de US$ 400. Pelas suas regras, ao atingir o limite o app encerra o dia. Fora do plano: operações fora da janela ou depois do limite. As outras 2 somaram +US$ 117,78: conta simples, não é o que teria acontecido. + 1 operação do histórico, à parte: +US$ 20,01; o limite do dia contou essa também.',
@@ -374,8 +380,8 @@ describe('the open day', () => {
       net: '2',
       gross: '2',
       window: { rule: true, evaluated: 4, inside: 3, outside: [{ tradeId: 't4', at: et('2026-12-01 11:09') }] },
-      limit: { amount: '400', scope: 'conta', atLimit: 'encerrar', worst: '-45', hitAt: null, after: [] },
-      fora: { n: 1, net: '-112.5' },
+      limit: limitOf({ worst: '-45' }),
+      fora: { n: 1, net: '-112.5', open: 0 },
       othersNet: '114.5',
       breakeven: { by: { MES: { n: '8', un: 'pts' }, MNQ: { n: '30', un: 'pts' } }, trades: 2, moved: 1 },
     });
@@ -408,7 +414,7 @@ describe('the open day', () => {
       net: '-127.25',
       gross: '-127.25',
       window: { rule: true, evaluated: 2, inside: 2, outside: [] },
-      limit: { amount: '400', scope: 'soma', atLimit: 'encerrar', worst: '-172.25', hitAt: null, after: [] },
+      limit: limitOf({ scope: 'soma', worst: '-172.25' }),
     });
     const t = dayTiles(f, 'futures');
     expect(sp(numerosDoDia(t, TOP))).toMatchObject({ res: '−US$ 127,25', lim: 'US$ 172,25 de US$ 400', limSub: 'pior momento · somando as contas de Futuros', barra: 43 });
@@ -470,7 +476,7 @@ describe('the open day', () => {
     expect(sp(comoLerOsNumeros(t, EBX, f))).toBe(
       'Limite do dia: esta conta não tem limite nas suas regras. Fora do plano: operações fora da janela. As outras 3 somaram US$ 0,00: conta simples, não é o que teria acontecido.',
     );
-    const b3 = facts({ day: '2026-11-12', trades: 1, closed: 1, losses: 1, net: '-180', gross: '-180', limit: { amount: '500', scope: 'conta', atLimit: 'encerrar', worst: '-180', hitAt: null, after: [] } });
+    const b3 = facts({ day: '2026-11-12', trades: 1, closed: 1, losses: 1, net: '-180', gross: '-180', limit: limitOf({ amount: '500', worst: '-180' }) });
     expect(sp(numerosDoDia(dayTiles(b3, 'b3'), CLEAR))).toMatchObject({ res: '−R$ 180,00', lim: 'R$ 180,00 de R$ 500', barra: 36 });
   });
 });
@@ -529,6 +535,7 @@ describe('the review, «Antes de operar», the carry-over', () => {
   const version = (id: number, at: string, over: Partial<DayReview> = {}) => ({
     id,
     savedAt: et(at),
+    written: true,
     worked: 'Esperei o reteste da mínima para vender.',
     differently: null,
     followed: 'sim' as const,
@@ -561,14 +568,14 @@ describe('the review, «Antes de operar», the carry-over', () => {
   });
 
   it('«Antes de operar» (choice 5): both times, each against the first entry', () => {
-    const note: DayNote = { text: 'Só compro acima da VWAP; parcial no +8.', firstSavedAt: et('2026-11-12 09:40'), savedAt: et('2026-11-12 10:42'), versions: 2 };
+    const note: DayNote = { id: 7, text: 'Só compro acima da VWAP; parcial no +8.', firstSavedAt: et('2026-11-12 09:40'), savedAt: et('2026-11-12 10:42'), versions: 2, written: true };
     expect(notaAntesDeOperar(note, et('2026-11-12 10:04'), NY)).toBe('anotado às 09:40, antes da 1ª entrada · editado às 10:42, depois da 1ª entrada');
     expect(notaAntesDeOperar({ ...note, savedAt: note.firstSavedAt, versions: 1 }, et('2026-11-12 10:04'), NY)).toBe('anotado às 09:40, antes da 1ª entrada');
     expect(notaAntesDeOperar({ ...note, savedAt: note.firstSavedAt, versions: 1 }, null, NY)).toBe('anotado às 09:40, antes da 1ª entrada');
   });
 
   it('«Do pregão anterior»', () => {
-    expect(doPregaoAnterior({ day: '2026-11-27', text: 'Esperar o recuo até a VWAP antes de comprar.' })).toBe(
+    expect(doPregaoAnterior({ day: '2026-11-27', text: 'Esperar o recuo até a VWAP antes de comprar.', savedAt: et('2026-11-27 11:15') })).toBe(
       '“Esperar o recuo até a VWAP antes de comprar.” · 27 nov',
     );
     expect(doPregaoAnterior(null)).toBe('Nada trazido do pregão anterior.');
@@ -626,10 +633,11 @@ describe('«Semana»', () => {
   });
 
   it('the week\'s «Fora do plano» list', () => {
+    const closedFile = { quantity: '1', assetType: 'futures', status: 'closed' as const, open: false, realized: true };
     expect(
       sp(
         foraDaSemanaItem(
-          { tradeId: 't', day: '2026-11-24', entryTime: et('2026-11-24 11:05'), symbol: 'MES', direction: 'long', breaks: ['fora_da_janela'], net: '-42.48', planKind: 'congelado' },
+          { tradeId: 't', day: '2026-11-24', entryTime: et('2026-11-24 11:05'), symbol: 'MES', direction: 'long', ...closedFile, breaks: ['fora_da_janela'], net: '-42.48', planKind: 'congelado' },
           TOP,
         ),
       ),
@@ -637,14 +645,14 @@ describe('«Semana»', () => {
     expect(
       sp(
         foraDaSemanaItem(
-          { tradeId: 't', day: '2026-11-19', entryTime: et('2026-11-19 10:52'), symbol: 'MES', direction: 'short', breaks: ['depois_do_limite'], net: '-38.74', planKind: 'congelado' },
+          { tradeId: 't', day: '2026-11-19', entryTime: et('2026-11-19 10:52'), symbol: 'MES', direction: 'short', ...closedFile, breaks: ['depois_do_limite'], net: '-38.74', planKind: 'congelado' },
           TOP,
         ),
       ),
     ).toBe('qui 19 · 10:52 · Venda MES · depois do limite · −US$ 38,74');
     expect(
       foraDaSemanaItem(
-        { tradeId: 't', day: '2026-11-11', entryTime: brt('2026-11-11 21:25'), symbol: 'EUR/USD', direction: 'put', breaks: ['fora_da_janela'], net: null, open: true, planKind: 'congelado' },
+        { tradeId: 't', day: '2026-11-11', entryTime: brt('2026-11-11 21:25'), symbol: 'EUR/USD', direction: 'put', quantity: null, assetType: 'binary', status: 'open', realized: false, breaks: ['fora_da_janela'], net: null, open: true, planKind: 'congelado' },
         EBX,
       ),
     ).toBe('qua 11 · 21:25 · Baixa EUR/USD · fora da janela · aberta');

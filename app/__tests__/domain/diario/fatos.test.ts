@@ -7,7 +7,7 @@
  */
 import { dayTiles, firstEntryAt, historyTiles, limitPercent, noteTimes, tilesFromCalendar, toneOf } from '@/lib/domain/diario';
 import { et } from '@/testing/gate';
-import { f19, facts, topOneDays } from '@/testing/diario';
+import { f19, facts, limitOf, topOneDays } from '@/testing/diario';
 
 describe('the tiles', () => {
   it('19 nov: net −US$ 465,40, the limit reached (100 %), one trade after it, the other four apart', () => {
@@ -15,7 +15,7 @@ describe('the tiles', () => {
     expect(t.result).toEqual({ net: '-465.4', tone: 'loss' });
     expect(t.operations).toEqual({ n: 5, open: 0, closed: 5, wins: 0, losses: 5, even: 0 });
     expect(t.limit).toEqual({ amount: '400', loss: '465.4', hitAt: et('2026-11-19 10:38'), percent: 100, somando: false, atLimit: 'encerrar' });
-    expect(t.fora).toEqual({ n: 1, net: '-38.74', allOpen: false });
+    expect(t.fora).toEqual({ n: 1, net: '-38.74', open: 0, allOpen: false });
     expect(t.others).toEqual({ n: 4, net: '-426.66' });
     expect(t.money).toEqual({ gross: '-453', commission: '12.4', pending: false });
     expect(t.history).toBeNull();
@@ -23,7 +23,7 @@ describe('the tiles', () => {
 
   it('1º dez: US$ 45 of US$ 400 at the worst moment (11 %), net +US$ 2,00', () => {
     const t = dayTiles(
-      facts({ trades: 4, closed: 4, wins: 2, losses: 2, net: '2', gross: '2', limit: { amount: '400', scope: 'conta', atLimit: 'encerrar', worst: '-45', hitAt: null, after: [] } }),
+      facts({ trades: 4, closed: 4, wins: 2, losses: 2, net: '2', gross: '2', limit: limitOf({ worst: '-45' }) }),
       'futures',
     );
     expect([t.limit?.loss, t.limit?.percent, t.result.tone]).toEqual(['45', 11, 'gain']);
@@ -44,7 +44,7 @@ describe('the tiles', () => {
 
   it('Lucid 50k on 1º dez: «somando as contas de Futuros», 43 %', () => {
     const t = dayTiles(
-      facts({ trades: 2, closed: 2, losses: 2, net: '-127.25', gross: '-127.25', limit: { amount: '400', scope: 'soma', atLimit: 'encerrar', worst: '-172.25', hitAt: null, after: [] } }),
+      facts({ trades: 2, closed: 2, losses: 2, net: '-127.25', gross: '-127.25', limit: limitOf({ scope: 'soma', worst: '-172.25' }) }),
       'futures',
     );
     expect([t.limit?.somando, t.limit?.loss, t.limit?.percent]).toEqual([true, '172.25', 43]);
@@ -57,7 +57,7 @@ describe('the tiles', () => {
   });
 
   it('the misto day keeps its history apart', () => {
-    const t = dayTiles(facts({ kind: 'misto', trades: 3, closed: 3, net: '83.14', history: { n: 1, net: '20.01' } }), 'futures');
+    const t = dayTiles(facts({ kind: 'misto', trades: 3, closed: 3, net: '83.14', history: { n: 1, net: '20.01', gross: '21.25' } }), 'futures');
     expect(t.history).toEqual({ n: 1, net: '20.01' });
   });
 

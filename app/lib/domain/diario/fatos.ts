@@ -68,7 +68,7 @@ export function limitPercent(loss: Money, amount: Money): number {
  * (historyTiles).
  */
 export function dayTiles(f: DayFacts, market: AccountMarket): DayTiles {
-  const foraOpen = f.fora.open ?? 0;
+  const foraOpen = f.fora.open;
   const foraClosed = f.fora.n - foraOpen;
   const othersN = Math.max(0, f.closed - foraClosed);
   let limit: LimitTile | null = null;
@@ -95,7 +95,7 @@ export function dayTiles(f: DayFacts, market: AccountMarket): DayTiles {
       commission: f.commission,
       pending: f.commission === null && COMMISSION_FROM_FILE.includes(market) && hasRealized(f),
     },
-    history: f.kind === 'misto' && f.history.n > 0 ? f.history : null,
+    history: f.kind === 'misto' && f.history.n > 0 ? { n: f.history.n, net: f.history.net } : null,
   };
 }
 
