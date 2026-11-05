@@ -54,12 +54,12 @@
 --     The heavy part of one month: the ISO weeks covering it (Monday on or before the 1st to the Sunday
 --     on or after the last day; a straddling week is whole in both months), diário days up to today.
 --       {"v": 1, "server_now", "account", "today", "desde", "desde_day", "month": "YYYY-MM", "from", "to",
---        "days": [{day, weekday, fora: {n, net}, recalculated, limit: {amount, scope, at_limit, worst,
---                  hit_at, net, trades} | null}],
---        "weeks": [{week_of, fora: {n, net}}],
+--        "days": [{day, weekday, fora: {n, net, open}, recalculated, limit: {amount, scope, at_limit, worst,
+--                  hit_at, worst_at_hit, net, trades} | null}],
+--        "weeks": [{week_of, fora: {n, net, open}}],
 --        "fora_trades": [{trade_id, day, entry_time, symbol, direction, quantity, asset_type, status,
 --                         breaks, plan_kind, realized, net}]}
---     Each day's fora, recalculated and limit are diario_dia's facts of that day.
+--     Each day's fora, recalculated and limit (without after and after_net) are diario_dia's facts of that day.
 --     Cost: one gate_at per recalculated trade of the five or six weeks (about 0.7 ms each; with
 --     «somando» each one also sums the scope's trades of its day), one limit_usage per day; flat in the
 --     length of the history, linear in the month's file-only diário trades (parity by construction with
@@ -122,10 +122,14 @@
 --    "commission", "first_entry_at",
 --    "window": {rule, evaluated, inside, outside: [{trade_id, at}]} | null (no window rule in force and
 --              no trade evaluated against one),
---    "limit": {amount, scope, at_limit, worst, hit_at, net, trades, after: [{trade_id, at}]} | null (the
---             day's version has no limit; worst, hit_at, net and trades are limit_usage(account, day,
---             scope = 'soma', amount, 'infinity'): every trade of the scope that day, history included),
---    "fora": {n, net}, "others_net", "recalculated", "history": {n, net, gross},
+--    "limit": {amount, scope, at_limit, worst, hit_at, worst_at_hit, net, trades, after: [{trade_id, at}],
+--             after_net} | null (the day's version has no limit; worst, hit_at, net and trades are
+--             limit_usage(account, day, scope = 'soma', amount, 'infinity'): every trade of the scope that
+--             day, history included; worst_at_hit is its worst up to hit_at (that instant's exits
+--             included: «atingido às 10:38, com US$ 426,66 de perda»), null without a hit; after lists the
+--             account's diário trades entered after the limit and after_net is their realized net, null
+--             when none realized),
+--    "fora": {n, net, open (still open)}, "others_net", "recalculated", "history": {n, net, gross},
 --    "breakeven": {by, trades, moved} | null (the day's version's rule; trades of its assets, and how
 --                 many have a breakeven stop move not undone),
 --    "version": {id, version_no} | null, "changes"}
@@ -513,6 +517,7 @@ declare
   ver public.account_rule_versions%rowtype;
   amt numeric;
   usage jsonb;
+  at_hit jsonb;
   wrule boolean;
   a record;
 begin
@@ -533,6 +538,7 @@ begin
          sum(r.comm) filter (where not r.h and r.rl) as comm,
          min(r.entry) filter (where not r.h) as first_entry,
          count(*) filter (where not r.h and r.verdict = 'fora_do_plano') as fora_n,
+         count(*) filter (where not r.h and r.verdict = 'fora_do_plano' and r.st = 'open') as fora_open,
          coalesce(sum(r.net) filter (where not r.h and r.rl and r.verdict = 'fora_do_plano'), 0) as fora_net,
          coalesce(sum(r.net) filter (where not r.h and r.rl and r.verdict is distinct from 'fora_do_plano'), 0) as others_net,
          count(*) filter (where not r.h and r.kind = 'recalculado') as recalculated,
@@ -544,6 +550,7 @@ begin
                     filter (where not r.h and r.breaks ? 'fora_da_janela'), '[]'::jsonb) as w_out,
          coalesce(jsonb_agg(jsonb_build_object('trade_id', r.id, 'at', r.entry) order by r.entry, r.id)
                     filter (where not r.h and r.breaks ? 'depois_do_limite'), '[]'::jsonb) as l_after,
+         sum(r.net) filter (where not r.h and r.rl and r.breaks ? 'depois_do_limite') as l_after_net,
          count(*) filter (where not r.h and r.be) as be_n,
          count(*) filter (where not r.h and r.be and r.be_moved) as be_moved
   into a
@@ -558,6 +565,11 @@ begin
 
   if amt is not null then
     usage := public.limit_usage(p_acc.id, p_day, ver.resolved#>>'{limit,mode}' = 'soma', amt, 'infinity');
+    -- The running net's worst point up to the instant the limit was reached (that instant's exits included)
+    if jsonb_typeof(usage->'hit_at') = 'string' then
+      at_hit := public.limit_usage(p_acc.id, p_day, ver.resolved#>>'{limit,mode}' = 'soma', amt,
+                                   (usage->>'hit_at')::timestamptz)->'worst_usd';
+    end if;
   end if;
 
   return jsonb_build_object(
@@ -572,9 +584,9 @@ begin
                 'rule', wrule, 'evaluated', a.w_eval, 'inside', a.w_in, 'outside', a.w_out) end,
     'limit', case when amt is not null then jsonb_build_object(
                'amount', amt, 'scope', ver.resolved#>>'{limit,mode}', 'at_limit', ver.resolved#>>'{limit,at_limit}',
-               'worst', usage->'worst_usd', 'hit_at', usage->'hit_at', 'net', usage->'net_usd', 'trades', usage->'trades',
-               'after', a.l_after) end,
-    'fora', jsonb_build_object('n', a.fora_n, 'net', a.fora_net),
+               'worst', usage->'worst_usd', 'hit_at', usage->'hit_at', 'worst_at_hit', at_hit, 'net', usage->'net_usd',
+               'trades', usage->'trades', 'after', a.l_after, 'after_net', a.l_after_net) end,
+    'fora', jsonb_build_object('n', a.fora_n, 'net', a.fora_net, 'open', a.fora_open),
     'others_net', a.others_net,
     'recalculated', a.recalculated,
     'history', jsonb_build_object('n', a.h_n, 'net', a.h_net, 'gross', a.h_gross),
@@ -830,7 +842,7 @@ begin
       f := public.diario_fatos_from(acc, d, day_rows);
       out_days := out_days || jsonb_build_array(jsonb_build_object(
         'day', d, 'weekday', extract(isodow from d)::int, 'fora', f->'fora', 'recalculated', f->'recalculated',
-        'limit', case when jsonb_typeof(f->'limit') = 'object' then (f->'limit') - 'after' end));
+        'limit', case when jsonb_typeof(f->'limit') = 'object' then (f->'limit') - array['after', 'after_net'] end));
       out_fora := out_fora || coalesce((
         select jsonb_agg(jsonb_build_object(
                  'trade_id', x->'id', 'day', d, 'entry_time', x->'entry_time', 'symbol', x->'symbol',
@@ -842,11 +854,13 @@ begin
     end loop;
   end if;
 
-  select coalesce(jsonb_agg(jsonb_build_object('week_of', w.week_of, 'fora', jsonb_build_object('n', w.n, 'net', w.net))
+  select coalesce(jsonb_agg(jsonb_build_object('week_of', w.week_of,
+                                               'fora', jsonb_build_object('n', w.n, 'net', w.net, 'open', w.open))
                             order by w.week_of), '[]'::jsonb)
   into out_weeks
   from (select (x->>'day')::date - (extract(isodow from (x->>'day')::date)::int - 1) as week_of,
-               sum((x#>>'{fora,n}')::int) as n, sum((x#>>'{fora,net}')::numeric) as net
+               sum((x#>>'{fora,n}')::int) as n, sum((x#>>'{fora,net}')::numeric) as net,
+               sum((x#>>'{fora,open}')::int) as open
         from jsonb_array_elements(out_days) x
         group by 1) w;
 

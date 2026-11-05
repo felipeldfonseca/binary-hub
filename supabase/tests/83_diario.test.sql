@@ -695,7 +695,7 @@ select tests.eq(public.diario_dia(:'fut', '2026-10-14')#>'{facts,history}', '{"n
 select tests.eq(public.diario_dia(:'fut', '2026-10-14')#>'{facts,limit,net}', '-5.48'::jsonb,
                 '14 Oct: the limit counts every trade of the day (−14.24 + 8.76)');
 select tests.eq((public.diario_mes(:'fut', '2026-10-01')#>'{days,0}') - 'limit',
-                '{"day": "2026-10-14", "weekday": 3, "fora": {"n": 1, "net": -34.24}, "recalculated": 1}'::jsonb,
+                '{"day": "2026-10-14", "weekday": 3, "fora": {"n": 1, "net": -34.24, "open": 0}, "recalculated": 1}'::jsonb,
                 'diario_mes: 12 and 13 Oct are not there (history has no plan); 14 Oct counts only its diário trades');
 select tests.eq((select count(*) from jsonb_array_elements(public.diario_calendario(:'semr')->'days') x where x->>'kind' <> 'historico'),
                 0::bigint, 'an account without rules: every day is history');
@@ -803,11 +803,11 @@ select tests.eq((select jsonb_build_array(x->'plan_kind', x->'plan', x->'plan_no
 -- 15 Oct: the +40 entered at 10:30, after the limit hit at 10:25
 select tests.eq(public.diario_dia(:'fut', '2026-10-15')#>'{facts,limit}',
                 '{"amount": 400, "scope": "conta", "at_limit": "encerrar", "worst": -450.00, "hit_at": "2026-10-15T14:25:00+00:00",
-                  "net": -410.00, "trades": 3}'::jsonb
+                  "worst_at_hit": -450.00, "net": -410.00, "trades": 3, "after_net": 40.00}'::jsonb
                 || jsonb_build_object('after', jsonb_build_array(jsonb_build_object('trade_id', tests.tid(:'fut', '2026-10-15 14:30Z'),
                                                                                     'at', '2026-10-15T14:30:00+00:00'))),
                 '15 Oct: limite US$ 400 atingido às 10:25, the 10:30 entry after it');
-select tests.eq(public.diario_dia(:'fut', '2026-10-15')#>'{facts,fora}', '{"n": 1, "net": 40.00}'::jsonb, '15 Oct: one out of plan, +40');
+select tests.eq(public.diario_dia(:'fut', '2026-10-15')#>'{facts,fora}', '{"n": 1, "net": 40.00, "open": 0}'::jsonb, '15 Oct: one out of plan, +40');
 select tests.eq(public.diario_dia(:'fut', '2026-10-15')#>'{facts,others_net}', '-450.00'::jsonb, '15 Oct: the others −450');
 commit;
 
@@ -820,7 +820,18 @@ insert into tests.p83 values ('luc_before', public.diario_dia(:'luc', '2026-10-2
 insert into tests.p83 values ('fut15_before', (public.diario_dia(:'fut', '2026-10-15')->'facts')::text);
 select tests.eq(tests.mday(public.diario_mes(:'luc', '2026-10-01'), '2026-10-23')->'limit',
                 '{"amount": 400, "scope": "soma", "at_limit": "avisar", "worst": -455.00, "hit_at": "2026-10-23T14:08:00+00:00",
-                  "net": -455.00, "trades": 4}'::jsonb, 'somando: Apex''s −300 and Lucid''s −150 hit the limit at 10:08');
+                  "worst_at_hit": -450.00, "net": -455.00, "trades": 4}'::jsonb, 'somando: Apex''s −300 and Lucid''s −150 hit the limit at 10:08');
+select tests.eq(((select v::jsonb from tests.p83 where k = 'luc_before')#>'{facts,limit}') - 'after',
+                '{"amount": 400, "scope": "soma", "at_limit": "avisar", "worst": -455.00, "hit_at": "2026-10-23T14:08:00+00:00",
+                  "worst_at_hit": -450.00, "net": -455.00, "trades": 4, "after_net": -5.00}'::jsonb,
+                'somando: «atingido às 10:08, com US$ 450,00 de perda» (the worst −455 came later); the two entries after it −5 (+20 − 25)');
+select tests.eq((select v::jsonb from tests.p83 where k = 'luc_before')#>'{facts,limit,worst_at_hit}',
+                public.limit_usage(:'luc', '2026-10-23', true, 400, '2026-10-23 14:08Z')->'worst_usd', '… limit_usage up to the hit');
+select tests.eq(jsonb_build_array(public.diario_dia(:'fut', '2026-10-16')#>'{facts,limit,worst_at_hit}',
+                                  public.diario_dia(:'fut', '2026-10-16')#>'{facts,limit,after_net}',
+                                  public.diario_dia(:'fut', '2026-10-20')#>'{facts,limit,worst_at_hit}'),
+                '[-490.00, null]'::jsonb || jsonb_build_array(null::jsonb),
+                'no entry after the limit: after_net null; no hit: worst_at_hit null');
 select tests.eq((select jsonb_agg(jsonb_build_array(x->'plan_kind', coalesce(x#>'{plan_now,breaks}', x#>'{plan,breaks}')) order by o)
                  from jsonb_array_elements((select v::jsonb from tests.p83 where k = 'luc_before')->'trades') with ordinality e(x, o)),
                 '[["recalculado", []], ["recalculado", ["depois_do_limite"]], ["congelado", ["depois_do_limite"]]]'::jsonb,
@@ -832,14 +843,18 @@ begin;
 select set_config('request.jwt.claim.sub', :U, true);
 set local role authenticated;
 select tests.eq(tests.mday(public.diario_mes(:'luc', '2026-10-01'), '2026-10-23')->'limit',
-                '{"amount": 400, "scope": "soma", "at_limit": "avisar", "worst": -155.00, "hit_at": null, "net": -155.00,
-                  "trades": 3}'::jsonb, 'Apex archived: it leaves the sum of a past day');
+                '{"amount": 400, "scope": "soma", "at_limit": "avisar", "worst": -155.00, "hit_at": null, "worst_at_hit": null,
+                  "net": -155.00, "trades": 3}'::jsonb, 'Apex archived: it leaves the sum of a past day');
 select tests.eq(tests.mday(public.diario_mes(:'luc', '2026-10-01'), '2026-10-23')#>'{limit,worst}',
                 public.limit_usage(:'luc', '2026-10-23', true, 400, 'infinity')->'worst_usd', '… exactly as limit_usage');
 select tests.eq((select jsonb_agg(jsonb_build_array(x->'plan_kind', coalesce(x#>'{plan_now,breaks}', x#>'{plan,breaks}')) order by o)
                  from jsonb_array_elements(public.diario_dia(:'luc', '2026-10-23')->'trades') with ordinality e(x, o)),
                 '[["recalculado", []], ["recalculado", []], ["congelado", ["depois_do_limite"]]]'::jsonb,
                 'the recalculated plan follows; the frozen one stays');
+select tests.eq((public.diario_dia(:'luc', '2026-10-23')#>'{facts,limit}') - 'after',
+                '{"amount": 400, "scope": "soma", "at_limit": "avisar", "worst": -155.00, "hit_at": null, "worst_at_hit": null,
+                  "net": -155.00, "trades": 3, "after_net": -25.00}'::jsonb,
+                'Apex archived: no hit; the frozen 10:30 entry (−25) is still after the limit');
 select tests.eq((select x->'gate_now' from jsonb_array_elements(public.diario_dia(:'luc', '2026-10-23')->'trades') x
                  where (x->>'entry_at')::timestamptz = '2026-10-23 14:20Z'),
                 public.gate_at(:'luc', '2026-10-23 14:20Z') - 'rules', '… exactly as gate_at');
@@ -894,6 +909,17 @@ select tests.eq(jsonb_build_array(public.diario_dia(:'apx', '2026-10-23')#>'{fac
 select tests.eq(public.diario_dia(:'fut', '2026-10-20')#>'{facts,breakeven}',
                 '{"by": {"MES": {"n": 8, "un": "pts"}}, "trades": 2, "moved": 1}'::jsonb,
                 '20 Oct: breakeven MES +8 pts, moved on 1 of 2');
+select tests.eq(public.diario_dia(:'fut', :'today')#>'{facts,fora}',
+                case when tests.dtrade((select v::jsonb from tests.p83 where k = 'dtoday'), :'live')#>>'{plan,verdict}' = 'fora_do_plano' then '{"n": 1, "net": 50.00, "open": 1}'
+                     else '{"n": 0, "net": 0, "open": 0}' end::jsonb,
+                'today: the live trade, still open with its partials (+50), is «fora» and open when its frozen plan broke');
+select tests.eq((select count(*) from unnest(array[:'today'::date, '2026-10-01'::date]) m(m)
+                 cross join lateral jsonb_array_elements(public.diario_mes(:'fut', m.m)->'weeks') w
+                 where (w.value#>>'{fora,open}')::int is distinct from (
+                         select sum((d#>>'{fora,open}')::int)
+                         from jsonb_array_elements(public.diario_mes(:'fut', m.m)->'days') d
+                         where date_trunc('week', (d->>'day')::date)::date = (w.value->>'week_of')::date)),
+                0::bigint, 'diario_mes: a week''s open «fora» trades are its days''');
 select tests.eq(public.diario_dia(:'fut', :'today')#>'{facts,breakeven}', '{"by": {"MES": {"n": 8, "un": "pts"}}, "trades": 1, "moved": 0}'::jsonb,
                 'today: a breakeven move undone does not count');
 select tests.eq(public.diario_dia(:'fut', '2026-10-14')#>'{facts,window}',
@@ -920,7 +946,7 @@ begin
       for x in select d from jsonb_array_elements(public.diario_mes(a, m)->'days') d loop
         f := public.diario_fatos(a, (x->>'day')::date);
         if x->'fora' is distinct from f->'fora' or x->'recalculated' is distinct from f->'recalculated'
-           or x->'limit' is distinct from (case when jsonb_typeof(f->'limit') = 'object' then (f->'limit') - 'after'
+           or x->'limit' is distinct from (case when jsonb_typeof(f->'limit') = 'object' then (f->'limit') - array['after', 'after_net']
                                                 else 'null'::jsonb end) then
           n := n + 1;
         end if;
@@ -946,7 +972,7 @@ select tests.eq((select jsonb_agg(x order by x->>'day') from jsonb_array_element
                  where (x->>'day')::date between '2026-10-26' and '2026-11-01'),
                 'the week of 26 Oct is whole in October''s and November''s answers');
 select tests.eq((select x from jsonb_array_elements(public.diario_mes(:'fut', '2026-10-01')->'weeks') x where x->>'week_of' = '2026-10-12'),
-                '{"week_of": "2026-10-12", "fora": {"n": 2, "net": 5.76}}'::jsonb,
+                '{"week_of": "2026-10-12", "fora": {"n": 2, "net": 5.76, "open": 0}}'::jsonb,
                 'the week of 12 Oct: out of plan the 11:40 of 14 Oct (−34.24) and the +40 of 15 Oct');
 select tests.eq((select jsonb_agg(jsonb_build_array(x->'day', x->'symbol', x->'breaks', x->'plan_kind', x->'net') order by o)
                  from jsonb_array_elements(public.diario_mes(:'fut', '2026-10-01')->'fora_trades') with ordinality e(x, o)
