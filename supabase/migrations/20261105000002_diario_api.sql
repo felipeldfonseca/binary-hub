@@ -22,16 +22,21 @@
 --   trade_entry_plan(trade_context_from_gate(gate_at(account, entry)))), as «Já fechada» evaluates
 --   one; a trade realized at or before its own entry instant would count in its own limit, so it is
 --   evaluated 1 µs before its entry); null for history.
---   The plan of a day: the version in force at least(now(), the day's end − 1 µs) (today: now, as the
---   «Posso operar hoje?» card), its windows opening on that day, and the earlier versions in force
---   during the day ("changes").
+--   The end of a day (diario_day_close): its day clock's end, or later when the day's last instants run
+--   past it (an overnight window opened on the day: its tail counts on the day it opened, as
+--   compute_trading_day counts every trade), so a day runs from the end of the day before to its own end.
+--   The plan of a day: the version in force at least(now(), the day's end − 1 µs) (today, also in an
+--   overnight tail after midnight: now, as the «Posso operar hoje?» card), its windows opening on that
+--   day, and the earlier versions in force during the day ("changes").
 --
 -- API (new; anon nothing, authenticated execute)
 --
 --   diario_calendario(p_account uuid, p_from date default null, p_to date default null) returns jsonb
---     The light calendar of one account: every trading day with a trade (or a written review) between
---     p_from (default: the first day with a trade, at most 1 500 days before p_to) and p_to (default:
---     today, or the last day with a trade if later). No plan and no limit (no gate_at, limit_usage).
+--     The light calendar of one account: every trading day with a trade or a written review between
+--     p_from (default: the first such day, at most 1 500 days before p_to) and p_to (default: today, or
+--     the last day with a trade if later); first_day and last_day are the first and the last day with a
+--     trade or a written review (a review may sit on a day without trades, before the first trade, or on
+--     an account without trades). No plan and no limit (no gate_at, limit_usage).
 --       {"v": 1, "server_now", "account": {id, label, market, platform, currency, day {tz, start_min},
 --        archived, is_example, tz_confirmed, file_tz, guessed_clock}, "today", "desde", "desde_day",
 --        "from", "to", "first_day", "last_day",
@@ -55,12 +60,16 @@
 --        "fora_trades": [{trade_id, day, entry_time, symbol, direction, quantity, asset_type, status,
 --                         breaks, plan_kind, realized, net}]}
 --     Each day's fora, recalculated and limit are diario_dia's facts of that day.
+--     Cost: one gate_at per recalculated trade of the five or six weeks (about 0.7 ms each; with
+--     «somando» each one also sums the scope's trades of its day), one limit_usage per day; flat in the
+--     length of the history, linear in the month's file-only diário trades (parity by construction with
+--     «Já fechada» and the «Posso operar hoje?» card: no copy of gate_eval).
 --     Codes: not_authenticated, unknown_account, bad_day (field month).
 --
 --   diario_dia(p_account uuid, p_day date) returns jsonb
 --     Everything the open day shows (also a day without trades: today before trading).
 --       {"v": 1, "server_now", "account", "today", "desde", "desde_day", "day", "weekday", "kind",
---        "bounds": {start, end},
+--        "bounds": {start, end} (the end of the day before and the day's end: diario_day_close),
 --        "plan": {at, version: {id, version_no, effective_from, origin} | null, rules (the Resolved) |
 --                 null, windows_today: [{opens_at, closes_at, tz}], changes: [{id, version_no,
 --                 effective_from, until, rules}]},
@@ -121,7 +130,7 @@
 --                 many have a breakeven stop move not undone),
 --    "version": {id, version_no} | null, "changes"}
 --
--- Internal (revoked from the API roles): diario_day_end, diario_plan_at, diario_week_closed,
+-- Internal (revoked from the API roles): diario_day_end, diario_day_close, diario_plan_at, diario_week_closed,
 -- diario_text, diario_check_review, diario_check_note, diario_money, diario_account_json, diario_head,
 -- diario_rows, diario_changes, diario_fatos_from, diario_fatos, diario_review_json, diario_note_json.
 --
@@ -178,15 +187,45 @@ as $$
               else (p_day + 1)::timestamp at time zone p_tz end
 $$;
 
--- The instant whose rule version is the plan of a day: now for today, the day's last instant for a
--- past day
+-- The instant a trading day ends (exclusive): its day clock's end, or later when the day's last instants
+-- run past it. The instants where a day can end past its clock are the close of a window occurrence that
+-- opened on the day (of the version in force at the clock's end, or of one taking effect in the tail) and
+-- a version taking effect in the tail; the latest of them whose instant before still counts on the day
+-- (compute_trading_day: the rule every trade's day follows) is the end.
+create or replace function public.diario_day_close(p_acc public.trading_accounts, p_day date)
+returns timestamptz
+language sql
+stable
+set search_path = ''
+as $$
+  select greatest(c.clock_end, (
+           select max(x.at)
+           from (select o.closes_at as at
+                 from (select v.resolved from public.rule_version_at(p_acc.id, c.clock_end) v
+                       union all
+                       select n.resolved from public.account_rule_versions n
+                       where n.account_id = p_acc.id and n.effective_from > c.clock_end
+                         and n.effective_from < c.clock_end + interval '2 days') r
+                 cross join lateral public.window_occurrences(r.resolved->'windows', c.clock_end, -2, 1) o
+                 where o.closes_at > c.clock_end
+                   and public.trading_day_on(o.opens_at, p_acc.day_tz, p_acc.day_start_min) = p_day
+                 union all
+                 select n.effective_from from public.account_rule_versions n
+                 where n.account_id = p_acc.id and n.effective_from > c.clock_end
+                   and n.effective_from < c.clock_end + interval '2 days') x
+           where public.compute_trading_day(p_acc.id, x.at - interval '1 microsecond') = p_day))
+  from (select public.diario_day_end(p_day, p_acc.day_tz, p_acc.day_start_min) as clock_end) c
+$$;
+
+-- The instant whose rule version is the plan of a day: now for today (also in an overnight tail past
+-- the clock's end, as the «Posso operar hoje?» card), the day's last instant for a past day
 create or replace function public.diario_plan_at(p_acc public.trading_accounts, p_day date)
 returns timestamptz
 language sql
 stable
 set search_path = ''
 as $$
-  select least(now(), public.diario_day_end(p_day, p_acc.day_tz, p_acc.day_start_min) - interval '1 microsecond')
+  select least(now(), public.diario_day_close(p_acc, p_day) - interval '1 microsecond')
 $$;
 
 -- A week (its Monday) is closed when today is after its last possible trading day: Sunday where
@@ -452,15 +491,15 @@ as $$
   select coalesce(jsonb_agg(jsonb_build_object('id', v.id, 'version_no', v.version_no, 'effective_from', v.effective_from,
                                                'until', nx.effective_from, 'rules', v.resolved)
                             order by v.effective_from, v.version_no), '[]'::jsonb)
-  from public.account_rule_versions v
+  from (select public.diario_plan_at(p_acc, p_day) as plan_at, public.diario_day_close(p_acc, p_day - 1) as day_start) b
+  join public.account_rule_versions v on v.account_id = p_acc.id
   left join lateral (select n.effective_from from public.account_rule_versions n
                      where n.account_id = v.account_id
                        and (n.effective_from, n.version_no) > (v.effective_from, v.version_no)
                      order by n.effective_from, n.version_no limit 1) nx on true
-  where v.account_id = p_acc.id
-    and v.id is distinct from p_ver
-    and v.effective_from < public.diario_plan_at(p_acc, p_day)
-    and coalesce(nx.effective_from, 'infinity') > public.diario_day_end(p_day - 1, p_acc.day_tz, p_acc.day_start_min)
+  where v.id is distinct from p_ver
+    and v.effective_from < b.plan_at
+    and coalesce(nx.effective_from, 'infinity') > b.day_start
 $$;
 
 -- The facts of a day from its rows (see the header)
@@ -631,6 +670,16 @@ begin
   today := public.compute_trading_day(acc.id, now());
   select min(t.trading_day), max(t.trading_day) into d_first, d_last
   from public.trades t where t.user_id = uid and t.account_id = acc.id;
+  -- A day whose current review is written is a calendar day too (also before the first trade, or on an
+  -- account without trades)
+  select least(d_first, min(v.day)), greatest(d_last, max(v.day)) into d_first, d_last
+  from (select r.trading_day as day,
+               (array_agg(r.worked is not null or r.differently is not null or r.followed is not null or r.carry_forward is not null
+                          order by r.saved_at desc, r.id desc))[1] as written
+        from public.day_reviews r
+        where r.user_id = uid and r.account_id = acc.id
+        group by r.trading_day) v
+  where v.written;
   d_to := coalesce(p_to, greatest(today, d_last));
   d_from := coalesce(p_from, least(d_to, greatest(coalesce(d_first, d_to), d_to - 1499)));
   if d_from > d_to or d_to - d_from > 1499 then
@@ -822,7 +871,7 @@ declare
   facts jsonb;
   plan_at timestamptz;
   ver public.account_rule_versions%rowtype;
-  day_end timestamptz;
+  clock_end timestamptz;
   out_plan jsonb;
   out_trades jsonb;
   out_carry jsonb;
@@ -842,7 +891,7 @@ begin
   facts := public.diario_fatos_from(acc, p_day, day_rows);
   plan_at := public.diario_plan_at(acc, p_day);
   ver := public.rule_version_at(acc.id, plan_at);
-  day_end := public.diario_day_end(p_day, acc.day_tz, acc.day_start_min);
+  clock_end := public.diario_day_end(p_day, acc.day_tz, acc.day_start_min);
 
   out_plan := jsonb_build_object(
     'at', plan_at,
@@ -855,7 +904,7 @@ begin
                                 order by o.opens_at, w.ord), '[]'::jsonb)
       from jsonb_array_elements(case when jsonb_typeof(ver.resolved->'windows') = 'array' then ver.resolved->'windows'
                                      else '[]'::jsonb end) with ordinality w(x, ord)
-      cross join lateral public.window_occurrences(jsonb_build_array(w.x), day_end - interval '1 microsecond', -2, 1) o
+      cross join lateral public.window_occurrences(jsonb_build_array(w.x), clock_end - interval '1 microsecond', -2, 1) o
       where w.ord <= 2 and public.trading_day_on(o.opens_at, acc.day_tz, acc.day_start_min) = p_day),
     'changes', public.diario_changes(acc, p_day, ver.id));
 
@@ -902,7 +951,7 @@ begin
     'day', p_day,
     'weekday', extract(isodow from p_day)::int,
     'kind', facts->'kind',
-    'bounds', jsonb_build_object('start', public.diario_day_end(p_day - 1, acc.day_tz, acc.day_start_min), 'end', day_end),
+    'bounds', jsonb_build_object('start', public.diario_day_close(acc, p_day - 1), 'end', public.diario_day_close(acc, p_day)),
     'plan', out_plan,
     'facts', facts,
     'trades', out_trades,
@@ -1137,6 +1186,7 @@ grant execute on function public.save_day_note(uuid, date, jsonb, boolean) to au
 
 -- Internal: only the functions above call them (as their owner)
 revoke all on function public.diario_day_end(date, text, int) from public, anon, authenticated;
+revoke all on function public.diario_day_close(public.trading_accounts, date) from public, anon, authenticated;
 revoke all on function public.diario_plan_at(public.trading_accounts, date) from public, anon, authenticated;
 revoke all on function public.diario_week_closed(text, date, date) from public, anon, authenticated;
 revoke all on function public.diario_text(jsonb, int) from public, anon, authenticated;

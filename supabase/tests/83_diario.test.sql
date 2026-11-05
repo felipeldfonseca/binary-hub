@@ -18,9 +18,19 @@
 --    9  save_day_review and save_day_note validation, in order
 --   10  server time and append-only; repeated; too_many_versions
 --   11  frozen summary; «o dia mudou» after an import
---   12  row limit: 1 200 days in one value; bad_range; a month of 1 200 trades; the light pass calls no
---       gate_at and no limit_usage
+--   12  row limit: 1 200 days in one value; bad_range and the 1 500-day edge; a month of 1 200 trades; the
+--       light pass calls no gate_at and no limit_usage
 --   13  nothing moved: every row and answer the suites left, as before the Diário's writes
+--   14  the facts «O diário registrou» freezes, recomputed from the tables for every account and day (and the
+--       calendar's keys, each trade's imported_at, the weeks); the window, breakeven, version, first entry, closed
+--   15  the calendar's default range (a review before the first trade, an account that never traded), the
+--       month's weeks, the end of a day (an overnight tail: bounds, the plan at the day's real end, the changes
+--       of a day), today's plan = the card's, a position exiting at its entry instant, links, unrealized money
+--   16  reviews saved one transaction each: the newest is the review, the first «salva às»; written by any
+--       one answer; repeated against the newest; carry-over order; one transaction: the newest by id
+--   17  «Antes de operar»: another account's note, the 50-version cap, a malformed key, explicit nulls, the
+--       payload limits at the byte; the generic checks again over everything
+--   (groups 14–17 run before 12, on days fixed in October 2026)
 --
 -- Fixed October–November 2026 days (all before the day this phase was built); the register functions
 -- stamp the server's now(), so «today» cases are relative to it. Versions are moved to fixed instants
@@ -388,6 +398,124 @@ select public.undo_event(:'live', jsonb_build_object('v', 1, 'kind', 'stop',
   'id', (select m.id from public.trade_stop_moves m where m.trade_id = :'live')))#>>'{position,stop_kind}';
 select public.undo_entry(:'tundo') is not null;
 delete from public.trades where id in (:'tdel', :'a29');
+commit;
+
+-- More accounts (groups 14–17), each with its versions at fixed instants before any trade of it
+--   Noturna 83       binary, window 23:30–00:30 Brasília every day; v1 1 Oct (limit US$ 100), v2 at 20 Oct 00:10
+--                    Brasília, inside 19 Oct's overnight tail (US$ 50), v3 and v4 on 21 Oct at 09:00 and 12:00 (US$ 40 and
+--                    30: two changes in one day), v5 at 23 Oct 00:30 Brasília, the instant 22 Oct's tail closes (US$ 20)
+--   Forex 83         forex, the market's two windows (08:00–10:00 and 13:00–15:00 ET, Mon–Fri), v1 1 Oct
+--   Saídas 83        futures, limit US$ 100 per account, a window with its rule off, v1 1 Oct: file positions of two rows
+--   Revisões 83      binary, v1 1 Oct, one trade on 20 Oct (reviews on days before it in group 15)
+--   Vazia 83         binary, v1 1 Oct, never a trade (a review in group 15)
+--   Janela vazia 83  binary, the window rule on without a window, v1 1 Oct
+begin;
+select set_config('request.jwt.claim.sub', :U, true);
+set local role authenticated;
+insert into public.trading_accounts (user_id, market, label, platform) values
+  (:U, 'binary', 'Noturna 83', 'ebinex'), (:U, 'forex', 'Forex 83', 'mt5'), (:U, 'futures', 'Saídas 83', 'topone'),
+  (:U, 'binary', 'Revisões 83', 'ebinex'), (:U, 'binary', 'Vazia 83', 'ebinex'), (:U, 'binary', 'Janela vazia 83', 'ebinex');
+commit;
+select id as noc from public.trading_accounts where user_id = :U and label = 'Noturna 83' \gset
+select id as fx from public.trading_accounts where user_id = :U and label = 'Forex 83' \gset
+select id as sai from public.trading_accounts where user_id = :U and label = 'Saídas 83' \gset
+select id as rvs from public.trading_accounts where user_id = :U and label = 'Revisões 83' \gset
+select id as vaz from public.trading_accounts where user_id = :U and label = 'Vazia 83' \gset
+select id as jv from public.trading_accounts where user_id = :U and label = 'Janela vazia 83' \gset
+
+create or replace function tests.noc83(p_usd int) returns jsonb language sql immutable as $$
+  select jsonb_build_object('rules', jsonb_build_object('v', 1, 'window_rule', '{"on": true, "outside": "fora"}'::jsonb,
+                                                        'limit', jsonb_build_object('usd', p_usd, 'mode', 'conta', 'at_limit', 'encerrar')),
+                            'window', '{"tz": "America/Sao_Paulo", "start_min": 1410, "end_min": 30, "weekdays": 127}'::jsonb)
+$$;
+grant execute on function tests.noc83(int) to authenticated;
+
+begin;
+select set_config('request.jwt.claim.sub', :U, true);
+set local role authenticated;
+select tests.eq(jsonb_array_length(public.save_rules(jsonb_build_object('v', 1, 'base_rev', public.rules_config()->>'rev',
+  'defaults', jsonb_build_object('forex', jsonb_build_object(
+    'rules', '{"v": 1, "window_rule": {"on": true, "outside": "fora"}}'::jsonb,
+    'windows', '[{"tz": "America/New_York", "start_min": 480, "end_min": 600, "weekdays": 31},
+                 {"tz": "America/New_York", "start_min": 780, "end_min": 900, "weekdays": 31}]'::jsonb)),
+  'accounts', jsonb_build_object(
+    :'noc', tests.noc83(100) || '{"version": "force"}'::jsonb,
+    :'fx', '{"rules": {"v": 1, "window_rule": {"on": true, "outside": "fora"}}, "window": null, "version": "force"}'::jsonb,
+    :'sai', '{"rules": {"v": 1, "window_rule": {"on": false, "outside": "fora"}, "limit": {"usd": 100, "mode": "conta", "at_limit": "encerrar"}},
+              "window": {"tz": "America/New_York", "start_min": 600, "end_min": 690, "weekdays": 31}, "version": "force"}'::jsonb,
+    :'rvs', '{"rules": {"v": 1}, "window": null, "version": "force"}'::jsonb,
+    :'vaz', '{"rules": {"v": 1}, "window": null, "version": "force"}'::jsonb,
+    :'jv', '{"rules": {"v": 1, "window_rule": {"on": true, "outside": "fora"}}, "window": null, "version": "force"}'::jsonb)))
+  ->'versions'), 6, 'six more first versions');
+commit;
+begin;
+select set_config('request.jwt.claim.sub', :U, true);
+set local role authenticated;
+select tests.eq(jsonb_array_length(public.save_rules(jsonb_build_object('v', 1, 'base_rev', public.rules_config()->>'rev',
+  'accounts', jsonb_build_object(:'noc', tests.noc83(50))))->'versions'), 1, 'Noturna 83: version 2');
+commit;
+begin;
+select set_config('request.jwt.claim.sub', :U, true);
+set local role authenticated;
+select tests.eq(jsonb_array_length(public.save_rules(jsonb_build_object('v', 1, 'base_rev', public.rules_config()->>'rev',
+  'accounts', jsonb_build_object(:'noc', tests.noc83(40))))->'versions'), 1, 'Noturna 83: version 3');
+commit;
+begin;
+select set_config('request.jwt.claim.sub', :U, true);
+set local role authenticated;
+select tests.eq(jsonb_array_length(public.save_rules(jsonb_build_object('v', 1, 'base_rev', public.rules_config()->>'rev',
+  'accounts', jsonb_build_object(:'noc', tests.noc83(30))))->'versions'), 1, 'Noturna 83: version 4');
+commit;
+begin;
+select set_config('request.jwt.claim.sub', :U, true);
+set local role authenticated;
+select tests.eq(jsonb_array_length(public.save_rules(jsonb_build_object('v', 1, 'base_rev', public.rules_config()->>'rev',
+  'accounts', jsonb_build_object(:'noc', tests.noc83(20))))->'versions'), 1, 'Noturna 83: version 5');
+commit;
+
+alter table public.account_rule_versions disable trigger account_rule_versions_guard;
+update public.account_rule_versions v set effective_from = case
+  when v.account_id <> :'noc' or v.version_no = 1 then '2026-10-01 03:00:00+00'::timestamptz
+  when v.version_no = 2 then '2026-10-20 03:10:00+00'::timestamptz
+  when v.version_no = 3 then '2026-10-21 12:00:00+00'::timestamptz
+  when v.version_no = 4 then '2026-10-21 15:00:00+00'::timestamptz
+  else '2026-10-23 03:30:00+00'::timestamptz end
+where v.account_id in (:'noc', :'fx', :'sai', :'rvs', :'vaz', :'jv');
+alter table public.account_rule_versions enable trigger account_rule_versions_guard;
+select id as noc_v1 from public.account_rule_versions where account_id = :'noc' and version_no = 1 \gset
+select id as noc_v2 from public.account_rule_versions where account_id = :'noc' and version_no = 2 \gset
+select id as noc_v3 from public.account_rule_versions where account_id = :'noc' and version_no = 3 \gset
+
+-- Noturna 83: 19 Oct 23:40 and 20 Oct 00:20 Brasília (both on 19 Oct; the second after version 2), 21 Oct 10:00 (outside).
+-- Saídas 83: 20 Oct, a position of two rows whose first exit is at its entry instant (−150 at 10:00 ET, +20 at 10:10);
+-- 21 Oct, two rows exiting after the entry; 22 Oct, one row exiting at its entry instant (a win).
+-- Revisões 83: 20 Oct 12:00 Brasília, on the file's wall clock. Janela vazia 83: at the very instant its version 1 takes
+-- effect (1 Oct 00:00 Brasília).
+begin;
+select set_config('request.jwt.claim.sub', :U, true);
+set local role authenticated;
+select tests.eq(tests.imp83(:'noc', 'ebinex', 'noc83.csv', jsonb_build_array(
+  tests.e83(2, 'N83-1', 'call', '2026-10-20 02:40Z', 'win', '8.80'),
+  tests.e83(3, 'N83-2', 'put', '2026-10-20 03:20Z', 'loss', '-10.00'),
+  tests.e83(4, 'N83-3', 'call', '2026-10-21 13:00Z', 'win', '8.80')))->>'inserted', '3', 'Noturna 83: three file rows');
+select tests.eq(tests.imp83(:'sai', 'topone', 'sai83.csv', jsonb_build_array(
+  tests.f83(2, 'S83-1a', 'MESZ6', 'long', '2026-10-20 14:00Z', '2026-10-20 14:00Z', '7000.00', '6970.00', '1', 'loss', '-150.00', null),
+  tests.f83(3, 'S83-1b', 'MESZ6', 'long', '2026-10-20 14:00Z', '2026-10-20 14:10Z', '7000.00', '7004.00', '1', 'win', '20.00', null),
+  tests.f83(4, 'S83-2a', 'MESZ6', 'long', '2026-10-21 14:00Z', '2026-10-21 14:05Z', '7000.00', '6990.00', '1', 'loss', '-50.00', null),
+  tests.f83(5, 'S83-2b', 'MESZ6', 'long', '2026-10-21 14:00Z', '2026-10-21 14:10Z', '7000.00', '6990.00', '1', 'loss', '-50.00', null),
+  tests.f83(6, 'S83-3', 'MESZ6', 'long', '2026-10-22 14:00Z', '2026-10-22 14:00Z', '7000.00', '7004.00', '1', 'win', '20.00', null)))->>'inserted',
+  '5', 'Saídas 83: five file rows');
+-- (a wall clock without an offset: the file's zone, UTC, is confirmed by this import)
+select tests.eq(tests.imp83(:'jv', 'ebinex', 'jv83.csv', jsonb_build_array(
+  tests.e83(2, 'J83-1', 'call', '2026-10-01 03:00Z', 'win', '8.80')))->>'inserted', '1', 'Janela vazia 83: one file row');
+select tests.eq(tests.imp83(:'rvs', 'ebinex', 'rvs83.csv', jsonb_build_array(
+  tests.e83(2, 'R83-1', 'call', '2026-10-20 15:00Z', 'win', '8.80') - 'utc_offset'))->>'inserted', '1', 'Revisões 83: one file row');
+-- Top One 83, the old page on Friday 30 Oct: at 10:10 ET a win without its money (pnl unknown) and a commission; at
+-- 10:30 a result still pending with a pnl typed
+insert into public.trades (user_id, account_id, symbol, asset_type, direction, entry_time, exit_time, entry_price, exit_price,
+                           quantity, result, pnl, commission)
+values (:U, :'fut', 'MESZ6', 'futures', 'long', '2026-10-30 14:10Z', '2026-10-30 14:20Z', 7000, null, 1, 'win', null, 1.24),
+       (:U, :'fut', 'MESZ6', 'futures', 'long', '2026-10-30 14:30Z', null, 7000, null, 1, 'pending', 12.50, null);
 commit;
 
 -- =============================================================================================
@@ -1160,6 +1288,467 @@ select tests.eq(jsonb_build_array(public.diario_dia(:'fut', '2026-10-28')#>'{rev
 commit;
 
 -- =============================================================================================
+-- 14. The facts «O diário registrou» freezes, recomputed from the tables
+-- =============================================================================================
+
+-- One account's day as the tables give it, without the Diário's functions: a trade's money is Σ(pnl − known commission)
+-- of its counting exits (a file exit always; an app exit not undone while no file exit exists), else its pnl − known
+-- commission when it has a pnl and a result other than pending; imported_at is the later of its batch and its newest link
+create or replace function tests.expect83(p_acc uuid, p_day date) returns jsonb language sql stable as $$
+  with v1 as (select v.effective_from as at from public.account_rule_versions v where v.account_id = p_acc and v.version_no = 1),
+  tr as (
+    select t.id, t.status, t.result, t.entry_time, t.pnl, t.commission,
+           ((select at from v1) is null or t.entry_time < (select at from v1)) as h,
+           exists (select 1 from public.trade_entry_context c where c.trade_id = t.id) as app,
+           ex.n, ex.net as x_net, ex.gross as x_gross, ex.comm as x_comm,
+           greatest((select b.created_at from public.import_batches b where b.id = t.import_batch_id),
+                    (select max(l.linked_at) from public.trade_import_links l where l.trade_id = t.id)) as imported_at
+    from public.trades t
+    left join lateral (select count(*) as n, sum(e.pnl - coalesce(e.commission, 0)) as net, sum(e.pnl) as gross,
+                              sum(e.commission) as comm
+                       from public.trade_exits e
+                       where e.trade_id = t.id
+                         and (e.origin = 'file' or (e.voided_at is null and not exists (
+                              select 1 from public.trade_exits f where f.trade_id = t.id and f.origin = 'file')))) ex on true
+    where t.account_id = p_acc and t.trading_day = p_day
+  ),
+  m as (
+    select tr.*, (tr.n > 0 or (tr.pnl is not null and coalesce(tr.result, '') <> 'pending')) as rl,
+           case when tr.n > 0 then tr.x_net else tr.pnl - coalesce(tr.commission, 0) end as net,
+           case when tr.n > 0 then tr.x_gross else tr.pnl end as gross,
+           case when tr.n > 0 then tr.x_comm else tr.commission end as comm
+    from tr
+  )
+  select jsonb_build_object(
+    'n', count(*) filter (where not h), 'app', count(*) filter (where not h and app),
+    'closed', count(*) filter (where not h and status = 'closed'), 'open', count(*) filter (where not h and status = 'open'),
+    'wins', count(*) filter (where not h and status = 'closed' and result = 'win'),
+    'losses', count(*) filter (where not h and status = 'closed' and result = 'loss'),
+    'even', count(*) filter (where not h and status = 'closed' and result = 'breakeven'),
+    'net', coalesce(sum(net) filter (where not h and rl), 0), 'gross', coalesce(sum(gross) filter (where not h and rl), 0),
+    'commission', sum(comm) filter (where not h and rl),
+    'first_entry_at', min(entry_time) filter (where not h),
+    'h_n', count(*) filter (where h),
+    'h_wins', count(*) filter (where h and status = 'closed' and result = 'win'),
+    'h_losses', count(*) filter (where h and status = 'closed' and result = 'loss'),
+    'h_even', count(*) filter (where h and status = 'closed' and result = 'breakeven'),
+    'h_net', coalesce(sum(net) filter (where h and rl), 0), 'h_gross', coalesce(sum(gross) filter (where h and rl), 0),
+    'imported_at', max(imported_at),
+    'trades_imported_at', coalesce(jsonb_object_agg(id, imported_at) filter (where id is not null), '{}'::jsonb),
+    'kind', case when count(*) = 0 then 'vazio' when count(*) filter (where not h) = 0 then 'historico'
+                 when count(*) filter (where h) = 0 then 'diario' else 'misto' end)
+  from m
+$$;
+
+-- Every account of the database (its owner's session), every day of its calendar: the calendar's keys, diario_dia's facts
+-- and each trade's imported_at against the tables; fora + others = net; each week the sum of its days. The first
+-- divergences, or [].
+create or replace function tests.indep83() returns jsonb language plpgsql as $$
+declare
+  bad jsonb := '[]'::jsonb;
+  a record;
+  cal jsonb;
+  x jsonb;
+  e jsonb;
+  dia jsonb;
+  f jsonb;
+  w jsonb;
+begin
+  for a in select t.id, t.user_id from public.trading_accounts t order by t.id loop
+    perform set_config('request.jwt.claim.sub', a.user_id::text, true);
+    cal := public.diario_calendario(a.id);
+    for x in select y from jsonb_array_elements(cal->'days') y loop
+      e := tests.expect83(a.id, (x->>'day')::date);
+      if x - array['day', 'weekday', 'review'] is distinct from jsonb_build_object(
+           'kind', e->'kind', 'n', e->'n', 'app', e->'app', 'open', e->'open', 'wins', e->'wins', 'losses', e->'losses',
+           'even', e->'even', 'net', e->'net', 'gross', e->'gross', 'commission', e->'commission', 'imported_at', e->'imported_at',
+           'history', case when (e->>'h_n')::int > 0 then jsonb_build_object('n', e->'h_n', 'wins', e->'h_wins',
+                        'losses', e->'h_losses', 'even', e->'h_even', 'net', e->'h_net', 'gross', e->'h_gross') else 'null'::jsonb end) then
+        bad := bad || jsonb_build_array(jsonb_build_object('what', 'calendar', 'account', a.id, 'got', x, 'expected', e));
+      end if;
+      dia := public.diario_dia(a.id, (x->>'day')::date);
+      f := dia->'facts';
+      if jsonb_build_object('kind', f->'kind', 'trades', f->'trades', 'closed', f->'closed', 'open', f->'open', 'wins', f->'wins',
+                            'losses', f->'losses', 'even', f->'even', 'net', f->'net', 'gross', f->'gross',
+                            'commission', f->'commission', 'first_entry_at', f->'first_entry_at', 'history', f->'history')
+         is distinct from jsonb_build_object('kind', e->'kind', 'trades', e->'n', 'closed', e->'closed', 'open', e->'open',
+                            'wins', e->'wins', 'losses', e->'losses', 'even', e->'even', 'net', e->'net', 'gross', e->'gross',
+                            'commission', e->'commission', 'first_entry_at', e->'first_entry_at',
+                            'history', jsonb_build_object('n', e->'h_n', 'net', e->'h_net', 'gross', e->'h_gross'))
+         or (f#>>'{fora,net}')::numeric + (f->>'others_net')::numeric <> (f->>'net')::numeric
+         or (select coalesce(jsonb_object_agg(t->>'trade_id', t->'imported_at'), '{}'::jsonb)
+             from jsonb_array_elements(dia->'trades') t) is distinct from e->'trades_imported_at' then
+        bad := bad || jsonb_build_array(jsonb_build_object('what', 'facts', 'account', a.id, 'got', f, 'expected', e));
+      end if;
+    end loop;
+    for w in select y from jsonb_array_elements(cal->'weeks') y loop
+      if w - array['week_of', 'closed'] is distinct from (
+           select jsonb_build_object('days', count(*) filter (where (z->>'n')::int > 0), 'n', coalesce(sum((z->>'n')::int), 0),
+                    'net', coalesce(sum((z->>'net')::numeric), 0), 'gross', coalesce(sum((z->>'gross')::numeric), 0),
+                    'commission', sum((z->>'commission')::numeric),
+                    'history', case when coalesce(sum((z#>>'{history,n}')::int), 0) > 0 then jsonb_build_object(
+                                 'n', sum((z#>>'{history,n}')::int), 'net', sum((z#>>'{history,net}')::numeric),
+                                 'gross', sum((z#>>'{history,gross}')::numeric)) else 'null'::jsonb end)
+           from jsonb_array_elements(cal->'days') z
+           where z->>'kind' <> 'vazio' and date_trunc('week', (z->>'day')::date)::date = (w->>'week_of')::date) then
+        bad := bad || jsonb_build_array(jsonb_build_object('what', 'week', 'account', a.id, 'got', w));
+      end if;
+    end loop;
+    if jsonb_array_length(bad) >= 3 then
+      return bad;
+    end if;
+  end loop;
+  return bad;
+end;
+$$;
+select tests.eq(tests.indep83(), '[]'::jsonb, 'every account and day: the calendar, the facts and the weeks are the tables''');
+
+begin;
+select set_config('request.jwt.claim.sub', :U, true);
+set local role authenticated;
+select tests.eq(public.diario_dia(:'ebx', '2026-10-19')#>'{facts,window}',
+                jsonb_build_object('rule', true, 'evaluated', 3, 'inside', 2, 'outside', jsonb_build_array(jsonb_build_object(
+                  'trade_id', tests.tid(:'ebx', '2026-10-19 23:10Z'), 'at', '2026-10-19T23:10:00+00:00'))),
+                'Ebinex 19 Oct: three judged by the window (no limit), two inside, the 20:10 outside');
+select tests.eq(jsonb_build_array(public.diario_dia(:'fut', '2026-10-24')#>'{facts,window}', public.diario_dia(:'sai', '2026-10-20')#>'{facts,window}',
+                                  public.diario_dia(:'jv', '2026-10-20')#>'{facts,window}'),
+                '[{"rule": true, "evaluated": 0, "inside": 0, "outside": []}, null, null]'::jsonb,
+                'the window line: the rule on a day without trades; none with a window and the rule off, or the rule on without a window');
+select tests.eq(public.diario_dia(:'fut', '2026-10-14')#>'{facts,breakeven}', '{"by": {"MES": {"n": 8, "un": "pts"}}, "trades": 1, "moved": 0}'::jsonb,
+                '14 Oct: the breakeven rule covers the diário MES trade (not the MNQ, not the history)');
+select tests.eq(jsonb_build_array(public.diario_dia(:'fut', '2026-10-21')#>'{facts,version}', public.diario_dia(:'semr', '2026-09-28')#>'{facts,version}'),
+                jsonb_build_array(jsonb_build_object('id', :'fut_v2', 'version_no', 2), null), 'the day''s version; none without rules');
+select tests.eq(public.diario_dia(:'fut', '2026-10-14')#>'{facts,first_entry_at}', '"2026-10-14T14:05:00+00:00"'::jsonb,
+                '14 Oct: the first diário entry (10:05 ET), not the history''s 08:50');
+select tests.eq(jsonb_build_array(public.diario_dia(:'fut', :'today')#>'{facts,closed}', public.diario_dia(:'fut', :'today')#>'{facts,open}',
+                                  public.diario_dia(:'fut', '2026-10-15')#>'{facts,closed}', public.diario_dia(:'fut', '2026-10-15')#>'{facts,open}'),
+                '[0, 1, 3, 0]'::jsonb, 'closed and open: today''s live trade, 15 Oct''s three');
+commit;
+
+-- =============================================================================================
+-- 15. The calendar's range, the month's weeks, the end of a day, the day's keys
+-- =============================================================================================
+
+-- Reviews on days without trades, each save its own transaction: before Revisões 83's first trade (two written, one
+-- cleared on 2 Oct, and one cleared on 3 Oct within the transaction that wrote it), and on Vazia 83, which never traded
+begin;
+select set_config('request.jwt.claim.sub', :U, true);
+set local role authenticated;
+select public.save_day_review(:'rvs', '2026-10-02', tests.rev83('{"worked": "Só estudei."}'))#>>'{review,versions}';
+select public.save_day_review(:'rvs', '2026-10-03', tests.rev83('{"worked": "Rascunho."}'))#>>'{review,versions}';
+select public.save_day_review(:'rvs', '2026-10-03', tests.rev83('{}'))#>>'{review,versions}';
+commit;
+begin;
+select set_config('request.jwt.claim.sub', :U, true);
+set local role authenticated;
+select public.save_day_review(:'rvs', '2026-10-02', tests.rev83('{}'))#>>'{review,versions}';
+commit;
+begin;
+select set_config('request.jwt.claim.sub', :U, true);
+set local role authenticated;
+select public.save_day_review(:'rvs', '2026-10-05', tests.rev83('{"worked": "Não operei: mercado lateral."}'))#>>'{review,versions}';
+select public.save_day_review(:'rvs', '2026-10-08', tests.rev83('{"worked": "Só observei."}'))#>>'{review,versions}';
+select public.save_day_review(:'vaz', '2026-10-06', tests.rev83('{"followed": "sim"}'))#>>'{review,versions}';
+select public.save_day_review(:'vaz', '2026-10-09', tests.rev83('{"differently": "Anotar antes."}'))#>>'{review,versions}';
+commit;
+
+begin;
+select set_config('request.jwt.claim.sub', :U, true);
+set local role authenticated;
+select tests.eq((select jsonb_build_array(c->'from', c->'first_day', c->'last_day',
+                   (select jsonb_agg(jsonb_build_array(x->'day', x->'kind', x#>'{review,versions}') order by x->>'day')
+                    from jsonb_array_elements(c->'days') x))
+                 from (select public.diario_calendario(:'rvs') as c) q),
+                '["2026-10-05", "2026-10-05", "2026-10-20", [["2026-10-05", "vazio", 1], ["2026-10-08", "vazio", 1], ["2026-10-20", "diario", null]]]'::jsonb,
+                'the default range starts at the first written review before the first trade (a cleared one does not count)');
+select tests.eq((select jsonb_agg(x->'day' order by x->>'day') from jsonb_array_elements(public.diario_calendario(:'rvs', '2026-10-01', null)->'days') x),
+                '["2026-10-05", "2026-10-08", "2026-10-20"]'::jsonb,
+                'from 1 Oct: 2 Oct (cleared later) and 3 Oct (cleared in the same transaction) have no ✓');
+select tests.eq((select jsonb_build_array(c->'from', c->'first_day', c->'last_day',
+                   (select jsonb_agg(jsonb_build_array(x->'day', x->'kind', x#>'{review,versions}') order by x->>'day')
+                    from jsonb_array_elements(c->'days') x))
+                 from (select public.diario_calendario(:'vaz') as c) q),
+                '["2026-10-06", "2026-10-06", "2026-10-09", [["2026-10-06", "vazio", 1], ["2026-10-09", "vazio", 1]]]'::jsonb,
+                'an account that never traded: its written reviews are the default range');
+select tests.eq(jsonb_build_array(tests.cday(public.diario_calendario(:'jv'), '2026-10-01')->'kind',
+                                  tests.cday(public.diario_calendario(:'jv'), '2026-10-01')->'history',
+                                  public.diario_dia(:'jv', '2026-10-01')#>'{trades,0,history}'),
+                '["diario", null, false]'::jsonb, 'a trade at the very instant version 1 takes effect is the diário''s');
+select tests.eq(tests.mday(public.diario_mes(:'jv', '2026-10-01'), '2026-10-01')->'recalculated', '1'::jsonb,
+                '… and its plan is in the month''s');
+select tests.eq(public.diario_calendario(:'ebx')->>'to', public.compute_trading_day(:'ebx', now())::text,
+                'the default end is today, after the last trade');
+select tests.eq(tests.cday(public.diario_calendario(:'fut'), '2026-10-28')->'imported_at',
+                (select to_jsonb(b.created_at) from public.import_batches b where b.account_id = :'fut' and b.file_name = 'top83_28.csv'),
+                '28 Oct: imported_at is the day''s newest import');
+select tests.eq(tests.cweek(public.diario_calendario(:'fut'), '2026-10-19')->'history', 'null'::jsonb, 'a week without history: null');
+select tests.eq(jsonb_build_array(public.diario_calendario(:'rvs')#>'{account,tz_confirmed}', public.diario_calendario(:'semr')#>'{account,tz_confirmed}',
+                                  public.diario_dia(:'rvs', '2026-10-20')#>'{trades,0,clock_guessed}'),
+                '[true, false, false]'::jsonb, 'the file zone confirmed by an import of wall clocks; never on the old import path');
+select tests.eq(jsonb_build_array(public.diario_dia(:'fut', '2026-10-21')->'desde', public.diario_dia(:'fut', '2026-10-21')->'desde_day'),
+                '["2026-10-14T13:02:11+00:00", "2026-10-14"]'::jsonb, '«desde» is version 1''s, also after version 2');
+-- The month: its ISO weeks, never a day after them; August 2026 ends on a Monday
+select tests.eq((select bool_and((x->>'day')::date <= (m->>'to')::date) from (select public.diario_mes(:'fut', '2026-10-01') as m) q,
+                   jsonb_array_elements(m->'days') x), true, 'October''s answer stops at its last week''s Sunday');
+select tests.eq(jsonb_build_array(public.diario_mes(:'fut', '2026-08-15')->'from', public.diario_mes(:'fut', '2026-08-15')->'to'),
+                '["2026-07-27", "2026-09-06"]'::jsonb, 'August 2026 (the 31st a Monday): its last week is whole');
+commit;
+
+-- The end of a day: the day clock's, or the close of an overnight window opened on it
+select tests.eq(jsonb_build_array(public.diario_day_end('2026-10-20', 'America/Sao_Paulo', 0), public.diario_day_end('2026-10-20', 'America/New_York', 1080)),
+                '["2026-10-21T03:00:00+00:00", "2026-10-20T22:00:00+00:00"]'::jsonb, 'the day clock''s end: midnight Brasília, 18:00 New York');
+begin;
+select set_config('request.jwt.claim.sub', :U, true);
+set local role authenticated;
+select tests.eq(jsonb_build_array(public.diario_dia(:'b3', '2026-10-20')->'bounds', public.diario_dia(:'fut', '2026-10-20')->'bounds',
+                                  public.diario_dia(:'ebx', '2026-10-19')->'bounds'),
+                '[{"start": "2026-10-20T03:00:00+00:00", "end": "2026-10-21T03:00:00+00:00"},
+                  {"start": "2026-10-19T22:00:00+00:00", "end": "2026-10-20T22:00:00+00:00"},
+                  {"start": "2026-10-19T03:30:00+00:00", "end": "2026-10-20T03:30:00+00:00"}]'::jsonb,
+                'bounds: B3 and futures on their clocks; Ebinex from 18 Oct''s window close to 19 Oct''s (00:30 Brasília)');
+select tests.eq((select t.trading_day from public.trades t where t.account_id = :'noc' and t.entry_time = '2026-10-20 03:20Z'), '2026-10-19'::date,
+                'Noturna 83: 00:20 Brasília inside the window opened on 19 Oct counts on 19 Oct');
+-- 19 Oct ended in its overnight tail under version 2 (saved at 00:10): the plan, its limit and «até 00:10 valia a versão 1»
+select tests.eq((select (d->'bounds') || jsonb_build_object('at', d#>'{plan,at}', 'version', d#>'{plan,version,version_no}',
+                   'limit', d#>'{facts,limit,amount}', 'facts_version', d#>'{facts,version,version_no}', 'n', d#>'{facts,changes}',
+                   'changes', (select jsonb_agg(x - 'rules') from jsonb_array_elements(d#>'{plan,changes}') x))
+                 from (select public.diario_dia(:'noc', '2026-10-19') as d) q),
+                jsonb_build_object('start', '2026-10-19T03:30:00+00:00', 'end', '2026-10-20T03:30:00+00:00',
+                  'at', '2026-10-20T03:29:59.999999+00:00', 'version', 2, 'limit', 50, 'facts_version', 2, 'n', 1,
+                  'changes', jsonb_build_array(jsonb_build_object('id', :'noc_v1', 'version_no', 1,
+                    'effective_from', '2026-10-01T03:00:00+00:00', 'until', '2026-10-20T03:10:00+00:00'))),
+                '19 Oct ends at 00:30 Brasília (its window''s close): version 2 is its plan, version 1 a change of the day');
+select tests.eq((select jsonb_build_array(d#>'{plan,version,version_no}', d#>'{facts,limit,amount}',
+                   (select jsonb_agg(jsonb_build_array(x->'version_no', x->'until') order by x->>'effective_from')
+                    from jsonb_array_elements(d#>'{plan,changes}') x))
+                 from (select public.diario_dia(:'noc', '2026-10-21') as d) q),
+                '[4, 30, [[2, "2026-10-21T12:00:00+00:00"], [3, "2026-10-21T15:00:00+00:00"]]]'::jsonb,
+                '21 Oct: two changes during the day, each once, each until the next one');
+select tests.eq((select jsonb_build_array(d#>'{plan,version,version_no}', d#>'{plan,changes}', d#>'{bounds,end}')
+                 from (select public.diario_dia(:'noc', '2026-10-22') as d) q),
+                '[4, [], "2026-10-23T03:30:00+00:00"]'::jsonb, '22 Oct ends when its tail closes, the instant version 5 starts');
+select tests.eq((select jsonb_build_array(d#>'{plan,version,version_no}', d#>'{plan,changes}', d#>'{bounds,start}')
+                 from (select public.diario_dia(:'noc', '2026-10-23') as d) q),
+                '[5, [], "2026-10-23T03:30:00+00:00"]'::jsonb, '23 Oct: version 4 ended as the day began, no change of the day');
+-- Today: the plan is the «Posso operar hoje?» card's, on every account
+select tests.eq((select count(*) from public.trading_accounts a
+                 where a.user_id = :U
+                   and (public.diario_dia(a.id, public.compute_trading_day(a.id, now()))#>'{plan,version,id}')
+                       is distinct from (public.gate_at(a.id, now())#>'{version,id}')), 0::bigint,
+                'today''s plan is the version of the «Posso operar hoje?» card, on every account');
+select tests.eq((select jsonb_agg(jsonb_build_array(x->'opens_at', x->'closes_at') order by x->>'opens_at')
+                 from jsonb_array_elements(public.diario_dia(:'fx', '2026-10-20')#>'{plan,windows_today}') x),
+                '[["2026-10-20T12:00:00+00:00", "2026-10-20T14:00:00+00:00"], ["2026-10-20T17:00:00+00:00", "2026-10-20T19:00:00+00:00"]]'::jsonb,
+                'Forex 83: the market''s two windows open on 20 Oct');
+commit;
+
+-- Every trade of the database lies inside its day's bounds
+select tests.eq((select count(*) from (select distinct t.account_id, t.trading_day from public.trades t where t.account_id is not null) d
+                 join public.trading_accounts a on a.id = d.account_id
+                 join public.trades t on t.account_id = d.account_id and t.trading_day = d.trading_day
+                 where t.entry_time < public.diario_day_close(a, d.trading_day - 1) or t.entry_time >= public.diario_day_close(a, d.trading_day)),
+                0::bigint, 'every trade enters inside its day''s bounds');
+
+-- A position whose exit is at its own entry instant (Saídas 83): its plan judged 1 µs before; the others at the entry
+begin;
+select set_config('request.jwt.claim.sub', :U, true);
+set local role authenticated;
+select tests.eq((select jsonb_agg(jsonb_build_array(x#>'{position,exits}', x#>'{gate_now,at}', x#>'{plan_now,verdict}') order by x->>'entry_at')
+                 from (select public.diario_dia(:'sai', d)->'trades' as t from unnest(array['2026-10-20', '2026-10-21', '2026-10-22']::date[]) d) q,
+                 jsonb_array_elements(q.t) x),
+                '[[2, "2026-10-20T13:59:59.999999+00:00", "no_plano"], [2, "2026-10-21T14:00:00+00:00", "no_plano"],
+                  [0, "2026-10-22T13:59:59.999999+00:00", "no_plano"]]'::jsonb,
+                'an exit at the entry instant (of a position''s exits, or of a win): judged 1 µs before; exits after it: at the entry');
+reset role;
+select tests.eq(public.trade_entry_plan(public.trade_context_from_gate(public.gate_at(:'sai', '2026-10-20 14:00Z')))->'breaks',
+                '["depois_do_limite"]'::jsonb, '(at the instant itself its own −150 would be past the US$ 100 limit)');
+set local role authenticated;
+-- The import's link as the day lists it
+select tests.eq((tests.dtrade(public.diario_dia(:'fut', '2026-10-22'), :'a22')#>'{links,0}') - array['batch_id', 'linked_at', 'before', 'after'],
+                '{"platform": "topone", "file_name": "top83_22.csv", "closed": false, "differs": [],
+                  "file_entry_at": "2026-10-22T14:05:00+00:00", "file_exit_at": "2026-10-22T14:20:00+00:00"}'::jsonb,
+                'a link: the file, whether it closed the trade, what differed, the file''s instants');
+-- Money not realized: an open trade without partials; a win without its pnl (its commission not counted)
+insert into tests.p83 values ('open_luc', public.register_entry(:'luc', jsonb_build_object('v', 1, 'client_key', tests.ck(),
+  'symbol', 'MESZ6', 'direction', 'long', 'quantity', '1', 'entry_price', '7000.00', 'allow_similar', true))->>'trade_id');
+select tests.eq(tests.dtrade(public.diario_dia(:'luc', :'today'), (select v::uuid from tests.p83 where k = 'open_luc'))->'money'
+                  || (select jsonb_build_object('fut30', jsonb_agg(x->'money' order by o))
+                      from jsonb_array_elements(public.diario_dia(:'fut', '2026-10-30')->'trades') with ordinality e(x, o)),
+                '{"realized": false, "net": null, "gross": null, "commission": null,
+                  "fut30": [{"realized": false, "net": null, "gross": null, "commission": null},
+                            {"realized": false, "net": null, "gross": null, "commission": null}]}'::jsonb,
+                'nothing realized: an open trade without partials, a win without its pnl, a pending result with a pnl');
+select tests.eq(tests.cday(public.diario_calendario(:'fut'), '2026-10-30') - array['day', 'weekday', 'imported_at', 'review'],
+                '{"kind": "diario", "n": 2, "app": 0, "open": 0, "wins": 1, "losses": 0, "even": 0, "net": 0, "gross": 0, "commission": null,
+                  "history": null}'::jsonb, '30 Oct: a win without its money counts as a win; nothing in net, gross or commission');
+select tests.eq(jsonb_build_array(public.diario_calendario(:'fut')#>'{account,guessed_clock}', public.diario_calendario(:'semr')#>'{account,guessed_clock}'),
+                '[0, 1]'::jsonb, 'guessed clocks are counted on the account itself');
+commit;
+
+-- =============================================================================================
+-- 16. Reviews saved one by one: the newest is the review, the first gives «salva às»
+-- =============================================================================================
+
+-- 29 Oct (no trade): five saves, each its own transaction: worked, differently, followed, cleared, carry_forward; 30 Oct
+-- differently only; 31 Oct followed only
+begin;
+select set_config('request.jwt.claim.sub', :U, true);
+set local role authenticated;
+select public.save_day_review(:'fut', '2026-10-29', tests.rev83('{"worked": "W"}'))#>>'{review,versions}';
+commit;
+begin;
+select set_config('request.jwt.claim.sub', :U, true);
+set local role authenticated;
+select public.save_day_review(:'fut', '2026-10-29', tests.rev83('{"differently": "D"}'))#>>'{review,versions}';
+commit;
+begin;
+select set_config('request.jwt.claim.sub', :U, true);
+set local role authenticated;
+select public.save_day_review(:'fut', '2026-10-29', tests.rev83('{"followed": "sim"}'))#>>'{review,versions}';
+commit;
+begin;
+select set_config('request.jwt.claim.sub', :U, true);
+set local role authenticated;
+select public.save_day_review(:'fut', '2026-10-29', tests.rev83('{}'))#>>'{review,versions}';
+commit;
+begin;
+select set_config('request.jwt.claim.sub', :U, true);
+set local role authenticated;
+select public.save_day_review(:'fut', '2026-10-29', tests.rev83('{"carry_forward": "C"}'))#>>'{review,versions}';
+select public.save_day_review(:'fut', '2026-10-30', tests.rev83('{"differently": "Esperar a confirmação."}'))#>>'{review,versions}';
+select public.save_day_review(:'fut', '2026-10-31', tests.rev83('{"followed": "nao"}'))#>>'{review,versions}';
+commit;
+select min(saved_at) as r29_first, max(saved_at) as r29_last, max(id) as r29_id from public.day_reviews
+where account_id = :'fut' and trading_day = '2026-10-29' \gset
+
+begin;
+select set_config('request.jwt.claim.sub', :U, true);
+set local role authenticated;
+select tests.ok(:'r29_first'::timestamptz < :'r29_last'::timestamptz, '29 Oct: five transactions, five instants');
+select tests.eq((public.diario_dia(:'fut', '2026-10-29')->'review') - array['id', 'auto_summary'],
+                jsonb_build_object('worked', null, 'differently', null, 'followed', null, 'carry_forward', 'C', 'versions', 5,
+                                   'written', true, 'first_saved_at', :'r29_first'::timestamptz, 'saved_at', :'r29_last'::timestamptz),
+                '29 Oct: the review is the newest save; «salva às» the first, «editada às» the newest');
+select tests.eq((select jsonb_agg(jsonb_build_array(x->'written', x->'worked', x->'differently', x->'followed', x->'carry_forward') order by o)
+                 from jsonb_array_elements(public.diario_dia(:'fut', '2026-10-29')->'review_history') with ordinality e(x, o)),
+                '[[false, null, null, null, null], [true, null, null, "sim", null], [true, null, "D", null, null], [true, "W", null, null, null]]'::jsonb,
+                'the earlier saves, newest first, each written by one answer (the cleared one not)');
+select tests.eq(tests.cday(public.diario_calendario(:'fut'), '2026-10-29')->'review',
+                jsonb_build_object('first_saved_at', :'r29_first'::timestamptz, 'saved_at', :'r29_last'::timestamptz, 'versions', 5),
+                'the calendar''s ✓: the first and the newest save');
+select tests.eq((select jsonb_build_array(v.id, v.first_saved_at, v.saved_at, v.versions, v.written, v.carry_forward)
+                 from public.day_reviews_now_v v where v.account_id = :'fut' and v.trading_day = '2026-10-29'),
+                jsonb_build_array(:'r29_id'::bigint, :'r29_first'::timestamptz, :'r29_last'::timestamptz, 5, true, 'C'),
+                'the view: the newest save, the first instant');
+select tests.eq((select jsonb_agg(jsonb_build_array(v.trading_day, v.written) order by v.trading_day) from public.day_reviews_now_v v
+                 where v.account_id = :'fut' and v.trading_day between '2026-10-26' and '2026-10-31'),
+                '[["2026-10-26", true], ["2026-10-27", false], ["2026-10-28", true], ["2026-10-29", true], ["2026-10-30", true],
+                  ["2026-10-31", true]]'::jsonb, 'the view: written by any one answer, not when cleared');
+select tests.eq(jsonb_build_array(tests.cday(public.diario_calendario(:'fut'), '2026-10-30')#>'{review,versions}',
+                                  tests.cday(public.diario_calendario(:'fut'), '2026-10-31')#>'{review,versions}',
+                                  public.diario_dia(:'fut', '2026-10-30')#>'{review,written}', public.diario_dia(:'fut', '2026-10-31')#>'{review,written}'),
+                '[1, 1, true, true]'::jsonb, '«O que faria diferente» alone, or «Seguiu o plano» alone, is a written review');
+select tests.eq(jsonb_build_array(public.save_day_review(:'fut', '2026-10-29', '{"v": 1, "carry_forward": "C"}', true)->'repeated',
+                                  public.save_day_review(:'fut', '2026-10-29', '{"v": 1, "worked": "W"}', true)->'repeated'),
+                '[true, false]'::jsonb, 'repeated is judged against the newest save, not the first');
+select tests.eq((public.diario_dia(:'fut', '2026-11-02')->'carry_in') - 'saved_at', '{"day": "2026-10-29", "text": "C"}'::jsonb,
+                '«Do pregão anterior»: the newest earlier day with a carry-over (29 Oct, not 23 Oct)');
+-- Saves of one transaction share an instant: the newest by id (14 Oct: three; 21 Oct: fifty)
+select tests.eq(public.diario_dia(:'fut', '2026-10-15')->'carry_in', 'null'::jsonb,
+                '14 Oct''s newest save (one transaction with two carry-overs before it) has none: nothing carried to 15 Oct');
+select tests.eq((select jsonb_build_array(v.id = (select max(r.id) from public.day_reviews r where r.account_id = :'fut' and r.trading_day = v.trading_day),
+                                          v.worked)
+                 from public.day_reviews_now_v v where v.account_id = :'fut' and v.trading_day = '2026-10-14'),
+                jsonb_build_array(true, E'\u0085x'), 'the view: in one transaction, the newest by id');
+commit;
+
+-- =============================================================================================
+-- 17. «Antes de operar»: one account's day, the cap, the payload's edges
+-- =============================================================================================
+
+-- The view of today's note on Top One 83 (two saves an hour apart, group 10)
+select tests.eq((select jsonb_build_array(v.versions, v.written, v.first_saved_at < v.saved_at, v.text) from public.day_notes_now_v v
+                 where v.account_id = :'fut' and v.trading_day = :'today'),
+                '[2, true, true, "Só a favor da VWAP; nada antes das 10:00."]'::jsonb, 'the notes'' view: the newest, the first instant');
+
+-- Lucid 83 today, in one transaction: Top One's text is not Lucid's note; a second save; the same again writes nothing
+begin;
+select set_config('request.jwt.claim.sub', :U, true);
+set local role authenticated;
+select tests.eq(public.save_day_note(:'luc', :'today', tests.rev83('{"text": "Só a favor da VWAP; nada antes das 10:00."}'))->'repeated',
+                'false'::jsonb, 'another account''s note is not this one''s: written');
+select tests.eq(public.save_day_note(:'luc', :'today', tests.rev83('{"text": "N2"}'))#>'{note,versions}', '2'::jsonb, 'a second save');
+select tests.eq(public.save_day_note(:'luc', :'today', tests.rev83('{"text": "N2"}'))->'repeated', 'true'::jsonb,
+                'in one transaction the newest save (by id) is the note: the same text writes nothing');
+select tests.eq((public.diario_dia(:'luc', :'today')->'note') - array['id', 'first_saved_at', 'saved_at'],
+                '{"text": "N2", "versions": 2, "written": true}'::jsonb, 'Lucid''s note: its own two saves');
+select tests.eq((select v.text from public.day_notes_now_v v where v.account_id = :'luc' and v.trading_day = :'today'), 'N2',
+                'the notes'' view: the newest by id');
+select tests.eq(jsonb_build_array(public.diario_dia(:'luc', :'today'::date - 1)->'note', public.diario_dia(:'fut', :'today'::date - 1)->'note',
+                                  public.diario_dia(:'apx', :'today')->'note'),
+                '[null, null, null]'::jsonb, 'no note on another day or another account');
+commit;
+
+-- Fifty versions of today's note on Cripto 83 at most; another account is not counted
+create or replace function tests.notes83(p_acc uuid, p_day date, p_n int) returns int language plpgsql as $$
+begin
+  for i in 1..p_n loop
+    perform public.save_day_note(p_acc, p_day, tests.rev83(jsonb_build_object('text', 'nota ' || i)));
+  end loop;
+  return (select count(*) from public.day_notes n where n.account_id = p_acc and n.trading_day = p_day);
+end;
+$$;
+grant execute on function tests.notes83(uuid, date, int) to authenticated;
+begin;
+select set_config('request.jwt.claim.sub', :U, true);
+set local role authenticated;
+select tests.eq(tests.notes83(:'cry', public.compute_trading_day(:'cry', now()), 50), 50, 'fifty versions of today''s note');
+select tests.fails(format('select public.save_day_note(%L, %L, %L)', :'cry', public.compute_trading_day(:'cry', now()), tests.rev83('{"text": "51"}')),
+                   'too_many_versions', null, 'the 51st: too_many_versions');
+select tests.eq(public.save_day_note(:'cry', public.compute_trading_day(:'cry', now()), tests.rev83('{"text": "nota 50"}'))->'repeated',
+                'true'::jsonb, 'the 51st with the current text is no new version');
+select tests.eq(public.save_day_note(:'ebx', public.compute_trading_day(:'ebx', now()), tests.rev83('{"text": "Ebinex."}'))#>'{note,versions}',
+                '1'::jsonb, 'another account''s first note: Cripto''s fifty do not count');
+commit;
+
+-- The payload: a client_key that is not a UUID, explicit nulls, the size limits at the byte
+create or replace function tests.sized83(p jsonb, p_key text, p_bytes int) returns jsonb language sql immutable as $$
+  select p || jsonb_build_object(p_key, repeat('x', p_bytes - octet_length((p || jsonb_build_object(p_key, ''))::text)))
+$$;
+begin;
+select set_config('request.jwt.claim.sub', :U, true);
+set local role authenticated;
+select tests.fails(format('select public.save_day_note(%L, %L, %L, true)', :'fut', :'today', '{"v": 1, "client_key": "nao-e-uuid", "text": "x"}'),
+                   'bad_client_key', 'client_key', 'note: a client_key that is not a UUID, also on a dry run');
+select tests.eq(jsonb_build_array(public.save_day_note(:'fut', :'today', '{"v": 1, "text": null}', true)->'repeated',
+                                  public.save_day_review(:'fut', '2026-10-28', '{"v": 1, "worked": null, "differently": null,
+                                                         "followed": null, "carry_forward": null}', true)->'repeated'),
+                '[false, false]'::jsonb, 'an explicit JSON null is an empty answer (it clears), never bad_text');
+select tests.eq(octet_length(tests.sized83('{"v": 1, "client_key": "0b3f1c2a-1111-4c2d-8e3f-000000000001"}', 'worked', 16384)::text), 16384,
+                '(a review payload of exactly 16 384 bytes)');
+select tests.fails(format('select public.save_day_review(%L, %L, %L)', :'fut', '2026-10-28',
+                          tests.sized83('{"v": 1, "client_key": "0b3f1c2a-1111-4c2d-8e3f-000000000001"}', 'worked', 16384)),
+                   'bad_text', 'worked', 'review: 16 384 bytes pass the size check');
+select tests.fails(format('select public.save_day_review(%L, %L, %L)', :'fut', '2026-10-28',
+                          tests.sized83('{"v": 1, "client_key": "0b3f1c2a-1111-4c2d-8e3f-000000000001"}', 'worked', 16385)),
+                   'payload_too_large', null, 'review: 16 385 bytes do not');
+select tests.fails(format('select public.save_day_note(%L, %L, %L)', :'fut', :'today',
+                          tests.sized83('{"v": 1, "client_key": "0b3f1c2a-1111-4c2d-8e3f-000000000001"}', 'text', 8192)),
+                   'bad_text', 'text', 'note: 8 192 bytes pass the size check');
+select tests.fails(format('select public.save_day_note(%L, %L, %L)', :'fut', :'today',
+                          tests.sized83('{"v": 1, "client_key": "0b3f1c2a-1111-4c2d-8e3f-000000000001"}', 'text', 8193)),
+                   'payload_too_large', null, 'note: 8 193 bytes do not');
+commit;
+select tests.eq(public.diario_text('null'::jsonb, 10), '{"value": null}'::jsonb, '(diario_text: JSON null is no text)');
+
+-- Everything above, through the generic checks again (the calendar is the limit's, the facts the tables', each trade
+-- trade_state's)
+select tests.eq(tests.cal_vs_limit83(), 0::bigint, 'again: every account and day, the calendar''s money is limit_usage''s');
+select tests.eq(tests.indep83(), '[]'::jsonb, 'again: the calendar, the facts and the weeks are the tables''');
+select tests.eq(tests.dia_is_state83(:U), 0::bigint, 'again: every trade of every day is trade_state + the Diário''s keys');
+select tests.eq(tests.mes_vs_fatos83(:U), 0::bigint, 'again: diario_mes per day is diario_fatos');
+
+-- =============================================================================================
 -- 12. One value however long the history; the light pass calls no gate_at
 -- =============================================================================================
 
@@ -1192,6 +1781,13 @@ select tests.fails(format('select public.diario_calendario(%L, %L, %L)', :'big',
                    'from after to: bad_range');
 select tests.eq(jsonb_array_length(public.diario_calendario(:'big', '2026-09-01', '2026-09-12')->'days'), 12, 'a range: its days');
 select tests.eq(jsonb_array_length(public.diario_calendario(:'big', null, '2023-05-01')->'days'), 0, 'a range before the first day: nothing');
+select tests.eq(jsonb_build_array(public.diario_calendario(:'big', null, '2028-01-01')->'from',
+                                  public.diario_calendario(:'big', null, '2028-01-01')->'first_day'),
+                jsonb_build_array(to_jsonb('2028-01-01'::date - 1499), '2023-06-01'), 'the default start: at most 1 500 days before the end');
+select tests.eq(jsonb_array_length(public.diario_calendario(:'big', '2023-06-01', '2023-06-01'::date + 1499)->'days'), 1200,
+                '1 500 days: the longest range');
+select tests.fails(format('select public.diario_calendario(%L, %L, %L)', :'big', '2023-06-01', '2023-06-01'::date + 1500), 'bad_range', null,
+                   '1 501 days: bad_range');
 select tests.eq((select sum((x#>>'{fora,n}')::int + (x->>'recalculated')::int) from jsonb_array_elements(public.diario_mes(:'mes', '2026-10-01')->'days') x),
                 (select count(*) from public.trades where account_id = :'mes') + (select count(*) from public.trades where account_id = :'mes'
                    and ((entry_time at time zone 'America/Sao_Paulo')::time >= time '20:00' or (entry_time at time zone 'America/Sao_Paulo')::time < time '10:00')),
