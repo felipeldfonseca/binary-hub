@@ -1254,7 +1254,7 @@ function entradaBinaria(out: ModeloEntrada, { conta, r, now, fechada, hm, entry,
   if (fechada) {
     if (r.duracao && out.entradaEm && !out.vencido) erros.fimB = ERROS.naoVenceu;
     else if (!r.resultado) erros.fimB = ERROS.comoTerminou;
-    if (r.resultado && out.vencido && stake.ok && payout) {
+    if (r.resultado && out.vencido && stake.ok && payout && !erros.stake) {
       const pnl =
         r.resultado === 'ganho'
           ? numericText(round(div(mul(numeric(stake.value), numeric(payout)), fromInt(100)), 2))
@@ -1262,7 +1262,8 @@ function entradaBinaria(out: ModeloEntrada, { conta, r, now, fechada, hm, entry,
             ? `-${stake.value}`
             : '0';
       out.linhaResultado = EBINEX.resultado(dinheiro(pnl, conta.currency));
-    } else out.linhaResultado = EBINEX.resultadoEscolha;
+    } else if (r.resultado && out.vencido) out.linhaResultado = EBINEX.resultadoPreencha;
+    else out.linhaResultado = EBINEX.resultadoEscolha;
   }
   if (r.direcao && symbol) out.descricao = { lado: r.direcao === 'call' ? EBINEX.alta : EBINEX.baixa, ativo: symbol };
 

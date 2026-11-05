@@ -194,6 +194,9 @@ export const EBINEX = {
   devolvida: 'Devolvida',
   resultado: (valor: string) => `Resultado: ${valor}`,
   resultadoEscolha: 'Resultado: escolha como terminou.',
+  // NEW: the outcome is chosen but stake or payout is not (the board's line has no such state);
+  // worded like `preencha` above and PRECOS.resultadoPrecos
+  resultadoPreencha: 'Resultado: preencha stake e payout.',
   /** Step 3's line: «… · perda · …» */
   fim: { ganho: 'ganho', perda: 'perda', devolvida: 'devolvida' },
 }
