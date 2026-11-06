@@ -358,23 +358,24 @@ describe('leaving step 3', () => {
     expect(onClose).not.toHaveBeenCalled()
   })
 
-  it('«Ver no Diário» from another page goes to /diario on the sheet’s account first (C7)', async () => {
+  // Phase 4 (M2, C21): the Diário on the trade's account, day and row, from any page; the row's ▾ takes the focus
+  it('«Ver no Diário» from another page goes to /diario on the trade’s account, day and row (M2)', async () => {
     mockPathname = '/trades'
     db.fetchTradeState.mockResolvedValue(operacaoTelas('operacao-mes-fechada'))
     const { onClose } = abrir(ids.trades.mes)
     await screen.findByRole('heading', { level: 3, name: 'Operação fechada' })
     await userEvent.click(screen.getByRole('button', { name: 'Ver no Diário' }))
-    await waitFor(() => expect(onClose).toHaveBeenCalledWith({ focusId: 'operacoes-do-dia' }))
-    expect(mockRouter.push).toHaveBeenCalledWith(`/diario?conta=${ids.accounts.topOne}`)
+    await waitFor(() => expect(onClose).toHaveBeenCalledWith({ focusId: `op-${ids.trades.mes}` }))
+    expect(mockRouter.push).toHaveBeenCalledWith(`/diario?conta=${ids.accounts.topOne}&dia=2026-10-22&op=${ids.trades.mes}`)
   })
 
-  it('«Ver no Diário» on /diario with the same account only closes', async () => {
+  it('«Ver no Diário» on /diario with the same account pushes the day and the row too (the page follows the URL)', async () => {
     db.fetchTradeState.mockResolvedValue(operacaoTelas('operacao-mes-fechada'))
     const { onClose } = abrir(ids.trades.mes)
     await screen.findByRole('heading', { level: 3, name: 'Operação fechada' })
     await userEvent.click(screen.getByRole('button', { name: 'Ver no Diário' }))
-    await waitFor(() => expect(onClose).toHaveBeenCalledWith({ focusId: 'operacoes-do-dia' }))
-    expect(mockRouter.push).not.toHaveBeenCalled()
+    await waitFor(() => expect(onClose).toHaveBeenCalledWith({ focusId: `op-${ids.trades.mes}` }))
+    expect(mockRouter.push).toHaveBeenCalledWith(`/diario?conta=${ids.accounts.topOne}&dia=2026-10-22&op=${ids.trades.mes}`)
   })
 })
 

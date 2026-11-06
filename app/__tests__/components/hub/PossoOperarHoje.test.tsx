@@ -43,7 +43,7 @@ jest.mock('@/lib/hub/regrasDb', () => ({
   mergePreferences: jest.fn(),
 }))
 
-// Phase 3: /diario also has «Operações do dia» (its own tests: OperacoesDoDia.test.tsx)
+// Phase 3: /diario's Registrar reads (the Diário's own tests: Diario*.test.tsx)
 jest.mock('@/lib/hub/registrarDb', () => ({
   ...jest.requireActual('@/lib/hub/registrarDb'),
   fetchDayTrades: jest.fn(),
@@ -764,8 +764,9 @@ describe('/diario', () => {
     const selector = await screen.findByRole('button', { name: /^Conta: / })
     const h1 = screen.getByRole('heading', { level: 1, name: 'Diário' })
     const card = await screen.findByRole('region', { name: 'Posso operar hoje?' })
-    // Phase 4 (telas B0): the open day's region, the Phase 3 bridge until lane L2 replaces it; the placeholder is gone
-    const bridge = await screen.findByRole('region', { name: 'Operações do dia' })
+    // Phase 4 (telas): the open day's region (lane L2's «o dia», section#dia); the placeholder is gone
+    await waitFor(() => expect(document.getElementById('dia')).not.toBeNull())
+    const bridge = document.getElementById('dia') as HTMLElement
     expect(screen.queryByText('O Diário chega na Fase 4.')).toBeNull()
     const follows = (a: Node, b: Node) => (a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0
     expect(follows(h1, selector)).toBe(true)
@@ -779,8 +780,11 @@ describe('/diario', () => {
     await userEvent.click(within(card).getByRole('button', { name: 'Ver a outra conta' }))
     expect(within(card).getByRole('list', { name: 'Outras contas' })).toHaveTextContent('Top One #1')
     await waitFor(() => expect(selector).toHaveAccessibleDescription('Janela 20:00–21:00 · Brasília'))
-    // One read of rules_now serves the card, the window line and the day of «Operações do dia»
-    expect(await within(bridge).findByText('Nenhuma operação registrada hoje.')).toBeInTheDocument()
+    // One read of rules_now serves the card, the window line and the open day (a region named by its day's H2)
+    expect(bridge).toHaveAttribute('aria-labelledby', 't-dia')
+    const titulo = within(bridge).getByRole('heading', { level: 2 })
+    expect(titulo.textContent).toMatch(/^(Segunda|Terça|Quarta|Quinta|Sexta)-feira|^(Sábado|Domingo), /)
+    expect(screen.getByRole('region', { name: titulo.textContent ?? '' })).toBe(bridge)
     expect(fetchRulesNow).toHaveBeenCalledTimes(1)
   })
 })

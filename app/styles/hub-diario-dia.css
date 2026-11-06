@@ -2,5 +2,922 @@
  * The Diário page, lane L2 «o dia» (Phase 4, telas): the open day, its plan, the trades and their drill, the review.
  * Scoped to .hub; tokens from styles/hub.css, the shared rules from styles/hub-diario.css. Imported by
  * app/(hub)/layout.tsx. Only lane L2 edits this file, with its prefixes only: hub-dr-dia-*, hub-dr-plano-*,
- * hub-dr-op-*, hub-dr-drill-*, hub-dr-img-*, hub-dr-rev-*.
+ * hub-dr-op-*, hub-dr-drill-*, hub-dr-img-*, hub-dr-rev-*. Measures from the approved boards (DiarioDezEnxuto,
+ * DiarioHojeEnxuto, canvas version 84): `.ck`, `.notas-dia`, `.nota-box`, `.tl-vaga`, `.ops`, `.op-linha`, `.drill`,
+ * `.fatos`, `.tempo`, `.minis`, `.dlg`, `.rev`, `.versoes`, `.marca`, `.chip-origem`, `.campo`; breakpoints as the
+ * boards' (≤ 980 the tablet, ≤ 540 the phone), as viewport media queries.
  */
+
+/* ---- The day's heading, note, tiles (E) ---- */
+
+.hub .hub-dr-dia-cartao {
+  scroll-margin-top: 16px;
+}
+.hub .hub-dr-dia-cab {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+}
+.hub .hub-dr-dia-nota {
+  margin: 0;
+  padding: 10px 14px;
+  border-radius: 12px;
+  border: 1px dashed var(--neutral-border);
+  font-size: 13px;
+  color: var(--text-2);
+  text-wrap: pretty;
+}
+.hub .hub-dr-dia-h3 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.3;
+}
+.hub .hub-dr-dia-h3:focus {
+  outline: none;
+}
+.hub .hub-dr-dia-h3:focus-visible {
+  outline: 2px dashed var(--mint-border);
+  outline-offset: 4px;
+  border-radius: 4px;
+}
+.hub .hub-dr-dia-numeros {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.hub .hub-dr-dia-tsub {
+  font-size: 12px;
+  color: var(--text-2);
+}
+.hub .hub-dr-dia-barra {
+  display: block;
+  height: 100%;
+}
+.hub .hub-dr-dia-barra--amber {
+  background: var(--amber);
+}
+.hub .hub-dr-dia-barra--red {
+  background: var(--red-fill);
+}
+.hub .hub-dr-dia-comoler {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* ---- «O plano do dia», «Antes de operar», «Do pregão anterior», the timeline's place (F) ---- */
+
+.hub .hub-dr-plano-bloco {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.hub .hub-dr-plano-lista {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.hub .hub-dr-plano-linha {
+  display: grid;
+  grid-template-columns: 150px minmax(0, 1fr) auto;
+  gap: 4px 14px;
+  align-items: center;
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: var(--inset);
+  font-size: 13px;
+}
+.hub .hub-dr-plano-meio {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 10px;
+  min-width: 0;
+}
+.hub .hub-dr-plano-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  font-weight: 700;
+  color: var(--mint);
+  text-decoration: underline;
+}
+/* The pills «No plano», «Fora do plano», «Sem regra», «Registrado» (board `.marca`) */
+.hub .hub-dr-plano-marca {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.hub .hub-dr-plano-marca--ok {
+  border: 1px solid var(--mint-border);
+  color: var(--mint);
+}
+.hub .hub-dr-plano-marca--fora {
+  background: var(--amber-bg);
+  border: 1px solid var(--amber-border);
+  color: var(--amber);
+}
+.hub .hub-dr-plano-marca--neutro {
+  background: var(--neutral-bg);
+  border: 1px solid var(--neutral-border);
+  color: var(--text);
+}
+.hub .hub-dr-plano-versao {
+  margin: 0;
+  padding: 0 14px;
+  font-size: 12px;
+  color: var(--text-2);
+}
+.hub .hub-dr-plano-notas {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(280px, 100%), 1fr));
+  gap: 8px;
+}
+.hub .hub-dr-plano-nota {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  min-width: 0;
+}
+.hub .hub-dr-plano-rot {
+  font-size: 12px;
+  color: var(--text-2);
+}
+.hub .hub-dr-plano-texto {
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+.hub .hub-dr-plano-quando {
+  font-size: 11px;
+  color: var(--text-2);
+}
+.hub .hub-dr-plano-antes {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+.hub .hub-dr-plano-antes-txt {
+  min-width: 0;
+}
+.hub .hub-dr-plano-btn {
+  flex: none;
+  padding: 0 12px;
+}
+.hub .hub-dr-plano-campo {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+/* The board's `.campo` inside a note box (`--inset`) */
+.hub .hub-dr-plano-input {
+  flex: 1 1 200px;
+  min-width: 0;
+  min-height: 44px;
+  padding: 0 12px;
+  border-radius: 12px;
+  border: 1px solid var(--field-border);
+  background: var(--inset);
+  color: var(--text);
+  font-family: inherit;
+  font-size: 14px;
+  box-sizing: border-box;
+}
+.hub .hub-dr-plano-input::placeholder {
+  color: var(--text-2);
+  opacity: 1;
+}
+.hub .hub-dr-plano-erro {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--amber);
+}
+/* «Linha do tempo · chega na Fase 5» (board `.tl-vaga`, `.chip-fase`) */
+.hub .hub-dr-plano-vaga {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  padding: 14px 16px;
+  border-radius: 14px;
+  border: 1px dashed var(--neutral-border);
+}
+.hub .hub-dr-plano-fase {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 9px;
+  border-radius: 999px;
+  border: 1px dashed var(--text-2);
+  color: var(--text-2);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+.hub .hub-dr-plano-vaga-txt {
+  flex: 1 1 260px;
+  font-size: 13px;
+  color: var(--text-2);
+}
+
+/* ---- «Operações do dia» (G) ---- */
+
+.hub .hub-dr-op-bloco {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.hub .hub-dr-op-vazio {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: var(--inset);
+  font-size: 13px;
+}
+.hub .hub-dr-op-tabela {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+/* One trade: its row and, when open, its drill (board rowgroup) */
+.hub .hub-dr-op-grupo {
+  display: flex;
+  flex-direction: column;
+  border-radius: 12px;
+  background: var(--inset);
+  border: 1px solid transparent;
+}
+.hub .hub-dr-op-grupo--fora {
+  border-color: var(--amber-border);
+}
+.hub .hub-dr-op-linha {
+  display: grid;
+  grid-template-columns: 104px minmax(170px, 1.5fr) 128px minmax(170px, 1.2fr) 44px;
+  gap: 6px 12px;
+  align-items: center;
+  padding: 8px 12px;
+  font-size: 13px;
+}
+.hub .hub-dr-op-linha > * {
+  min-width: 0;
+}
+.hub .hub-dr-op-cab {
+  padding: 0 12px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-2);
+}
+.hub .hub-dr-op-hora {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 12px;
+}
+.hub .hub-dr-op-op {
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+/* Inline after the operation (Tailwind's preflight makes every svg a block) */
+.hub .hub-dr-op-clipe {
+  display: inline-block;
+  vertical-align: -2px;
+  fill: none;
+  stroke: var(--text-2);
+  stroke-width: 2.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+/* «Registrada depois», «Do arquivo», «Página antiga» (board `.chip-origem`) */
+.hub .hub-dr-op-chip {
+  display: inline-block;
+  padding: 1px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--neutral-border);
+  color: var(--text);
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+/* The «Operação» cell's second line, and a timeline item's (board `.op-sub`) */
+.hub .hub-dr-op-sub {
+  display: block;
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--text-2);
+  text-wrap: pretty;
+}
+.hub .hub-dr-op-res {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.hub .hub-dr-op-plano {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+}
+.hub .hub-dr-op-fora {
+  font-size: 12px;
+  color: var(--amber);
+}
+.hub .hub-dr-op-hist {
+  font-size: 12px;
+  color: var(--text-2);
+}
+.hub .hub-dr-op-acao {
+  padding: 0 14px;
+}
+.hub .hub-dr-op-abre {
+  display: flex;
+  justify-content: flex-end;
+}
+.hub .hub-dr-op-btn {
+  flex: none;
+}
+.hub .hub-dr-op-seta {
+  display: block;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.hub .hub-dr-op-apagadas {
+  margin: 0;
+  padding: 0 12px;
+  font-size: 12px;
+  color: var(--text-2);
+}
+.hub .hub-dr-op-outros {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  padding: 0 12px;
+  font-size: 13px;
+}
+/* «Abrir 30 nov» (board `.btn-link`) */
+.hub .hub-dr-op-link,
+.hub .hub-dr-img-add {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--mint);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+/* ---- The drill (H) ---- */
+
+.hub .hub-dr-drill-corpo {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px 20px;
+  margin: 0 12px 12px;
+  padding: 14px 16px;
+  border-radius: 12px;
+  background: var(--surface);
+  font-size: 13px;
+}
+.hub .hub-dr-drill-col {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+.hub .hub-dr-drill-full {
+  grid-column: 1 / -1;
+  min-width: 0;
+}
+/* «Sua operação»: label and value (board `.fatos`) */
+.hub .hub-dr-drill-fatos {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 4px 12px;
+  margin: 0;
+  font-size: 13px;
+}
+.hub .hub-dr-drill-fato {
+  display: contents;
+}
+.hub .hub-dr-drill-fato dt {
+  color: var(--text-2);
+}
+.hub .hub-dr-drill-fato dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.hub .hub-dr-drill-linha {
+  margin: 0;
+  font-size: 12px;
+  color: var(--text-2);
+  text-wrap: pretty;
+}
+/* «Linha do tempo da operação» (board `.tempo`) */
+.hub .hub-dr-drill-tempo {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 13px;
+}
+.hub .hub-dr-drill-tempo li {
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr);
+  gap: 8px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: var(--inset);
+}
+.hub .hub-dr-drill-tempo-hora {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--text-2);
+}
+/* «Fechar sem salvar?» (H12, not drawn: the import sheet's words) */
+.hub .hub-dr-drill-guarda {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--amber-border);
+  background: var(--amber-bg);
+}
+.hub .hub-dr-drill-guarda-txt {
+  margin: 0;
+  font-weight: 700;
+  color: var(--text);
+}
+/* «Suas marcas» */
+.hub .hub-dr-drill-marcas {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.hub .hub-dr-drill-marcas-tit {
+  font-size: 13px;
+}
+.hub .hub-dr-drill-grupos {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 8px 24px;
+}
+.hub .hub-dr-drill-grupo {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.hub .hub-dr-drill-grupo-rot {
+  font-size: 12px;
+  color: var(--text-2);
+}
+.hub .hub-dr-drill-grupo-tempo {
+  display: block;
+  font-size: 11px;
+}
+.hub .hub-dr-drill-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.hub .hub-dr-drill-pill {
+  min-width: 44px;
+  padding: 0 12px;
+  text-align: center;
+}
+.hub .hub-dr-drill-erro {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--amber);
+}
+
+/* ---- «Imagens e nota» (H8–H11) ---- */
+
+.hub .hub-dr-img-salvas {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+}
+.hub .hub-dr-img-cab {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+}
+.hub .hub-dr-img-cab-txt {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+}
+.hub .hub-dr-img-quando {
+  font-size: 12px;
+  color: var(--text-2);
+}
+.hub .hub-dr-img-btn {
+  padding: 0 12px;
+}
+/* The thumbnails (board `.minis`, `.mini`: 168 × 104) */
+.hub .hub-dr-img-minis {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.hub .hub-dr-img-mini {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 168px;
+  max-width: 100%;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-2);
+  font-family: inherit;
+  font-size: 11px;
+  text-align: left;
+  cursor: pointer;
+}
+.hub .hub-dr-img-previa {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 168px;
+  max-width: 100%;
+  height: 104px;
+  border-radius: 8px;
+  background: var(--inset);
+  border: 1px solid var(--border);
+  box-sizing: border-box;
+  object-fit: cover;
+  color: var(--text-2);
+  font-size: 11px;
+}
+.hub .hub-dr-img-previa--grande {
+  width: 100%;
+  height: auto;
+  aspect-ratio: 168 / 104;
+  border-radius: 10px;
+  object-fit: contain;
+}
+.hub .hub-dr-img-legenda {
+  font-size: 11px;
+  color: var(--text-2);
+  overflow-wrap: anywhere;
+}
+.hub .hub-dr-img-nota {
+  margin: 0;
+  font-size: 13px;
+  text-wrap: pretty;
+  overflow-wrap: anywhere;
+}
+/* The dialog «Imagem 1 de 2» (board `.dlg`: inline, not modal) */
+.hub .hub-dr-img-dlg {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px;
+  border-radius: 14px;
+  border: 1px solid var(--neutral-border);
+  background: var(--bg);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35);
+}
+/* The dialog's caption is 12 px (template.html `.dlg .linha2`); the thumbnails' stays 11 px (`.mini`) */
+.hub .hub-dr-img-dlg .hub-dr-img-legenda {
+  font-size: 12px;
+}
+.hub .hub-dr-img-dlg-cab {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+}
+.hub .hub-dr-img-dlg-acoes,
+.hub .hub-dr-img-acoes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 8px;
+}
+/* The editor (board `t.axEd`): the whole box takes a drop and a paste (DEV-C1) */
+.hub .hub-dr-img-ed {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--field-border);
+}
+/* Files dragged over the box: the Registrar's drop state (`.hub-reg-sobre`), a mint ring and no tint, so the hint,
+   «Nota» and the counter keep their contrast (a --mint-bg tint left --text-2 at 3,88:1 in claro) */
+.hub .hub-dr-img-ed--sobre {
+  border-color: var(--mint);
+  box-shadow: inset 0 0 0 1px var(--mint);
+}
+.hub .hub-dr-img-dica {
+  margin: 0;
+  font-size: 12px;
+  color: var(--text-2);
+}
+.hub .hub-dr-img-lista {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.hub .hub-dr-img-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  padding: 4px 4px 4px 12px;
+  border-radius: 12px;
+  background: var(--inset);
+}
+.hub .hub-dr-img-nome {
+  min-width: 0;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.hub .hub-dr-img-campo {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.hub .hub-dr-img-rot {
+  font-size: 12px;
+  color: var(--text-2);
+}
+.hub .hub-dr-img-area {
+  width: 100%;
+  min-height: 64px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--field-border);
+  background: var(--surface);
+  color: var(--text);
+  font-family: inherit;
+  font-size: 14px;
+  line-height: 1.5;
+  resize: vertical;
+  box-sizing: border-box;
+}
+.hub .hub-dr-img-area::placeholder {
+  color: var(--text-2);
+  opacity: 1;
+}
+.hub .hub-dr-img-contador {
+  font-size: 11px;
+  color: var(--text-2);
+}
+
+/* ---- «Revisão do dia» (I) ---- */
+
+.hub .hub-dr-rev-bloco {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 16px;
+  border-radius: 16px;
+  background: var(--inset);
+}
+.hub .hub-dr-rev-tit {
+  min-width: 0;
+}
+.hub .hub-dr-rev-acoes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 8px;
+}
+.hub .hub-dr-rev-texto,
+.hub .hub-dr-rev-versoes-bloco {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.hub .hub-dr-rev-registrou {
+  margin: 0;
+  font-size: 12px;
+  color: var(--text-2);
+}
+.hub .hub-dr-rev-registrou strong {
+  color: var(--text);
+}
+.hub .hub-dr-rev-mudou {
+  margin: 0;
+  padding: 8px 12px;
+  border-radius: 10px;
+  border: 1px dashed var(--neutral-border);
+  font-size: 12px;
+}
+.hub .hub-dr-rev-campos {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 4px 12px;
+  margin: 0;
+  font-size: 13px;
+}
+.hub .hub-dr-rev-campo {
+  display: contents;
+}
+.hub .hub-dr-rev-campo dt {
+  color: var(--text-2);
+}
+.hub .hub-dr-rev-campo dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.hub .hub-dr-rev-versoes {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.hub .hub-dr-rev-versoes li {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px dashed var(--neutral-border);
+}
+.hub .hub-dr-rev-versao-tit {
+  font-size: 12px;
+}
+.hub .hub-dr-rev-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.hub .hub-dr-rev-textos {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(300px, 100%), 1fr));
+  gap: 10px;
+}
+.hub .hub-dr-rev-campo-form {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.hub .hub-dr-rev-rot {
+  font-size: 12px;
+  color: var(--text-2);
+}
+.hub .hub-dr-rev-area,
+.hub .hub-dr-rev-input {
+  width: 100%;
+  min-height: 44px;
+  padding: 0 12px;
+  border-radius: 12px;
+  border: 1px solid var(--field-border);
+  background: var(--surface);
+  color: var(--text);
+  font-family: inherit;
+  font-size: 14px;
+  box-sizing: border-box;
+}
+.hub .hub-dr-rev-area {
+  min-height: 64px;
+  padding: 10px 12px;
+  line-height: 1.5;
+  resize: vertical;
+}
+.hub .hub-dr-rev-area::placeholder,
+.hub .hub-dr-rev-input::placeholder {
+  color: var(--text-2);
+  opacity: 1;
+}
+.hub .hub-dr-rev-seguiu {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.hub .hub-dr-rev-dica {
+  font-size: 11px;
+  color: var(--text-2);
+}
+.hub .hub-dr-rev-erro {
+  margin: 0;
+  font-weight: 700;
+  color: var(--amber);
+}
+
+/* ---- ≤ 980 px: the plan's rows and the trades' rows stack; the drill takes one column ---- */
+
+@media (max-width: 980px) {
+  .hub .hub-dr-plano-linha {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+  .hub .hub-dr-plano-linha > .hub-dr-plano-meio {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+  /* The header row is read, not shown */
+  .hub .hub-dr-op-cab {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+  /* Hora r1, Operação r2, Resultado r1–2 right, Plano cols 1–2 r3, ▾ col 3 rows 1–3 at the bottom (owner choice 3) */
+  .hub .hub-dr-op-linha {
+    grid-template-columns: minmax(0, 1fr) auto 44px;
+  }
+  .hub .hub-dr-op-linha > :nth-child(1) {
+    grid-column: 1;
+    grid-row: 1;
+  }
+  .hub .hub-dr-op-linha > :nth-child(2) {
+    grid-column: 1;
+    grid-row: 2;
+  }
+  .hub .hub-dr-op-linha > :nth-child(3) {
+    grid-column: 2;
+    grid-row: 1 / 3;
+    align-self: center;
+    text-align: right;
+  }
+  .hub .hub-dr-op-linha > :nth-child(4) {
+    grid-column: 1 / 3;
+    grid-row: 3;
+  }
+  .hub .hub-dr-op-linha > :nth-child(5) {
+    grid-column: 3;
+    grid-row: 1 / 4;
+    align-self: end;
+  }
+  .hub .hub-dr-drill-corpo {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* ---- ≤ 540 px: the phone ---- */
+
+@media (max-width: 540px) {
+  .hub .hub-dr-drill-corpo {
+    margin: 0 6px 8px;
+    padding: 12px;
+  }
+  .hub .hub-dr-drill-tempo li {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .hub .hub-dr-img-dlg {
+    padding: 10px;
+  }
+  .hub .hub-dr-rev-campos {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 2px 0;
+  }
+  .hub .hub-dr-rev-campo dd {
+    margin-bottom: 8px;
+  }
+}

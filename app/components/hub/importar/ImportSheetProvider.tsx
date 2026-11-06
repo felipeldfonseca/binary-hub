@@ -46,7 +46,7 @@ const FOCUS_WAIT_STEP_MS = 50
 
 type Session =
   | { key: number; kind: 'importar'; mode: SheetMode; accountId: string | null }
-  | { key: number; kind: 'registrar'; accountId: string | null; tradeId: string | null }
+  | { key: number; kind: 'registrar'; accountId: string | null; tradeId: string | null; day: string | null }
 
 interface FocusReturn {
   opener: HTMLElement | null
@@ -88,7 +88,11 @@ export default function ImportSheetProvider({ children }: { children: React.Reac
 
   const openRegistrar = useCallback(
     (options: OpenRegistrarOptions) =>
-      start({ key: Date.now(), kind: 'registrar', accountId: options.accountId ?? null, tradeId: options.tradeId ?? null }, options.opener, options.fallback),
+      start(
+        { key: Date.now(), kind: 'registrar', accountId: options.accountId ?? null, tradeId: options.tradeId ?? null, day: options.day ?? null },
+        options.opener,
+        options.fallback,
+      ),
     [start],
   )
 
@@ -161,7 +165,7 @@ export default function ImportSheetProvider({ children }: { children: React.Reac
         </div>
         {session?.kind === 'importar' && <ImportSheet key={session.key} mode={session.mode} accountId={session.accountId} onClose={close} />}
         {session?.kind === 'registrar' && (
-          <RegistrarSheet key={session.key} accountId={session.accountId} tradeId={session.tradeId} onClose={close} />
+          <RegistrarSheet key={session.key} accountId={session.accountId} tradeId={session.tradeId} dia={session.day} onClose={close} />
         )}
       </RegistrarSheetContext.Provider>
     </SheetContext.Provider>
