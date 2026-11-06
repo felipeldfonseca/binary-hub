@@ -11,7 +11,9 @@ import { BUSY, CLOSE, CONTAS, ERROR_TEXT, IMPORTACOES, LOADING, TRY_AGAIN, ops }
  * "Importações" of an account (no board): its batches, newest first, each undoable once.
  * Undoing deletes the batch's trades and gives back the trades it completed (registered in the app,
  * Phase 3; imported earlier, Phase 3c); the confirmation says how many of each, in trades, read when it
- * opens (useBatchUndo: the batch's counts are the file's lines, and a position can take several).
+ * opens (useBatchUndo: the batch's counts are the file's lines, and a position can take several). Phase 4 (D20, board
+ * dez 13): under it, what the owner put in the Diário on the batch's own trades and leaves with them («Saem junto: 2
+ * marcas e 1 nota que você pôs no Diário.»), when there is any.
  */
 export default function Importacoes({ account, onClose }: { account: TradingAccount; onClose: () => void }) {
   const { db } = useHubDb()
@@ -142,10 +144,14 @@ export default function Importacoes({ account, onClose }: { account: TradingAcco
               )}
               {confirming === batch.id && (
                 <div className="hub-bloco hub-bloco--atencao" role="group" aria-labelledby={`desfazer-${batch.id}`} style={{ flex: '1 1 100%' }}>
-                  {/* Live: the counts arrive after «Manter» took focus */}
-                  <span id={`desfazer-${batch.id}`} style={{ fontWeight: 700 }} aria-live="polite">
-                    {undoCounts ? IMPORTACOES.confirm(undoCounts) : counts.isError ? IMPORTACOES.countError : LOADING}
-                  </span>
+                  {/* Live: the counts arrive after «Manter» took focus. Phase 4 (D20): under them, the marks, images
+                      and notes of the Diário that leave with the batch's own trades, when there are any */}
+                  <div aria-live="polite" style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                    <span id={`desfazer-${batch.id}`} style={{ fontWeight: 700 }}>
+                      {undoCounts ? IMPORTACOES.confirm(undoCounts) : counts.isError ? IMPORTACOES.countError : LOADING}
+                    </span>
+                    {undoCounts && IMPORTACOES.saem(undoCounts.diario) && <span style={{ fontSize: 13 }}>{IMPORTACOES.saem(undoCounts.diario)}</span>}
+                  </div>
                   <div className="hub-acoes">
                     {undoCounts && (
                       <button

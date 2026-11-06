@@ -288,6 +288,18 @@ export const IMPORTACOES = {
       ? `Importação desfeita: ${apagadas}, e a que já estava voltou a ser como era.`
       : `Importação desfeita: ${apagadas}, e as ${formatInt(back)} que já estavam voltaram a ser como eram.`
   },
+  /**
+   * Phase 4 (Diário board dez 13, D20): under the confirmation, what the owner put in the Diário on the batch's own
+   * trades and leaves with them: «Saem junto: 2 marcas e 1 nota que você pôs no Diário.» Only the counts above zero,
+   * joined by «, » and « e »; null when all are zero (no line)
+   */
+  saem: ({ marks, images, notes }: { marks: number; images: number; notes: number }): string | null => {
+    const pl = (k: number, um: string, varios: string) => `${formatInt(k)} ${k === 1 ? um : varios}`
+    const itens = [marks ? pl(marks, 'marca', 'marcas') : '', images ? pl(images, 'imagem', 'imagens') : '', notes ? pl(notes, 'nota', 'notas') : ''].filter(Boolean)
+    if (!itens.length) return null
+    const lista = itens.length === 1 ? itens[0] : `${itens.slice(0, -1).join(', ')} e ${itens[itens.length - 1]}`
+    return `Saem junto: ${lista} que você pôs no Diário.`
+  },
 }
 
 /**
