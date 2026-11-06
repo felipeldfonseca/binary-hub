@@ -13,6 +13,8 @@ import { useImportSheet } from '@/components/hub/importar/ImportSheetProvider'
 import { useRegistrarSheet } from '@/components/hub/registrar/abrir'
 import { useDiarioPaginaOpcional } from '@/components/hub/diario/useDiarioPagina'
 import { diaPassadoDoDiario } from '@/lib/hub/diarioPagina'
+import { linhaDaData } from '@/lib/hub/diario'
+import { useServerNow } from '@/hooks/useRegistrar'
 import SeletorConta from './SeletorConta'
 import { ADD_ACCOUNT, CONTAS, DIARIO, IMPORT_FILE, LOADING, TRY_AGAIN } from './copy'
 
@@ -49,6 +51,8 @@ export function contaParaRegistrar(current: TradingAccount | null, active: reado
  * reader's, or the column mapping: MARKET_SPEC[m].mapping), so the sheet opens on the current account.
  * Phase 3: «Registrar operação» for an account that can register (podeRegistrar: every market since
  * 3-4, the end of D36); hidden while the accounts load, after a failed read and in the empty state.
+ * Phase 4 (the Diário boards, A2): under the H1, the date line on the open account's clock at the server's now
+ * («terça-feira, 1º de dezembro, 11:35 ET»), on the Diário page only.
  */
 export default function DiarioCabecalho() {
   const conta = useContaAtual()
@@ -73,6 +77,10 @@ export default function DiarioCabecalho() {
     conta.current && (MARKET_SPEC[conta.current.market].reader || MARKET_SPEC[conta.current.market].mapping) ? conta.current.id : null
   const rulesNow = useRulesNow()
   const rulesFailed = rulesNowFailed(rulesNow)
+  // Phase 4 (A2): the date line under the H1 on the Diário's clock (the open account's window clock), at the server's
+  // now, turning with the server's minute; only on the Diário page (its provider knows the open account)
+  const agora = useServerNow(60_000)
+  const dataLinha = pagina ? linhaDaData(agora, pagina.contaDiario.tz) : null
 
   // «Janela 10:00–11:00 ET» / «Sem janela salva»; nothing while loading, after a failed read (also
   // while it is retried or waits offline, as the card), or for an account the answer does not have
@@ -222,6 +230,7 @@ export default function DiarioCabecalho() {
           <h1 ref={titleRef} tabIndex={-1}>
             {DIARIO.title}
           </h1>
+          {dataLinha && <div className="hub-dr-topo-data">{dataLinha}</div>}
         </div>
         <div className="hub-acoes">
           {canRegister && conta.current && (
