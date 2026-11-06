@@ -1,6 +1,5 @@
 /**
- * Phase 3c · lane C1: hub-registrar-parciais.css and the bridge's second line in
- * hub-operacoes-dia.css. jsdom does no layout, so these check the rules themselves (the screenshots
+ * Phase 3c · lane C1: hub-registrar-parciais.css. jsdom does no layout, so these check the rules themselves (the screenshots
  * at 375 / 768 / 1280 show the result): every rule scoped to .hub, the timeline's wrapping (time
  * 44 px, item `flex: 1 1 200px`), the sub-lines at 12 px regular weight, the touch targets the new
  * controls reuse (44 px), the stylesheet imported by the hub's layout, and the contrast of every
@@ -89,18 +88,6 @@ describe('hub-registrar-parciais.css', () => {
     expect(regra('.hub .hub-reg .hub-pill', reg).getPropertyValue('min-width')).toBe('44px')
     expect(regra('.hub .hub-reg .hub-reg-pill-q', reg).getPropertyValue('min-width')).toBe('52px')
     expect(regra('.hub .hub-pill', hub).getPropertyValue('min-height')).toBe('44px')
-  })
-})
-
-describe('hub-operacoes-dia.css · the bridge’s second line', () => {
-  it('is a block of 12 px, regular weight, the secondary text colour, scoped to .hub', () => {
-    const r = regra('.hub .hub-ops-dia__sub', rules(lerCss('hub-operacoes-dia.css')))
-    expect([r.getPropertyValue('display'), r.getPropertyValue('font-size'), r.getPropertyValue('font-weight'), r.getPropertyValue('color')]).toEqual([
-      'block',
-      '12px',
-      '400',
-      'var(--text-2)',
-    ])
   })
 })
 

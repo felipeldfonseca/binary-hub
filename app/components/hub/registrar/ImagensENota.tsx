@@ -53,6 +53,27 @@ function soltarPrevia(url: string | null) {
   }
 }
 
+/**
+ * Phase 4 (the Diário's drill, contract §6.6, H10): the Diário's variant of this block. With it, the ids are the
+ * Diário's (one drill and the Registrar sheet can coexist), «Editar» focuses «Nota», «Cancelar» and a save hand the
+ * focus back to the Diário, the statuses are the board's («3 imagens e nota salvas em 12 nov, às 10:42.»), and
+ * ImagensENota draws the board's editor. Without it nothing changes.
+ */
+export interface AnexosDiario {
+  /** Unique ids in the page: `${idBase}-nota`, `-escolher`, `-rm-<key>` */
+  idBase: string
+  /** «às 10:42» / «em 12 nov, às 10:42», relative to the trade's own day */
+  quando(at: Date): string
+  /** «3 imagens e nota salvas em 12 nov, às 10:42.» (ANEXOS.quem + quando) */
+  salvo(quem: string, quando: string): string
+  /** «Imagens e nota removidas às 10:42.» */
+  removido(quando: string): string
+  /** «Cancelar»: the Diário focuses «Editar» or «Adicionar imagens ou nota» */
+  aoCancelar(): void
+  /** A save: the Diário focuses «Editar», or «Adicionar imagens ou nota» when everything was removed */
+  aoSalvar(removeuTudo: boolean): void
+}
+
 const salvoComoItem = (i: TradeImage): ItemAnexo => ({ kind: 'saved', key: `s-${i.id}`, id: i.id, name: i.name, bytes: i.bytes, path: i.path })
 
 /** When the images and the note were last saved (the summary's «às 10:41») */
@@ -68,7 +89,11 @@ function salvoEm(view: TradeView): Date | null {
  * saved images and note are the trade's (TradeView); what is chosen or typed here stays until
  * «Salvar imagens e nota», or goes with «Registrar outra» / «Ver no Diário» (salvarPendente).
  */
-export function useAnexos(conta: ContaReg, view: TradeView) {
+export function useAnexos(conta: ContaReg, view: TradeView, opcoes: { diario?: AnexosDiario } = {}) {
+  const diario = opcoes.diario ?? null
+  /** The block's ids: the Registrar's, or the Diário's prefixed ones */
+  const idDe = (x: 'f-escolher' | 'f-editar-anx' | 'f-nota' | string) =>
+    diario ? `${diario.idBase}-${x === 'f-escolher' ? 'escolher' : x === 'f-nota' ? 'nota' : x}` : x
   const save = useSaveImagesAndNote()
   const salvos = view.images
   const notaSalva = view.trade.note ?? ''
@@ -149,7 +174,7 @@ export function useAnexos(conta: ContaReg, view: TradeView) {
     setErro(null)
     setAviso('')
     setSt('')
-    focar('f-escolher')
+    focar(diario ? idDe('f-nota') : 'f-escolher')
   }
 
   const remover = (key: string) => {
@@ -166,7 +191,7 @@ export function useAnexos(conta: ContaReg, view: TradeView) {
     setSt('')
     setAviso(ANEXOS.removida(item.name, nova.length))
     const prox = nova[k] ?? nova[k - 1]
-    focar(prox ? `rm-${prox.key}` : 'f-escolher')
+    focar(prox ? idDe(`rm-${prox.key}`) : idDe('f-escolher'))
   }
 
   const cancelar = () => {
@@ -176,7 +201,8 @@ export function useAnexos(conta: ContaReg, view: TradeView) {
     setErro(null)
     setAviso('')
     setSt('')
-    focar('f-editar-anx')
+    if (diario) diario.aoCancelar()
+    else focar('f-editar-anx')
   }
 
   /** «Salvar imagens e nota»; the result says what was saved (for «Operação anterior: …») */
@@ -200,8 +226,13 @@ export function useAnexos(conta: ContaReg, view: TradeView) {
         setEditando(false)
         setLista([])
         setNota('')
-        setSt(ANEXOS.removido(antes.n, antes.nota, quandoTxt))
-        focar('f-escolher')
+        if (diario) {
+          setSt(diario.removido(diario.quando(res.savedAt)))
+          diario.aoSalvar(true)
+        } else {
+          setSt(ANEXOS.removido(antes.n, antes.nota, quandoTxt))
+          focar('f-escolher')
+        }
         return { ok: true, quem: null, hora: null }
       }
       if (res.failed.length > 0) {
@@ -223,7 +254,10 @@ export function useAnexos(conta: ContaReg, view: TradeView) {
       setEditando(false)
       setLista([])
       setNota('')
-      focar('f-editar-anx')
+      if (diario) {
+        setSt(diario.salvo(ANEXOS.quem(n, !!res.state.trade.note), diario.quando(res.savedAt)))
+        diario.aoSalvar(false)
+      } else focar('f-editar-anx')
       return { ok: true, quem: ANEXOS.quem(n, !!res.state.trade.note), hora: quandoTxt }
     } catch (e) {
       const code = e instanceof RegistrarDataError ? e.code : 'unknown'
@@ -256,7 +290,9 @@ export function useAnexos(conta: ContaReg, view: TradeView) {
   }
 
   const quandoSalvo = quando ?? salvoEm(view)
-  const statusSalvo = resumo
+  const statusSalvo = diario
+    ? st
+    : resumo
     ? ANEXOS.salvo(ANEXOS.quem(salvos.length, !!notaSalva), quandoSalvo ? hora(conta, quandoSalvo) : '', salvos.length > 1 || (salvos.length > 0 && !!notaSalva))
     : st
 
@@ -287,6 +323,9 @@ export function useAnexos(conta: ContaReg, view: TradeView) {
     salvar,
     salvarPendente,
     erroCheio: () => comErro(ANEXOS.erroQuantas),
+    /** The Diário's variant (null in the Registrar) and the block's ids */
+    diario,
+    idDe,
   }
 }
 
@@ -313,8 +352,157 @@ function MiniaturaSalva({ path, name, grande = false }: { path: string; name: st
   )
 }
 
-/** The block (presentational over useAnexos) */
+/**
+ * The Diário's editor (board DiarioDezEnxuto `t.axEd`, contract H10): the title without ⓘ, the hint, the attached
+ * images as text rows «nome · tamanho» with «Remover» (no previews), «Escolher imagens», «Nota» without «(opcional)»
+ * and its counter, «Salvar imagens e nota» (primary) and «Cancelar» (always). Dropping and pasting work on the whole
+ * box (DEV-C1: the computer's hint says so). The status lives in the drill (it outlasts the editor).
+ */
+function EditorDoDiario({ a, d }: { a: Anexos; d: AnexosDiario }) {
+  const [sobre, setSobre] = useState(false)
+  const inputRef = useRef<HTMLInputElement>(null)
+  const [toque] = useState(soToque)
+  const [atalho] = useState(atalhoColar)
+  const temArquivos = (event: React.DragEvent) => Array.from(event.dataTransfer?.types ?? []).includes('Files')
+  const dica = a.cheio ? ANEXOS.cheio : toque ? ANEXOS.dicaToque : ANEXOS.dica(atalho)
+  const id = (x: string) => `${d.idBase}-${x}`
+  return (
+    <div
+      className={sobre ? 'hub-dr-img-ed hub-dr-img-ed--sobre' : 'hub-dr-img-ed'}
+      role="group"
+      aria-labelledby={id('tit')}
+      onDragEnter={(event) => {
+        if (!temArquivos(event)) return
+        event.preventDefault()
+        setSobre(true)
+      }}
+      onDragOver={(event) => {
+        if (!temArquivos(event)) return
+        event.preventDefault()
+        try {
+          event.dataTransfer.dropEffect = 'copy'
+        } catch {
+          // only the cursor
+        }
+        if (!sobre) setSobre(true)
+      }}
+      onDragLeave={(event) => {
+        const rt = event.relatedTarget as Node | null
+        if (rt && event.currentTarget.contains(rt)) return
+        setSobre(false)
+      }}
+      onDrop={(event) => {
+        event.preventDefault()
+        event.stopPropagation()
+        setSobre(false)
+        const files = Array.from(event.dataTransfer?.files ?? [])
+        if (files.length) a.incluir(files)
+      }}
+      onPaste={(event) => {
+        const cd = event.clipboardData
+        if (!cd) return
+        let files = Array.from(cd.files ?? [])
+        if (!files.length && cd.items) files = Array.from(cd.items).filter((it) => it.kind === 'file').map((it) => it.getAsFile()).filter((f): f is File => !!f)
+        if (!files.length) return
+        event.preventDefault()
+        a.incluir(files)
+      }}
+    >
+      <strong id={id('tit')}>{ANEXOS.titulo}</strong>
+      <span id={id('dica')} className="hub-dr-img-dica">
+        {dica}
+      </span>
+      {a.lista.length > 0 && (
+        <ul className="hub-dr-img-lista" aria-label={ANEXOS.anexadas}>
+          {a.lista.map((i) => (
+            <li key={i.key} className="hub-dr-img-item">
+              <span className="hub-dr-img-nome">
+                {i.name}
+                {i.bytes !== null ? ` · ${formatImageSize(i.bytes)}` : ''}
+              </span>
+              <button id={id(`rm-${i.key}`)} type="button" className="hub-btn hub-dr-img-btn" aria-label={ANEXOS.removerAria(i.name)} onClick={() => a.remover(i.key)}>
+                {ANEXOS.remover}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+      <div>
+        <button
+          id={id('escolher')}
+          type="button"
+          className="hub-btn"
+          aria-disabled={a.cheio || undefined}
+          aria-describedby={id('dica')}
+          onClick={() => (a.cheio ? a.erroCheio() : inputRef.current?.click())}
+        >
+          {ANEXOS.escolher}
+        </button>
+        <input
+          ref={inputRef}
+          className="sr-only"
+          type="file"
+          accept={IMAGE_ACCEPT}
+          multiple
+          tabIndex={-1}
+          aria-hidden="true"
+          aria-label={ANEXOS.escolher}
+          onChange={(event) => {
+            const files = Array.from(event.target.files ?? [])
+            try {
+              event.target.value = ''
+            } catch {
+              // the same file can be chosen again
+            }
+            if (files.length) a.incluir(files)
+          }}
+        />
+      </div>
+      {a.erro && (
+        <span key={a.erro.n} className="hub-erro hub-reg-erro" role="alert">
+          {a.erro.texto}
+        </span>
+      )}
+      <div className="hub-dr-img-campo">
+        <label htmlFor={id('nota')} className="hub-dr-img-rot">
+          {ANEXOS.nota}
+        </label>
+        <textarea
+          id={id('nota')}
+          className="hub-dr-img-area"
+          rows={3}
+          maxLength={MAX_NOTA}
+          placeholder={ANEXOS.notaPh}
+          aria-describedby={id('contador')}
+          value={a.nota}
+          onChange={(event) => a.setNota(event.target.value)}
+        />
+        <span id={id('contador')} className="hub-dr-img-contador">
+          {ANEXOS.contador(a.nota.length)}
+        </span>
+      </div>
+      <div className="hub-dr-img-acoes">
+        <button type="button" className="hub-btn hub-btn--pri" aria-disabled={!a.podeSalvar || a.ocupado || undefined} onClick={() => void a.salvar()}>
+          {ANEXOS.salvar}
+        </button>
+        <button type="button" className="hub-btn" onClick={a.cancelar}>
+          {ANEXOS.cancelar}
+        </button>
+      </div>
+      <p className={a.progresso ? 'hub-dr-img-dica' : 'sr-only'} role="status">
+        {a.progresso ? ANEXOS.enviando(a.progresso.sending, a.progresso.total) : ''}
+      </p>
+    </div>
+  )
+}
+
+/** The block (presentational over useAnexos); with the Diário's variant, the board's editor */
 export default function ImagensENota({ a }: { a: Anexos }) {
+  if (a.diario) return <EditorDoDiario a={a} d={a.diario} />
+  return <ImagensENotaRegistrar a={a} />
+}
+
+function ImagensENotaRegistrar({ a }: { a: Anexos }) {
   const [info, alternarInfo] = useToggle()
   const [sobre, setSobre] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)

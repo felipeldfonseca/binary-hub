@@ -2,8 +2,8 @@
  * Fase 4 · telas (B0): the Diário page's frame and shared state (DiarioPagina, useDiarioPagina; contract §4.2–§4.4,
  * §4.10) on the approved boards' scenarios (testing/diarioTelas, invented data). The regions are B0's stubs; a probe
  * in the top region's place reads the shared state. Covers the URL ↔ state rules on load and while mounted, the reset
- * on an account change, the leave guard, «Registrar operação» on a past day, the Phase 3 bridge still in the open
- * day's slot, C7 when the Phase 4 SQL is missing, and the page following the selector at once (moved from
+ * on an account change, the leave guard, «Registrar operação» on a past day, the open day's region in its slot (lane
+ * L2's «o dia», which retired the Phase 3 bridge), C7 when the Phase 4 SQL is missing, and the page following the selector at once (moved from
  * OperacoesDoDia.test).
  */
 import React from 'react'
@@ -59,19 +59,19 @@ beforeEach(() => {
   mockAbrirRegistrar.mockReset()
 })
 
-describe('the frame: the boards’ order, the bridge in the open day’s slot', () => {
-  it('H1 → selector → «Posso operar hoje?» → the open day’s region (the Phase 3 bridge until lane L2), one read of rules_now', async () => {
+describe('the frame: the boards’ order, the open day in its slot', () => {
+  it('H1 → selector → «Posso operar hoje?» → the open day’s region (lane L2’s «o dia»), one read of rules_now', async () => {
     await renderDiario('2')
     await carregada()
     const h1 = screen.getByRole('heading', { level: 1, name: 'Diário' })
     const selector = await screen.findByRole('button', { name: /^Conta: Top One/ })
     const card = await screen.findByRole('region', { name: 'Posso operar hoje?' })
-    const bridge = await screen.findByRole('region', { name: 'Operações do dia' })
+    const dia = await screen.findByRole('region', { name: 'Terça-feira, 10 de novembro' })
     const follows = (a: Node, b: Node) => (a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0
     expect(follows(h1, selector)).toBe(true)
     expect(follows(selector, card)).toBe(true)
-    expect(follows(card, bridge)).toBe(true)
-    expect(await within(bridge).findByText('Nenhuma operação registrada hoje.')).toBeInTheDocument()
+    expect(follows(card, dia)).toBe(true)
+    expect(await within(dia).findByRole('heading', { level: 3, name: 'Operações do dia' })).toBeInTheDocument()
     expect(screen.queryByText('O Diário chega na Fase 4.')).toBeNull()
     expect(mocks.fetchRulesNow).toHaveBeenCalledTimes(1)
   })
@@ -93,14 +93,14 @@ describe('the frame: the boards’ order, the bridge in the open day’s slot', 
     await renderDiario('10d', { estado: 'erro' })
     const alerta = await screen.findByRole('alert')
     expect(alerta).toHaveTextContent('Não foi possível carregar o Diário.')
-    expect(screen.queryByRole('region', { name: 'Operações do dia' })).toBeNull()
+    expect(document.getElementById('dia')).toBeNull()
   })
 
   it('nothing below the card while the calendar is read', async () => {
     await renderDiario('10c', { estado: 'carregando' })
     await screen.findByRole('region', { name: 'Posso operar hoje?' })
     expect(sonda()).toHaveAttribute('data-dia', '')
-    expect(screen.queryByRole('region', { name: 'Operações do dia' })).toBeNull()
+    expect(document.getElementById('dia')).toBeNull()
     expect(screen.queryByRole('alert')).toBeNull()
   })
 })
