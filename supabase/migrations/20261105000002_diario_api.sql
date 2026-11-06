@@ -119,7 +119,8 @@
 -- diario_fatos (internal; diario_dia's "facts" and the frozen auto_summary): the day's facts, English
 -- keys, "v": 1 (pt-BR words are app/lib/hub's):
 --   {"v": 1, "day", "kind", "trades", "closed", "open", "wins", "losses", "even", "net", "gross",
---    "commission", "first_entry_at",
+--    "commission", "commission_unknown" (diário trades that realized money without a known commission:
+--    the day is still gross until the broker's file brings it), "first_entry_at",
 --    "window": {rule, evaluated, inside, outside: [{trade_id, at}]} | null (no window rule in force and
 --              no trade evaluated against one),
 --    "limit": {amount, scope, at_limit, worst, hit_at, worst_at_hit, net, trades, after: [{trade_id, at}],
@@ -127,11 +128,21 @@
 --             limit_usage(account, day, scope = 'soma', amount, 'infinity'): every trade of the scope that
 --             day, history included; worst_at_hit is its worst up to hit_at (that instant's exits
 --             included: «atingido às 10:38, com US$ 426,66 de perda»), null without a hit; after lists the
---             account's diário trades entered after the limit and after_net is their realized net, null
---             when none realized),
---    "fora": {n, net, open (still open)}, "others_net", "recalculated", "history": {n, net, gross},
---    "breakeven": {by, trades, moved} | null (the day's version's rule; trades of its assets, and how
---                 many have a breakeven stop move not undone),
+--             account's diário trades entered at or after hit_at as the day stands now (gate_at's rule; one
+--             realized at or before its own entry instant only after it), [] without a hit, and after_net
+--             is the realized net of the closed ones, null when none: «1 depois, às 10:52: −US$ 38,74». A
+--             trade's own plan stays its frozen or recalculated one, so its «depois do limite» mark can
+--             differ when the hit moved after it was registered: a later «Já fechada», another account's
+--             trades under «somando», a commission from the file, a deletion),
+--    "fora": {n, net, open (still open)} (the diário trades whose plan is fora_do_plano; net sums the
+--            closed ones: «1 operação · −US$ 38,74», «· aberta» when all are open), "others_net" (the
+--            realized net of the closed diário trades that kept the plan: «As outras 4 somaram …»; an open
+--            trade's partials count only in "net"), "recalculated", "history": {n, net, gross},
+--    "breakeven": {by, trades, reached, moved} | null (the day's version's rule; trades: the diário trades
+--                 of its assets; reached: those with a stop (initial or moved) that got to the rule's +N, by
+--                 a counting exit at or past trade_breakeven's level or a stop move not undone with that
+--                 many points in favour; moved: of the reached, how many have a breakeven stop move not
+--                 undone: «moveu em 1 de 2», «nenhuma chegou ao ponto da regra»),
 --    "version": {id, version_no} | null, "changes"}
 --
 -- Internal (revoked from the API roles): diario_day_end, diario_day_close, diario_plan_at, diario_week_closed,
@@ -415,7 +426,10 @@ $$;
 -- =============================================================================================
 
 -- Every trade of one account's trading day, oldest entry first: its fields, history, app, money
--- (diario_money), plan_kind, plan and gate (see the header), be_moved (a breakeven stop move not
+-- (diario_money), plan_kind, plan and gate (see the header), self_at_entry (realized at or before
+-- its own entry instant), and for the breakeven row: has_stop (an initial stop or a stop move not
+-- undone), best_exit (the most favourable counting exit price, or the single exit), best_move (the
+-- most points in favour a stop move not undone recorded) and be_moved (a breakeven stop move not
 -- undone). One gate_at per recalculated trade.
 create or replace function public.diario_rows(p_acc public.trading_accounts, p_day date)
 returns jsonb
@@ -447,6 +461,11 @@ begin
            m.realized, m.net, m.gross, m.commission,
            exists (select 1 from public.trade_stop_moves s
                    where s.trade_id = t.id and s.kind = 'breakeven' and s.voided_at is null) as be_moved,
+           t.stop_price is not null or exists (select 1 from public.trade_stop_moves s
+                                               where s.trade_id = t.id and s.voided_at is null) as has_stop,
+           case t.direction when 'long' then coalesce(x.hi, t.exit_price) when 'short' then coalesce(x.lo, t.exit_price)
+           end as best_exit,
+           (select max(s.favor) from public.trade_stop_moves s where s.trade_id = t.id and s.voided_at is null) as best_move,
            -- Realized at or before its own entry instant (limit_usage would count it at the entry)
            case when exists (select 1 from public.trade_exits_v e where e.trade_id = t.id and e.counts)
                 then exists (select 1 from public.trade_exits_v e
@@ -456,6 +475,8 @@ begin
     from public.trades t
     left join public.trade_entry_context c on c.trade_id = t.id
     cross join lateral public.diario_money(t.id, t.pnl, t.commission, t.result) m
+    cross join lateral (select max(e.exit_price) as hi, min(e.exit_price) as lo
+                        from public.trade_exits_v e where e.trade_id = t.id and e.counts) x
     where t.user_id = p_acc.user_id and t.account_id = p_acc.id and t.trading_day = p_day
     order by t.entry_time, t.id
   loop
@@ -478,7 +499,8 @@ begin
       'direction', r.direction, 'quantity', r.quantity, 'asset_type', r.asset_type, 'entry_price', r.entry_price,
       'option', r.option_right is not null, 'source', r.source, 'history', r.history, 'app', r.app,
       'realized', r.realized, 'net', r.net, 'gross', r.gross, 'commission', r.commission,
-      'plan_kind', kind, 'plan', pl, 'gate', g, 'be_moved', r.be_moved));
+      'plan_kind', kind, 'plan', pl, 'gate', g, 'self_at_entry', r.self_at_entry, 'has_stop', r.has_stop,
+      'best_exit', r.best_exit, 'best_move', r.best_move, 'be_moved', r.be_moved));
   end loop;
   return res;
 end;
@@ -517,7 +539,10 @@ declare
   ver public.account_rule_versions%rowtype;
   amt numeric;
   usage jsonb;
+  hit timestamptz;
   at_hit jsonb;
+  l_after jsonb := '[]'::jsonb;
+  l_after_net numeric;
   wrule boolean;
   a record;
 begin
@@ -537,10 +562,14 @@ begin
          coalesce(sum(r.gross) filter (where not r.h and r.rl), 0) as gross,
          sum(r.comm) filter (where not r.h and r.rl) as comm,
          min(r.entry) filter (where not r.h) as first_entry,
+         count(*) filter (where not r.h and r.rl and r.comm is null) as comm_unknown,
          count(*) filter (where not r.h and r.verdict = 'fora_do_plano') as fora_n,
          count(*) filter (where not r.h and r.verdict = 'fora_do_plano' and r.st = 'open') as fora_open,
-         coalesce(sum(r.net) filter (where not r.h and r.rl and r.verdict = 'fora_do_plano'), 0) as fora_net,
-         coalesce(sum(r.net) filter (where not r.h and r.rl and r.verdict is distinct from 'fora_do_plano'), 0) as others_net,
+         -- «Fora do plano» and «As outras N somaram» sum closed trades only (an open trade's partials
+         -- stay in the day's net, as on the approved boards)
+         coalesce(sum(r.net) filter (where not r.h and r.rl and r.st = 'closed' and r.verdict = 'fora_do_plano'), 0) as fora_net,
+         coalesce(sum(r.net) filter (where not r.h and r.rl and r.st = 'closed' and r.verdict is distinct from 'fora_do_plano'), 0)
+           as others_net,
          count(*) filter (where not r.h and r.kind = 'recalculado') as recalculated,
          coalesce(sum(r.net) filter (where r.h and r.rl), 0) as h_net,
          coalesce(sum(r.gross) filter (where r.h and r.rl), 0) as h_gross,
@@ -548,27 +577,43 @@ begin
          count(*) filter (where not r.h and r.checks ? 'janela' and not r.breaks ? 'fora_da_janela') as w_in,
          coalesce(jsonb_agg(jsonb_build_object('trade_id', r.id, 'at', r.entry) order by r.entry, r.id)
                     filter (where not r.h and r.breaks ? 'fora_da_janela'), '[]'::jsonb) as w_out,
-         coalesce(jsonb_agg(jsonb_build_object('trade_id', r.id, 'at', r.entry) order by r.entry, r.id)
-                    filter (where not r.h and r.breaks ? 'depois_do_limite'), '[]'::jsonb) as l_after,
-         sum(r.net) filter (where not r.h and r.rl and r.breaks ? 'depois_do_limite') as l_after_net,
-         count(*) filter (where not r.h and r.be) as be_n,
-         count(*) filter (where not r.h and r.be and r.be_moved) as be_moved
+         count(*) filter (where not r.h and r.be is not null) as be_n,
+         count(*) filter (where not r.h and r.reached) as be_reached,
+         count(*) filter (where not r.h and r.reached and r.be_moved) as be_moved
   into a
-  from (select (x->>'history')::boolean as h, x->>'status' as st, x->>'result' as res, (x->>'realized')::boolean as rl,
-               (x->>'net')::numeric as net, (x->>'gross')::numeric as gross, (x->>'commission')::numeric as comm,
-               (x->>'entry_time')::timestamptz as entry, x->>'id' as id, x->>'plan_kind' as kind,
-               x#>>'{plan,verdict}' as verdict, x#>'{plan,checks_evaluated}' as checks, x#>'{plan,breaks}' as breaks,
-               (x->>'be_moved')::boolean as be_moved,
-               public.trade_breakeven(ver.resolved, p_acc.market, x->>'symbol', (x->>'option')::boolean, x->>'direction',
-                                      (x->>'entry_price')::numeric) is not null as be
-        from jsonb_array_elements(p_rows) x) r;
+  from (select b.*,
+               -- The trade reached the rule's +N: an exit at or past the level, or a stop move with that many
+               -- points in favour (the trade has a stop)
+               b.be is not null and b.has_stop
+                 and ((b.be->>'level' is not null and b.best_exit is not null
+                       and (b.best_exit - (b.be->>'level')::numeric) * case when b.dir = 'long' then 1 else -1 end >= 0)
+                      or b.best_move >= (b.be->>'n')::numeric) is true as reached
+        from (select (x->>'history')::boolean as h, x->>'status' as st, x->>'result' as res, (x->>'realized')::boolean as rl,
+                     (x->>'net')::numeric as net, (x->>'gross')::numeric as gross, (x->>'commission')::numeric as comm,
+                     (x->>'entry_time')::timestamptz as entry, x->>'id' as id, x->>'plan_kind' as kind,
+                     x#>>'{plan,verdict}' as verdict, x#>'{plan,checks_evaluated}' as checks, x#>'{plan,breaks}' as breaks,
+                     (x->>'be_moved')::boolean as be_moved, (x->>'has_stop')::boolean as has_stop, x->>'direction' as dir,
+                     (x->>'best_exit')::numeric as best_exit, (x->>'best_move')::numeric as best_move,
+                     public.trade_breakeven(ver.resolved, p_acc.market, x->>'symbol', (x->>'option')::boolean, x->>'direction',
+                                            (x->>'entry_price')::numeric) as be
+              from jsonb_array_elements(p_rows) x) b) r;
 
   if amt is not null then
     usage := public.limit_usage(p_acc.id, p_day, ver.resolved#>>'{limit,mode}' = 'soma', amt, 'infinity');
     -- The running net's worst point up to the instant the limit was reached (that instant's exits included)
     if jsonb_typeof(usage->'hit_at') = 'string' then
-      at_hit := public.limit_usage(p_acc.id, p_day, ver.resolved#>>'{limit,mode}' = 'soma', amt,
-                                   (usage->>'hit_at')::timestamptz)->'worst_usd';
+      hit := (usage->>'hit_at')::timestamptz;
+      at_hit := public.limit_usage(p_acc.id, p_day, ver.resolved#>>'{limit,mode}' = 'soma', amt, hit)->'worst_usd';
+      -- The diário trades entered after the limit was reached, as the day stands now (gate_at's rule: an
+      -- entry at or after hit_at; one realized at or before its own entry is judged 1 µs before it)
+      select coalesce(jsonb_agg(jsonb_build_object('trade_id', x->>'id', 'at', (x->>'entry_time')::timestamptz)
+                                order by (x->>'entry_time')::timestamptz, x->>'id'), '[]'::jsonb),
+             sum((x->>'net')::numeric) filter (where (x->>'realized')::boolean and x->>'status' = 'closed')
+      into l_after, l_after_net
+      from jsonb_array_elements(p_rows) x
+      where not (x->>'history')::boolean
+        and ((x->>'entry_time')::timestamptz > hit
+             or ((x->>'entry_time')::timestamptz = hit and not (x->>'self_at_entry')::boolean));
     end if;
   end if;
 
@@ -578,20 +623,20 @@ begin
     'kind', case when a.n = 0 and a.h_n = 0 then 'vazio' when a.n = 0 then 'historico' when a.h_n = 0 then 'diario'
                  else 'misto' end,
     'trades', a.n, 'closed', a.closed, 'open', a.open, 'wins', a.wins, 'losses', a.losses, 'even', a.even,
-    'net', a.net, 'gross', a.gross, 'commission', a.comm,
+    'net', a.net, 'gross', a.gross, 'commission', a.comm, 'commission_unknown', a.comm_unknown,
     'first_entry_at', a.first_entry,
     'window', case when wrule or a.w_eval > 0 then jsonb_build_object(
                 'rule', wrule, 'evaluated', a.w_eval, 'inside', a.w_in, 'outside', a.w_out) end,
     'limit', case when amt is not null then jsonb_build_object(
                'amount', amt, 'scope', ver.resolved#>>'{limit,mode}', 'at_limit', ver.resolved#>>'{limit,at_limit}',
                'worst', usage->'worst_usd', 'hit_at', usage->'hit_at', 'worst_at_hit', at_hit, 'net', usage->'net_usd',
-               'trades', usage->'trades', 'after', a.l_after, 'after_net', a.l_after_net) end,
+               'trades', usage->'trades', 'after', l_after, 'after_net', l_after_net) end,
     'fora', jsonb_build_object('n', a.fora_n, 'net', a.fora_net, 'open', a.fora_open),
     'others_net', a.others_net,
     'recalculated', a.recalculated,
     'history', jsonb_build_object('n', a.h_n, 'net', a.h_net, 'gross', a.h_gross),
     'breakeven', case when jsonb_typeof(ver.resolved#>'{breakeven,by}') = 'object' then jsonb_build_object(
-                   'by', ver.resolved#>'{breakeven,by}', 'trades', a.be_n, 'moved', a.be_moved) end,
+                   'by', ver.resolved#>'{breakeven,by}', 'trades', a.be_n, 'reached', a.be_reached, 'moved', a.be_moved) end,
     'version', case when ver.id is not null then jsonb_build_object('id', ver.id, 'version_no', ver.version_no) end,
     'changes', jsonb_array_length(public.diario_changes(p_acc, p_day, ver.id)));
 end;

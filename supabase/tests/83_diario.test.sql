@@ -30,7 +30,9 @@
 --       one answer; repeated against the newest; carry-over order; one transaction: the newest by id
 --   17  «Antes de operar»: another account's note, the 50-version cap, a malformed key, explicit nulls, the
 --       payload limits at the byte; the generic checks again over everything
---   (groups 14–17 run before 12, on days fixed in October 2026)
+--   18  the facts' «depois do limite» as the day stands (a «Já fechada» registered late, the trade that hit
+--       deleted), the breakeven row's trades that got to the rule's point, the commission still to come
+--   (groups 18 and 14–17 run before 12, on days fixed in October 2026)
 --
 -- Fixed October–November 2026 days (all before the day this phase was built); the register functions
 -- stamp the server's now(), so «today» cases are relative to it. Versions are moved to fixed instants
@@ -828,10 +830,12 @@ select tests.eq(((select v::jsonb from tests.p83 where k = 'luc_before')#>'{fact
 select tests.eq((select v::jsonb from tests.p83 where k = 'luc_before')#>'{facts,limit,worst_at_hit}',
                 public.limit_usage(:'luc', '2026-10-23', true, 400, '2026-10-23 14:08Z')->'worst_usd', '… limit_usage up to the hit');
 select tests.eq(jsonb_build_array(public.diario_dia(:'fut', '2026-10-16')#>'{facts,limit,worst_at_hit}',
+                                  public.diario_dia(:'fut', '2026-10-16')#>'{facts,limit,after}',
                                   public.diario_dia(:'fut', '2026-10-16')#>'{facts,limit,after_net}',
                                   public.diario_dia(:'fut', '2026-10-20')#>'{facts,limit,worst_at_hit}'),
-                '[-490.00, null]'::jsonb || jsonb_build_array(null::jsonb),
-                'no entry after the limit: after_net null; no hit: worst_at_hit null');
+                '[-490.00, []]'::jsonb || jsonb_build_array(null::jsonb, null::jsonb),
+                'no entry after the limit (the −500 that hit it at its own entry instant is judged 1 µs before): after [] and '
+                'after_net null; no hit: worst_at_hit null');
 select tests.eq((select jsonb_agg(jsonb_build_array(x->'plan_kind', coalesce(x#>'{plan_now,breaks}', x#>'{plan,breaks}')) order by o)
                  from jsonb_array_elements((select v::jsonb from tests.p83 where k = 'luc_before')->'trades') with ordinality e(x, o)),
                 '[["recalculado", []], ["recalculado", ["depois_do_limite"]], ["congelado", ["depois_do_limite"]]]'::jsonb,
@@ -851,10 +855,12 @@ select tests.eq((select jsonb_agg(jsonb_build_array(x->'plan_kind', coalesce(x#>
                  from jsonb_array_elements(public.diario_dia(:'luc', '2026-10-23')->'trades') with ordinality e(x, o)),
                 '[["recalculado", []], ["recalculado", []], ["congelado", ["depois_do_limite"]]]'::jsonb,
                 'the recalculated plan follows; the frozen one stays');
-select tests.eq((public.diario_dia(:'luc', '2026-10-23')#>'{facts,limit}') - 'after',
+select tests.eq(public.diario_dia(:'luc', '2026-10-23')#>'{facts,limit}',
                 '{"amount": 400, "scope": "soma", "at_limit": "avisar", "worst": -155.00, "hit_at": null, "worst_at_hit": null,
-                  "net": -155.00, "trades": 3, "after_net": -25.00}'::jsonb,
-                'Apex archived: no hit; the frozen 10:30 entry (−25) is still after the limit');
+                  "net": -155.00, "trades": 3, "after": [], "after_net": null}'::jsonb,
+                'Apex archived: no hit, so no entry is after it in the facts…');
+select tests.eq(public.diario_dia(:'luc', '2026-10-23')#>'{facts,fora}', '{"n": 1, "net": -25.00, "open": 0}'::jsonb,
+                '… while the frozen 10:30 entry (−25) keeps its own «depois do limite» mark');
 select tests.eq((select x->'gate_now' from jsonb_array_elements(public.diario_dia(:'luc', '2026-10-23')->'trades') x
                  where (x->>'entry_at')::timestamptz = '2026-10-23 14:20Z'),
                 public.gate_at(:'luc', '2026-10-23 14:20Z') - 'rules', '… exactly as gate_at');
@@ -907,12 +913,18 @@ select tests.eq(jsonb_build_array(public.diario_dia(:'apx', '2026-10-23')#>'{fac
                                   public.diario_dia(:'apx', '2026-10-23')#>'{facts,window}'),
                 '[null, null, null]'::jsonb, 'no limit, no window rule: null');
 select tests.eq(public.diario_dia(:'fut', '2026-10-20')#>'{facts,breakeven}',
-                '{"by": {"MES": {"n": 8, "un": "pts"}}, "trades": 2, "moved": 1}'::jsonb,
-                '20 Oct: breakeven MES +8 pts, moved on 1 of 2');
+                '{"by": {"MES": {"n": 8, "un": "pts"}}, "trades": 2, "reached": 1, "moved": 1}'::jsonb,
+                '20 Oct: breakeven MES +8 pts; of the two MES trades, the «Já fechada» with a stop got to +8 (moved at +9, out at +10) '
+                'and moved; the file''s, without a stop, is not counted («moveu em 1 de 1»)');
 select tests.eq(public.diario_dia(:'fut', :'today')#>'{facts,fora}',
-                case when tests.dtrade((select v::jsonb from tests.p83 where k = 'dtoday'), :'live')#>>'{plan,verdict}' = 'fora_do_plano' then '{"n": 1, "net": 50.00, "open": 1}'
+                case when tests.dtrade((select v::jsonb from tests.p83 where k = 'dtoday'), :'live')#>>'{plan,verdict}' = 'fora_do_plano' then '{"n": 1, "net": 0, "open": 1}'
                      else '{"n": 0, "net": 0, "open": 0}' end::jsonb,
-                'today: the live trade, still open with its partials (+50), is «fora» and open when its frozen plan broke');
+                'today: the live trade, still open with its partials (+50), is «fora» and open when its frozen plan broke; '
+                '«Fora do plano» sums closed trades only (as the boards: «1 operação · aberta»)');
+select tests.eq(jsonb_build_array(public.diario_dia(:'fut', :'today')#>'{facts,others_net}', public.diario_dia(:'fut', :'today')#>'{facts,net}',
+                                  public.diario_dia(:'fut', :'today')#>'{facts,commission_unknown}'),
+                '[0, 50.00, 1]'::jsonb,
+                'today: the open trade''s partials (+50) are in the day''s net, not in «As outras»; they wait for the commission');
 select tests.eq((select count(*) from unnest(array[:'today'::date, '2026-10-01'::date]) m(m)
                  cross join lateral jsonb_array_elements(public.diario_mes(:'fut', m.m)->'weeks') w
                  where (w.value#>>'{fora,open}')::int is distinct from (
@@ -920,8 +932,9 @@ select tests.eq((select count(*) from unnest(array[:'today'::date, '2026-10-01':
                          from jsonb_array_elements(public.diario_mes(:'fut', m.m)->'days') d
                          where date_trunc('week', (d->>'day')::date)::date = (w.value->>'week_of')::date)),
                 0::bigint, 'diario_mes: a week''s open «fora» trades are its days''');
-select tests.eq(public.diario_dia(:'fut', :'today')#>'{facts,breakeven}', '{"by": {"MES": {"n": 8, "un": "pts"}}, "trades": 1, "moved": 0}'::jsonb,
-                'today: a breakeven move undone does not count');
+select tests.eq(public.diario_dia(:'fut', :'today')#>'{facts,breakeven}',
+                '{"by": {"MES": {"n": 8, "un": "pts"}}, "trades": 1, "reached": 0, "moved": 0}'::jsonb,
+                'today: a breakeven move undone does not count, nor its +9 in favour; the partials got to +6 («nenhuma chegou ao ponto da regra»)');
 select tests.eq(public.diario_dia(:'fut', '2026-10-14')#>'{facts,window}',
                 jsonb_build_object('rule', true, 'evaluated', 2, 'inside', 1, 'outside',
                   jsonb_build_array(jsonb_build_object('trade_id', tests.tid(:'fut', '2026-10-14 15:40Z'), 'at', '2026-10-14T15:40:00+00:00'))),
@@ -1314,6 +1327,105 @@ select tests.eq(jsonb_build_array(public.diario_dia(:'fut', '2026-10-28')#>'{rev
 commit;
 
 -- =============================================================================================
+-- 18. What the approved boards draw (review of 5 Nov): «depois do limite» in the facts is the day as it
+--     stands; the breakeven row counts the trades that got to the rule's point
+-- =============================================================================================
+
+-- Revisão 4 83: futures, window 10:00–11:30 ET (rule on), limit US$ 100 per account «encerrar», breakeven MES +8 pts;
+-- v1 1 Oct. 27 Oct: «Já fechada» +10 at 10:20 and +5 at 10:30 registered first («no plano» then), −150 at 10:05–10:15
+-- registered after them (the limit is reached at 10:15), and −5 at 10:40 registered after the limit. 28 Oct: «Já fechada»
+-- with a stop of 10 pts: long out at +10 pts, long out at −1, short out at +9, short moved to the breakeven at +8 and out
+-- at the entry; and a long without a stop out at +10.
+begin;
+select set_config('request.jwt.claim.sub', :U, true);
+set local role authenticated;
+insert into public.trading_accounts (user_id, market, label, platform) values (:U, 'futures', 'Revisão 4 83', 'topone');
+commit;
+select id as r4 from public.trading_accounts where user_id = :U and label = 'Revisão 4 83' \gset
+begin;
+select set_config('request.jwt.claim.sub', :U, true);
+set local role authenticated;
+select tests.eq(jsonb_array_length(public.save_rules(jsonb_build_object('v', 1, 'base_rev', public.rules_config()->>'rev',
+  'accounts', jsonb_build_object(:'r4', jsonb_build_object(
+    'rules', '{"v": 1, "window_rule": {"on": true, "outside": "fora"}, "limit": {"usd": 100, "mode": "conta", "at_limit": "encerrar"},
+               "breakeven": {"on": true, "by": {"MES": 8}}}'::jsonb,
+    'window', '{"tz": "America/New_York", "start_min": 600, "end_min": 690, "weekdays": 31}'::jsonb, 'version', 'force'))))
+  ->'versions'), 1, 'Revisão 4 83: version 1');
+commit;
+alter table public.account_rule_versions disable trigger account_rule_versions_guard;
+update public.account_rule_versions v set effective_from = '2026-10-01 12:00:00+00' where v.account_id = :'r4';
+alter table public.account_rule_versions enable trigger account_rule_versions_guard;
+
+begin;
+select set_config('request.jwt.claim.sub', :U, true);
+set local role authenticated;
+insert into tests.p83 values ('r4a', tests.a83(:'r4', '2026-10-27', 'MESZ6', 'long', '1', '7000.00', '10:20',
+  '{"exit": "10:25", "exit_price": "7002.00"}')->>'trade_id');
+insert into tests.p83 values ('r4b', tests.a83(:'r4', '2026-10-27', 'MESZ6', 'long', '1', '7000.00', '10:30',
+  '{"exit": "10:35", "exit_price": "7001.00"}')->>'trade_id');
+insert into tests.p83 values ('r4c', tests.a83(:'r4', '2026-10-27', 'MESZ6', 'long', '1', '7000.00', '10:05',
+  '{"exit": "10:15", "exit_price": "6970.00"}')->>'trade_id');
+insert into tests.p83 values ('r4d', tests.a83(:'r4', '2026-10-27', 'MESZ6', 'long', '1', '7000.00', '10:40',
+  '{"exit": "10:45", "exit_price": "6999.00"}')->>'trade_id');
+select tests.a83(:'r4', '2026-10-28', 'MESZ6', 'long', '1', '7000.00', '10:05', '{"stop_pts": "10", "exit": "10:10", "exit_price": "7010.00"}') is not null;
+select tests.a83(:'r4', '2026-10-28', 'MESZ6', 'long', '1', '7000.00', '10:15', '{"stop_pts": "10", "exit": "10:20", "exit_price": "6999.00"}') is not null;
+select tests.a83(:'r4', '2026-10-28', 'MESZ6', 'short', '1', '7000.00', '10:25', '{"stop_pts": "10", "exit": "10:30", "exit_price": "6991.00"}') is not null;
+select tests.a83(:'r4', '2026-10-28', 'MESZ6', 'short', '1', '7000.00', '10:35',
+  '{"stop_pts": "10", "breakeven": {"price_then": "6992.00"}, "exit": "10:45", "exit_price": "7000.00"}') is not null;
+select tests.a83(:'r4', '2026-10-28', 'MESZ6', 'long', '1', '7000.00', '10:50', '{"exit": "10:55", "exit_price": "7010.00"}') is not null;
+commit;
+select v as r4a from tests.p83 where k = 'r4a' \gset
+select v as r4b from tests.p83 where k = 'r4b' \gset
+select v as r4c from tests.p83 where k = 'r4c' \gset
+select v as r4d from tests.p83 where k = 'r4d' \gset
+
+begin;
+select set_config('request.jwt.claim.sub', :U, true);
+set local role authenticated;
+-- The plans stay what they were when each was registered: only the 10:40 says «depois do limite»
+select tests.eq((select jsonb_agg(jsonb_build_array(x->'plan_kind', x#>'{plan,breaks}') order by o)
+                 from jsonb_array_elements(public.diario_dia(:'r4', '2026-10-27')->'trades') with ordinality e(x, o)),
+                '[["congelado", []], ["congelado", []], ["congelado", []], ["congelado", ["depois_do_limite"]]]'::jsonb,
+                '27 Oct: the frozen plans (10:05, 10:20, 10:30 in plan; 10:40 after the limit)');
+-- The facts: the limit reached at 10:15, and every entry after it as the day stands
+select tests.eq(public.diario_dia(:'r4', '2026-10-27')#>'{facts,limit}',
+                '{"amount": 100, "scope": "conta", "at_limit": "encerrar", "worst": -150.00, "hit_at": "2026-10-27T14:15:00+00:00",
+                  "worst_at_hit": -150.00, "net": -140.00, "trades": 4, "after_net": 10.00}'::jsonb
+                || jsonb_build_object('after', jsonb_build_array(
+                     jsonb_build_object('trade_id', :'r4a', 'at', '2026-10-27T14:20:00+00:00'),
+                     jsonb_build_object('trade_id', :'r4b', 'at', '2026-10-27T14:30:00+00:00'),
+                     jsonb_build_object('trade_id', :'r4d', 'at', '2026-10-27T14:40:00+00:00'))),
+                '27 Oct: «atingido às 10:15, com US$ 150,00 de perda · 3 depois, às 10:20, 10:30 e 10:40: +US$ 10,00» (the two '
+                'registered before the −150 too)');
+select tests.eq(jsonb_build_array(public.diario_dia(:'r4', '2026-10-27')#>'{facts,fora}', public.diario_dia(:'r4', '2026-10-27')#>'{facts,others_net}'),
+                '[{"n": 1, "net": -5.00, "open": 0}, -135.00]'::jsonb, '27 Oct: «Fora do plano» is the plans''; the others −135');
+select tests.eq(tests.mday(public.diario_mes(:'r4', '2026-10-01'), '2026-10-27')->'limit',
+                (public.diario_dia(:'r4', '2026-10-27')#>'{facts,limit}') - array['after', 'after_net'], 'diario_mes: the same limit');
+commit;
+-- The −150 deleted on the old page: no hit, nothing after it in the facts; the 10:40 keeps its frozen mark
+begin;
+select set_config('request.jwt.claim.sub', :U, true);
+set local role authenticated;
+delete from public.trades where id = :'r4c';
+select tests.eq(public.diario_dia(:'r4', '2026-10-27')#>'{facts,limit}',
+                '{"amount": 100, "scope": "conta", "at_limit": "encerrar", "worst": 0, "hit_at": null, "worst_at_hit": null,
+                  "net": 10.00, "trades": 3, "after": [], "after_net": null}'::jsonb,
+                '27 Oct after the deletion: no hit, so no entry after it');
+select tests.eq(jsonb_build_array(public.diario_dia(:'r4', '2026-10-27')#>'{facts,fora}', public.diario_dia(:'r4', '2026-10-27')#>'{facts,others_net}',
+                                  jsonb_array_length(public.diario_dia(:'r4', '2026-10-27')->'deleted')),
+                '[{"n": 1, "net": -5.00, "open": 0}, 15.00, 1]'::jsonb,
+                '… the 10:40 keeps its «depois do limite»; the others +15; the deletion is listed');
+-- 28 Oct: the breakeven row counts the trades with a stop that got to +8 pts
+select tests.eq(public.diario_dia(:'r4', '2026-10-28')#>'{facts,breakeven}',
+                '{"by": {"MES": {"n": 8, "un": "pts"}}, "trades": 5, "reached": 3, "moved": 1}'::jsonb,
+                '28 Oct: five MES trades; with a stop, out at +10, +9 and moved at +8 got there (−1 did not; the one without a stop '
+                'is not counted): «moveu em 1 de 3»');
+select tests.eq(jsonb_build_array(public.diario_dia(:'r4', '2026-10-28')#>'{facts,net}', public.diario_dia(:'r4', '2026-10-28')#>'{facts,commission}',
+                                  public.diario_dia(:'r4', '2026-10-28')#>'{facts,commission_unknown}'),
+                '[140.00, null, 5]'::jsonb, '28 Oct: five «Já fechada» still without the broker''s commission');
+commit;
+
+-- =============================================================================================
 -- 14. The facts «O diário registrou» freezes, recomputed from the tables
 -- =============================================================================================
 
@@ -1353,6 +1465,8 @@ create or replace function tests.expect83(p_acc uuid, p_day date) returns jsonb 
     'even', count(*) filter (where not h and status = 'closed' and result = 'breakeven'),
     'net', coalesce(sum(net) filter (where not h and rl), 0), 'gross', coalesce(sum(gross) filter (where not h and rl), 0),
     'commission', sum(comm) filter (where not h and rl),
+    'open_net', coalesce(sum(net) filter (where not h and rl and status = 'open'), 0),
+    'commission_unknown', count(*) filter (where not h and rl and comm is null),
     'first_entry_at', min(entry_time) filter (where not h),
     'h_n', count(*) filter (where h),
     'h_wins', count(*) filter (where h and status = 'closed' and result = 'win'),
@@ -1367,8 +1481,8 @@ create or replace function tests.expect83(p_acc uuid, p_day date) returns jsonb 
 $$;
 
 -- Every account of the database (its owner's session), every day of its calendar: the calendar's keys, diario_dia's facts
--- and each trade's imported_at against the tables; fora + others = net; each week the sum of its days. The first
--- divergences, or [].
+-- and each trade's imported_at against the tables; fora + others (closed trades) + the open trades' partials = net; each
+-- week the sum of its days. The first divergences, or [].
 create or replace function tests.indep83() returns jsonb language plpgsql as $$
 declare
   bad jsonb := '[]'::jsonb;
@@ -1396,12 +1510,14 @@ begin
       f := dia->'facts';
       if jsonb_build_object('kind', f->'kind', 'trades', f->'trades', 'closed', f->'closed', 'open', f->'open', 'wins', f->'wins',
                             'losses', f->'losses', 'even', f->'even', 'net', f->'net', 'gross', f->'gross',
-                            'commission', f->'commission', 'first_entry_at', f->'first_entry_at', 'history', f->'history')
+                            'commission', f->'commission', 'commission_unknown', f->'commission_unknown',
+                            'first_entry_at', f->'first_entry_at', 'history', f->'history')
          is distinct from jsonb_build_object('kind', e->'kind', 'trades', e->'n', 'closed', e->'closed', 'open', e->'open',
                             'wins', e->'wins', 'losses', e->'losses', 'even', e->'even', 'net', e->'net', 'gross', e->'gross',
-                            'commission', e->'commission', 'first_entry_at', e->'first_entry_at',
+                            'commission', e->'commission', 'commission_unknown', e->'commission_unknown',
+                            'first_entry_at', e->'first_entry_at',
                             'history', jsonb_build_object('n', e->'h_n', 'net', e->'h_net', 'gross', e->'h_gross'))
-         or (f#>>'{fora,net}')::numeric + (f->>'others_net')::numeric <> (f->>'net')::numeric
+         or (f#>>'{fora,net}')::numeric + (f->>'others_net')::numeric + (e->>'open_net')::numeric <> (f->>'net')::numeric
          or (select coalesce(jsonb_object_agg(t->>'trade_id', t->'imported_at'), '{}'::jsonb)
              from jsonb_array_elements(dia->'trades') t) is distinct from e->'trades_imported_at' then
         bad := bad || jsonb_build_array(jsonb_build_object('what', 'facts', 'account', a.id, 'got', f, 'expected', e));
@@ -1440,8 +1556,15 @@ select tests.eq(jsonb_build_array(public.diario_dia(:'fut', '2026-10-24')#>'{fac
                                   public.diario_dia(:'jv', '2026-10-20')#>'{facts,window}'),
                 '[{"rule": true, "evaluated": 0, "inside": 0, "outside": []}, null, null]'::jsonb,
                 'the window line: the rule on a day without trades; none with a window and the rule off, or the rule on without a window');
-select tests.eq(public.diario_dia(:'fut', '2026-10-14')#>'{facts,breakeven}', '{"by": {"MES": {"n": 8, "un": "pts"}}, "trades": 1, "moved": 0}'::jsonb,
-                '14 Oct: the breakeven rule covers the diário MES trade (not the MNQ, not the history)');
+select tests.eq(public.diario_dia(:'fut', '2026-10-14')#>'{facts,breakeven}',
+                '{"by": {"MES": {"n": 8, "un": "pts"}}, "trades": 1, "reached": 0, "moved": 0}'::jsonb,
+                '14 Oct: the breakeven rule covers the diário MES trade (not the MNQ, not the history), which never got to +8');
+select tests.eq(jsonb_build_array(public.diario_dia(:'fut', '2026-10-14')#>'{facts,commission}', public.diario_dia(:'fut', '2026-10-14')#>'{facts,commission_unknown}',
+                                  public.diario_dia(:'fut', '2026-10-22')#>'{facts,commission_unknown}', public.diario_dia(:'fut', '2026-10-15')#>'{facts,commission_unknown}',
+                                  public.diario_dia(:'fut', '2026-10-30')#>'{facts,commission_unknown}'),
+                '[1.24, 1, 0, 3, 0]'::jsonb,
+                'commission_unknown: 14 Oct the file''s commission is known but the «Já fechada» MNQ still waits for it; 22 Oct the file '
+                'completed both exits; 15 Oct none known; 30 Oct nothing realized');
 select tests.eq(jsonb_build_array(public.diario_dia(:'fut', '2026-10-21')#>'{facts,version}', public.diario_dia(:'semr', '2026-09-28')#>'{facts,version}'),
                 jsonb_build_array(jsonb_build_object('id', :'fut_v2', 'version_no', 2), null), 'the day''s version; none without rules');
 select tests.eq(public.diario_dia(:'fut', '2026-10-14')#>'{facts,first_entry_at}', '"2026-10-14T14:05:00+00:00"'::jsonb,
