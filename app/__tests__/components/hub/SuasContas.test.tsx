@@ -100,7 +100,7 @@ beforeEach(() => {
   })
   fetchImportFormats.mockResolvedValue({})
   // What «Desfazer» of a batch does, in trades (each test with a batch says its own)
-  fetchBatchUndo.mockResolvedValue({ trades: 1, exits: 1, registered: 0, existing: 0 })
+  fetchBatchUndo.mockResolvedValue({ trades: 1, exits: 1, registered: 0, existing: 0, diario: { marks: 0, images: 0, notes: 0 } })
   updateAccount.mockResolvedValue(undefined)
   setPrimary.mockResolvedValue(undefined)
 })
@@ -563,7 +563,7 @@ describe('Importações', () => {
       makeBatch({ id: 'b-old', file_name: 'operacoes_set.csv', status: 'undone', undone_at: '2026-10-02T10:00:00Z' }),
       makeBatch({ id: 'b-legacy', is_legacy: true, file_name: null, rows_inserted: 612 }),
     ])
-    fetchBatchUndo.mockResolvedValue({ trades: 5, exits: 5, registered: 0, existing: 0 })
+    fetchBatchUndo.mockResolvedValue({ trades: 5, exits: 5, registered: 0, existing: 0, diario: { marks: 0, images: 0, notes: 0 } })
     importUndo.mockResolvedValue({ deleted: 5 })
     renderHub(<SuasContas />)
 
@@ -618,7 +618,7 @@ describe('Importações', () => {
     it('only completed them: says so, undoes without «apagar», and says they came back as they were', async () => {
       // A file whose 3 rows were the owner's registered trades: nothing inserted, kept to be undone
       fetchBatches.mockResolvedValue([makeBatch({ id: 'b-link', rows_total: 3, rows_inserted: 0, rows_duplicate: 0, rows_linked: 3 })])
-      fetchBatchUndo.mockResolvedValue({ trades: 0, exits: 0, registered: 3, existing: 0 })
+      fetchBatchUndo.mockResolvedValue({ trades: 0, exits: 0, registered: 3, existing: 0, diario: { marks: 0, images: 0, notes: 0 } })
       importUndo.mockResolvedValue({ deleted: 0 })
       renderHub(<SuasContas />)
 
@@ -639,7 +639,7 @@ describe('Importações', () => {
 
     it('inserted some and completed one: deletes the new ones and gives the registered one back', async () => {
       fetchBatches.mockResolvedValue([makeBatch({ id: 'b-mix', rows_total: 7, rows_inserted: 4, rows_duplicate: 2, rows_linked: 1 })])
-      fetchBatchUndo.mockResolvedValue({ trades: 4, exits: 4, registered: 1, existing: 0 })
+      fetchBatchUndo.mockResolvedValue({ trades: 4, exits: 4, registered: 1, existing: 0, diario: { marks: 0, images: 0, notes: 0 } })
       importUndo.mockResolvedValue({ deleted: 4 })
       renderHub(<SuasContas />)
 
@@ -688,7 +688,7 @@ describe('Importações', () => {
     it('an execution file: «as 4 operações …, em 6 saídas», then «4 operações apagadas»', async () => {
       // tradovate-ordens.csv: its 6 exits are 6 inserted lines; the database made 4 trades of them
       fetchBatches.mockResolvedValue([makeBatch({ id: 'b-tv', platform: 'modelo', file_name: 'tradovate-ordens.csv', rows_total: 6, rows_inserted: 6 })])
-      fetchBatchUndo.mockResolvedValue({ trades: 4, exits: 6, registered: 0, existing: 0 })
+      fetchBatchUndo.mockResolvedValue({ trades: 4, exits: 6, registered: 0, existing: 0, diario: { marks: 0, images: 0, notes: 0 } })
       importUndo.mockResolvedValue({ deleted: 4 })
       renderHub(<SuasContas />)
 
@@ -706,7 +706,7 @@ describe('Importações', () => {
     it('a Top One position in two rows onto a registered trade: «a registrada por você», not «as 2»', async () => {
       // rows_linked counts the position's 2 lines; they completed 1 registered trade
       fetchBatches.mockResolvedValue([makeBatch({ id: 'b-reg', rows_total: 3, rows_inserted: 1, rows_linked: 2 })])
-      fetchBatchUndo.mockResolvedValue({ trades: 1, exits: 1, registered: 1, existing: 0 })
+      fetchBatchUndo.mockResolvedValue({ trades: 1, exits: 1, registered: 1, existing: 0, diario: { marks: 0, images: 0, notes: 0 } })
       importUndo.mockResolvedValue({ deleted: 1 })
       renderHub(<SuasContas />)
 
@@ -719,7 +719,7 @@ describe('Importações', () => {
     it('a row that joined a trade already there: nothing deleted, «Desfazer» alone', async () => {
       // rows_inserted counts the joined line; import_undo deletes no trade, it takes the exit back out
       fetchBatches.mockResolvedValue([makeBatch({ id: 'b-mais', rows_total: 2, rows_inserted: 1, rows_duplicate: 1 })])
-      fetchBatchUndo.mockResolvedValue({ trades: 0, exits: 0, registered: 0, existing: 1 })
+      fetchBatchUndo.mockResolvedValue({ trades: 0, exits: 0, registered: 0, existing: 1, diario: { marks: 0, images: 0, notes: 0 } })
       importUndo.mockResolvedValue({ deleted: 0 })
       renderHub(<SuasContas />)
 
@@ -745,7 +745,7 @@ describe('Importações', () => {
       expect(await within(item).findByRole('group', { name: 'Não foi possível ver o que esta importação apagaria.' })).toBeInTheDocument()
       expect(within(item).queryByRole('button', { name: /^Desfazer/ })).not.toBeInTheDocument()
 
-      fetchBatchUndo.mockResolvedValueOnce({ trades: 4, exits: 6, registered: 0, existing: 0 })
+      fetchBatchUndo.mockResolvedValueOnce({ trades: 4, exits: 6, registered: 0, existing: 0, diario: { marks: 0, images: 0, notes: 0 } })
       await userEvent.click(within(item).getByRole('button', { name: 'Tentar de novo' }))
       expect(await within(item).findByRole('group', { name: 'Desfazer apaga as 4 operações desta importação, em 6 saídas.' })).toBeInTheDocument()
       expect(importUndo).not.toHaveBeenCalled()

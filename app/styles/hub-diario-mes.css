@@ -1,6 +1,726 @@
 /*
  * The Diário page, lane L1 «mês e semana» (Phase 4, telas): the top of the page and its states, the calendar, the
- * week and the footer. Scoped to .hub; tokens from styles/hub.css, the shared rules from styles/hub-diario.css.
+ * week and the footer, and the account selector's additions (the search and firm groups from 10 accounts). Scoped to
+ * .hub; tokens from styles/hub.css, the shared rules from styles/hub-diario.css. Measures and colours are the approved
+ * boards' (DiarioDezEnxuto / DiarioHojeEnxuto, canvas version 84: `.cal-*`, `.faixa`, `#rodape`, `.conta-*`); their
+ * container breakpoints are viewport media queries here (≤ 700 px phones and small tablets, ≤ 540 px phones).
  * Imported by app/(hub)/layout.tsx. Only lane L1 edits this file, with its prefixes only: hub-dr-cal-*, hub-dr-sem-*,
- * hub-dr-topo-*, hub-dr-rod-*.
+ * hub-dr-topo-*, hub-dr-rod-*, hub-seletor__*.
  */
+
+/* ---------------------------------------------------------------------------------------------
+ * The top: the date line under the H1, the section links, the banners, the states
+ * ------------------------------------------------------------------------------------------- */
+
+/* The Diário's H1 keeps the board's 40 px on phones too (hub.css makes the pages' H1 34 px at ≤ 640 px) */
+.hub .hub-dr-topo-cab h1 {
+  font-size: 40px;
+}
+
+/* «terça-feira, 1º de dezembro, 11:35 ET» (A2) */
+.hub .hub-dr-topo-data {
+  margin-top: 4px;
+  color: var(--text-2);
+}
+
+/* «Calendário · O dia · Semana» and «Diário desde …» (C1, C2) */
+.hub .hub-dr-topo {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.hub .hub-dr-topo-secoes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 14px;
+  font-size: 13px;
+}
+.hub .hub-dr-topo-secoes a {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  min-width: 44px;
+  font-weight: 700;
+  text-decoration: underline;
+}
+
+/* The amber banners: no rules (C3), pending reviews (C4) */
+.hub .hub-dr-topo-aviso {
+  border: 1px solid var(--amber-border);
+  background: var(--amber-bg);
+}
+.hub .hub-dr-topo-aviso-txt {
+  flex: 1 1 360px;
+  min-width: 0;
+}
+.hub .hub-dr-topo-aviso-txt--curto {
+  flex-basis: 300px;
+}
+.hub .hub-dr-topo-aviso-tit {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+}
+.hub .hub-dr-topo-aviso-forte {
+  margin: 0;
+  font-weight: 700;
+}
+.hub .hub-dr-topo-icone {
+  flex: 0 0 auto;
+  fill: none;
+  stroke: var(--amber);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+/* «Definir as regras», «Ver no calendário»: amber with dark text (board `#2B2210`) */
+.hub .hub-dr-topo-botao,
+.hub .hub-dr-topo-botao:hover {
+  border-color: var(--amber);
+  background: var(--amber);
+  color: #2b2210;
+}
+.hub .hub-dr-topo-x {
+  flex: none;
+}
+.hub .hub-dr-topo-x svg {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.2;
+  stroke-linecap: round;
+}
+
+/* «Sem conexão. Tente de novo quando a conexão voltar.» (C5) */
+.hub .hub-dr-topo-offline {
+  border: 1px dashed var(--neutral-border);
+  font-weight: 700;
+}
+
+/*
+ * «Carregando…», the empty card while offline, «Não foi possível carregar o Diário.» (C6, C6b, C7). The board's card
+ * (`.cartao` with an inline min-height: 240px) is content-box: 240 px inside its padding and border (286 px at desktop,
+ * 278 px on phones); the app's preflight makes every box border-box, so this one says content-box again
+ */
+.hub .hub-dr-topo-estado {
+  box-sizing: content-box;
+  min-height: 240px;
+  justify-content: center;
+}
+.hub .hub-dr-topo-erro {
+  margin: 0;
+  font-weight: 700;
+}
+
+/* ---------------------------------------------------------------------------------------------
+ * «Calendário» (D)
+ * ------------------------------------------------------------------------------------------- */
+
+/* ‹ «Hoje» › */
+.hub .hub-dr-cal-nav {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.hub .hub-dr-cal-seta {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* The month: its H3 over the grid */
+.hub .hub-dr-cal-mes {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+.hub .hub-dr-cal-h3 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+/* Seg–Sex (or Seg–Dom) and «Semana», a little wider */
+.hub .hub-dr-cal-grade {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr)) minmax(0, 1.15fr);
+  gap: 5px;
+  padding: 2px;
+}
+.hub .hub-dr-cal-grade--sete {
+  grid-template-columns: repeat(7, minmax(0, 1fr)) minmax(0, 1.15fr);
+}
+.hub .hub-dr-cal-col {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-2);
+}
+
+/* A day (board `.cal-cel`) */
+.hub .hub-dr-cal-cel {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+  min-width: 0;
+  min-height: 72px;
+  padding: 7px 8px;
+  border-radius: 12px;
+  border: 1px solid transparent;
+  background-color: var(--inset);
+  box-sizing: border-box;
+  color: var(--text);
+  font-family: inherit;
+  font-size: inherit;
+  text-align: left;
+  animation: hub-dr-cal-entra 0.42s cubic-bezier(0.2, 0.7, 0.3, 1) backwards;
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease,
+    border-color 0.2s ease;
+}
+@keyframes hub-dr-cal-entra {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* The colour by quartiles (board `fundoDe`): gains mint, losses red; 1–2 a tint and a 4 px bar, 3–4 filled with dark
+   text, 4 with a glow. Colour never alone: the number and the label carry the sign */
+.hub .hub-dr-cal-cel--g1 {
+  background-color: rgba(225, 255, 217, 0.07);
+  box-shadow: inset 0 -4px 0 rgba(225, 255, 217, 0.95);
+}
+.hub .hub-dr-cal-cel--g2 {
+  background-color: rgba(225, 255, 217, 0.15);
+  box-shadow: inset 0 -4px 0 rgba(225, 255, 217, 0.95);
+}
+.hub .hub-dr-cal-cel--g3 {
+  background-color: rgba(225, 255, 217, 0.72);
+  color: #26301f;
+}
+.hub .hub-dr-cal-cel--g4 {
+  background-color: rgba(225, 255, 217, 0.9);
+  color: #26301f;
+  box-shadow: 0 8px 22px rgba(225, 255, 217, 0.28);
+}
+.hub .hub-dr-cal-cel--p1 {
+  background-color: rgba(255, 138, 138, 0.07);
+  box-shadow: inset 0 -4px 0 rgba(255, 138, 138, 0.95);
+}
+.hub .hub-dr-cal-cel--p2 {
+  background-color: rgba(255, 138, 138, 0.15);
+  box-shadow: inset 0 -4px 0 rgba(255, 138, 138, 0.95);
+}
+.hub .hub-dr-cal-cel--p3 {
+  background-color: rgba(255, 138, 138, 0.72);
+  color: #3a0f0f;
+}
+.hub[data-tema='escuro'] .hub-dr-cal-cel--p3 {
+  background-color: rgba(255, 138, 138, 0.82);
+}
+.hub .hub-dr-cal-cel--p4 {
+  background-color: rgba(255, 138, 138, 0.9);
+  color: #3a0f0f;
+  box-shadow: 0 8px 22px rgba(255, 138, 138, 0.28);
+}
+
+/* «Histórico importado · só resultado»: hatched, white stripes on the strong levels */
+.hub .hub-dr-cal-cel--hist {
+  background-image: repeating-linear-gradient(135deg, transparent 0 6px, rgba(0, 0, 0, 0.14) 6px 9px);
+}
+.hub .hub-dr-cal-cel--hist-forte {
+  background-image: repeating-linear-gradient(135deg, transparent 0 6px, rgba(255, 255, 255, 0.18) 6px 9px);
+}
+
+/* A day that opens; the open day. A button keeps the font's own line height, as the board's buttons do (the app's
+   reset would give it the page's 1.5) */
+.hub button.hub-dr-cal-cel {
+  border-color: var(--neutral-border);
+  line-height: normal;
+  cursor: pointer;
+}
+.hub button.hub-dr-cal-cel:hover,
+.hub button.hub-dr-cal-cel:focus-visible {
+  z-index: 3;
+  border-color: var(--text);
+  transform: scale(1.07);
+}
+.hub button.hub-dr-cal-cel[aria-pressed='true'] {
+  border: 2px solid var(--text);
+}
+
+/* The neighbouring month: dashed, empty */
+.hub .hub-dr-cal-cel--fora {
+  border: 1px dashed var(--border);
+  background-color: transparent;
+}
+
+/* Today: the mint dot */
+.hub .hub-dr-cal-cel--hoje::after {
+  content: '';
+  position: absolute;
+  top: -3px;
+  right: -3px;
+  width: 9px;
+  height: 9px;
+  border-radius: 999px;
+  background: var(--mint);
+  box-shadow: 0 0 0 2px var(--bg);
+}
+
+/* The number, the marks ● ■ ✓ on the page's colour, the result (mono when there are trades) */
+.hub .hub-dr-cal-cab {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+}
+.hub .hub-dr-cal-num {
+  font-size: 12px;
+  font-weight: 700;
+}
+.hub .hub-dr-cal-marcas {
+  display: inline-flex;
+  gap: 3px;
+  margin-left: auto;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: var(--bg);
+  font-size: 10px;
+  line-height: 16px;
+}
+.hub .hub-dr-cal-res {
+  font-size: 12px;
+  font-weight: 700;
+}
+.hub .hub-dr-cal-res--num {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 13px;
+}
+.hub .hub-dr-cal-cel--fixa .hub-dr-cal-res {
+  color: var(--text-2);
+}
+.hub .hub-dr-cal-res--curto {
+  display: none;
+  font-size: 12px;
+}
+
+/* The hover's tip (also on keyboard focus): over the cell, anchored left on the first column, right on the last two */
+.hub .hub-dr-cal-dica {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 8px);
+  z-index: 5;
+  width: max-content;
+  max-width: 240px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid var(--neutral-border);
+  background: var(--bg);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  color: var(--text);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.4;
+  text-align: left;
+  white-space: normal;
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-50%, 4px);
+  transition:
+    opacity 0.15s ease,
+    transform 0.15s ease;
+}
+.hub .hub-dr-cal-cel:hover .hub-dr-cal-dica,
+.hub .hub-dr-cal-cel:focus-visible .hub-dr-cal-dica {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+.hub .hub-dr-cal-cel--dica-e .hub-dr-cal-dica {
+  left: 0;
+  transform: translate(0, 4px);
+}
+.hub .hub-dr-cal-cel--dica-e:hover .hub-dr-cal-dica,
+.hub .hub-dr-cal-cel--dica-e:focus-visible .hub-dr-cal-dica {
+  transform: translate(0, 0);
+}
+.hub .hub-dr-cal-cel--dica-d .hub-dr-cal-dica {
+  left: auto;
+  right: 0;
+  transform: translate(0, 4px);
+}
+.hub .hub-dr-cal-cel--dica-d:hover .hub-dr-cal-dica,
+.hub .hub-dr-cal-cel--dica-d:focus-visible .hub-dr-cal-dica {
+  transform: translate(0, 0);
+}
+
+/* The «Semana» column (board `.cal-sem`): outlined, its result in the diário's colour */
+.hub .hub-dr-cal-sem {
+  border: 1px solid var(--border);
+  background-color: transparent;
+}
+.hub button.hub-dr-cal-sem {
+  border-color: var(--neutral-border);
+}
+.hub button.hub-dr-cal-sem[aria-pressed='true'] {
+  border: 2px solid var(--text);
+}
+.hub .hub-dr-cal-sem-rot,
+.hub .hub-dr-cal-sem-n {
+  font-size: 11px;
+  color: var(--text-2);
+}
+.hub .hub-dr-cal-sem-res {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 13px;
+  font-weight: 700;
+}
+.hub .hub-dr-cal-sem-traco {
+  font-size: 12px;
+  color: var(--text-2);
+}
+
+/* The legend (D22) */
+.hub .hub-dr-cal-legenda {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 14px;
+  font-size: 12px;
+  color: var(--text-2);
+}
+.hub .hub-dr-cal-leg-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.hub .hub-dr-cal-amostras {
+  display: inline-flex;
+  gap: 2px;
+}
+.hub .hub-dr-cal-amostra {
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+}
+.hub .hub-dr-cal-amostra--g1 {
+  background: rgba(225, 255, 217, 0.15);
+  box-shadow: inset 0 -3px 0 rgba(225, 255, 217, 0.95);
+}
+.hub .hub-dr-cal-amostra--g2 {
+  background: rgba(225, 255, 217, 0.72);
+}
+.hub .hub-dr-cal-amostra--g3 {
+  background: rgba(225, 255, 217, 0.9);
+}
+.hub .hub-dr-cal-amostra--p1 {
+  background: rgba(255, 138, 138, 0.15);
+  box-shadow: inset 0 -3px 0 rgba(255, 138, 138, 0.95);
+}
+.hub .hub-dr-cal-amostra--p2 {
+  background: rgba(255, 138, 138, 0.72);
+}
+.hub .hub-dr-cal-amostra--p3 {
+  background: rgba(255, 138, 138, 0.9);
+}
+
+/* ---------------------------------------------------------------------------------------------
+ * «Semana» (J): the tiles are hub-diario.css's; the bars, the «Fora do plano» list
+ * ------------------------------------------------------------------------------------------- */
+
+.hub .hub-dr-sem-corpo {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+.hub .hub-dr-sem-barras-col {
+  flex: 1 1 260px;
+  min-width: 0;
+}
+.hub .hub-dr-sem-barras {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 140px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: var(--inset);
+  box-sizing: border-box;
+}
+.hub .hub-dr-sem-dia {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+.hub .hub-dr-sem-metade {
+  display: flex;
+  height: 60px;
+}
+.hub .hub-dr-sem-metade--cima {
+  align-items: flex-end;
+}
+.hub .hub-dr-sem-metade--baixo {
+  align-items: flex-start;
+}
+.hub .hub-dr-sem-barra {
+  width: 22px;
+  border-radius: 4px 4px 0 0;
+  background: var(--mint);
+}
+.hub .hub-dr-sem-metade--baixo .hub-dr-sem-barra {
+  border-radius: 0 0 4px 4px;
+}
+.hub .hub-dr-sem-barra--perda {
+  background: var(--red-fill);
+}
+.hub .hub-dr-sem-eixo {
+  width: 100%;
+  height: 1px;
+  background: var(--neutral-border);
+}
+.hub .hub-dr-sem-rot {
+  font-size: 11px;
+  color: var(--text-2);
+}
+.hub .hub-dr-sem-val {
+  font-family: var(--mono);
+  font-size: 11px;
+  white-space: nowrap;
+}
+.hub .hub-dr-sem-val-curto {
+  display: none;
+}
+.hub .hub-dr-sem-fora {
+  flex: 1 1 360px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.hub .hub-dr-sem-fora-tit {
+  margin: 0;
+}
+.hub .hub-dr-sem-lista {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  padding: 0 0 0 18px;
+  list-style: disc;
+  font-size: 13px;
+}
+/* The week's own month could not be read (J4, not drawn) */
+.hub .hub-dr-sem-erro {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+}
+.hub .hub-dr-sem-alerta {
+  margin: 0;
+  font-weight: 700;
+}
+
+/* ---------------------------------------------------------------------------------------------
+ * The footer (K)
+ * ------------------------------------------------------------------------------------------- */
+
+.hub .hub-dr-rod {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 16px 22px;
+  border-radius: 24px;
+  border: 1px solid var(--border);
+}
+.hub .hub-dr-rod-acoes {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+}
+.hub .hub-dr-rod-painel {
+  font-size: 12px;
+}
+.hub .hub-dr-rod-linha {
+  margin: 0;
+  font-size: 12px;
+  color: var(--text-2);
+}
+.hub .hub-dr-rod-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  font-size: 12px;
+  color: var(--text-2);
+  text-decoration: underline;
+}
+
+/* ---------------------------------------------------------------------------------------------
+ * The account selector (A7–A13; board `.conta-*`): the popover's measures, and from 10 accounts the search, the
+ * firm headers and the scrolling blocks with shadows at their edges
+ * ------------------------------------------------------------------------------------------- */
+
+.hub .hub-seletor__lista {
+  gap: 2px;
+  width: 300px;
+  max-width: calc(100vw - 32px);
+}
+.hub .hub-seletor__grupo {
+  padding: 6px 10px 0;
+}
+.hub .hub-seletor__rodape {
+  margin-top: 4px;
+}
+.hub .hub-seletor__nota {
+  padding: 4px 10px 0;
+}
+.hub .hub-seletor__busca {
+  padding: 0 0 8px;
+}
+.hub .hub-seletor__busca .hub-entrada {
+  background: var(--surface);
+}
+.hub .hub-seletor__blocos,
+.hub .hub-seletor__bloco {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+/*
+ * Without a query the 7th account is cut in half: the list scrolls; the focus ring is never cut. The board's
+ * `.conta-rolagem` is content-box: 372 px inside its 4 px padding, 380 px in all (preflight's border-box would make
+ * the viewport 8 px shorter and leave only a sliver of the 7th account)
+ */
+.hub .hub-seletor__rolagem {
+  --fim: rgba(0, 0, 0, 0.32);
+  box-sizing: content-box;
+  max-height: 372px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  margin: -4px -6px;
+  padding: 4px 6px;
+  scroll-padding-block: 8px;
+  background:
+    linear-gradient(var(--bg) 40%, rgba(0, 0, 0, 0)) top / 100% 24px no-repeat local,
+    linear-gradient(rgba(0, 0, 0, 0), var(--bg) 60%) bottom / 100% 24px no-repeat local,
+    linear-gradient(var(--fim), rgba(0, 0, 0, 0)) top / 100% 18px no-repeat scroll,
+    linear-gradient(rgba(0, 0, 0, 0), var(--fim)) bottom / 100% 18px no-repeat scroll,
+    var(--bg);
+}
+.hub[data-tema='escuro'] .hub-seletor__rolagem {
+  --fim: rgba(255, 255, 255, 0.12);
+}
+.hub .hub-seletor__mesa {
+  padding: 6px 10px 0;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-2);
+}
+.hub .hub-seletor__nada {
+  margin: 0;
+  padding: 10px;
+  font-size: 13px;
+  color: var(--text-2);
+}
+
+/* ---------------------------------------------------------------------------------------------
+ * Phones and small tablets (board ≤ 700 px): the calendar without «Semana»'s column (each week a row under its
+ * days), short results, no hover tip; ≤ 540 px the seven columns reach into the card's padding (≥ 44 px each at 375)
+ * ------------------------------------------------------------------------------------------- */
+
+@media (max-width: 700px) {
+  .hub .hub-dr-cal-grade,
+  .hub .hub-dr-cal-grade--sete {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 4px;
+  }
+  .hub .hub-dr-cal-grade--sete {
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+  }
+  .hub .hub-dr-cal-col--sem {
+    display: none;
+  }
+  .hub .hub-dr-cal-cel {
+    min-height: 58px;
+    padding: 6px 4px;
+  }
+  .hub .hub-dr-cal-sem {
+    grid-column: 1 / -1;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 2px 10px;
+    min-height: 44px;
+    padding: 6px 10px;
+  }
+  .hub .hub-dr-cal-res--longo {
+    display: none;
+  }
+  .hub .hub-dr-cal-res--curto {
+    display: inline;
+  }
+  .hub .hub-dr-cal-dica {
+    display: none;
+  }
+  .hub .hub-dr-cal-marcas {
+    gap: 1px;
+    padding: 0 2px;
+    font-size: 9px;
+  }
+  .hub .hub-dr-sem-val-longo {
+    display: none;
+  }
+  .hub .hub-dr-sem-val-curto {
+    display: inline;
+  }
+}
+
+@media (max-width: 540px) {
+  .hub .hub-dr-cal-grade--sete {
+    margin: 0 -14px;
+    gap: 3px;
+  }
+  .hub .hub-dr-cal-grade--sete .hub-dr-cal-cel {
+    padding: 5px 3px;
+  }
+}
+
+/* Touch screens: no hover tip (the label carries it) */
+@media (hover: none) {
+  .hub .hub-dr-cal-dica {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hub .hub-dr-cal-cel {
+    animation: none;
+    transition: none;
+  }
+  .hub button.hub-dr-cal-cel:hover,
+  .hub button.hub-dr-cal-cel:focus-visible {
+    transform: none;
+  }
+  .hub .hub-dr-cal-dica {
+    transition: none;
+  }
+}
