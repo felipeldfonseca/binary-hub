@@ -31,8 +31,9 @@
 --   17  «Antes de operar»: another account's note, the 50-version cap, a malformed key, explicit nulls, the
 --       payload limits at the byte; the generic checks again over everything
 --   18  the facts' «depois do limite» as the day stands (a «Já fechada» registered late, the trade that hit
---       deleted), the breakeven row's trades that got to the rule's point, the commission still to come
---   (groups 18 and 14–17 run before 12, on days fixed in October 2026)
+--       deleted, an open trade's partials out of after_net), the breakeven row's trades that got to the rule's
+--       point (a move to the breakeven short of it is not «moveu»), the commission still to come
+--   (groups 18 and 14–17 run before 12, on days fixed in October 2026; group 18 also today, live)
 --
 -- Fixed October–November 2026 days (all before the day this phase was built); the register functions
 -- stamp the server's now(), so «today» cases are relative to it. Versions are moved to fixed instants
@@ -1423,6 +1424,92 @@ select tests.eq(public.diario_dia(:'r4', '2026-10-28')#>'{facts,breakeven}',
 select tests.eq(jsonb_build_array(public.diario_dia(:'r4', '2026-10-28')#>'{facts,net}', public.diario_dia(:'r4', '2026-10-28')#>'{facts,commission}',
                                   public.diario_dia(:'r4', '2026-10-28')#>'{facts,commission_unknown}'),
                 '[140.00, null, 5]'::jsonb, '28 Oct: five «Já fechada» still without the broker''s commission');
+commit;
+
+-- 29 Oct: «Já fechada» with a stop of 10 pts: a long out at +10 pts (it got to +8 without a move), and a long whose stop
+-- went to the breakeven at +5, short of the rule's +8, then out at the entry (it never got there)
+begin;
+select set_config('request.jwt.claim.sub', :U, true);
+set local role authenticated;
+select tests.a83(:'r4', '2026-10-29', 'MESZ6', 'long', '1', '7000.00', '10:05', '{"stop_pts": "10", "exit": "10:10", "exit_price": "7010.00"}') is not null;
+insert into tests.p83 values ('r4e', tests.a83(:'r4', '2026-10-29', 'MESZ6', 'long', '1', '7000.00', '10:20',
+  '{"stop_pts": "10", "breakeven": {"price_then": "7005.00"}, "exit": "10:30", "exit_price": "7000.00"}')->>'trade_id');
+commit;
+select v as r4e from tests.p83 where k = 'r4e' \gset
+begin;
+select set_config('request.jwt.claim.sub', :U, true);
+set local role authenticated;
+select tests.eq(jsonb_build_array(tests.dtrade(public.diario_dia(:'r4', '2026-10-29'), :'r4e')#>'{stop_moves,0,kind}',
+                                  tests.dtrade(public.diario_dia(:'r4', '2026-10-29'), :'r4e')#>'{stop_moves,0,favor}',
+                                  tests.dtrade(public.diario_dia(:'r4', '2026-10-29'), :'r4e')#>'{stop_moves,0,voided_at}',
+                                  tests.dtrade(public.diario_dia(:'r4', '2026-10-29'), :'r4e')#>'{position,realized_pnl}'),
+                '["breakeven", 5, null, 0]'::jsonb, '29 Oct: the 10:20 moved its stop to the breakeven at +5 pts and went out at the entry');
+select tests.eq(public.diario_dia(:'r4', '2026-10-29')#>'{facts,breakeven}',
+                '{"by": {"MES": {"n": 8, "un": "pts"}}, "trades": 2, "reached": 1, "moved": 0}'::jsonb,
+                '29 Oct: only the +10 got to +8, and it never moved its stop; the move at +5 is not counted: «moveu em 0 de 1»');
+commit;
+
+-- Today, live on the server's clock: an MES −150 entered and closed (the US$ 100 limit is reached at its exit); after
+-- it, an MES of 2 contracts entered and still open with a partial (+20), and an MES entered and closed (+10). «Depois
+-- do limite» lists both entries after the hit; its result sums the closed one only (the open one's partial stays in
+-- the day's net, as «Fora do plano» and «As outras» do)
+begin;
+select set_config('request.jwt.claim.sub', :U, true);
+set local role authenticated;
+insert into tests.p83 values ('r4x', public.register_entry(:'r4', jsonb_build_object('v', 1, 'client_key', tests.ck(),
+  'symbol', 'MESZ6', 'direction', 'long', 'quantity', '1', 'entry_price', '7000.00', 'allow_similar', true))->>'trade_id');
+commit;
+select v as r4x from tests.p83 where k = 'r4x' \gset
+begin;
+select set_config('request.jwt.claim.sub', :U, true);
+set local role authenticated;
+select public.register_exit(:'r4x', '{"v": 1, "exit_price": "6970.00"}')->>'status';
+commit;
+begin;
+select set_config('request.jwt.claim.sub', :U, true);
+set local role authenticated;
+insert into tests.p83 values ('r4y', public.register_entry(:'r4', jsonb_build_object('v', 1, 'client_key', tests.ck(),
+  'symbol', 'MESZ6', 'direction', 'long', 'quantity', '2', 'entry_price', '7000.00', 'allow_similar', true))->>'trade_id');
+commit;
+select v as r4y from tests.p83 where k = 'r4y' \gset
+begin;
+select set_config('request.jwt.claim.sub', :U, true);
+set local role authenticated;
+select public.register_partial(:'r4y', jsonb_build_object('v', 1, 'client_key', tests.ck(), 'quantity', '1', 'exit_price', '7004.00'))#>>'{position,open}';
+commit;
+begin;
+select set_config('request.jwt.claim.sub', :U, true);
+set local role authenticated;
+insert into tests.p83 values ('r4z', public.register_entry(:'r4', jsonb_build_object('v', 1, 'client_key', tests.ck(),
+  'symbol', 'MESZ6', 'direction', 'long', 'quantity', '1', 'entry_price', '7000.00', 'allow_similar', true))->>'trade_id');
+commit;
+select v as r4z from tests.p83 where k = 'r4z' \gset
+begin;
+select set_config('request.jwt.claim.sub', :U, true);
+set local role authenticated;
+select public.register_exit(:'r4z', '{"v": 1, "exit_price": "7002.00"}')->>'status';
+commit;
+select trading_day as r4today from public.trades where id = :'r4x' \gset
+begin;
+select set_config('request.jwt.claim.sub', :U, true);
+set local role authenticated;
+select tests.eq((select jsonb_agg(jsonb_build_array(t.trading_day, t.status) order by t.entry_time) from public.trades t
+                 where t.id in (:'r4x', :'r4y', :'r4z')),
+                jsonb_build_array(jsonb_build_array(:'r4today', 'closed'), jsonb_build_array(:'r4today', 'open'),
+                                  jsonb_build_array(:'r4today', 'closed')),
+                'today: the three on one trading day; the one of 2 contracts still open');
+select tests.eq(public.diario_dia(:'r4', :'r4today')#>'{facts,limit}',
+                '{"amount": 100, "scope": "conta", "at_limit": "encerrar", "worst": -150.00, "worst_at_hit": -150.00,
+                  "net": -120.00, "trades": 3, "after_net": 10.00}'::jsonb
+                || jsonb_build_object(
+                     'hit_at', (select exit_time from public.trades where id = :'r4x'),
+                     'after', (select jsonb_agg(jsonb_build_object('trade_id', t.id, 'at', t.entry_time) order by t.entry_time)
+                               from public.trades t where t.id in (:'r4y', :'r4z'))),
+                'today: the limit reached at the −150''s exit; both entries after it are «depois do limite», and its result is '
+                'the closed one''s +10 (not the open one''s partial: +US$ 10,00, not +US$ 30,00)');
+select tests.eq(jsonb_build_array(public.diario_dia(:'r4', :'r4today')#>'{facts,net}', public.diario_dia(:'r4', :'r4today')#>'{facts,open}',
+                                  tests.dtrade(public.diario_dia(:'r4', :'r4today'), :'r4y')#>'{position,realized_pnl}'),
+                '[-120.00, 1, 20.00]'::jsonb, 'today: the open trade''s partial (+20) is in the day''s net');
 commit;
 
 -- =============================================================================================
