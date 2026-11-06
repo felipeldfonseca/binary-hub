@@ -14,6 +14,10 @@ import '@/styles/hub-registrar-parciais.css'
 // Phase 3b: lane L2's import sheet around the column mapping, then lane L1's mapping steps
 import '@/styles/hub-importar.css'
 import '@/styles/hub-importar-mapa.css'
+// Phase 4: the Diário page's shared rules (B0), then lane L1's month and week, lane L2's open day
+import '@/styles/hub-diario.css'
+import '@/styles/hub-diario-mes.css'
+import '@/styles/hub-diario-dia.css'
 import ProtectedRoute from '@/components/auth/ProtectedRoute'
 import AppShell from '@/components/hub/AppShell'
 import HubGate, { HubLoading } from '@/components/hub/HubGate'

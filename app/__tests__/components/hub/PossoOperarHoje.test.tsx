@@ -49,6 +49,18 @@ jest.mock('@/lib/hub/registrarDb', () => ({
   fetchDayTrades: jest.fn(),
 }))
 
+// Phase 4 (telas B0): the Diário page reads the account's calendar, month and day first (recorded answers)
+jest.mock('@/lib/hub/diarioDb', () => {
+  const actual = jest.requireActual('@/lib/hub/diarioDb')
+  const { diarioJson } = jest.requireActual('@/testing/diarioDb')
+  return {
+    ...actual,
+    fetchCalendario: jest.fn(async () => actual.parseCalendar(diarioJson('calendario-top'))),
+    fetchMes: jest.fn(async () => actual.parseMonth(diarioJson('mes-top-2026-10'))),
+    fetchDia: jest.fn(async () => actual.parseDay(diarioJson('dia-top-1026'))),
+  }
+})
+
 const fetchRulesNow = regrasDb.fetchRulesNow as jest.MockedFunction<typeof regrasDb.fetchRulesNow>
 const mergePreferences = regrasDb.mergePreferences as jest.MockedFunction<typeof regrasDb.mergePreferences>
 const fetchAccounts = contasDb.fetchAccounts as jest.MockedFunction<typeof contasDb.fetchAccounts>
@@ -740,24 +752,27 @@ describe('PossoOperarHojeDiario with the app’s query defaults (QueryProvider)'
 })
 
 describe('/diario', () => {
-  it('places the card between the Diário header and «Operações do dia», then the placeholder, and the window under the selector', async () => {
+  it('places the card between the Diário header and the open day’s region, and the window under the selector', async () => {
     const ids = idsDono()
     fetchAccounts.mockResolvedValue([
       makeAccount({ id: ids.topOne, label: 'Top One #1', market: 'futures' }),
       makeAccount({ id: ids.ebinex, label: 'Ebinex', market: 'binary', is_primary: true }),
     ])
-    renderHub(<DiarioPage />)
+    const view = renderHub(<DiarioPage />)
+    // As the app's QueryProvider (staleTime 60 s): the open day's region, drawn once the calendar answered, shares
+    // the card's rules_now answer instead of reading it again
+    view.queryClient.setDefaultOptions({ queries: { ...view.queryClient.getDefaultOptions().queries, staleTime: 60_000 } })
 
     const selector = await screen.findByRole('button', { name: /^Conta: / })
     const h1 = screen.getByRole('heading', { level: 1, name: 'Diário' })
     const card = await screen.findByRole('region', { name: 'Posso operar hoje?' })
+    // Phase 4 (telas B0): the open day's region, the Phase 3 bridge until lane L2 replaces it; the placeholder is gone
     const bridge = await screen.findByRole('region', { name: 'Operações do dia' })
-    const placeholder = screen.getByText('O Diário chega na Fase 4.')
+    expect(screen.queryByText('O Diário chega na Fase 4.')).toBeNull()
     const follows = (a: Node, b: Node) => (a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0
     expect(follows(h1, selector)).toBe(true)
     expect(follows(selector, card)).toBe(true)
     expect(follows(card, bridge)).toBe(true)
-    expect(follows(bridge, placeholder)).toBe(true)
 
     expect(await within(card).findAllByRole('listitem')).toHaveLength(2)
     await waitFor(() => expect(selector).toHaveAccessibleDescription('Janela 20:00–21:00 · Brasília'))

@@ -1,0 +1,6 @@
+/*
+ * The Diário page, lane L2 «o dia» (Phase 4, telas): the open day, its plan, the trades and their drill, the review.
+ * Scoped to .hub; tokens from styles/hub.css, the shared rules from styles/hub-diario.css. Imported by
+ * app/(hub)/layout.tsx. Only lane L2 edits this file, with its prefixes only: hub-dr-dia-*, hub-dr-plano-*,
+ * hub-dr-op-*, hub-dr-drill-*, hub-dr-img-*, hub-dr-rev-*.
+ */

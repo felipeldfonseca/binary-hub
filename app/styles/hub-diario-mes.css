@@ -1,0 +1,6 @@
+/*
+ * The Diário page, lane L1 «mês e semana» (Phase 4, telas): the top of the page and its states, the calendar, the
+ * week and the footer. Scoped to .hub; tokens from styles/hub.css, the shared rules from styles/hub-diario.css.
+ * Imported by app/(hub)/layout.tsx. Only lane L1 edits this file, with its prefixes only: hub-dr-cal-*, hub-dr-sem-*,
+ * hub-dr-topo-*, hub-dr-rod-*.
+ */

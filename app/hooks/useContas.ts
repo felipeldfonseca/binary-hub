@@ -187,7 +187,7 @@ export function useRefreshAfterWrite() {
  * "Conta atual", shared by every hub screen: `?conta=` in the URL, else the last choice
  * (profiles.preferences.conta_atual), else the primary account, else the first active one.
  * Choosing saves the choice with merge_preferences (only conta_atual changes); a `?conta=` in the
- * URL follows it.
+ * URL follows it, and the Diário's `?dia=` and `?op=` leave with the account they belonged to.
  */
 export function useContaAtual() {
   const accounts = useAccounts();
@@ -213,6 +213,9 @@ export function useContaAtual() {
       if (fromUrl && fromUrl !== id) {
         const params = new URLSearchParams(searchParams?.toString() ?? '');
         params.set('conta', id);
+        // Phase 4: the Diário's open day and trade belong to the account left (a day of another account means nothing)
+        params.delete('dia');
+        params.delete('op');
         router.replace(`${pathname ?? ''}?${params.toString()}`);
       }
       try {

@@ -19,11 +19,9 @@ import OperacoesDoDia, { diaDaPonte } from '@/components/hub/diario/OperacoesDoD
 import OperacoesDoDiaVista from '@/components/hub/diario/OperacoesDoDiaVista'
 import { linhaDoDia, linhasDoDia } from '@/components/hub/diario/linhas'
 import DiarioCabecalho from '@/components/hub/contas/DiarioCabecalho'
-import PossoOperarHojeDiario from '@/components/hub/posso/PossoOperarHojeDiario'
 import DiarioPage from '@/app/(hub)/diario/page'
 import { OPERACOES_DO_DIA_ID } from '@/components/hub/registrar/abrir'
 import { renderHub } from '@/testing/hubHarness'
-import { hubKeys } from '@/hooks/useContas'
 import { regrasKeys } from '@/hooks/useRegras'
 import { registrarKeys } from '@/hooks/useRegistrar'
 import type { RulesNow } from '@/lib/hub/regras'
@@ -87,6 +85,19 @@ jest.mock('@/lib/hub/registrarDb', () => ({
   fetchDayTrades: jest.fn(),
   fetchTradeEvents: jest.fn(),
 }))
+
+// Phase 4 (telas B0): /diario reads the account's calendar, month and day before its regions (recorded answers);
+// the bridge sits in the open day's slot until lane L2 retires it
+jest.mock('@/lib/hub/diarioDb', () => {
+  const actual = jest.requireActual('@/lib/hub/diarioDb')
+  const { diarioJson } = jest.requireActual('@/testing/diarioDb')
+  return {
+    ...actual,
+    fetchCalendario: jest.fn(async () => actual.parseCalendar(diarioJson('calendario-top'))),
+    fetchMes: jest.fn(async () => actual.parseMonth(diarioJson('mes-top-2026-10'))),
+    fetchDia: jest.fn(async () => actual.parseDay(diarioJson('dia-top-1026'))),
+  }
+})
 
 // The Registrar sheet is lane A's (contract §6.2, C9): a stand-in that shows the props it got
 const mockSheet = jest.fn()
@@ -574,70 +585,25 @@ describe('«Operações do dia» · presentational', () => {
 })
 
 describe('/diario with «Operações do dia»', () => {
-  it('orders H1 → selector → card → «Operações do dia» → the placeholder, with one read of rules_now', async () => {
-    renderHub(<DiarioPage />)
+  // Phase 4 (telas B0): the placeholder is gone and the bridge sits in the open day's slot; the two «follows the
+  // account chosen in the selector» cases moved to DiarioPaginaBase.test.tsx (they now assert the page's account)
+  it('orders H1 → selector → card → «Operações do dia», with one read of rules_now', async () => {
+    const view = renderHub(<DiarioPage />)
+    // As the app's QueryProvider (staleTime 60 s): the bridge, drawn once the calendar answered, shares the card's answer
+    view.queryClient.setDefaultOptions({ queries: { ...view.queryClient.getDefaultOptions().queries, staleTime: 60_000 } })
 
     const selector = await screen.findByRole('button', { name: /^Conta: / })
     const h1 = screen.getByRole('heading', { level: 1, name: 'Diário' })
     const card = await screen.findByRole('region', { name: 'Posso operar hoje?' })
     const bridge = await ponte()
-    const placeholder = screen.getByText('O Diário chega na Fase 4.')
+    expect(screen.queryByText('O Diário chega na Fase 4.')).toBeNull()
     const follows = (a: Node, b: Node) => (a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0
     expect(follows(h1, selector)).toBe(true)
     expect(follows(selector, card)).toBe(true)
     expect(follows(card, bridge)).toBe(true)
-    expect(follows(bridge, placeholder)).toBe(true)
     await within(bridge).findByRole('table')
     // One read of rules_now serves the card, the window line and the bridge's day
     expect(fetchRulesNow).toHaveBeenCalledTimes(1)
-  })
-
-  it('follows the account chosen in the selector at once, even when the choice cannot be saved', async () => {
-    mergePreferences.mockRejectedValue(new regrasDb.RegrasDataError('network'))
-    fetchRulesNow.mockResolvedValue(agoraTelas('agora-qui-2024-brt'))
-    fetchDayTrades.mockImplementation(async (_db, accountId) => (accountId === ids.accounts.ebinex ? diaTelas('dia-ebinex') : []))
-    renderHub(
-      <>
-        <DiarioCabecalho />
-        <PossoOperarHojeDiario />
-        <OperacoesDoDia />
-      </>,
-    )
-    expect(await within(await ponte()).findByText('Nenhuma operação registrada hoje.')).toBeInTheDocument()
-
-    await userEvent.click(await screen.findByRole('button', { name: /^Conta: Top One #1/ }))
-    await userEvent.click(screen.getByRole('button', { name: /^Ebinex/ }))
-
-    expect(await within(await ponte()).findByRole('table')).toBeInTheDocument()
-    expect(fetchDayTrades).toHaveBeenLastCalledWith(expect.anything(), ids.accounts.ebinex, '2026-10-22', expect.any(Date))
-    expect(screen.getByRole('button', { name: /^Conta: Ebinex/ })).toBeInTheDocument()
-  })
-
-  it('keeps the header and the bridge on the same account when the preferences are read again after a failed save', async () => {
-    mergePreferences.mockRejectedValue(new regrasDb.RegrasDataError('network'))
-    fetchRulesNow.mockResolvedValue(agoraTelas('agora-qui-2024-brt'))
-    fetchDayTrades.mockImplementation(async (_db, accountId) => (accountId === ids.accounts.ebinex ? diaTelas('dia-ebinex') : []))
-    const view = renderHub(
-      <>
-        <DiarioCabecalho />
-        <OperacoesDoDia />
-      </>,
-    )
-    await userEvent.click(await screen.findByRole('button', { name: /^Conta: Top One #1/ }))
-    await userEvent.click(screen.getByRole('button', { name: /^Ebinex/ }))
-    expect(await within(await ponte()).findByRole('table')).toBeInTheDocument()
-    await waitFor(() => expect(mergePreferences).toHaveBeenCalled())
-
-    // An import's refresh (or a reconnect) reads the preferences again: still without the choice
-    fetchDayTrades.mockClear()
-    await act(() => view.queryClient.invalidateQueries({ queryKey: hubKeys.preferencias('user-1') }))
-    await waitFor(() => expect(fetchPreferences).toHaveBeenCalledTimes(2))
-
-    expect(screen.getByRole('button', { name: /^Conta: Ebinex/ })).toBeInTheDocument()
-    expect(await within(await ponte()).findByRole('button', { name: 'Abrir no Registrar: Baixa de EUR/USD às 20:10' })).toBeInTheDocument()
-    expect(fetchDayTrades).not.toHaveBeenCalledWith(expect.anything(), ids.accounts.topOne, expect.anything(), expect.anything())
-    // The choice is in the URL, which both blocks read first
-    expect(mockReplace).toHaveBeenCalledWith(`/diario?conta=${ids.accounts.ebinex}`, { scroll: false })
   })
 })
 

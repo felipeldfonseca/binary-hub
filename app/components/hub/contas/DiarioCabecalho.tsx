@@ -11,6 +11,8 @@ import { podeRegistrar } from '@/lib/hub/registrar'
 import { rulesNowFailed } from '@/components/hub/posso/rulesNowRead'
 import { useImportSheet } from '@/components/hub/importar/ImportSheetProvider'
 import { useRegistrarSheet } from '@/components/hub/registrar/abrir'
+import { useDiarioPaginaOpcional } from '@/components/hub/diario/useDiarioPagina'
+import { diaPassadoDoDiario } from '@/lib/hub/diarioPagina'
 import SeletorConta from './SeletorConta'
 import { ADD_ACCOUNT, CONTAS, DIARIO, IMPORT_FILE, LOADING, TRY_AGAIN } from './copy'
 
@@ -50,6 +52,8 @@ export function contaParaRegistrar(current: TradingAccount | null, active: reado
  */
 export default function DiarioCabecalho() {
   const conta = useContaAtual()
+  // Phase 4: the Diário page's state (null outside its provider, or without an account)
+  const pagina = useDiarioPaginaOpcional()
   const sheet = useImportSheet()
   const registrar = useRegistrarSheet()
   const router = useRouter()
@@ -129,18 +133,26 @@ export default function DiarioCabecalho() {
   // choice lives in its own useContaAtual until merge_preferences saves it: when that save fails,
   // the next read of the preferences (after an import, on reconnect) would put the old account back
   // in the bridge only. So the choice goes into ?conta=, which both read first (useContaAtual
-  // already moves a ?conta= that is there); choose() saves it as before, for the next visit
-  const choose = (id: string) => {
+  // already moves a ?conta= that is there); choose() saves it as before, for the next visit.
+  // Phase 4: the Diário page may hold unsaved work (its leave guard answers first: «Continuar aqui» keeps the URL and
+  // the account), and the open day and trade (?dia=, ?op=) leave with the account they belonged to
+  const choose = async (id: string) => {
+    if (pagina && !(await pagina.confirmarSaida())) return
     if (!searchParams?.get('conta')) {
       const params = new URLSearchParams(searchParams?.toString() ?? '')
       params.set('conta', id)
       // Already handled once the selector is on screen (a reload must not open a sheet again)
       params.delete('importar')
       params.delete('registrar')
+      params.delete('dia')
+      params.delete('op')
       router.replace(`/diario?${params.toString()}`, { scroll: false })
     }
     void conta.choose(id)
   }
+
+  // D16: on a past day of the diário, «Registrar operação» opens «Já fechada» on that day
+  const diaDoRegistrar = pagina && diaPassadoDoDiario(pagina.dia, pagina.hoje, pagina.desdeDay) ? pagina.dia : null
 
   let selector: React.ReactNode
   if (conta.isLoading && !conta.isRetrying) {
@@ -217,7 +229,13 @@ export default function DiarioCabecalho() {
               ref={registrarRef}
               type="button"
               className="hub-btn hub-btn--pri"
-              onClick={(event) => registrar.open({ accountId: (conta.current as TradingAccount).id, opener: event.currentTarget })}
+              onClick={(event) =>
+                registrar.open({
+                  accountId: (conta.current as TradingAccount).id,
+                  opener: event.currentTarget,
+                  ...(diaDoRegistrar ? { day: diaDoRegistrar } : {}),
+                })
+              }
             >
               {DIARIO.registrar}
             </button>

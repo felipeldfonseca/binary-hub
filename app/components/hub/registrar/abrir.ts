@@ -21,6 +21,11 @@ export interface OpenRegistrarOptions {
   opener?: HTMLElement | null
   /** Gets focus when the opener is gone; defaults to the page's H1 */
   fallback?: HTMLElement | null
+  /**
+   * Phase 4 (D16): a past trading day of the account ('YYYY-MM-DD'), the Diário's open day when it is one: the sheet
+   * opens «Já fechada» on that day (lane L2; until then the sheet ignores it)
+   */
+  day?: string | null
 }
 
 /** How the sheet closes: `focusId` (e.g. «Ver no Diário» → the bridge's heading) takes the focus instead of the opener */
