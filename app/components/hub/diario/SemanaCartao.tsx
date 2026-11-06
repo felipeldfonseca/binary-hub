@@ -1,29 +1,41 @@
 'use client'
 
-import { useMemo } from 'react'
-import { monthOf, weekCard, weekOf, type CalendarRead } from '@/lib/domain/diario'
+import { useMemo, useState } from 'react'
+import { monthColumns, monthOf, weekCard, weekOf, type CalendarRead } from '@/lib/domain/diario'
 import { InfoButton, InfoPanel, useToggle } from '@/components/hub/contas/ui'
 import { LOADING, TRY_AGAIN } from '@/components/hub/contas/copy'
 import { useDiarioMes } from '@/hooks/useDiario'
 import { foraDaSemanaItem, semanaTexto } from '@/lib/hub/diario'
-import { mesDaSemana, statusDaSemana } from '@/lib/hub/diarioMes'
+import { mesDaSemana, proximoAnuncio, statusDaSemana, type AnuncioDaSemana, type VistoDaSemana } from '@/lib/hub/diarioMes'
 import { useDiarioPagina } from './useDiarioPagina'
 import { SECAO, TITULO } from './ids'
 import { SEMANA } from './copyMes'
 
 /**
  * «Semana» (lane L1, contract §2.2 J1–J7; boards dez 11a / 11b): the open day's week, or the one tapped in the
- * calendar («Semana aberta abaixo: …»). Its title, ⓘ, four tiles, one bar per day and the «Fora do plano» list are
- * lib/hub/diario's semanaTexto and foraDaSemanaItem over lib/domain/diario weekCard (the calendar's SQL sums, ● and
- * the list from the week's diario_mes). That month read is the month shown when the week's Monday is in it, else
- * the week's own (30 nov–4 dez with December shown): its loading and its error are this card's own, not the page's.
+ * calendar («Semana aberta abaixo: …», said once, in the calendar's columns). Its title, ⓘ, four tiles, one bar per
+ * day and the «Fora do plano» list are lib/hub/diario's semanaTexto and foraDaSemanaItem over lib/domain/diario
+ * weekCard (the calendar's SQL sums, ● and the list from the week's diario_mes). That month read is the month shown
+ * when the week's Monday is in it, else the week's own (30 nov–4 dez with December shown): its loading and its error
+ * are this card's own, not the page's.
  */
 export default function SemanaCartao() {
-  const { conta, contaDiario, regras, calendario, mesLido, hoje, mes, semana, semanaAnunciada } = useDiarioPagina()
+  const { conta, contaDiario, regras, calendario, mesLido, hoje, dia, mes, semana, semanaAnunciada } = useDiarioPagina()
   const [infoAberto, alternarInfo] = useToggle()
   const cal = calendario.data as CalendarRead
   const segunda = semana ?? weekOf(cal.today)
-  const alvo = mesDaSemana(segunda, mes ?? monthOf(cal.today))
+  const mesMostrado = mes ?? monthOf(cal.today)
+  const alvo = mesDaSemana(segunda, mesMostrado)
+
+  // J3 (D20): «Semana aberta abaixo: …» when a week cell opens the week, in the calendar's columns (the cell's own range);
+  // ended by the next day opened, never said again for a day opened later inside that week (proximoAnuncio)
+  const [visto, setVisto] = useState<VistoDaSemana>({ semanaAnunciada, dia })
+  const [anuncio, setAnuncio] = useState<AnuncioDaSemana | null>(null)
+  if (visto.semanaAnunciada !== semanaAnunciada || visto.dia !== dia) {
+    const agora = { semanaAnunciada, dia }
+    setVisto(agora)
+    setAnuncio(proximoAnuncio(anuncio, visto, agora, monthColumns(cal.account.market, mesMostrado, cal.days)))
+  }
   const doProprioMes = useDiarioMes(conta.id, alvo.proprio ? alvo.mes : null, { today: hoje })
   const leitura = alvo.proprio ? doProprioMes : mesLido
   const doMes = leitura.data && leitura.data.month === alvo.mes ? leitura.data : null
@@ -137,7 +149,7 @@ export default function SemanaCartao() {
       </div>
       {infoAberto && <InfoPanel id="info-semana">{texto.info}</InfoPanel>}
       <div role="status" className="sr-only">
-        {statusDaSemana(card, semanaAnunciada)}
+        {statusDaSemana(anuncio, card.weekOf)}
       </div>
       {corpo}
     </section>

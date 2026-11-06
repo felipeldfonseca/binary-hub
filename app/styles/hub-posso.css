@@ -62,8 +62,12 @@
   margin: 0 0 12px;
 }
 
-/* One account (board `li.posso-conta`): name · answer · limit */
+/*
+ * One account (board `li.posso-conta`): name · answer · limit. The board's row is content-box: 44 px inside the 1 px
+ * border between rows (45 px from the second row on), and inside the 8 px padding on phones
+ */
 .hub .hub-posso__conta {
+  box-sizing: content-box;
   display: grid;
   grid-template-columns: 92px minmax(0, 1fr) auto;
   align-items: center;

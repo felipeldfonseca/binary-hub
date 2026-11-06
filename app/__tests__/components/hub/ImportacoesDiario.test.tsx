@@ -46,6 +46,8 @@ describe('«Saem junto» in the undo confirmation (D20)', () => {
     const vivo = within(grupo).getByText(e.saem!).parentElement as HTMLElement
     expect(vivo).toHaveAttribute('aria-live', 'polite')
     expect(vivo.firstElementChild?.textContent?.replace(/ /g, ' ')).toBe(limpo(e.confirma))
+    // 8 px under it, as the board's `.atencao` (column, gap 8px) whose children both are (review: 4 px)
+    expect(vivo.style.gap).toBe('8px')
     expect(within(grupo).getByRole('button', { name: e.sim })).toBeInTheDocument()
     expect(within(grupo).getByRole('button', { name: 'Manter' })).toHaveFocus()
   })
@@ -70,6 +72,19 @@ describe('«Saem junto» in the undo confirmation (D20)', () => {
     expect(within(grupo).getByRole('button', { name: 'Tentar de novo' })).toBeInTheDocument()
     expect(within(grupo).queryByText(/^Saem junto/)).toBeNull()
     expect(within(grupo).queryByRole('button', { name: 'Desfazer e apagar' })).toBeNull()
+  })
+
+  it('a batch with one new trade says «1 nova» (the board engine’s singular), the others «N novas»', async () => {
+    const { q } = await importacoes()
+    const parte = (arquivo: string) => {
+      const linha = screen.getByText(arquivo, { exact: false }).closest('li') as HTMLElement
+      return linha.querySelector('.hub-partes')?.firstElementChild?.textContent
+    }
+    const um = q.lotes!.batches.find((b) => b.rows_inserted === 1)!
+    expect(um.file_name).toBe('TopOne_1021.csv')
+    expect(parte(um.file_name!)).toBe('1 nova')
+    expect(parte('TopOne_1110.csv')).toBe('5 novas')
+    expect(parte('TopOne_1124.csv')).toBe('0 novas')
   })
 
   it('«Manter» closes the confirmation and gives the focus back to «Desfazer»', async () => {

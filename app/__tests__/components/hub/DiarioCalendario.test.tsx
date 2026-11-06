@@ -259,6 +259,47 @@ describe('the keyboard (D14): one tab stop per month, arrows between the days th
     expect(within(calendario()).getByRole('heading', { level: 3 })).toHaveTextContent('Dezembro de 2026')
   })
 
+  it('‹ › and «Hoje» put the tab stop back on the open day, never on a day the keyboard left in that month (board: focoCal null)', async () => {
+    const { user } = await pronto('2')
+    const h3 = () => within(calendario()).getByRole('heading', { level: 3 })
+    const parada = () => grade().querySelector('[tabindex="0"]')?.getAttribute('data-dia')
+    act(() => celula('2026-11-10').focus())
+    await user.keyboard('{ArrowRight}')
+    expect(parada()).toBe('2026-11-12')
+    await user.click(within(calendario()).getByRole('button', { name: 'Mês anterior' }))
+    await waitFor(() => expect(h3()).toHaveTextContent('Outubro de 2026'))
+    await user.click(within(calendario()).getByRole('button', { name: 'Próximo mês' }))
+    await waitFor(() => expect(h3()).toHaveTextContent('Novembro de 2026'))
+    expect(parada()).toBe('2026-11-10')
+    // «Hoje» (December) and back: the same
+    act(() => celula('2026-11-10').focus())
+    await user.keyboard('{End}')
+    expect(parada()).toBe('2026-11-30')
+    await user.click(within(calendario()).getByRole('button', { name: 'Hoje' }))
+    await waitFor(() => expect(h3()).toHaveTextContent('Dezembro de 2026'))
+    await user.click(within(calendario()).getByRole('button', { name: 'Mês anterior' }))
+    await waitFor(() => expect(h3()).toHaveTextContent('Novembro de 2026'))
+    expect(parada()).toBe('2026-11-10')
+  })
+
+  it('PageUp into a month where no day opens (a month off): the focus goes to «Calendário», never to the page’s start', async () => {
+    const { user, q, cru, queryClient } = await pronto('2')
+    // October without a trade, between September's history and November (calendarMonths still pages through it)
+    const c = cru[q.info.contaId].calendario
+    c.days = (c.days as Record<string, unknown>[]).filter((d) => !String(d.day).startsWith('2026-10'))
+    c.weeks = (c.weeks as Record<string, unknown>[]).filter((w) => !String(w.week_of).startsWith('2026-10'))
+    await act(async () => {
+      await queryClient.invalidateQueries({ queryKey: diarioKeys.calendario(USUARIO_DO_QUADRO, q.info.contaId) })
+    })
+    act(() => celula('2026-11-10').focus())
+    await user.keyboard('{PageUp}')
+    await waitFor(() => expect(within(calendario()).getByRole('heading', { level: 3 })).toHaveTextContent('Outubro de 2026'))
+    expect(grade().querySelectorAll('button[data-dia]')).toHaveLength(0)
+    await waitFor(() => expect(within(calendario()).getByRole('heading', { level: 2, name: 'Calendário' })).toHaveFocus())
+    expect(document.activeElement).not.toBe(document.body)
+    expect(screen.getByText('Mês: Outubro de 2026.')).toHaveAttribute('role', 'status')
+  })
+
   it('after ‹ ›, the tab stop is the open day in its month, else the first day that opens', async () => {
     const { user } = await pronto('2')
     await user.click(within(calendario()).getByRole('button', { name: 'Mês anterior' }))
@@ -314,6 +355,55 @@ describe('opening a day and a week', () => {
     const semana = screen.getByRole('region', { name: 'Semana' })
     expect(within(semana).getByText('16 a 20 de novembro · 5 pregões com operações')).toBeInTheDocument()
     expect(semanas()[3]).toHaveAttribute('aria-pressed', 'true')
+  })
+
+  it('«Aberto abaixo: …» only for a day the calendar opened: nothing on load, nothing for a day opened another way (the URL)', async () => {
+    const { q, user } = await pronto('2')
+    const statusDoDia = () => calendario().querySelectorAll(':scope > [role="status"]')[1] as HTMLElement
+    expect(calendario().querySelectorAll(':scope > [role="status"]')[0]).toHaveTextContent('Mês: Novembro de 2026.')
+    expect(statusDoDia()).toBeEmptyDOMElement()
+    act(() => navegacao.definir(`/diario?conta=${q.info.contaId}&dia=2026-11-19`))
+    await waitFor(() => expect(celula('2026-11-19')).toHaveAttribute('aria-pressed', 'true'))
+    expect(statusDoDia()).toBeEmptyDOMElement()
+    await user.click(celula('2026-11-24'))
+    await waitFor(() => expect(statusDoDia()).toHaveTextContent('Aberto abaixo: Terça-feira, 24 de novembro.'))
+  })
+
+  it('«Semana aberta abaixo: …» once: the next day opened ends it, and a later day inside that week never says it again', async () => {
+    const { user } = await pronto('2')
+    const statusDaSemana = () => (screen.getByRole('region', { name: 'Semana' }).querySelector(':scope > [role="status"]') as HTMLElement).textContent
+    await user.click(semanas()[3])
+    await waitFor(() => expect(statusDaSemana()).toBe('Semana aberta abaixo: 16 a 20 de novembro.'))
+    await user.click(celula('2026-11-24'))
+    await waitFor(() => expect(navegacao.params().get('dia')).toBe('2026-11-24'))
+    expect(statusDaSemana()).toBe('')
+    // 19 nov is in the week said before: only the calendar's «Aberto abaixo: …» (review: both were said)
+    await user.click(celula('2026-11-19'))
+    await waitFor(() => expect(navegacao.params().get('dia')).toBe('2026-11-19'))
+    expect(await screen.findByText('Aberto abaixo: Quinta-feira, 19 de novembro.')).toHaveAttribute('role', 'status')
+    expect(within(screen.getByRole('region', { name: 'Semana' })).getByText('16 a 20 de novembro · 5 pregões com operações')).toBeInTheDocument()
+    expect(statusDaSemana()).toBe('')
+    // Another week tapped is said
+    await user.click(semanas()[4])
+    await waitFor(() => expect(statusDaSemana()).toBe('Semana aberta abaixo: 23 a 27 de novembro.'))
+  })
+
+  it('in a 7-column month, «Semana aberta abaixo: …» has the week cell’s own range (to Sunday), with no weekend trade in it', async () => {
+    const { q, cru, queryClient, user } = await pronto('2')
+    // An invented Saturday trade on 14 nov: November gets Sáb and Dom
+    const dias = cru[q.info.contaId].calendario.days as Record<string, unknown>[]
+    const modelo = dias.find((d) => d.day === '2026-11-12') as Record<string, unknown>
+    dias.push({ ...modelo, day: '2026-11-14', weekday: 6, review: null })
+    dias.sort((a, b) => String(a.day).localeCompare(String(b.day)))
+    await act(async () => {
+      await queryClient.invalidateQueries({ queryKey: diarioKeys.calendario(USUARIO_DO_QUADRO, q.info.contaId) })
+    })
+    await waitFor(() => expect(grade()).toHaveClass('hub-dr-cal-grade--sete'))
+    const semana2 = semanas()[1]
+    expect(semana2.getAttribute('aria-label')).toMatch(/^Semana de 2 a 8 de novembro: /)
+    await user.click(semana2)
+    await waitFor(() => expect(semana2).toHaveAttribute('aria-pressed', 'true'))
+    expect(screen.getByText('Semana aberta abaixo: 2 a 8 de novembro.')).toHaveAttribute('role', 'status')
   })
 
   it('a week cell opens the week in the card and says so («Semana aberta abaixo: …»); a regular tab stop', async () => {

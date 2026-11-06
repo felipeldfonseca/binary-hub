@@ -97,8 +97,13 @@
   font-weight: 700;
 }
 
-/* «Carregando…», the empty card while offline, «Não foi possível carregar o Diário.» (C6, C6b, C7) */
+/*
+ * «Carregando…», the empty card while offline, «Não foi possível carregar o Diário.» (C6, C6b, C7). The board's card
+ * (`.cartao` with an inline min-height: 240px) is content-box: 240 px inside its padding and border (286 px at desktop,
+ * 278 px on phones); the app's preflight makes every box border-box, so this one says content-box again
+ */
 .hub .hub-dr-topo-estado {
+  box-sizing: content-box;
   min-height: 240px;
   justify-content: center;
 }
@@ -600,9 +605,14 @@
   flex-direction: column;
   gap: 2px;
 }
-/* Without a query the 7th account is cut in half: the list scrolls; the focus ring is never cut */
+/*
+ * Without a query the 7th account is cut in half: the list scrolls; the focus ring is never cut. The board's
+ * `.conta-rolagem` is content-box: 372 px inside its 4 px padding, 380 px in all (preflight's border-box would make
+ * the viewport 8 px shorter and leave only a sliver of the 7th account)
+ */
 .hub .hub-seletor__rolagem {
   --fim: rgba(0, 0, 0, 0.32);
+  box-sizing: content-box;
   max-height: 372px;
   overflow-y: auto;
   overscroll-behavior: contain;

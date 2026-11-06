@@ -6,7 +6,18 @@
  * around the one shown, the legend's flags (D22), the statuses of the month, the day and the week opened from the
  * calendar (D5, J3), the week card's month read (§5.6); and IMPORTACOES.saem («Saem junto», D20).
  */
-import { legendaDoCalendario, mesDaSemana, mesesVizinhos, paradaDoTab, proximoFoco, statusDaSemana, statusDoDia, statusDoMes } from '@/lib/hub/diarioMes'
+import {
+  legendaDoCalendario,
+  mesDaSemana,
+  mesesVizinhos,
+  paradaDoTab,
+  proximoAnuncio,
+  proximoFoco,
+  statusDaSemana,
+  statusDoDia,
+  statusDoMes,
+  textoDaSemanaAberta,
+} from '@/lib/hub/diarioMes'
 import { IMPORTACOES } from '@/components/hub/contas/copy'
 
 /** November 2026 of dez 2 (Top One): the days that open (11 and 26 nov have no trades) */
@@ -91,15 +102,63 @@ describe('the legend and the statuses', () => {
     expect(statusDoDia('2026-12-01', '2026-12-01')).toBe('Aberto abaixo: Terça-feira, 1º de dezembro.')
     expect(statusDoDia('2026-11-10', null)).toBe('')
     expect(statusDoDia('2026-11-10', '2026-11-19')).toBe('')
-    expect(statusDaSemana({ weekOf: '2026-10-26', lastShown: '2026-10-30' }, '2026-10-26')).toBe('Semana aberta abaixo: 26 a 30 de outubro.')
-    expect(statusDaSemana({ weekOf: '2026-11-30', lastShown: '2026-12-04' }, '2026-11-30')).toBe('Semana aberta abaixo: 30 de novembro a 4 de dezembro.')
-    expect(statusDaSemana({ weekOf: '2026-10-26', lastShown: '2026-10-30' }, null)).toBe('')
+    expect(textoDaSemanaAberta('2026-10-26', 5)).toBe('Semana aberta abaixo: 26 a 30 de outubro.')
+    expect(textoDaSemanaAberta('2026-11-30', 5)).toBe('Semana aberta abaixo: 30 de novembro a 4 de dezembro.')
+  })
+
+  it('«Semana aberta abaixo: …» in the calendar’s columns: in a 7-column month a week runs to Sunday, as the cell’s label', () => {
+    // Review: the week card's own columns said «9 a 13 de novembro» while the cell said «Semana de 9 a 15 de novembro»
+    expect(textoDaSemanaAberta('2026-11-09', 7)).toBe('Semana aberta abaixo: 9 a 15 de novembro.')
+    expect(textoDaSemanaAberta('2026-11-30', 7)).toBe('Semana aberta abaixo: 30 de novembro a 6 de dezembro.')
+    const a = proximoAnuncio(null, { semanaAnunciada: null, dia: '2026-11-10' }, { semanaAnunciada: '2026-11-09', dia: '2026-11-10' }, 7)
+    expect(statusDaSemana(a, '2026-11-09')).toBe('Semana aberta abaixo: 9 a 15 de novembro.')
+  })
+
+  it('J3 is said once per week opened, and ends with the next day opened (never again for a later day of that week)', () => {
+    const W = '2026-11-16'
+    const inicio = { semanaAnunciada: null, dia: '2026-11-10' }
+    expect(proximoAnuncio(null, inicio, inicio, 5)).toBeNull()
+    // The week cell of 16–20 nov: said
+    const aberta = { semanaAnunciada: W, dia: '2026-11-10' }
+    const a = proximoAnuncio(null, inicio, aberta, 5)
+    expect(a).toEqual({ semana: W, dia: '2026-11-10', texto: 'Semana aberta abaixo: 16 a 20 de novembro.' })
+    expect(statusDaSemana(a, W)).toBe('Semana aberta abaixo: 16 a 20 de novembro.')
+    // Something else re-renders: the same announcement (no new text, nothing said again)
+    expect(proximoAnuncio(a, aberta, aberta, 5)).toBe(a)
+    // 24 nov opens: ended
+    const dia24 = { semanaAnunciada: W, dia: '2026-11-24' }
+    const b = proximoAnuncio(a, aberta, dia24, 5)
+    expect(b).toBeNull()
+    expect(statusDaSemana(b, '2026-11-23')).toBe('')
+    // 19 nov opens, inside the week said before: still nothing (the calendar says «Aberto abaixo: …»)
+    const dia19 = { semanaAnunciada: W, dia: '2026-11-19' }
+    expect(statusDaSemana(proximoAnuncio(b, dia24, dia19, 5), W)).toBe('')
+    // Even when the day goes back to the one open when the week was said
+    expect(proximoAnuncio(null, dia19, aberta, 5)).toBeNull()
+    // Another week tapped: said; then the first again: said again
+    const outra = proximoAnuncio(null, dia19, { semanaAnunciada: '2026-11-23', dia: '2026-11-19' }, 5)
+    expect(statusDaSemana(outra, '2026-11-23')).toBe('Semana aberta abaixo: 23 a 27 de novembro.')
+    const devolta = proximoAnuncio(outra, { semanaAnunciada: '2026-11-23', dia: '2026-11-19' }, { semanaAnunciada: W, dia: '2026-11-19' }, 5)
+    expect(statusDaSemana(devolta, W)).toBe('Semana aberta abaixo: 16 a 20 de novembro.')
+    // Another account: B0's state starts over (no week, today's day)
+    expect(proximoAnuncio(devolta, { semanaAnunciada: W, dia: '2026-11-19' }, { semanaAnunciada: null, dia: '2026-12-01' }, 5)).toBeNull()
+    // Only for the week it names
+    expect(statusDaSemana(a, '2026-11-09')).toBe('')
   })
 
   it('the week card’s month: the month shown when the week’s Monday is in it, else the week’s own', () => {
     expect(mesDaSemana('2026-11-09', '2026-11')).toEqual({ mes: '2026-11', proprio: false })
     expect(mesDaSemana('2026-11-30', '2026-12')).toEqual({ mes: '2026-11', proprio: true })
     expect(mesDaSemana('2026-11-09', '2026-10')).toEqual({ mes: '2026-11', proprio: true })
+  })
+})
+
+describe('IMPORTACOES.inserted: the batch line’s «nova» (board dez 13, engine `l.novas === 1 ? \' nova\' : \' novas\'`)', () => {
+  it('«1 nova», «0 novas», «5 novas», «1.200 novas»', () => {
+    expect(IMPORTACOES.inserted(1)).toBe('1 nova')
+    expect(IMPORTACOES.inserted(0)).toBe('0 novas')
+    expect(IMPORTACOES.inserted(5)).toBe('5 novas')
+    expect(IMPORTACOES.inserted(1200)).toBe('1.200 novas')
   })
 })
 

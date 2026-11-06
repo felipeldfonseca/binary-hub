@@ -142,6 +142,23 @@ describe('the calendar’s layout', () => {
     expect(decl(mes, '.hub .hub-seletor__rolagem', 'scroll-padding-block')).toBe('8px')
     expect(decl(mes, ".hub[data-tema='escuro'] .hub-seletor__rolagem", '--fim')).toBe('rgba(255, 255, 255, 0.12)')
   })
+
+  it('the list’s viewport is the board’s 380 px (content-box: 372 px inside its 4 px padding), so the 7th account is cut in half', () => {
+    // Under the app's preflight every box is border-box: without this the viewport is 372 px in all (review: a sliver)
+    expect(decl(mes, '.hub .hub-seletor__rolagem', 'box-sizing')).toBe('content-box')
+    const [vertical] = decl(mes, '.hub .hub-seletor__rolagem', 'padding').split(' ')
+    expect(px(decl(mes, '.hub .hub-seletor__rolagem', 'max-height')) + 2 * px(vertical)).toBe(380)
+  })
+})
+
+describe('the states’ card (C6, C6b, C7)', () => {
+  it('240 px inside the card’s padding and border, as the board’s content-box `.cartao` (286 px desktop, 278 px phones)', () => {
+    expect(decl(mes, '.hub .hub-dr-topo-estado', 'box-sizing')).toBe('content-box')
+    expect(decl(mes, '.hub .hub-dr-topo-estado', 'min-height')).toBe('240px')
+    const total = (padding: string) => 240 + 2 * px(padding.split(' ')[0]) + 2
+    expect(total(decl(diario, '.hub .hub-dr-cartao', 'padding'))).toBe(286)
+    expect(total(decl(diario, '.hub .hub-dr-cartao', 'padding', '(max-width: 540px)'))).toBe(278)
+  })
 })
 
 describe('motion', () => {

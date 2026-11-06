@@ -2,7 +2,8 @@
  * The Diário page's lane L1 «mês e semana» (Phase 4, telas): its pure rules, no React. The calendar's roving focus
  * (contract D14: one tab stop per month, arrows between the days that open, Home/End, PageUp/PageDown to the
  * neighbouring months), which day holds the tab stop, the legend's flags (D22), the screen-reader statuses of the
- * month, the day and the week opened from the calendar (D5, J3), and which month read feeds the week card (§5.6).
+ * month, the day and the week opened from the calendar (D5, J3: said once, ended by another day), and which month read
+ * feeds the week card (§5.6).
  * The words come from components/hub/diario/copyMes.ts (NEW) and lib/hub/diario.ts (D).
  */
 import { addDays } from '@/lib/domain/tempo'
@@ -89,9 +90,45 @@ export const statusDoMes = (mes: string): string => CAL.mesStatus(mesTitulo(mes)
 /** «Aberto abaixo: Terça-feira, 10 de novembro.» (D5), once a day opened from the calendar; '' otherwise */
 export const statusDoDia = (dia: Day | null, anunciado: Day | null): string => (dia && anunciado === dia ? CAL.abertoAbaixo(diaLongo(dia)) : '')
 
-/** «Semana aberta abaixo: 26 a 30 de outubro.» (J3), once the week shown was opened from the calendar; '' otherwise */
-export function statusDaSemana(semana: { weekOf: Day; lastShown: Day }, anunciada: Day | null): string {
-  return anunciada === semana.weekOf ? SEMANA.abertaAbaixo(intervaloLongo(semana.weekOf, semana.lastShown)) : ''
+/**
+ * «Semana aberta abaixo: 9 a 15 de novembro.» (J3, D20): the week as the calendar draws it, with the shown month's
+ * columns (`monthGrid().columns`), so the range is the week cell's own label's (the board's `rangeTxt(s, s + cols − 1)`):
+ * in a 7-column month a week without a weekend trade still runs to Sunday
+ */
+export function textoDaSemanaAberta(semana: Day, colunas: 5 | 7): string {
+  return SEMANA.abertaAbaixo(intervaloLongo(semana, addDays(semana, colunas - 1)))
+}
+
+/** J3's announcement: the week opened from the calendar, the day open when it was, and its words */
+export interface AnuncioDaSemana {
+  semana: Day
+  dia: Day | null
+  texto: string
+}
+
+/** What the week card last saw of the page: the last week opened from the calendar (B0's semanaAnunciada), the open day */
+export interface VistoDaSemana {
+  semanaAnunciada: Day | null
+  dia: Day | null
+}
+
+/**
+ * J3 from one render to the next: a week opened from the calendar (semanaAnunciada changed) is said, in the shown month's
+ * columns; it holds while that day stays open; another day opening ends it (the calendar's D5 «Aberto abaixo: …» says
+ * that one), so a day opened later inside that week never says the week again. B0 never clears semanaAnunciada, and the
+ * same week tapped again changes nothing the card sees: then nothing is said (as the board, whose text stays the same).
+ */
+export function proximoAnuncio(atual: AnuncioDaSemana | null, antes: VistoDaSemana, agora: VistoDaSemana, colunas: 5 | 7): AnuncioDaSemana | null {
+  if (agora.semanaAnunciada && agora.semanaAnunciada !== antes.semanaAnunciada) {
+    return { semana: agora.semanaAnunciada, dia: agora.dia, texto: textoDaSemanaAberta(agora.semanaAnunciada, colunas) }
+  }
+  if (atual && atual.dia === agora.dia && atual.semana === agora.semanaAnunciada) return atual
+  return null
+}
+
+/** J3's status text for the week the card shows: the announcement's while it is that week; '' otherwise */
+export function statusDaSemana(anuncio: AnuncioDaSemana | null, semanaMostrada: Day): string {
+  return anuncio && anuncio.semana === semanaMostrada ? anuncio.texto : ''
 }
 
 /**

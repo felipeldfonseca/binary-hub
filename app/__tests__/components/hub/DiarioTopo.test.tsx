@@ -1,20 +1,25 @@
 /**
- * Fase 4 · telas, lane L1: the top of the Diário page and its states (contract §2.2 A15, C1–C8) on the approved
- * boards' scenarios (testing/diarioTelas, invented data): the section links, «Diário desde …», the banner of an account
- * without rules (10a), the pending-reviews banner («Ver no calendário», × for the session, both focusing «Calendário»),
- * the offline band over a loaded page (10e) and on a first load (C6b, not drawn), «Carregando…» (10c), «Não foi possível
- * carregar o Diário.» (10d, the Phase 4 SQL missing) and its retry, the account chosen for a screen reader, no account.
- * Also the copy check of copyMes.ts (no prototype label of the boards).
+ * Fase 4 · telas, lane L1: the top of the Diário page and its states (contract §2.2 A2, A15, C1–C8) on the approved
+ * boards' scenarios (testing/diarioTelas, invented data): the date line under the H1 on each market's clock, the section
+ * links, «Diário desde …», the banner of an account without rules (10a), the pending-reviews banner («Ver no
+ * calendário», × for the session, both focusing «Calendário»), the offline band over a loaded page (10e, and from the
+ * browser's own word) and on a first load (C6b, not drawn), «Carregando…» (10c), «Não foi possível carregar o Diário.»
+ * (10d, the Phase 4 SQL missing; the month shown failing) and its retry, the account chosen for a screen reader (never
+ * on the first load), no account. Also the copy check of copyMes.ts (no prototype label of the boards).
  */
+import React from 'react'
 import fs from 'fs'
 import path from 'path'
 import { act, screen, waitFor, within } from '@testing-library/react'
 import { onlineManager } from '@tanstack/react-query'
 import { diarioKeys } from '@/hooks/useDiario'
 import { hubKeys } from '@/hooks/useContas'
-import { parseCalendar, parseDay, parseMonth } from '@/lib/hub/diarioDb'
+import { DiarioDataError, parseCalendar, parseDay, parseMonth } from '@/lib/hub/diarioDb'
+import type { HubPreferences } from '@/lib/hub/contasDb'
+import DiarioPage from '@/app/(hub)/diario/page'
 import { mocks, renderDiario } from '@/testing/diarioTelas'
-import { USUARIO_DO_QUADRO } from '@/testing/diarioTelasMocks'
+import { renderHub } from '@/testing/hubHarness'
+import { navegacao, USUARIO_DO_QUADRO } from '@/testing/diarioTelasMocks'
 import type { Cenario } from '@/testing/diarioQuadro'
 import * as copyMes from '@/components/hub/diario/copyMes'
 
@@ -31,6 +36,27 @@ const diario = () => screen.queryByRole('region', { name: 'Diário' })
 
 beforeEach(() => {
   window.sessionStorage.clear()
+})
+
+/** The visually hidden statuses' texts (the account chosen, the calendar's, the week's) */
+const statuses = () => Array.from(document.querySelectorAll('[role="status"].sr-only')).map((el) => el.textContent)
+
+describe('the date line under the H1 (A2)', () => {
+  it.each<[Cenario, string]>([
+    ['2', 'terça-feira, 1º de dezembro, 11:35 ET'],
+    ['1', 'quinta-feira, 12 de novembro, 10:42 ET'],
+    ['6', 'quarta-feira, 11 de novembro, 21:20 de Brasília'],
+    ['7', 'sábado, 14 de novembro, 21:40 de Brasília'],
+    ['8', 'quinta-feira, 12 de novembro, 11:20 de Brasília'],
+  ])('%s: «%s», on the open account’s clock at the server’s now', async (cen, linha) => {
+    const { q } = await renderDiario(cen)
+    await screen.findByRole('region', { name: 'Calendário' })
+    expect(q.esperado.dataLinha).toBe(linha)
+    const h1 = screen.getByRole('heading', { level: 1, name: 'Diário' })
+    const data = h1.nextElementSibling as HTMLElement
+    expect(data).toHaveClass('hub-dr-topo-data')
+    expect(data.textContent).toBe(linha)
+  })
 })
 
 describe('the section links and the top line (C1, C2)', () => {
@@ -150,6 +176,23 @@ describe('offline (C5, C6b)', () => {
     expect(screen.getByRole('region', { name: 'Calendário' })).toBeInTheDocument()
   })
 
+  it('the browser’s own word (navigator.onLine false) shows the band while React Query still says online; back online, gone', async () => {
+    const onLine = jest.spyOn(Navigator.prototype, 'onLine', 'get').mockReturnValue(false)
+    try {
+      await renderDiario('2')
+      expect(await screen.findByRole('region', { name: 'Calendário' })).toBeInTheDocument()
+      expect(onlineManager.isOnline()).toBe(true)
+      expect(screen.getByText(OFFLINE).closest('[role="status"]')).not.toBeNull()
+      onLine.mockReturnValue(true)
+      act(() => {
+        window.dispatchEvent(new Event('online'))
+      })
+      await waitFor(() => expect(screen.queryByText(OFFLINE)).toBeNull())
+    } finally {
+      onLine.mockRestore()
+    }
+  })
+
   it('first load offline (not drawn): the band and an empty busy card, never «Carregando…» nor the error; online → the calendar draws', async () => {
     const { q, cru, queryClient } = await renderDiario('2', { estado: 'carregando' })
     await screen.findByRole('button', { name: /^Conta: Top One/ })
@@ -207,6 +250,29 @@ describe('loading and error (C6, C7; hoje 10c, 10d)', () => {
     expect(screen.queryByRole('alert')).toBeNull()
   })
 
+  it('the month shown fails after the calendar answered (C7): no top line, no banner; «Tentar de novo» reads the month again', async () => {
+    const { user, cru, q } = await renderDiario('2')
+    const cal = await screen.findByRole('region', { name: 'Calendário' })
+    expect(screen.getByText(q.esperado.linhaTopo!)).toBeInTheDocument()
+    expect(screen.getByRole('region', { name: 'Revisões pendentes' })).toBeInTheDocument()
+    // October has not been read yet: its read fails without data
+    mocks.fetchMes.mockRejectedValue(new DiarioDataError('unknown'))
+    await user.click(within(cal).getByRole('button', { name: 'Mês anterior' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('Não foi possível carregar o Diário.')
+    expect(screen.queryByText(q.esperado.linhaTopo!)).toBeNull()
+    expect(screen.queryByText(/^Diário desde/)).toBeNull()
+    expect(screen.queryByRole('region', { name: 'Revisões pendentes' })).toBeNull()
+    // The retry reads the month shown again (not only the calendar and the day)
+    const lidas = mocks.fetchMes.mock.calls.length
+    mocks.fetchMes.mockImplementation(async (_db, id, month) => parseMonth(cru[id].meses[month]))
+    await user.click(screen.getByRole('button', { name: 'Tentar de novo' }))
+    expect(await screen.findByRole('region', { name: 'Calendário' })).toBeInTheDocument()
+    expect(mocks.fetchMes.mock.calls.slice(lidas).map((c) => c[2])).toContain('2026-10')
+    expect(within(screen.getByRole('region', { name: 'Calendário' })).getByRole('heading', { level: 3 })).toHaveTextContent('Outubro de 2026')
+    expect(screen.getByText(q.esperado.linhaTopo!)).toBeInTheDocument()
+    expect(screen.queryByRole('alert')).toBeNull()
+  })
+
   it('a later failed read of a calendar that answered keeps the page drawn, without an alert', async () => {
     const { q, queryClient } = await renderDiario('2')
     await screen.findByRole('region', { name: 'Calendário' })
@@ -223,7 +289,7 @@ describe('the account (A15, C8)', () => {
   it('nothing on the first load; after a choice in the selector «Conta Lucid 50k.», the selector keeps the focus', async () => {
     const { user } = await renderDiario('9b')
     await screen.findByRole('region', { name: 'Calendário' })
-    const status = () => Array.from(document.querySelectorAll('[role="status"].sr-only')).map((el) => el.textContent)
+    const status = statuses
     expect(status()).not.toContain('Conta Top One.')
     const botao = screen.getByRole('button', { name: /^Conta: Top One/ })
     await user.click(botao)
@@ -231,6 +297,34 @@ describe('the account (A15, C8)', () => {
     await user.click(screen.getByRole('button', { name: 'Lucid 50k Avaliação' }))
     await waitFor(() => expect(status()).toContain('Conta Lucid 50k.'))
     expect(screen.getByRole('button', { name: /^Conta: Lucid 50k/ })).toHaveFocus()
+  })
+
+  it('nothing on the first load when the saved account comes after the primary one was drawn (the preferences read later)', async () => {
+    const r = await renderDiario('9b')
+    await screen.findByRole('region', { name: 'Calendário' })
+    r.unmount()
+    const lucid = r.q.contas.find((c) => c.label === 'Lucid 50k')!
+    const primaria = r.q.contas.find((c) => c.is_primary)!
+    expect(primaria.label).toBe('Top One')
+    let responder: (p: HubPreferences) => void = () => {}
+    mocks.fetchPreferences.mockImplementation(() => new Promise<HubPreferences>((ok) => (responder = ok)))
+    mocks.fetchCalendario.mockClear()
+    // The menu's link: /diario without ?conta=
+    navegacao.definir('/diario')
+    renderHub(<DiarioPage />)
+    // While the preferences are read the page draws the primary account (B0's frame)
+    await waitFor(() => expect(mocks.fetchCalendario).toHaveBeenCalledWith(expect.anything(), primaria.id))
+    await screen.findByRole('region', { name: 'Calendário' })
+    await act(async () => {
+      responder({ conta_atual: lucid.id } as HubPreferences)
+    })
+    expect(await screen.findByRole('button', { name: /^Conta: Lucid 50k/ })).toBeInTheDocument()
+    await waitFor(() => expect(mocks.fetchCalendario).toHaveBeenCalledWith(expect.anything(), lucid.id))
+    await act(async () => {
+      await new Promise((ok) => setTimeout(ok, 20))
+    })
+    expect(statuses()).not.toContain('Conta Lucid 50k.')
+    expect(statuses()).not.toContain('Conta Top One.')
   })
 
   it('without an account: the header’s empty state and nothing below the card', async () => {

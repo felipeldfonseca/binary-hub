@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
+import { useContaAtual } from '@/hooks/useContas'
 import { avisoDeRevisoes, linhaDoTopo } from '@/lib/hub/diario'
 import { useDiarioPagina } from './useDiarioPagina'
 import { useSemConexao } from './DiarioEstados'
@@ -44,14 +45,21 @@ export default function TopoDoDiario() {
   const cal = calendario.data ?? null
   const hoje = cal?.today ?? null
 
-  // A15: the account a choice in the selector opened (the provider is not remounted: this region sees the change)
+  // A15: the account a choice in the selector opened (the provider is not remounted: this region sees the change).
+  // Not on the first load: while the accounts or the preferences are read (useContaAtual's isLoading, as the page's
+  // own), the page draws the primary account, then the saved one (preferences.conta_atual) once they come; that change,
+  // in the render where the reading ended, is nobody's choice (the header shows «Carregando…» until then)
+  const { isLoading: contasLendo } = useContaAtual()
   const contaAnterior = useRef(conta.id)
+  const lendoAntes = useRef(contasLendo)
   const [contaStatus, setContaStatus] = useState('')
   useEffect(() => {
+    const primeiraLeitura = lendoAntes.current || contasLendo
+    lendoAntes.current = contasLendo
     if (contaAnterior.current === conta.id) return
     contaAnterior.current = conta.id
-    setContaStatus(TOPO.contaStatus(conta.label))
-  }, [conta.id, conta.label])
+    if (!primeiraLeitura) setContaStatus(TOPO.contaStatus(conta.label))
+  }, [conta.id, conta.label, contasLendo])
 
   // C4: closed for the session (storage may throw or be empty: then only until the page is left)
   const [fechados, setFechados] = useState<Record<string, true>>({})

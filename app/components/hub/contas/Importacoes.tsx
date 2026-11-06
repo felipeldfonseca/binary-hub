@@ -145,8 +145,9 @@ export default function Importacoes({ account, onClose }: { account: TradingAcco
               {confirming === batch.id && (
                 <div className="hub-bloco hub-bloco--atencao" role="group" aria-labelledby={`desfazer-${batch.id}`} style={{ flex: '1 1 100%' }}>
                   {/* Live: the counts arrive after «Manter» took focus. Phase 4 (D20): under them, the marks, images
-                      and notes of the Diário that leave with the batch's own trades, when there are any */}
-                  <div aria-live="polite" style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                      and notes of the Diário that leave with the batch's own trades, when there are any, 8 px apart
+                      (board `.atencao`'s gap, where both are its own children) */}
+                  <div aria-live="polite" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                     <span id={`desfazer-${batch.id}`} style={{ fontWeight: 700 }}>
                       {undoCounts ? IMPORTACOES.confirm(undoCounts) : counts.isError ? IMPORTACOES.countError : LOADING}
                     </span>

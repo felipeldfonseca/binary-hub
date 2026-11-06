@@ -95,6 +95,9 @@ describe('hub-posso.css: the Diário’s card (board DiarioDezEnxuto, «Muitas c
   it('one account’s row: name 92 px · answer · limit, 44 px tall; 120 px for the name from 10 accounts', () => {
     expect(value('.hub .hub-posso__conta', 'grid-template-columns')).toBe('92px minmax(0, 1fr) auto')
     expect(value('.hub .hub-posso__conta', 'min-height')).toBe('44px')
+    // content-box as the board's `.posso-conta`: 44 px inside the border between rows (45 px from the second row on)
+    // and inside the phones' 8 px padding, not 44 px in all as the app's preflight would make it
+    expect(value('.hub .hub-posso__conta', 'box-sizing')).toBe('content-box')
     expect(value('.hub .hub-posso__corpo--largo .hub-posso__conta', 'grid-template-columns')).toBe('120px minmax(0, 1fr) auto')
     expect(value('.hub .hub-posso__corpo', 'flex')).toBe('1 1 560px')
   })

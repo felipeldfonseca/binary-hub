@@ -207,7 +207,8 @@ export const IMPORTACOES = {
   legacy: 'Histórico anterior', // NEW (owner's name for the batch of the old imports)
   legacyNote: 'não dá para desfazer', // NEW
   noName: 'arquivo sem nome', // NEW
-  inserted: (count: number) => `${formatInt(count)} novas`,
+  /** «1 nova» / «5 novas» (Fase 4: the singular, as the Diário board's batch line, engine `l.novas === 1 ? ' nova'`) */
+  inserted: (count: number) => (count === 1 ? '1 nova' : `${formatInt(count)} novas`),
   /**
    * NEW (Fase 3, D29): trades registered in the app that the batch completed (import_batches
    * .rows_linked); undoing gives them back

@@ -61,18 +61,27 @@ export default function Calendario() {
   const mesDeHoje = monthOf(cal.today)
   const legenda = legendaDoCalendario(regras)
 
-  // PageUp / PageDown: the first day that opens in the month just shown takes the focus (and the tab stop)
+  // PageUp / PageDown: the first day that opens in the month just shown takes the focus (and the tab stop). A month
+  // where no day opens (a month off between the first trade and today) has no tab stop: the focus, whose cell is gone,
+  // goes to «Calendário» (its H2, tabIndex −1), never to the page's start; «Mês: …» says which month it is
   useEffect(() => {
     if (!focarPrimeiroDe || focarPrimeiroDe !== mesAtual) return
     setFocarPrimeiroDe(null)
     const primeiro = clicaveis[0]
-    if (!primeiro) return
+    if (!primeiro) {
+      document.getElementById(TITULO.calendario)?.focus()
+      return
+    }
     setFocado({ mes: mesAtual, dia: primeiro })
     grade.current?.querySelector<HTMLElement>(`[data-dia="${primeiro}"]`)?.focus()
   }, [focarPrimeiroDe, mesAtual, clicaveis])
 
+  // ‹ «Hoje» › (the board's mesAnterior / mesProximo / mesHoje clear focoCal): the month's tab stop goes back to the open
+  // day when it is in the month, else to its first day that opens — never to a day the keyboard left there earlier
   const irPara = (alvo: string | null) => {
-    if (alvo) mostrarMes(alvo)
+    if (!alvo) return
+    setFocado(null)
+    mostrarMes(alvo)
   }
 
   const onTecla = (event: React.KeyboardEvent<HTMLDivElement>) => {
@@ -122,7 +131,7 @@ export default function Calendario() {
             className="hub-btn"
             aria-disabled={mesAtual === mesDeHoje || undefined}
             onClick={() => {
-              if (mesAtual !== mesDeHoje) mostrarMes(mesDeHoje)
+              if (mesAtual !== mesDeHoje) irPara(mesDeHoje)
             }}
           >
             {CAL.hoje}

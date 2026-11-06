@@ -134,6 +134,22 @@ describe('the card’s details', () => {
     expect(cartao().querySelector('.hub-posso__corpo')).toHaveClass('hub-posso__corpo--largo')
   })
 
+  it('the wider name column from exactly 10 accounts (MANY_ACCOUNTS), not at 9', async () => {
+    const { q, queryClient } = await pronto('9b')
+    const aberta = q.rulesNow.accounts.find((a) => a.accountId === q.info.contaId)!
+    const outras = q.rulesNow.accounts.filter((a) => a.accountId !== q.info.contaId)
+    const com = async (n: number) => {
+      mocks.fetchRulesNow.mockResolvedValue({ ...q.rulesNow, accounts: [aberta, ...outras.slice(0, n - 1)] })
+      await act(async () => {
+        await queryClient.invalidateQueries({ queryKey: regrasKeys.agora(USUARIO_DO_QUADRO) })
+      })
+      await waitFor(() => expect(within(cartao()).getByText(n === 2 ? 'Outra conta:' : `Outras ${n - 1} contas:`)).toBeInTheDocument())
+      return cartao().querySelector('.hub-posso__corpo') as HTMLElement
+    }
+    expect(await com(10)).toHaveClass('hub-posso__corpo--largo')
+    expect(await com(9)).not.toHaveClass('hub-posso__corpo--largo')
+  })
+
   it('10a: «Sem janela salva · Definir» (aria «Definir a janela da Ylos 50k em Personalizar»), no limit', async () => {
     await pronto('10a')
     const [li] = linhas(within(cartao()).getByRole('list', { name: 'Posso operar hoje?' }))
