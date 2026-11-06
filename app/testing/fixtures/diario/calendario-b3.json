@@ -1,0 +1,58 @@
+{
+  "v": 1,
+  "to": "2026-10-28",
+  "days": [
+    {
+      "n": 1,
+      "app": 1,
+      "day": "2026-10-28",
+      "net": 18.5,
+      "even": 0,
+      "kind": "diario",
+      "open": 0,
+      "wins": 1,
+      "gross": 20,
+      "losses": 0,
+      "review": null,
+      "history": null,
+      "weekday": 3,
+      "commission": 1.5,
+      "imported_at": null
+    }
+  ],
+  "from": "2026-10-28",
+  "desde": "2026-10-28T12:00:04.75629+00:00",
+  "today": "2026-10-28",
+  "weeks": [
+    {
+      "n": 1,
+      "net": 18.5,
+      "days": 1,
+      "gross": 20,
+      "closed": false,
+      "history": null,
+      "week_of": "2026-10-26",
+      "commission": 1.5
+    }
+  ],
+  "account": {
+    "id": "cc84d39b-05e0-4a5a-8dff-9258518cb64b",
+    "day": {
+      "tz": "America/Sao_Paulo",
+      "start_min": 0
+    },
+    "label": "Clear",
+    "market": "b3",
+    "file_tz": "UTC",
+    "archived": false,
+    "currency": "BRL",
+    "platform": "profit",
+    "is_example": false,
+    "tz_confirmed": false,
+    "guessed_clock": 0
+  },
+  "last_day": "2026-10-28",
+  "desde_day": "2026-10-28",
+  "first_day": "2026-10-28",
+  "server_now": "2026-10-28T14:40:04.965163+00:00"
+}

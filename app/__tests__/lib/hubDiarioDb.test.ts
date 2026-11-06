@@ -64,7 +64,28 @@ const refusal = async (p: Promise<unknown>) => {
 describe('the recorded answers', () => {
   it('holds every answer the suite recorded', () => {
     expect(DIARIO_FIXTURES).toEqual(
-      expect.arrayContaining(['calendario-top', 'calendario-ebx', 'mes-top-2026-10', 'mes-ebx-2026-10', 'dia-top-1014', 'dia-top-1015', 'dia-top-1021', 'dia-top-1022', 'dia-top-1023', 'dia-top-1026', 'dia-ebx-1024', 'revisao-1022', 'nota-1023', 'ids']),
+      expect.arrayContaining([
+        'calendario-top',
+        'calendario-ebx',
+        'calendario-b3',
+        'mes-top-2026-10',
+        'mes-ebx-2026-10',
+        'dia-top-1014',
+        'dia-top-1015',
+        'dia-top-1021',
+        'dia-top-1022',
+        'dia-top-1023',
+        'dia-top-1026',
+        'dia-top-1027-aberta',
+        'dia-top-1027',
+        'dia-top-1028',
+        'dia-ebx-1024',
+        'dia-ebx-1028',
+        'dia-b3-1028',
+        'revisao-1022',
+        'nota-1023',
+        'ids',
+      ]),
     );
   });
 
@@ -113,6 +134,48 @@ describe('the recorded answers', () => {
       ['2026-10-14', ['fora_da_janela'], 'recalculado', 'closed', false, true, '8.76', '1'],
       ['2026-10-21', ['depois_do_limite'], 'recalculado', 'closed', false, true, '-38.74', '1'],
     ]);
+  });
+
+  it('27 Oct before the file: the undo and the deletion by their path, an old-page trade, an open MES with a partial', () => {
+    const d = parseDay(diarioJson('dia-top-1027-aberta'));
+    expect(d.deleted.map((x) => x.via)).toEqual(['desfazer_entrada', 'apagada']);
+    expect(d.trades.map((t) => [t.trade.status, t.planKind, t.context === null, t.import === null, t.money.realized])).toEqual([
+      ['open', 'congelado', false, true, true],
+      ['closed', 'congelado', false, true, true],
+      ['closed', 'recalculado', true, true, true],
+      ['closed', 'congelado', false, true, true],
+    ]);
+    expect([d.facts.commissionUnknown, d.facts.breakeven, d.facts.fora, d.facts.othersNet]).toEqual([
+      4,
+      { by: { MES: { n: '8', un: 'pts' } }, trades: 4, reached: 1, moved: 1 },
+      { n: 1, net: '-25', open: 0 },
+      '25',
+    ]);
+  });
+
+  it('27 Oct after the file: a link that closed the trade, a link that corrected the exit price', () => {
+    const d = parseDay(diarioJson('dia-top-1027'));
+    const links = d.trades.map((t) => t.links.map((l) => [l.platform, l.fileName, l.closed, l.differs.includes('exit_price'), l.fileEntryAt !== null]));
+    expect(links).toEqual([
+      [['topone', 'top_1027.csv', true, false, true]],
+      [['topone', 'top_1027.csv', false, true, true]],
+      [],
+      [['topone', 'top_1027.csv', false, false, true]],
+    ]);
+    expect(d.trades[1].links[0].before).toHaveProperty('exit_price');
+    expect(d.trades[1].links[0].after).toHaveProperty('exit_price');
+    expect(d.trades.map((t) => t.importedAt !== null)).toEqual([true, true, false, true]);
+  });
+
+  it('28 Oct: the facts put the 10:30 after the limit a later «Já fechada» reached; the binary still open; B3 in reais', () => {
+    const d = parseDay(diarioJson('dia-top-1028'));
+    expect(linhasDoPlano(d.plan.rules!, d.facts, TOP)[1].fato.replace(/\u00a0/g, ' ')).toBe('atingido às 10:20, com US$ 450,00 de perda · 1 depois, às 10:30: +US$ 5,00');
+    expect(d.trades.map((t) => (t.planNow ?? t.plan)?.verdict)).toEqual(['no_plano', 'no_plano']);
+    const e = parseDay(diarioJson('dia-ebx-1028'));
+    expect([e.trades[0].trade.status, e.trades[0].trade.expiresAt instanceof Date, e.facts.open, e.account.market]).toEqual(['open', true, 1, 'binary']);
+    const c = parseCalendar(diarioJson('calendario-b3'));
+    expect([c.account.currency, c.account.market, c.days.map((x) => [x.net, x.commission])]).toEqual(['BRL', 'b3', [['18.5', '1.5']]]);
+    expect(parseDay(diarioJson('dia-b3-1028')).facts.limit?.amount).toBe('500');
   });
 
   it('the limit day, as the board writes it', () => {
@@ -255,6 +318,17 @@ describe('the calendar past 1 500 days: pages of whole weeks', () => {
     expect(calendarPages('2026-01-05', '2026-10-28')).toEqual([{ from: '2026-01-05', to: '2026-10-28' }]);
   });
 
+  it('calendarPages: when the oldest page\'s Monday is the first day itself, it is that one page, never a page that ends before it starts', () => {
+    // 2022-10-03 is a Monday; 1 500 days later
+    const first = '2022-10-03';
+    const to = addDays(first, CALENDAR_MAX_DAYS - 1);
+    expect(new Date(`${first}T00:00:00Z`).getUTCDay()).toBe(1);
+    expect(calendarPages(first, to)).toEqual([{ from: first, to }]);
+    const pages = calendarPages(first, addDays(to, 7));
+    expect(pages.every((p) => p.from <= p.to)).toBe(true);
+    expect(pages[pages.length - 1].from).toBe(first);
+  });
+
   it('fetchCalendario joins the pages: the days and weeks in order, the newest head', async () => {
     const base = diarioJson('calendario-top') as Obj;
     const answer = (from: string | null, to: string | null): Obj => {
@@ -303,6 +377,11 @@ describe('signed image URLs', () => {
     ]);
     expect(Object.keys(urls)).toHaveLength(230);
     expect([urls['u/t/007.webp'], urls['u/t/008.webp']]).toEqual([null, 'https://x/u/t/008.webp?token=t']);
+  });
+
+  it('a path the bucket refused is null even when the item carries a URL', async () => {
+    const { db } = storage((ps) => ({ data: ps.map((p) => ({ path: p, error: p === 'b' ? 'Object not found' : null, signedUrl: `https://x/${p}` })), error: null }));
+    expect(await signedImageUrls(db, ['a', 'b'])).toEqual({ a: 'https://x/a', b: null });
   });
 
   it('the trade\'s own paths from the day; a failed call is a code', async () => {

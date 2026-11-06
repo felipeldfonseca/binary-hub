@@ -7,8 +7,11 @@
  * Rules, as on the approved boards (DiarioDezEnxuto / DiarioHojeEnxuto, owner's decisions of
  * 23 Oct and 5 Nov 2026):
  * - Columns Seg–Sex, plus Sáb and Dom in a Cripto account (its window runs every day) and in a
- *   month where the account has a weekend trading day. Futures, Forex and Ações sessions that
- *   open on Sunday evening already count on Monday.
+ *   month where the account has a weekend trading day (or a review written on a weekend day: a
+ *   saved review is never hidden). Futures, Forex and Ações sessions that open on Sunday evening
+ *   already count on Monday.
+ * - «Semana em andamento» while today is in the week (Monday to Sunday), as on the boards: on a
+ *   futures Saturday it still reads «5 de 5 pregões».
  * - The «Semana» column sums only the diário days of each ISO week (SQL sums); the history
  *   (trades before the first rule version) shows apart, with ▨, and never enters the diário.
  * - Colour by quartiles of the daily result: diário days (the misto day by its diário part)
@@ -121,17 +124,26 @@ export const hasTrades = (d: CalendarDay): boolean => d.n + (d.history?.n ?? 0) 
 
 const isWeekend = (day: Day) => isoWeekdayOf(day) >= 6;
 
-/** 7 in a Cripto account or a month with a weekend trading day (any trade), 5 otherwise */
+/**
+ * 7 in a Cripto account or a month with a weekend trading day (any trade) or a review written on
+ * a weekend day (a futures «today» is Saturday after Friday's close: a review saved there is
+ * shown, with its ✓), 5 otherwise
+ */
 export function monthColumns(market: AccountMarket, month: string, days: readonly CalendarDay[]): 5 | 7 {
   if (EVERY_DAY_MARKETS.includes(market)) return 7;
-  return days.some((d) => monthOf(d.day) === month && isWeekend(d.day) && hasTrades(d)) ? 7 : 5;
+  return days.some((d) => monthOf(d.day) === month && isWeekend(d.day) && (hasTrades(d) || d.review !== null)) ? 7 : 5;
 }
 
-/** The «Semana» card's columns: 7 in a Cripto account or a week with a diário trade on Sáb or Dom */
+/**
+ * The «Semana» card's columns: 7 in a Cripto account or a week with a diário trade, or a written
+ * review, on Sáb or Dom (a weekend day with only history stays out, as on the boards)
+ */
 export function weekColumns(market: AccountMarket, week: Day, days: readonly CalendarDay[]): 5 | 7 {
   if (EVERY_DAY_MARKETS.includes(market)) return 7;
   const end = addDays(week, 6);
-  return days.some((d) => d.day >= week && d.day <= end && isWeekend(d.day) && d.kind !== 'historico' && d.n > 0) ? 7 : 5;
+  return days.some((d) => d.day >= week && d.day <= end && isWeekend(d.day) && ((d.kind !== 'historico' && d.n > 0) || d.review !== null))
+    ? 7
+    : 5;
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -223,7 +235,7 @@ export interface GridCell {
   level: HeatLevel;
   /** The colour is a loss */
   loss: boolean;
-  /** ✓: the day's review is written */
+  /** ✓: the day's review is written (any day it was saved on, a history day included) */
   reviewed: boolean;
   /** A day due a review that has none («sem revisão» in the hover) */
   pendingReview: boolean;
@@ -291,8 +303,9 @@ export function monthGrid(input: MonthGridInput): MonthGrid {
       const future = day > today;
       const data = inMonth && !future ? byDay[day] ?? null : null;
       const withTrades = !!data && hasTrades(data);
-      // A written review on a day without trades (a 'vazio' row) still shows ✓ and opens the day
-      const reviewed = !!data && data.kind !== 'historico' && data.review !== null;
+      // A written review shows ✓ and opens the day wherever it was saved: a day without trades (a
+      // 'vazio' row), or the day the rules began when all its trades came before them ('historico')
+      const reviewed = !!data && data.review !== null;
       const isToday = day === today;
       const m = data && data.kind !== 'historico' ? mesDay[day] : undefined;
       cells.push({
@@ -350,7 +363,7 @@ export interface WeekCard {
   weekOf: Day;
   columns: 5 | 7;
   lastShown: Day;
-  /** It started and is not closed (isWeekClosed): «Semana em andamento · {pregoesAte} de {columns} pregões» */
+  /** Today is in the week (Monday to Sunday): «Semana em andamento · {pregoesAte} de {columns} pregões» */
   inProgress: boolean;
   /** Days of the week up to today that the columns show */
   pregoesAte: number;
@@ -408,7 +421,9 @@ export function weekCard(input: {
     bars.push({ day, net: d ? d.net : null, future: day > today, height, loss: v !== undefined && sign(v) < 0 });
   }
 
-  const inProgress = s <= today && !isWeekClosed(market, s, today);
+  // The boards' rule (engine.js: sem ≤ hoje ≤ sem + 6), not the week's close: a futures Saturday
+  // is still «Semana em andamento · 5 de 5 pregões»
+  const inProgress = s <= today && today <= end;
   return {
     weekOf: s,
     columns,

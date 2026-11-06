@@ -6,7 +6,11 @@
  *
  * Owner's decision (23 Oct 2026): the result is NET everywhere in the Diário (day, calendar, week,
  * each trade), the same number the limit counts; the gross and the commissions go to the ⓘ. A
- * day whose app trades still lack the broker's commission shows gross, and the ⓘ says so.
+ * day with a trade still waiting for the broker's commission shows gross, and the ⓘ says so (the
+ * approved boards: any such trade, even when another trade's commission is known).
+ *
+ * «Fora do plano» and «As outras N somaram» are closed trades on both sides (count and money, as
+ * on the boards): an open trade's partials are in the day's result only.
  */
 import type { AccountMarket } from '../markets';
 import { abs, numeric, sign } from '../registro/numeric';
@@ -46,7 +50,10 @@ export interface DayTiles {
   limit: LimitTile | null;
   /** null when no diário trade broke the plan («nenhuma») */
   fora: (ForaSum & { allOpen: boolean }) | null;
-  /** The closed diário trades that kept the plan («As outras 4 somaram −US$ 426,66») */
+  /**
+   * The closed diário trades that kept the plan («As outras 4 somaram −US$ 426,66»): their count
+   * and the SQL's sum of the same trades; null without a trade «fora» or without such a trade
+   */
   others: { n: number; net: Money } | null;
   /** For the ⓘ: the gross, the known commission, and whether the commission is still to come */
   money: { gross: Money; commission: Money | null; pending: boolean };
@@ -64,11 +71,12 @@ export function limitPercent(loss: Money, amount: Money): number {
 
 /**
  * The tiles of a diário or misto day from its facts. `market` decides whether a missing
- * commission is «still to come» (COMMISSION_FROM_FILE). A history day has its own tiles
- * (historyTiles).
+ * commission is «still to come» (COMMISSION_FROM_FILE: some realized trade has none). A history
+ * day has its own tiles (historyTiles).
  */
 export function dayTiles(f: DayFacts, market: AccountMarket): DayTiles {
   const foraOpen = f.fora.open;
+  // Closed trades that kept the plan: the same trades whose net others_net sums
   const foraClosed = f.fora.n - foraOpen;
   const othersN = Math.max(0, f.closed - foraClosed);
   let limit: LimitTile | null = null;
@@ -93,15 +101,10 @@ export function dayTiles(f: DayFacts, market: AccountMarket): DayTiles {
     money: {
       gross: f.gross,
       commission: f.commission,
-      pending: f.commission === null && COMMISSION_FROM_FILE.includes(market) && hasRealized(f),
+      pending: f.commissionUnknown > 0 && COMMISSION_FROM_FILE.includes(market),
     },
     history: f.kind === 'misto' && f.history.n > 0 ? { n: f.history.n, net: f.history.net } : null,
   };
-}
-
-/** Some money was realized on the day (a closed trade, or a partial of an open one) */
-function hasRealized(f: DayFacts): boolean {
-  return f.closed > 0 || sign(numeric(f.gross)) !== 0;
 }
 
 /** A history day's tiles: only what the file brought («—», «o limite ainda não existia», «sem plano») */

@@ -28,6 +28,17 @@
  *   revisao-1022-editada   18:05 ET: a second version («em parte», «O que você faria diferente?»)
  *   nota-1023            «Antes de operar» at 09:40 ET on 23 Oct
  *   nota-1023-editada    edited at 10:42 ET, after the 10:04 entry
+ *
+ * Then (the review of 5 Nov), each read at its own moment:
+ *   dia-top-1027-aberta  Tue 27 Oct 11:40 ET: a live MES of 2 still open with a partial at +10 and the stop
+ *                        at the breakeven, «Já fechada» in and outside the window, an old-page trade (no
+ *                        app context), a live entry undone and a «Já fechada» deleted on the old page
+ *   dia-top-1027         17:00 ET, after the broker's file: a link that closed the live MES, one that
+ *                        corrected a «Já fechada»'s exit price, one that only completed the commission
+ *   dia-top-1028         Wed 28 Oct 10:40 ET: a live MES at 10:30, then a «Já fechada» of 10:05 reaching the
+ *                        limit at 10:20 (the facts put the 10:30 after it; its own plan stays «no plano»)
+ *   dia-ebx-1028         an Ebinex binary still open
+ *   calendario-b3, dia-b3-1028   Clear (B3, R$): rules from 28 Oct, a «Já fechada» WIN with «Custos»
  */
 import fs from 'fs';
 import path from 'path';

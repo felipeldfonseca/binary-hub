@@ -204,11 +204,13 @@ export function celulaDoCalendario(cell: GridCell, conta: ContaDiario, mes?: Mon
   const hoje = cell.today ? ', hoje' : '';
   if (d.kind === 'historico') {
     const h = d.history as HistoryPart;
+    // NEW: a review saved on the day the rules began, when every trade of it came before them
+    const escrita = d.review ? ' · revisão escrita' : '';
     return {
       res,
       resCurto,
-      dica: `${curto} · ${dinheiro(h.net, conta.currency)} · ${h.n} op.: ${ganhosEPerdas(h, conta.market)} · Histórico importado · só resultado`,
-      aria: `${curto}, ${res} ${moeda}, ${h.n} op., Histórico importado${hoje}`,
+      dica: `${curto} · ${dinheiro(h.net, conta.currency)} · ${h.n} op.: ${ganhosEPerdas(h, conta.market)} · Histórico importado · só resultado${escrita}`,
+      aria: `${curto}, ${res} ${moeda}, ${h.n} op., Histórico importado${d.review ? ', revisão escrita' : ''}${hoje}`,
     };
   }
   const fora = mes?.fora.n ?? 0;
@@ -340,10 +342,9 @@ export function etiquetasDoDia(d: CalendarDay | null, today: Day, conta: ContaDi
   if (limitHitAt) out.push(`Limite atingido às ${hora(limitHitAt, conta.tz)}`);
   if (!d) return out;
   if (d.kind === 'historico' && d.importedAt) out.push(`Histórico importado · ${diaCurto(utcToLocal(d.importedAt, conta.tz).date)}`);
-  if (d.kind !== 'historico') {
-    if (d.review) out.push('Revisão escrita');
-    else if (isPendingReview(d, today)) out.push('Sem revisão');
-  }
+  // A written review shows on any day it was saved (also the day the rules began with only history)
+  if (d.review) out.push('Revisão escrita');
+  else if (isPendingReview(d, today)) out.push('Sem revisão');
   return out;
 }
 
@@ -448,7 +449,8 @@ export function numerosSemRegras(conta: ContaDiario): NumerosTexto {
     barraTom: 'amber',
     fora: '—',
     foraSub: '',
-    foraTom: 'muted',
+    // The board's empty day: «—» in the text colour (only the history day is muted)
+    foraTom: 'neutral',
   };
 }
 
@@ -598,7 +600,8 @@ export function linhasDoPlano(rules: Rules, f: DayFacts, conta: ContaDiario): Li
     rows.push({
       item: 'Breakeven',
       plano: breakevenDoPlano(rules.breakeven),
-      fato: b.trades ? `moveu em ${b.moved} de ${b.trades}` : 'nenhuma chegou ao ponto da regra',
+      // Of the trades that got to the rule's point (the board's «mm»), how many had the stop moved
+      fato: b.reached ? `moveu em ${b.moved} de ${b.reached}` : 'nenhuma chegou ao ponto da regra',
       marca: 'Registrado',
       tipo: 'neutro',
       link: null,

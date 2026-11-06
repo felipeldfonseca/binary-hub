@@ -38,11 +38,12 @@ export function pendingReviews(days: readonly CalendarDay[], today: Day): { days
 
 /**
  * «Revisões» of a week: the days that count (a diário day before today with a trade registered
- * in the app, or any diário day whose review is written: today enters only once reviewed) and
- * how many of them have a written review. Pass the week's days up to today.
+ * in the app, or any day whose review is written, also the day the rules began with only history
+ * on it: today enters only once reviewed) and how many of them have a written review. Pass the
+ * week's days up to today.
  */
 export function weekReviews(days: readonly CalendarDay[], today: Day): { counted: number; reviewed: number } {
-  const counted = days.filter((d) => d.kind !== 'historico' && ((d.app > 0 && d.day < today) || d.review !== null));
+  const counted = days.filter((d) => (d.kind !== 'historico' && d.app > 0 && d.day < today) || d.review !== null);
   return { counted: counted.length, reviewed: counted.filter((d) => d.review !== null).length };
 }
 

@@ -4,7 +4,7 @@
   "kind": "vazio",
   "note": null,
   "plan": {
-    "at": "2026-10-26T13:00:04.989591+00:00",
+    "at": "2026-10-26T13:00:05.149747+00:00",
     "rules": {
       "v": 1,
       "day": {
@@ -56,10 +56,10 @@
     },
     "changes": [],
     "version": {
-      "id": "c8f22e6e-6644-4f3d-9080-24a8dad21671",
+      "id": "25953858-fd08-4354-a3b2-ac5b5a3ed565",
       "origin": "criar",
       "version_no": 1,
-      "effective_from": "2026-10-14T13:12:04.806342+00:00"
+      "effective_from": "2026-10-14T13:12:04.922437+00:00"
     },
     "windows_today": [
       {
@@ -69,7 +69,7 @@
       }
     ]
   },
-  "desde": "2026-10-14T13:12:04.806342+00:00",
+  "desde": "2026-10-14T13:12:04.922437+00:00",
   "facts": {
     "v": 1,
     "day": "2026-10-26",
@@ -112,7 +112,7 @@
       "gross": 0
     },
     "version": {
-      "id": "c8f22e6e-6644-4f3d-9080-24a8dad21671",
+      "id": "25953858-fd08-4354-a3b2-ac5b5a3ed565",
       "version_no": 1
     },
     "breakeven": {
@@ -123,12 +123,14 @@
         }
       },
       "moved": 0,
-      "trades": 0
+      "trades": 0,
+      "reached": 0
     },
     "commission": null,
     "others_net": 0,
     "recalculated": 0,
-    "first_entry_at": null
+    "first_entry_at": null,
+    "commission_unknown": 0
   },
   "today": "2026-10-26",
   "bounds": {
@@ -138,7 +140,7 @@
   "review": null,
   "trades": [],
   "account": {
-    "id": "ab278fe9-7bda-4b37-abd7-fdf642bc0c36",
+    "id": "92baa31a-c684-4a48-ae52-3e7a30c8ff68",
     "day": {
       "tz": "America/New_York",
       "start_min": 1080
@@ -158,19 +160,19 @@
   "carry_in": {
     "day": "2026-10-22",
     "text": "Esperar o reteste antes de comprar.",
-    "saved_at": "2026-10-22T22:05:05.295556+00:00"
+    "saved_at": "2026-10-22T22:05:05.425762+00:00"
   },
   "desde_day": "2026-10-14",
-  "server_now": "2026-10-26T13:00:04.989591+00:00",
+  "server_now": "2026-10-26T13:00:05.149747+00:00",
   "open_elsewhere": [
     {
       "app": true,
       "symbol": "MES",
       "quantity": 1,
-      "trade_id": "25a54fe6-1f73-4cbe-bc6b-b8e656712423",
+      "trade_id": "d3089a4b-0b8a-463b-bcdb-e3234f0aafd8",
       "direction": "long",
       "asset_type": "futures",
-      "entry_time": "2026-10-23T14:04:04.528982+00:00",
+      "entry_time": "2026-10-23T14:04:04.667647+00:00",
       "expires_at": null,
       "trading_day": "2026-10-23"
     }

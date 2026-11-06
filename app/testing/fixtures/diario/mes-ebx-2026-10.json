@@ -44,7 +44,7 @@
     }
   ],
   "from": "2026-09-28",
-  "desde": "2026-10-14T13:12:04.806342+00:00",
+  "desde": "2026-10-14T13:12:04.922437+00:00",
   "month": "2026-10",
   "today": "2026-10-26",
   "weeks": [
@@ -58,7 +58,7 @@
     }
   ],
   "account": {
-    "id": "2f98554d-8539-4d62-a1d2-54cb074f4dc3",
+    "id": "3d747e0c-d9a2-46e8-af1d-5f4e1bbce6bb",
     "day": {
       "tz": "America/Sao_Paulo",
       "start_min": 0
@@ -74,7 +74,7 @@
     "guessed_clock": 0
   },
   "desde_day": "2026-10-14",
-  "server_now": "2026-10-26T13:00:05.045673+00:00",
+  "server_now": "2026-10-26T13:00:05.206082+00:00",
   "fora_trades": [
     {
       "day": "2026-10-25",
@@ -86,7 +86,7 @@
       "symbol": "BTC/USDT",
       "quantity": 1,
       "realized": true,
-      "trade_id": "42d41221-8a26-461e-bcfe-955da4ec9343",
+      "trade_id": "64da14f3-e4ea-4616-94c7-be5e618a4ff6",
       "direction": "call",
       "plan_kind": "recalculado",
       "asset_type": "binary_option",

@@ -380,6 +380,7 @@ export function parseFacts(json: unknown): DayFacts {
     net: money(f.net),
     gross: money(f.gross),
     commission: moneyOrNull(f.commission),
+    commissionUnknown: int(f.commission_unknown),
     firstEntryAt: dateOrNull(f.first_entry_at),
     window: w && { rule: bool(w.rule), evaluated: int(w.evaluated), inside: int(w.inside), outside: list(w.outside, parseTradeAt) },
     limit: l && { ...parseLimit(l), after: list(l.after, parseTradeAt), afterNet: moneyOrNull(l.after_net) },
@@ -387,7 +388,7 @@ export function parseFacts(json: unknown): DayFacts {
     othersNet: money(f.others_net),
     recalculated: int(f.recalculated),
     history: { n: int(h.n), net: money(h.net), gross: money(h.gross) },
-    breakeven: b && { by: parseBreakevenBy(b.by), trades: int(b.trades), moved: int(b.moved) },
+    breakeven: b && { by: parseBreakevenBy(b.by), trades: int(b.trades), reached: int(b.reached), moved: int(b.moved) },
     version: v && { id: str(v.id), versionNo: int(v.version_no) },
     changes: int(f.changes),
   };

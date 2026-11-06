@@ -6,6 +6,7 @@
  * arrives with the file counts), against the approved boards' invented days.
  */
 import {
+  carryInOf,
   dayChanged,
   isPendingReview,
   pendingReviews,
@@ -40,6 +41,12 @@ describe('days due a review', () => {
     expect(p.recent).toEqual(['2026-10-20', '2026-10-27', '2026-11-13', '2026-11-18'].filter((d) => d >= '2026-10-30'));
   });
 
+  it('«nas últimas 4 semanas» includes the day exactly 28 days back', () => {
+    const p = pendingReviews(topOneDays(), '2026-11-17');
+    expect(p.recent).toContain('2026-10-20');
+    expect(pendingReviews(topOneDays(), '2026-11-18').recent).not.toContain('2026-10-20');
+  });
+
   it('Ebinex on 11 nov: the file-only days (21 out, 4 nov) are not pending', () => {
     expect(pendingReviews(ebinexDays(), '2026-11-11').days).toEqual(['2026-10-17', '2026-10-26', '2026-10-28']);
   });
@@ -53,6 +60,32 @@ describe('«Revisões» of a week', () => {
       d.day === '2026-10-28' ? { ...d, review: { firstSavedAt: et('2026-10-28 19:00'), savedAt: et('2026-10-28 19:00'), versions: 1 } } : d,
     );
     expect(weekReviews(reviewed, '2026-12-01')).toEqual({ counted: 4, reviewed: 3 });
+  });
+});
+
+describe('«Revisões» and a review saved on a history day (review, 10 Oct)', () => {
+  it('the day the rules began with only history on it: its written review counts', () => {
+    const days = ebinexDays().filter((d) => d.kind === 'historico').slice(0, 1);
+    expect(days).toHaveLength(1);
+    expect(weekReviews(days, '2026-12-01')).toEqual({ counted: 0, reviewed: 0 });
+    const reviewed = days.map((d) => ({ ...d, review: { firstSavedAt: brt('2026-10-10 21:00'), savedAt: brt('2026-10-11 04:32'), versions: 2 } }));
+    expect(weekReviews(reviewed, '2026-12-01')).toEqual({ counted: 1, reviewed: 1 });
+  });
+});
+
+describe('«Do pregão anterior» (the twin of diario_dia\'s carry_in)', () => {
+  const reviews = [
+    { day: '2026-10-13', carryForward: 'Antes das regras' },
+    { day: '2026-10-20', carryForward: null },
+    { day: '2026-10-21', carryForward: 'Esperar o reteste.' },
+  ];
+  it('the newest earlier day with a text; none on a history day or before «desde»\'s day; on «desde»\'s day itself, any earlier one', () => {
+    expect(carryInOf(reviews, '2026-10-22', '2026-10-14', 'diario')).toEqual({ day: '2026-10-21', text: 'Esperar o reteste.' });
+    expect(carryInOf(reviews, '2026-10-21', '2026-10-14', 'diario')).toEqual({ day: '2026-10-13', text: 'Antes das regras' });
+    expect(carryInOf(reviews, '2026-10-22', '2026-10-14', 'historico')).toBeNull();
+    expect(carryInOf(reviews, '2026-10-13', '2026-10-14', 'misto')).toBeNull();
+    expect(carryInOf(reviews, '2026-10-14', '2026-10-14', 'misto')).toEqual({ day: '2026-10-13', text: 'Antes das regras' });
+    expect(carryInOf(reviews, '2026-10-14', null, 'diario')).toBeNull();
   });
 });
 

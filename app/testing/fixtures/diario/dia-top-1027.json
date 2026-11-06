@@ -1,0 +1,990 @@
+{
+  "v": 1,
+  "day": "2026-10-27",
+  "kind": "diario",
+  "note": null,
+  "plan": {
+    "at": "2026-10-27T21:00:04.665696+00:00",
+    "rules": {
+      "v": 1,
+      "day": {
+        "tz": "America/New_York",
+        "start_min": 1080
+      },
+      "block": {
+        "on": true,
+        "after_min": 10,
+        "calendars": [
+          "us"
+        ],
+        "before_min": 5
+      },
+      "limit": {
+        "usd": 400,
+        "mode": "conta",
+        "at_limit": "encerrar"
+      },
+      "market": "futures",
+      "states": {
+        "alinhadas": null,
+        "so_tecnica": null,
+        "em_conflito": null,
+        "sem_direcao": null,
+        "so_fundamentos": null
+      },
+      "windows": [
+        {
+          "tz": "America/New_York",
+          "end_min": 660,
+          "weekdays": 31,
+          "start_min": 600
+        }
+      ],
+      "breakeven": {
+        "by": {
+          "MES": {
+            "n": 8,
+            "un": "pts"
+          }
+        }
+      },
+      "window_rule": {
+        "on": true,
+        "outside": "fora"
+      },
+      "windows_from": "account"
+    },
+    "changes": [],
+    "version": {
+      "id": "25953858-fd08-4354-a3b2-ac5b5a3ed565",
+      "origin": "criar",
+      "version_no": 1,
+      "effective_from": "2026-10-14T13:12:04.922437+00:00"
+    },
+    "windows_today": [
+      {
+        "tz": "America/New_York",
+        "opens_at": "2026-10-27T14:00:00+00:00",
+        "closes_at": "2026-10-27T15:00:00+00:00"
+      }
+    ]
+  },
+  "desde": "2026-10-14T13:12:04.922437+00:00",
+  "facts": {
+    "v": 1,
+    "day": "2026-10-27",
+    "net": 66.29,
+    "even": 0,
+    "fora": {
+      "n": 1,
+      "net": -26.24,
+      "open": 0
+    },
+    "kind": "diario",
+    "open": 0,
+    "wins": 3,
+    "gross": 71.25,
+    "limit": {
+      "net": 66.29,
+      "after": [],
+      "scope": "conta",
+      "worst": 0,
+      "amount": 400,
+      "hit_at": null,
+      "trades": 4,
+      "at_limit": "encerrar",
+      "after_net": null,
+      "worst_at_hit": null
+    },
+    "closed": 4,
+    "losses": 1,
+    "trades": 4,
+    "window": {
+      "rule": true,
+      "inside": 3,
+      "outside": [
+        {
+          "at": "2026-10-27T15:20:00+00:00",
+          "trade_id": "cadac25e-9d1a-45fe-adaf-8bf0993b2455"
+        }
+      ],
+      "evaluated": 4
+    },
+    "changes": 0,
+    "history": {
+      "n": 0,
+      "net": 0,
+      "gross": 0
+    },
+    "version": {
+      "id": "25953858-fd08-4354-a3b2-ac5b5a3ed565",
+      "version_no": 1
+    },
+    "breakeven": {
+      "by": {
+        "MES": {
+          "n": 8,
+          "un": "pts"
+        }
+      },
+      "moved": 1,
+      "trades": 4,
+      "reached": 1
+    },
+    "commission": 4.96,
+    "others_net": 92.53,
+    "recalculated": 1,
+    "first_entry_at": "2026-10-27T14:05:05.319255+00:00",
+    "commission_unknown": 1
+  },
+  "today": "2026-10-27",
+  "bounds": {
+    "end": "2026-10-27T22:00:00+00:00",
+    "start": "2026-10-26T22:00:00+00:00"
+  },
+  "review": null,
+  "trades": [
+    {
+      "gate": {
+        "at": "2026-10-27T14:05:05.319255+00:00",
+        "block": {
+          "state": "nao_avaliado",
+          "reason": "fase5"
+        },
+        "desde": "2026-10-14T13:12:04.922437+00:00",
+        "label": "Top One #1",
+        "limit": {
+          "usd": 400,
+          "mode": "conta",
+          "near": false,
+          "used": 0,
+          "state": "ok",
+          "hit_at": null,
+          "reason": null,
+          "trades": 0,
+          "net_usd": 0,
+          "at_limit": "encerrar",
+          "worst_usd": 0
+        },
+        "today": {
+          "trades": 0,
+          "net_usd": 0,
+          "worst_usd": 0
+        },
+        "market": "futures",
+        "status": "liberado",
+        "window": {
+          "next": {
+            "opens_at": "2026-10-28T14:00:00+00:00",
+            "closes_at": "2026-10-28T15:00:00+00:00",
+            "trading_day": "2026-10-28"
+          },
+          "state": "dentro",
+          "reason": null,
+          "current": {
+            "opens_at": "2026-10-27T14:00:00+00:00",
+            "closes_at": "2026-10-27T15:00:00+00:00"
+          },
+          "position": "dentro"
+        },
+        "version": {
+          "id": "25953858-fd08-4354-a3b2-ac5b5a3ed565",
+          "origin": "criar",
+          "version_no": 1,
+          "effective_from": "2026-10-14T13:12:04.922437+00:00"
+        },
+        "warnings": [],
+        "desde_day": "2026-10-14",
+        "account_id": "92baa31a-c684-4a48-ae52-3e7a30c8ff68",
+        "changes_at": "2026-10-27T15:00:00+00:00",
+        "state_rule": {
+          "state": "nao_avaliado",
+          "reason": "fase5"
+        },
+        "trading_day": "2026-10-27",
+        "checks_evaluated": [
+          "janela",
+          "limite"
+        ]
+      },
+      "plan": {
+        "breaks": [],
+        "verdict": "no_plano",
+        "checks_evaluated": [
+          "janela",
+          "limite"
+        ]
+      },
+      "exits": [
+        {
+          "id": 13,
+          "pnl": 50,
+          "kind": "parcial",
+          "counts": false,
+          "origin": "app",
+          "quantity": 1,
+          "exit_time": "2026-10-27T14:12:05.349531+00:00",
+          "pnl_basis": "prices",
+          "voided_at": null,
+          "commission": null,
+          "exit_price": 7010,
+          "file_exit_at": null,
+          "registered_at": "2026-10-27T14:12:05.349531+00:00"
+        },
+        {
+          "id": 14,
+          "pnl": 50,
+          "kind": null,
+          "counts": true,
+          "origin": "file",
+          "quantity": 1,
+          "exit_time": "2026-10-27T14:12:05.349531+00:00",
+          "pnl_basis": "file",
+          "voided_at": null,
+          "commission": 1.24,
+          "exit_price": 7010,
+          "file_exit_at": "2026-10-27T14:12:00+00:00",
+          "registered_at": "2026-10-27T21:00:04.615668+00:00"
+        },
+        {
+          "id": 15,
+          "pnl": 20,
+          "kind": null,
+          "counts": true,
+          "origin": "file",
+          "quantity": 1,
+          "exit_time": "2026-10-27T14:50:00+00:00",
+          "pnl_basis": "file",
+          "voided_at": null,
+          "commission": 1.24,
+          "exit_price": 7004,
+          "file_exit_at": "2026-10-27T14:50:00+00:00",
+          "registered_at": "2026-10-27T21:00:04.615668+00:00"
+        }
+      ],
+      "links": [
+        {
+          "after": {
+            "pnl": 70,
+            "notes": "topone:MESZ6/900000000021",
+            "result": "win",
+            "status": "closed",
+            "quantity": 2,
+            "exit_time": "2026-10-27T14:50:00+00:00",
+            "pnl_basis": "file",
+            "commission": 2.48,
+            "exit_price": 7007,
+            "external_id": "MESZ6/900000000021",
+            "source_platform": "topone"
+          },
+          "before": {
+            "pnl": null,
+            "notes": null,
+            "result": "pending",
+            "status": "open",
+            "quantity": 2,
+            "exit_time": null,
+            "pnl_basis": null,
+            "commission": null,
+            "exit_price": null,
+            "external_id": null,
+            "source_platform": null
+          },
+          "closed": true,
+          "differs": [],
+          "batch_id": "4996d431-8672-4b01-ad04-0460e30fdb9a",
+          "platform": "topone",
+          "file_name": "top_1027.csv",
+          "linked_at": "2026-10-27T21:00:04.615668+00:00",
+          "file_exit_at": "2026-10-27T14:50:00+00:00",
+          "file_entry_at": "2026-10-27T14:05:00+00:00"
+        }
+      ],
+      "marks": [],
+      "money": {
+        "net": 67.52,
+        "gross": 70,
+        "realized": true,
+        "commission": 2.48
+      },
+      "trade": {
+        "id": "0a3f3665-aeb1-4432-87fd-23b42b8b2aec",
+        "pnl": 70,
+        "note": null,
+        "option": null,
+        "result": "win",
+        "source": "live",
+        "status": "closed",
+        "symbol": "MES",
+        "quantity": 2,
+        "direction": "long",
+        "exit_time": "2026-10-27T14:50:00+00:00",
+        "pnl_basis": "file",
+        "timeframe": null,
+        "account_id": "92baa31a-c684-4a48-ae52-3e7a30c8ff68",
+        "asset_type": "futures",
+        "commission": 2.48,
+        "entry_time": "2026-10-27T14:05:05.319255+00:00",
+        "exit_price": 7007,
+        "expires_at": null,
+        "stop_price": 6990,
+        "entry_price": 7000,
+        "trading_day": "2026-10-27",
+        "stake_amount": null,
+        "target_price": null,
+        "note_saved_at": null,
+        "registered_at": "2026-10-27T14:05:05.319255+00:00",
+        "payout_percent": null,
+        "duration_seconds": null,
+        "exit_registered_at": null
+      },
+      "images": [],
+      "import": null,
+      "context": {
+        "origin": "live",
+        "rule_ok": null,
+        "in_block": null,
+        "warnings": [],
+        "in_window": true,
+        "after_limit": false,
+        "captured_at": "2026-10-27T14:05:05.319255+00:00",
+        "gate_status": "liberado",
+        "evaluated_at": "2026-10-27T14:05:05.319255+00:00",
+        "state_choice": null,
+        "checks_evaluated": [
+          "janela",
+          "limite"
+        ],
+        "day_pnl_at_entry": 0,
+        "day_worst_at_entry": 0
+      },
+      "history": false,
+      "version": {
+        "id": "25953858-fd08-4354-a3b2-ac5b5a3ed565",
+        "version_no": 1
+      },
+      "entry_at": "2026-10-27T14:05:05.319255+00:00",
+      "gate_now": null,
+      "plan_now": null,
+      "position": {
+        "r": 0.7,
+        "open": 0,
+        "undo": null,
+        "exits": 2,
+        "closed": 2,
+        "partials": 1,
+        "quantity": 2,
+        "stop_now": 7000,
+        "stop_kind": "breakeven",
+        "realized_pnl": 70,
+        "stop_initial": 6990
+      },
+      "trade_id": "0a3f3665-aeb1-4432-87fd-23b42b8b2aec",
+      "breakeven": {
+        "n": 8,
+        "un": "pts",
+        "key": "MES",
+        "level": 7008
+      },
+      "marks_now": [],
+      "plan_kind": "congelado",
+      "stop_moves": [
+        {
+          "id": 6,
+          "kind": "breakeven",
+          "unit": "pts",
+          "favor": 10,
+          "origin": "live",
+          "ao_vivo": true,
+          "moved_at": "2026-10-27T14:13:05.380965+00:00",
+          "prev_stop": 6990,
+          "price_now": 7010,
+          "voided_at": null,
+          "stop_price": 7000
+        }
+      ],
+      "imported_at": "2026-10-27T21:00:04.615668+00:00",
+      "trading_day": "2026-10-27",
+      "clock_guessed": false,
+      "registered_at": "2026-10-27T14:05:05.319255+00:00"
+    },
+    {
+      "gate": {
+        "at": "2026-10-27T14:20:00+00:00",
+        "block": {
+          "state": "nao_avaliado",
+          "reason": "fase5"
+        },
+        "desde": "2026-10-14T13:12:04.922437+00:00",
+        "label": "Top One #1",
+        "limit": {
+          "usd": 400,
+          "mode": "conta",
+          "near": false,
+          "used": 0,
+          "state": "ok",
+          "hit_at": null,
+          "reason": null,
+          "trades": 1,
+          "net_usd": 50,
+          "at_limit": "encerrar",
+          "worst_usd": 0
+        },
+        "today": {
+          "trades": 1,
+          "net_usd": 50,
+          "worst_usd": 0
+        },
+        "market": "futures",
+        "status": "liberado",
+        "window": {
+          "next": {
+            "opens_at": "2026-10-28T14:00:00+00:00",
+            "closes_at": "2026-10-28T15:00:00+00:00",
+            "trading_day": "2026-10-28"
+          },
+          "state": "dentro",
+          "reason": null,
+          "current": {
+            "opens_at": "2026-10-27T14:00:00+00:00",
+            "closes_at": "2026-10-27T15:00:00+00:00"
+          },
+          "position": "dentro"
+        },
+        "version": {
+          "id": "25953858-fd08-4354-a3b2-ac5b5a3ed565",
+          "origin": "criar",
+          "version_no": 1,
+          "effective_from": "2026-10-14T13:12:04.922437+00:00"
+        },
+        "warnings": [],
+        "desde_day": "2026-10-14",
+        "account_id": "92baa31a-c684-4a48-ae52-3e7a30c8ff68",
+        "changes_at": "2026-10-27T15:00:00+00:00",
+        "state_rule": {
+          "state": "nao_avaliado",
+          "reason": "fase5"
+        },
+        "trading_day": "2026-10-27",
+        "checks_evaluated": [
+          "janela",
+          "limite"
+        ]
+      },
+      "plan": {
+        "breaks": [],
+        "verdict": "no_plano",
+        "checks_evaluated": [
+          "janela",
+          "limite"
+        ]
+      },
+      "exits": [],
+      "links": [
+        {
+          "after": {
+            "pnl": 11.25,
+            "notes": "topone:MESZ6/900000000023",
+            "pnl_basis": "file",
+            "commission": 1.24,
+            "exit_price": 6997.75,
+            "external_id": "MESZ6/900000000023",
+            "source_platform": "topone"
+          },
+          "before": {
+            "pnl": 10,
+            "notes": null,
+            "pnl_basis": "prices",
+            "commission": null,
+            "exit_price": 6998,
+            "external_id": null,
+            "source_platform": null
+          },
+          "closed": false,
+          "differs": [
+            "exit_price",
+            "pnl"
+          ],
+          "batch_id": "4996d431-8672-4b01-ad04-0460e30fdb9a",
+          "platform": "topone",
+          "file_name": "top_1027.csv",
+          "linked_at": "2026-10-27T21:00:04.615668+00:00",
+          "file_exit_at": "2026-10-27T14:30:00+00:00",
+          "file_entry_at": "2026-10-27T14:20:00+00:00"
+        }
+      ],
+      "marks": [],
+      "money": {
+        "net": 10.01,
+        "gross": 11.25,
+        "realized": true,
+        "commission": 1.24
+      },
+      "trade": {
+        "id": "09205acf-9f0d-4c8c-9b31-343ad82adcb2",
+        "pnl": 11.25,
+        "note": null,
+        "option": null,
+        "result": "win",
+        "source": "after",
+        "status": "closed",
+        "symbol": "MES",
+        "quantity": 1,
+        "direction": "short",
+        "exit_time": "2026-10-27T14:30:00+00:00",
+        "pnl_basis": "file",
+        "timeframe": null,
+        "account_id": "92baa31a-c684-4a48-ae52-3e7a30c8ff68",
+        "asset_type": "futures",
+        "commission": 1.24,
+        "entry_time": "2026-10-27T14:20:00+00:00",
+        "exit_price": 6997.75,
+        "expires_at": null,
+        "stop_price": 7010,
+        "entry_price": 7000,
+        "trading_day": "2026-10-27",
+        "stake_amount": null,
+        "target_price": null,
+        "note_saved_at": null,
+        "registered_at": "2026-10-27T15:40:05.451746+00:00",
+        "payout_percent": null,
+        "duration_seconds": null,
+        "exit_registered_at": "2026-10-27T15:40:05.451746+00:00"
+      },
+      "images": [],
+      "import": null,
+      "context": {
+        "origin": "reconstructed",
+        "rule_ok": null,
+        "in_block": null,
+        "warnings": [],
+        "in_window": true,
+        "after_limit": false,
+        "captured_at": "2026-10-27T15:40:05.451746+00:00",
+        "gate_status": "liberado",
+        "evaluated_at": "2026-10-27T14:20:00+00:00",
+        "state_choice": null,
+        "checks_evaluated": [
+          "janela",
+          "limite"
+        ],
+        "day_pnl_at_entry": 50,
+        "day_worst_at_entry": 0
+      },
+      "history": false,
+      "version": {
+        "id": "25953858-fd08-4354-a3b2-ac5b5a3ed565",
+        "version_no": 1
+      },
+      "entry_at": "2026-10-27T14:20:00+00:00",
+      "gate_now": null,
+      "plan_now": null,
+      "position": {
+        "r": 0.225,
+        "open": 0,
+        "undo": null,
+        "exits": 0,
+        "closed": 1,
+        "partials": 0,
+        "quantity": 1,
+        "stop_now": 7010,
+        "stop_kind": null,
+        "realized_pnl": 11.25,
+        "stop_initial": 7010
+      },
+      "trade_id": "09205acf-9f0d-4c8c-9b31-343ad82adcb2",
+      "breakeven": {
+        "n": 8,
+        "un": "pts",
+        "key": "MES",
+        "level": 6992
+      },
+      "marks_now": [],
+      "plan_kind": "congelado",
+      "stop_moves": [],
+      "imported_at": "2026-10-27T21:00:04.615668+00:00",
+      "trading_day": "2026-10-27",
+      "clock_guessed": false,
+      "registered_at": "2026-10-27T15:40:05.451746+00:00"
+    },
+    {
+      "gate": null,
+      "plan": null,
+      "exits": [],
+      "links": [],
+      "marks": [],
+      "money": {
+        "net": 15,
+        "gross": 15,
+        "realized": true,
+        "commission": null
+      },
+      "trade": {
+        "id": "410e343b-8561-460a-97dd-96eeea6e9741",
+        "pnl": 15,
+        "note": null,
+        "option": null,
+        "result": "win",
+        "source": "after",
+        "status": "closed",
+        "symbol": "MESZ6",
+        "quantity": 1,
+        "direction": "long",
+        "exit_time": "2026-10-27T14:55:00+00:00",
+        "pnl_basis": null,
+        "timeframe": null,
+        "account_id": "92baa31a-c684-4a48-ae52-3e7a30c8ff68",
+        "asset_type": "futures",
+        "commission": null,
+        "entry_time": "2026-10-27T14:50:00+00:00",
+        "exit_price": 7003,
+        "expires_at": null,
+        "stop_price": null,
+        "entry_price": 7000,
+        "trading_day": "2026-10-27",
+        "stake_amount": null,
+        "target_price": null,
+        "note_saved_at": null,
+        "registered_at": "2026-10-27T15:40:05.524398+00:00",
+        "payout_percent": null,
+        "duration_seconds": null,
+        "exit_registered_at": null
+      },
+      "images": [],
+      "import": null,
+      "context": null,
+      "history": false,
+      "version": null,
+      "entry_at": "2026-10-27T14:50:00+00:00",
+      "gate_now": {
+        "at": "2026-10-27T14:50:00+00:00",
+        "block": {
+          "state": "nao_avaliado",
+          "reason": "fase5"
+        },
+        "desde": "2026-10-14T13:12:04.922437+00:00",
+        "label": "Top One #1",
+        "limit": {
+          "usd": 400,
+          "mode": "conta",
+          "near": false,
+          "used": 0,
+          "state": "ok",
+          "hit_at": null,
+          "reason": null,
+          "trades": 2,
+          "net_usd": 77.53,
+          "at_limit": "encerrar",
+          "worst_usd": 0
+        },
+        "today": {
+          "trades": 2,
+          "net_usd": 77.53,
+          "worst_usd": 0
+        },
+        "market": "futures",
+        "status": "liberado",
+        "window": {
+          "next": {
+            "opens_at": "2026-10-28T14:00:00+00:00",
+            "closes_at": "2026-10-28T15:00:00+00:00",
+            "trading_day": "2026-10-28"
+          },
+          "state": "dentro",
+          "reason": null,
+          "current": {
+            "opens_at": "2026-10-27T14:00:00+00:00",
+            "closes_at": "2026-10-27T15:00:00+00:00"
+          },
+          "position": "dentro"
+        },
+        "version": {
+          "id": "25953858-fd08-4354-a3b2-ac5b5a3ed565",
+          "origin": "criar",
+          "version_no": 1,
+          "effective_from": "2026-10-14T13:12:04.922437+00:00"
+        },
+        "warnings": [],
+        "desde_day": "2026-10-14",
+        "account_id": "92baa31a-c684-4a48-ae52-3e7a30c8ff68",
+        "changes_at": "2026-10-27T15:00:00+00:00",
+        "state_rule": {
+          "state": "nao_avaliado",
+          "reason": "fase5"
+        },
+        "trading_day": "2026-10-27",
+        "checks_evaluated": [
+          "janela",
+          "limite"
+        ]
+      },
+      "plan_now": {
+        "breaks": [],
+        "verdict": "no_plano",
+        "checks_evaluated": [
+          "janela",
+          "limite"
+        ]
+      },
+      "position": {
+        "r": null,
+        "open": 0,
+        "undo": null,
+        "exits": 0,
+        "closed": 1,
+        "partials": 0,
+        "quantity": 1,
+        "stop_now": null,
+        "stop_kind": null,
+        "realized_pnl": 15,
+        "stop_initial": null
+      },
+      "trade_id": "410e343b-8561-460a-97dd-96eeea6e9741",
+      "breakeven": null,
+      "marks_now": [],
+      "plan_kind": "recalculado",
+      "stop_moves": [],
+      "imported_at": null,
+      "trading_day": "2026-10-27",
+      "clock_guessed": false,
+      "registered_at": "2026-10-27T15:40:05.524398+00:00"
+    },
+    {
+      "gate": {
+        "at": "2026-10-27T15:20:00+00:00",
+        "block": {
+          "state": "nao_avaliado",
+          "reason": "fase5"
+        },
+        "desde": "2026-10-14T13:12:04.922437+00:00",
+        "label": "Top One #1",
+        "limit": {
+          "usd": 400,
+          "mode": "conta",
+          "near": false,
+          "used": 0,
+          "state": "ok",
+          "hit_at": null,
+          "reason": null,
+          "trades": 2,
+          "net_usd": 60,
+          "at_limit": "encerrar",
+          "worst_usd": 0
+        },
+        "today": {
+          "trades": 2,
+          "net_usd": 60,
+          "worst_usd": 0
+        },
+        "market": "futures",
+        "status": "fora_janela",
+        "window": {
+          "next": {
+            "opens_at": "2026-10-28T14:00:00+00:00",
+            "closes_at": "2026-10-28T15:00:00+00:00",
+            "trading_day": "2026-10-28"
+          },
+          "state": "fora",
+          "reason": null,
+          "current": null,
+          "position": "depois"
+        },
+        "version": {
+          "id": "25953858-fd08-4354-a3b2-ac5b5a3ed565",
+          "origin": "criar",
+          "version_no": 1,
+          "effective_from": "2026-10-14T13:12:04.922437+00:00"
+        },
+        "warnings": [],
+        "desde_day": "2026-10-14",
+        "account_id": "92baa31a-c684-4a48-ae52-3e7a30c8ff68",
+        "changes_at": "2026-10-27T22:00:00+00:00",
+        "state_rule": {
+          "state": "nao_avaliado",
+          "reason": "fase5"
+        },
+        "trading_day": "2026-10-27",
+        "checks_evaluated": [
+          "janela",
+          "limite"
+        ]
+      },
+      "plan": {
+        "breaks": [
+          "fora_da_janela"
+        ],
+        "verdict": "fora_do_plano",
+        "checks_evaluated": [
+          "janela",
+          "limite"
+        ]
+      },
+      "exits": [],
+      "links": [
+        {
+          "after": {
+            "notes": "topone:MESZ6/900000000024",
+            "commission": 1.24,
+            "external_id": "MESZ6/900000000024",
+            "source_platform": "topone"
+          },
+          "before": {
+            "notes": null,
+            "commission": null,
+            "external_id": null,
+            "source_platform": null
+          },
+          "closed": false,
+          "differs": [],
+          "batch_id": "4996d431-8672-4b01-ad04-0460e30fdb9a",
+          "platform": "topone",
+          "file_name": "top_1027.csv",
+          "linked_at": "2026-10-27T21:00:04.615668+00:00",
+          "file_exit_at": "2026-10-27T15:25:00+00:00",
+          "file_entry_at": "2026-10-27T15:20:00+00:00"
+        }
+      ],
+      "marks": [],
+      "money": {
+        "net": -26.24,
+        "gross": -25,
+        "realized": true,
+        "commission": 1.24
+      },
+      "trade": {
+        "id": "cadac25e-9d1a-45fe-adaf-8bf0993b2455",
+        "pnl": -25,
+        "note": null,
+        "option": null,
+        "result": "loss",
+        "source": "after",
+        "status": "closed",
+        "symbol": "MES",
+        "quantity": 1,
+        "direction": "long",
+        "exit_time": "2026-10-27T15:25:00+00:00",
+        "pnl_basis": "prices",
+        "timeframe": null,
+        "account_id": "92baa31a-c684-4a48-ae52-3e7a30c8ff68",
+        "asset_type": "futures",
+        "commission": 1.24,
+        "entry_time": "2026-10-27T15:20:00+00:00",
+        "exit_price": 6995,
+        "expires_at": null,
+        "stop_price": 6990,
+        "entry_price": 7000,
+        "trading_day": "2026-10-27",
+        "stake_amount": null,
+        "target_price": null,
+        "note_saved_at": null,
+        "registered_at": "2026-10-27T15:40:05.47549+00:00",
+        "payout_percent": null,
+        "duration_seconds": null,
+        "exit_registered_at": "2026-10-27T15:40:05.47549+00:00"
+      },
+      "images": [],
+      "import": null,
+      "context": {
+        "origin": "reconstructed",
+        "rule_ok": null,
+        "in_block": null,
+        "warnings": [],
+        "in_window": false,
+        "after_limit": false,
+        "captured_at": "2026-10-27T15:40:05.47549+00:00",
+        "gate_status": "fora_janela",
+        "evaluated_at": "2026-10-27T15:20:00+00:00",
+        "state_choice": null,
+        "checks_evaluated": [
+          "janela",
+          "limite"
+        ],
+        "day_pnl_at_entry": 60,
+        "day_worst_at_entry": 0
+      },
+      "history": false,
+      "version": {
+        "id": "25953858-fd08-4354-a3b2-ac5b5a3ed565",
+        "version_no": 1
+      },
+      "entry_at": "2026-10-27T15:20:00+00:00",
+      "gate_now": null,
+      "plan_now": null,
+      "position": {
+        "r": -0.5,
+        "open": 0,
+        "undo": null,
+        "exits": 0,
+        "closed": 1,
+        "partials": 0,
+        "quantity": 1,
+        "stop_now": 6990,
+        "stop_kind": null,
+        "realized_pnl": -25,
+        "stop_initial": 6990
+      },
+      "trade_id": "cadac25e-9d1a-45fe-adaf-8bf0993b2455",
+      "breakeven": {
+        "n": 8,
+        "un": "pts",
+        "key": "MES",
+        "level": 7008
+      },
+      "marks_now": [],
+      "plan_kind": "congelado",
+      "stop_moves": [],
+      "imported_at": "2026-10-27T21:00:04.615668+00:00",
+      "trading_day": "2026-10-27",
+      "clock_guessed": false,
+      "registered_at": "2026-10-27T15:40:05.47549+00:00"
+    }
+  ],
+  "account": {
+    "id": "92baa31a-c684-4a48-ae52-3e7a30c8ff68",
+    "day": {
+      "tz": "America/New_York",
+      "start_min": 1080
+    },
+    "label": "Top One #1",
+    "market": "futures",
+    "file_tz": "UTC",
+    "archived": false,
+    "currency": "USD",
+    "platform": "topone",
+    "is_example": false,
+    "tz_confirmed": true,
+    "guessed_clock": 0
+  },
+  "deleted": [
+    {
+      "at": "2026-10-27T14:40:05.428383+00:00",
+      "via": "desfazer_entrada"
+    },
+    {
+      "at": "2026-10-27T15:40:05.524398+00:00",
+      "via": "apagada"
+    }
+  ],
+  "weekday": 2,
+  "carry_in": {
+    "day": "2026-10-22",
+    "text": "Esperar o reteste antes de comprar.",
+    "saved_at": "2026-10-22T22:05:05.425762+00:00"
+  },
+  "desde_day": "2026-10-14",
+  "server_now": "2026-10-27T21:00:04.665696+00:00",
+  "open_elsewhere": [
+    {
+      "app": true,
+      "symbol": "MES",
+      "quantity": 1,
+      "trade_id": "d3089a4b-0b8a-463b-bcdb-e3234f0aafd8",
+      "direction": "long",
+      "asset_type": "futures",
+      "entry_time": "2026-10-23T14:04:04.667647+00:00",
+      "expires_at": null,
+      "trading_day": "2026-10-23"
+    }
+  ],
+  "review_history": []
+}

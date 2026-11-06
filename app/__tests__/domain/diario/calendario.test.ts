@@ -267,11 +267,88 @@ describe('the answers\' own rules (cases4.json pins them against the SQL)', () =
     expect([isWeekClosed('binary', '2026-11-23', '2026-11-29'), isWeekClosed('crypto', '2026-11-23', '2026-11-30')]).toEqual([false, true]);
   });
 
-  it('«Semana em andamento» until the week is closed: a futures Saturday shows the week whole, Cripto\'s goes on', () => {
+  it('«Semana em andamento» while today is in the week (the boards: sem ≤ hoje ≤ sem + 6): a futures Saturday is «5 de 5 pregões»', () => {
     const days = topOneDays();
-    const card = weekCard({ day: '2026-11-27', today: '2026-11-28', market: 'futures', days, weeks: calendarWeeks(days) });
-    expect([card.inProgress, card.columns]).toEqual([false, 5]);
+    const weeks = calendarWeeks(days);
+    const sat = weekCard({ day: '2026-11-27', today: '2026-11-28', market: 'futures', days, weeks });
+    expect([sat.inProgress, sat.pregoesAte, sat.columns]).toEqual([true, 5, 5]);
+    expect(weekCard({ day: '2026-11-27', today: '2026-11-29', market: 'futures', days, weeks }).inProgress).toBe(true);
+    // The next Monday the week is over (and closed: isWeekClosed already from Saturday)
+    expect(weekCard({ day: '2026-11-27', today: '2026-11-30', market: 'futures', days, weeks }).inProgress).toBe(false);
+    expect(isWeekClosed('futures', '2026-11-23', '2026-11-28')).toBe(true);
     expect(weekCard({ day: '2026-11-12', today: '2026-11-14', market: 'crypto', days: binanceDays() }).inProgress).toBe(true);
+    // Tuesday: «2 de 5»
+    expect(weekCard({ day: '2026-11-24', today: '2026-11-24', market: 'futures', days, weeks }).pregoesAte).toBe(2);
+  });
+
+  it('a review written on a history day (the day the rules began with only earlier trades) shows ✓ (review, 10 Oct)', () => {
+    const hist = ebinexDays().find((d) => d.kind === 'historico')!;
+    const review = { firstSavedAt: et('2026-10-10 20:00'), savedAt: et('2026-10-11 03:32'), versions: 2 };
+    const days = ebinexDays().map((d) => (d.day === hist.day ? { ...d, review } : d));
+    const grid = monthGrid({ month: hist.day.slice(0, 7), today: '2026-12-01', market: 'binary', days });
+    const cell = grid.weeks.flatMap((w) => w.cells).find((c) => c.day === hist.day)!;
+    expect([cell.historyOnly, cell.reviewed, cell.clickable, cell.pendingReview]).toEqual([true, true, true, false]);
+  });
+
+  it('a review written on a weekend day without trades (a futures «today» after Friday\'s close) draws Sáb and Dom (review, 7 Nov)', () => {
+    const sat: CalendarDay = {
+      day: '2026-11-07',
+      weekday: 6,
+      kind: 'vazio',
+      n: 0,
+      app: 0,
+      open: 0,
+      wins: 0,
+      losses: 0,
+      even: 0,
+      net: '0',
+      gross: '0',
+      commission: null,
+      review: { firstSavedAt: et('2026-11-06 19:30'), savedAt: et('2026-11-06 19:30'), versions: 1 },
+      history: null,
+      importedAt: null,
+    };
+    const days = [...topOneDays(), sat];
+    expect(monthColumns('futures', '2026-11', days)).toBe(7);
+    expect(monthColumns('futures', '2026-11', topOneDays())).toBe(5);
+    const grid = monthGrid({ month: '2026-11', today: '2026-12-01', market: 'futures', days });
+    const cell = grid.weeks.flatMap((w) => w.cells).find((c) => c.day === '2026-11-07')!;
+    expect([cell.weekend, cell.reviewed, cell.clickable, cell.hasTrades]).toEqual([true, true, true, false]);
+    const card = weekCard({ day: '2026-11-06', today: '2026-12-01', market: 'futures', days });
+    // The week's four reviewed trading days, and the Saturday: counted and drawn
+    expect([card.columns, card.reviews]).toEqual([7, { counted: 5, reviewed: 5 }]);
+    expect(weekCard({ day: '2026-11-06', today: '2026-12-01', market: 'futures', days: topOneDays() }).reviews).toEqual({ counted: 4, reviewed: 4 });
+    expect(weekColumns('futures', '2026-11-02', topOneDays())).toBe(5);
+  });
+
+  it('a weekend day with only history keeps the «Semana» card at 5 columns (as the boards: ehDiario)', () => {
+    const histSat: CalendarDay = {
+      day: '2026-11-07',
+      weekday: 6,
+      kind: 'historico',
+      n: 0,
+      app: 0,
+      open: 0,
+      wins: 0,
+      losses: 0,
+      even: 0,
+      net: '0',
+      gross: '0',
+      commission: null,
+      review: null,
+      history: { n: 1, wins: 1, losses: 0, even: 0, net: '20', gross: '21.24' },
+      importedAt: et('2026-11-09 10:00'),
+    };
+    const days = [...topOneDays(), histSat];
+    expect(weekColumns('futures', '2026-11-02', days)).toBe(5);
+    // …while the month shows the weekend (any trade)
+    expect(monthColumns('futures', '2026-11', days)).toBe(7);
+  });
+
+  it('a bar never thinner than 3 px when its day has a result', () => {
+    const days = topOneDays().map((d) => (d.day === '2026-11-24' ? { ...d, net: '0.5' } : d));
+    const bars = weekCard({ day: '2026-11-24', today: '2026-12-01', market: 'futures', days }).bars;
+    expect(bars.find((b) => b.day === '2026-11-24')!.height).toBe(3);
   });
 
   it('the kind of a day, and a written review on a day without trades (✓, opens the day)', () => {

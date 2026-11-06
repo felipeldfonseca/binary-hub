@@ -70,7 +70,7 @@ const cases = raw as unknown as Cases;
 describe('cases4.json', () => {
   it('records every group', () => {
     expect(cases.about).toMatch(/20261105000001_diario\.sql and 20261105000002_diario_api\.sql/);
-    expect([cases.review.length, cases.note.length, cases.text.length, cases.week.week_of.length, cases.week.closed.length]).toEqual([45, 12, 14, 13, 56]);
+    expect([cases.review.length, cases.note.length, cases.text.length, cases.week.week_of.length, cases.week.closed.length]).toEqual([49, 14, 14, 13, 56]);
     expect([cases.day_end.length, cases.kind.length, cases.carry.length]).toEqual([28, 4, 5]);
   });
 });

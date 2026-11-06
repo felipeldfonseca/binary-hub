@@ -285,6 +285,7 @@ export function facts(over: Partial<DayFacts>): DayFacts {
     net: '0',
     gross: '0',
     commission: null,
+    commissionUnknown: 0,
     firstEntryAt: null,
     window: { rule: true, evaluated: 0, inside: 0, outside: [] },
     limit: limitOf({}),
@@ -324,10 +325,14 @@ export const f19 = (): DayFacts =>
     }),
     fora: { n: 1, net: '-38.74', open: 0 },
     othersNet: '-426.66',
-    breakeven: { by: { MES: { n: '8', un: 'pts' }, MNQ: { n: '30', un: 'pts' } }, trades: 0, moved: 0 },
+    // Five MES/MNQ trades, none got to +8 / +30 (the board: «nenhuma chegou ao ponto da regra»)
+    breakeven: { by: { MES: { n: '8', un: 'pts' }, MNQ: { n: '30', un: 'pts' } }, trades: 5, reached: 0, moved: 0 },
   });
 
-/** 10 nov (board scenario 2): five trades, the 11:20 one from the file outside the window, the breakeven moved in 1 of 2 */
+/**
+ * 10 nov (board scenario 2): five trades, the 11:20 one from the file outside the window; four of
+ * the rule's assets, two got to the rule's point, the breakeven moved in 1 of 2
+ */
 export const f10 = (): DayFacts =>
   facts({
     day: '2026-11-10',
@@ -343,5 +348,5 @@ export const f10 = (): DayFacts =>
     fora: { n: 1, net: '-32.49', open: 0 },
     othersNet: '300.42',
     recalculated: 1,
-    breakeven: { by: { MES: { n: '8', un: 'pts' }, MNQ: { n: '30', un: 'pts' } }, trades: 2, moved: 1 },
+    breakeven: { by: { MES: { n: '8', un: 'pts' }, MNQ: { n: '30', un: 'pts' } }, trades: 4, reached: 2, moved: 1 },
   });

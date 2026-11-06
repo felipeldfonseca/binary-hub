@@ -134,7 +134,11 @@ export interface CalendarRead extends DiarioHead {
   weeks: CalendarWeek[];
 }
 
-/** «Fora do plano» of a day or a week: how many diário trades, their realized net, how many are still open */
+/**
+ * «Fora do plano» of a day or a week: how many diário trades broke the plan, the realized net of
+ * the closed ones (an open trade's partials count only in the day's net), how many are still open
+ * («1 operação · aberta» when all are)
+ */
 export interface ForaSum {
   n: number;
   net: Money;
@@ -234,22 +238,35 @@ export interface DayFacts {
   net: Money;
   gross: Money;
   commission: Money | null;
+  /**
+   * Diário trades that realized money without a known commission: while any waits for the
+   * broker's file the day is still gross («A comissão ainda não chegou»), even when another
+   * trade's commission is known
+   */
+  commissionUnknown: number;
   /** The day's first diário entry; null without one */
   firstEntryAt: Date | null;
   /** null when no window rule is in force and no trade was judged against one */
   window: { rule: boolean; evaluated: number; inside: number; outside: TradeAt[] } | null;
   /**
-   * null when the version has no limit. `after`: the diário trades entered after it; `afterNet`
-   * their realized net («1 depois, às 10:52: −US$ 38,74»), null when none realized
+   * null when the version has no limit. `after`: the diário trades entered at or after hitAt as
+   * the day stands now ([] without a hit; a trade's own plan mark is its frozen or recalculated
+   * one and can differ when the hit moved after it was registered); `afterNet` the realized net
+   * of the closed ones («1 depois, às 10:52: −US$ 38,74»), null when none
    */
   limit: (DayLimit & { after: TradeAt[]; afterNet: Money | null }) | null;
   fora: ForaSum;
-  /** Realized net of the diário trades that kept the plan («As outras 4 somaram …») */
+  /** Realized net of the closed diário trades that kept the plan («As outras 4 somaram …») */
   othersNet: Money;
   recalculated: number;
   history: { n: number; net: Money; gross: Money };
-  /** null without the breakeven rule: the rule, the trades it applies to, and how many moved */
-  breakeven: { by: BreakevenRule['by']; trades: number; moved: number } | null;
+  /**
+   * null without the breakeven rule: the rule; `trades`, the diário trades of its assets;
+   * `reached`, those with a stop that got to the rule's +N (an exit at or past it, or a stop move
+   * with that many points in favour); `moved`, of the reached ones, how many had the stop moved to
+   * the entry («moveu em 1 de 2»; «nenhuma chegou ao ponto da regra» when none reached)
+   */
+  breakeven: { by: BreakevenRule['by']; trades: number; reached: number; moved: number } | null;
   version: { id: string; versionNo: number } | null;
   /** Earlier versions in force during the day */
   changes: number;

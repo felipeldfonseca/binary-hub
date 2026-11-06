@@ -30,7 +30,7 @@ describe('the tiles', () => {
   });
 
   it('12 nov at 10:42 (board «Hoje»): an open trade with its partial counts; the commission is still to come', () => {
-    const t = dayTiles(facts({ trades: 2, closed: 1, open: 1, wins: 1, net: '85', gross: '85', commission: null }), 'futures');
+    const t = dayTiles(facts({ trades: 2, closed: 1, open: 1, wins: 1, net: '85', gross: '85', commission: null, commissionUnknown: 1 }), 'futures');
     expect(t.operations).toEqual({ n: 2, open: 1, closed: 1, wins: 1, losses: 0, even: 0 });
     expect(t.money.pending).toBe(true);
     expect(t.limit?.loss).toBe('0');
@@ -38,8 +38,30 @@ describe('the tiles', () => {
   });
 
   it('no commission is pending where the files bring none (binárias), nor before any result', () => {
-    expect(dayTiles(facts({ trades: 3, closed: 3, wins: 2, losses: 1, net: '10.7', gross: '10.7', limit: null }), 'binary').money.pending).toBe(false);
+    expect(dayTiles(facts({ trades: 3, closed: 3, wins: 2, losses: 1, net: '10.7', gross: '10.7', commissionUnknown: 3, limit: null }), 'binary').money.pending).toBe(false);
     expect(dayTiles(facts({ trades: 1, open: 1 }), 'futures').money.pending).toBe(false);
+  });
+
+  it('a known commission on one trade does not make the day net while another still waits for it (review, 9 Oct)', () => {
+    // The file's trade came with US$ 2,49; two «Já fechada» still have none (the SQL's commission_unknown)
+    const f = facts({ trades: 4, closed: 3, open: 1, net: '54.51', gross: '57', commission: '2.49', commissionUnknown: 2 });
+    expect(dayTiles(f, 'futures').money).toEqual({ gross: '57', commission: '2.49', pending: true });
+    expect(dayTiles({ ...f, commissionUnknown: 0 }, 'futures').money.pending).toBe(false);
+    // Forex and Ações wait for the broker too; Cripto and B3 take «Custos» at the exit
+    expect([dayTiles(f, 'forex').money.pending, dayTiles(f, 'stocks').money.pending, dayTiles(f, 'crypto').money.pending, dayTiles(f, 'b3').money.pending]).toEqual([
+      true,
+      true,
+      false,
+      false,
+    ]);
+  });
+
+  it('«As outras N» counts the closed trades that kept the plan, the same ones others_net sums (an open trade\'s partial apart)', () => {
+    // 30 Oct (review, seed 25): 08:04 outside the window +15, a «Já fechada» +26.25 in the plan, an open trade with a −33.75 partial
+    const t = dayTiles(facts({ trades: 3, closed: 2, open: 1, net: '7.5', fora: { n: 1, net: '15', open: 0 }, othersNet: '26.25' }), 'futures');
+    expect([t.fora, t.others]).toEqual([{ n: 1, net: '15', open: 0, allOpen: false }, { n: 1, net: '26.25' }]);
+    // 21 Oct (seed 10): both «fora» closed, the only trade in the plan still open: no «As outras»
+    expect(dayTiles(facts({ trades: 3, closed: 2, open: 1, fora: { n: 2, net: '-20.99', open: 0 }, othersNet: '0' }), 'futures').others).toBeNull();
   });
 
   it('Lucid 50k on 1º dez: «somando as contas de Futuros», 43 %', () => {
@@ -54,6 +76,8 @@ describe('the tiles', () => {
     const t = dayTiles(facts({ trades: 4, closed: 3, open: 1, fora: { n: 1, net: '0', open: 1 } }), 'binary');
     expect(t.fora).toEqual({ n: 1, net: '0', open: 1, allOpen: true });
     expect(t.others).toEqual({ n: 3, net: '0' });
+    // One open, one closed: the closed one's money shows
+    expect(dayTiles(facts({ trades: 2, closed: 1, open: 1, fora: { n: 2, net: '-12', open: 1 } }), 'futures').fora?.allOpen).toBe(false);
   });
 
   it('the misto day keeps its history apart', () => {

@@ -1,6 +1,6 @@
 import React from 'react'
 import { act, renderHook, waitFor } from '@testing-library/react'
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { QueryClient, QueryClientProvider, focusManager } from '@tanstack/react-query'
 import * as diarioDb from '@/lib/hub/diarioDb'
 import { hubKeys } from '@/hooks/useContas'
 import { registrarKeys } from '@/hooks/useRegistrar'
@@ -117,6 +117,34 @@ describe('reads', () => {
     expect(queryClient.getQueryCache().find({ queryKey: diarioKeys.mes('user-1', 'acc-1', '2026-10') })?.options).toMatchObject({ refetchOnWindowFocus: 'always' })
   })
 
+  it('on focus: the calendar, the current month and today are read again; a past month and a past day are not', async () => {
+    const { wrapper } = setup()
+    const { result } = renderHook(
+      () => ({
+        cal: useDiarioCalendario('acc-1'),
+        mesAgora: useDiarioMes('acc-1', '2026-10', { today: '2026-10-26' }),
+        mesPassado: useDiarioMes('acc-1', '2026-09', { today: '2026-10-26' }),
+        hoje: useDiarioDia('acc-1', '2026-10-26', { today: '2026-10-26' }),
+        passado: useDiarioDia('acc-1', '2026-10-22', { today: '2026-10-26' }),
+      }),
+      { wrapper },
+    )
+    await waitFor(() => expect(Object.values(result.current).every((q) => q.isSuccess)).toBe(true))
+    const count = () => ({
+      cal: db.fetchCalendario.mock.calls.length,
+      meses: db.fetchMes.mock.calls.map(([, , m]) => m).sort(),
+      dias: db.fetchDia.mock.calls.map(([, , d]) => d).sort(),
+    })
+    expect(count()).toEqual({ cal: 1, meses: ['2026-09', '2026-10'], dias: ['2026-10-22', '2026-10-26'] })
+    await act(async () => {
+      focusManager.setFocused(false)
+      focusManager.setFocused(true)
+    })
+    await waitFor(() => expect(db.fetchCalendario).toHaveBeenCalledTimes(2))
+    await waitFor(() => expect(count()).toEqual({ cal: 2, meses: ['2026-09', '2026-10', '2026-10'], dias: ['2026-10-22', '2026-10-26', '2026-10-26'] }))
+    focusManager.setFocused(undefined)
+  })
+
   it('nothing is read without an account or a day', async () => {
     const { wrapper } = setup()
     renderHook(() => ({ cal: useDiarioCalendario(null), dia: useDiarioDia('acc-1', null) }), { wrapper })
@@ -135,6 +163,14 @@ describe('reads', () => {
     expect(queryClient.getQueryData(diarioKeys.imagens('user-1', 'acc-1', 't-1', 'u/t/a.webp,u/t/b.webp'))).toEqual({ 'u/t/a.webp': 'https://x/a' })
     const none = renderHook(() => useDayImages('acc-1', 't-2', []), { wrapper })
     expect(none.result.current.fetchStatus).toBe('idle')
+    // Signed again only after 9 minutes: another view of the same trade within them reads the cache
+    expect(queryClient.getQueryCache().find({ queryKey: diarioKeys.imagens('user-1', 'acc-1', 't-1', 'u/t/a.webp,u/t/b.webp') })?.options).toMatchObject({
+      staleTime: SIGNED_URLS_STALE_MS,
+      refetchOnWindowFocus: false,
+    })
+    const again = renderHook(() => useDayImages('acc-1', 't-1', ['u/t/a.webp', 'u/t/b.webp']), { wrapper })
+    await waitFor(() => expect(again.result.current.isSuccess).toBe(true))
+    expect(db.signedImageUrls).toHaveBeenCalledTimes(1)
   })
 })
 

@@ -26,6 +26,12 @@
  *     the 10:04 entry still open); Mon 26 Oct 09:00, today.
  *   Ebinex (binárias, Brasília): history on Fri 9 Oct; rules from 14 Oct (window 09:00–12:00 every
  *     day, US$ 100 that warns); Saturday 24 and Sunday 25 Oct, the 13:30 outside the window.
+ *   Then (the review of 5 Nov): Tue 27 Oct on Top One, a live MES of 2 with a partial at +10 and the
+ *     stop at the breakeven (still open), «Já fechada» in and outside the window, an old-page trade,
+ *     a live entry undone and a «Já fechada» deleted on the old page; at 17:00 the broker's file
+ *     closes the live MES and completes the two «Já fechada» (one exit price corrected). Wed 28 Oct
+ *     a live MES at 10:30 and, registered after it, a «Já fechada» of 10:05 that reaches the limit at
+ *     10:20; an Ebinex binary still open; Clear (B3, R$) from 28 Oct with a «Já fechada» WIN.
  */
 import { createHash, randomUUID } from 'crypto';
 import fs from 'fs';
@@ -57,7 +63,9 @@ import { afterPayload, entryPayload, exitPayload, extrasPayload, imageSlotsReque
 import { EVERY_DAY, MON_TO_FRI, tradingDayBounds } from '@/lib/domain/tempo';
 import { importCommit, importPreview } from '@/lib/hub/contasDb';
 import {
+  apagadasTexto,
   avisoDeRevisoes,
+  comoLerOsNumeros,
   doPregaoAnterior,
   fatosTexto,
   linhaDoTopo,
@@ -77,7 +85,7 @@ import {
   saveDayReview,
   type DayRead,
 } from '@/lib/hub/diarioDb';
-import { imageSlots, moveStop, newClientKey, registerAfter, registerEntry, registerExit, registerPartial, saveExtras } from '@/lib/hub/registrarDb';
+import { imageSlots, moveStop, newClientKey, registerAfter, registerEntry, registerExit, registerPartial, saveExtras, undoEntry } from '@/lib/hub/registrarDb';
 import { PG_URL, asUser, asUserExec, createAccountAsUser, lit, pgClient, psql } from '@/testing/pg';
 
 const SHIFT_FILE = process.env.BH_PG_SHIFT_FILE;
@@ -116,7 +124,7 @@ describePg('Phase 4 × the real SQL: the Diário\'s reads and writes', () => {
   const uid = randomUUID();
   const log: { name: string; args: Record<string, unknown>; answer: { data: unknown; error: unknown } }[] = [];
   const db = pgClient(uid, log);
-  const acc = { top: '', ebx: '' };
+  const acc = { top: '', ebx: '', b3: '' };
   const trades: Record<string, string> = {};
   const recorded: string[] = [];
   const write = (name: string, json: unknown) => {
@@ -126,6 +134,9 @@ describePg('Phase 4 × the real SQL: the Diário\'s reads and writes', () => {
   const lastAnswer = () => log[log.length - 1].answer.data;
   const TOP: ContaDiario = { currency: 'USD', market: 'futures', tz: NY };
   const EBX: ContaDiario = { currency: 'USD', market: 'binary', tz: SP };
+  const B3: ContaDiario = { currency: 'BRL', market: 'b3', tz: SP };
+  /** The money's no-break spaces as plain ones, in a string or any JSON value */
+  const sp = <T,>(x: T): T => JSON.parse(JSON.stringify(x).replace(/\u00a0/g, ' '));
 
   /** Preview, then commit, as the import sheet does (the preview counts as the commit) */
   async function importar(accountId: string, text: string, name: string, tz: string, platform: 'topone' | 'ebinex') {
@@ -506,6 +517,7 @@ insert into public.hub_members (user_id) values ('${uid}');`);
     ]);
     expect([d.review, d.note, d.carryIn]).toEqual([null, null, null]);
     const tiles = dayTiles(d.facts, 'futures');
+    expect(d.facts.commissionUnknown).toBe(1);
     expect(tiles.money).toEqual({ gross: '60', commission: null, pending: true });
   });
 
@@ -527,8 +539,12 @@ insert into public.hub_members (user_id) values ('${uid}');`);
     expect(linhasDoPlano(d.plan.rules!, d.facts, TOP).map((l) => [l.item, l.fato.replace(/ /g, ' '), l.marca])).toEqual([
       ['Janela', '4 de 4 dentro', 'No plano'],
       ['Limite', 'atingido às 10:38, com US$ 426,66 de perda · 1 depois, às 10:52: −US$ 38,74', 'Fora do plano'],
-      ['Breakeven', 'moveu em 0 de 4', 'Registrado'],
+      // Four MES trades from the file, none with a stop that got to +8 (the board: no count to give)
+      ['Breakeven', 'nenhuma chegou ao ponto da regra', 'Registrado'],
     ]);
+    expect(d.facts.breakeven).toEqual({ by: { MES: { n: '8', un: 'pts' } }, trades: 4, reached: 0, moved: 0 });
+    // Every exit came with its commission (two of them zero): net, the gross in the ⓘ
+    expect([d.facts.commissionUnknown, dayTiles(d.facts, 'futures').money.pending]).toEqual([0, false]);
     expect(fatosTexto(d.facts, TOP).replace(/ /g, ' ')).toBe(
       '4 operações · −US$ 465,40 · limite atingido às 10:38 · 1 depois do limite, às 10:52 · limite: US$ 465,40 de US$ 400 no pior momento',
     );
@@ -552,7 +568,9 @@ insert into public.hub_members (user_id) values ('${uid}');`);
       ['breakeven'],
       { realized: true, net: '175', gross: '175', commission: null },
     ]);
-    expect(d.facts.breakeven).toEqual({ by: { MES: { n: '8', un: 'pts' } }, trades: 1, moved: 1 });
+    // The partial at +8 got to the rule's point; the stop went to the entry there
+    expect(d.facts.breakeven).toEqual({ by: { MES: { n: '8', un: 'pts' } }, trades: 1, reached: 1, moved: 1 });
+    expect(linhasDoPlano(d.plan.rules!, d.facts, TOP)[2]).toMatchObject({ item: 'Breakeven', fato: 'moveu em 1 de 1' });
     expect([t.images.map((i) => [i.name, i.mime, i.path.startsWith(`${uid}/${trades.live}/`)]), t.trade.note]).toEqual([[['MES_entrada.webp', 'image/webp', true]], 'Entrei no reteste.']);
     expect(d.review).toMatchObject({ versions: 2, followed: 'em_parte', written: true });
     expect(d.review!.previous).toHaveLength(1);
@@ -636,10 +654,219 @@ insert into public.hub_members (user_id) values ('${uid}');`);
     await expect(fetchDia(other, acc.top, '2026-10-22')).rejects.toMatchObject({ code: 'unknown_account' });
   });
 
+  it('Tue 27 Oct 11:40 ET: an open MES with a partial, «Já fechada» in and outside the window, an old-page trade, an undo and a deletion', async () => {
+    setClock('2026-10-27T14:05:05Z');
+    const p = await registerEntry(db, acc.top, entryPayload('futures', { clientKey: newClientKey(), symbol: 'MES', direction: 'long', quantity: '2', entryPrice: '7000.00', stop: '10', clock: NY }));
+    trades.p27 = p.state.trade.id;
+    setClock('2026-10-27T14:12:05Z');
+    await registerPartial(db, trades.p27, partialPayload({ clientKey: newClientKey(), quantity: '1', exitPrice: '7010.00', exit: '10:12', clock: NY }));
+    setClock('2026-10-27T14:13:05Z');
+    await moveStop(db, trades.p27, movePayload({ clientKey: newClientKey(), kind: 'breakeven', priceNow: '7010.00' }));
+    setClock('2026-10-27T14:40:05Z');
+    const u = await registerEntry(db, acc.top, entryPayload('futures', { clientKey: newClientKey(), symbol: 'MNQ', direction: 'short', quantity: '1', entryPrice: '21000.00', clock: NY }));
+    await undoEntry(db, u.state.trade.id);
+    setClock('2026-10-27T15:40:05Z');
+    const j1 = await registerAfter(
+      db,
+      acc.top,
+      afterPayload('futures', { clientKey: newClientKey(), symbol: 'MES', direction: 'short', quantity: '1', entryPrice: '7000.00', stop: '10', clock: NY, day: '2026-10-27', entry: '10:20', exit: '10:30', exitPrice: '6998.00', allowSimilar: true }),
+    );
+    trades.j27 = j1.state.trade.id;
+    const j2 = await registerAfter(
+      db,
+      acc.top,
+      afterPayload('futures', { clientKey: newClientKey(), symbol: 'MES', direction: 'long', quantity: '1', entryPrice: '7000.00', stop: '10', clock: NY, day: '2026-10-27', entry: '11:20', exit: '11:25', exitPrice: '6995.00', allowSimilar: true }),
+    );
+    trades.fora27 = j2.state.trade.id;
+    const v = await registerAfter(
+      db,
+      acc.top,
+      afterPayload('futures', { clientKey: newClientKey(), symbol: 'MNQ', direction: 'long', quantity: '1', entryPrice: '21000.00', clock: NY, day: '2026-10-27', entry: '10:45', exit: '10:50', exitPrice: '21002.00', allowSimilar: true }),
+    );
+    // The old page: one trade typed there (no app context), and the MNQ deleted there
+    asUserExec(
+      uid,
+      `insert into public.trades (user_id, account_id, symbol, asset_type, direction, entry_time, exit_time, entry_price, exit_price, quantity, result, pnl)
+       values ('${uid}', '${acc.top}', 'MESZ6', 'futures', 'long', '2026-10-27 14:50Z', '2026-10-27 14:55Z', 7000, 7003, 1, 'win', 15);
+       delete from public.trades where id = '${v.state.trade.id}';`,
+    );
+
+    const d = await dia(acc.top, '2026-10-27', 'dia-top-1027-aberta');
+    expect(d.trades.map((t) => [t.trade.entryTime.toISOString().slice(11, 16), t.trade.status, t.planKind, (t.planNow ?? t.plan)?.verdict, t.money.net])).toEqual([
+      ['14:05', 'open', 'congelado', 'no_plano', '50'],
+      ['14:20', 'closed', 'congelado', 'no_plano', '10'],
+      ['14:50', 'closed', 'recalculado', 'no_plano', '15'],
+      ['15:20', 'closed', 'congelado', 'fora_do_plano', '-25'],
+    ]);
+    // «Fora do plano» and «As outras» are closed trades: the open MES's +50 is in the day only
+    expect([d.facts.net, d.facts.closed, d.facts.open, d.facts.fora, d.facts.othersNet, d.facts.commissionUnknown]).toEqual([
+      '50',
+      3,
+      1,
+      { n: 1, net: '-25', open: 0 },
+      '25',
+      4,
+    ]);
+    const t = dayTiles(d.facts, 'futures');
+    expect([t.others, t.fora?.allOpen, t.money.pending]).toEqual([{ n: 2, net: '25' }, false, true]);
+    expect(sp(comoLerOsNumeros(t, TOP, d.facts))).toBe(
+      'A comissão ainda não chegou: o resultado está bruto até o arquivo da corretora. Limite do dia: a maior perda acumulada no pregão, no pior momento, já com a comissão quando o arquivo a trouxe, contra o seu limite de US$ 400. Pelas suas regras, ao atingir o limite o app encerra o dia. Fora do plano: operações fora da janela ou depois do limite. As outras 2 somaram +US$ 25,00: conta simples, não é o que teria acontecido.',
+    );
+    expect(sp(numerosDoDia(t, TOP).fora)).toBe('1 operação · −US$ 25,00');
+    // The breakeven row: four MES trades; only the live one (stop, +10 at the partial) got to +8, and moved
+    expect(d.facts.breakeven).toEqual({ by: { MES: { n: '8', un: 'pts' } }, trades: 4, reached: 1, moved: 1 });
+    expect(sp(linhasDoPlano(d.plan.rules!, d.facts, TOP)).map((l) => [l.item, l.fato, l.marca])).toEqual([
+      ['Janela', '3 de 4 dentro', 'Fora do plano'],
+      ['Limite', 'nenhuma perda acumulada', 'No plano'],
+      ['Breakeven', 'moveu em 1 de 1', 'Registrado'],
+    ]);
+    // The undo and the deletion, by their own path; the old page's trade has no app context
+    expect(d.deleted.map((x) => [x.via, x.at.toISOString().slice(11, 16)])).toEqual([
+      ['desfazer_entrada', '14:40'],
+      ['apagada', '15:40'],
+    ]);
+    expect(apagadasTexto(d.deleted, NY)).toBe('1 operação registrada foi apagada às 11:40.');
+    expect(d.trades[2]).toMatchObject({ context: null, import: null, links: [], clockGuessed: false });
+  });
+
+  it('Tue 27 Oct 17:00 ET: the broker\'s file closes the live MES and completes both «Já fechada» (one exit price corrected)', async () => {
+    setClock('2026-10-27T21:00:05Z');
+    await importar(
+      acc.top,
+      topOneCsv([
+        ['900000000021', 'BUY', '27/10/2026 14:05:00', '7000', '27/10/2026 14:12:00', '7010', '$50', '1.24'],
+        ['900000000022', 'BUY', '27/10/2026 14:05:00', '7000', '27/10/2026 14:50:00', '7004', '$20', '1.24'],
+        ['900000000023', 'SELL', '27/10/2026 14:20:00', '7000', '27/10/2026 14:30:00', '6997.75', '$11.25', '1.24'],
+        ['900000000024', 'BUY', '27/10/2026 15:20:00', '7000', '27/10/2026 15:25:00', '6995', '-$25', '1.24'],
+      ]),
+      'top_1027.csv',
+      'UTC',
+      'topone',
+    );
+    const d = await dia(acc.top, '2026-10-27', 'dia-top-1027');
+    const byId = (id: string) => d.trades.find((x) => x.trade.id === id)!;
+    expect(d.trades).toHaveLength(4);
+    expect([byId(trades.p27).trade.status, byId(trades.p27).links.map((l) => [l.fileName, l.closed]), byId(trades.p27).money]).toEqual([
+      'closed',
+      [['top_1027.csv', true]],
+      { realized: true, net: '67.52', gross: '70', commission: '2.48' },
+    ]);
+    const j = byId(trades.j27);
+    expect([j.links.map((l) => [l.closed, l.differs.includes('exit_price')]), j.money]).toEqual([
+      [[false, true]],
+      { realized: true, net: '10.01', gross: '11.25', commission: '1.24' },
+    ]);
+    expect([j.links[0].before.exit_price, j.links[0].after.exit_price].map((x) => numericText(trimScale(numeric(String(x)))))).toEqual(['6998', '6997.75']);
+    expect(byId(trades.fora27).links.map((l) => [l.closed, l.differs])).toEqual([[false, []]]);
+    // The old page's trade still waits for its commission: the day stays «still gross»
+    expect([d.facts.net, d.facts.gross, d.facts.commission, d.facts.commissionUnknown, d.facts.fora, d.facts.othersNet]).toEqual([
+      '66.29',
+      '71.25',
+      '4.96',
+      1,
+      { n: 1, net: '-26.24', open: 0 },
+      '92.53',
+    ]);
+    expect(dayTiles(d.facts, 'futures').money.pending).toBe(true);
+  });
+
+  it('Wed 28 Oct: a live MES at 10:30, then a «Já fechada» of 10:05 that reaches the limit at 10:20; an open binary; Clear (B3)', async () => {
+    setClock('2026-10-28T12:00:05Z');
+    acc.b3 = await createAccountAsUser(uid, { market: 'b3', label: 'Clear', platform: 'profit', firm: null, external_ref: null, phase: null, size: null, is_primary: false });
+    asUser(
+      uid,
+      `public.save_rules(${lit({
+        v: 1,
+        base_rev: (asUser(uid, 'public.rules_config()') as { rev: string }).rev,
+        accounts: {
+          [acc.b3]: {
+            rules: { v: 1, window_rule: { on: true, outside: 'fora' }, limit: { brl: 500, mode: 'conta', at_limit: 'encerrar' } },
+            window: { tz: SP, start_min: 600, end_min: 1020, weekdays: MON_TO_FRI },
+            version: 'force',
+          },
+        },
+      })})`,
+    );
+    setClock('2026-10-28T14:30:05Z');
+    const q = await registerEntry(db, acc.top, entryPayload('futures', { clientKey: newClientKey(), symbol: 'MES', direction: 'long', quantity: '1', entryPrice: '7000.00', stop: '10', clock: NY }));
+    trades.q28 = q.state.trade.id;
+    const bin = await registerEntry(db, acc.ebx, entryPayload('binary', { clientKey: newClientKey(), symbol: 'EUR/USD', direction: 'call', stake: '10', payout: '88', durationS: 300, clock: SP }));
+    trades.bin28 = bin.state.trade.id;
+    const ebx = await dia(acc.ebx, '2026-10-28', 'dia-ebx-1028');
+    expect([ebx.facts.trades, ebx.facts.open, ebx.facts.closed, ebx.facts.net, ebx.trades[0].trade.status, ebx.trades[0].money.realized]).toEqual([1, 1, 0, '0', 'open', false]);
+    expect(ebx.trades[0].trade.expiresAt).not.toBeNull();
+    expect(numerosDoDia(dayTiles(ebx.facts, 'binary'), EBX)).toMatchObject({ ops: '1 · 1 aberta', opsSub: '' });
+    await registerAfter(
+      db,
+      acc.b3,
+      afterPayload('b3', { clientKey: newClientKey(), symbol: 'WINZ26', direction: 'long', quantity: '1', entryPrice: '130000', clock: SP, day: '2026-10-28', entry: '10:00', exit: '10:15', exitPrice: '130100', costs: '1.50', allowSimilar: true }),
+    );
+    setClock('2026-10-28T14:35:05Z');
+    await registerExit(db, trades.q28, exitPayload('futures', { exitPrice: '7001.00', exit: '10:35', clock: NY }));
+    setClock('2026-10-28T14:40:05Z');
+    const late = await registerAfter(
+      db,
+      acc.top,
+      afterPayload('futures', { clientKey: newClientKey(), symbol: 'MES', direction: 'long', quantity: '1', entryPrice: '7000.00', clock: NY, day: '2026-10-28', entry: '10:05', exit: '10:20', exitPrice: '6910.00', allowSimilar: true }),
+    );
+    trades.late28 = late.state.trade.id;
+
+    const d = await dia(acc.top, '2026-10-28', 'dia-top-1028');
+    // The 10:30 was registered before the −450 existed: its own plan stays «no plano»…
+    expect(d.trades.map((x) => [x.trade.id, (x.planNow ?? x.plan)?.verdict])).toEqual([
+      [trades.late28, 'no_plano'],
+      [trades.q28, 'no_plano'],
+    ]);
+    // …and the facts put it after the limit, as the day stands: the row agrees with its own hour
+    expect(d.facts.limit).toMatchObject({
+      hitAt: new Date('2026-10-28T14:20:00Z'),
+      worstAtHit: '-450',
+      after: [{ tradeId: trades.q28, at: q.state.trade.entryTime }],
+      afterNet: '5',
+    });
+    expect(sp(linhasDoPlano(d.plan.rules!, d.facts, TOP)[1])).toMatchObject({
+      fato: 'atingido às 10:20, com US$ 450,00 de perda · 1 depois, às 10:30: +US$ 5,00',
+      marca: 'Fora do plano',
+    });
+    expect([d.facts.fora, numerosDoDia(dayTiles(d.facts, 'futures'), TOP).fora]).toEqual([{ n: 0, net: '0', open: 0 }, 'nenhuma']);
+
+    const c = await fetchCalendario(db, acc.b3);
+    write('calendario-b3', lastAnswer());
+    checkCalendar(c);
+    expect([c.account.currency, c.account.market, c.days.map((x) => [x.day, x.kind, x.n, x.net, x.gross, x.commission])]).toEqual([
+      'BRL',
+      'b3',
+      [['2026-10-28', 'diario', 1, '18.5', '20', '1.5']],
+    ]);
+    const b = await dia(acc.b3, '2026-10-28', 'dia-b3-1028');
+    expect(sp(numerosDoDia(dayTiles(b.facts, 'b3'), B3).res)).toBe('+R$ 18,50');
+    expect(sp(linhasDoPlano(b.plan.rules!, b.facts, B3).map((l) => `${l.item}: ${l.plano} · ${l.fato}`).join(' | '))).toBe(
+      'Janela: 10:00–17:00 · Brasília · 1 de 1 dentro | Limite: R$ 500 · encerra o dia · nenhuma perda acumulada',
+    );
+    expect(sp(comoLerOsNumeros(dayTiles(b.facts, 'b3'), B3, b.facts))).toContain('Resultado líquido. Bruto +R$ 20,00 · comissões −R$ 1,50.');
+  });
+
   it('records the ids', () => {
     write('ids', { user: uid, accounts: acc, trades });
     expect(recorded).toEqual(
-      expect.arrayContaining(['calendario-top', 'calendario-ebx', 'mes-top-2026-10', 'mes-ebx-2026-10', 'dia-top-1021', 'dia-top-1022', 'dia-top-1023', 'revisao-1022', 'nota-1023', 'ids']),
+      expect.arrayContaining([
+        'calendario-top',
+        'calendario-ebx',
+        'calendario-b3',
+        'mes-top-2026-10',
+        'mes-ebx-2026-10',
+        'dia-top-1021',
+        'dia-top-1022',
+        'dia-top-1023',
+        'dia-top-1027-aberta',
+        'dia-top-1027',
+        'dia-top-1028',
+        'dia-ebx-1028',
+        'dia-b3-1028',
+        'revisao-1022',
+        'nota-1023',
+        'ids',
+      ]),
     );
   });
 });
