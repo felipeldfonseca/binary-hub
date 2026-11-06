@@ -10,13 +10,14 @@
 import React from 'react'
 import fs from 'fs'
 import path from 'path'
-import { act, screen, waitFor, within } from '@testing-library/react'
+import { act, cleanup, render, screen, waitFor, within } from '@testing-library/react'
 import { onlineManager } from '@tanstack/react-query'
 import { diarioKeys } from '@/hooks/useDiario'
 import { hubKeys } from '@/hooks/useContas'
 import { DiarioDataError, parseCalendar, parseDay, parseMonth } from '@/lib/hub/diarioDb'
 import type { HubPreferences } from '@/lib/hub/contasDb'
 import DiarioPage from '@/app/(hub)/diario/page'
+import { DiarioTitulo } from '@/components/hub/contas/DiarioCabecalho'
 import { mocks, renderDiario } from '@/testing/diarioTelas'
 import { renderHub } from '@/testing/hubHarness'
 import { navegacao, USUARIO_DO_QUADRO } from '@/testing/diarioTelasMocks'
@@ -299,7 +300,7 @@ describe('the account (A15, C8)', () => {
     expect(screen.getByRole('button', { name: /^Conta: Lucid 50k/ })).toHaveFocus()
   })
 
-  it('nothing on the first load when the saved account comes after the primary one was drawn (the preferences read later)', async () => {
+  it('nothing on the first load when the saved account is read after the accounts (the page waits for it; the primary one is never drawn)', async () => {
     const r = await renderDiario('9b')
     await screen.findByRole('region', { name: 'Calendário' })
     r.unmount()
@@ -312,9 +313,13 @@ describe('the account (A15, C8)', () => {
     // The menu's link: /diario without ?conta=
     navegacao.definir('/diario')
     renderHub(<DiarioPage />)
-    // While the preferences are read the page draws the primary account (B0's frame)
-    await waitFor(() => expect(mocks.fetchCalendario).toHaveBeenCalledWith(expect.anything(), primaria.id))
-    await screen.findByRole('region', { name: 'Calendário' })
+    // While the preferences are read the page waits: the primary account is neither drawn nor read
+    await waitFor(() => expect(mocks.fetchPreferences).toHaveBeenCalled())
+    await act(async () => {
+      await new Promise((ok) => setTimeout(ok, 50))
+    })
+    expect(screen.queryByRole('region', { name: 'Calendário' })).toBeNull()
+    expect(mocks.fetchCalendario).not.toHaveBeenCalled()
     await act(async () => {
       responder({ conta_atual: lucid.id } as HubPreferences)
     })
@@ -325,6 +330,16 @@ describe('the account (A15, C8)', () => {
     })
     expect(statuses()).not.toContain('Conta Lucid 50k.')
     expect(statuses()).not.toContain('Conta Top One.')
+    expect(mocks.fetchCalendario.mock.calls.map((c) => c[1])).toEqual([lucid.id])
+  })
+
+  it('the H1 row carries hub-dr-topo-cab (the board’s 40 px title on phones), loaded or still reading the accounts', async () => {
+    await renderDiario('2')
+    const h1 = await screen.findByRole('heading', { level: 1, name: 'Diário' })
+    expect(h1.closest('.hub-dr-topo-cab')).not.toBeNull()
+    cleanup()
+    render(<DiarioTitulo />)
+    expect(screen.getByRole('heading', { level: 1, name: 'Diário' }).closest('.hub-dr-topo-cab')).not.toBeNull()
   })
 
   it('without an account: the header’s empty state and nothing below the card', async () => {

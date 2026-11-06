@@ -15,6 +15,8 @@ import { contaDiarioDe, diaDaUrl, diaPassadoDoDiario } from '@/lib/hub/diarioPag
 import { mocks, renderDiario } from '@/testing/diarioTelas'
 import { navegacao, USUARIO_DO_QUADRO } from '@/testing/diarioTelasMocks'
 import { idsQuadro } from '@/testing/diarioQuadro'
+import { renderHub } from '@/testing/hubHarness'
+import DiarioPage from '@/app/(hub)/diario/page'
 
 jest.mock('next/navigation', () => require('@/testing/diarioTelasMocks').mockNavegacao())
 jest.mock('@/lib/supabase', () => require('@/testing/diarioTelasMocks').mockSupabase())
@@ -28,12 +30,15 @@ jest.mock('@/lib/hub/registrarDb', () => require('@/testing/diarioTelasMocks').m
 let mockPagina: DiarioPaginaValor | null = null
 /** Every trade asked for that the page held (lane L2's «o dia» consumes one that is not a trade of the day at once) */
 const mockOpsPedidas: string[] = []
+/** Every account the page drew its regions for, in order */
+const mockContasVistas: string[] = []
 jest.mock('@/components/hub/diario/TopoDoDiario', () => ({
   __esModule: true,
   default: function SondaDaPagina() {
     const p = require('@/components/hub/diario/useDiarioPagina').useDiarioPagina()
     mockPagina = p
     if (p.opPedida) mockOpsPedidas.push(p.opPedida)
+    if (mockContasVistas[mockContasVistas.length - 1] !== p.conta.id) mockContasVistas.push(p.conta.id)
     return (
       <p data-testid="sonda" data-conta={p.conta.id} data-dia={p.dia ?? ''} data-mes={p.mes ?? ''} data-semana={p.semana ?? ''} data-op={p.opPedida ?? ''}>
         {p.conta.label}
@@ -41,6 +46,18 @@ jest.mock('@/components/hub/diario/TopoDoDiario', () => ({
     )
   },
 }))
+
+// Lane L2's «o dia» consumes a trade asked for at once; a test of consumirOp itself puts a stub in its place
+let mockSemODia = false
+jest.mock('@/components/hub/diario/ODia', () => {
+  const real = jest.requireActual('@/components/hub/diario/ODia')
+  return {
+    __esModule: true,
+    default: function ODiaOuStub(props: Record<string, unknown>) {
+      return mockSemODia ? require('react').createElement('p', { 'data-testid': 'sem-o-dia' }) : require('react').createElement(real.default, props)
+    },
+  }
+})
 
 // «Registrar operação»: what the header asks the sheet (the sheet itself is lane L2's)
 const mockAbrirRegistrar = jest.fn()
@@ -60,6 +77,8 @@ async function carregada() {
 beforeEach(() => {
   mockPagina = null
   mockOpsPedidas.length = 0
+  mockContasVistas.length = 0
+  mockSemODia = false
   mockAbrirRegistrar.mockReset()
 })
 
@@ -135,6 +154,18 @@ describe('the URL and the shared state', () => {
     expect(navegacao.params().get('op')).toBeNull()
     expect(navegacao.params().get('dia')).toBe('2026-11-10')
     expect(navegacao.replace).toHaveBeenLastCalledWith(`/diario?conta=${q.info.contaId}&dia=2026-11-10`, { scroll: false })
+  })
+
+  it('consumirOp clears the trade asked for (with «o dia» out of the way, it stays until then)', async () => {
+    mockSemODia = true
+    const { q } = await renderDiario('2')
+    await screen.findByTestId('sem-o-dia')
+    act(() => navegacao.definir(`/diario?conta=${q.info.contaId}&dia=2026-11-10&op=abc`))
+    await waitFor(() => expect(sonda()).toHaveAttribute('data-op', 'abc'))
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 50))
+    })
+    expect(sonda()).toHaveAttribute('data-op', 'abc')
     act(() => pagina().consumirOp())
     await waitFor(() => expect(sonda()).toHaveAttribute('data-op', ''))
   })
@@ -251,6 +282,39 @@ describe('the account selector and the leave guard', () => {
     await waitFor(() => expect(sonda()).toHaveAttribute('data-conta', ids.accounts.top))
     expect(screen.getByRole('button', { name: /^Conta: Top One/ })).toBeInTheDocument()
     await waitFor(() => expect(mocks.mergePreferences).toHaveBeenCalled())
+  })
+
+  it('without ?conta=, waits for the saved choice: the primary account is never drawn or read first', async () => {
+    const view = await renderDiario('6')
+    const primaria = view.q.contas.find((c) => c.is_primary) ?? view.q.contas[0]
+    const salva = view.q.contas.find((c) => c.id !== primaria.id && !c.archived_at)
+    if (!salva) throw new Error('scenario 6 needs two active accounts')
+    view.unmount()
+    mockContasVistas.length = 0
+    mocks.fetchCalendario.mockClear()
+
+    // A fresh visit to /diario: the accounts answer at once, the preferences (the saved choice) a moment later
+    let responder: (p: { conta_atual: string }) => void = () => {}
+    mocks.fetchPreferences.mockReset().mockImplementation(() => new Promise((r) => (responder = r)))
+    navegacao.reiniciar()
+    navegacao.definir('/diario')
+    renderHub(<DiarioPage />)
+    await waitFor(() => expect(mocks.fetchPreferences).toHaveBeenCalled())
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 50))
+    })
+    expect(screen.queryByTestId('sonda')).toBeNull()
+    expect(mocks.fetchCalendario).not.toHaveBeenCalled()
+    // «Posso operar hoje?» waits too (rules_now has answered): no account's line, not even for a moment
+    await waitFor(() => expect(mocks.fetchRulesNow).toHaveBeenCalled())
+    const cartao = screen.getByRole('region', { name: 'Posso operar hoje?' })
+    expect(within(cartao).getByRole('status')).toHaveTextContent('Carregando…')
+    expect(cartao.querySelectorAll('li')).toHaveLength(0)
+
+    await act(async () => responder({ conta_atual: salva.id }))
+    await waitFor(() => expect(sonda()).toHaveAttribute('data-conta', salva.id))
+    expect(mockContasVistas).toEqual([salva.id])
+    expect(mocks.fetchCalendario.mock.calls.map((c) => c[1])).not.toContain(primaria.id)
   })
 
   it('keeps the header and the page on the same account when the preferences are read again after a failed save', async () => {

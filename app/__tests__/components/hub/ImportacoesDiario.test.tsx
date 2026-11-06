@@ -98,6 +98,18 @@ describe('«Saem junto» in the undo confirmation (D20)', () => {
     expect(within(grupo).queryByRole('button', { name: 'Desfazer e apagar' })).toBeNull()
   })
 
+  it('an undone batch: «Desfeita em» the day on the account’s clock, never the device’s (03:30Z is still 11 nov in ET)', async () => {
+    const r = await renderDiario('13')
+    const conta = r.q.contas.find((c) => c.id === r.q.info.contaId)!
+    r.unmount()
+    const base = r.q.lotes!.batches.find((b) => b.file_name === 'TopOne_1110.csv')!
+    mocks.fetchBatches.mockReset().mockResolvedValue([{ ...base, status: 'undone', undone_at: '2026-11-12T03:30:00+00:00' }])
+    renderHub(<Importacoes account={conta} onClose={jest.fn()} />)
+    const desfeita = await screen.findByText(/^Desfeita em/)
+    expect(limpo(desfeita.textContent)).toBe('Desfeita em 11 nov')
+    expect(screen.queryByRole('button', { name: /^Desfazer a importação/ })).toBeNull()
+  })
+
   it('a batch with one new trade says «1 nova» (the board engine’s singular), the others «N novas»', async () => {
     const { q } = await importacoes()
     const parte = (arquivo: string) => {

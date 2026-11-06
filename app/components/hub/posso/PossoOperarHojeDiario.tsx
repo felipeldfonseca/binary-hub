@@ -15,16 +15,17 @@ import { rulesNowFailed, useRulesNowCatchUp } from './rulesNowRead'
  * useContaAtual().current, so the card follows a choice in the selector at once) and one line for the others; outside
  * the page's provider, every account's line as before.
  */
-export default function PossoOperarHojeDiario() {
+export default function PossoOperarHojeDiario({ aguardandoConta = false }: { aguardandoConta?: boolean } = {}) {
   const rulesNow = useRulesNow()
   const catchingUp = useRulesNowCatchUp(rulesNow)
   const pagina = useDiarioPaginaOpcional()
 
   // A read that failed, is being retried or waits offline wins over older lines: «Liberado · até
-  // 11:00 ET» must not stay up after 11:00
+  // 11:00 ET» must not stay up after 11:00. While the Diário still reads which account is open, «Carregando…»:
+  // every account's line would show for a moment before the card keeps only the open one
   const state: PossoEstado = rulesNowFailed(rulesNow)
     ? { status: 'error' }
-    : rulesNow.data && !catchingUp
+    : rulesNow.data && !catchingUp && !aguardandoConta
       ? { status: 'ready', accounts: rulesNow.data.accounts }
       : { status: 'loading' }
 

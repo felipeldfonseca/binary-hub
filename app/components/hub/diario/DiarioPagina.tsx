@@ -19,13 +19,16 @@ import RodapeDiario from './RodapeDiario'
  */
 export default function DiarioPagina() {
   const conta = useContaAtual()
+  // Without ?conta=, the saved choice (the preferences) decides the account: until it is read, nothing below the
+  // header (it says «Carregando…»), so the primary account is never drawn, nor read, on the way to the saved one
+  const aberta = conta.isLoading ? null : conta.current
   return (
     // Not keyed: an account change must not remount the header (focus goes back to «Conta: …»);
     // the provider resets its own state when conta.current?.id changes (contract §4.3)
-    <DiarioPaginaProvider conta={conta.current} contas={conta.active}>
+    <DiarioPaginaProvider conta={aberta} contas={conta.active}>
       <DiarioCabecalho />
-      <PossoOperarHojeDiario />
-      {conta.current && (
+      <PossoOperarHojeDiario aguardandoConta={conta.isLoading} />
+      {aberta && (
         <>
           <TopoDoDiario />
           <DiarioEstados>
