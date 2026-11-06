@@ -1,15 +1,31 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import { MARKET_SPEC } from '@/lib/domain/markets'
+import { utcToLocal } from '@/lib/domain/tempo'
 import type { TradingAccount } from '@/lib/hub/contas'
 import { importUndo, toHubError, type HubErrorCode, type ImportBatch } from '@/lib/hub/contasDb'
-import { formatDay, formatWhen } from '@/lib/hub/formato'
+import { formatDayMonth } from '@/lib/hub/formato'
 import { useBatchUndo, useHubDb, useImportBatches, useRefreshAfterWrite } from '@/hooks/useContas'
 import { BUSY, CLOSE, CONTAS, ERROR_TEXT, IMPORTACOES, LOADING, TRY_AGAIN, ops } from './copy'
 
 /**
- * "Importações" of an account (no board): its batches, newest first, each undoable once.
- * Undoing deletes the batch's trades and gives back the trades it completed (registered in the app,
+ * When a batch was imported (or undone), on the account's clock: its market's window clock, the Diário's default
+ * (contract §3.4: every hour on the window clock, never the device's zone; board dez 13: Top One's batch of 00:12Z is
+ * «11 nov, 19:12», ET). '11 nov, 19:12', with the year when it is not the current one on that clock ('2 jan 2025,
+ * 09:05'); `hora: false`, the day alone ('2 out'). Phase 1 wrote both on the device's clock (formato.formatWhen).
+ */
+export function quandoNoRelogio(timestamp: string, tz: string, { hora = true, agora = new Date() }: { hora?: boolean; agora?: Date } = {}): string {
+  const at = new Date(timestamp)
+  if (Number.isNaN(at.getTime())) return ''
+  const local = utcToLocal(at, tz)
+  const dia = formatDayMonth(local.date, local.year !== utcToLocal(agora, tz).year)
+  return hora ? `${dia}, ${String(local.hour).padStart(2, '0')}:${String(local.minute).padStart(2, '0')}` : dia
+}
+
+/**
+ * "Importações" of an account (board dez 13 since Phase 4; no board before): its batches, newest first, each
+ * undoable once, at their time on the account's clock (quandoNoRelogio). Undoing deletes the batch's trades and gives back the trades it completed (registered in the app,
  * Phase 3; imported earlier, Phase 3c); the confirmation says how many of each, in trades, read when it
  * opens (useBatchUndo: the batch's counts are the file's lines, and a position can take several). Phase 4 (D20, board
  * dez 13): under it, what the owner put in the Diário on the batch's own trades and leaves with them («Saem junto: 2
@@ -31,6 +47,8 @@ export default function Importacoes({ account, onClose }: { account: TradingAcco
   const keepRef = useRef<HTMLButtonElement>(null)
   const undoRefs = useRef<Record<string, HTMLButtonElement | null>>({})
   const titleId = `importacoes-${account.id}`
+  // The account's clock (the market's window clock): the batch's time and the day it was undone
+  const relogio = MARKET_SPEC[account.market].windowTz
 
   useEffect(() => {
     titleRef.current?.focus()
@@ -92,7 +110,7 @@ export default function Importacoes({ account, onClose }: { account: TradingAcco
     content = (
       <ul className="hub-lotes">
         {batches.data.map((batch) => {
-          const when = formatWhen(batch.created_at)
+          const when = quandoNoRelogio(batch.created_at, relogio)
           if (batch.is_legacy) {
             return (
               <li key={batch.id} className="hub-lote">
@@ -126,7 +144,7 @@ export default function Importacoes({ account, onClose }: { account: TradingAcco
                 </span>
               </div>
               {batch.status === 'undone' ? (
-                <span className="hub-nota">{IMPORTACOES.undoneOn(batch.undone_at ? formatDay(batch.undone_at) : '')}</span>
+                <span className="hub-nota">{IMPORTACOES.undoneOn(batch.undone_at ? quandoNoRelogio(batch.undone_at, relogio, { hora: false }) : '')}</span>
               ) : (
                 confirming !== batch.id && (
                   <button

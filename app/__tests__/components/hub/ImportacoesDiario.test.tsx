@@ -6,9 +6,8 @@
  */
 import React from 'react'
 import { screen, waitFor, within } from '@testing-library/react'
-import Importacoes from '@/components/hub/contas/Importacoes'
+import Importacoes, { quandoNoRelogio } from '@/components/hub/contas/Importacoes'
 import { HubDataError } from '@/lib/hub/contasDb'
-import { formatWhen } from '@/lib/hub/formato'
 import { renderHub } from '@/testing/hubHarness'
 import { mocks, renderDiario } from '@/testing/diarioTelas'
 
@@ -32,12 +31,37 @@ async function importacoes() {
   return { ...r, view, conta }
 }
 
+describe('the batches’ time on the account’s clock (contract §3.4; board dez 13)', () => {
+  it('Top One’s batches as the board writes them, on ET (the market’s window clock), never the device’s zone', async () => {
+    const { q } = await importacoes()
+    for (const e of q.esperado.lotes!) {
+      expect(screen.getByText(e.titulo, { exact: false })).toBeInTheDocument()
+      if (e.desfazer) expect(screen.getByRole('button', { name: e.aria })).toBeInTheDocument()
+    }
+    expect(q.esperado.lotes!.map((e) => e.titulo)).toEqual(['25 nov, 19:08 · TopOne_1124.csv', '18 nov, 19:05 · TopOne_1117.csv', '11 nov, 19:12 · TopOne_1110.csv'])
+    expect(screen.getByRole('button', { name: 'Desfazer a importação de 11 nov, 19:12' })).toBeInTheDocument()
+  })
+
+  it('quandoNoRelogio: the day on that clock near midnight, the year only when it is not the current one there', () => {
+    const agora = new Date('2026-12-01T16:35:00Z')
+    expect(quandoNoRelogio('2026-11-12T00:12:00+00:00', 'America/New_York', { agora })).toBe('11 nov, 19:12')
+    expect(quandoNoRelogio('2026-11-12T00:12:00+00:00', 'America/Sao_Paulo', { agora })).toBe('11 nov, 21:12')
+    expect(quandoNoRelogio('2026-11-12T03:30:00+00:00', 'America/Sao_Paulo', { agora })).toBe('12 nov, 00:30')
+    expect(quandoNoRelogio('2026-11-12T03:30:00+00:00', 'America/New_York', { agora })).toBe('11 nov, 22:30')
+    expect(quandoNoRelogio('2026-11-12T00:12:00+00:00', 'America/New_York', { agora, hora: false })).toBe('11 nov')
+    // 1 Jan 2026 02:00Z is still 2025 in New York
+    expect(quandoNoRelogio('2026-01-01T02:00:00Z', 'America/New_York', { agora })).toBe('31 dez 2025, 21:00')
+    expect(quandoNoRelogio('2026-01-01T02:00:00Z', 'UTC', { agora })).toBe('1 jan, 02:00')
+    expect(quandoNoRelogio('não é data', 'America/New_York', { agora })).toBe('')
+  })
+})
+
 describe('«Saem junto» in the undo confirmation (D20)', () => {
   it('11 nov: the built confirmation, then «Saem junto: 2 marcas e 1 nota que você pôs no Diário.»; «Manter» has the focus', async () => {
     const { q, user } = await importacoes()
     const lote = q.lotes!.batches.find((b) => b.file_name === 'TopOne_1110.csv')!
     const e = q.esperado.lotes!.find((l) => l.titulo.endsWith('TopOne_1110.csv'))!
-    await user.click(screen.getByRole('button', { name: `Desfazer a importação de ${formatWhen(lote.created_at)}` }))
+    await user.click(screen.getByRole('button', { name: `Desfazer a importação de ${quandoNoRelogio(lote.created_at, 'America/New_York')}` }))
     const grupo = await screen.findByRole('group', { name: limpo(e.confirma) })
     expect(mocks.fetchBatchUndo).toHaveBeenCalledWith(expect.anything(), lote.id)
     expect(within(grupo).getByText(e.saem!)).toBeInTheDocument()
@@ -56,7 +80,7 @@ describe('«Saem junto» in the undo confirmation (D20)', () => {
     const { q, user } = await importacoes()
     const lote = q.lotes!.batches.find((b) => b.file_name === 'TopOne_1124.csv')!
     const e = q.esperado.lotes!.find((l) => l.titulo.endsWith('TopOne_1124.csv'))!
-    await user.click(screen.getByRole('button', { name: `Desfazer a importação de ${formatWhen(lote.created_at)}` }))
+    await user.click(screen.getByRole('button', { name: `Desfazer a importação de ${quandoNoRelogio(lote.created_at, 'America/New_York')}` }))
     const grupo = await screen.findByRole('group', { name: limpo(e.confirma) })
     expect(e.saem).toBeNull()
     expect(within(grupo).queryByText(/^Saem junto/)).toBeNull()
@@ -67,7 +91,7 @@ describe('«Saem junto» in the undo confirmation (D20)', () => {
     const { q, user } = await importacoes()
     mocks.fetchBatchUndo.mockRejectedValue(new HubDataError('unknown'))
     const lote = q.lotes!.batches.find((b) => b.file_name === 'TopOne_1110.csv')!
-    await user.click(screen.getByRole('button', { name: `Desfazer a importação de ${formatWhen(lote.created_at)}` }))
+    await user.click(screen.getByRole('button', { name: `Desfazer a importação de ${quandoNoRelogio(lote.created_at, 'America/New_York')}` }))
     const grupo = await screen.findByRole('group', { name: 'Não foi possível ver o que esta importação apagaria.' })
     expect(within(grupo).getByRole('button', { name: 'Tentar de novo' })).toBeInTheDocument()
     expect(within(grupo).queryByText(/^Saem junto/)).toBeNull()
@@ -90,11 +114,11 @@ describe('«Saem junto» in the undo confirmation (D20)', () => {
   it('«Manter» closes the confirmation and gives the focus back to «Desfazer»', async () => {
     const { q, user } = await importacoes()
     const lote = q.lotes!.batches.find((b) => b.file_name === 'TopOne_1110.csv')!
-    const desfazer = screen.getByRole('button', { name: `Desfazer a importação de ${formatWhen(lote.created_at)}` })
+    const desfazer = screen.getByRole('button', { name: `Desfazer a importação de ${quandoNoRelogio(lote.created_at, 'America/New_York')}` })
     await user.click(desfazer)
     const grupo = await screen.findByRole('group', { name: /^Desfazer apaga as 5 operações/ })
     await user.click(within(grupo).getByRole('button', { name: 'Manter' }))
-    await waitFor(() => expect(screen.getByRole('button', { name: `Desfazer a importação de ${formatWhen(lote.created_at)}` })).toHaveFocus())
+    await waitFor(() => expect(screen.getByRole('button', { name: `Desfazer a importação de ${quandoNoRelogio(lote.created_at, 'America/New_York')}` })).toHaveFocus())
     expect(screen.queryByText(/^Saem junto/)).toBeNull()
   })
 })
