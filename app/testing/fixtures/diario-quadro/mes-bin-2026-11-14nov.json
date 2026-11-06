@@ -1,0 +1,143 @@
+{
+ "v": 1,
+ "server_now": "2026-11-15T00:40:00+00:00",
+ "account": {
+  "id": "a924751d-50e0-5621-a7d8-d83733eb1a12",
+  "day": {
+   "tz": "America/Sao_Paulo",
+   "start_min": 0
+  },
+  "label": "Binance",
+  "market": "crypto",
+  "file_tz": "UTC",
+  "archived": false,
+  "currency": "USD",
+  "platform": null,
+  "is_example": false,
+  "tz_confirmed": true,
+  "guessed_clock": 0
+ },
+ "today": "2026-11-14",
+ "desde": "2026-10-13T15:00:00+00:00",
+ "desde_day": "2026-10-13",
+ "to": "2026-12-06",
+ "from": "2026-10-26",
+ "month": "2026-11",
+ "days": [
+  {
+   "day": "2026-10-26",
+   "fora": {
+    "n": 0,
+    "net": 0,
+    "open": 0
+   },
+   "limit": null,
+   "weekday": 1,
+   "recalculated": 0
+  },
+  {
+   "day": "2026-10-30",
+   "fora": {
+    "n": 0,
+    "net": 0,
+    "open": 0
+   },
+   "limit": null,
+   "weekday": 5,
+   "recalculated": 0
+  },
+  {
+   "day": "2026-11-01",
+   "fora": {
+    "n": 0,
+    "net": 0,
+    "open": 0
+   },
+   "limit": null,
+   "weekday": 7,
+   "recalculated": 0
+  },
+  {
+   "day": "2026-11-02",
+   "fora": {
+    "n": 0,
+    "net": 0,
+    "open": 0
+   },
+   "limit": null,
+   "weekday": 1,
+   "recalculated": 0
+  },
+  {
+   "day": "2026-11-05",
+   "fora": {
+    "n": 0,
+    "net": 0,
+    "open": 0
+   },
+   "limit": null,
+   "weekday": 4,
+   "recalculated": 0
+  },
+  {
+   "day": "2026-11-07",
+   "fora": {
+    "n": 0,
+    "net": 0,
+    "open": 0
+   },
+   "limit": null,
+   "weekday": 6,
+   "recalculated": 0
+  },
+  {
+   "day": "2026-11-09",
+   "fora": {
+    "n": 0,
+    "net": 0,
+    "open": 0
+   },
+   "limit": null,
+   "weekday": 1,
+   "recalculated": 0
+  },
+  {
+   "day": "2026-11-14",
+   "fora": {
+    "n": 0,
+    "net": 0,
+    "open": 0
+   },
+   "limit": null,
+   "weekday": 6,
+   "recalculated": 0
+  }
+ ],
+ "weeks": [
+  {
+   "fora": {
+    "n": 0,
+    "net": 0,
+    "open": 0
+   },
+   "week_of": "2026-10-26"
+  },
+  {
+   "fora": {
+    "n": 0,
+    "net": 0,
+    "open": 0
+   },
+   "week_of": "2026-11-02"
+  },
+  {
+   "fora": {
+    "n": 0,
+    "net": 0,
+    "open": 0
+   },
+   "week_of": "2026-11-09"
+  }
+ ],
+ "fora_trades": []
+}

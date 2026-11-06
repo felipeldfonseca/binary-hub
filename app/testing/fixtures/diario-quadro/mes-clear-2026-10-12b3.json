@@ -1,0 +1,255 @@
+{
+ "v": 1,
+ "server_now": "2026-11-12T14:20:00+00:00",
+ "account": {
+  "id": "c06c9e56-fd0c-5945-ab47-cce6240b19b2",
+  "day": {
+   "tz": "America/Sao_Paulo",
+   "start_min": 0
+  },
+  "label": "Clear",
+  "market": "b3",
+  "file_tz": "UTC",
+  "archived": false,
+  "currency": "BRL",
+  "platform": null,
+  "is_example": false,
+  "tz_confirmed": true,
+  "guessed_clock": 0
+ },
+ "today": "2026-11-12",
+ "desde": "2026-10-13T12:30:00+00:00",
+ "desde_day": "2026-10-13",
+ "to": "2026-11-01",
+ "from": "2026-09-28",
+ "month": "2026-10",
+ "days": [
+  {
+   "day": "2026-10-14",
+   "fora": {
+    "n": 0,
+    "net": 0,
+    "open": 0
+   },
+   "limit": {
+    "net": 32,
+    "scope": "conta",
+    "worst": 0,
+    "amount": 500,
+    "hit_at": null,
+    "trades": 1,
+    "at_limit": "encerrar",
+    "worst_at_hit": null
+   },
+   "weekday": 3,
+   "recalculated": 0
+  },
+  {
+   "day": "2026-10-16",
+   "fora": {
+    "n": 0,
+    "net": 0,
+    "open": 0
+   },
+   "limit": {
+    "net": 166,
+    "scope": "conta",
+    "worst": 0,
+    "amount": 500,
+    "hit_at": null,
+    "trades": 3,
+    "at_limit": "encerrar",
+    "worst_at_hit": null
+   },
+   "weekday": 5,
+   "recalculated": 0
+  },
+  {
+   "day": "2026-10-20",
+   "fora": {
+    "n": 0,
+    "net": 0,
+    "open": 0
+   },
+   "limit": {
+    "net": 92,
+    "scope": "conta",
+    "worst": 0,
+    "amount": 500,
+    "hit_at": null,
+    "trades": 2,
+    "at_limit": "encerrar",
+    "worst_at_hit": null
+   },
+   "weekday": 2,
+   "recalculated": 0
+  },
+  {
+   "day": "2026-10-21",
+   "fora": {
+    "n": 0,
+    "net": 0,
+    "open": 0
+   },
+   "limit": {
+    "net": 98,
+    "scope": "conta",
+    "worst": 0,
+    "amount": 500,
+    "hit_at": null,
+    "trades": 3,
+    "at_limit": "encerrar",
+    "worst_at_hit": null
+   },
+   "weekday": 3,
+   "recalculated": 0
+  },
+  {
+   "day": "2026-10-22",
+   "fora": {
+    "n": 0,
+    "net": 0,
+    "open": 0
+   },
+   "limit": {
+    "net": -51,
+    "scope": "conta",
+    "worst": -56,
+    "amount": 500,
+    "hit_at": null,
+    "trades": 3,
+    "at_limit": "encerrar",
+    "worst_at_hit": null
+   },
+   "weekday": 4,
+   "recalculated": 0
+  },
+  {
+   "day": "2026-10-23",
+   "fora": {
+    "n": 0,
+    "net": 0,
+    "open": 0
+   },
+   "limit": {
+    "net": 153,
+    "scope": "conta",
+    "worst": 0,
+    "amount": 500,
+    "hit_at": null,
+    "trades": 1,
+    "at_limit": "encerrar",
+    "worst_at_hit": null
+   },
+   "weekday": 5,
+   "recalculated": 0
+  },
+  {
+   "day": "2026-10-26",
+   "fora": {
+    "n": 0,
+    "net": 0,
+    "open": 0
+   },
+   "limit": {
+    "net": -96,
+    "scope": "conta",
+    "worst": -96,
+    "amount": 500,
+    "hit_at": null,
+    "trades": 2,
+    "at_limit": "encerrar",
+    "worst_at_hit": null
+   },
+   "weekday": 1,
+   "recalculated": 0
+  },
+  {
+   "day": "2026-10-28",
+   "fora": {
+    "n": 0,
+    "net": 0,
+    "open": 0
+   },
+   "limit": {
+    "net": 89,
+    "scope": "conta",
+    "worst": 0,
+    "amount": 500,
+    "hit_at": null,
+    "trades": 2,
+    "at_limit": "encerrar",
+    "worst_at_hit": null
+   },
+   "weekday": 3,
+   "recalculated": 0
+  },
+  {
+   "day": "2026-10-29",
+   "fora": {
+    "n": 0,
+    "net": 0,
+    "open": 0
+   },
+   "limit": {
+    "net": 195,
+    "scope": "conta",
+    "worst": 0,
+    "amount": 500,
+    "hit_at": null,
+    "trades": 3,
+    "at_limit": "encerrar",
+    "worst_at_hit": null
+   },
+   "weekday": 4,
+   "recalculated": 0
+  },
+  {
+   "day": "2026-10-30",
+   "fora": {
+    "n": 0,
+    "net": 0,
+    "open": 0
+   },
+   "limit": {
+    "net": 63,
+    "scope": "conta",
+    "worst": -102,
+    "amount": 500,
+    "hit_at": null,
+    "trades": 3,
+    "at_limit": "encerrar",
+    "worst_at_hit": null
+   },
+   "weekday": 5,
+   "recalculated": 0
+  }
+ ],
+ "weeks": [
+  {
+   "fora": {
+    "n": 0,
+    "net": 0,
+    "open": 0
+   },
+   "week_of": "2026-10-12"
+  },
+  {
+   "fora": {
+    "n": 0,
+    "net": 0,
+    "open": 0
+   },
+   "week_of": "2026-10-19"
+  },
+  {
+   "fora": {
+    "n": 0,
+    "net": 0,
+    "open": 0
+   },
+   "week_of": "2026-10-26"
+  }
+ ],
+ "fora_trades": []
+}

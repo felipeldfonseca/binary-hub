@@ -1,0 +1,483 @@
+{
+ "v": 1,
+ "server_now": "2026-11-15T00:40:00+00:00",
+ "account": {
+  "id": "a924751d-50e0-5621-a7d8-d83733eb1a12",
+  "day": {
+   "tz": "America/Sao_Paulo",
+   "start_min": 0
+  },
+  "label": "Binance",
+  "market": "crypto",
+  "file_tz": "UTC",
+  "archived": false,
+  "currency": "USD",
+  "platform": null,
+  "is_example": false,
+  "tz_confirmed": true,
+  "guessed_clock": 0
+ },
+ "today": "2026-11-14",
+ "desde": "2026-10-13T15:00:00+00:00",
+ "desde_day": "2026-10-13",
+ "day": "2026-11-14",
+ "kind": "diario",
+ "note": {
+  "id": 1,
+  "text": "Só vender BTC abaixo da mínima de sexta.",
+  "written": true,
+  "saved_at": "2026-11-14T22:48:00+00:00",
+  "versions": 1,
+  "first_saved_at": "2026-11-14T22:48:00+00:00"
+ },
+ "plan": {
+  "at": "2026-11-15T00:40:00+00:00",
+  "rules": {
+   "v": 1,
+   "day": {
+    "tz": "America/Sao_Paulo",
+    "start_min": 0
+   },
+   "block": null,
+   "limit": null,
+   "market": "crypto",
+   "states": null,
+   "windows": [
+    {
+     "tz": "America/Sao_Paulo",
+     "end_min": 1320,
+     "weekdays": 127,
+     "start_min": 1200
+    }
+   ],
+   "window_rule": {
+    "on": true,
+    "outside": "fora"
+   },
+   "windows_from": "account"
+  },
+  "changes": [],
+  "version": {
+   "id": "1f7b48c4-eaf8-573b-bc98-a7c342d92b9a",
+   "origin": "criar",
+   "version_no": 1,
+   "effective_from": "2026-10-13T15:00:00+00:00"
+  },
+  "windows_today": [
+   {
+    "tz": "America/Sao_Paulo",
+    "opens_at": "2026-11-14T23:00:00+00:00",
+    "closes_at": "2026-11-15T01:00:00+00:00"
+   }
+  ]
+ },
+ "facts": {
+  "v": 1,
+  "day": "2026-11-14",
+  "net": 212.5,
+  "even": 0,
+  "fora": {
+   "n": 0,
+   "net": 0,
+   "open": 0
+  },
+  "kind": "diario",
+  "open": 1,
+  "wins": 1,
+  "gross": 212.5,
+  "limit": null,
+  "closed": 1,
+  "losses": 0,
+  "trades": 2,
+  "window": {
+   "rule": true,
+   "inside": 2,
+   "outside": [],
+   "evaluated": 2
+  },
+  "changes": 0,
+  "history": {
+   "n": 0,
+   "net": 0,
+   "gross": 0
+  },
+  "version": {
+   "id": "1f7b48c4-eaf8-573b-bc98-a7c342d92b9a",
+   "version_no": 1
+  },
+  "breakeven": null,
+  "commission": null,
+  "others_net": 212.5,
+  "recalculated": 0,
+  "first_entry_at": "2026-11-14T23:35:00+00:00",
+  "commission_unknown": 1
+ },
+ "bounds": {
+  "end": "2026-11-15T03:00:00+00:00",
+  "start": "2026-11-14T03:00:00+00:00"
+ },
+ "review": null,
+ "trades": [
+  {
+   "gate": {
+    "at": "2026-11-14T23:35:00+00:00",
+    "block": {
+     "state": "nao_avaliado",
+     "reason": "so_futuros"
+    },
+    "desde": "2026-10-13T15:00:00+00:00",
+    "label": "Binance",
+    "limit": {
+     "state": "nao_avaliado",
+     "reason": "sem_limite"
+    },
+    "today": {
+     "trades": 0,
+     "net_usd": 0,
+     "worst_usd": 0
+    },
+    "market": "crypto",
+    "status": "liberado",
+    "window": {
+     "next": {
+      "opens_at": "2026-11-15T23:00:00+00:00",
+      "closes_at": "2026-11-16T01:00:00+00:00",
+      "trading_day": "2026-11-15"
+     },
+     "state": "dentro",
+     "reason": null,
+     "current": {
+      "opens_at": "2026-11-14T23:00:00+00:00",
+      "closes_at": "2026-11-15T01:00:00+00:00"
+     },
+     "position": "dentro"
+    },
+    "version": {
+     "id": "1f7b48c4-eaf8-573b-bc98-a7c342d92b9a",
+     "origin": "criar",
+     "version_no": 1,
+     "effective_from": "2026-10-13T15:00:00+00:00"
+    },
+    "warnings": [],
+    "desde_day": "2026-10-13",
+    "account_id": "a924751d-50e0-5621-a7d8-d83733eb1a12",
+    "changes_at": "2026-11-15T01:00:00+00:00",
+    "state_rule": {
+     "state": "nao_avaliado",
+     "reason": "so_futuros"
+    },
+    "trading_day": "2026-11-14",
+    "checks_evaluated": [
+     "janela"
+    ]
+   },
+   "plan": {
+    "breaks": [],
+    "verdict": "no_plano",
+    "checks_evaluated": [
+     "janela"
+    ]
+   },
+   "exits": [],
+   "links": [],
+   "marks": [
+    {
+     "id": 40,
+     "kind": "setup",
+     "limpa": true,
+     "value": "A",
+     "marked_at": "2026-11-14T23:35:00+00:00"
+    },
+    {
+     "id": 41,
+     "kind": "emocao",
+     "limpa": true,
+     "value": "Confiante",
+     "marked_at": "2026-11-14T23:36:00+00:00"
+    }
+   ],
+   "money": {
+    "net": 212.5,
+    "gross": 212.5,
+    "realized": true,
+    "commission": null
+   },
+   "trade": {
+    "id": "803b3045-50d8-5e26-aa48-52c8badf9801",
+    "pnl": 212.5,
+    "note": null,
+    "option": null,
+    "result": "win",
+    "source": "live",
+    "status": "closed",
+    "symbol": "BTC/USDT",
+    "quantity": 0.25,
+    "direction": "short",
+    "exit_time": "2026-11-15T00:02:00+00:00",
+    "pnl_basis": "prices",
+    "timeframe": null,
+    "account_id": "a924751d-50e0-5621-a7d8-d83733eb1a12",
+    "asset_type": "crypto",
+    "commission": null,
+    "entry_time": "2026-11-14T23:35:00+00:00",
+    "exit_price": 97600,
+    "expires_at": null,
+    "stop_price": null,
+    "entry_price": 98450,
+    "trading_day": "2026-11-14",
+    "stake_amount": null,
+    "target_price": null,
+    "note_saved_at": null,
+    "registered_at": "2026-11-14T23:35:00+00:00",
+    "payout_percent": null,
+    "duration_seconds": null,
+    "exit_registered_at": "2026-11-15T00:02:00+00:00"
+   },
+   "images": [],
+   "import": null,
+   "context": {
+    "origin": "live",
+    "rule_ok": null,
+    "in_block": null,
+    "warnings": [],
+    "in_window": true,
+    "after_limit": false,
+    "captured_at": "2026-11-14T23:35:00+00:00",
+    "gate_status": "liberado",
+    "evaluated_at": "2026-11-14T23:35:00+00:00",
+    "state_choice": null,
+    "checks_evaluated": [
+     "janela"
+    ],
+    "day_pnl_at_entry": 0,
+    "day_worst_at_entry": 0
+   },
+   "history": false,
+   "version": {
+    "id": "1f7b48c4-eaf8-573b-bc98-a7c342d92b9a",
+    "version_no": 1
+   },
+   "entry_at": "2026-11-14T23:35:00+00:00",
+   "gate_now": null,
+   "plan_now": null,
+   "position": {
+    "r": null,
+    "open": 0,
+    "undo": null,
+    "exits": 0,
+    "closed": 0.25,
+    "partials": 0,
+    "quantity": 0.25,
+    "stop_now": null,
+    "stop_kind": null,
+    "realized_pnl": 212.5,
+    "stop_initial": null
+   },
+   "trade_id": "803b3045-50d8-5e26-aa48-52c8badf9801",
+   "breakeven": null,
+   "marks_now": [
+    {
+     "kind": "setup",
+     "clean_at": "2026-11-14T23:35:00+00:00",
+     "current_at": "2026-11-14T23:35:00+00:00",
+     "clean_value": "A",
+     "changed_after": false,
+     "current_limpa": true,
+     "current_value": "A"
+    },
+    {
+     "kind": "emocao",
+     "clean_at": "2026-11-14T23:36:00+00:00",
+     "current_at": "2026-11-14T23:36:00+00:00",
+     "clean_value": "Confiante",
+     "changed_after": false,
+     "current_limpa": true,
+     "current_value": "Confiante"
+    }
+   ],
+   "plan_kind": "congelado",
+   "stop_moves": [],
+   "imported_at": null,
+   "trading_day": "2026-11-14",
+   "clock_guessed": false,
+   "registered_at": "2026-11-14T23:35:00+00:00"
+  },
+  {
+   "gate": {
+    "at": "2026-11-15T00:15:00+00:00",
+    "block": {
+     "state": "nao_avaliado",
+     "reason": "so_futuros"
+    },
+    "desde": "2026-10-13T15:00:00+00:00",
+    "label": "Binance",
+    "limit": {
+     "state": "nao_avaliado",
+     "reason": "sem_limite"
+    },
+    "today": {
+     "trades": 1,
+     "net_usd": 212.5,
+     "worst_usd": 0
+    },
+    "market": "crypto",
+    "status": "liberado",
+    "window": {
+     "next": {
+      "opens_at": "2026-11-15T23:00:00+00:00",
+      "closes_at": "2026-11-16T01:00:00+00:00",
+      "trading_day": "2026-11-15"
+     },
+     "state": "dentro",
+     "reason": null,
+     "current": {
+      "opens_at": "2026-11-14T23:00:00+00:00",
+      "closes_at": "2026-11-15T01:00:00+00:00"
+     },
+     "position": "dentro"
+    },
+    "version": {
+     "id": "1f7b48c4-eaf8-573b-bc98-a7c342d92b9a",
+     "origin": "criar",
+     "version_no": 1,
+     "effective_from": "2026-10-13T15:00:00+00:00"
+    },
+    "warnings": [],
+    "desde_day": "2026-10-13",
+    "account_id": "a924751d-50e0-5621-a7d8-d83733eb1a12",
+    "changes_at": "2026-11-15T01:00:00+00:00",
+    "state_rule": {
+     "state": "nao_avaliado",
+     "reason": "so_futuros"
+    },
+    "trading_day": "2026-11-14",
+    "checks_evaluated": [
+     "janela"
+    ]
+   },
+   "plan": {
+    "breaks": [],
+    "verdict": "no_plano",
+    "checks_evaluated": [
+     "janela"
+    ]
+   },
+   "exits": [],
+   "links": [],
+   "marks": [
+    {
+     "id": 42,
+     "kind": "setup",
+     "limpa": true,
+     "value": "B",
+     "marked_at": "2026-11-15T00:15:00+00:00"
+    }
+   ],
+   "money": {
+    "net": null,
+    "gross": null,
+    "realized": false,
+    "commission": null
+   },
+   "trade": {
+    "id": "8a9461d2-b2c0-59b8-a6b3-b309e976fa22",
+    "pnl": null,
+    "note": null,
+    "option": null,
+    "result": "pending",
+    "source": "live",
+    "status": "open",
+    "symbol": "ETH/USDT",
+    "quantity": 1.5,
+    "direction": "long",
+    "exit_time": null,
+    "pnl_basis": null,
+    "timeframe": null,
+    "account_id": "a924751d-50e0-5621-a7d8-d83733eb1a12",
+    "asset_type": "crypto",
+    "commission": null,
+    "entry_time": "2026-11-15T00:15:00+00:00",
+    "exit_price": null,
+    "expires_at": null,
+    "stop_price": null,
+    "entry_price": 3612.4,
+    "trading_day": "2026-11-14",
+    "stake_amount": null,
+    "target_price": null,
+    "note_saved_at": null,
+    "registered_at": "2026-11-15T00:15:00+00:00",
+    "payout_percent": null,
+    "duration_seconds": null,
+    "exit_registered_at": null
+   },
+   "images": [],
+   "import": null,
+   "context": {
+    "origin": "live",
+    "rule_ok": null,
+    "in_block": null,
+    "warnings": [],
+    "in_window": true,
+    "after_limit": false,
+    "captured_at": "2026-11-15T00:15:00+00:00",
+    "gate_status": "liberado",
+    "evaluated_at": "2026-11-15T00:15:00+00:00",
+    "state_choice": null,
+    "checks_evaluated": [
+     "janela"
+    ],
+    "day_pnl_at_entry": 212.5,
+    "day_worst_at_entry": 0
+   },
+   "history": false,
+   "version": {
+    "id": "1f7b48c4-eaf8-573b-bc98-a7c342d92b9a",
+    "version_no": 1
+   },
+   "entry_at": "2026-11-15T00:15:00+00:00",
+   "gate_now": null,
+   "plan_now": null,
+   "position": {
+    "r": null,
+    "open": 1.5,
+    "undo": null,
+    "exits": 0,
+    "closed": 0,
+    "partials": 0,
+    "quantity": 1.5,
+    "stop_now": null,
+    "stop_kind": null,
+    "realized_pnl": null,
+    "stop_initial": null
+   },
+   "trade_id": "8a9461d2-b2c0-59b8-a6b3-b309e976fa22",
+   "breakeven": null,
+   "marks_now": [
+    {
+     "kind": "setup",
+     "clean_at": "2026-11-15T00:15:00+00:00",
+     "current_at": "2026-11-15T00:15:00+00:00",
+     "clean_value": "B",
+     "changed_after": false,
+     "current_limpa": true,
+     "current_value": "B"
+    }
+   ],
+   "plan_kind": "congelado",
+   "stop_moves": [],
+   "imported_at": null,
+   "trading_day": "2026-11-14",
+   "clock_guessed": false,
+   "registered_at": "2026-11-15T00:15:00+00:00"
+  }
+ ],
+ "deleted": [],
+ "weekday": 6,
+ "carry_in": {
+  "day": "2026-11-07",
+  "text": "Nada depois das 22:00.",
+  "saved_at": "2026-11-08T00:15:00+00:00"
+ },
+ "open_elsewhere": [],
+ "review_history": []
+}

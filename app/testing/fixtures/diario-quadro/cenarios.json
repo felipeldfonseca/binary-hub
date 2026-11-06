@@ -1,0 +1,201 @@
+{
+ "2": {
+  "ag": "1dez",
+  "conta": "top",
+  "dia": "2026-11-10",
+  "aberta": "65b3784c-1c5e-5716-b3dc-0c9628f8b3b4",
+  "contaId": "aba5cd0c-35ec-5491-96c2-7b98d1be8271",
+  "quadro": "dez",
+  "rotulo": "2 · Um dia completo · Top One, terça 10 nov (aberto no calendário em 1º dez)"
+ },
+ "3": {
+  "ag": "1dez",
+  "conta": "top",
+  "dia": "2026-11-19",
+  "aberta": "dc342602-b2a5-5613-a0a2-7c03184adc8b",
+  "contaId": "aba5cd0c-35ec-5491-96c2-7b98d1be8271",
+  "quadro": "dez",
+  "rotulo": "3 · Limite atingido · Top One, quinta 19 nov"
+ },
+ "3b": {
+  "ag": "1dez",
+  "conta": "top",
+  "dia": "2026-11-19",
+  "aberta": "dc342602-b2a5-5613-a0a2-7c03184adc8b",
+  "variante": "avisar",
+  "contaId": "aba5cd0c-35ec-5491-96c2-7b98d1be8271",
+  "quadro": "dez",
+  "rotulo": "3 · Limite atingido com “Só avisar” · a mesma quinta 19 nov, se as regras só avisassem"
+ },
+ "4": {
+  "ag": "1dez",
+  "conta": "top",
+  "dia": "2026-10-14",
+  "mes": "2026-10",
+  "extras": [
+   "2026-10-21",
+   "2026-10-23"
+  ],
+  "contaId": "aba5cd0c-35ec-5491-96c2-7b98d1be8271",
+  "quadro": "dez",
+  "rotulo": "4 · Calendário · Top One em outubro: histórico, o dia em que as regras começaram e revisões pendentes"
+ },
+ "5": {
+  "ag": "1dez",
+  "conta": "top",
+  "dia": "2026-10-08",
+  "mes": "2026-10",
+  "aberta": "4a9bc5ab-4513-5d69-9c77-710b22e143c6",
+  "contaId": "aba5cd0c-35ec-5491-96c2-7b98d1be8271",
+  "quadro": "dez",
+  "rotulo": "5 · Um dia do histórico · Top One, quinta 8 out (só para ler)"
+ },
+ "9": {
+  "ag": "1dez",
+  "conta": "lucid",
+  "dia": "2026-12-01",
+  "extras": [
+   "2026-11-30"
+  ],
+  "contaId": "fa4fc63d-4453-5cc0-9fce-64257c2802fb",
+  "quadro": "dez",
+  "rotulo": "9 · Somando as contas de Futuros · Lucid 50k, hoje 1º dez"
+ },
+ "9b": {
+  "ag": "1dezM",
+  "conta": "top",
+  "dia": "2026-12-01",
+  "escolhas": {
+   "Apex 50k #5": "dc17a234-cf3c-569c-8704-c6e10056e3f2",
+   "Lucid 50k": "fa4fc63d-4453-5cc0-9fce-64257c2802fb"
+  },
+  "contaId": "aba5cd0c-35ec-5491-96c2-7b98d1be8271",
+  "quadro": "dez",
+  "rotulo": "9b · Muitas contas · Top One entre 35 contas, hoje 1º dez: a linha das outras, “Ver todas” e a busca do seletor"
+ },
+ "11a": {
+  "ag": "1dez",
+  "conta": "top",
+  "dia": "2026-11-24",
+  "mes": "2026-11",
+  "semana": "2026-11-23",
+  "contaId": "aba5cd0c-35ec-5491-96c2-7b98d1be8271",
+  "quadro": "dez",
+  "rotulo": "11 · Semana fechada · Top One, 23 a 27 nov (aberta pelo calendário)"
+ },
+ "11b": {
+  "ag": "1dez",
+  "conta": "top",
+  "dia": "2026-12-01",
+  "contaId": "aba5cd0c-35ec-5491-96c2-7b98d1be8271",
+  "quadro": "dez",
+  "rotulo": "11 · Semana em andamento · Top One, hoje 1º dez"
+ },
+ "13": {
+  "ag": "1dez",
+  "conta": "top",
+  "dia": "2026-12-01",
+  "importacoes": true,
+  "contaId": "aba5cd0c-35ec-5491-96c2-7b98d1be8271",
+  "quadro": "dez",
+  "rotulo": "13 · Rodapé, página antiga e o desfazer de Importações · Top One, 1º dez"
+ },
+ "1": {
+  "ag": "12nov",
+  "conta": "top",
+  "dia": "2026-11-12",
+  "aberta": "de1d5353-2a4b-5137-9e51-26157df5578f",
+  "contaId": "aba5cd0c-35ec-5491-96c2-7b98d1be8271",
+  "quadro": "hoje",
+  "rotulo": "1 · Hoje, no meio da janela · Top One, quinta 12 nov, 10:42 ET"
+ },
+ "6": {
+  "ag": "11nov",
+  "conta": "ebx",
+  "dia": "2026-11-11",
+  "aberta": "028373fa-4ff5-5f65-ba5d-3b388701f47a",
+  "contaId": "d1dbd70b-7a9b-550b-bcc8-ed37b06586cc",
+  "quadro": "hoje",
+  "rotulo": "6 · Binárias · Ebinex, quarta 11 nov, 21:20 de Brasília"
+ },
+ "7": {
+  "ag": "14nov",
+  "conta": "bin",
+  "dia": "2026-11-14",
+  "aberta": "803b3045-50d8-5e26-aa48-52c8badf9801",
+  "contaId": "a924751d-50e0-5621-a7d8-d83733eb1a12",
+  "quadro": "hoje",
+  "rotulo": "7 · Cripto com fim de semana · Binance, sábado 14 nov, 21:40 de Brasília"
+ },
+ "8": {
+  "ag": "12b3",
+  "conta": "clear",
+  "dia": "2026-11-12",
+  "aberta": "8ef77602-f89a-516c-be59-0a9a7a2cb2f0",
+  "contaId": "c06c9e56-fd0c-5945-ab47-cce6240b19b2",
+  "quadro": "hoje",
+  "rotulo": "8 · B3 em reais · Clear, quinta 12 nov, 11:20 de Brasília"
+ },
+ "10a": {
+  "ag": "12nov",
+  "conta": "ylos",
+  "dia": "2026-11-12",
+  "mes": "2026-10",
+  "contaId": "5d06ef36-6cac-50b4-8e74-3ad396d6be91",
+  "quadro": "hoje",
+  "rotulo": "10 · Conta sem regras · Ylos 50k, 12 nov"
+ },
+ "10b": {
+  "ag": "12nov",
+  "conta": "ibkr",
+  "dia": "2026-11-12",
+  "contaId": "2346978d-11e2-5e46-86bd-2c92d20e05c2",
+  "quadro": "hoje",
+  "rotulo": "10 · Conta sem operações · IBKR, 12 nov"
+ },
+ "10c": {
+  "ag": "12nov",
+  "conta": "top",
+  "dia": "2026-11-12",
+  "estado": "carregando",
+  "contaId": "aba5cd0c-35ec-5491-96c2-7b98d1be8271",
+  "quadro": "hoje",
+  "rotulo": "10 · Carregando · Top One, 12 nov"
+ },
+ "10d": {
+  "ag": "12nov",
+  "conta": "top",
+  "dia": "2026-11-12",
+  "estado": "erro",
+  "contaId": "aba5cd0c-35ec-5491-96c2-7b98d1be8271",
+  "quadro": "hoje",
+  "rotulo": "10 · Não foi possível carregar · Top One, 12 nov"
+ },
+ "10e": {
+  "ag": "12nov",
+  "conta": "top",
+  "dia": "2026-11-12",
+  "estado": "offline",
+  "contaId": "aba5cd0c-35ec-5491-96c2-7b98d1be8271",
+  "quadro": "hoje",
+  "rotulo": "10 · Sem conexão · Top One, 12 nov: a revisão de hoje não é salva"
+ },
+ "12a": {
+  "ag": "12nov",
+  "conta": "top",
+  "dia": "2026-11-10",
+  "aberta": "aa644c4d-b6ee-52af-8307-f681ddb6f9b9",
+  "contaId": "aba5cd0c-35ec-5491-96c2-7b98d1be8271",
+  "quadro": "hoje",
+  "rotulo": "12 · Celular 375 px, claro · 10 nov com a operação em 2 saídas, a revisão e o mês"
+ },
+ "12b": {
+  "ag": "12nov",
+  "conta": "top",
+  "dia": "2026-11-10",
+  "aberta": "65b3784c-1c5e-5716-b3dc-0c9628f8b3b4",
+  "contaId": "aba5cd0c-35ec-5491-96c2-7b98d1be8271",
+  "quadro": "hoje",
+  "rotulo": "12 · Celular 375 px, escuro · 10 nov com a imagem aberta"
+ }
+}
