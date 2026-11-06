@@ -123,8 +123,8 @@ describe('hub-posso.css: the Diário’s card (board DiarioDezEnxuto, «Muitas c
     expect(value('.hub .hub-posso', 'padding', '(max-width: 540px)')).toBe('8px 16px')
   })
 
-  it('«Definir», «Tentar de novo» in a line keep a 44 px target', () => {
+  it('«Definir», «Tentar de novo» in a line keep a 44 px target; the limit itself adds no height (board `.posso-lim`)', () => {
     expect(value('.hub .hub-posso__acao', 'min-height')).toBe('44px')
-    expect(value('.hub .hub-posso__limite', 'min-height')).toBe('44px')
+    expect(value('.hub .hub-posso__limite', 'min-height')).toBe('')
   })
 })

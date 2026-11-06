@@ -21,7 +21,7 @@ import { ADD_ACCOUNT, CONTAS, DIARIO, IMPORT_FILE, LOADING, TRY_AGAIN } from './
 /** The H1 row alone, while the account data is not there yet. */
 export function DiarioTitulo() {
   return (
-    <div className="hub-pg-topo">
+    <div className="hub-pg-topo hub-dr-topo-cab">
       <div style={{ flex: '1 1 420px', minWidth: 0 }}>
         <h1 tabIndex={-1}>{DIARIO.title}</h1>
       </div>
@@ -223,7 +223,7 @@ export default function DiarioCabecalho() {
 
   return (
     <>
-      <div className="hub-pg-topo">
+      <div className="hub-pg-topo hub-dr-topo-cab">
         <div style={{ flex: '1 1 420px', minWidth: 0 }}>
           {/* Takes focus when the control that opened the import sheet, or «Tentar de novo», is gone
               and no account selector took its place (the empty state) */}

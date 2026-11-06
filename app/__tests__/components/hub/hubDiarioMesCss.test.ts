@@ -113,6 +113,13 @@ describe('the calendar’s layout', () => {
     expect(decl(mes, '.hub .hub-dr-cal-dica', 'display', '(hover: none)')).toBe('none')
   })
 
+  it('the board’s type: a day that opens keeps the font’s own line height (as the board’s buttons); the H1 40 px on phones too', () => {
+    expect(decl(mes, '.hub button.hub-dr-cal-cel', 'line-height')).toBe('normal')
+    expect(decl(mes, '.hub .hub-dr-topo-cab h1', 'font-size')).toBe('40px')
+    // hub.css makes a page's H1 34 px at ≤ 640 px with a less specific rule
+    expect(decl(hub, '.hub-pg-topo h1', 'font-size', '(max-width: 640px)')).toBe('34px')
+  })
+
   it('375 px with 7 columns: every column at least 44 px wide (§5.8, from the rules)', () => {
     const largura = 375
     const gutter = px(decl(hub, '.hub-container', 'padding', '(max-width: 640px)').split(' ')[1])

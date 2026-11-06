@@ -12,6 +12,11 @@
  * The top: the date line under the H1, the section links, the banners, the states
  * ------------------------------------------------------------------------------------------- */
 
+/* The Diário's H1 keeps the board's 40 px on phones too (hub.css makes the pages' H1 34 px at ≤ 640 px) */
+.hub .hub-dr-topo-cab h1 {
+  font-size: 40px;
+}
+
 /* «terça-feira, 1º de dezembro, 11:35 ET» (A2) */
 .hub .hub-dr-topo-data {
   margin-top: 4px;
@@ -234,9 +239,11 @@
   background-image: repeating-linear-gradient(135deg, transparent 0 6px, rgba(255, 255, 255, 0.18) 6px 9px);
 }
 
-/* A day that opens; the open day */
+/* A day that opens; the open day. A button keeps the font's own line height, as the board's buttons do (the app's
+   reset would give it the page's 1.5) */
 .hub button.hub-dr-cal-cel {
   border-color: var(--neutral-border);
+  line-height: normal;
   cursor: pointer;
 }
 .hub button.hub-dr-cal-cel:hover,

@@ -129,7 +129,6 @@
   align-items: center;
   flex-wrap: wrap;
   gap: 0 8px;
-  min-height: 44px;
   justify-self: end;
 }
 /* The open account's limit, with «somando as contas de Futuros» under it (board `.posso-lim-col`) */
