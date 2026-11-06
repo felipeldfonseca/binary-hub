@@ -26,11 +26,14 @@ jest.mock('@/lib/hub/registrarDb', () => require('@/testing/diarioTelasMocks').m
 
 // The probe: the top region's stub, replaced by one that keeps the shared state for the test
 let mockPagina: DiarioPaginaValor | null = null
+/** Every trade asked for that the page held (lane L2's «o dia» consumes one that is not a trade of the day at once) */
+const mockOpsPedidas: string[] = []
 jest.mock('@/components/hub/diario/TopoDoDiario', () => ({
   __esModule: true,
   default: function SondaDaPagina() {
     const p = require('@/components/hub/diario/useDiarioPagina').useDiarioPagina()
     mockPagina = p
+    if (p.opPedida) mockOpsPedidas.push(p.opPedida)
     return (
       <p data-testid="sonda" data-conta={p.conta.id} data-dia={p.dia ?? ''} data-mes={p.mes ?? ''} data-semana={p.semana ?? ''} data-op={p.opPedida ?? ''}>
         {p.conta.label}
@@ -56,6 +59,7 @@ async function carregada() {
 
 beforeEach(() => {
   mockPagina = null
+  mockOpsPedidas.length = 0
   mockAbrirRegistrar.mockReset()
 })
 
@@ -126,7 +130,8 @@ describe('the URL and the shared state', () => {
   it('a ?op= on load is the trade asked for, and leaves the URL; consumirOp clears it', async () => {
     const { q } = await renderDiario('2')
     act(() => navegacao.definir(`/diario?conta=${q.info.contaId}&dia=2026-11-10&op=abc`))
-    await waitFor(() => expect(sonda()).toHaveAttribute('data-op', 'abc'))
+    // held by the page (lane L2's «o dia» drops it at once: «abc» is not a trade of 10 nov)
+    await waitFor(() => expect(mockOpsPedidas).toContain('abc'))
     expect(navegacao.params().get('op')).toBeNull()
     expect(navegacao.params().get('dia')).toBe('2026-11-10')
     expect(navegacao.replace).toHaveBeenLastCalledWith(`/diario?conta=${q.info.contaId}&dia=2026-11-10`, { scroll: false })
@@ -143,7 +148,7 @@ describe('the URL and the shared state', () => {
     await waitFor(() => expect(sonda()).toHaveAttribute('data-dia', '2026-11-24'))
     expect(sonda()).toHaveAttribute('data-mes', '2026-11')
     expect(sonda()).toHaveAttribute('data-semana', '2026-11-23')
-    await waitFor(() => expect(sonda()).toHaveAttribute('data-op', 't-24'))
+    await waitFor(() => expect(mockOpsPedidas).toContain('t-24'))
     expect(navegacao.params().get('op')).toBeNull()
     await waitFor(() => expect(mocks.fetchDia).toHaveBeenCalledWith(expect.anything(), q.info.contaId, '2026-11-24'))
   })
@@ -167,7 +172,8 @@ describe('the URL and the shared state', () => {
     act(() => pagina().abrirDia('2026-12-01', { op: 'x' }))
     await waitFor(() => expect(sonda()).toHaveAttribute('data-dia', '2026-12-01'))
     expect(navegacao.params().has('dia')).toBe(false)
-    expect(sonda()).toHaveAttribute('data-op', 'x')
+    // the page held the trade asked for (L2 drops it once the day answers without it: not a trade of 1º dez)
+    expect(mockOpsPedidas).toContain('x')
     // not asked to announce: the last announced day stays
     expect(pagina().diaAnunciado).toBe('2026-10-14')
   })
