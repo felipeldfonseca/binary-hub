@@ -122,6 +122,18 @@ describe('G · the rows of the board', () => {
     await user.click(botao)
     expect(mockSheet).toHaveBeenLastCalledWith({ accountId: q.info.contaId, tradeId: null, dia: null })
   })
+
+  it('a past day without trades: «Nenhuma operação neste dia.» and no «Registrar operação» (G2)', async () => {
+    const { q, cru, queryClient } = await renderDiario('2')
+    await tabela()
+    cru[q.info.contaId].dias[q.info.dia].trades = []
+    await act(async () => {
+      await queryClient.invalidateQueries({ queryKey: diarioKeys.dia(USUARIO_DO_QUADRO, q.info.contaId, q.info.dia) })
+    })
+    const vazio = await screen.findByText('Nenhuma operação neste dia.')
+    expect(within(vazio.parentElement as HTMLElement).queryByRole('button', { name: 'Registrar operação' })).toBeNull()
+    expect(screen.queryByText('Nenhuma operação registrada hoje.')).toBeNull()
+  })
 })
 
 describe('G · one drill at a time, its ▾', () => {
@@ -205,6 +217,29 @@ describe('G14 · open trades of other days; the deep link', () => {
     act(() => navegacao.push(`/diario?conta=${q.info.contaId}&dia=2026-11-19&op=${t.trade.id}`))
     await waitFor(() => expect(document.getElementById(`op-${t.trade.id}`)).toHaveFocus())
     expect(document.getElementById(`drill-${t.trade.id}`)).toBeInTheDocument()
+    expect(navegacao.params().get('op')).toBeNull()
+  })
+
+  it('«Ver no Diário» to a day read earlier in the session: the new trade comes with the read again, its drill opens and its ▾ takes the focus', async () => {
+    const { q, cru, queryClient } = await renderDiario('2')
+    await tabela()
+    // 19 nov read once, then back to the scenario's day: 19 nov stays in the cache
+    act(() => navegacao.push(`/diario?conta=${q.info.contaId}&dia=2026-11-19`))
+    await waitFor(() => expect(within(document.getElementById('dia')!).getByRole('heading', { level: 2 })).toHaveTextContent('Quinta-feira, 19 de novembro'))
+    await tabela()
+    act(() => navegacao.push(`/diario?conta=${q.info.contaId}&dia=${q.info.dia}`))
+    await waitFor(() => expect(within(document.getElementById('dia')!).getByRole('heading', { level: 2 })).toHaveTextContent('Terça-feira, 10 de novembro'))
+    // the Registrar writes a trade on 19 nov and marks the Diário's reads stale (the inactive 19 nov is not read now)
+    const dia = cru[q.info.contaId].dias['2026-11-19']
+    const novo = '0f1e2d3c-4b5a-4968-8776-655443322110'
+    dia.trades = [...dia.trades, { ...JSON.parse(JSON.stringify(dia.trades[4])), trade_id: novo, trade: { ...dia.trades[4].trade, id: novo } }]
+    await act(async () => {
+      await queryClient.invalidateQueries({ queryKey: diarioKeys.all(USUARIO_DO_QUADRO) })
+    })
+    act(() => navegacao.push(`/diario?conta=${q.info.contaId}&dia=2026-11-19&op=${novo}`))
+    await waitFor(() => expect(document.getElementById(`op-${novo}`)).toHaveFocus())
+    expect(document.getElementById(`op-${novo}`)).toHaveAttribute('aria-expanded', 'true')
+    expect(document.getElementById(`drill-${novo}`)).toBeInTheDocument()
     expect(navegacao.params().get('op')).toBeNull()
   })
 

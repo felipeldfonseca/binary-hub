@@ -125,7 +125,8 @@ export default function RevisaoDoDia({ d, accountId, conta }: { d: DayRead; acco
             {REVISAO.titulo}
           </h3>
           {!salva && !form && <p className="hub-dr-sub">{REVISAO.sub}</p>}
-          {salva && r && <p className="hub-dr-sub">{linhaDaRevisao(r, d.day, conta.tz)}</p>}
+          {/* board `revSalva = temRevisao && !!rvUlt0 && !formOn`: while the form is open, only the title */}
+          {salva && r && !form && <p className="hub-dr-sub">{linhaDaRevisao(r, d.day, conta.tz)}</p>}
         </div>
         {!salva && !form && (
           <button ref={escreverRef} type="button" className="hub-btn" aria-expanded="false" aria-controls="rev-form" onClick={abrir}>

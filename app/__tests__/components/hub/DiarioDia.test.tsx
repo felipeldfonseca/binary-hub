@@ -140,6 +140,17 @@ describe('E · the heading, its tags, the note and the tiles', () => {
   })
 })
 
+describe('DEV B0-1 · «Do pregão anterior» is the database’s carry_in (for the owner, with the PR)', () => {
+  it('9 (Lucid, 1º dez): the board says «Nada trazido do pregão anterior.»; the app shows the newest earlier carry, «“Uma operação por vez.” · 27 nov»', async () => {
+    const { q } = await renderDiario('9')
+    const e = q.esperado as EsperadoDia
+    expect(e.anterior).toBe('Nada trazido do pregão anterior.')
+    expect(q.dias[q.info.dia].carryIn?.day).toBe('2026-11-27')
+    const dia = await oDia()
+    expect(sem(within(dia).getByText('Do pregão anterior').parentElement?.textContent)).toBe('Do pregão anterior“Uma operação por vez.” · 27 nov')
+  })
+})
+
 describe('F · «O plano do dia»', () => {
   it('the ⓘ: the board’s text with the breakeven sentence and Futuros’ Phase 5 one', async () => {
     const { q, user } = await renderDiario('2')
@@ -228,6 +239,19 @@ describe('F · «O plano do dia»', () => {
     expect(await within(dia).findByRole('alert')).toHaveTextContent('Sem conexão. A nota não foi salva.')
     expect(mocks.saveDayNote).not.toHaveBeenCalled()
     expect(campo).toHaveValue('Esperar a VWAP.')
+  })
+
+  it('a save that failed keeps its client_key for the retry (one key per editing session)', async () => {
+    const { user } = await renderDiario('9')
+    const dia = await oDia()
+    const DiarioDataError = jest.requireActual('@/lib/hub/diarioDb').DiarioDataError
+    mocks.saveDayNote.mockRejectedValueOnce(new DiarioDataError('network'))
+    await user.type(within(dia).getByLabelText('Antes de operar'), 'Esperar a VWAP.')
+    await user.click(within(dia).getByRole('button', { name: 'Salvar' }))
+    expect(await within(dia).findByRole('alert')).toHaveTextContent('Sem conexão. A nota não foi salva.')
+    await user.click(within(dia).getByRole('button', { name: 'Salvar' }))
+    await waitFor(() => expect(mocks.saveDayNote).toHaveBeenCalledTimes(2))
+    expect(mocks.saveDayNote.mock.calls[1][3].client_key).toBe(mocks.saveDayNote.mock.calls[0][3].client_key)
   })
 
   it('another refusal (not_today when the day turned): «Não foi possível salvar a nota.» and the day is read again', async () => {

@@ -10,6 +10,8 @@
 import fs from 'fs'
 import path from 'path'
 import { parseDay, type DayRead, type DiaryDayTrade, type OpenElsewhere } from '@/lib/hub/diarioDb'
+import { marksNow } from '@/lib/domain/registro'
+import type { PlanBreak } from '@/lib/domain/gate'
 import { contaDiarioDe } from '@/lib/hub/diarioPagina'
 import { contaReg } from '@/lib/hub/registrarForm'
 import { formatImageSize } from '@/lib/hub/registrarImagens'
@@ -32,6 +34,7 @@ import {
   resultadoDaLinha,
   subDaLinha,
   tempoDaOperacao,
+  temLinhaDoTempo,
   type ContaDaOperacao,
 } from '@/lib/hub/diarioOperacao'
 import { CENARIOS, quadro, type Cenario, type EsperadoDia, type Quadro } from '@/testing/diarioQuadro'
@@ -296,5 +299,164 @@ describe('G14: open trades of other days', () => {
   it('a binary «EUR/USD · Alta» and an option «{symbol} · Compra · 2 ct» (no duration, no contract words)', () => {
     expect(operacaoDeOutroDia({ ...base, symbol: 'EUR/USD', direction: 'call', quantity: null, assetType: 'binary_option' }, 'binary')).toBe('EUR/USD · Alta')
     expect(limpo(operacaoDeOutroDia({ ...base, symbol: 'SPY', direction: 'long', quantity: '2', assetType: 'option' }, 'options'))).toBe('SPY · Compra · 2 ct')
+  })
+})
+
+// ------------------------------------------------------------------------------------------------
+// Review fixes (L2 reviews 1 and 2): the marks' «antes: … · agora: …» for any change (board `escolher`), and the
+// words whose single-edit mutants survived the suites (temLinhaDoTempo, «salvas», the sr join, the action's context,
+// the gate's subs, G14's plural and first trade, «Na corretora» seconds)
+// ------------------------------------------------------------------------------------------------
+
+describe('H13 · a changed or cleared mark reads «antes: … · agora: …» whatever its phase (board engine `escolher`)', () => {
+  const marca = (id: number, kind: 'setup' | 'execucao' | 'emocao', value: string | null, at: string, limpa: boolean) => ({ id, kind, value, markedAt: new Date(at), limpa })
+  const com = (t: DiaryDayTrade, extra: ReturnType<typeof marca>[]) => {
+    const marks = [...t.marks, ...extra]
+    return { ...t, marks, marksNow: marksNow(marks) }
+  }
+  const tempoDe = (t: DiaryDayTrade, conta: ContaDaOperacao, kind: string) => marcasDaOperacao(t, conta.reg).find((g) => g.kind === kind)!.tempo
+
+  const q9 = quadro('9')
+  const d30 = q9.dias['2026-11-30']
+  const conta30 = contaDa(q9, d30)
+  const mnq = d30.trades.find((t) => t.trade.status === 'open')!
+  const q2 = quadro('2')
+  const d10 = q2.dias['2026-11-10']
+  const conta10 = contaDa(q2, d10)
+  const t1022 = d10.trades.find((t) => horaDaLinha(t, conta10.tz).startsWith('10:22'))!
+
+  it('the open 30 nov MNQ before its exit, Setup A → B (both «limpa»): «antes: A às 10:52 · agora: B 1º dez às 11:35» (DEV-C5: never «ontem»)', () => {
+    expect(tempoDe(mnq, conta30, 'setup')).toBe('às 10:52 · antes da saída')
+    const t = com(mnq, [marca(9001, 'setup', 'B', '2026-12-01T16:35:00Z', true)])
+    expect(tempoDe(t, conta30, 'setup')).toBe('antes: A às 10:52 · agora: B 1º dez às 11:35')
+  })
+
+  it('cleared: «antes: A às 10:52 · agora: sem marca 1º dez às 11:35»', () => {
+    const t = com(mnq, [marca(9001, 'setup', null, '2026-12-01T16:35:00Z', true)])
+    expect(tempoDe(t, conta30, 'setup')).toBe('antes: A às 10:52 · agora: sem marca 1º dez às 11:35')
+    expect(marcasDaOperacao(t, conta30.reg).find((g) => g.kind === 'setup')!.valor).toBeNull()
+  })
+
+  it('an earlier mark made after the result (10:22 MNQ, Setup C at 17:48) changed to B: «antes: C às 17:48 · agora: B 1º dez às 11:35»', () => {
+    expect(tempoDe(t1022, conta10, 'setup')).toBe('às 17:48 · depois do resultado')
+    expect(tempoDe(com(t1022, [marca(9001, 'setup', 'B', '2026-12-01T16:35:00Z', false)]), conta10, 'setup')).toBe('antes: C às 17:48 · agora: B 1º dez às 11:35')
+    expect(tempoDe(com(t1022, [marca(9001, 'setup', null, '2026-12-01T16:35:00Z', false)]), conta10, 'setup')).toBe('antes: C às 17:48 · agora: sem marca 1º dez às 11:35')
+  })
+
+  it('later changes keep the first «antes» of the run; a group cleared starts a new run; a first mark after a clear has its phase', () => {
+    const abc = com(mnq, [marca(9001, 'setup', 'B', '2026-12-01T16:35:00Z', true), marca(9002, 'setup', 'C', '2026-12-01T16:36:00Z', true)])
+    expect(tempoDe(abc, conta30, 'setup')).toBe('antes: A às 10:52 · agora: C 1º dez às 11:36')
+    const novo = com(mnq, [marca(9001, 'setup', null, '2026-12-01T16:35:00Z', true), marca(9002, 'setup', 'B', '2026-12-01T16:36:00Z', true)])
+    expect(tempoDe(novo, conta30, 'setup')).toBe('1º dez às 11:36 · antes da saída')
+    // a group never marked, then marked: its phase only
+    expect(tempoDe(com(mnq, [marca(9001, 'emocao', 'calmo', '2026-12-01T16:35:00Z', true)]), conta30, 'emocao')).toBe('1º dez às 11:35 · antes da saída')
+    expect(tempoDe(mnq, conta30, 'emocao')).toBeNull()
+  })
+})
+
+describe('H7 · temLinhaDoTempo: ≥ 2 counting exits, a stop move not undone, or an open trade with an exit', () => {
+  const q2 = quadro('2')
+  const d2 = q2.dias['2026-11-10']
+  const conta2 = contaDa(q2, d2)
+  const fechada = d2.trades.find((t) => horaDaLinha(t, conta2.tz).startsWith('10:14'))!
+  const q1 = quadro('1')
+  const d1 = q1.dias['2026-11-12']
+  const aberta = d1.trades.find((t) => t.trade.status === 'open')!
+  const [parcial, final] = fechada.exits
+  const [move] = fechada.stopMoves
+
+  it('the fixtures: 10:14 closed with two exits and a breakeven move; 10:18 open with a partial and a move', () => {
+    expect([fechada.exits.length, fechada.stopMoves.length, aberta.exits.length, aberta.stopMoves.length]).toEqual([2, 1, 1, 1])
+    expect(temLinhaDoTempo(fechada, 'futures')).toBe(true)
+    expect(temLinhaDoTempo(aberta, 'futures')).toBe(true)
+  })
+
+  it('a closed trade with one counting exit and no move: no timeline', () => {
+    expect(temLinhaDoTempo({ ...fechada, exits: [final], stopMoves: [] }, 'futures')).toBe(false)
+    expect(temLinhaDoTempo({ ...fechada, exits: [parcial, final], stopMoves: [] }, 'futures')).toBe(true)
+  })
+
+  it('a stop move counts only while not undone', () => {
+    expect(temLinhaDoTempo({ ...fechada, exits: [final], stopMoves: [move] }, 'futures')).toBe(true)
+    expect(temLinhaDoTempo({ ...fechada, exits: [final], stopMoves: [{ ...move, voidedAt: new Date('2026-11-10T15:30:00Z') }] }, 'futures')).toBe(false)
+  })
+
+  it('an open trade with one counting exit and no move: the timeline; without exits: none', () => {
+    expect(temLinhaDoTempo({ ...aberta, stopMoves: [] }, 'futures')).toBe(true)
+    expect(temLinhaDoTempo({ ...aberta, exits: [], stopMoves: [] }, 'futures')).toBe(false)
+  })
+
+  it('never on a binary nor a history trade', () => {
+    expect(temLinhaDoTempo(fechada, 'binary')).toBe(false)
+    expect(temLinhaDoTempo({ ...fechada, history: true }, 'futures')).toBe(false)
+  })
+})
+
+describe('the row’s and the drill’s other words', () => {
+  const q1 = quadro('1')
+  const d1 = q1.dias['2026-11-12']
+  const conta1 = contaDa(q1, d1)
+  const aberta = d1.trades.find((t) => t.trade.status === 'open')!
+  const img = (id: string, at: string) => ({ id, path: `u/${id}.png`, mime: 'image/png' as const, bytes: 1000, name: `${id}.png`, position: 1, savedAt: new Date(at) })
+
+  it('H8: one image and a note are «salvas»; a note alone «salva»', () => {
+    const nota = { ...aberta.trade, note: 'Parcial no +8.', noteSavedAt: new Date('2026-11-12T15:21:00Z') }
+    expect(quandoAnexos({ ...aberta, images: [img('a', '2026-11-12T15:20:00Z')], trade: nota }, conta1.tz)).toBe('salvas às 10:21 · antes da saída')
+    expect(quandoAnexos({ ...aberta, images: [], trade: nota }, conta1.tz)).toBe('salva às 10:21 · antes da saída')
+  })
+
+  it('G10: two breaks read «fora da janela · depois do limite», the screen reader «fora do plano: fora da janela e depois do limite»', () => {
+    const p = (aberta.plan ?? aberta.planNow)!
+    const t = { ...aberta, plan: { ...p, verdict: 'fora_do_plano' as const, breaks: ['fora_da_janela', 'depois_do_limite'] as PlanBreak[] } }
+    expect(planoDaLinha(t)).toEqual({ tipo: 'fora', texto: 'fora da janela · depois do limite', aria: 'fora do plano: fora da janela e depois do limite' })
+  })
+
+  it('G11: an open trade gets its action only with a context (registered in the app)', () => {
+    expect(acaoDaLinha(aberta, 'futures', conta1.tz)?.texto).toBe('Registrar saída')
+    expect(acaoDaLinha({ ...aberta, context: null }, 'futures', conta1.tz)).toBeNull()
+    expect(acaoDaLinha({ ...aberta, trade: { ...aberta.trade, status: 'closed' } }, 'futures', conta1.tz)).toBeNull()
+  })
+
+  it('H2: «Liberado · com aviso: hoje não é dia da janela», «… · com aviso: fora da janela», and «Sem janela salva» without a window', () => {
+    const g = quadro('2').dias['2026-11-10'].trades[0].gate!
+    const janela = (x: object) => ({ ...(g.window as object), ...x }) as never
+    expect(possoNaEntrada({ ...g, status: 'liberado', warnings: ['fora_janela'], window: janela({ evaluated: true, position: 'nao_e_dia' }) })).toBe('Liberado · com aviso: hoje não é dia da janela')
+    expect(possoNaEntrada({ ...g, status: 'liberado', warnings: ['fora_janela'], window: janela({ evaluated: true, position: 'antes' }) })).toBe('Liberado · com aviso: fora da janela')
+    expect(possoNaEntrada({ ...g, status: 'liberado', warnings: [], window: { evaluated: false, reason: 'sem_janela' } as never })).toBe('Sem janela salva')
+    expect(possoNaEntrada({ ...g, status: 'fora_janela', window: janela({ evaluated: true, position: 'antes' }) })).toBe('Fora da sua janela')
+  })
+
+  it('H6: «Na corretora» writes the broker’s seconds with two digits («10:48:05»)', () => {
+    const q2 = quadro('2')
+    const d2 = q2.dias['2026-11-10']
+    const conta2 = contaDa(q2, d2)
+    const mgc = d2.trades.find((t) => horaDaLinha(t, conta2.tz).startsWith('10:47'))!
+    expect(mgc.links.length).toBeGreaterThan(0)
+    const t = { ...mgc, links: [{ ...mgc.links[0], fileEntryAt: new Date('2026-11-10T15:48:05Z'), fileExitAt: null }] }
+    expect(linhasDaOperacao(t, conta2)).toContain('Na corretora: 10:48:05.')
+  })
+})
+
+describe('G14 · three open trades of one day', () => {
+  const base: OpenElsewhere = {
+    tradeId: 't1',
+    tradingDay: '2026-11-30',
+    entryTime: new Date('2026-11-30T15:52:00Z'),
+    symbol: 'MNQ',
+    direction: 'long',
+    quantity: '1',
+    assetType: 'futures',
+    expiresAt: null,
+    app: true,
+  }
+  it('«3 operações abertas de ontem: a, b e c.» in entry order; the link opens the day’s first trade', () => {
+    const xs = [
+      { ...base, tradeId: 'segunda', symbol: 'MES', direction: 'short' as const, quantity: '2', entryTime: new Date('2026-11-30T16:10:00Z') },
+      { ...base, tradeId: 'terceira', symbol: 'MGC', entryTime: new Date('2026-11-30T17:00:00Z') },
+      { ...base, tradeId: 'primeira', entryTime: new Date('2026-11-30T14:40:00Z') },
+    ]
+    const [l] = abertasDeOutrosDias(xs, '2026-12-01', 'futures')
+    expect(limpo(l.texto)).toBe('3 operações abertas de ontem: MNQ · Compra · 1 ct, MES · Venda · 2 ct e MGC · Compra · 1 ct.')
+    expect(l.tradeId).toBe('primeira')
   })
 })

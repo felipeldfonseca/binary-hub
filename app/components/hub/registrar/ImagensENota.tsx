@@ -355,8 +355,9 @@ function MiniaturaSalva({ path, name, grande = false }: { path: string; name: st
 /**
  * The Diário's editor (board DiarioDezEnxuto `t.axEd`, contract H10): the title without ⓘ, the hint, the attached
  * images as text rows «nome · tamanho» with «Remover» (no previews), «Escolher imagens», «Nota» without «(opcional)»
- * and its counter, «Salvar imagens e nota» (primary) and «Cancelar» (always). Dropping and pasting work on the whole
- * box (DEV-C1: the computer's hint says so). The status lives in the drill (it outlasts the editor).
+ * and its counter, «Salvar imagens e nota» (primary, never dimmed but while saving) and «Cancelar» (always). The hint
+ * stays with 4 images (only «Escolher imagens» greys). Dropping and pasting work on the whole box (DEV-C1: the
+ * computer's hint says so). The status lives in the drill (it outlasts the editor).
  */
 function EditorDoDiario({ a, d }: { a: Anexos; d: AnexosDiario }) {
   const [sobre, setSobre] = useState(false)
@@ -364,7 +365,8 @@ function EditorDoDiario({ a, d }: { a: Anexos; d: AnexosDiario }) {
   const [toque] = useState(soToque)
   const [atalho] = useState(atalhoColar)
   const temArquivos = (event: React.DragEvent) => Array.from(event.dataTransfer?.types ?? []).includes('Files')
-  const dica = a.cheio ? ANEXOS.cheio : toque ? ANEXOS.dicaToque : ANEXOS.dica(atalho)
+  // The board keeps its hint with 4 images and only greys «Escolher imagens» (engine `axCheio`)
+  const dica = toque ? ANEXOS.dicaToque : ANEXOS.dica(atalho)
   const id = (x: string) => `${d.idBase}-${x}`
   return (
     <div
@@ -482,7 +484,9 @@ function EditorDoDiario({ a, d }: { a: Anexos; d: AnexosDiario }) {
         </span>
       </div>
       <div className="hub-dr-img-acoes">
-        <button type="button" className="hub-btn hub-btn--pri" aria-disabled={!a.podeSalvar || a.ocupado || undefined} onClick={() => void a.salvar()}>
+        {/* Always the board's primary button; an editor with nothing to save (nothing saved, nothing chosen or typed)
+            closes as «Cancelar» does: nothing is sent */}
+        <button type="button" className="hub-btn hub-btn--pri" aria-disabled={a.ocupado || undefined} onClick={() => (a.podeSalvar ? void a.salvar() : a.cancelar())}>
           {ANEXOS.salvar}
         </button>
         <button type="button" className="hub-btn" onClick={a.cancelar}>

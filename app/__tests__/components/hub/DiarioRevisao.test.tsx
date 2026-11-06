@@ -112,6 +112,24 @@ describe('I3–I7 · saving, the saved review, a second version', () => {
   })
 })
 
+describe('I2 + I3 · editing a saved review (board `revSalva = … && !formOn`)', () => {
+  it.each(['12a', '2'] as const)('%s: «Editar» leaves only the title over the form (no «Salva às …» line); «Cancelar» brings the line back', async (cen) => {
+    const { q, user } = await renderDiario(cen)
+    const e = q.esperado as EsperadoDia
+    const rev = await revisao()
+    const linha = String(e.revisao.linha)
+    expect(within(rev).getByText(linha)).toBeInTheDocument()
+    await user.click(within(rev).getByRole('button', { name: 'Editar' }))
+    await waitFor(() => expect(within(rev).getByLabelText('O que funcionou?')).toHaveFocus())
+    expect(within(rev).queryByText(linha)).toBeNull()
+    expect(rev.querySelector('.hub-dr-rev-tit .hub-dr-sub')).toBeNull()
+    expect(within(rev).queryByText('2 minutos · tudo opcional')).toBeNull()
+    await user.click(within(rev).getByRole('button', { name: 'Cancelar' }))
+    await waitFor(() => expect(within(rev).getByRole('button', { name: 'Editar' })).toHaveFocus())
+    expect(within(rev).getByText(linha)).toBeInTheDocument()
+  })
+})
+
 describe('I8 · offline, a refusal, a repeated answer, one client_key', () => {
   it('10e: offline, «Salvar revisão» says «Sem conexão. A revisão não foi salva.» at once, sends nothing, keeps the text; online again, the same tap saves', async () => {
     const { user } = await renderDiario('10e', { estado: 'offline' })

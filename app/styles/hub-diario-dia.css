@@ -622,6 +622,10 @@
   background: var(--bg);
   box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35);
 }
+/* The dialog's caption is 12 px (template.html `.dlg .linha2`); the thumbnails' stays 11 px (`.mini`) */
+.hub .hub-dr-img-dlg .hub-dr-img-legenda {
+  font-size: 12px;
+}
 .hub .hub-dr-img-dlg-cab {
   display: flex;
   align-items: center;
@@ -644,9 +648,11 @@
   border-radius: 10px;
   border: 1px solid var(--field-border);
 }
+/* Files dragged over the box: the Registrar's drop state (`.hub-reg-sobre`), a mint ring and no tint, so the hint,
+   «Nota» and the counter keep their contrast (a --mint-bg tint left --text-2 at 3,88:1 in claro) */
 .hub .hub-dr-img-ed--sobre {
   border-color: var(--mint);
-  background: var(--mint-bg);
+  box-shadow: inset 0 0 0 1px var(--mint);
 }
 .hub .hub-dr-img-dica {
   margin: 0;

@@ -780,8 +780,11 @@ describe('/diario', () => {
     await userEvent.click(within(card).getByRole('button', { name: 'Ver a outra conta' }))
     expect(within(card).getByRole('list', { name: 'Outras contas' })).toHaveTextContent('Top One #1')
     await waitFor(() => expect(selector).toHaveAccessibleDescription('Janela 20:00–21:00 · Brasília'))
-    // One read of rules_now serves the card, the window line and the open day
+    // One read of rules_now serves the card, the window line and the open day (a region named by its day's H2)
     expect(bridge).toHaveAttribute('aria-labelledby', 't-dia')
+    const titulo = within(bridge).getByRole('heading', { level: 2 })
+    expect(titulo.textContent).toMatch(/^(Segunda|Terça|Quarta|Quinta|Sexta)-feira|^(Sábado|Domingo), /)
+    expect(screen.getByRole('region', { name: titulo.textContent ?? '' })).toBe(bridge)
     expect(fetchRulesNow).toHaveBeenCalledTimes(1)
   })
 })

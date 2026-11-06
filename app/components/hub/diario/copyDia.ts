@@ -60,6 +60,13 @@ export const ANTES = {
   erro: 'Não foi possível salvar a nota.',
 }
 
+/**
+ * DEV B0-1 (for the owner, with the PR): the value under «Do pregão anterior» is the database's carry_in (diario_dia,
+ * lib/domain/diario carryInOf, final): the newest earlier day whose current review carries a «Levar para o próximo
+ * pregão», with its date («“Uma operação por vez.” · 27 nov»). The boards look only at the previous Diário day and say
+ * «Nada trazido do pregão anterior.» when that day has no review: 9 board states differ (dez 3/3b 19 nov, dez 4 → 21
+ * out, dez 9 Lucid 1º dez, dez 9b/11b/13 Top One 1º dez, hoje 7, hoje 8).
+ */
 export const ANTERIOR = {
   /** NEW (B dump dez 2) */
   rotulo: 'Do pregão anterior',

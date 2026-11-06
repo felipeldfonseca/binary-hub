@@ -102,6 +102,25 @@ describe('hub-diario-dia.css', () => {
     expect(['display', 'font-size', 'font-weight', 'color'].map((p) => valor('.hub .hub-dr-op-sub', p))).toEqual(['block', '12px', '400', 'var(--text-2)'])
   })
 
+  it('the image captions: 11 px under the thumbnails (board `.mini`), 12 px in the dialog (template.html `.dlg .linha2`)', () => {
+    expect(valor('.hub .hub-dr-img-legenda', 'font-size')).toBe('11px')
+    expect(valor('.hub .hub-dr-img-dlg .hub-dr-img-legenda', 'font-size')).toBe('12px')
+  })
+
+  it('files dragged over the editor: a mint ring as the Registrar’s, no tint under the hint, «Nota» and the counter', () => {
+    const r = regra('.hub .hub-dr-img-ed--sobre')
+    expect(r.getPropertyValue('border-color').trim()).toBe('var(--mint)')
+    expect(r.getPropertyValue('box-shadow').trim()).toBe('inset 0 0 0 1px var(--mint)')
+    expect(r.getPropertyValue('background').trim()).toBe('')
+    expect(r.getPropertyValue('background-color').trim()).toBe('')
+    // no other rule tints the box or its small text while dragging (the contrast pair below holds then too)
+    for (const { rule } of todas.filter((x) => x.rule.selectorText.includes('hub-dr-img-ed--sobre'))) {
+      expect(rule.style.getPropertyValue('background').trim() + rule.style.getPropertyValue('background-color').trim()).toBe('')
+      expect(rule.selectorText).not.toMatch(/hub-dr-img-(dica|rot|contador)/)
+    }
+    for (const sel of ['.hub .hub-dr-img-dica', '.hub .hub-dr-img-rot', '.hub .hub-dr-img-contador']) expect([sel, valor(sel, 'color')]).toEqual([sel, 'var(--text-2)'])
+  })
+
   it('hub-operacoes-dia.css keeps no rule of the retired bridge', () => {
     const resto = rules(lerCss('hub-operacoes-dia.css'))
     expect(resto.length).toBeGreaterThan(0)
@@ -166,6 +185,8 @@ const PARES: [string, string, string[]][] = [
   ['the review’s alert', '--amber', ['--inset', '--surface', '--bg']],
   ['the leave guard', '--text', ['--amber-bg', '--surface', '--inset', '--surface', '--bg']],
   ['the image dialog’s caption', '--text-2', ['--bg', '--surface', '--inset', '--surface', '--bg']],
+  // the editor's box (no background of its own, also while files are dragged over it) in the drill in the row
+  ['the editor’s hint, «Nota» and counter (also while files are dragged over it)', '--text-2', ['--surface', '--inset', '--surface', '--bg']],
 ]
 
 describe.each(['claro', 'escuro'] as const)('contrast in %s', (tema) => {

@@ -28,6 +28,9 @@ function Previa({ url, estado, nome, grande = false }: { url: string | null | un
  * thumbnail opens the dialog «Imagem 1 de 2» (not modal, as drawn: «Fechar» takes the focus, Escape closes, ← and →
  * move, closing gives the focus to the thumbnail shown); «Editar» or «Adicionar imagens ou nota» opens the board's
  * editor (the Registrar's block in its Diário variant). The status outlasts the editor (it says what the save did).
+ * Opening the editor closes the dialog (board `abrirEditor`: `dlg: null`), so «Cancelar» or a save brings back the
+ * thumbnails, never the dialog; the dialog's image is clamped to the images saved (board `di`), so a save that removed
+ * the image shown never hides the others.
  */
 export default function ImagensDoDia({
   t,
@@ -50,10 +53,12 @@ export default function ImagensDoDia({
   const n = imagens.length
   const temSalvo = n > 0 || !!t.trade.note
   const id = (x: string) => `${idBase}-${x}`
+  /** The image the dialog shows: none while the editor is open or nothing is saved, else clamped to the last one */
+  const di = dlg === null || n === 0 || a.editando ? null : Math.min(dlg, n - 1)
 
   useEffect(() => {
-    if (dlg !== null) fecharRef.current?.focus()
-  }, [dlg === null]) // eslint-disable-line react-hooks/exhaustive-deps
+    if (di !== null) fecharRef.current?.focus()
+  }, [di === null]) // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (focoMini) document.getElementById(id(`mini-${focoMini.k}`))?.focus()
   }, [focoMini]) // eslint-disable-line react-hooks/exhaustive-deps
@@ -64,12 +69,17 @@ export default function ImagensDoDia({
     return urls.data[path] ? 'pronto' : 'falhou'
   }
   const fechar = () => {
-    const k = dlg ?? 0
+    const k = di ?? 0
     setDlg(null)
     setFocoMini((f) => ({ k, n: (f?.n ?? 0) + 1 }))
   }
   const ir = (k: number) => {
     if (k >= 0 && k < n) setDlg(k)
+  }
+  /** «Editar» and «Adicionar imagens ou nota»: the dialog closes as the editor opens */
+  const editar = () => {
+    setDlg(null)
+    a.editar()
   }
 
   return (
@@ -86,12 +96,12 @@ export default function ImagensDoDia({
               {quando && <span className="hub-dr-img-quando">{quando}</span>}
             </div>
             {!t.history && (
-              <button id={id('editar')} type="button" className="hub-btn hub-dr-img-btn" aria-label={ANEXOS.editarAria} onClick={a.editar}>
+              <button id={id('editar')} type="button" className="hub-btn hub-dr-img-btn" aria-label={ANEXOS.editarAria} onClick={editar}>
                 {ANEXOS.editar}
               </button>
             )}
           </div>
-          {dlg !== null && imagens[dlg] && (
+          {di !== null && (
             <div
               role="dialog"
               aria-labelledby={id('dlg-tit')}
@@ -102,20 +112,20 @@ export default function ImagensDoDia({
                   fechar()
                 } else if (event.key === 'ArrowLeft') {
                   event.preventDefault()
-                  ir(dlg - 1)
+                  ir(di - 1)
                 } else if (event.key === 'ArrowRight') {
                   event.preventDefault()
-                  ir(dlg + 1)
+                  ir(di + 1)
                 }
               }}
             >
               <div className="hub-dr-img-dlg-cab">
-                <strong id={id('dlg-tit')}>{IMAGENS.dialogo(dlg + 1, n)}</strong>
+                <strong id={id('dlg-tit')}>{IMAGENS.dialogo(di + 1, n)}</strong>
                 <div className="hub-dr-img-dlg-acoes">
-                  <button type="button" className="hub-btn" aria-disabled={dlg === 0 || undefined} onClick={() => ir(dlg - 1)}>
+                  <button type="button" className="hub-btn" aria-disabled={di === 0 || undefined} onClick={() => ir(di - 1)}>
                     {IMAGENS.anterior}
                   </button>
-                  <button type="button" className="hub-btn" aria-disabled={dlg >= n - 1 || undefined} onClick={() => ir(dlg + 1)}>
+                  <button type="button" className="hub-btn" aria-disabled={di >= n - 1 || undefined} onClick={() => ir(di + 1)}>
                     {IMAGENS.proxima}
                   </button>
                   <button ref={fecharRef} type="button" className="hub-btn" onClick={fechar}>
@@ -123,13 +133,13 @@ export default function ImagensDoDia({
                   </button>
                 </div>
               </div>
-              <Previa url={urls.data?.[imagens[dlg].path]} estado={estado(imagens[dlg].path)} nome={imagens[dlg].name} grande />
+              <Previa url={urls.data?.[imagens[di].path]} estado={estado(imagens[di].path)} nome={imagens[di].name} grande />
               <span className="hub-dr-img-legenda">
-                {imagens[dlg].name} · {formatImageSize(imagens[dlg].bytes ?? 0)}
+                {imagens[di].name} · {formatImageSize(imagens[di].bytes ?? 0)}
               </span>
             </div>
           )}
-          {n > 0 && dlg === null && (
+          {n > 0 && di === null && (
             <ul className="hub-dr-img-minis" aria-label={IMAGENS.lista}>
               {imagens.map((im, k) => (
                 <li key={im.id}>
@@ -147,7 +157,7 @@ export default function ImagensDoDia({
         </div>
       ) : !t.history ? (
         <div className="hub-dr-drill-full">
-          <button id={id('add')} type="button" className="hub-dr-img-add" onClick={a.editar}>
+          <button id={id('add')} type="button" className="hub-dr-img-add" onClick={editar}>
             {IMAGENS.adicionar}
           </button>
         </div>

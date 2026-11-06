@@ -61,22 +61,29 @@ function CorpoDoDia({ p, d }: { p: DiarioPaginaValor; d: DayRead }) {
   const alternar = useCallback(
     async (tid: string) => {
       if (!(await confirmar())) return
+      // A ▾ pressed with the mouse where buttons do not take the focus (Safari): the focus is still in the drill
+      // that goes (its guard, its editor) or already lost; that ▾ takes it
+      const ativo = document.activeElement
+      if (!ativo || ativo === document.body || ativo.closest('[id^="drill-"]')) document.getElementById(linhaId(tid))?.focus()
       setAberta((a) => (a === tid ? null : tid))
     },
     [confirmar],
   )
 
-  // A deep link or «Abrir 30 nov»: the trade's drill opens and its ▾ takes the focus
+  // A deep link or «Abrir 30 nov»: the trade's drill opens and its ▾ takes the focus. A trade that is not in the
+  // day's answer is dropped only once the day's read has settled: a day read earlier in the session is drawn from the
+  // cache while it is read again, and the trade just registered («Ver no Diário») comes with that read
   const { opPedida, consumirOp } = p
+  const lendo = p.diaLido.isFetching
   const [focarLinha, setFocarLinha] = useState<string | null>(null)
   useEffect(() => {
     if (!opPedida) return
     if (d.trades.some((t) => t.trade.id === opPedida)) {
       setAberta(opPedida)
       setFocarLinha(opPedida)
-    }
+    } else if (lendo) return
     consumirOp()
-  }, [opPedida, consumirOp, d.trades])
+  }, [opPedida, consumirOp, d.trades, lendo])
   useEffect(() => {
     if (!focarLinha) return
     const botao = document.getElementById(linhaId(focarLinha))

@@ -6,7 +6,7 @@
  *
  * Every time is on the Diário's clock (`tz`) and relative to the trade's own day (`ref` = its entry, contract §2.2 H
  * preamble): bare on that day, a date otherwise; never «ontem». The built producers are called, never copied: opTexto,
- * precoDe, diferencaTexto, distanciaDoStop, chipMarca, marcasDivididas (registrarForm), linhaDoTempo, subDaPonte,
+ * precoDe, diferencaTexto, distanciaDoStop, chipMarca, quandoMarca (registrarForm), linhaDoTempo, subDaPonte,
  * cartaoComParciais, formaDaOperacao (registrarParciais), the domain's dinheiro (lib/hub/diario); the board's own words
  * are copyDia's.
  */
@@ -14,7 +14,7 @@ import { addDays, formatHhMm, utcToLocal } from '@/lib/domain/tempo'
 import type { AccountMarket, Currency } from '@/lib/domain/markets'
 import type { GateResult, PlanBreak } from '@/lib/domain/gate'
 import { COMMISSION_FROM_FILE, type Day } from '@/lib/domain/diario'
-import { averageExit, countingExits, firstExitCut, isClean } from '@/lib/domain/registro'
+import { averageExit, countingExits, firstExitCut, isClean, type MarkEvent } from '@/lib/domain/registro'
 import { abs, fromInt, mul, numeric, numericText, plainText, round, sign, sub, trimScale } from '@/lib/domain/registro/numeric'
 import { EBINEX, FECHADA, GATE, MARCAS, PASSOS_PRECOS } from '@/components/hub/registrar/copy'
 import { FECHADA_3C } from '@/components/hub/registrar/copyParciais'
@@ -40,9 +40,9 @@ import {
   diferencaTexto,
   distanciaDoStop,
   marcasAtuais,
-  marcasDivididas,
   opTexto,
   precoDe,
+  quandoMarca,
   textoQuebras,
   valorMarca,
   type ContaReg,
@@ -536,15 +536,41 @@ export interface GrupoDeMarcas {
 
 const ROTULOS: Record<MarcaKind, string> = { setup: MARCAS_DIA.setup, execucao: MARCAS.execucao, emocao: MARCAS.emocao }
 
-/** H13: the three groups with their current value and time (R chipMarca / marcasDivididas with ref = the entry) */
+/**
+ * H13 · the time under a group (board engine `escolher`, dia.py `marcas_de`), relative to `ref` (the trade's day):
+ *   - a mark changed or cleared after one with a value: «antes: A às 10:52 · agora: B 1º dez às 11:35» / «… · agora: sem
+ *     marca 1º dez às 11:35», whatever the phase of either (the board writes the change for any group that had a
+ *     value). The «antes» is the first mark of the unbroken run of valued marks the change comes from: the board keeps
+ *     its first «antes» across later changes, and a group cleared before starts a new run;
+ *   - a mark with no valued mark just before it: «às 10:07 · antes da saída» (R chipMarca: the server's limpa);
+ *   - a group cleared with nothing before it, or never marked: nothing.
+ * A tap is stored at once, so what the board did within one visit holds across reloads here.
+ */
+function tempoDaMarca(reg: ContaReg, kind: MarcaKind, eventos: readonly MarkEvent[], ref: Date): string | null {
+  const xs = eventos.slice().sort((a, b) => a.markedAt.getTime() - b.markedAt.getTime() || a.id - b.id)
+  const cur = xs[xs.length - 1]
+  if (!cur) return null
+  let base: MarkEvent | null = null
+  for (let k = xs.length - 2; k >= 0 && xs[k].value !== null; k--) base = xs[k]
+  if (base && base.value !== null) {
+    return FECHADA.historico(
+      `${valorMarca(kind, base.value)} ${quandoMarca(reg, base.markedAt, ref)}`,
+      `${cur.value !== null ? valorMarca(kind, cur.value) : FECHADA.semMarca} ${quandoMarca(reg, cur.markedAt, ref)}`,
+    )
+  }
+  return cur.value !== null ? chipMarca(reg, { currentAt: cur.markedAt, currentLimpa: cur.limpa }, ref).texto : null
+}
+
+/** H13: the three groups with their current value and time (tempoDaMarca, R chipMarca with ref = the entry) */
 export function marcasDaOperacao(t: Pick<DiaryDayTrade, 'marks' | 'marksNow' | 'trade'>, reg: ContaReg): GrupoDeMarcas[] {
   const ref = referencia(t)
   const atuais = marcasAtuais(t.marksNow)
   return MARCA_KINDS.map((kind) => {
     const n = atuais[kind]
-    const historico = marcasDivididas(reg, t.marks.filter((e) => e.kind === kind), ref).depois.find((x) => x.historico)?.historico ?? null
+    const eventos = t.marks.filter((e) => e.kind === kind)
     const valor = n?.currentValue ? valorMarca(kind, n.currentValue) : null
-    return { kind, rotulo: ROTULOS[kind], valor, tempo: historico ?? (n?.currentValue ? chipMarca(reg, n, ref).texto : null) }
+    const tempo = eventos.length ? tempoDaMarca(reg, kind, eventos, ref) : n?.currentValue ? chipMarca(reg, n, ref).texto : null
+    return { kind, rotulo: ROTULOS[kind], valor, tempo }
   })
 }
 

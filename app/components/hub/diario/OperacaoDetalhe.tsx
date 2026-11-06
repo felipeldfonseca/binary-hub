@@ -100,12 +100,26 @@ export default function OperacaoDetalhe({
   }, [a.pendente])
 
   const ficarRef = useRef<HTMLButtonElement>(null)
+  // Where the focus was when the guard took it (the ▾ pressed, another drill's ▾, the account selector, «Abrir 30
+  // nov»): «Fechar» gives it back there before the drill goes, so the focus never drops to the page's start (§6.9)
+  const voltarRef = useRef<HTMLElement | null>(null)
   useEffect(() => {
     if (guarda) {
+      const ativo = document.activeElement
+      const dentro = !!document.getElementById(drillId(tid))?.contains(ativo)
+      voltarRef.current = ativo instanceof HTMLElement && ativo !== document.body && !dentro ? ativo : null
       ficarRef.current?.scrollIntoView?.({ block: 'nearest' })
       ficarRef.current?.focus()
     }
-  }, [guarda])
+  }, [guarda]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  /** «Fechar»: leave without saving; the focus goes back to what asked to leave */
+  const sair = () => {
+    const voltar = voltarRef.current
+    voltarRef.current = null
+    if (voltar?.isConnected) voltar.focus()
+    guarda?.sair()
+  }
 
   /** «Continuar aqui»: the editor stays, its «Nota» takes the focus back */
   const ficar = () => {
@@ -170,7 +184,7 @@ export default function OperacaoDetalhe({
             {FOLHA.leaveQuestion}
           </p>
           <div className="hub-dr-img-acoes">
-            <button type="button" className="hub-btn" onClick={guarda.sair}>
+            <button type="button" className="hub-btn" onClick={sair}>
               {FOLHA.leaveYes}
             </button>
             <button ref={ficarRef} type="button" className="hub-btn hub-btn--pri" onClick={ficar}>

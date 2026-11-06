@@ -7,9 +7,11 @@
  */
 import fs from 'fs'
 import path from 'path'
-import { act, screen, waitFor, within } from '@testing-library/react'
+import { act, fireEvent, screen, waitFor, within } from '@testing-library/react'
 import { abrirDrill, mocks, renderDiario, type DiarioRenderizado } from '@/testing/diarioTelas'
 import { escritasDoDrill } from '@/testing/diarioDiaEscritas'
+import { diarioKeys } from '@/hooks/useDiario'
+import { USUARIO_DO_QUADRO } from '@/testing/diarioTelasMocks'
 import type { EsperadoDia } from '@/testing/diarioQuadro'
 
 jest.mock('next/navigation', () => require('@/testing/diarioTelasMocks').mockNavegacao())
@@ -318,6 +320,188 @@ describe('H12 · the leave guard', () => {
     })
     expect(screen.getByRole('button', { name: /^Conta: Top One/ })).toBeInTheDocument()
     expect(mocks.mergePreferences).not.toHaveBeenCalled()
+  })
+})
+
+// ------------------------------------------------------------------------------------------------
+// Review fixes (L2 reviews 1 and 2)
+// ------------------------------------------------------------------------------------------------
+
+describe('H9 + H10 · the dialog closes when the editor opens (board `abrirEditor`: dlg null)', () => {
+  it('2: «Imagem 2 de 2», then «Editar», then «Cancelar»: the thumbnails come back (no dialog) and «Editar» has the focus', async () => {
+    const r = await renderDiario('2')
+    const drill = await drillDe(r, '10:03')
+    await r.user.click(within(drill).getByRole('button', { name: 'Abrir MES_10-09_saida.png, imagem 2 de 2' }))
+    expect(within(drill).getByRole('dialog', { name: 'Imagem 2 de 2' })).toBeInTheDocument()
+    await r.user.click(within(drill).getByRole('button', { name: 'Editar imagens e nota' }))
+    await waitFor(() => expect(within(drill).getByLabelText('Nota')).toHaveFocus())
+    await r.user.click(within(drill).getByRole('button', { name: 'Cancelar' }))
+    await waitFor(() => expect(within(drill).getByRole('button', { name: 'Editar imagens e nota' })).toHaveFocus())
+    expect(within(drill).queryByRole('dialog')).toBeNull()
+    expect(within(within(drill).getByRole('list', { name: 'Imagens' })).getAllByRole('button')).toHaveLength(2)
+  })
+
+  it('2: the day read again with one image less while «Imagem 2 de 2» is open: the dialog shows the last one left («Imagem 1 de 1»)', async () => {
+    const r = await renderDiario('2')
+    const drill = await drillDe(r, '10:03')
+    await r.user.click(within(drill).getByRole('button', { name: 'Abrir MES_10-09_saida.png, imagem 2 de 2' }))
+    const raw = (r.cru[r.q.info.contaId].dias[r.q.info.dia].trades as { images: unknown[] }[])[0]
+    raw.images = raw.images.slice(0, 1)
+    await act(async () => {
+      await r.queryClient.invalidateQueries({ queryKey: diarioKeys.all(USUARIO_DO_QUADRO) })
+    })
+    await waitFor(() => expect(within(drill).getByRole('dialog', { name: 'Imagem 1 de 1' })).toBeInTheDocument())
+    expect(sem(within(drill).getByRole('dialog').querySelector('.hub-dr-img-legenda')?.textContent)).toBe('MES_10-03_entrada.png · 612 KB')
+  })
+
+  it('12a: a save that removes the image shown keeps the other thumbnail on screen', async () => {
+    const r = await renderDiario('12a')
+    escritasDoDrill(r)
+    const drill = await drillDe(r, '10:03')
+    await r.user.click(within(drill).getByRole('button', { name: 'Abrir MES_10-09_saida.png, imagem 2 de 2' }))
+    await r.user.click(within(drill).getByRole('button', { name: 'Editar imagens e nota' }))
+    await r.user.click(within(drill).getByRole('button', { name: 'Remover imagem MES_10-09_saida.png' }))
+    await r.user.click(within(drill).getByRole('button', { name: 'Salvar imagens e nota' }))
+    await waitFor(() => expect(within(drill).getByRole('button', { name: 'Editar imagens e nota' })).toHaveFocus())
+    await waitFor(() => expect(within(within(drill).getByRole('list', { name: 'Imagens' })).getAllByRole('button').map((b) => b.getAttribute('aria-label'))).toEqual(['Abrir MES_10-03_entrada.png, imagem 1 de 1']))
+    expect(within(drill).queryByRole('dialog')).toBeNull()
+  })
+})
+
+describe('H10 · the editor as drawn: the primary save, the hint with 4 images', () => {
+  it('1: «Adicionar imagens ou nota» → «Salvar imagens e nota» is the enabled primary button; pressed empty, it closes as «Cancelar» and sends nothing', async () => {
+    const r = await renderDiario('1')
+    escritasDoDrill(r)
+    const drill = await drillDe(r, '10:04')
+    await r.user.click(within(drill).getByRole('button', { name: 'Adicionar imagens ou nota' }))
+    const salvar = within(drill).getByRole('button', { name: 'Salvar imagens e nota' })
+    expect(salvar).toHaveClass('hub-btn--pri')
+    expect(salvar).not.toHaveAttribute('aria-disabled')
+    await r.user.click(salvar)
+    await waitFor(() => expect(within(drill).getByRole('button', { name: 'Adicionar imagens ou nota' })).toHaveFocus())
+    expect(within(drill).queryByLabelText('Nota')).toBeNull()
+    expect(mocks.saveExtras).not.toHaveBeenCalled()
+    expect(mocks.imageSlots).not.toHaveBeenCalled()
+  })
+
+  it('2: with 4 images the hint stays «… Até 4 imagens PNG, JPG ou WebP, de até 10 MB cada.»; only «Escolher imagens» greys', async () => {
+    const r = await renderDiario('2')
+    const drill = await drillDe(r, '10:03')
+    await r.user.click(within(drill).getByRole('button', { name: 'Editar imagens e nota' }))
+    const ed = within(drill).getByRole('group', { name: 'Imagens e nota' })
+    const dica = () => sem(ed.querySelector('.hub-dr-img-dica')?.textContent)
+    const antes = dica()
+    expect(antes).toMatch(/Até 4 imagens PNG, JPG ou WebP, de até 10 MB cada\.$/)
+    const arquivo = (nome: string) => new File(['x'], nome, { type: 'image/png' })
+    act(() => {
+      fireEvent.change(ed.querySelector('input[type="file"]') as HTMLInputElement, { target: { files: [arquivo('MES_10-03_3.png'), arquivo('MES_10-03_4.png')] } })
+    })
+    await waitFor(() => expect(within(within(ed).getByRole('list', { name: 'Imagens anexadas' })).getAllByRole('listitem')).toHaveLength(4))
+    expect(dica()).toBe(antes)
+    expect(within(ed).queryByText('Limite de 4 imagens. Remova uma para trocar.')).toBeNull()
+    expect(within(ed).getByRole('button', { name: 'Escolher imagens' })).toHaveAttribute('aria-disabled', 'true')
+    expect(within(ed).getByRole('button', { name: 'Salvar imagens e nota' })).not.toHaveAttribute('aria-disabled')
+  })
+})
+
+describe('H13 · changing and clearing a mark write «antes: … · agora: …» (board `escolher`)', () => {
+  it('9 → 30 nov: Setup A → B on the open MNQ before its exit: «antes: A às 10:52 · agora: B 1º dez às 11:35»; tapping B again clears it', async () => {
+    const r = await renderDiario('9')
+    escritasDoDrill(r)
+    await r.user.click(await screen.findByRole('button', { name: 'Abrir 30 nov' }))
+    const botao = await waitFor(() => {
+      const b = screen.getByRole('button', { name: 'Detalhes da operação: Compra de MNQ às 10:52' })
+      expect(b).toHaveAttribute('aria-expanded', 'true')
+      return b
+    })
+    const drill = document.getElementById(botao.getAttribute('aria-controls') as string) as HTMLElement
+    const tempoSetup = () => sem(drill.querySelector('.hub-dr-drill-grupo-tempo')?.textContent)
+    expect(tempoSetup()).toBe('às 10:52 · antes da saída')
+    const setup = () => within(drill).getByRole('group', { name: /^Setup/ })
+    await r.user.click(within(setup()).getByRole('button', { name: 'B' }))
+    await waitFor(() => expect(tempoSetup()).toBe('antes: A às 10:52 · agora: B 1º dez às 11:35'))
+    await r.user.click(within(setup()).getByRole('button', { name: 'B' }))
+    await waitFor(() => expect(tempoSetup()).toBe('antes: A às 10:52 · agora: sem marca 1º dez às 11:35'))
+    expect(within(setup()).queryByRole('button', { pressed: true })).toBeNull()
+  })
+
+  it('2: 10:22 MNQ, Setup C (17:48, after the result) → B: «antes: C às 17:48 · agora: B 1º dez às 11:35»', async () => {
+    const r = await renderDiario('2')
+    escritasDoDrill(r)
+    const drill = await drillDe(r, '10:22')
+    await r.user.click(within(within(drill).getByRole('group', { name: /^Setup/ })).getByRole('button', { name: 'B' }))
+    await waitFor(() => expect(sem(drill.querySelector('.hub-dr-drill-grupo-tempo')?.textContent)).toBe('antes: C às 17:48 · agora: B 1º dez às 11:35'))
+  })
+})
+
+describe('H12 · after «Fechar», the focus goes to what asked to leave', () => {
+  async function comNota(r: DiarioRenderizado, hora: string) {
+    const drill = await drillDe(r, hora)
+    await r.user.click(within(drill).getByRole('button', { name: 'Adicionar imagens ou nota' }))
+    await r.user.type(within(drill).getByLabelText('Nota'), 'Ainda não salvei.')
+    return drill
+  }
+
+  it('the same drill’s ▾: «Fechar» closes the drill and its ▾ keeps the focus', async () => {
+    const r = await renderDiario('2')
+    await comNota(r, '10:14')
+    const seta = screen.getByRole('button', { name: 'Detalhes da operação: Compra de MES às 10:14' })
+    await r.user.click(seta)
+    await r.user.click(screen.getByRole('button', { name: 'Fechar' }))
+    await waitFor(() => expect(seta).toHaveAttribute('aria-expanded', 'false'))
+    expect(seta).toHaveFocus()
+    expect(document.activeElement).not.toBe(document.body)
+  })
+
+  it('another drill’s ▾: «Fechar» opens it and its ▾ has the focus', async () => {
+    const r = await renderDiario('2')
+    await comNota(r, '10:14')
+    const outra = screen.getByRole('button', { name: 'Detalhes da operação: Venda de MNQ às 10:22' })
+    await r.user.click(outra)
+    await r.user.click(screen.getByRole('button', { name: 'Fechar' }))
+    await waitFor(() => expect(outra).toHaveAttribute('aria-expanded', 'true'))
+    expect(outra).toHaveFocus()
+  })
+
+  it('clicks that do not move the focus (Safari’s buttons): after «Fechar» the ▾ pressed still gets the focus', async () => {
+    const r = await renderDiario('2')
+    await comNota(r, '10:14')
+    const seta = screen.getByRole('button', { name: 'Detalhes da operação: Compra de MES às 10:14' })
+    act(() => {
+      fireEvent.click(seta)
+    })
+    const fechar = await screen.findByRole('button', { name: 'Fechar' })
+    await act(async () => {
+      fireEvent.click(fechar)
+    })
+    await waitFor(() => expect(seta).toHaveAttribute('aria-expanded', 'false'))
+    expect(seta).toHaveFocus()
+  })
+
+  it('another account in the selector: «Fechar» changes the account and the selector’s button has the focus', async () => {
+    const r = await renderDiario('2')
+    await comNota(r, '10:14')
+    await r.user.click(screen.getByRole('button', { name: /^Conta: Top One/ }))
+    await r.user.click(await screen.findByRole('button', { name: /^Lucid 50k/ }))
+    await r.user.click(await screen.findByRole('button', { name: 'Fechar' }))
+    await waitFor(() => expect(screen.getByRole('button', { name: /^Conta: Lucid 50k/ })).toBeInTheDocument())
+    expect(screen.getByRole('button', { name: /^Conta: Lucid 50k/ })).toHaveFocus()
+  })
+
+  it('the page asks the browser before leaving while the editor holds unsaved work (beforeunload), and stops asking after', async () => {
+    const r = await renderDiario('2')
+    const sair = () => {
+      const e = new Event('beforeunload', { cancelable: true })
+      window.dispatchEvent(e)
+      return e.defaultPrevented
+    }
+    const drill = await drillDe(r, '10:14')
+    expect(sair()).toBe(false)
+    await r.user.click(within(drill).getByRole('button', { name: 'Adicionar imagens ou nota' }))
+    await r.user.type(within(drill).getByLabelText('Nota'), 'Ainda não salvei.')
+    expect(sair()).toBe(true)
+    await r.user.click(within(drill).getByRole('button', { name: 'Cancelar' }))
+    expect(sair()).toBe(false)
   })
 })
 
