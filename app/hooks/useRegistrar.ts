@@ -85,6 +85,8 @@ const prefix = {
   previa: (uid: string | undefined) => ['hub', uid, 'registrar', 'previa'] as const,
   atividade: (uid: string | undefined) => ['hub', uid, 'atividade'] as const,
   eventos: (uid: string | undefined) => ['hub', uid, 'registrar', 'eventos'] as const,
+  /** Phase 4: the Diário of every account (hooks/useDiario's diarioKeys.all) */
+  diario: (uid: string | undefined) => ['hub', uid, 'diario'] as const,
 };
 
 /** What each write changes, besides the trade's own entry (set from the answer) */
@@ -95,22 +97,28 @@ export type RegistrarWrite = 'entrada' | 'saida' | 'fechada' | 'desfazer' | 'mar
  * hoje» (an open trade never counts, but its answer's per-account `today` is refreshed with the
  * rest); atividade: «{n} op. desde então» and Suas contas' counts; the old pages' trade lists
  * ['trades'] and ['trade-stats'] (/trades and the dashboard read the same rows). rules_config is
- * never made stale by a trade: rules_config() reads no trade.
+ * never made stale by a trade: rules_config() reads no trade. Phase 4: every write makes the
+ * Diário stale ('diario', every account: under «somando» a trade on one futures account moves
+ * another's limit; the marks, the images and the note show on the day too), and only its queries
+ * on screen are read again.
  */
 export const REGISTRAR_INVALIDATIONS: Readonly<
-  Record<RegistrarWrite, readonly ('abertas' | 'dia' | 'eventos' | 'recentes' | 'previa' | 'regrasAgora' | 'atividade' | 'paginasAntigas')[]>
+  Record<
+    RegistrarWrite,
+    readonly ('abertas' | 'dia' | 'eventos' | 'recentes' | 'previa' | 'regrasAgora' | 'atividade' | 'paginasAntigas' | 'diario')[]
+  >
 > = {
-  entrada: ['abertas', 'dia', 'recentes', 'previa', 'regrasAgora', 'atividade', 'paginasAntigas'],
-  saida: ['abertas', 'dia', 'eventos', 'previa', 'regrasAgora', 'paginasAntigas'],
-  fechada: ['dia', 'eventos', 'recentes', 'previa', 'regrasAgora', 'atividade', 'paginasAntigas'],
-  desfazer: ['abertas', 'dia', 'eventos', 'recentes', 'previa', 'regrasAgora', 'atividade', 'paginasAntigas'],
-  marcas: [],
-  extras: ['dia'],
+  entrada: ['abertas', 'dia', 'recentes', 'previa', 'regrasAgora', 'atividade', 'paginasAntigas', 'diario'],
+  saida: ['abertas', 'dia', 'eventos', 'previa', 'regrasAgora', 'paginasAntigas', 'diario'],
+  fechada: ['dia', 'eventos', 'recentes', 'previa', 'regrasAgora', 'atividade', 'paginasAntigas', 'diario'],
+  desfazer: ['abertas', 'dia', 'eventos', 'recentes', 'previa', 'regrasAgora', 'atividade', 'paginasAntigas', 'diario'],
+  marcas: ['diario'],
+  extras: ['dia', 'diario'],
   // Phase 3c: a partial counts on the day's limit at its minute; a move changes no money; an undone
   // partial leaves it (the bridge's second line and the chooser's «… em aberto» read 'eventos')
-  parcial: ['abertas', 'dia', 'eventos', 'previa', 'regrasAgora'],
-  stop: ['dia', 'eventos', 'previa'],
-  evento: ['abertas', 'dia', 'eventos', 'previa', 'regrasAgora'],
+  parcial: ['abertas', 'dia', 'eventos', 'previa', 'regrasAgora', 'diario'],
+  stop: ['dia', 'eventos', 'previa', 'diario'],
+  evento: ['abertas', 'dia', 'eventos', 'previa', 'regrasAgora', 'diario'],
 };
 
 /**
@@ -138,6 +146,8 @@ export function invalidateAfterRegistrar(queryClient: QueryClient, uid: string |
         return [{ queryKey: [...prefix.atividade(uid)] }];
       case 'paginasAntigas':
         return [{ queryKey: ['trades'] }, { queryKey: ['trade-stats'] }];
+      case 'diario':
+        return [{ queryKey: [...prefix.diario(uid)] }];
     }
   });
   return Promise.all(filters.map((f) => queryClient.invalidateQueries(f)));

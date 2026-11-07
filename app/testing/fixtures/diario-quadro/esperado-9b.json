@@ -1,0 +1,1471 @@
+{
+ "cen": "9b",
+ "rotulo": "9b · Muitas contas · Top One entre 35 contas, hoje 1º dez: a linha das outras, “Ver todas” e a busca do seletor",
+ "dataLinha": "terça-feira, 1º de dezembro, 11:35 ET",
+ "conta": {
+  "nome": "Top One",
+  "janela": "Janela 10:00–11:00 ET",
+  "valores": "Valores em US$."
+ },
+ "flags": {
+  "semRegras": false,
+  "temAviso": true,
+  "offline": false,
+  "carregando": false,
+  "erro": false,
+  "pronto": true,
+  "infos": {
+   "posso": false,
+   "cal": false,
+   "resumo": false,
+   "plano": false,
+   "ops": false,
+   "semana": false,
+   "grava": false,
+   "marcas": false
+  }
+ },
+ "possoSel": [
+  {
+   "nome": "Top One",
+   "pal": "Fora da sua janela",
+   "sub": "abre amanhã às 10:00 ET",
+   "acao": null,
+   "acaoAria": null,
+   "lim": "US$ 45 de US$ 400",
+   "soma": false,
+   "tom": "tom-amber"
+  }
+ ],
+ "outras": {
+  "titulo": "Outras 34 contas:",
+  "partes": [
+   {
+    "texto": "19 liberadas",
+    "tom": "tom-mint"
+   },
+   {
+    "texto": "3 encerradas por hoje",
+    "tom": "tom-red"
+   },
+   {
+    "texto": "9 fora da janela",
+    "tom": "tom-amber"
+   },
+   {
+    "texto": "3 sem janela salva",
+    "tom": "tom-muted"
+   }
+  ],
+  "botao": "Ocultar",
+  "abertas": true
+ },
+ "possoOutras": [
+  {
+   "nome": "Alpha 50k #1",
+   "pal": "Liberado",
+   "sub": "até 12:00 ET",
+   "acao": null,
+   "acaoAria": null,
+   "lim": "US$ 0 de US$ 500",
+   "soma": false,
+   "tom": "tom-mint"
+  },
+  {
+   "nome": "Alpha 50k #2",
+   "pal": "Liberado",
+   "sub": "até 12:00 ET",
+   "acao": null,
+   "acaoAria": null,
+   "lim": "US$ 0 de US$ 500",
+   "soma": false,
+   "tom": "tom-mint"
+  },
+  {
+   "nome": "Alpha 50k #3",
+   "pal": "Liberado",
+   "sub": "até 12:00 ET",
+   "acao": null,
+   "acaoAria": null,
+   "lim": "US$ 0 de US$ 500",
+   "soma": false,
+   "tom": "tom-mint"
+  },
+  {
+   "nome": "Apex 50k #1",
+   "pal": "Liberado",
+   "sub": "até 12:00 ET",
+   "acao": null,
+   "acaoAria": null,
+   "lim": "US$ 0 de US$ 500",
+   "soma": false,
+   "tom": "tom-mint"
+  },
+  {
+   "nome": "Apex 50k #2",
+   "pal": "Liberado",
+   "sub": "até 12:00 ET",
+   "acao": null,
+   "acaoAria": null,
+   "lim": "US$ 0 de US$ 500",
+   "soma": false,
+   "tom": "tom-mint"
+  },
+  {
+   "nome": "Apex 50k #3",
+   "pal": "Liberado",
+   "sub": "até 12:00 ET",
+   "acao": null,
+   "acaoAria": null,
+   "lim": "US$ 0 de US$ 500",
+   "soma": false,
+   "tom": "tom-mint"
+  },
+  {
+   "nome": "Apex 50k #4",
+   "pal": "Liberado",
+   "sub": "até 12:00 ET",
+   "acao": null,
+   "acaoAria": null,
+   "lim": "US$ 0 de US$ 500",
+   "soma": false,
+   "tom": "tom-mint"
+  },
+  {
+   "nome": "Apex 50k #5",
+   "pal": "Encerrado por hoje",
+   "sub": "limite atingido às 10:41",
+   "acao": null,
+   "acaoAria": null,
+   "lim": "US$ 503 de US$ 500",
+   "soma": false,
+   "tom": "tom-red"
+  },
+  {
+   "nome": "Apex 50k #6",
+   "pal": "Encerrado por hoje",
+   "sub": "limite atingido às 10:41",
+   "acao": null,
+   "acaoAria": null,
+   "lim": "US$ 503 de US$ 500",
+   "soma": false,
+   "tom": "tom-red"
+  },
+  {
+   "nome": "Apex 100k #1",
+   "pal": "Liberado",
+   "sub": "até 16:00 ET",
+   "acao": null,
+   "acaoAria": null,
+   "lim": "US$ 0 de US$ 1.000",
+   "soma": false,
+   "tom": "tom-mint"
+  },
+  {
+   "nome": "Apex 100k #2",
+   "pal": "Liberado",
+   "sub": "até 16:00 ET",
+   "acao": null,
+   "acaoAria": null,
+   "lim": "US$ 0 de US$ 1.000",
+   "soma": false,
+   "tom": "tom-mint"
+  },
+  {
+   "nome": "Apex 100k #3",
+   "pal": "Liberado",
+   "sub": "até 16:00 ET",
+   "acao": null,
+   "acaoAria": null,
+   "lim": "US$ 0 de US$ 1.000",
+   "soma": false,
+   "tom": "tom-mint"
+  },
+  {
+   "nome": "Lucid 50k",
+   "pal": "Encerrado por hoje",
+   "sub": "limite atingido às 10:20",
+   "acao": null,
+   "acaoAria": null,
+   "lim": "US$ 1.113,25 de US$ 400",
+   "soma": false,
+   "tom": "tom-red"
+  },
+  {
+   "nome": "Lucid 50k #2",
+   "pal": "Liberado",
+   "sub": "até 12:00 ET",
+   "acao": null,
+   "acaoAria": null,
+   "lim": "US$ 0 de US$ 400",
+   "soma": false,
+   "tom": "tom-mint"
+  },
+  {
+   "nome": "Lucid 50k #3",
+   "pal": "Liberado",
+   "sub": "até 12:00 ET",
+   "acao": null,
+   "acaoAria": null,
+   "lim": "US$ 0 de US$ 400",
+   "soma": false,
+   "tom": "tom-mint"
+  },
+  {
+   "nome": "Lucid 100k",
+   "pal": "Liberado",
+   "sub": "até 12:00 ET",
+   "acao": null,
+   "acaoAria": null,
+   "lim": "US$ 0 de US$ 800",
+   "soma": false,
+   "tom": "tom-mint"
+  },
+  {
+   "nome": "MFFU 50k #1",
+   "pal": "Liberado",
+   "sub": "até 16:00 ET",
+   "acao": null,
+   "acaoAria": null,
+   "lim": "US$ 0 de US$ 500",
+   "soma": false,
+   "tom": "tom-mint"
+  },
+  {
+   "nome": "MFFU 50k #2",
+   "pal": "Liberado",
+   "sub": "até 16:00 ET",
+   "acao": null,
+   "acaoAria": null,
+   "lim": "US$ 0 de US$ 500",
+   "soma": false,
+   "tom": "tom-mint"
+  },
+  {
+   "nome": "MFFU 50k #3",
+   "pal": "Liberado",
+   "sub": "até 16:00 ET",
+   "acao": null,
+   "acaoAria": null,
+   "lim": "US$ 0 de US$ 500",
+   "soma": false,
+   "tom": "tom-mint"
+  },
+  {
+   "nome": "Topstep 50k #1",
+   "pal": "Fora da sua janela",
+   "sub": "abre amanhã às 10:00 ET",
+   "acao": null,
+   "acaoAria": null,
+   "lim": "US$ 0 de US$ 500",
+   "soma": false,
+   "tom": "tom-amber"
+  },
+  {
+   "nome": "Topstep 50k #2",
+   "pal": "Fora da sua janela",
+   "sub": "abre amanhã às 10:00 ET",
+   "acao": null,
+   "acaoAria": null,
+   "lim": "US$ 0 de US$ 500",
+   "soma": false,
+   "tom": "tom-amber"
+  },
+  {
+   "nome": "Topstep 50k #3",
+   "pal": "Fora da sua janela",
+   "sub": "abre amanhã às 10:00 ET",
+   "acao": null,
+   "acaoAria": null,
+   "lim": "US$ 0 de US$ 500",
+   "soma": false,
+   "tom": "tom-amber"
+  },
+  {
+   "nome": "Topstep 50k #4",
+   "pal": "Fora da sua janela",
+   "sub": "abre amanhã às 10:00 ET",
+   "acao": null,
+   "acaoAria": null,
+   "lim": "US$ 0 de US$ 500",
+   "soma": false,
+   "tom": "tom-amber"
+  },
+  {
+   "nome": "Topstep 150k",
+   "pal": "Fora da sua janela",
+   "sub": "abre amanhã às 10:00 ET",
+   "acao": null,
+   "acaoAria": null,
+   "lim": "US$ 0 de US$ 1.500",
+   "soma": false,
+   "tom": "tom-amber"
+  },
+  {
+   "nome": "Tradeify 50k #1",
+   "pal": "Liberado",
+   "sub": "até 12:00 ET",
+   "acao": null,
+   "acaoAria": null,
+   "lim": "US$ 23 de US$ 600",
+   "soma": false,
+   "tom": "tom-mint"
+  },
+  {
+   "nome": "Tradeify 50k #2",
+   "pal": "Liberado",
+   "sub": "até 12:00 ET",
+   "acao": null,
+   "acaoAria": null,
+   "lim": "US$ 0 de US$ 600",
+   "soma": false,
+   "tom": "tom-mint"
+  },
+  {
+   "nome": "Tradeify 50k #3",
+   "pal": "Liberado",
+   "sub": "até 12:00 ET",
+   "acao": null,
+   "acaoAria": null,
+   "lim": "US$ 0 de US$ 600",
+   "soma": false,
+   "tom": "tom-mint"
+  },
+  {
+   "nome": "Tradeify 50k #4",
+   "pal": "Sem janela salva",
+   "sub": null,
+   "acao": "Definir",
+   "acaoAria": "Definir a janela da Tradeify 50k #4 em Personalizar",
+   "lim": null,
+   "soma": false,
+   "tom": "tom-muted"
+  },
+  {
+   "nome": "Ylos 50k",
+   "pal": "Sem janela salva",
+   "sub": null,
+   "acao": "Definir",
+   "acaoAria": "Definir a janela da Ylos 50k em Personalizar",
+   "lim": null,
+   "soma": false,
+   "tom": "tom-muted"
+  },
+  {
+   "nome": "Ebinex",
+   "pal": "Fora da sua janela",
+   "sub": "abre às 20:00 de Brasília",
+   "acao": null,
+   "acaoAria": null,
+   "lim": null,
+   "soma": false,
+   "tom": "tom-amber"
+  },
+  {
+   "nome": "FTMO",
+   "pal": "Fora da sua janela",
+   "sub": "abre amanhã às 08:00 ET",
+   "acao": null,
+   "acaoAria": null,
+   "lim": "US$ 0 de US$ 1.000",
+   "soma": false,
+   "tom": "tom-amber"
+  },
+  {
+   "nome": "IBKR",
+   "pal": "Sem janela salva",
+   "sub": null,
+   "acao": "Definir",
+   "acaoAria": "Definir a janela da IBKR em Personalizar",
+   "lim": null,
+   "soma": false,
+   "tom": "tom-muted"
+  },
+  {
+   "nome": "Binance",
+   "pal": "Fora da sua janela",
+   "sub": "abre às 20:00 de Brasília",
+   "acao": null,
+   "acaoAria": null,
+   "lim": null,
+   "soma": false,
+   "tom": "tom-amber"
+  },
+  {
+   "nome": "Clear",
+   "pal": "Fora da sua janela",
+   "sub": "abre amanhã às 10:00 de Brasília",
+   "acao": null,
+   "acaoAria": null,
+   "lim": "R$ 0 de R$ 500",
+   "soma": false,
+   "tom": "tom-amber"
+  }
+ ],
+ "linhaTopo": "Diário desde 14 out: 110 operações em 32 pregões · 85 antes, em Histórico importado · só resultado",
+ "aviso": "5 pregões sem revisão, 3 nas últimas 4 semanas",
+ "mes": {
+  "titulo": "Dezembro de 2026",
+  "status": "Mês: Dezembro de 2026.",
+  "colunas": [
+   "Seg",
+   "Ter",
+   "Qua",
+   "Qui",
+   "Sex"
+  ],
+  "anterior": true,
+  "proximo": false,
+  "noMesDeHoje": true
+ },
+ "infoCal": "Cada pregão é pintado pelo resultado: verde ganho, vermelho perda, mais forte quanto maior (quartis do resultado diário, ganhos e perdas à parte). O pregão de futuros vai das 18:00 da véspera às 17:00 ET. Traço (—): dia sem operações. Hachurado: Histórico importado, antes das suas regras, só com resultado, nunca somado ao diário e com uma escala de cor própria. Ponto verde: hoje. Borda branca: dia aberto. Tracejado: dia do mês vizinho. A coluna Semana soma só o diário; o histórico aparece à parte, com ▨. Toque numa semana para abri-la. Passe o mouse num dia para ver operações, ganhos e perdas. Pregões sem revisão de meses anteriores ficam no mês deles: use ‹.",
+ "semanas": [
+  {
+   "rotulo": "30 nov–4 dez",
+   "botao": true,
+   "res": "−98,75",
+   "n": "7 op.",
+   "fora": "1",
+   "hist": null,
+   "aria": "Semana de 30 de novembro a 4 de dezembro: −98,75 dólares, 7 op., 1 fora do plano. Abrir a semana.",
+   "vazia": false,
+   "traco": null,
+   "dias": [
+    {
+     "id": "2026-11-30",
+     "clicavel": false,
+     "tab": null,
+     "aberto": false,
+     "classe": "cal-fora dica-e",
+     "res": "",
+     "curto": "",
+     "marcas": null,
+     "dica": "",
+     "aria": ""
+    },
+    {
+     "id": "2026-12-01",
+     "clicavel": true,
+     "tab": "0",
+     "aberto": true,
+     "classe": "cal-hoje",
+     "res": "+2,00",
+     "curto": "+2",
+     "marcas": {
+      "fora": true,
+      "limite": false,
+      "revisao": false
+     },
+     "dica": "1º dez · +US$ 2,00 · 4 op.: 2 ganhos, 2 perdas · 1 fora do plano",
+     "aria": "1º dez, +2,00 dólares, 4 op., com operação fora do plano, hoje"
+    },
+    {
+     "id": "2026-12-02",
+     "clicavel": false,
+     "tab": null,
+     "aberto": false,
+     "classe": "",
+     "res": "",
+     "curto": "",
+     "marcas": null,
+     "dica": "",
+     "aria": "2 dez, ainda não aconteceu"
+    },
+    {
+     "id": "2026-12-03",
+     "clicavel": false,
+     "tab": null,
+     "aberto": false,
+     "classe": "dica-d",
+     "res": "",
+     "curto": "",
+     "marcas": null,
+     "dica": "",
+     "aria": "3 dez, ainda não aconteceu"
+    },
+    {
+     "id": "2026-12-04",
+     "clicavel": false,
+     "tab": null,
+     "aberto": false,
+     "classe": "dica-d",
+     "res": "",
+     "curto": "",
+     "marcas": null,
+     "dica": "",
+     "aria": "4 dez, ainda não aconteceu"
+    }
+   ]
+  },
+  {
+   "rotulo": "7–11 dez",
+   "botao": false,
+   "res": null,
+   "n": null,
+   "fora": null,
+   "hist": null,
+   "aria": null,
+   "vazia": true,
+   "traco": "",
+   "dias": [
+    {
+     "id": "2026-12-07",
+     "clicavel": false,
+     "tab": null,
+     "aberto": false,
+     "classe": "dica-e",
+     "res": "",
+     "curto": "",
+     "marcas": null,
+     "dica": "",
+     "aria": "7 dez, ainda não aconteceu"
+    },
+    {
+     "id": "2026-12-08",
+     "clicavel": false,
+     "tab": null,
+     "aberto": false,
+     "classe": "",
+     "res": "",
+     "curto": "",
+     "marcas": null,
+     "dica": "",
+     "aria": "8 dez, ainda não aconteceu"
+    },
+    {
+     "id": "2026-12-09",
+     "clicavel": false,
+     "tab": null,
+     "aberto": false,
+     "classe": "",
+     "res": "",
+     "curto": "",
+     "marcas": null,
+     "dica": "",
+     "aria": "9 dez, ainda não aconteceu"
+    },
+    {
+     "id": "2026-12-10",
+     "clicavel": false,
+     "tab": null,
+     "aberto": false,
+     "classe": "dica-d",
+     "res": "",
+     "curto": "",
+     "marcas": null,
+     "dica": "",
+     "aria": "10 dez, ainda não aconteceu"
+    },
+    {
+     "id": "2026-12-11",
+     "clicavel": false,
+     "tab": null,
+     "aberto": false,
+     "classe": "dica-d",
+     "res": "",
+     "curto": "",
+     "marcas": null,
+     "dica": "",
+     "aria": "11 dez, ainda não aconteceu"
+    }
+   ]
+  },
+  {
+   "rotulo": "14–18 dez",
+   "botao": false,
+   "res": null,
+   "n": null,
+   "fora": null,
+   "hist": null,
+   "aria": null,
+   "vazia": true,
+   "traco": "",
+   "dias": [
+    {
+     "id": "2026-12-14",
+     "clicavel": false,
+     "tab": null,
+     "aberto": false,
+     "classe": "dica-e",
+     "res": "",
+     "curto": "",
+     "marcas": null,
+     "dica": "",
+     "aria": "14 dez, ainda não aconteceu"
+    },
+    {
+     "id": "2026-12-15",
+     "clicavel": false,
+     "tab": null,
+     "aberto": false,
+     "classe": "",
+     "res": "",
+     "curto": "",
+     "marcas": null,
+     "dica": "",
+     "aria": "15 dez, ainda não aconteceu"
+    },
+    {
+     "id": "2026-12-16",
+     "clicavel": false,
+     "tab": null,
+     "aberto": false,
+     "classe": "",
+     "res": "",
+     "curto": "",
+     "marcas": null,
+     "dica": "",
+     "aria": "16 dez, ainda não aconteceu"
+    },
+    {
+     "id": "2026-12-17",
+     "clicavel": false,
+     "tab": null,
+     "aberto": false,
+     "classe": "dica-d",
+     "res": "",
+     "curto": "",
+     "marcas": null,
+     "dica": "",
+     "aria": "17 dez, ainda não aconteceu"
+    },
+    {
+     "id": "2026-12-18",
+     "clicavel": false,
+     "tab": null,
+     "aberto": false,
+     "classe": "dica-d",
+     "res": "",
+     "curto": "",
+     "marcas": null,
+     "dica": "",
+     "aria": "18 dez, ainda não aconteceu"
+    }
+   ]
+  },
+  {
+   "rotulo": "21–25 dez",
+   "botao": false,
+   "res": null,
+   "n": null,
+   "fora": null,
+   "hist": null,
+   "aria": null,
+   "vazia": true,
+   "traco": "",
+   "dias": [
+    {
+     "id": "2026-12-21",
+     "clicavel": false,
+     "tab": null,
+     "aberto": false,
+     "classe": "dica-e",
+     "res": "",
+     "curto": "",
+     "marcas": null,
+     "dica": "",
+     "aria": "21 dez, ainda não aconteceu"
+    },
+    {
+     "id": "2026-12-22",
+     "clicavel": false,
+     "tab": null,
+     "aberto": false,
+     "classe": "",
+     "res": "",
+     "curto": "",
+     "marcas": null,
+     "dica": "",
+     "aria": "22 dez, ainda não aconteceu"
+    },
+    {
+     "id": "2026-12-23",
+     "clicavel": false,
+     "tab": null,
+     "aberto": false,
+     "classe": "",
+     "res": "",
+     "curto": "",
+     "marcas": null,
+     "dica": "",
+     "aria": "23 dez, ainda não aconteceu"
+    },
+    {
+     "id": "2026-12-24",
+     "clicavel": false,
+     "tab": null,
+     "aberto": false,
+     "classe": "dica-d",
+     "res": "",
+     "curto": "",
+     "marcas": null,
+     "dica": "",
+     "aria": "24 dez, ainda não aconteceu"
+    },
+    {
+     "id": "2026-12-25",
+     "clicavel": false,
+     "tab": null,
+     "aberto": false,
+     "classe": "dica-d",
+     "res": "",
+     "curto": "",
+     "marcas": null,
+     "dica": "",
+     "aria": "25 dez, ainda não aconteceu"
+    }
+   ]
+  },
+  {
+   "rotulo": "28 dez–1º jan",
+   "botao": false,
+   "res": null,
+   "n": null,
+   "fora": null,
+   "hist": null,
+   "aria": null,
+   "vazia": true,
+   "traco": "",
+   "dias": [
+    {
+     "id": "2026-12-28",
+     "clicavel": false,
+     "tab": null,
+     "aberto": false,
+     "classe": "dica-e",
+     "res": "",
+     "curto": "",
+     "marcas": null,
+     "dica": "",
+     "aria": "28 dez, ainda não aconteceu"
+    },
+    {
+     "id": "2026-12-29",
+     "clicavel": false,
+     "tab": null,
+     "aberto": false,
+     "classe": "",
+     "res": "",
+     "curto": "",
+     "marcas": null,
+     "dica": "",
+     "aria": "29 dez, ainda não aconteceu"
+    },
+    {
+     "id": "2026-12-30",
+     "clicavel": false,
+     "tab": null,
+     "aberto": false,
+     "classe": "",
+     "res": "",
+     "curto": "",
+     "marcas": null,
+     "dica": "",
+     "aria": "30 dez, ainda não aconteceu"
+    },
+    {
+     "id": "2026-12-31",
+     "clicavel": false,
+     "tab": null,
+     "aberto": false,
+     "classe": "dica-d",
+     "res": "",
+     "curto": "",
+     "marcas": null,
+     "dica": "",
+     "aria": "31 dez, ainda não aconteceu"
+    },
+    {
+     "id": "2027-01-01",
+     "clicavel": false,
+     "tab": null,
+     "aberto": false,
+     "classe": "cal-fora dica-d",
+     "res": "",
+     "curto": "",
+     "marcas": null,
+     "dica": "",
+     "aria": ""
+    }
+   ]
+  }
+ ],
+ "legendaLimite": true,
+ "dia": {
+  "titulo": "Terça-feira, 1º de dezembro",
+  "tags": [],
+  "nota": null
+ },
+ "rs": {
+  "res": "+US$ 2,00",
+  "resCor": "var(--mint)",
+  "ops": "4",
+  "opsSub": "2 ganhos, 2 perdas",
+  "fora": "1 operação · −US$ 112,50",
+  "foraSub": "",
+  "foraCor": "var(--amber)",
+  "lim": "US$ 45,00 de US$ 400",
+  "limSub": "pior momento",
+  "temBarra": true,
+  "bar": "11%",
+  "barCor": "var(--amber)"
+ },
+ "infoResumo": "A comissão ainda não chegou: o resultado está bruto até o arquivo da corretora. Limite do dia: a maior perda acumulada no pregão, no pior momento, já com a comissão quando o arquivo a trouxe, contra o seu limite de US$ 400. Pelas suas regras, ao atingir o limite o app encerra o dia. Fora do plano: operações fora da janela ou depois do limite. As outras 3 somaram +US$ 114,50: conta simples, não é o que teria acontecido.",
+ "comPlano": true,
+ "infoPlano": "Cada linha compara as regras que valiam neste dia, em Personalizar, com o que o diário registrou: janela e limite. Uma operação fora da janela ou depois do limite fica fora do plano, mesmo quando a tela só avisava. Breakeven: a sua regra e em quantas operações que chegaram ao ponto dela o stop foi para a entrada; quem confere é Análises. Bloqueio de dados, viés e regra do estado chegam na Fase 5.",
+ "plano": [
+  {
+   "item": "Janela",
+   "plano": "10:00–11:00 ET",
+   "fato": "3 de 4 dentro",
+   "marca": "Fora do plano",
+   "tipo": "fora",
+   "link": null
+  },
+  {
+   "item": "Limite",
+   "plano": "US$ 400 · encerra o dia",
+   "fato": "pior momento: US$ 45",
+   "marca": "No plano",
+   "tipo": "ok",
+   "link": null
+  },
+  {
+   "item": "Breakeven",
+   "plano": "MES +8 pts · MNQ +30 pts",
+   "fato": "moveu em 1 de 2",
+   "marca": "Registrado",
+   "tipo": "neutro",
+   "link": null
+  }
+ ],
+ "versao": [],
+ "antes": {
+  "ver": true,
+  "txt": "Esperar Nova York assentar. Vender só abaixo da VWAP.",
+  "nota": "anotado às 09:38, antes da 1ª entrada",
+  "editar": true,
+  "nada": false,
+  "campo": false
+ },
+ "anterior": "Nada trazido do pregão anterior.",
+ "semOps": null,
+ "trades": [
+  {
+   "h": "10:04–10:06",
+   "op": "MES · Venda · 2 ct",
+   "chip": null,
+   "sub": null,
+   "res": "−US$ 45,00",
+   "plano": "No plano",
+   "planoAria": null,
+   "acao": null,
+   "acaoAria": null,
+   "clip": null,
+   "rot": "Detalhes da operação: Venda de MES às 10:04",
+   "aberto": false
+  },
+  {
+   "h": "10:33–10:49",
+   "op": "MES · Venda · 2 ct",
+   "chip": null,
+   "sub": null,
+   "res": "+US$ 95,00",
+   "plano": "No plano",
+   "planoAria": null,
+   "acao": null,
+   "acaoAria": null,
+   "clip": null,
+   "rot": "Detalhes da operação: Venda de MES às 10:33",
+   "aberto": false
+  },
+  {
+   "h": "10:52–10:58",
+   "op": "MNQ · Venda · 1 ct",
+   "chip": null,
+   "sub": null,
+   "res": "+US$ 64,50",
+   "plano": "No plano",
+   "planoAria": null,
+   "acao": null,
+   "acaoAria": null,
+   "clip": null,
+   "rot": "Detalhes da operação: Venda de MNQ às 10:52",
+   "aberto": false
+  },
+  {
+   "h": "11:09–11:16",
+   "op": "MES · Compra · 3 ct",
+   "chip": null,
+   "sub": null,
+   "res": "−US$ 112,50",
+   "plano": "● fora da janela",
+   "planoAria": "fora do plano: fora da janela",
+   "acao": null,
+   "acaoAria": null,
+   "clip": null,
+   "rot": "Detalhes da operação: Compra de MES às 11:09",
+   "aberto": false
+  }
+ ],
+ "drills": [
+  {
+   "op": "MES · Venda · 2 ct",
+   "fatos": [
+    [
+     "Hora",
+     "10:04–10:06"
+    ],
+    [
+     "Entrada → saída",
+     "7.951,25 → 7.955,75 · −4,50 pts"
+    ],
+    [
+     "Stop · alvo",
+     "não anotados"
+    ],
+    [
+     "Resultado",
+     "−US$ 45,00"
+    ],
+    [
+     "Comissão",
+     "ainda não chegou: o resultado está bruto até o arquivo da corretora."
+    ],
+    [
+     "Posso operar hoje?",
+     "Liberado"
+    ]
+   ],
+   "linhas": [],
+   "tempo": null,
+   "be": null,
+   "ax": null,
+   "adicionar": true,
+   "marcas": [
+    {
+     "rot": "Setup · sua nota, de A a C",
+     "valor": "C",
+     "tempo": "às 10:04 · antes da saída"
+    },
+    {
+     "rot": "Execução",
+     "valor": "cedo",
+     "tempo": "às 10:05 · antes da saída"
+    },
+    {
+     "rot": "Emoção",
+     "valor": "Ansioso",
+     "tempo": "às 10:05 · antes da saída"
+    }
+   ]
+  },
+  {
+   "op": "MES · Venda · 2 ct",
+   "fatos": [
+    [
+     "Hora",
+     "10:33–10:49"
+    ],
+    [
+     "Entrada → saída",
+     "7.938,50 → 7.929,00 · +9,50 pts"
+    ],
+    [
+     "Stop · alvo",
+     "stop 12 · alvo 24 pts · às 10:33"
+    ],
+    [
+     "R",
+     "+0,8 R · com stop de 12 pts"
+    ],
+    [
+     "Resultado",
+     "+US$ 95,00"
+    ],
+    [
+     "Comissão",
+     "ainda não chegou: o resultado está bruto até o arquivo da corretora."
+    ],
+    [
+     "Posso operar hoje?",
+     "Liberado"
+    ]
+   ],
+   "linhas": [
+    "Breakeven: o stop não foi movido · sua regra: +8 pts."
+   ],
+   "tempo": null,
+   "be": null,
+   "ax": null,
+   "adicionar": true,
+   "marcas": [
+    {
+     "rot": "Setup · sua nota, de A a C",
+     "valor": "A",
+     "tempo": "às 10:33 · antes da saída"
+    },
+    {
+     "rot": "Execução",
+     "valor": "no ponto",
+     "tempo": "às 10:48 · antes da saída"
+    },
+    {
+     "rot": "Emoção",
+     "valor": null,
+     "tempo": null
+    }
+   ]
+  },
+  {
+   "op": "MNQ · Venda · 1 ct",
+   "fatos": [
+    [
+     "Hora",
+     "10:52–10:58"
+    ],
+    [
+     "Entrada → saída",
+     "25.684,00 → 25.651,75 · +32,25 pts"
+    ],
+    [
+     "Stop · alvo",
+     "stop 30 · alvo 60 pts · às 10:52"
+    ],
+    [
+     "R",
+     "+1,1 R · com stop de 30 pts"
+    ],
+    [
+     "Resultado",
+     "+US$ 64,50"
+    ],
+    [
+     "Comissão",
+     "ainda não chegou: o resultado está bruto até o arquivo da corretora."
+    ],
+    [
+     "Posso operar hoje?",
+     "Liberado"
+    ]
+   ],
+   "linhas": [],
+   "tempo": [
+    {
+     "h": "10:52",
+     "txt": "Entrada · 1 ct a 25.684,00 · stop 30 pts",
+     "sub": null
+    },
+    {
+     "h": "10:56",
+     "txt": "Stop no breakeven · 25.684,00 · com +30,00 pts a favor",
+     "sub": null
+    },
+    {
+     "h": "10:58",
+     "txt": "Saída · 1 ct a 25.651,75 · +32,25 pts · +US$ 64,50",
+     "sub": null
+    }
+   ],
+   "be": "Breakeven às 10:56, com +30,00 pts a favor · sua regra: +30 pts.",
+   "ax": null,
+   "adicionar": true,
+   "marcas": [
+    {
+     "rot": "Setup · sua nota, de A a C",
+     "valor": "B",
+     "tempo": "às 10:52 · antes da saída"
+    },
+    {
+     "rot": "Execução",
+     "valor": null,
+     "tempo": null
+    },
+    {
+     "rot": "Emoção",
+     "valor": null,
+     "tempo": null
+    }
+   ]
+  },
+  {
+   "op": "MES · Compra · 3 ct",
+   "fatos": [
+    [
+     "Hora",
+     "11:09–11:16"
+    ],
+    [
+     "Entrada → saída",
+     "7.931,25 → 7.923,75 · −7,50 pts"
+    ],
+    [
+     "Stop · alvo",
+     "não anotados"
+    ],
+    [
+     "Resultado",
+     "−US$ 112,50"
+    ],
+    [
+     "Comissão",
+     "ainda não chegou: o resultado está bruto até o arquivo da corretora."
+    ],
+    [
+     "Posso operar hoje?",
+     "Fora da sua janela"
+    ]
+   ],
+   "linhas": [],
+   "tempo": null,
+   "be": null,
+   "ax": null,
+   "adicionar": true,
+   "marcas": [
+    {
+     "rot": "Setup · sua nota, de A a C",
+     "valor": "C",
+     "tempo": "às 11:09 · antes da saída"
+    },
+    {
+     "rot": "Execução",
+     "valor": "tarde",
+     "tempo": "às 11:28 · depois do resultado"
+    },
+    {
+     "rot": "Emoção",
+     "valor": null,
+     "tempo": null
+    }
+   ]
+  }
+ ],
+ "apagadas": null,
+ "abertaOntem": null,
+ "revisao": {
+  "tem": true,
+  "fechada": true,
+  "salva": false,
+  "linha": "",
+  "ver": false,
+  "botao": "Ver revisão",
+  "form": false,
+  "mudou": null,
+  "versoes": null,
+  "erro": null
+ },
+ "revisaoAtual": null,
+ "formulario": null,
+ "versoes": null,
+ "semana": {
+  "titulo": "Semana em andamento · 2 de 5 pregões",
+  "info": "Pregões de 30 de novembro a 4 de dezembro. Fora do plano: fora da janela ou depois do limite. Revisões: dos pregões com operação registrada no app ou com revisão, quantos têm revisão; hoje só entra depois que você escrever a revisão dele. A coluna Semana do calendário traz os mesmos números.",
+  "numeros": [
+   [
+    "Resultado",
+    "−US$ 98,75"
+   ],
+   [
+    "Operações",
+    "7"
+   ],
+   [
+    "Fora do plano",
+    "1 · −US$ 112,50"
+   ],
+   [
+    "Revisões",
+    "0 de 1"
+   ]
+  ],
+  "vazia": null,
+  "barras": [
+   [
+    "seg",
+    "−100,75",
+    "−101"
+   ],
+   [
+    "ter",
+    "+2,00",
+    "+2"
+   ],
+   [
+    "qua",
+    "",
+    ""
+   ],
+   [
+    "qui",
+    "",
+    ""
+   ],
+   [
+    "sex",
+    "",
+    ""
+   ]
+  ],
+  "leitor": "Resultado por dia: seg, −100,75 · ter, +2,00 · qua, ainda não aconteceu · qui, ainda não aconteceu · sex, ainda não aconteceu.",
+  "fora": [
+   "ter 1 · 11:09 · Compra MES · fora da janela · −US$ 112,50"
+  ]
+ },
+ "quadro": "dez",
+ "busca": {
+  "apex": {
+   "status": "9 contas encontradas.",
+   "nenhuma": null,
+   "grupos": [
+    {
+     "mercado": "Futuros · 9",
+     "mesa": "Apex · 9",
+     "contas": [
+      "Apex 50k #1",
+      "Apex 50k #2",
+      "Apex 50k #3",
+      "Apex 50k #4",
+      "Apex 50k #5",
+      "Apex 50k #6",
+      "Apex 100k #1",
+      "Apex 100k #2",
+      "Apex 100k #3"
+     ]
+    }
+   ]
+  },
+  "funded": {
+   "status": "3 contas encontradas.",
+   "nenhuma": null,
+   "grupos": [
+    {
+     "mercado": "Futuros · 3",
+     "mesa": "My Funded Futures · 3",
+     "contas": [
+      "MFFU 50k #1",
+      "MFFU 50k #2",
+      "MFFU 50k #3"
+     ]
+    }
+   ]
+  },
+  "zzz": {
+   "status": "Nenhuma conta encontrada.",
+   "nenhuma": "Nenhuma conta com “zzz”.",
+   "grupos": []
+  },
+  "lúcid": {
+   "status": "4 contas encontradas.",
+   "nenhuma": null,
+   "grupos": [
+    {
+     "mercado": "Futuros · 4",
+     "mesa": "Lucid · 4",
+     "contas": [
+      "Lucid 50k",
+      "Lucid 50k #2",
+      "Lucid 50k #3",
+      "Lucid 100k"
+     ]
+    }
+   ]
+  },
+  "": {
+   "status": null,
+   "nenhuma": null,
+   "grupos": [
+    {
+     "mercado": "Futuros · 30",
+     "mesa": "Alpha Futures · 3",
+     "contas": [
+      "Alpha 50k #1",
+      "Alpha 50k #2",
+      "Alpha 50k #3"
+     ]
+    },
+    {
+     "mercado": null,
+     "mesa": "Apex · 9",
+     "contas": [
+      "Apex 50k #1",
+      "Apex 50k #2",
+      "Apex 50k #3",
+      "Apex 50k #4",
+      "Apex 50k #5",
+      "Apex 50k #6",
+      "Apex 100k #1",
+      "Apex 100k #2",
+      "Apex 100k #3"
+     ]
+    },
+    {
+     "mercado": null,
+     "mesa": "Lucid · 4",
+     "contas": [
+      "Lucid 50k",
+      "Lucid 50k #2",
+      "Lucid 50k #3",
+      "Lucid 100k"
+     ]
+    },
+    {
+     "mercado": null,
+     "mesa": "My Funded Futures · 3",
+     "contas": [
+      "MFFU 50k #1",
+      "MFFU 50k #2",
+      "MFFU 50k #3"
+     ]
+    },
+    {
+     "mercado": null,
+     "mesa": "Top One · 1",
+     "contas": [
+      "Top One"
+     ]
+    },
+    {
+     "mercado": null,
+     "mesa": "Topstep · 5",
+     "contas": [
+      "Topstep 50k #1",
+      "Topstep 50k #2",
+      "Topstep 50k #3",
+      "Topstep 50k #4",
+      "Topstep 150k"
+     ]
+    },
+    {
+     "mercado": null,
+     "mesa": "Tradeify · 4",
+     "contas": [
+      "Tradeify 50k #1",
+      "Tradeify 50k #2",
+      "Tradeify 50k #3",
+      "Tradeify 50k #4"
+     ]
+    },
+    {
+     "mercado": null,
+     "mesa": "Ylos · 1",
+     "contas": [
+      "Ylos 50k"
+     ]
+    },
+    {
+     "mercado": "Opções binárias · 1",
+     "mesa": null,
+     "contas": [
+      "Ebinex"
+     ]
+    },
+    {
+     "mercado": "Forex · 1",
+     "mesa": null,
+     "contas": [
+      "FTMO"
+     ]
+    },
+    {
+     "mercado": "Ações · 1",
+     "mesa": null,
+     "contas": [
+      "IBKR"
+     ]
+    },
+    {
+     "mercado": "Cripto · 1",
+     "mesa": null,
+     "contas": [
+      "Binance"
+     ]
+    },
+    {
+     "mercado": "B3 · 1",
+     "mesa": null,
+     "contas": [
+      "Clear"
+     ]
+    }
+   ]
+  }
+ },
+ "escolhas": {
+  "Apex 50k #5": {
+   "contaStatus": "Conta Apex 50k #5.",
+   "possoSel": [
+    {
+     "nome": "Apex 50k #5",
+     "pal": "Encerrado por hoje",
+     "sub": "limite atingido às 10:41",
+     "acao": null,
+     "acaoAria": null,
+     "lim": "US$ 503 de US$ 500",
+     "soma": false,
+     "tom": "tom-red"
+    }
+   ],
+   "outras": {
+    "titulo": "Outras 34 contas:",
+    "partes": [
+     {
+      "texto": "19 liberadas",
+      "tom": "tom-mint"
+     },
+     {
+      "texto": "2 encerradas por hoje",
+      "tom": "tom-red"
+     },
+     {
+      "texto": "10 fora da janela",
+      "tom": "tom-amber"
+     },
+     {
+      "texto": "3 sem janela salva",
+      "tom": "tom-muted"
+     }
+    ]
+   },
+   "dia": "Terça-feira, 1º de dezembro",
+   "res": "−US$ 503,00"
+  },
+  "Lucid 50k": {
+   "contaStatus": "Conta Lucid 50k.",
+   "possoSel": [
+    {
+     "nome": "Lucid 50k",
+     "pal": "Encerrado por hoje",
+     "sub": "limite atingido às 10:20",
+     "acao": null,
+     "acaoAria": null,
+     "lim": "US$ 1.113,25 de US$ 400",
+     "soma": true,
+     "tom": "tom-red"
+    }
+   ],
+   "outras": {
+    "titulo": "Outras 34 contas:",
+    "partes": [
+     {
+      "texto": "19 liberadas",
+      "tom": "tom-mint"
+     },
+     {
+      "texto": "2 encerradas por hoje",
+      "tom": "tom-red"
+     },
+     {
+      "texto": "10 fora da janela",
+      "tom": "tom-amber"
+     },
+     {
+      "texto": "3 sem janela salva",
+      "tom": "tom-muted"
+     }
+    ]
+   },
+   "dia": "Terça-feira, 1º de dezembro",
+   "res": "−US$ 127,25"
+  }
+ }
+}

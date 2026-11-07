@@ -1,0 +1,134 @@
+{
+ "cen": "10c",
+ "rotulo": "10 · Carregando · Top One, 12 nov",
+ "dataLinha": "quinta-feira, 12 de novembro, 10:42 ET",
+ "conta": {
+  "nome": "Top One",
+  "janela": "Janela 10:00–11:00 ET",
+  "valores": "Valores em US$."
+ },
+ "flags": {
+  "semRegras": false,
+  "temAviso": false,
+  "offline": false,
+  "carregando": true,
+  "erro": false,
+  "pronto": false,
+  "infos": {
+   "posso": false,
+   "cal": false,
+   "resumo": false,
+   "plano": false,
+   "ops": false,
+   "semana": false,
+   "grava": false,
+   "marcas": false
+  }
+ },
+ "possoSel": [
+  {
+   "nome": "Top One",
+   "pal": "Liberado",
+   "sub": "até 11:00 ET",
+   "acao": null,
+   "acaoAria": null,
+   "lim": "US$ 0 de US$ 400",
+   "soma": false,
+   "tom": "tom-mint"
+  }
+ ],
+ "outras": {
+  "titulo": "Outras 7 contas:",
+  "partes": [
+   {
+    "texto": "1 liberada",
+    "tom": "tom-mint"
+   },
+   {
+    "texto": "4 fora da janela",
+    "tom": "tom-amber"
+   },
+   {
+    "texto": "2 sem janela salva",
+    "tom": "tom-muted"
+   }
+  ],
+  "botao": "Ver todas",
+  "abertas": false
+ },
+ "possoOutras": [
+  {
+   "nome": "Lucid 50k",
+   "pal": "Liberado",
+   "sub": "até 11:00 ET",
+   "acao": null,
+   "acaoAria": null,
+   "lim": "US$ 0 de US$ 400",
+   "soma": false,
+   "tom": "tom-mint"
+  },
+  {
+   "nome": "Ylos 50k",
+   "pal": "Sem janela salva",
+   "sub": null,
+   "acao": "Definir",
+   "acaoAria": "Definir a janela da Ylos 50k em Personalizar",
+   "lim": null,
+   "soma": false,
+   "tom": "tom-muted"
+  },
+  {
+   "nome": "Ebinex",
+   "pal": "Fora da sua janela",
+   "sub": "abre às 20:00 de Brasília",
+   "acao": null,
+   "acaoAria": null,
+   "lim": null,
+   "soma": false,
+   "tom": "tom-amber"
+  },
+  {
+   "nome": "FTMO",
+   "pal": "Fora da sua janela",
+   "sub": "abre amanhã às 08:00 ET",
+   "acao": null,
+   "acaoAria": null,
+   "lim": "US$ 0 de US$ 1.000",
+   "soma": false,
+   "tom": "tom-amber"
+  },
+  {
+   "nome": "IBKR",
+   "pal": "Sem janela salva",
+   "sub": null,
+   "acao": "Definir",
+   "acaoAria": "Definir a janela da IBKR em Personalizar",
+   "lim": null,
+   "soma": false,
+   "tom": "tom-muted"
+  },
+  {
+   "nome": "Binance",
+   "pal": "Fora da sua janela",
+   "sub": "abre às 20:00 de Brasília",
+   "acao": null,
+   "acaoAria": null,
+   "lim": null,
+   "soma": false,
+   "tom": "tom-amber"
+  },
+  {
+   "nome": "Clear",
+   "pal": "Fora da sua janela",
+   "sub": "abre amanhã às 10:00 de Brasília",
+   "acao": null,
+   "acaoAria": null,
+   "lim": "R$ 180 de R$ 500",
+   "soma": false,
+   "tom": "tom-amber"
+  }
+ ],
+ "linhaTopo": null,
+ "aviso": null,
+ "quadro": "hoje"
+}

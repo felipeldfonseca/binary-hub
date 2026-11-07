@@ -275,7 +275,17 @@ export interface BatchUndo {
    */
   registered: number;
   existing: number;
+  /**
+   * Phase 4 (Diário, D20): what the owner put in the Diário on the batch's OWN trades (trades.import_batch_id = the
+   * batch), which import_undo deletes with them: the marks in force (trade_marks_now_v with a value; setup, execução
+   * and emoção), the saved images (trade_attachments 'ok') and the trades with a note. A trade the batch only completed
+   * keeps its own («Saem junto: 2 marcas e 1 nota que você pôs no Diário.», IMPORTACOES.saem)
+   */
+  diario: { marks: number; images: number; notes: number };
 }
+
+/** The marks «Saem junto» counts (trade_marks.kind; «seguiu_texto» is Phase 5's and never set from the Diário) */
+const DIARIO_MARK_KINDS = ['setup', 'execucao', 'emocao'];
 
 /**
  * A page of a full read (the API's row limit, supabase/config.toml max_rows); a page the limit cuts shorter is followed
@@ -287,7 +297,7 @@ const UNDO_ID_CHUNK = 100;
 
 /**
  * Every row of a read, page after page from what came, until the exact count is there. `page` asks for a stable order
- * (a unique column) and { count: 'exact' }; a failed page fails the whole read (never a part of it).
+ * (ending in a unique column) and { count: 'exact' }; a failed page fails the whole read (never a part of it).
  */
 async function readAll<T>(page: (from: number, to: number) => PromiseLike<Result<T[]>>): Promise<T[]> {
   const out: T[] = [];
@@ -305,38 +315,70 @@ async function readAll<T>(page: (from: number, to: number) => PromiseLike<Result
   }
 }
 
+/** The exact count of a head read; a failed read is a HubDataError (never the database text) */
+async function countOf(query: PromiseLike<Result<unknown>>): Promise<number> {
+  let result: Result<unknown>;
+  try {
+    result = await query;
+  } catch (e) {
+    throw toHubError(e);
+  }
+  if (result.error) throw toHubError(result.error);
+  return result.count ?? 0;
+}
+
+/** Ids in short `in` lists (UNDO_ID_CHUNK each) */
+function chunked(ids: readonly string[]): string[][] {
+  const chunks: string[][] = [];
+  for (let i = 0; i < ids.length; i += UNDO_ID_CHUNK) chunks.push(ids.slice(i, i + UNDO_ID_CHUNK));
+  return chunks;
+}
+
 export async function fetchBatchUndo(db: SupabaseClient, batchId: string): Promise<BatchUndo> {
-  const [counted, links, exits] = await Promise.all([
-    (async () => {
-      let result: Result<unknown>;
-      try {
-        result = await db.from('trades').select('id', { count: 'exact', head: true }).eq('import_batch_id', batchId);
-      } catch (e) {
-        throw toHubError(e);
-      }
-      if (result.error) throw toHubError(result.error);
-      return result.count ?? 0;
-    })(),
+  const [counted, links, exits, ownRows] = await Promise.all([
+    countOf(db.from('trades').select('id', { count: 'exact', head: true }).eq('import_batch_id', batchId)),
     readAll<{ trade_id: string }>((from, to) =>
       db.from('trade_import_links').select('trade_id', { count: 'exact' }).eq('batch_id', batchId).order('trade_id').range(from, to),
     ),
     readAll<{ trade_id: string }>((from, to) =>
       db.from('trade_exits').select('trade_id', { count: 'exact' }).eq('batch_id', batchId).order('id').range(from, to),
     ),
+    // Phase 4: the batch's own trades, whose marks, images and notes leave with them («Saem junto»)
+    readAll<{ id: string }>((from, to) => db.from('trades').select('id', { count: 'exact' }).eq('import_batch_id', batchId).order('id').range(from, to)),
   ]);
   // The trades those rows are on: the batch's own (a position's exits), or one it wrote on
   const ids = Array.from(new Set([...links, ...exits].map((r) => r.trade_id)));
-  const chunks: string[][] = [];
-  for (let i = 0; i < ids.length; i += UNDO_ID_CHUNK) chunks.push(ids.slice(i, i + UNDO_ID_CHUNK));
   const trades = new Map<string, { import_batch_id: string | null; source: string | null }>();
   for (const rows of await Promise.all(
-    chunks.map((chunk) =>
+    chunked(ids).map((chunk) =>
       run<{ id: string; import_batch_id: string | null; source: string | null }[]>(
         db.from('trades').select('id, import_batch_id, source').in('id', chunk),
       ),
     ),
   )) {
     for (const r of rows ?? []) trades.set(r.id, r);
+  }
+  // What the owner put in the Diário on those own trades: three head counts per short `in` list (none without trades)
+  const diario = { marks: 0, images: 0, notes: 0 };
+  for (const [marks, images, notes] of await Promise.all(
+    chunked(ownRows.map((r) => r.id)).map((chunk) =>
+      Promise.all([
+        countOf(
+          db
+            .from('trade_marks_now_v')
+            .select('trade_id', { count: 'exact', head: true })
+            .in('trade_id', chunk)
+            .in('kind', DIARIO_MARK_KINDS)
+            .not('current_value', 'is', null),
+        ),
+        countOf(db.from('trade_attachments').select('id', { count: 'exact', head: true }).in('trade_id', chunk).eq('status', 'ok')),
+        countOf(db.from('trades').select('id', { count: 'exact', head: true }).in('id', chunk).not('note', 'is', null)),
+      ]),
+    ),
+  )) {
+    diario.marks += marks;
+    diario.images += images;
+    diario.notes += notes;
   }
   const own = exits.filter((e) => trades.get(e.trade_id)?.import_batch_id === batchId);
   const linked = links.map((l) => trades.get(l.trade_id)).filter((t): t is { import_batch_id: string | null; source: string | null } => !!t);
@@ -346,6 +388,7 @@ export async function fetchBatchUndo(db: SupabaseClient, batchId: string): Promi
     exits: counted - new Set(own.map((e) => e.trade_id)).size + own.length,
     registered: linked.length - existing,
     existing,
+    diario,
   };
 }
 
@@ -518,14 +561,22 @@ export async function fetchTemplates(db: SupabaseClient): Promise<Template[]> {
  * its batches (import_batches.template_id, set by import_template_save, «Desfazer» keeps it) → each batch's account →
  * trading_accounts.market, read with the user's session (RLS: own rows; archived accounts included). A model with no batch
  * is absent: it fits every market. Two plain reads, no embedding: the database has no column for it (no change in 3b).
- * Both are read whole, page after page past the API's row limit (readAll, in id order): a model whose batches a cut read
- * missed would look batch-less and so fit every market, and «Atualizar o modelo» would come checked over another
- * market's model. A failed page fails the read: the sheet then takes the markets as unknown (useTemplateMarkets).
+ * Both are read whole, page after page past the API's row limit (readAll): a model whose batches a cut read missed would
+ * look batch-less and so fit every market, and «Atualizar o modelo» would come checked over another market's model. A
+ * failed page fails the read: the sheet then takes the markets as unknown (useTemplateMarkets). The batches come in the
+ * order they were made (created_at, then the random id for a tie), so a model's markets are listed in the order it was
+ * first used in them, the same on every read: the «outro mercado» line prints them («Futuros e B3»).
  */
 export async function fetchTemplateMarkets(db: SupabaseClient): Promise<Record<string, AccountMarket[]>> {
   const [batches, accounts] = await Promise.all([
     readAll<{ template_id: string | null; account_id: string }>((from, to) =>
-      db.from('import_batches').select('template_id, account_id', { count: 'exact' }).eq('platform', 'modelo').order('id').range(from, to),
+      db
+        .from('import_batches')
+        .select('template_id, account_id', { count: 'exact' })
+        .eq('platform', 'modelo')
+        .order('created_at')
+        .order('id')
+        .range(from, to),
     ),
     readAll<{ id: string; market: AccountMarket }>((from, to) =>
       db.from('trading_accounts').select('id, market', { count: 'exact' }).order('id').range(from, to),

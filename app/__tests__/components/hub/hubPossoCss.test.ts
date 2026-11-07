@@ -1,9 +1,9 @@
 /**
- * hub-posso.css: the « · » of a «Posso operar hoje?» answer never ends or starts a line. jsdom does
- * no layout, so these tests check the rules the browser layout relies on (the screenshots of the
- * long states at 320–1280 px show the result): the separator travels with the detail, sits in the
- * room every piece keeps on its left, and the line box clips its left edge between the separator
- * and a focus ring.
+ * hub-posso.css: the « · » of a «Posso operar hoje?» answer never starts a line (Diário board revision of 25 Oct,
+ * Phase 4 · telas lane L1): it ends the answer's own piece («Fora da sua janela ·»), so a detail that wraps starts its
+ * line without it. jsdom does no layout, so these tests check the rules the browser layout relies on (the screenshots
+ * of the card at 375 / 768 / 1280 px show the result), and the board's measures of the Diário's card: the open
+ * account, «somando as contas de Futuros», the others line, the wider name column from 10 accounts, the phone layout.
  */
 import fs from 'fs'
 import path from 'path'
@@ -27,82 +27,107 @@ function rules(css: string): { media: string; rule: CSSStyleRule }[] {
 
 const posso = rules(read('hub-posso.css'))
 
-/** A top-level rule's declared value, by its exact selector */
-function value(selector: string, property: string): string {
-  const found = posso.find((r) => !r.media && r.rule.selectorText === selector)
-  if (!found) throw new Error(`no rule ${selector}`)
+/** A rule's declared value, by one of its selectors (top level, or inside `media`) */
+function value(selector: string, property: string, media = ''): string {
+  const found = posso.find((r) => r.media === media && r.rule.selectorText.split(',').map((s) => s.trim()).includes(selector))
+  if (!found) throw new Error(`no rule ${selector} ${media}`)
   return found.rule.style.getPropertyValue(property).trim()
 }
 
-const px = (text: string) => {
-  const m = text.match(/^(-?\d+(?:\.\d+)?)px$/)
-  if (!m) throw new Error(`not px: ${text}`)
-  return Number(m[1])
-}
-
 beforeEach(() => {
-  // The structure PossoOperarHoje renders for «Fora da sua janela · abre às 10:00 ET» and
-  // «Sem janela salva · Definir»
+  // The structure PossoOperarHoje renders for «Fora da sua janela · abre às 10:00 ET» and «Sem janela salva · Definir»
   document.body.innerHTML = `
     <div class="hub">
-      <span class="hub-posso__estado hub-posso__estado--empilha" id="sub">
-        <strong class="hub-posso__palavra">Fora da sua janela</strong>
-        <span class="hub-posso__mais"><span class="hub-posso__sep" aria-hidden="true">·</span><span>abre às 10:00 ET</span></span>
+      <span class="hub-posso__estado" id="sub">
+        <strong class="hub-posso__palavra">Fora da sua janela<span class="hub-posso__sep hub-posso__sep--esp" aria-hidden="true">· </span></strong>
+        <span class="hub-tom--muted">abre às 10:00 ET</span>
       </span>
       <span class="hub-posso__estado" id="acao">
-        <span class="hub-posso__palavra">Sem janela salva</span>
-        <span class="hub-posso__mais"><span class="hub-posso__sep" aria-hidden="true">·</span><a class="hub-posso__acao" href="/personalizar#janelas">Definir</a></span>
+        <span class="hub-posso__palavra">Sem janela salva<span class="hub-posso__sep" aria-hidden="true">·</span></span>
+        <a class="hub-posso__acao" href="/personalizar#janelas">Definir</a>
       </span>
     </div>`
 })
 
 describe('hub-posso.css: the separator of an answer', () => {
-  it('gives every piece of the line the same room on its left, and starts the line box that far to the left', () => {
-    expect(value('.hub-posso__estado', '--posso-sep')).toBe('calc(12px + 0.196em)')
-    expect(value('.hub-posso__estado', 'margin-left')).toBe('calc(-1 * var(--posso-sep))')
-    expect(value('.hub-posso__estado > *', 'margin-left')).toBe('var(--posso-sep)')
-    expect(value('.hub-posso__estado', 'gap')).toBe('0')
-    // Both pieces get the room: the answer and the detail with its separator
-    const pieces = Array.from(document.querySelectorAll('#acao > *'))
-    expect(pieces.map((el) => el.className)).toEqual(['hub-posso__palavra', 'hub-posso__mais'])
-    expect(pieces.every((el) => el.matches('.hub-posso__estado > *'))).toBe(true)
+  it('scopes every rule to .hub', () => {
+    for (const { rule } of posso) for (const s of rule.selectorText.split(',')) expect(s.trim()).toMatch(/^\.hub[\s.[]/)
   })
 
-  it('puts « · » in that room, right before the detail, 6px from it as on the board', () => {
+  it('lays the answer and its detail out as wrapping pieces, 6px apart (board `.posso-estado`)', () => {
+    expect(value('.hub .hub-posso__estado', 'display')).toBe('flex')
+    expect(value('.hub .hub-posso__estado', 'flex-wrap')).toBe('wrap')
+    expect(value('.hub .hub-posso__estado', 'gap')).toBe('0 6px')
+    // No clipping trick any more: the separator is part of the answer's own piece
+    expect(value('.hub .hub-posso__estado', 'clip-path')).toBe('')
+    expect(value('.hub .hub-posso__estado', 'margin-left')).toBe('')
+  })
+
+  it('ends the answer with « · », 6px after it, regular weight and muted (board `.sep-fim`)', () => {
     const sep = document.querySelector('#acao .hub-posso__sep') as HTMLElement
-    expect(sep.parentElement).toHaveClass('hub-posso__mais')
-    expect(sep.nextElementSibling).toHaveTextContent('Definir')
-    expect(value('.hub-posso__mais', 'position')).toBe('relative')
-    expect(value('.hub-posso__sep', 'position')).toBe('absolute')
-    expect(value('.hub-posso__sep', 'right')).toBe('100%')
-    expect(value('.hub-posso__sep', 'padding-right')).toBe('6px')
+    expect(sep.parentElement).toHaveClass('hub-posso__palavra')
+    expect(sep.parentElement?.lastElementChild).toBe(sep)
+    expect(value('.hub .hub-posso__sep', 'margin-left')).toBe('6px')
+    expect(value('.hub .hub-posso__sep', 'font-weight')).toBe('400')
+    expect(value('.hub .hub-posso__sep', 'color')).toBe('var(--text-2)')
+    expect(value('.hub .hub-posso__sep', 'position')).toBe('')
   })
 
-  it('clips the line box between the separator of a piece that starts a line and a focus ring', () => {
-    const clip = value('.hub-posso__estado', 'clip-path')
-    const m = clip.match(/^inset\((\S+) (\S+) (\S+) calc\(var\(--posso-sep\) - (\d+(?:\.\d+)?)px\)\)$/)
-    expect(m).not.toBeNull()
-    const [, top, right, bottom, left] = m as RegExpMatchArray
-    // Only the left edge is clipped
-    expect([top, right, bottom]).toEqual(['-100vmax', '-100vmax', '-100vmax'])
-    // A piece that starts a line starts at the line's own left edge (x = 0); the clip runs `cut` px
-    // to its left, the separator ends `gap` px to its left, a focus ring reaches `ring` px
-    const cut = Number(left)
-    const gap = px(value('.hub-posso__sep', 'padding-right'))
-    const hub = rules(read('hub.css')).find((r) => !r.media && r.rule.selectorText === '.hub :focus-visible') as { rule: CSSStyleRule }
-    const [, width] = hub.rule.style.getPropertyValue('outline').trim().match(/^(\d+)px/) as RegExpMatchArray
-    const ring = Number(width) + px(hub.rule.style.getPropertyValue('outline-offset').trim())
-    expect(ring).toBe(4)
-    expect(ring).toBeLessThan(cut)
-    expect(cut).toBeLessThan(gap)
+  it('keeps the trailing space before a text detail (board `.sep-fim-esp`), so the gap after «·» is the board’s', () => {
+    expect(value('.hub .hub-posso__sep--esp', 'white-space')).toBe('pre')
+    expect(value('.hub .hub-posso__sep--esp', 'margin-right')).toBe('-6px')
+    expect(document.querySelector('#sub .hub-posso__sep')?.textContent).toBe('· ')
   })
 
-  it('hides « · » where the board stacks the answer and its sub (.empilha), with the separator inside the detail', () => {
-    const empilha = posso.filter((r) => r.media && r.rule.style.getPropertyValue('display').trim() === 'none')
-    expect(empilha.map((r) => [r.media, r.rule.selectorText])).toEqual([
-      ['(max-width: 359px), (min-width: 641px) and (max-width: 1000px)', '.hub-posso__estado--empilha .hub-posso__sep'],
-    ])
-    expect(document.querySelector('#sub .hub-posso__sep')?.matches(empilha[0].rule.selectorText)).toBe(true)
-    expect(document.querySelector('#acao .hub-posso__sep')?.matches(empilha[0].rule.selectorText)).toBe(false)
+  it('stacks the answer over its detail on phones (≤ 700 px) and hides « · » there, only in the answer', () => {
+    const m = '(max-width: 700px)'
+    expect(value('.hub .hub-posso__estado', 'flex-direction', m)).toBe('column')
+    expect(value('.hub .hub-posso__estado', 'align-items', m)).toBe('flex-start')
+    expect(value('.hub .hub-posso__estado .hub-posso__sep', 'display', m)).toBe('none')
+    expect(document.querySelector('#sub .hub-posso__sep')?.matches('.hub .hub-posso__estado .hub-posso__sep')).toBe(true)
+    // The others line keeps its separators (they are not inside an answer)
+    document.body.innerHTML += '<div class="hub"><p class="hub-posso__resumo"><strong class="hub-posso__parte">5 fora da janela<span class="hub-posso__sep" id="parte">·</span></strong></p></div>'
+    expect(document.getElementById('parte')?.matches('.hub .hub-posso__estado .hub-posso__sep')).toBe(false)
+  })
+})
+
+describe('hub-posso.css: the Diário’s card (board DiarioDezEnxuto, «Muitas contas»)', () => {
+  it('one account’s row: name 92 px · answer · limit, 44 px tall; 120 px for the name from 10 accounts', () => {
+    expect(value('.hub .hub-posso__conta', 'grid-template-columns')).toBe('92px minmax(0, 1fr) auto')
+    expect(value('.hub .hub-posso__conta', 'min-height')).toBe('44px')
+    // content-box as the board's `.posso-conta`: 44 px inside the border between rows (45 px from the second row on)
+    // and inside the phones' 8 px padding, not 44 px in all as the app's preflight would make it
+    expect(value('.hub .hub-posso__conta', 'box-sizing')).toBe('content-box')
+    expect(value('.hub .hub-posso__corpo--largo .hub-posso__conta', 'grid-template-columns')).toBe('120px minmax(0, 1fr) auto')
+    expect(value('.hub .hub-posso__corpo', 'flex')).toBe('1 1 560px')
+  })
+
+  it('the open account’s limit in a column with «somando as contas de Futuros» under it, right-aligned; left on phones', () => {
+    expect(value('.hub .hub-posso__limite--col', 'flex-direction')).toBe('column')
+    expect(value('.hub .hub-posso__limite--col', 'align-items')).toBe('flex-end')
+    expect(value('.hub .hub-posso__limite--col', 'align-items', '(max-width: 700px)')).toBe('flex-start')
+    expect(value('.hub .hub-posso__limite', 'justify-self')).toBe('end')
+    expect(value('.hub .hub-posso__limite', 'justify-self', '(max-width: 700px)')).toBe('start')
+  })
+
+  it('the others line: wraps, a 44 px row under a border, «Ver todas» at its end; their lines under another border', () => {
+    expect(value('.hub .hub-posso__outras', 'justify-content')).toBe('space-between')
+    expect(value('.hub .hub-posso__outras', 'flex-wrap')).toBe('wrap')
+    expect(value('.hub .hub-posso__outras', 'min-height')).toBe('44px')
+    expect(value('.hub .hub-posso__outras', 'border-top')).toBe('1px solid var(--border)')
+    expect(value('.hub .hub-posso__resumo', 'gap')).toBe('0 6px')
+    expect(value('.hub .hub-posso__todas', 'border-top')).toBe('1px solid var(--border)')
+  })
+
+  it('one column on phones, both widths of the name column; the card’s padding 16 px at ≤ 540 px', () => {
+    const m = '(max-width: 700px)'
+    expect(value('.hub .hub-posso__conta', 'grid-template-columns', m)).toBe('minmax(0, 1fr)')
+    expect(value('.hub .hub-posso__corpo--largo .hub-posso__conta', 'grid-template-columns', m)).toBe('minmax(0, 1fr)')
+    expect(value('.hub .hub-posso', 'padding', '(max-width: 540px)')).toBe('8px 16px')
+  })
+
+  it('«Definir», «Tentar de novo» in a line keep a 44 px target; the limit itself adds no height (board `.posso-lim`)', () => {
+    expect(value('.hub .hub-posso__acao', 'min-height')).toBe('44px')
+    expect(value('.hub .hub-posso__limite', 'min-height')).toBe('')
   })
 })

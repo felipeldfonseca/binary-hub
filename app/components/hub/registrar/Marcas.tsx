@@ -62,8 +62,12 @@ export function PillsMarca({
  * (registrar.md §8). The pill shows the tap at once, its chip says «salvando…» until the answer; a
  * failure puts the pill back and says so. A tap on the selected value is «desmarcar» (null). Taps
  * wait for the one before (C11): a mark is not idempotent, so a double tap must not send twice.
+ *
+ * Phase 4 (the Diário's drill, contract §6.6): `referencia` writes the announcement's time relative to that instant (the
+ * trade's own entry: «Setup B, 12 nov às 10:42, depois do resultado.» on a past day) instead of the server's now. The
+ * Registrar passes nothing.
  */
-export function useMarcar(conta: ContaReg, view: TradeView | null) {
+export function useMarcar(conta: ContaReg, view: TradeView | null, opcoes: { referencia?: Date } = {}) {
   const add = useAddMarks()
   const [pendente, setPendente] = useState<{ kind: MarcaKind; valor: string | null } | null>(null)
   const [erro, setErro] = useState(false)
@@ -81,7 +85,8 @@ export function useMarcar(conta: ContaReg, view: TradeView | null) {
     setPendente({ kind, valor: novo })
     try {
       const state = await add.mutateAsync({ tradeId: view.trade.id, marks: { [kind]: novo } as Marks })
-      setAnuncio(anuncioMarca(conta, kind, marcasAtuais(state.marksNow)[kind], state.serverNow))
+      const n = marcasAtuais(state.marksNow)[kind]
+      setAnuncio(anuncioMarca(conta, kind, n, n && opcoes.referencia ? opcoes.referencia : state.serverNow))
     } catch {
       setErro(true)
     } finally {

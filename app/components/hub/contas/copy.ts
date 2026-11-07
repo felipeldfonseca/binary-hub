@@ -207,7 +207,8 @@ export const IMPORTACOES = {
   legacy: 'Histórico anterior', // NEW (owner's name for the batch of the old imports)
   legacyNote: 'não dá para desfazer', // NEW
   noName: 'arquivo sem nome', // NEW
-  inserted: (count: number) => `${formatInt(count)} novas`,
+  /** «1 nova» / «5 novas» (Fase 4: the singular, as the Diário board's batch line, engine `l.novas === 1 ? ' nova'`) */
+  inserted: (count: number) => (count === 1 ? '1 nova' : `${formatInt(count)} novas`),
   /**
    * NEW (Fase 3, D29): trades registered in the app that the batch completed (import_batches
    * .rows_linked); undoing gives them back
@@ -287,6 +288,18 @@ export const IMPORTACOES = {
     return back === 1
       ? `Importação desfeita: ${apagadas}, e a que já estava voltou a ser como era.`
       : `Importação desfeita: ${apagadas}, e as ${formatInt(back)} que já estavam voltaram a ser como eram.`
+  },
+  /**
+   * Phase 4 (Diário board dez 13, D20): under the confirmation, what the owner put in the Diário on the batch's own
+   * trades and leaves with them: «Saem junto: 2 marcas e 1 nota que você pôs no Diário.» Only the counts above zero,
+   * joined by «, » and « e »; null when all are zero (no line)
+   */
+  saem: ({ marks, images, notes }: { marks: number; images: number; notes: number }): string | null => {
+    const pl = (k: number, um: string, varios: string) => `${formatInt(k)} ${k === 1 ? um : varios}`
+    const itens = [marks ? pl(marks, 'marca', 'marcas') : '', images ? pl(images, 'imagem', 'imagens') : '', notes ? pl(notes, 'nota', 'notas') : ''].filter(Boolean)
+    if (!itens.length) return null
+    const lista = itens.length === 1 ? itens[0] : `${itens.slice(0, -1).join(', ')} e ${itens[itens.length - 1]}`
+    return `Saem junto: ${lista} que você pôs no Diário.`
   },
 }
 

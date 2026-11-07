@@ -111,13 +111,17 @@ export function useRulesNow({ enabled = true }: { enabled?: boolean } = {}) {
   });
 }
 
-/** What a saved change makes stale: the rules, the account list and its counts, the preferences */
+/**
+ * What a saved change makes stale: the rules, the account list and its counts, the preferences,
+ * and the Diário (today's plan, its limit, and «desde» when a version 1 is created)
+ */
 export function invalidateAfterSave(queryClient: QueryClient, uid: string | undefined): Promise<unknown> {
   return Promise.all([
     queryClient.invalidateQueries({ queryKey: regrasKeys.all(uid) }),
     queryClient.invalidateQueries({ queryKey: hubKeys.contas(uid) }),
     queryClient.invalidateQueries({ queryKey: ['hub', uid, 'atividade'] }),
     queryClient.invalidateQueries({ queryKey: hubKeys.preferencias(uid) }),
+    queryClient.invalidateQueries({ queryKey: ['hub', uid, 'diario'] }),
   ]);
 }
 

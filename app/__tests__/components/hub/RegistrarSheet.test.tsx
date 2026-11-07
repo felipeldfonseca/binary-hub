@@ -313,12 +313,13 @@ describe('the draft (D14, C6)', () => {
 })
 
 describe('«Ver no Diário» focus target', () => {
-  it('closes with the bridge’s heading as the focus target', async () => {
+  // Phase 4 (M2): the trade's row on the Diário (its ▾, linhaId)
+  it('closes with the trade’s row as the focus target', async () => {
     db.fetchTradeState.mockResolvedValue(operacaoTelas('operacao-mes-fechada'))
     const { onClose } = abrir({ tradeId: ids.trades.mes })
     await screen.findByRole('heading', { level: 3, name: 'Operação fechada' })
     await userEvent.click(screen.getByRole('button', { name: 'Ver no Diário' }))
-    await waitFor(() => expect(onClose).toHaveBeenCalledWith({ focusId: 'operacoes-do-dia' }))
+    await waitFor(() => expect(onClose).toHaveBeenCalledWith({ focusId: `op-${ids.trades.mes}` }))
   })
 })
 

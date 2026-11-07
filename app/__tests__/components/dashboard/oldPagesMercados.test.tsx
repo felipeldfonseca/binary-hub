@@ -446,6 +446,7 @@ describe('which rows reach the old pages (D38, 3-4)', () => {
         gte: self,
         lte: self,
         limit: self,
+        range: self,
         eq: (col: string, v: unknown) => {
           mine.push([col, v])
           return q

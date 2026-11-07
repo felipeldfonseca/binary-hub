@@ -253,9 +253,9 @@ describe('Phase 3b · the column-mapping models (import_templates)', () => {
         : { data: [{ id: 'a-fut', market: 'futures' }, { id: 'a-fut-2', market: 'futures' }, { id: 'a-b3', market: 'b3' }] },
     );
     await expect(fetchTemplateMarkets(db)).resolves.toEqual({ 't-ba': ['futures', 'b3'], 't-tv': ['futures'] });
-    // Each read whole: in id order, page by page (one page here: no count past it)
+    // Each read whole, page by page (one page here: no count past it): the batches in the order made, the accounts by id
     expect(log).toEqual([
-      [['from', 'import_batches'], ['select', 'template_id, account_id', { count: 'exact' }], ['eq', 'platform', 'modelo'], ['order', 'id'], ['range', 0, 999]],
+      [['from', 'import_batches'], ['select', 'template_id, account_id', { count: 'exact' }], ['eq', 'platform', 'modelo'], ['order', 'created_at'], ['order', 'id'], ['range', 0, 999]],
       [['from', 'trading_accounts'], ['select', 'id, market', { count: 'exact' }], ['order', 'id'], ['range', 0, 999]],
     ]);
     await expect(fetchTemplateMarkets(fakeDb(() => ({ data: null })).db)).resolves.toEqual({});
@@ -263,18 +263,43 @@ describe('Phase 3b · the column-mapping models (import_templates)', () => {
     expect((falha as HubDataError).code).toBe('network');
   });
 
+  it('fetchTemplateMarkets: a model’s markets in the order it was first used in them (the batches by created_at, then id), whatever the ids', async () => {
+    // «BlackArrow» used in Futuros on 15 Oct, then in B3 on 16 Oct: the B3 batch's random id sorts first.
+    // «Tradovate»'s two batches made in the same instant: the id decides, the same way on every read.
+    const lotes = [
+      { id: 'lote-a', platform: 'modelo', template_id: 't-ba', account_id: 'a-b3', created_at: '2026-10-16T12:00:00.000000+00:00' },
+      { id: 'lote-b', platform: 'modelo', template_id: 't-ba', account_id: 'a-fut', created_at: '2026-10-15T12:00:00.000000+00:00' },
+      { id: 'lote-d', platform: 'modelo', template_id: 't-tv', account_id: 'a-fut', created_at: '2026-10-15T13:00:00.000000+00:00' },
+      { id: 'lote-c', platform: 'modelo', template_id: 't-tv', account_id: 'a-b3', created_at: '2026-10-15T13:00:00.000000+00:00' },
+    ];
+    const contas = [{ id: 'a-b3', market: 'b3' }, { id: 'a-fut', market: 'futures' }];
+    const { db, calls } = apiPaginada({ import_batches: lotes, trading_accounts: contas });
+    await expect(fetchTemplateMarkets(db)).resolves.toEqual({ 't-ba': ['futures', 'b3'], 't-tv': ['b3', 'futures'] });
+    expect(calls.map((c) => [c.table, c.order])).toEqual([
+      ['import_batches', ['created_at', 'id']],
+      ['trading_accounts', ['id']],
+    ]);
+  });
+
   describe('fetchTemplateMarkets past the API’s row limit (max_rows 1000): every page, or no answer', () => {
-    const lote = (n: number, template_id: string | null, account_id: string) => ({ id: `lote-${String(n).padStart(5, '0')}`, platform: 'modelo', template_id, account_id });
+    /** The n-th batch made (one a minute from 15 Oct), its id in the same order */
+    const lote = (n: number, template_id: string | null, account_id: string) => ({
+      id: `lote-${String(n).padStart(5, '0')}`,
+      platform: 'modelo',
+      template_id,
+      account_id,
+      created_at: new Date(Date.UTC(2026, 9, 15) + n * 60_000).toISOString(),
+    });
 
     it('1 200 mapped-file batches: the model whose only batch is past the first page keeps its market', async () => {
-      // 1 199 batches of «Tradovate» in Futuros, then «BlackArrow»'s only one (Futuros), last in id order
+      // 1 199 batches of «Tradovate» in Futuros, then «BlackArrow»'s only one (Futuros), the last made
       const lotes = [...Array.from({ length: 1199 }, (_, i) => lote(i, 't-tv', 'a-fut')), lote(1199, 't-ba', 'a-fut')];
       // A reader's batch (another platform) is never read
-      lotes.push({ id: 'lote-00000-ebinex', platform: 'ebinex', template_id: 't-ba', account_id: 'a-b3' });
+      lotes.push({ ...lote(0, 't-ba', 'a-b3'), id: 'lote-00000-ebinex', platform: 'ebinex' });
       const contas = [{ id: 'a-b3', market: 'b3' }, { id: 'a-fut', market: 'futures' }];
       const { db, calls } = apiPaginada({ import_batches: lotes, trading_accounts: contas });
       await expect(fetchTemplateMarkets(db)).resolves.toEqual({ 't-tv': ['futures'], 't-ba': ['futures'] });
-      expect(calls.filter((c) => c.table === 'import_batches').map((c) => [c.order, c.range])).toEqual([[['id'], [0, 999]], [['id'], [1000, 1999]]]);
+      expect(calls.filter((c) => c.table === 'import_batches').map((c) => [c.order, c.range])).toEqual([[['created_at', 'id'], [0, 999]], [['created_at', 'id'], [1000, 1999]]]);
       expect(calls.filter((c) => c.table === 'trading_accounts').map((c) => [c.order, c.range])).toEqual([[['id'], [0, 999]]]);
     });
 
@@ -286,7 +311,7 @@ describe('Phase 3b · the column-mapping models (import_templates)', () => {
       await expect(fetchTemplateMarkets(db)).resolves.toEqual({ 't-tv': ['futures'], 't-ba': ['b3'] });
       expect(calls.filter((c) => c.table === 'import_batches').map((c) => c.range)).toEqual([[0, 999], [2, 1001], [4, 1003]]);
       expect(calls.filter((c) => c.table === 'trading_accounts').map((c) => c.range)).toEqual([[0, 999], [2, 1001], [4, 1003]]);
-      expect(calls.every((c) => c.count && c.order.join() === 'id')).toBe(true);
+      expect(calls.every((c) => c.count && c.order.join() === (c.table === 'import_batches' ? 'created_at,id' : 'id'))).toBe(true);
     });
 
     it('a page that fails fails the read (never the pages before it): the sheet then takes the markets as unknown', async () => {

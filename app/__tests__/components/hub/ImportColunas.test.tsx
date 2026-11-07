@@ -676,12 +676,13 @@ describe('owner decision (23 Oct): a model saved in another market is offered, n
 
   it('past the API’s row limit (max_rows 1000): «BlackArrow»’s only batch on the second page keeps it of Futuros, unchecked; a failed page is «unknown»', async () => {
     // The real read on an API that answers 1 000 rows at most: 1 000 batches of «Tradovate» in Ylos 50k, then
-    // «BlackArrow»'s only one (Ylos 50k, Futuros), last in id order
+    // «BlackArrow»'s only one (Ylos 50k, Futuros), the last made (one a minute from 15 Oct, ids in the same order)
     const real = (jest.requireActual('@/lib/hub/contasDb') as typeof data).fetchTemplateMarkets
     const ylos = CONTAS_QUADRO.ylos.id
+    const feito = (n: number) => new Date(Date.UTC(2026, 9, 15) + n * 60_000).toISOString()
     const lotes = [
-      ...Array.from({ length: 1000 }, (_, i) => ({ id: `lote-${String(i).padStart(5, '0')}`, platform: 'modelo', template_id: MODELO_TRADOVATE_LINHA.id, account_id: ylos })),
-      { id: 'lote-01000', platform: 'modelo', template_id: BA, account_id: ylos },
+      ...Array.from({ length: 1000 }, (_, i) => ({ id: `lote-${String(i).padStart(5, '0')}`, platform: 'modelo', template_id: MODELO_TRADOVATE_LINHA.id, account_id: ylos, created_at: feito(i) })),
+      { id: 'lote-01000', platform: 'modelo', template_id: BA, account_id: ylos, created_at: feito(1000) },
     ]
     const tabelas = { import_batches: lotes, trading_accounts: contasQuadro().map((c) => ({ id: c.id, market: c.market })) }
     const casos = [

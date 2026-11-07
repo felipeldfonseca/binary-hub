@@ -25,3 +25,15 @@ export const POSSO = {
   // NEW: the last read of rules_now failed; older lines are not shown, they may be outdated
   loadError: 'Não foi possível carregar o “Posso operar hoje?”.',
 }
+
+/**
+ * Phase 4 · telas, lane L1: the card on the Diário (board DiarioDezEnxuto, revision of 25 Oct, «Muitas contas»). The
+ * others line, «Ver todas», «Ocultar» and the ⓘ sentence are lib/hub/posso's (possoNoDiario, POSSO_NO_DIARIO_INFO).
+ * Markers of the telas contract (§0): NEW = on the board, produced by nothing.
+ */
+export const POSSO_DIARIO = {
+  /** NEW, B dump dez 9 (engine `temSoma`, driven by D possoNoDiario().conta.somando): under the open account's limit */
+  somando: 'somando as contas de Futuros',
+  /** NEW, B dump dez 9b (template `ul#posso-outras-lista aria-label`): the others' lines after «Ver todas» */
+  outrasLista: 'Outras contas',
+}

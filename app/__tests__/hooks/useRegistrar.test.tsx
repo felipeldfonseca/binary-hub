@@ -134,16 +134,17 @@ describe('cache keys and what each write makes stale', () => {
 
   it('names the caches per write (never rules_config: it reads no trade)', () => {
     expect(REGISTRAR_INVALIDATIONS).toEqual({
-      entrada: ['abertas', 'dia', 'recentes', 'previa', 'regrasAgora', 'atividade', 'paginasAntigas'],
-      saida: ['abertas', 'dia', 'eventos', 'previa', 'regrasAgora', 'paginasAntigas'],
-      fechada: ['dia', 'eventos', 'recentes', 'previa', 'regrasAgora', 'atividade', 'paginasAntigas'],
-      desfazer: ['abertas', 'dia', 'eventos', 'recentes', 'previa', 'regrasAgora', 'atividade', 'paginasAntigas'],
-      marcas: [],
-      extras: ['dia'],
+      entrada: ['abertas', 'dia', 'recentes', 'previa', 'regrasAgora', 'atividade', 'paginasAntigas', 'diario'],
+      saida: ['abertas', 'dia', 'eventos', 'previa', 'regrasAgora', 'paginasAntigas', 'diario'],
+      fechada: ['dia', 'eventos', 'recentes', 'previa', 'regrasAgora', 'atividade', 'paginasAntigas', 'diario'],
+      desfazer: ['abertas', 'dia', 'eventos', 'recentes', 'previa', 'regrasAgora', 'atividade', 'paginasAntigas', 'diario'],
+      // Phase 4: the Diário shows the marks, the images and the note on the day
+      marcas: ['diario'],
+      extras: ['dia', 'diario'],
       // Phase 3c: a partial counts on the day's limit; a move changes no money; an event undone leaves the limit
-      parcial: ['abertas', 'dia', 'eventos', 'previa', 'regrasAgora'],
-      stop: ['dia', 'eventos', 'previa'],
-      evento: ['abertas', 'dia', 'eventos', 'previa', 'regrasAgora'],
+      parcial: ['abertas', 'dia', 'eventos', 'previa', 'regrasAgora', 'diario'],
+      stop: ['dia', 'eventos', 'previa', 'diario'],
+      evento: ['abertas', 'dia', 'eventos', 'previa', 'regrasAgora', 'diario'],
     })
   })
 
@@ -161,6 +162,8 @@ describe('cache keys and what each write makes stale', () => {
       { queryKey: regrasKeys.agora('u') },
       { queryKey: ['trades'] },
       { queryKey: ['trade-stats'] },
+      // Phase 4: every account's Diário (under «somando» a trade moves another account's limit)
+      { queryKey: ['hub', 'u', 'diario'] },
     ])
     spy.mockClear()
     await invalidateAfterRegistrar(queryClient, 'u', 'entrada')
@@ -424,6 +427,7 @@ describe('Phase 3c writes and reads', () => {
       ['hub', 'user-1', 'registrar', 'eventos'],
       ['hub', 'user-1', 'registrar', 'previa'],
       regrasKeys.agora('user-1'),
+      ['hub', 'user-1', 'diario'],
     ])
   })
 

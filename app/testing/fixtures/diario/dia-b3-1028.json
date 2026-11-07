@@ -1,0 +1,297 @@
+{
+  "v": 1,
+  "day": "2026-10-28",
+  "kind": "diario",
+  "note": null,
+  "plan": {
+    "at": "2026-10-28T14:40:04.980978+00:00",
+    "rules": {
+      "v": 1,
+      "day": {
+        "tz": "America/Sao_Paulo",
+        "start_min": 0
+      },
+      "block": null,
+      "limit": {
+        "brl": 500,
+        "mode": "conta",
+        "at_limit": "encerrar"
+      },
+      "market": "b3",
+      "states": null,
+      "windows": [
+        {
+          "tz": "America/Sao_Paulo",
+          "end_min": 1020,
+          "weekdays": 31,
+          "start_min": 600
+        }
+      ],
+      "window_rule": {
+        "on": true,
+        "outside": "fora"
+      },
+      "windows_from": "account"
+    },
+    "changes": [],
+    "version": {
+      "id": "e5800906-732d-4dbe-8da2-3e68a0d68728",
+      "origin": "criar",
+      "version_no": 1,
+      "effective_from": "2026-10-28T12:00:04.75629+00:00"
+    },
+    "windows_today": [
+      {
+        "tz": "America/Sao_Paulo",
+        "opens_at": "2026-10-28T13:00:00+00:00",
+        "closes_at": "2026-10-28T20:00:00+00:00"
+      }
+    ]
+  },
+  "desde": "2026-10-28T12:00:04.75629+00:00",
+  "facts": {
+    "v": 1,
+    "day": "2026-10-28",
+    "net": 18.5,
+    "even": 0,
+    "fora": {
+      "n": 0,
+      "net": 0,
+      "open": 0
+    },
+    "kind": "diario",
+    "open": 0,
+    "wins": 1,
+    "gross": 20,
+    "limit": {
+      "net": 18.5,
+      "after": [],
+      "scope": "conta",
+      "worst": 0,
+      "amount": 500,
+      "hit_at": null,
+      "trades": 1,
+      "at_limit": "encerrar",
+      "after_net": null,
+      "worst_at_hit": null
+    },
+    "closed": 1,
+    "losses": 0,
+    "trades": 1,
+    "window": {
+      "rule": true,
+      "inside": 1,
+      "outside": [],
+      "evaluated": 1
+    },
+    "changes": 0,
+    "history": {
+      "n": 0,
+      "net": 0,
+      "gross": 0
+    },
+    "version": {
+      "id": "e5800906-732d-4dbe-8da2-3e68a0d68728",
+      "version_no": 1
+    },
+    "breakeven": null,
+    "commission": 1.5,
+    "others_net": 18.5,
+    "recalculated": 0,
+    "first_entry_at": "2026-10-28T13:00:00+00:00",
+    "commission_unknown": 0
+  },
+  "today": "2026-10-28",
+  "bounds": {
+    "end": "2026-10-29T03:00:00+00:00",
+    "start": "2026-10-28T03:00:00+00:00"
+  },
+  "review": null,
+  "trades": [
+    {
+      "gate": {
+        "at": "2026-10-28T13:00:00+00:00",
+        "block": {
+          "state": "nao_avaliado",
+          "reason": "so_futuros"
+        },
+        "desde": "2026-10-28T12:00:04.75629+00:00",
+        "label": "Clear",
+        "limit": {
+          "usd": 500,
+          "mode": "conta",
+          "near": false,
+          "used": 0,
+          "state": "ok",
+          "hit_at": null,
+          "reason": null,
+          "trades": 0,
+          "net_usd": 0,
+          "at_limit": "encerrar",
+          "worst_usd": 0
+        },
+        "today": {
+          "trades": 0,
+          "net_usd": 0,
+          "worst_usd": 0
+        },
+        "market": "b3",
+        "status": "liberado",
+        "window": {
+          "next": {
+            "opens_at": "2026-10-29T13:00:00+00:00",
+            "closes_at": "2026-10-29T20:00:00+00:00",
+            "trading_day": "2026-10-29"
+          },
+          "state": "dentro",
+          "reason": null,
+          "current": {
+            "opens_at": "2026-10-28T13:00:00+00:00",
+            "closes_at": "2026-10-28T20:00:00+00:00"
+          },
+          "position": "dentro"
+        },
+        "version": {
+          "id": "e5800906-732d-4dbe-8da2-3e68a0d68728",
+          "origin": "criar",
+          "version_no": 1,
+          "effective_from": "2026-10-28T12:00:04.75629+00:00"
+        },
+        "warnings": [],
+        "desde_day": "2026-10-28",
+        "account_id": "cc84d39b-05e0-4a5a-8dff-9258518cb64b",
+        "changes_at": "2026-10-28T20:00:00+00:00",
+        "state_rule": {
+          "state": "nao_avaliado",
+          "reason": "so_futuros"
+        },
+        "trading_day": "2026-10-28",
+        "checks_evaluated": [
+          "janela",
+          "limite"
+        ]
+      },
+      "plan": {
+        "breaks": [],
+        "verdict": "no_plano",
+        "checks_evaluated": [
+          "janela",
+          "limite"
+        ]
+      },
+      "exits": [],
+      "links": [],
+      "marks": [],
+      "money": {
+        "net": 18.5,
+        "gross": 20,
+        "realized": true,
+        "commission": 1.5
+      },
+      "trade": {
+        "id": "c4b11bc5-8dec-4091-a216-bf26ab830840",
+        "pnl": 20,
+        "note": null,
+        "option": null,
+        "result": "win",
+        "source": "after",
+        "status": "closed",
+        "symbol": "WINZ26",
+        "quantity": 1,
+        "direction": "long",
+        "exit_time": "2026-10-28T13:15:00+00:00",
+        "pnl_basis": "prices",
+        "timeframe": null,
+        "account_id": "cc84d39b-05e0-4a5a-8dff-9258518cb64b",
+        "asset_type": "futures",
+        "commission": 1.5,
+        "entry_time": "2026-10-28T13:00:00+00:00",
+        "exit_price": 130100,
+        "expires_at": null,
+        "stop_price": null,
+        "entry_price": 130000,
+        "trading_day": "2026-10-28",
+        "stake_amount": null,
+        "target_price": null,
+        "note_saved_at": null,
+        "registered_at": "2026-10-28T14:30:04.851075+00:00",
+        "payout_percent": null,
+        "duration_seconds": null,
+        "exit_registered_at": "2026-10-28T14:30:04.851075+00:00"
+      },
+      "images": [],
+      "import": null,
+      "context": {
+        "origin": "reconstructed",
+        "rule_ok": null,
+        "in_block": null,
+        "warnings": [],
+        "in_window": true,
+        "after_limit": false,
+        "captured_at": "2026-10-28T14:30:04.851075+00:00",
+        "gate_status": "liberado",
+        "evaluated_at": "2026-10-28T13:00:00+00:00",
+        "state_choice": null,
+        "checks_evaluated": [
+          "janela",
+          "limite"
+        ],
+        "day_pnl_at_entry": 0,
+        "day_worst_at_entry": 0
+      },
+      "history": false,
+      "version": {
+        "id": "e5800906-732d-4dbe-8da2-3e68a0d68728",
+        "version_no": 1
+      },
+      "entry_at": "2026-10-28T13:00:00+00:00",
+      "gate_now": null,
+      "plan_now": null,
+      "position": {
+        "r": null,
+        "open": 0,
+        "undo": null,
+        "exits": 0,
+        "closed": 1,
+        "partials": 0,
+        "quantity": 1,
+        "stop_now": null,
+        "stop_kind": null,
+        "realized_pnl": 20,
+        "stop_initial": null
+      },
+      "trade_id": "c4b11bc5-8dec-4091-a216-bf26ab830840",
+      "breakeven": null,
+      "marks_now": [],
+      "plan_kind": "congelado",
+      "stop_moves": [],
+      "imported_at": null,
+      "trading_day": "2026-10-28",
+      "clock_guessed": false,
+      "registered_at": "2026-10-28T14:30:04.851075+00:00"
+    }
+  ],
+  "account": {
+    "id": "cc84d39b-05e0-4a5a-8dff-9258518cb64b",
+    "day": {
+      "tz": "America/Sao_Paulo",
+      "start_min": 0
+    },
+    "label": "Clear",
+    "market": "b3",
+    "file_tz": "UTC",
+    "archived": false,
+    "currency": "BRL",
+    "platform": "profit",
+    "is_example": false,
+    "tz_confirmed": false,
+    "guessed_clock": 0
+  },
+  "deleted": [],
+  "weekday": 3,
+  "carry_in": null,
+  "desde_day": "2026-10-28",
+  "server_now": "2026-10-28T14:40:04.980978+00:00",
+  "open_elsewhere": [],
+  "review_history": []
+}

@@ -436,6 +436,20 @@ describe('step 1 (review)', () => {
     expect(linha('perda')).toBe('Resultado: −US$\u00a020,00')
     expect(linha('devolvida')).toBe('Resultado: US$\u00a00,00')
   })
+
+  it('Ebinex «Já fechada» with the outcome chosen but no stake or payout: the line asks for them, not for the outcome', () => {
+    const now2024 = at('2026-10-22T23:24:04Z')
+    const m = (patch: Partial<Rascunho>) =>
+      modeloEntrada({ conta: ebx, r: rascunhoEbx({ modo: 'fechada', direcao: 'call', duracao: 300, hora: '20:13', resultado: 'ganho', ...patch }), now: now2024, hoje, tentou: false })
+    for (const patch of [{ stake: '' }, { payout: '' }, { stake: '', payout: '' }, { stake: '20,123' }]) {
+      const f = m(patch)
+      expect(f.linhaBinaria).toBe('Preencha stake e payout.')
+      expect(f.linhaResultado).toBe('Resultado: preencha stake e payout.')
+    }
+    // No outcome yet: the outcome comes first, as on the board
+    expect(m({ stake: '', resultado: null }).linhaResultado).toBe('Resultado: escolha como terminou.')
+    expect(m({}).linhaResultado).toBe('Resultado: +US$ 17,40')
+  })
 })
 
 describe('the gate line, the limit line and step 3 (review)', () => {

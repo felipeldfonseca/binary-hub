@@ -1,0 +1,531 @@
+{
+ "v": 1,
+ "server_now": "2026-12-01T16:35:00+00:00",
+ "account": {
+  "id": "fa4fc63d-4453-5cc0-9fce-64257c2802fb",
+  "day": {
+   "tz": "America/New_York",
+   "start_min": 1080
+  },
+  "label": "Lucid 50k",
+  "market": "futures",
+  "file_tz": "UTC",
+  "archived": false,
+  "currency": "USD",
+  "platform": "topone",
+  "is_example": false,
+  "tz_confirmed": true,
+  "guessed_clock": 0
+ },
+ "today": "2026-12-01",
+ "desde": "2026-11-02T14:05:00+00:00",
+ "desde_day": "2026-11-02",
+ "day": "2026-12-01",
+ "kind": "diario",
+ "note": null,
+ "plan": {
+  "at": "2026-12-01T16:35:00+00:00",
+  "rules": {
+   "v": 1,
+   "day": {
+    "tz": "America/New_York",
+    "start_min": 1080
+   },
+   "block": {
+    "on": true,
+    "after_min": 10,
+    "calendars": [
+     "us"
+    ],
+    "before_min": 5
+   },
+   "limit": {
+    "usd": 400,
+    "mode": "soma",
+    "at_limit": "encerrar"
+   },
+   "market": "futures",
+   "states": {
+    "alinhadas": null,
+    "so_tecnica": null,
+    "em_conflito": null,
+    "sem_direcao": null,
+    "so_fundamentos": null
+   },
+   "windows": [
+    {
+     "tz": "America/New_York",
+     "end_min": 660,
+     "weekdays": 31,
+     "start_min": 600
+    }
+   ],
+   "window_rule": {
+    "on": true,
+    "outside": "fora"
+   },
+   "windows_from": "account"
+  },
+  "changes": [],
+  "version": {
+   "id": "8854debf-e4ad-505d-bb54-11be20aad4d7",
+   "origin": "criar",
+   "version_no": 1,
+   "effective_from": "2026-11-02T14:05:00+00:00"
+  },
+  "windows_today": [
+   {
+    "tz": "America/New_York",
+    "opens_at": "2026-12-01T15:00:00+00:00",
+    "closes_at": "2026-12-01T16:00:00+00:00"
+   }
+  ]
+ },
+ "facts": {
+  "v": 1,
+  "day": "2026-12-01",
+  "net": -127.25,
+  "even": 0,
+  "fora": {
+   "n": 1,
+   "net": -31.25,
+   "open": 0
+  },
+  "kind": "diario",
+  "open": 0,
+  "wins": 0,
+  "gross": -127.25,
+  "limit": {
+   "net": -1005.5,
+   "after": [
+    {
+     "at": "2026-12-01T15:41:00+00:00",
+     "trade_id": "c4d13fc2-9073-5363-8f47-7dcd6e0bceb0"
+    }
+   ],
+   "scope": "soma",
+   "worst": -1113.25,
+   "amount": 400,
+   "hit_at": "2026-12-01T15:20:00+00:00",
+   "trades": 16,
+   "at_limit": "encerrar",
+   "after_net": -31.25,
+   "worst_at_hit": -470
+  },
+  "closed": 2,
+  "losses": 2,
+  "trades": 2,
+  "window": {
+   "rule": true,
+   "inside": 2,
+   "outside": [],
+   "evaluated": 2
+  },
+  "changes": 0,
+  "history": {
+   "n": 0,
+   "net": 0,
+   "gross": 0
+  },
+  "version": {
+   "id": "8854debf-e4ad-505d-bb54-11be20aad4d7",
+   "version_no": 1
+  },
+  "breakeven": null,
+  "commission": null,
+  "others_net": -96,
+  "recalculated": 0,
+  "first_entry_at": "2026-12-01T15:12:00+00:00",
+  "commission_unknown": 2
+ },
+ "bounds": {
+  "end": "2026-12-01T23:00:00+00:00",
+  "start": "2026-11-30T23:00:00+00:00"
+ },
+ "review": null,
+ "trades": [
+  {
+   "gate": {
+    "at": "2026-12-01T15:12:00+00:00",
+    "block": {
+     "state": "nao_avaliado",
+     "reason": "fase5"
+    },
+    "desde": "2026-11-02T14:05:00+00:00",
+    "label": "Lucid 50k",
+    "limit": {
+     "usd": 400,
+     "mode": "soma",
+     "near": false,
+     "used": 57,
+     "state": "ok",
+     "hit_at": null,
+     "reason": null,
+     "trades": 4,
+     "net_usd": -208,
+     "at_limit": "encerrar",
+     "worst_usd": -228
+    },
+    "today": {
+     "trades": 4,
+     "net_usd": -208,
+     "worst_usd": -228
+    },
+    "market": "futures",
+    "status": "liberado",
+    "window": {
+     "next": {
+      "opens_at": "2026-12-02T15:00:00+00:00",
+      "closes_at": "2026-12-02T16:00:00+00:00",
+      "trading_day": "2026-12-02"
+     },
+     "state": "dentro",
+     "reason": null,
+     "current": {
+      "opens_at": "2026-12-01T15:00:00+00:00",
+      "closes_at": "2026-12-01T16:00:00+00:00"
+     },
+     "position": "dentro"
+    },
+    "version": {
+     "id": "8854debf-e4ad-505d-bb54-11be20aad4d7",
+     "origin": "criar",
+     "version_no": 1,
+     "effective_from": "2026-11-02T14:05:00+00:00"
+    },
+    "warnings": [],
+    "desde_day": "2026-11-02",
+    "account_id": "fa4fc63d-4453-5cc0-9fce-64257c2802fb",
+    "changes_at": "2026-12-01T16:00:00+00:00",
+    "state_rule": {
+     "state": "nao_avaliado",
+     "reason": "fase5"
+    },
+    "trading_day": "2026-12-01",
+    "checks_evaluated": [
+     "janela",
+     "limite"
+    ]
+   },
+   "plan": {
+    "breaks": [],
+    "verdict": "no_plano",
+    "checks_evaluated": [
+     "janela",
+     "limite"
+    ]
+   },
+   "exits": [],
+   "links": [],
+   "marks": [
+    {
+     "id": 260,
+     "kind": "setup",
+     "limpa": true,
+     "value": "B",
+     "marked_at": "2026-12-01T15:12:00+00:00"
+    }
+   ],
+   "money": {
+    "net": -96,
+    "gross": -96,
+    "realized": true,
+    "commission": null
+   },
+   "trade": {
+    "id": "1fb09202-bb15-5ecb-bfbf-73563028e717",
+    "pnl": -96,
+    "note": null,
+    "option": null,
+    "result": "loss",
+    "source": "live",
+    "status": "closed",
+    "symbol": "MNQ",
+    "quantity": 2,
+    "direction": "short",
+    "exit_time": "2026-12-01T15:20:00+00:00",
+    "pnl_basis": "prices",
+    "timeframe": null,
+    "account_id": "fa4fc63d-4453-5cc0-9fce-64257c2802fb",
+    "asset_type": "futures",
+    "commission": null,
+    "entry_time": "2026-12-01T15:12:00+00:00",
+    "exit_price": 25692,
+    "expires_at": null,
+    "stop_price": null,
+    "entry_price": 25668,
+    "trading_day": "2026-12-01",
+    "stake_amount": null,
+    "target_price": null,
+    "note_saved_at": null,
+    "registered_at": "2026-12-01T15:12:00+00:00",
+    "payout_percent": null,
+    "duration_seconds": null,
+    "exit_registered_at": "2026-12-01T15:20:00+00:00"
+   },
+   "images": [],
+   "import": null,
+   "context": {
+    "origin": "live",
+    "rule_ok": null,
+    "in_block": null,
+    "warnings": [],
+    "in_window": true,
+    "after_limit": false,
+    "captured_at": "2026-12-01T15:12:00+00:00",
+    "gate_status": "liberado",
+    "evaluated_at": "2026-12-01T15:12:00+00:00",
+    "state_choice": null,
+    "checks_evaluated": [
+     "janela",
+     "limite"
+    ],
+    "day_pnl_at_entry": -208,
+    "day_worst_at_entry": -228
+   },
+   "history": false,
+   "version": {
+    "id": "8854debf-e4ad-505d-bb54-11be20aad4d7",
+    "version_no": 1
+   },
+   "entry_at": "2026-12-01T15:12:00+00:00",
+   "gate_now": null,
+   "plan_now": null,
+   "position": {
+    "r": null,
+    "open": 0,
+    "undo": null,
+    "exits": 0,
+    "closed": 2,
+    "partials": 0,
+    "quantity": 2,
+    "stop_now": null,
+    "stop_kind": null,
+    "realized_pnl": -96,
+    "stop_initial": null
+   },
+   "trade_id": "1fb09202-bb15-5ecb-bfbf-73563028e717",
+   "breakeven": null,
+   "marks_now": [
+    {
+     "kind": "setup",
+     "clean_at": "2026-12-01T15:12:00+00:00",
+     "current_at": "2026-12-01T15:12:00+00:00",
+     "clean_value": "B",
+     "changed_after": false,
+     "current_limpa": true,
+     "current_value": "B"
+    }
+   ],
+   "plan_kind": "congelado",
+   "stop_moves": [],
+   "imported_at": null,
+   "trading_day": "2026-12-01",
+   "clock_guessed": false,
+   "registered_at": "2026-12-01T15:12:00+00:00"
+  },
+  {
+   "gate": {
+    "at": "2026-12-01T15:41:00+00:00",
+    "block": {
+     "state": "nao_avaliado",
+     "reason": "fase5"
+    },
+    "desde": "2026-11-02T14:05:00+00:00",
+    "label": "Lucid 50k",
+    "limit": {
+     "usd": 400,
+     "mode": "soma",
+     "near": false,
+     "used": 100,
+     "state": "atingido",
+     "hit_at": "2026-12-01T15:20:00+00:00",
+     "reason": null,
+     "trades": 7,
+     "net_usd": -470,
+     "at_limit": "encerrar",
+     "worst_usd": -470
+    },
+    "today": {
+     "trades": 7,
+     "net_usd": -470,
+     "worst_usd": -470
+    },
+    "market": "futures",
+    "status": "encerrado",
+    "window": {
+     "next": {
+      "opens_at": "2026-12-02T15:00:00+00:00",
+      "closes_at": "2026-12-02T16:00:00+00:00",
+      "trading_day": "2026-12-02"
+     },
+     "state": "dentro",
+     "reason": null,
+     "current": {
+      "opens_at": "2026-12-01T15:00:00+00:00",
+      "closes_at": "2026-12-01T16:00:00+00:00"
+     },
+     "position": "dentro"
+    },
+    "version": {
+     "id": "8854debf-e4ad-505d-bb54-11be20aad4d7",
+     "origin": "criar",
+     "version_no": 1,
+     "effective_from": "2026-11-02T14:05:00+00:00"
+    },
+    "warnings": [],
+    "desde_day": "2026-11-02",
+    "account_id": "fa4fc63d-4453-5cc0-9fce-64257c2802fb",
+    "changes_at": "2026-12-01T16:00:00+00:00",
+    "state_rule": {
+     "state": "nao_avaliado",
+     "reason": "fase5"
+    },
+    "trading_day": "2026-12-01",
+    "checks_evaluated": [
+     "janela",
+     "limite"
+    ]
+   },
+   "plan": {
+    "breaks": [
+     "depois_do_limite"
+    ],
+    "verdict": "fora_do_plano",
+    "checks_evaluated": [
+     "janela",
+     "limite"
+    ]
+   },
+   "exits": [],
+   "links": [],
+   "marks": [
+    {
+     "id": 261,
+     "kind": "setup",
+     "limpa": true,
+     "value": "C",
+     "marked_at": "2026-12-01T15:41:00+00:00"
+    }
+   ],
+   "money": {
+    "net": -31.25,
+    "gross": -31.25,
+    "realized": true,
+    "commission": null
+   },
+   "trade": {
+    "id": "c4d13fc2-9073-5363-8f47-7dcd6e0bceb0",
+    "pnl": -31.25,
+    "note": null,
+    "option": null,
+    "result": "loss",
+    "source": "live",
+    "status": "closed",
+    "symbol": "MES",
+    "quantity": 1,
+    "direction": "short",
+    "exit_time": "2026-12-01T15:47:00+00:00",
+    "pnl_basis": "prices",
+    "timeframe": null,
+    "account_id": "fa4fc63d-4453-5cc0-9fce-64257c2802fb",
+    "asset_type": "futures",
+    "commission": null,
+    "entry_time": "2026-12-01T15:41:00+00:00",
+    "exit_price": 7940.25,
+    "expires_at": null,
+    "stop_price": null,
+    "entry_price": 7934,
+    "trading_day": "2026-12-01",
+    "stake_amount": null,
+    "target_price": null,
+    "note_saved_at": null,
+    "registered_at": "2026-12-01T15:41:00+00:00",
+    "payout_percent": null,
+    "duration_seconds": null,
+    "exit_registered_at": "2026-12-01T15:47:00+00:00"
+   },
+   "images": [],
+   "import": null,
+   "context": {
+    "origin": "live",
+    "rule_ok": null,
+    "in_block": null,
+    "warnings": [],
+    "in_window": true,
+    "after_limit": true,
+    "captured_at": "2026-12-01T15:41:00+00:00",
+    "gate_status": "encerrado",
+    "evaluated_at": "2026-12-01T15:41:00+00:00",
+    "state_choice": null,
+    "checks_evaluated": [
+     "janela",
+     "limite"
+    ],
+    "day_pnl_at_entry": -470,
+    "day_worst_at_entry": -470
+   },
+   "history": false,
+   "version": {
+    "id": "8854debf-e4ad-505d-bb54-11be20aad4d7",
+    "version_no": 1
+   },
+   "entry_at": "2026-12-01T15:41:00+00:00",
+   "gate_now": null,
+   "plan_now": null,
+   "position": {
+    "r": null,
+    "open": 0,
+    "undo": null,
+    "exits": 0,
+    "closed": 1,
+    "partials": 0,
+    "quantity": 1,
+    "stop_now": null,
+    "stop_kind": null,
+    "realized_pnl": -31.25,
+    "stop_initial": null
+   },
+   "trade_id": "c4d13fc2-9073-5363-8f47-7dcd6e0bceb0",
+   "breakeven": null,
+   "marks_now": [
+    {
+     "kind": "setup",
+     "clean_at": "2026-12-01T15:41:00+00:00",
+     "current_at": "2026-12-01T15:41:00+00:00",
+     "clean_value": "C",
+     "changed_after": false,
+     "current_limpa": true,
+     "current_value": "C"
+    }
+   ],
+   "plan_kind": "congelado",
+   "stop_moves": [],
+   "imported_at": null,
+   "trading_day": "2026-12-01",
+   "clock_guessed": false,
+   "registered_at": "2026-12-01T15:41:00+00:00"
+  }
+ ],
+ "deleted": [],
+ "weekday": 2,
+ "carry_in": {
+  "day": "2026-11-27",
+  "text": "Uma operação por vez.",
+  "saved_at": "2026-11-27T16:06:00+00:00"
+ },
+ "open_elsewhere": [
+  {
+   "app": true,
+   "symbol": "MNQ",
+   "quantity": 1,
+   "trade_id": "662e0ff3-a048-5bfb-b9c9-cf0f64bdf2ed",
+   "direction": "long",
+   "asset_type": "futures",
+   "entry_time": "2026-11-30T15:52:00+00:00",
+   "expires_at": null,
+   "trading_day": "2026-11-30"
+  }
+ ],
+ "review_history": []
+}

@@ -1,0 +1,29 @@
+{
+ "v": 1,
+ "server_now": "2026-11-12T15:42:00+00:00",
+ "account": {
+  "id": "2346978d-11e2-5e46-86bd-2c92d20e05c2",
+  "day": {
+   "tz": "America/New_York",
+   "start_min": 1200
+  },
+  "label": "IBKR",
+  "market": "stocks",
+  "file_tz": "UTC",
+  "archived": false,
+  "currency": "USD",
+  "platform": null,
+  "is_example": false,
+  "tz_confirmed": true,
+  "guessed_clock": 0
+ },
+ "today": "2026-11-12",
+ "desde": "2026-10-13T12:00:00+00:00",
+ "desde_day": "2026-10-13",
+ "to": "2026-12-06",
+ "from": "2026-10-26",
+ "month": "2026-11",
+ "days": [],
+ "weeks": [],
+ "fora_trades": []
+}

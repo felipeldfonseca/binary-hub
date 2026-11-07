@@ -8,7 +8,19 @@
  */
 import { fetchBatchUndo, HubDataError } from '@/lib/hub/contasDb'
 
-type Call = { table: string; select: string; opts?: { count?: string; head?: boolean }; eq: [string, unknown][]; in?: [string, string[]]; range?: [number, number]; order?: string }
+type Call = {
+  table: string
+  select: string
+  opts?: { count?: string; head?: boolean }
+  eq: [string, unknown][]
+  in?: [string, string[]]
+  /** Every `in` filter (Phase 4: the Diário's marks are filtered by trade and by kind) */
+  ins: [string, string[]][]
+  /** `.not(column, 'is', null)` */
+  notNull: string[]
+  range?: [number, number]
+  order?: string
+}
 
 /** A client whose reads answer from `tables`, `limit` rows at most per request (the API's max rows) */
 function client(tables: Record<string, Record<string, unknown>[]>, limit = 1000, calls: Call[] = []) {
@@ -16,17 +28,19 @@ function client(tables: Record<string, Record<string, unknown>[]>, limit = 1000,
     calls,
     db: {
       from: (table: string) => {
-        const call: Call = { table, select: '', eq: [] }
+        const call: Call = { table, select: '', eq: [], ins: [], notNull: [] }
         calls.push(call)
         const chain = {
           select: (c: string, o?: Call['opts']) => ((call.select = c), (call.opts = o), chain),
           eq: (c: string, v: unknown) => (call.eq.push([c, v]), chain),
-          in: (c: string, v: string[]) => ((call.in = [c, v]), chain),
+          in: (c: string, v: string[]) => ((call.in = call.in ?? [c, v]), call.ins.push([c, v]), chain),
+          not: (c: string, op: string, v: unknown) => (op === 'is' && v === null && call.notNull.push(c), chain),
           order: (c: string) => ((call.order = c), chain),
           range: (a: number, b: number) => ((call.range = [a, b]), chain),
           then: (ok: (r: unknown) => unknown, ko: (e: unknown) => unknown) => {
             let rows = (tables[table] ?? []).filter((r) => call.eq.every(([c, v]) => r[c] === v))
-            if (call.in) rows = rows.filter((r) => (call.in as [string, string[]])[1].includes(r[(call.in as [string, string[]])[0]] as string))
+            for (const [c, v] of call.ins) rows = rows.filter((r) => v.includes(r[c] as string))
+            for (const c of call.notNull) rows = rows.filter((r) => r[c] !== null && r[c] !== undefined)
             const count = call.opts?.count === 'exact' ? rows.length : null
             if (call.order) rows = [...rows].sort((a, b) => String(a[call.order as string]).localeCompare(String(b[call.order as string])))
             if (call.range) rows = rows.slice(call.range[0], call.range[1] + 1)
@@ -67,22 +81,25 @@ describe('fetchBatchUndo', () => {
     // The API's row limit lower than a page: every read still comes whole
     const { db, calls } = client({ trades, trade_exits: exits, trade_import_links: links }, 400)
 
-    expect(await fetchBatchUndo(db, B)).toEqual({ trades: 1200, exits: 1196 + 9, registered: 1100, existing: 2 })
+    expect(await fetchBatchUndo(db, B)).toEqual({ trades: 1200, exits: 1196 + 9, registered: 1100, existing: 2, diario: { marks: 0, images: 0, notes: 0 } })
 
-    const head = calls.filter((c) => c.opts?.head)
+    const head = calls.filter((c) => c.opts?.head && c.eq.some(([col]) => col === 'import_batch_id'))
     expect(head).toEqual([expect.objectContaining({ table: 'trades', eq: [['import_batch_id', B]], opts: { count: 'exact', head: true } })])
     // Pages from what came: 400 rows per answer
     expect(calls.filter((c) => c.table === 'trade_import_links').map((c) => c.range)).toEqual([[0, 999], [400, 1399], [800, 1799]])
     expect(calls.filter((c) => c.table === 'trade_exits').map((c) => c.range)).toEqual([[0, 999]])
     // The trades those rows are on, 100 ids per request (1 100 links + 4 positions + 2 joined)
-    const lists = calls.filter((c) => c.in)
+    const lists = calls.filter((c) => c.select === 'id, import_batch_id, source')
     expect(lists.map((c) => c.in?.[1].length)).toEqual([...Array(11).fill(100), 6])
+    // Phase 4: the batch's own 1 200 trades, read whole past the row limit, then «Saem junto»'s three counts per 100
+    expect(calls.filter((c) => c.table === 'trades' && c.range).map((c) => c.range)).toEqual([[0, 999], [400, 1399], [800, 1799]])
+    expect(calls.filter((c) => c.table === 'trade_marks_now_v').map((c) => c.in?.[1].length)).toEqual(Array(12).fill(100))
   })
 
-  it('a batch whose rows were all new single trades: no further read', async () => {
+  it('a batch whose rows were all new single trades: no read of the trades it is on, then the Diário’s three counts', async () => {
     const { db, calls } = client({ trades: [{ id: 't1', import_batch_id: 'b' }, { id: 't2', import_batch_id: 'b' }] })
-    expect(await fetchBatchUndo(db, 'b')).toEqual({ trades: 2, exits: 2, registered: 0, existing: 0 })
-    expect(calls.map((c) => c.table)).toEqual(['trades', 'trade_import_links', 'trade_exits'])
+    expect(await fetchBatchUndo(db, 'b')).toEqual({ trades: 2, exits: 2, registered: 0, existing: 0, diario: { marks: 0, images: 0, notes: 0 } })
+    expect(calls.map((c) => c.table)).toEqual(['trades', 'trade_import_links', 'trade_exits', 'trades', 'trade_marks_now_v', 'trade_attachments', 'trades'])
   })
 
   it('a failed read is a HubDataError (never the database text)', async () => {

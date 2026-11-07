@@ -1,0 +1,77 @@
+{
+ "v": 1,
+ "server_now": "2026-11-12T15:42:00+00:00",
+ "account": {
+  "id": "5d06ef36-6cac-50b4-8e74-3ad396d6be91",
+  "day": {
+   "tz": "America/New_York",
+   "start_min": 1080
+  },
+  "label": "Ylos 50k",
+  "market": "futures",
+  "file_tz": "UTC",
+  "archived": false,
+  "currency": "USD",
+  "platform": "topone",
+  "is_example": false,
+  "tz_confirmed": true,
+  "guessed_clock": 0
+ },
+ "today": "2026-11-12",
+ "desde": null,
+ "desde_day": null,
+ "day": "2026-11-12",
+ "kind": "vazio",
+ "note": null,
+ "plan": {
+  "at": "2026-11-12T15:42:00+00:00",
+  "rules": null,
+  "changes": [],
+  "version": null,
+  "windows_today": []
+ },
+ "facts": {
+  "v": 1,
+  "day": "2026-11-12",
+  "net": 0,
+  "even": 0,
+  "fora": {
+   "n": 0,
+   "net": 0,
+   "open": 0
+  },
+  "kind": "vazio",
+  "open": 0,
+  "wins": 0,
+  "gross": 0,
+  "limit": null,
+  "closed": 0,
+  "losses": 0,
+  "trades": 0,
+  "window": null,
+  "changes": 0,
+  "history": {
+   "n": 0,
+   "net": 0,
+   "gross": 0
+  },
+  "version": null,
+  "breakeven": null,
+  "commission": null,
+  "others_net": 0,
+  "recalculated": 0,
+  "first_entry_at": null,
+  "commission_unknown": 0
+ },
+ "bounds": {
+  "end": "2026-11-12T23:00:00+00:00",
+  "start": "2026-11-11T23:00:00+00:00"
+ },
+ "review": null,
+ "trades": [],
+ "deleted": [],
+ "weekday": 4,
+ "carry_in": null,
+ "open_elsewhere": [],
+ "review_history": []
+}
