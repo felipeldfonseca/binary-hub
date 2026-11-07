@@ -538,6 +538,12 @@ function parseBreakeven(x: unknown): TradeBreakeven | null {
   return { key: str(b.key), n: dec(b.n, PRICE), un: oneOf(b.un, UNITS), level: decOrNull(b.level, PRICE) };
 }
 
+/** trade_entry_plan's answer (breaks, verdict, checks_evaluated); a RegistrarAnswerError on another shape */
+export const parseEntryPlanAnswer = (x: unknown): EntryPlanAnswer => parsePlan(x);
+
+/** A gate answer (gate_at minus its rules, as an entry context stores it); a RegistrarAnswerError on another shape */
+export const parseGateAnswer = (x: unknown): GateResult => parseGate(x);
+
 /** trade_state(): every answer that names a trade carries it */
 export function parseTradeState(json: unknown): TradeState {
   const s = obj(json);

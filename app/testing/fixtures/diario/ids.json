@@ -1,0 +1,19 @@
+{
+  "user": "501882e2-d381-4e74-aed2-db41eecd6e6f",
+  "accounts": {
+    "top": "92baa31a-c684-4a48-ae52-3e7a30c8ff68",
+    "ebx": "3d747e0c-d9a2-46e8-af1d-5f4e1bbce6bb",
+    "b3": "cc84d39b-05e0-4a5a-8dff-9258518cb64b"
+  },
+  "trades": {
+    "jaFechada": "bea7ab4c-b21e-49a7-a1a3-20900fada624",
+    "live": "363f7612-f883-45d8-8fe0-73833bdf555e",
+    "aberta": "d3089a4b-0b8a-463b-bcdb-e3234f0aafd8",
+    "p27": "0a3f3665-aeb1-4432-87fd-23b42b8b2aec",
+    "j27": "09205acf-9f0d-4c8c-9b31-343ad82adcb2",
+    "fora27": "cadac25e-9d1a-45fe-adaf-8bf0993b2455",
+    "q28": "ac93e2d4-5fef-4532-b4ba-3180730eee39",
+    "bin28": "bfedad7b-2e0d-4918-a7e5-254be47cf8a4",
+    "late28": "c8029ec9-6cad-429c-a141-44336e1b1d46"
+  }
+}

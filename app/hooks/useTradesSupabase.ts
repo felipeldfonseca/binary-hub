@@ -3,6 +3,7 @@ import { useMemo } from 'react';
 import { createDataClient } from '@/lib/supabase';
 import { useAuth } from '@/lib/contexts/AuthContextSupabase';
 import type { Trade, TradeInsert, TradeUpdate } from '@/types/database';
+import { invalidateDiario } from '@/hooks/useDiario';
 
 interface TradeFilters {
   symbol?: string;
@@ -18,6 +19,15 @@ export function useTradesSupabase(filters?: TradeFilters) {
   const { user, session } = useAuth();
   const db = useMemo(() => createDataClient(session?.access_token ?? null), [session?.access_token]);
   const queryClient = useQueryClient();
+
+  // Every write here also marks the Diário stale: it reads the same trades, and its «Página antiga de
+  // operações» link sends the owner here to delete and export (a day must not keep a deleted trade)
+  const refreshAfterWrite = () => {
+    queryClient.invalidateQueries({ queryKey: ['trades'] });
+    queryClient.invalidateQueries({ queryKey: ['trade-stats'] });
+    queryClient.invalidateQueries({ queryKey: ['trading-sessions'] });
+    void invalidateDiario(queryClient, user?.id);
+  };
 
   // Get trades with filters
   const tradesQuery = useQuery({
@@ -120,11 +130,7 @@ export function useTradesSupabase(filters?: TradeFilters) {
       if (error) throw error;
       return data as Trade;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['trades'] });
-      queryClient.invalidateQueries({ queryKey: ['trade-stats'] });
-      queryClient.invalidateQueries({ queryKey: ['trading-sessions'] });
-    },
+    onSuccess: refreshAfterWrite,
   });
 
   // Update a trade
@@ -146,11 +152,7 @@ export function useTradesSupabase(filters?: TradeFilters) {
       if (error) throw error;
       return data as Trade;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['trades'] });
-      queryClient.invalidateQueries({ queryKey: ['trade-stats'] });
-      queryClient.invalidateQueries({ queryKey: ['trading-sessions'] });
-    },
+    onSuccess: refreshAfterWrite,
   });
 
   // Delete a trade
@@ -160,11 +162,7 @@ export function useTradesSupabase(filters?: TradeFilters) {
 
       if (error) throw error;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['trades'] });
-      queryClient.invalidateQueries({ queryKey: ['trade-stats'] });
-      queryClient.invalidateQueries({ queryKey: ['trading-sessions'] });
-    },
+    onSuccess: refreshAfterWrite,
   });
 
   // Quick add trade (simplified for binary options)
@@ -211,11 +209,7 @@ export function useTradesSupabase(filters?: TradeFilters) {
       if (error) throw error;
       return data as Trade;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['trades'] });
-      queryClient.invalidateQueries({ queryKey: ['trade-stats'] });
-      queryClient.invalidateQueries({ queryKey: ['trading-sessions'] });
-    },
+    onSuccess: refreshAfterWrite,
   });
 
   // Quick add futures trade
@@ -264,11 +258,7 @@ export function useTradesSupabase(filters?: TradeFilters) {
       if (error) throw error;
       return data as Trade;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['trades'] });
-      queryClient.invalidateQueries({ queryKey: ['trade-stats'] });
-      queryClient.invalidateQueries({ queryKey: ['trading-sessions'] });
-    },
+    onSuccess: refreshAfterWrite,
   });
 
   return {

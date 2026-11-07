@@ -9,9 +9,11 @@
  */
 import { formatHhMm, utcToLocal } from '@/lib/domain';
 import {
+  ACCOUNT_MARKETS,
   answerOf,
   centsToUsd,
   currencyOf,
+  type AccountMarket,
   type Currency,
   type CheckKey,
   type GateResult,
@@ -215,3 +217,127 @@ export function regraDoEstado(c: StateRuleCheck): string | null {
       return null;
   }
 }
+
+// ---------------------------------------------------------------------------------------------
+// «Posso operar hoje?» on the Diário (Phase 4, «Muitas contas»: owner's request of 25 Oct 2026)
+// ---------------------------------------------------------------------------------------------
+
+/** What the Diário's card reads of one account of rules_now() */
+export interface ContaPosso {
+  accountId: string;
+  label: string;
+  market: AccountMarket;
+  gate: GateResult;
+  /** null before version 1 */
+  rules: Rules | null;
+}
+
+/** The others line's states, in its order (board choice 9: «liberadas · encerradas por hoje · fora da janela · sem janela salva») */
+export type EstadoDaConta = 'liberada' | 'liberada_com_aviso' | 'encerrada' | 'fora_da_janela' | 'sem_janela' | 'outra';
+export const ORDEM_DOS_ESTADOS: readonly EstadoDaConta[] = ['liberada', 'liberada_com_aviso', 'encerrada', 'fora_da_janela', 'sem_janela', 'outra'];
+
+const ESTADO_PALAVRAS: Record<EstadoDaConta, { um: string; varios: string; tom: Tom }> = {
+  liberada: { um: 'liberada', varios: 'liberadas', tom: 'mint' },
+  liberada_com_aviso: { um: 'liberada com aviso', varios: 'liberadas com aviso', tom: 'neutral' },
+  encerrada: { um: 'encerrada por hoje', varios: 'encerradas por hoje', tom: 'red' },
+  fora_da_janela: { um: 'fora da janela', varios: 'fora da janela', tom: 'amber' },
+  sem_janela: { um: 'sem janela salva', varios: 'sem janela salva', tom: 'muted' },
+  // «Aguardar até …» (Phase 5), «Sem regra ativa», «Limite do dia indisponível»
+  outra: { um: 'com outra resposta', varios: 'com outra resposta', tom: 'muted' },
+};
+
+/** The state an account counts as in the others line, from the same answer possoLinha words */
+export function estadoDaConta(gate: GateResult): EstadoDaConta {
+  const a = answerOf(gate);
+  switch (a.kind) {
+    case 'liberado':
+      return avisos(a.warnings, a.position === 'nao_e_dia') ? 'liberada_com_aviso' : 'liberada';
+    case 'encerrado':
+      return 'encerrada';
+    case 'fora_janela':
+      return 'fora_da_janela';
+    case 'sem_janela':
+      return a.reason === 'regra_desligada' ? 'outra' : 'sem_janela';
+    default:
+      return 'outra';
+  }
+}
+
+export interface LinhaDaConta {
+  accountId: string;
+  label: string;
+  linha: PossoLinha;
+}
+
+export interface OutrasContas {
+  /** «Outra conta:», «Outras 7 contas:» */
+  titulo: string;
+  /** «5 fora da janela» · «2 sem janela salva», «todas fora da janela», or the one other account's state */
+  partes: { texto: string; tom: Tom }[];
+  /** «Ver todas» / «Ver a outra conta» (closed when the page opens) */
+  verTodas: string;
+  ocultar: string;
+  /** Their lines in the card's order (by market, then the server's order), for «Ver todas» */
+  contas: LinhaDaConta[];
+}
+
+export interface PossoNoDiario {
+  /** The account open in the Diário; null when it is not among the answers */
+  conta: (LinhaDaConta & { somando: boolean }) | null;
+  /** One line for the others; null without other accounts (the line is not shown) */
+  outras: OutrasContas | null;
+}
+
+const marketRank = (m: AccountMarket) => {
+  const i = ACCOUNT_MARKETS.indexOf(m);
+  return i < 0 ? ACCOUNT_MARKETS.length : i;
+};
+
+/**
+ * «Posso operar hoje?» on the Diário: only the selected account, with «somando as contas de
+ * Futuros» under its limit when the limit sums them, and ONE line for the others counting their
+ * answers in a fixed order («Outras 34 contas: 19 liberadas · 3 encerradas por hoje · 9 fora da
+ * janela · 3 sem janela salva»; «todas fora da janela» when they all share one state; the state
+ * alone with one other account). The view of every account goes to the Início (Phase 8).
+ */
+export function possoNoDiario(accounts: readonly ContaPosso[], selectedId: string): PossoNoDiario {
+  const ordered = accounts
+    .map((a, i) => ({ a, i }))
+    .sort((x, y) => marketRank(x.a.market) - marketRank(y.a.market) || x.i - y.i)
+    .map((x) => x.a);
+  const sel = ordered.find((a) => a.accountId === selectedId) ?? null;
+  const others = ordered.filter((a) => a.accountId !== selectedId);
+  const linhaDe = (a: ContaPosso): LinhaDaConta => ({ accountId: a.accountId, label: a.label, linha: possoLinha(a.label, a.gate, a.rules) });
+
+  let outras: OutrasContas | null = null;
+  if (others.length) {
+    const n = others.length;
+    const contagem: Record<EstadoDaConta, number> = { liberada: 0, liberada_com_aviso: 0, encerrada: 0, fora_da_janela: 0, sem_janela: 0, outra: 0 };
+    for (const a of others) contagem[estadoDaConta(a.gate)] += 1;
+    const presentes = ORDEM_DOS_ESTADOS.filter((e) => contagem[e] > 0);
+    outras = {
+      titulo: n === 1 ? 'Outra conta:' : `Outras ${n} contas:`,
+      partes: presentes.map((e) => {
+        const w = ESTADO_PALAVRAS[e];
+        const k = contagem[e];
+        const texto = n === 1 ? w.um : presentes.length === 1 ? `todas ${w.varios}` : `${k} ${k === 1 ? w.um : w.varios}`;
+        return { texto, tom: w.tom };
+      }),
+      verTodas: n === 1 ? 'Ver a outra conta' : 'Ver todas',
+      ocultar: 'Ocultar',
+      contas: others.map(linhaDe),
+    };
+  }
+  return {
+    conta: sel ? { ...linhaDe(sel), somando: sel.rules?.limit?.mode === 'soma' } : null,
+    outras,
+  };
+}
+
+/** The others line as one string: «Outras 7 contas: 5 fora da janela · 2 sem janela salva» */
+export function outrasTexto(o: OutrasContas): string {
+  return `${o.titulo} ${o.partes.map((p) => p.texto).join(' · ')}`;
+}
+
+/** The sentence the card's ⓘ gains on the Diário (owner's revision of 25 Oct) */
+export const POSSO_NO_DIARIO_INFO = 'Aqui aparece a conta aberta no Diário; as outras ficam numa linha, e “Ver todas” mostra a resposta de cada uma.';

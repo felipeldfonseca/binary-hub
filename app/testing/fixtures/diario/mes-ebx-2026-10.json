@@ -1,0 +1,96 @@
+{
+  "v": 1,
+  "to": "2026-11-01",
+  "days": [
+    {
+      "day": "2026-10-24",
+      "fora": {
+        "n": 0,
+        "net": 0,
+        "open": 0
+      },
+      "limit": {
+        "net": -1.2,
+        "scope": "conta",
+        "worst": -1.2,
+        "amount": 100,
+        "hit_at": null,
+        "trades": 2,
+        "at_limit": "avisar",
+        "worst_at_hit": null
+      },
+      "weekday": 6,
+      "recalculated": 2
+    },
+    {
+      "day": "2026-10-25",
+      "fora": {
+        "n": 1,
+        "net": -10,
+        "open": 0
+      },
+      "limit": {
+        "net": -1,
+        "scope": "conta",
+        "worst": -1,
+        "amount": 100,
+        "hit_at": null,
+        "trades": 2,
+        "at_limit": "avisar",
+        "worst_at_hit": null
+      },
+      "weekday": 7,
+      "recalculated": 2
+    }
+  ],
+  "from": "2026-09-28",
+  "desde": "2026-10-14T13:12:04.922437+00:00",
+  "month": "2026-10",
+  "today": "2026-10-26",
+  "weeks": [
+    {
+      "fora": {
+        "n": 1,
+        "net": -10,
+        "open": 0
+      },
+      "week_of": "2026-10-19"
+    }
+  ],
+  "account": {
+    "id": "3d747e0c-d9a2-46e8-af1d-5f4e1bbce6bb",
+    "day": {
+      "tz": "America/Sao_Paulo",
+      "start_min": 0
+    },
+    "label": "Ebinex",
+    "market": "binary",
+    "file_tz": "America/Sao_Paulo",
+    "archived": false,
+    "currency": "USD",
+    "platform": "ebinex",
+    "is_example": false,
+    "tz_confirmed": true,
+    "guessed_clock": 0
+  },
+  "desde_day": "2026-10-14",
+  "server_now": "2026-10-26T13:00:05.206082+00:00",
+  "fora_trades": [
+    {
+      "day": "2026-10-25",
+      "net": -10,
+      "breaks": [
+        "fora_da_janela"
+      ],
+      "status": "closed",
+      "symbol": "BTC/USDT",
+      "quantity": 1,
+      "realized": true,
+      "trade_id": "64da14f3-e4ea-4616-94c7-be5e618a4ff6",
+      "direction": "call",
+      "plan_kind": "recalculado",
+      "asset_type": "binary_option",
+      "entry_time": "2026-10-25T16:30:05+00:00"
+    }
+  ]
+}
