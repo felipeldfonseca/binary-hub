@@ -1,0 +1,241 @@
+{
+ "v": 1,
+ "server_now": "2026-11-12T00:20:00+00:00",
+ "account": {
+  "id": "d1dbd70b-7a9b-550b-bcc8-ed37b06586cc",
+  "day": {
+   "tz": "America/Sao_Paulo",
+   "start_min": 0
+  },
+  "label": "Ebinex",
+  "market": "binary",
+  "file_tz": "America/Sao_Paulo",
+  "archived": false,
+  "currency": "USD",
+  "platform": "ebinex",
+  "is_example": false,
+  "tz_confirmed": true,
+  "guessed_clock": 0
+ },
+ "today": "2026-11-11",
+ "desde": "2026-10-14T22:40:00+00:00",
+ "desde_day": "2026-10-14",
+ "to": "2026-12-06",
+ "from": "2026-10-26",
+ "month": "2026-11",
+ "days": [
+  {
+   "day": "2026-10-26",
+   "fora": {
+    "n": 0,
+    "net": 0,
+    "open": 0
+   },
+   "limit": null,
+   "weekday": 1,
+   "recalculated": 0
+  },
+  {
+   "day": "2026-10-27",
+   "fora": {
+    "n": 0,
+    "net": 0,
+    "open": 0
+   },
+   "limit": null,
+   "weekday": 2,
+   "recalculated": 0
+  },
+  {
+   "day": "2026-10-28",
+   "fora": {
+    "n": 0,
+    "net": 0,
+    "open": 0
+   },
+   "limit": null,
+   "weekday": 3,
+   "recalculated": 0
+  },
+  {
+   "day": "2026-10-30",
+   "fora": {
+    "n": 0,
+    "net": 0,
+    "open": 0
+   },
+   "limit": null,
+   "weekday": 5,
+   "recalculated": 0
+  },
+  {
+   "day": "2026-11-02",
+   "fora": {
+    "n": 0,
+    "net": 0,
+    "open": 0
+   },
+   "limit": null,
+   "weekday": 1,
+   "recalculated": 0
+  },
+  {
+   "day": "2026-11-03",
+   "fora": {
+    "n": 0,
+    "net": 0,
+    "open": 0
+   },
+   "limit": null,
+   "weekday": 2,
+   "recalculated": 0
+  },
+  {
+   "day": "2026-11-04",
+   "fora": {
+    "n": 0,
+    "net": 0,
+    "open": 0
+   },
+   "limit": null,
+   "weekday": 3,
+   "recalculated": 2
+  },
+  {
+   "day": "2026-11-05",
+   "fora": {
+    "n": 1,
+    "net": 17,
+    "open": 0
+   },
+   "limit": null,
+   "weekday": 4,
+   "recalculated": 0
+  },
+  {
+   "day": "2026-11-09",
+   "fora": {
+    "n": 0,
+    "net": 0,
+    "open": 0
+   },
+   "limit": null,
+   "weekday": 1,
+   "recalculated": 0
+  },
+  {
+   "day": "2026-11-10",
+   "fora": {
+    "n": 2,
+    "net": -2.1,
+    "open": 0
+   },
+   "limit": null,
+   "weekday": 2,
+   "recalculated": 0
+  },
+  {
+   "day": "2026-11-11",
+   "fora": {
+    "n": 1,
+    "net": 0,
+    "open": 1
+   },
+   "limit": null,
+   "weekday": 3,
+   "recalculated": 0
+  }
+ ],
+ "weeks": [
+  {
+   "fora": {
+    "n": 0,
+    "net": 0,
+    "open": 0
+   },
+   "week_of": "2026-10-26"
+  },
+  {
+   "fora": {
+    "n": 1,
+    "net": 17,
+    "open": 0
+   },
+   "week_of": "2026-11-02"
+  },
+  {
+   "fora": {
+    "n": 3,
+    "net": -2.1,
+    "open": 1
+   },
+   "week_of": "2026-11-09"
+  }
+ ],
+ "fora_trades": [
+  {
+   "day": "2026-11-05",
+   "net": 17,
+   "breaks": [
+    "fora_da_janela"
+   ],
+   "status": "closed",
+   "symbol": "EUR/USD",
+   "quantity": 1,
+   "realized": true,
+   "trade_id": "ea95ef28-de86-5155-a24e-fc68b58bd5bb",
+   "direction": "call",
+   "plan_kind": "congelado",
+   "asset_type": "binary_option",
+   "entry_time": "2026-11-06T00:00:00+00:00"
+  },
+  {
+   "day": "2026-11-10",
+   "net": -15,
+   "breaks": [
+    "fora_da_janela"
+   ],
+   "status": "closed",
+   "symbol": "GBP/USD",
+   "quantity": 1,
+   "realized": true,
+   "trade_id": "87f284a2-4343-54e5-bad1-49a7b6271a9c",
+   "direction": "call",
+   "plan_kind": "congelado",
+   "asset_type": "binary_option",
+   "entry_time": "2026-11-11T00:09:00+00:00"
+  },
+  {
+   "day": "2026-11-10",
+   "net": 12.9,
+   "breaks": [
+    "fora_da_janela"
+   ],
+   "status": "closed",
+   "symbol": "EUR/USD",
+   "quantity": 1,
+   "realized": true,
+   "trade_id": "6c8660a1-ec43-59a4-9b50-047fca487fb6",
+   "direction": "put",
+   "plan_kind": "congelado",
+   "asset_type": "binary_option",
+   "entry_time": "2026-11-11T00:21:00+00:00"
+  },
+  {
+   "day": "2026-11-11",
+   "net": null,
+   "breaks": [
+    "fora_da_janela"
+   ],
+   "status": "open",
+   "symbol": "EUR/USD",
+   "quantity": 1,
+   "realized": false,
+   "trade_id": "93c59a71-5be5-544e-92a4-b7a991db3b5d",
+   "direction": "put",
+   "plan_kind": "congelado",
+   "asset_type": "binary_option",
+   "entry_time": "2026-11-12T00:12:00+00:00"
+  }
+ ]
+}

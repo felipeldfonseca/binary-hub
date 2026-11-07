@@ -1,0 +1,29 @@
+{
+ "v": 1,
+ "server_now": "2026-11-12T00:20:00+00:00",
+ "account": {
+  "id": "d1dbd70b-7a9b-550b-bcc8-ed37b06586cc",
+  "day": {
+   "tz": "America/Sao_Paulo",
+   "start_min": 0
+  },
+  "label": "Ebinex",
+  "market": "binary",
+  "file_tz": "America/Sao_Paulo",
+  "archived": false,
+  "currency": "USD",
+  "platform": "ebinex",
+  "is_example": false,
+  "tz_confirmed": true,
+  "guessed_clock": 0
+ },
+ "today": "2026-11-11",
+ "desde": "2026-10-14T22:40:00+00:00",
+ "desde_day": "2026-10-14",
+ "to": "2026-10-04",
+ "from": "2026-08-31",
+ "month": "2026-09",
+ "days": [],
+ "weeks": [],
+ "fora_trades": []
+}

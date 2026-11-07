@@ -1,0 +1,181 @@
+/*
+ * The Diário page (Phase 4, telas B0): the rules both lanes share, from the approved boards (DiarioDezEnxuto,
+ * DiarioHojeEnxuto, canvas version 84: `.cartao`, `.cab`, `.tiles`, `.tile`, `.faixa`, `.chip`, `.mono`). Scoped to
+ * .hub like styles/hub.css, whose tokens these use, so claro and escuro differ only by `.hub[data-tema]`. Imported by
+ * app/(hub)/layout.tsx. Final at B0: lane L1 adds its rules to hub-diario-mes.css (hub-dr-cal-*, hub-dr-sem-*,
+ * hub-dr-topo-*, hub-dr-rod-*), lane L2 to hub-diario-dia.css (hub-dr-dia-*, hub-dr-plano-*, hub-dr-op-*,
+ * hub-dr-drill-*, hub-dr-img-*, hub-dr-rev-*).
+ */
+
+/* The page column (board `main`): header, card, then the regions, 20 px apart */
+.hub .hub-diario {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  min-width: 0;
+}
+
+/* A region's card (board `.cartao`) */
+.hub .hub-dr-cartao {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 22px 24px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 24px;
+  min-width: 0;
+}
+
+/* The heading row (board `.cab`): title on the left, actions on the right, wrapping */
+.hub .hub-dr-cab {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+}
+
+/* A heading with its ⓘ (board `.titulo-i`) */
+.hub .hub-dr-titulo-i {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* The regions' H2 (board `.cab h2`: Poly 24) */
+.hub .hub-dr-h2 {
+  margin: 0;
+  font-family: 'Poly', Georgia, serif;
+  font-size: 24px;
+  line-height: 1.2;
+  font-weight: 400;
+}
+.hub .hub-dr-h2:focus {
+  outline: none;
+}
+
+/* A muted line under a heading */
+.hub .hub-dr-sub {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-2);
+}
+
+/* The tiles (board `.tiles` / `.tile`): 4 columns, 2 at ≤ 980 px, 1 at ≤ 540 px */
+.hub .hub-dr-tiles {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+.hub .hub-dr-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 14px 16px;
+  border-radius: 16px;
+  background: var(--inset);
+  min-width: 0;
+}
+.hub .hub-dr-rotulo {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-2);
+}
+.hub .hub-dr-valor {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 20px;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+/* «Limite do dia» and «Fora do plano» of the day: 15 px bold in the regular font (E4) */
+.hub .hub-dr-valor--texto {
+  font-family: inherit;
+  font-variant-numeric: normal;
+  font-size: 15px;
+}
+/* The week's tiles: mono 17 px (J4) */
+.hub .hub-dr-valor--semana {
+  font-size: 17px;
+}
+
+/* A thin bar (the limit's, the week's): 6 px on the track */
+.hub .hub-dr-barra {
+  display: block;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--track);
+  overflow: hidden;
+}
+
+/* A band across a card (board `.faixa`) */
+.hub .hub-dr-faixa {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+  padding: 12px 16px;
+  border-radius: 18px;
+}
+
+/* A neutral chip (board `.chip` + `.chip-neutro`) */
+.hub .hub-dr-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 9px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  background: var(--neutral-bg);
+  border: 1px solid var(--neutral-border);
+  color: var(--text);
+}
+
+/* Numbers (board `.mono`) */
+.hub .hub-dr-mono {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}
+
+/* An entrance the lanes may give a block; none under reduced motion */
+.hub .hub-dr-anim {
+  animation: hub-dr-entra 0.42s ease-out both;
+}
+@keyframes hub-dr-entra {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (max-width: 980px) {
+  .hub .hub-dr-tiles {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 540px) {
+  .hub .hub-dr-cartao {
+    padding: 18px 16px;
+  }
+  .hub .hub-dr-tiles {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hub .hub-dr-anim {
+    animation: none;
+  }
+}

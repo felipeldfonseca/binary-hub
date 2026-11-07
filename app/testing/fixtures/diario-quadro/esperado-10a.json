@@ -1,0 +1,613 @@
+{
+ "cen": "10a",
+ "rotulo": "10 · Conta sem regras · Ylos 50k, 12 nov",
+ "dataLinha": "quinta-feira, 12 de novembro, 10:42 ET",
+ "conta": {
+  "nome": "Ylos 50k",
+  "janela": "Sem janela salva",
+  "valores": "Valores em US$."
+ },
+ "flags": {
+  "semRegras": true,
+  "temAviso": false,
+  "offline": false,
+  "carregando": false,
+  "erro": false,
+  "pronto": true,
+  "infos": {
+   "posso": false,
+   "cal": false,
+   "resumo": false,
+   "plano": false,
+   "ops": false,
+   "semana": false,
+   "grava": false,
+   "marcas": false
+  }
+ },
+ "possoSel": [
+  {
+   "nome": "Ylos 50k",
+   "pal": "Sem janela salva",
+   "sub": null,
+   "acao": "Definir",
+   "acaoAria": "Definir a janela da Ylos 50k em Personalizar",
+   "lim": null,
+   "soma": false,
+   "tom": "tom-muted"
+  }
+ ],
+ "outras": {
+  "titulo": "Outras 7 contas:",
+  "partes": [
+   {
+    "texto": "2 liberadas",
+    "tom": "tom-mint"
+   },
+   {
+    "texto": "4 fora da janela",
+    "tom": "tom-amber"
+   },
+   {
+    "texto": "1 sem janela salva",
+    "tom": "tom-muted"
+   }
+  ],
+  "botao": "Ver todas",
+  "abertas": false
+ },
+ "possoOutras": [
+  {
+   "nome": "Top One",
+   "pal": "Liberado",
+   "sub": "até 11:00 ET",
+   "acao": null,
+   "acaoAria": null,
+   "lim": "US$ 0 de US$ 400",
+   "soma": false,
+   "tom": "tom-mint"
+  },
+  {
+   "nome": "Lucid 50k",
+   "pal": "Liberado",
+   "sub": "até 11:00 ET",
+   "acao": null,
+   "acaoAria": null,
+   "lim": "US$ 0 de US$ 400",
+   "soma": false,
+   "tom": "tom-mint"
+  },
+  {
+   "nome": "Ebinex",
+   "pal": "Fora da sua janela",
+   "sub": "abre às 20:00 de Brasília",
+   "acao": null,
+   "acaoAria": null,
+   "lim": null,
+   "soma": false,
+   "tom": "tom-amber"
+  },
+  {
+   "nome": "FTMO",
+   "pal": "Fora da sua janela",
+   "sub": "abre amanhã às 08:00 ET",
+   "acao": null,
+   "acaoAria": null,
+   "lim": "US$ 0 de US$ 1.000",
+   "soma": false,
+   "tom": "tom-amber"
+  },
+  {
+   "nome": "IBKR",
+   "pal": "Sem janela salva",
+   "sub": null,
+   "acao": "Definir",
+   "acaoAria": "Definir a janela da IBKR em Personalizar",
+   "lim": null,
+   "soma": false,
+   "tom": "tom-muted"
+  },
+  {
+   "nome": "Binance",
+   "pal": "Fora da sua janela",
+   "sub": "abre às 20:00 de Brasília",
+   "acao": null,
+   "acaoAria": null,
+   "lim": null,
+   "soma": false,
+   "tom": "tom-amber"
+  },
+  {
+   "nome": "Clear",
+   "pal": "Fora da sua janela",
+   "sub": "abre amanhã às 10:00 de Brasília",
+   "acao": null,
+   "acaoAria": null,
+   "lim": "R$ 180 de R$ 500",
+   "soma": false,
+   "tom": "tom-amber"
+  }
+ ],
+ "linhaTopo": null,
+ "aviso": null,
+ "mes": {
+  "titulo": "Outubro de 2026",
+  "status": "Mês: Outubro de 2026.",
+  "colunas": [
+   "Seg",
+   "Ter",
+   "Qua",
+   "Qui",
+   "Sex"
+  ],
+  "anterior": true,
+  "proximo": true,
+  "noMesDeHoje": false
+ },
+ "infoCal": "Cada pregão é pintado pelo resultado: verde ganho, vermelho perda, mais forte quanto maior (quartis do resultado diário, ganhos e perdas à parte). O pregão de futuros vai das 18:00 da véspera às 17:00 ET. Traço (—): dia sem operações. Hachurado: Histórico importado, antes das suas regras, só com resultado, nunca somado ao diário e com uma escala de cor própria. Ponto verde: hoje. Borda branca: dia aberto. Tracejado: dia do mês vizinho. A coluna Semana soma só o diário; o histórico aparece à parte, com ▨. Toque numa semana para abri-la. Passe o mouse num dia para ver operações, ganhos e perdas. Pregões sem revisão de meses anteriores ficam no mês deles: use ‹.",
+ "semanas": [
+  {
+   "rotulo": "28 set–2 out",
+   "botao": true,
+   "res": "+110,00",
+   "n": "5 op.",
+   "fora": null,
+   "hist": null,
+   "aria": "Semana de 28 de setembro a 2 de outubro: histórico importado, +110,00 dólares. Abrir a semana.",
+   "vazia": false,
+   "traco": null,
+   "dias": [
+    {
+     "id": "2026-09-28",
+     "clicavel": false,
+     "tab": null,
+     "aberto": false,
+     "classe": "cal-fora dica-e",
+     "res": "",
+     "curto": "",
+     "marcas": null,
+     "dica": "",
+     "aria": ""
+    },
+    {
+     "id": "2026-09-29",
+     "clicavel": false,
+     "tab": null,
+     "aberto": false,
+     "classe": "cal-fora",
+     "res": "",
+     "curto": "",
+     "marcas": null,
+     "dica": "",
+     "aria": ""
+    },
+    {
+     "id": "2026-09-30",
+     "clicavel": false,
+     "tab": null,
+     "aberto": false,
+     "classe": "cal-fora",
+     "res": "",
+     "curto": "",
+     "marcas": null,
+     "dica": "",
+     "aria": ""
+    },
+    {
+     "id": "2026-10-01",
+     "clicavel": false,
+     "tab": null,
+     "aberto": false,
+     "classe": "dica-d",
+     "res": "sem op.",
+     "curto": "—",
+     "marcas": null,
+     "dica": "1º out · sem operações",
+     "aria": "1º out, sem operações"
+    },
+    {
+     "id": "2026-10-02",
+     "clicavel": true,
+     "tab": "0",
+     "aberto": false,
+     "classe": "cal-imp   dica-d",
+     "res": "+65,88",
+     "curto": "+66",
+     "marcas": null,
+     "dica": "2 out · +US$ 65,88 · 3 op.: 2 ganhos, 1 perda · Histórico importado · só resultado",
+     "aria": "2 out, +65,88 dólares, 3 op., Histórico importado"
+    }
+   ]
+  },
+  {
+   "rotulo": "5–9 out",
+   "botao": true,
+   "res": "+452,72",
+   "n": "8 op.",
+   "fora": null,
+   "hist": null,
+   "aria": "Semana de 5 a 9 de outubro: histórico importado, +452,72 dólares. Abrir a semana.",
+   "vazia": false,
+   "traco": null,
+   "dias": [
+    {
+     "id": "2026-10-05",
+     "clicavel": true,
+     "tab": "-1",
+     "aberto": false,
+     "classe": "cal-imp-forte   dica-e",
+     "res": "+111,40",
+     "curto": "+111",
+     "marcas": null,
+     "dica": "5 out · +US$ 111,40 · 3 op.: 2 ganhos, 1 perda · Histórico importado · só resultado",
+     "aria": "5 out, +111,40 dólares, 3 op., Histórico importado"
+    },
+    {
+     "id": "2026-10-06",
+     "clicavel": false,
+     "tab": null,
+     "aberto": false,
+     "classe": "",
+     "res": "sem op.",
+     "curto": "—",
+     "marcas": null,
+     "dica": "6 out · sem operações",
+     "aria": "6 out, sem operações"
+    },
+    {
+     "id": "2026-10-07",
+     "clicavel": true,
+     "tab": "-1",
+     "aberto": false,
+     "classe": "cal-imp-forte",
+     "res": "+230,04",
+     "curto": "+230",
+     "marcas": null,
+     "dica": "7 out · +US$ 230,04 · 3 op.: 3 ganhos, 0 perdas · Histórico importado · só resultado",
+     "aria": "7 out, +230,04 dólares, 3 op., Histórico importado"
+    },
+    {
+     "id": "2026-10-08",
+     "clicavel": true,
+     "tab": "-1",
+     "aberto": false,
+     "classe": "cal-imp   dica-d",
+     "res": "+111,28",
+     "curto": "+111",
+     "marcas": null,
+     "dica": "8 out · +US$ 111,28 · 2 op.: 2 ganhos, 0 perdas · Histórico importado · só resultado",
+     "aria": "8 out, +111,28 dólares, 2 op., Histórico importado"
+    },
+    {
+     "id": "2026-10-09",
+     "clicavel": false,
+     "tab": null,
+     "aberto": false,
+     "classe": "dica-d",
+     "res": "sem op.",
+     "curto": "—",
+     "marcas": null,
+     "dica": "9 out · sem operações",
+     "aria": "9 out, sem operações"
+    }
+   ]
+  },
+  {
+   "rotulo": "12–16 out",
+   "botao": true,
+   "res": "+122,70",
+   "n": "8 op.",
+   "fora": null,
+   "hist": null,
+   "aria": "Semana de 12 a 16 de outubro: histórico importado, +122,70 dólares. Abrir a semana.",
+   "vazia": false,
+   "traco": null,
+   "dias": [
+    {
+     "id": "2026-10-12",
+     "clicavel": false,
+     "tab": null,
+     "aberto": false,
+     "classe": "dica-e",
+     "res": "sem op.",
+     "curto": "—",
+     "marcas": null,
+     "dica": "12 out · sem operações",
+     "aria": "12 out, sem operações"
+    },
+    {
+     "id": "2026-10-13",
+     "clicavel": true,
+     "tab": "-1",
+     "aberto": false,
+     "classe": "cal-imp-forte",
+     "res": "+180,30",
+     "curto": "+180",
+     "marcas": null,
+     "dica": "13 out · +US$ 180,30 · 3 op.: 3 ganhos, 0 perdas · Histórico importado · só resultado",
+     "aria": "13 out, +180,30 dólares, 3 op., Histórico importado"
+    },
+    {
+     "id": "2026-10-14",
+     "clicavel": true,
+     "tab": "-1",
+     "aberto": false,
+     "classe": "cal-imp-forte",
+     "res": "−37,48",
+     "curto": "−37",
+     "marcas": null,
+     "dica": "14 out · −US$ 37,48 · 2 op.: 1 ganho, 1 perda · Histórico importado · só resultado",
+     "aria": "14 out, −37,48 dólares, 2 op., Histórico importado"
+    },
+    {
+     "id": "2026-10-15",
+     "clicavel": false,
+     "tab": null,
+     "aberto": false,
+     "classe": "dica-d",
+     "res": "sem op.",
+     "curto": "—",
+     "marcas": null,
+     "dica": "15 out · sem operações",
+     "aria": "15 out, sem operações"
+    },
+    {
+     "id": "2026-10-16",
+     "clicavel": true,
+     "tab": "-1",
+     "aberto": false,
+     "classe": "cal-imp   dica-d",
+     "res": "−20,12",
+     "curto": "−20",
+     "marcas": null,
+     "dica": "16 out · −US$ 20,12 · 3 op.: 1 ganho, 2 perdas · Histórico importado · só resultado",
+     "aria": "16 out, −20,12 dólares, 3 op., Histórico importado"
+    }
+   ]
+  },
+  {
+   "rotulo": "19–23 out",
+   "botao": true,
+   "res": "+46,33",
+   "n": "6 op.",
+   "fora": null,
+   "hist": null,
+   "aria": "Semana de 19 a 23 de outubro: histórico importado, +46,33 dólares. Abrir a semana.",
+   "vazia": false,
+   "traco": null,
+   "dias": [
+    {
+     "id": "2026-10-19",
+     "clicavel": false,
+     "tab": null,
+     "aberto": false,
+     "classe": "dica-e",
+     "res": "sem op.",
+     "curto": "—",
+     "marcas": null,
+     "dica": "19 out · sem operações",
+     "aria": "19 out, sem operações"
+    },
+    {
+     "id": "2026-10-20",
+     "clicavel": true,
+     "tab": "-1",
+     "aberto": false,
+     "classe": "cal-imp-forte",
+     "res": "−76,21",
+     "curto": "−76",
+     "marcas": null,
+     "dica": "20 out · −US$ 76,21 · 3 op.: 1 ganho, 2 perdas · Histórico importado · só resultado",
+     "aria": "20 out, −76,21 dólares, 3 op., Histórico importado"
+    },
+    {
+     "id": "2026-10-21",
+     "clicavel": false,
+     "tab": null,
+     "aberto": false,
+     "classe": "",
+     "res": "sem op.",
+     "curto": "—",
+     "marcas": null,
+     "dica": "21 out · sem operações",
+     "aria": "21 out, sem operações"
+    },
+    {
+     "id": "2026-10-22",
+     "clicavel": true,
+     "tab": "-1",
+     "aberto": false,
+     "classe": "cal-imp-forte   dica-d",
+     "res": "+122,54",
+     "curto": "+123",
+     "marcas": null,
+     "dica": "22 out · +US$ 122,54 · 3 op.: 2 ganhos, 1 perda · Histórico importado · só resultado",
+     "aria": "22 out, +122,54 dólares, 3 op., Histórico importado"
+    },
+    {
+     "id": "2026-10-23",
+     "clicavel": false,
+     "tab": null,
+     "aberto": false,
+     "classe": "dica-d",
+     "res": "sem op.",
+     "curto": "—",
+     "marcas": null,
+     "dica": "23 out · sem operações",
+     "aria": "23 out, sem operações"
+    }
+   ]
+  },
+  {
+   "rotulo": "26–30 out",
+   "botao": true,
+   "res": "+86,49",
+   "n": "8 op.",
+   "fora": null,
+   "hist": null,
+   "aria": "Semana de 26 a 30 de outubro: histórico importado, +86,49 dólares. Abrir a semana.",
+   "vazia": false,
+   "traco": null,
+   "dias": [
+    {
+     "id": "2026-10-26",
+     "clicavel": true,
+     "tab": "-1",
+     "aberto": false,
+     "classe": "cal-imp   dica-e",
+     "res": "−14,94",
+     "curto": "−15",
+     "marcas": null,
+     "dica": "26 out · −US$ 14,94 · 2 op.: 1 ganho, 1 perda · Histórico importado · só resultado",
+     "aria": "26 out, −14,94 dólares, 2 op., Histórico importado"
+    },
+    {
+     "id": "2026-10-27",
+     "clicavel": true,
+     "tab": "-1",
+     "aberto": false,
+     "classe": "cal-imp",
+     "res": "−11,96",
+     "curto": "−12",
+     "marcas": null,
+     "dica": "27 out · −US$ 11,96 · 3 op.: 2 ganhos, 1 perda · Histórico importado · só resultado",
+     "aria": "27 out, −11,96 dólares, 3 op., Histórico importado"
+    },
+    {
+     "id": "2026-10-28",
+     "clicavel": true,
+     "tab": "-1",
+     "aberto": false,
+     "classe": "cal-imp",
+     "res": "+72,52",
+     "curto": "+73",
+     "marcas": null,
+     "dica": "28 out · +US$ 72,52 · 1 op.: 1 ganho, 0 perdas · Histórico importado · só resultado",
+     "aria": "28 out, +72,52 dólares, 1 op., Histórico importado"
+    },
+    {
+     "id": "2026-10-29",
+     "clicavel": false,
+     "tab": null,
+     "aberto": false,
+     "classe": "dica-d",
+     "res": "sem op.",
+     "curto": "—",
+     "marcas": null,
+     "dica": "29 out · sem operações",
+     "aria": "29 out, sem operações"
+    },
+    {
+     "id": "2026-10-30",
+     "clicavel": true,
+     "tab": "-1",
+     "aberto": false,
+     "classe": "cal-imp   dica-d",
+     "res": "+40,87",
+     "curto": "+41",
+     "marcas": null,
+     "dica": "30 out · +US$ 40,87 · 2 op.: 2 ganhos, 0 perdas · Histórico importado · só resultado",
+     "aria": "30 out, +40,87 dólares, 2 op., Histórico importado"
+    }
+   ]
+  }
+ ],
+ "legendaLimite": false,
+ "dia": {
+  "titulo": "Quinta-feira, 12 de novembro",
+  "tags": [],
+  "nota": null
+ },
+ "rs": {
+  "res": "US$ 0,00",
+  "resCor": "var(--text)",
+  "ops": "0",
+  "opsSub": "",
+  "lim": "—",
+  "limSub": "sem regras salvas",
+  "temBarra": false,
+  "bar": "0%",
+  "barCor": "var(--amber)",
+  "fora": "—",
+  "foraSub": "",
+  "foraCor": "var(--text)"
+ },
+ "infoResumo": "Limite do dia: esta conta não tem limite nas suas regras.",
+ "comPlano": false,
+ "semOps": {
+  "texto": "Nenhuma operação registrada hoje.",
+  "registrar": true
+ },
+ "trades": [],
+ "drills": [],
+ "apagadas": null,
+ "abertaOntem": null,
+ "revisao": {
+  "tem": false,
+  "fechada": false,
+  "salva": false,
+  "linha": "",
+  "ver": false,
+  "botao": "Ver revisão",
+  "form": false,
+  "mudou": null,
+  "versoes": null,
+  "erro": null
+ },
+ "revisaoAtual": null,
+ "formulario": null,
+ "versoes": null,
+ "semana": {
+  "titulo": "Semana em andamento · 4 de 5 pregões",
+  "info": "Pregões de 9 a 13 de novembro. Revisões: dos pregões com operação registrada no app ou com revisão, quantos têm revisão; hoje só entra depois que você escrever a revisão dele. A coluna Semana do calendário traz os mesmos números.",
+  "numeros": [
+   [
+    "Resultado",
+    "US$ 0,00"
+   ],
+   [
+    "Operações",
+    "0"
+   ],
+   [
+    "Fora do plano",
+    "nenhuma"
+   ],
+   [
+    "Revisões",
+    "—"
+   ]
+  ],
+  "vazia": "Nenhuma operação nesta semana.",
+  "barras": [
+   [
+    "seg",
+    "—",
+    "—"
+   ],
+   [
+    "ter",
+    "—",
+    "—"
+   ],
+   [
+    "qua",
+    "—",
+    "—"
+   ],
+   [
+    "qui",
+    "—",
+    "—"
+   ],
+   [
+    "sex",
+    "",
+    ""
+   ]
+  ],
+  "leitor": "Resultado por dia: seg, sem operações · ter, sem operações · qua, sem operações · qui, sem operações · sex, ainda não aconteceu.",
+  "fora": []
+ },
+ "quadro": "hoje"
+}

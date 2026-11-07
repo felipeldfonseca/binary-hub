@@ -23,7 +23,9 @@ import { fetchBatchUndo, fetchBatches, importCommit, importPreview, importUndo, 
 import { newClientKey, registerEntry } from '@/lib/hub/registrarDb';
 import { IMPORTACOES } from '@/components/hub/contas/copy';
 import { SAMPLES, readSample } from '@/testing/mappedFiles';
-import { PG_URL, asUser, createAccountAsUser, lit, pgClient, psql } from '@/testing/pg';
+import { PG_URL, asUser, createAccountAsUser, lit, psql } from '@/testing/pg';
+// Phase 4 (lane L1): fetchBatchUndo also counts the Diário's marks, images and notes (`not … is null` reads)
+import { pgClientComNot } from '@/testing/pgLeituras';
 
 const SHIFT_FILE = process.env.BH_PG_SHIFT_FILE;
 const NY = 'America/New_York';
@@ -48,7 +50,7 @@ const topOne = (rows: [string, string, number, string, number, number][]) =>
 
 describePg('«Desfazer» counts trades, never the file’s lines × the real SQL', () => {
   const uid = randomUUID();
-  const db = pgClient(uid);
+  const db = pgClientComNot(uid);
   const acc: Record<string, string> = {};
 
   /** Every trade of the account with its file exits and links, as stored (updated_at aside) */
@@ -148,7 +150,7 @@ delete from public.profiles where id = '${uid}';`);
     const um = await confirmacao(acc.topA, b1);
     expect(um.linhas).toEqual({ inserted: 3, linked: 0 });
     expect(um.antes).toBe('Desfazer apaga as 3 operações desta importação.');
-    expect(um.counts).toEqual({ trades: 2, exits: 3, registered: 0, existing: 0 });
+    expect(um.counts).toEqual({ trades: 2, exits: 3, registered: 0, existing: 0, diario: { marks: 0, images: 0, notes: 0 } });
     expect(um.agora).toBe('Desfazer apaga as 2 operações desta importação, em 3 saídas.');
     expect(IMPORTACOES.confirmYes(um.counts.trades)).toBe('Desfazer e apagar');
 
@@ -168,11 +170,11 @@ delete from public.profiles where id = '${uid}';`);
     const dois = await confirmacao(acc.topA, b2);
     expect(dois.linhas).toEqual({ inserted: 2, linked: 0 });
     expect(dois.antes).toBe('Desfazer apaga as 2 operações desta importação.');
-    expect(dois.counts).toEqual({ trades: 0, exits: 0, registered: 0, existing: 2 });
+    expect(dois.counts).toEqual({ trades: 0, exits: 0, registered: 0, existing: 2, diario: { marks: 0, images: 0, notes: 0 } });
     expect(dois.agora).toBe('Desfazer não apaga nada: as 2 operações que já estavam voltam a ser como eram antes desta importação.');
     expect(IMPORTACOES.confirmYes(dois.counts.trades)).toBe('Desfazer');
     // The first batch's counts are its own: the second batch's exits are not its lines
-    expect((await confirmacao(acc.topA, b1)).counts).toEqual({ trades: 2, exits: 3, registered: 0, existing: 0 });
+    expect((await confirmacao(acc.topA, b1)).counts).toEqual({ trades: 2, exits: 3, registered: 0, existing: 0, diario: { marks: 0, images: 0, notes: 0 } });
 
     expect(await desfazer(b2, dois.counts)).toBe('Importação desfeita: as 2 operações que já estavam voltaram a ser como eram.');
     expect(fingerprint(acc.topA)).toBe(depois1);
@@ -193,7 +195,7 @@ delete from public.profiles where id = '${uid}';`);
     const x = await confirmacao(acc.topB, b);
     expect(x.linhas).toEqual({ inserted: 1, linked: 2 });
     expect(x.antes).toBe('Desfazer apaga a operação desta importação, e as 2 registradas por você voltam a ser como estavam antes dela.');
-    expect(x.counts).toEqual({ trades: 1, exits: 1, registered: 1, existing: 0 });
+    expect(x.counts).toEqual({ trades: 1, exits: 1, registered: 1, existing: 0, diario: { marks: 0, images: 0, notes: 0 } });
     expect(x.agora).toBe('Desfazer apaga a operação desta importação, e a registrada por você volta a ser como estava antes dela.');
     expect(await desfazer(b, x.counts)).toBe('Importação desfeita: 1 operação apagada, e a registrada por você voltou a ser como estava.');
     expect(fingerprint(acc.topB)).toBe(registrada);
@@ -211,7 +213,7 @@ delete from public.profiles where id = '${uid}';`);
     const x = await confirmacao(acc.tradovate, b);
     expect(x.linhas).toEqual({ inserted: 6, linked: 0 });
     expect(x.antes).toBe('Desfazer apaga as 6 operações desta importação.');
-    expect(x.counts).toEqual({ trades: 4, exits: 6, registered: 0, existing: 0 });
+    expect(x.counts).toEqual({ trades: 4, exits: 6, registered: 0, existing: 0, diario: { marks: 0, images: 0, notes: 0 } });
     expect(x.agora).toBe('Desfazer apaga as 4 operações desta importação, em 6 saídas.');
     expect(await desfazer(b, x.counts)).toBe('Importação desfeita: 4 operações apagadas.');
     expect(fingerprint(acc.tradovate)).toBe(vazio);
@@ -228,7 +230,7 @@ delete from public.profiles where id = '${uid}';`);
     const x = await confirmacao(acc.lucid, b);
     expect(x.linhas).toEqual({ inserted: 4, linked: 2 });
     expect(x.antes).toBe('Desfazer apaga as 4 operações desta importação, e as 2 registradas por você voltam a ser como estavam antes dela.');
-    expect(x.counts).toEqual({ trades: 3, exits: 4, registered: 1, existing: 0 });
+    expect(x.counts).toEqual({ trades: 3, exits: 4, registered: 1, existing: 0, diario: { marks: 0, images: 0, notes: 0 } });
     expect(x.agora).toBe('Desfazer apaga as 3 operações desta importação, em 4 saídas, e a registrada por você volta a ser como estava antes dela.');
     expect(await desfazer(b, x.counts)).toBe('Importação desfeita: 3 operações apagadas, e a registrada por você voltou a ser como estava.');
     expect(fingerprint(acc.lucid)).toBe(registrada);

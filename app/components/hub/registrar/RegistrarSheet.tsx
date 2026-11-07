@@ -2,9 +2,9 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
-import { usePathname, useRouter } from 'next/navigation'
+import { useRouter } from 'next/navigation'
 import { useIsMutating, useQuery } from '@tanstack/react-query'
-import { hubKeys, useContaAtual, useHubDb, usePreferences } from '@/hooks/useContas'
+import { hubKeys, useHubDb, usePreferences } from '@/hooks/useContas'
 import { useRulesNow } from '@/hooks/useRegras'
 import { useImageTrashSweep, useOpenTrades, useRegistrarDefaults, useServerNow, useTradeView } from '@/hooks/useRegistrar'
 import { visibleAccounts, type TradingAccount } from '@/lib/hub/contas'
@@ -12,8 +12,9 @@ import { fetchAccounts } from '@/lib/hub/contasDb'
 import { diaDeHoje, padroesDoRegistrar, podeRegistrar, type RegistrarDefaults } from '@/lib/hub/registrar'
 import { newClientKey, type TradeView } from '@/lib/hub/registrarDb'
 import { chaveRascunho, contaReg, indicador, lerRascunho, rascunhoInicial, rascunhoMexido, textoAviso, type Rascunho } from '@/lib/hub/registrarForm'
+import { linhaId } from '@/components/hub/diario/ids'
 import { CLOSE, FOLHA_REG, LOADING, TRY_AGAIN } from './copy'
-import { OPERACOES_DO_DIA_ID, type CloseRegistrarOptions } from './abrir'
+import { type CloseRegistrarOptions } from './abrir'
 import Escolha from './Escolha'
 import PassoAberta from './PassoAberta'
 import PassoEntrada from './PassoEntrada'
@@ -33,6 +34,11 @@ export interface RegistrarSheetProps {
   tradeId: string | null
   /** Closes the sheet (the provider returns focus to the opener, or to `focusId`) */
   onClose: (options?: CloseRegistrarOptions) => void
+  /**
+   * Phase 4 (D16, M1): a past trading day of `accountId` ('YYYY-MM-DD'): step 1 opens in «Já fechada» on it, unless a
+   * draft is saved for the account (the draft wins: DEV-C3)
+   */
+  dia?: string | null
 }
 
 type Vista =
@@ -86,13 +92,11 @@ function useContasRegistrar() {
   return { active, isLoading: q.isPending, isError: q.isError, pausada: q.isPending && q.fetchStatus === 'paused', refetch: q.refetch }
 }
 
-export default function RegistrarSheet({ accountId, tradeId, onClose }: RegistrarSheetProps) {
+export default function RegistrarSheet({ accountId, tradeId, onClose, dia = null }: RegistrarSheetProps) {
   const contas = useContasRegistrar()
   const rulesNow = useRulesNow()
   const prefs = usePreferences()
-  const contaAtual = useContaAtual()
   const router = useRouter()
-  const pathname = usePathname()
   const now = useServerNow(1000)
   const ocupado = useIsMutating() > 0
   useImageTrashSweep()
@@ -114,7 +118,9 @@ export default function RegistrarSheet({ accountId, tradeId, onClose }: Registra
     setFocoN((n) => n + 1)
   }, [])
 
-  const abertas = useOpenTrades(contaId, { enabled: !!contaId && !tradeId })
+  // M1: «Já fechada» on a past day of the account the sheet was opened for (never on another account chosen in it)
+  const diaPassado = dia && !tradeId && contaId === accountId ? dia : null
+  const abertas = useOpenTrades(contaId, { enabled: !!contaId && !tradeId && !diaPassado })
   const alvo = vista && (vista.passo === 'aberta' || vista.passo === 'fechada') ? vista.tradeId : vista ? null : tradeId
   const trade = useTradeView(alvo, { enabled: !!alvo })
   const defaults = useRegistrarDefaults(account ? { id: account.id, market: account.market } : null)
@@ -155,14 +161,20 @@ export default function RegistrarSheet({ accountId, tradeId, onClose }: Registra
       }
       return
     }
+    if (diaPassado) {
+      ir({ passo: 'entrada', aviso: null })
+      return
+    }
     if (abertas.isPending || abertas.isError) return
     const open = abertas.data
     if (open.length === 0) ir({ passo: 'entrada', aviso: null })
     else if (open.length === 1) ir({ passo: 'aberta', tradeId: open[0].id })
     else ir({ passo: 'escolha' })
-  }, [vista, contas.isLoading, contas.isError, account, rulesNowPronto, agora, tradeId, trade.isPending, trade.isError, trade.data, abertas.isPending, abertas.isError, abertas.data, lista, ir])
+  }, [vista, contas.isLoading, contas.isError, account, rulesNowPronto, agora, tradeId, diaPassado, trade.isPending, trade.isError, trade.data, abertas.isPending, abertas.isError, abertas.data, lista, ir])
 
   // Step 1's draft per account: memory and sessionStorage (D14, C6)
+  /** M1: the past day shapes step 1 until the sheet starts a new form (a registration, «Registrar outra», an undo) */
+  const comDia = useRef(true)
   const [rascunhos, setRascunhos] = useState<Record<string, { r: Rascunho; inicial: Rascunho; padroes: RegistrarDefaults }>>({})
   const defaultsProntos = !!account && (defaults.isSuccess || defaults.isError || defaults.fetchStatus === 'paused')
   const padroes = useMemo(() => (account ? defaults.data ?? padroesDoRegistrar(account.market, []) : null), [account, defaults.data])
@@ -171,11 +183,13 @@ export default function RegistrarSheet({ accountId, tradeId, onClose }: Registra
     const cur = rascunhos[conta.id]
     if (cur && (cur.padroes === padroes || rascunhoMexido(cur.r, cur.inicial))) return
     // A new form; or one with nothing typed yet whose starting values changed: after a registration the
-    // account's recent trades are read again, and «Nova entrada» starts from the last one (D5)
-    const inicial = rascunhoInicial(conta, padroes, cur?.r.clientKey ?? newClientKey())
+    // account's recent trades are read again, and «Nova entrada» starts from the last one (D5). M1: a past day of the
+    // Diário starts «Já fechada» on it; a draft saved for the account wins (DEV-C3)
+    const base = rascunhoInicial(conta, padroes, cur?.r.clientKey ?? newClientKey())
+    const inicial: Rascunho = diaPassado && conta.id === accountId && comDia.current ? { ...base, modo: 'fechada', dia: diaPassado } : base
     const r = cur ? { ...inicial, maisAberto: cur.r.maisAberto } : lerSessao(conta.id) ?? inicial
     setRascunhos((x) => ({ ...x, [conta.id]: { r, inicial, padroes } }))
-  }, [conta, defaultsProntos, padroes, rascunhos])
+  }, [conta, defaultsProntos, padroes, rascunhos, diaPassado, accountId])
   const setR = useCallback(
     (fn: (r: Rascunho) => Rascunho) => {
       if (!contaId) return
@@ -192,6 +206,7 @@ export default function RegistrarSheet({ accountId, tradeId, onClose }: Registra
   /** A new form on the account (after a success, «Registrar outra», an undo): a new client_key */
   const limparRascunho = useCallback(() => {
     if (!conta || !padroes) return
+    comDia.current = false
     gravarSessao(null, conta.id)
     const inicial = rascunhoInicial(conta, padroes, newClientKey())
     setRascunhos((x) => ({ ...x, [conta.id]: { r: inicial, inicial, padroes } }))
@@ -257,10 +272,18 @@ export default function RegistrarSheet({ accountId, tradeId, onClose }: Registra
     }
   }
 
-  // «Ver no Diário»: the bridge shows the Diário's current account; another page or account goes there first (C7)
+  // «Ver no Diário» (M2, C21): the Diário on the trade's account, day and row, from any page (also /diario: the page
+  // follows the new URL); the row's ▾ takes the focus once the day is drawn (the provider waits for it)
   const irDiario = () => {
-    if (contaId && (pathname !== '/diario' || contaAtual.current?.id !== contaId)) router.push(`/diario?conta=${encodeURIComponent(contaId)}`)
-    onClose({ focusId: OPERACOES_DO_DIA_ID })
+    const id = vista && vista.passo === 'fechada' ? vista.tradeId : null
+    const t = id ? vistaDe(id)?.trade ?? null : null
+    if (contaId) {
+      const q = new URLSearchParams({ conta: contaId })
+      if (t?.tradingDay) q.set('dia', t.tradingDay)
+      if (id) q.set('op', id)
+      router.push(`/diario?${q.toString()}`)
+    }
+    onClose(id ? { focusId: linhaId(id) } : undefined)
   }
 
   // ----------------------------------------------------------------------------------------------

@@ -43,11 +43,23 @@ jest.mock('@/lib/hub/regrasDb', () => ({
   mergePreferences: jest.fn(),
 }))
 
-// Phase 3: /diario also has «Operações do dia» (its own tests: OperacoesDoDia.test.tsx)
+// Phase 3: /diario's Registrar reads (the Diário's own tests: Diario*.test.tsx)
 jest.mock('@/lib/hub/registrarDb', () => ({
   ...jest.requireActual('@/lib/hub/registrarDb'),
   fetchDayTrades: jest.fn(),
 }))
+
+// Phase 4 (telas B0): the Diário page reads the account's calendar, month and day first (recorded answers)
+jest.mock('@/lib/hub/diarioDb', () => {
+  const actual = jest.requireActual('@/lib/hub/diarioDb')
+  const { diarioJson } = jest.requireActual('@/testing/diarioDb')
+  return {
+    ...actual,
+    fetchCalendario: jest.fn(async () => actual.parseCalendar(diarioJson('calendario-top'))),
+    fetchMes: jest.fn(async () => actual.parseMonth(diarioJson('mes-top-2026-10'))),
+    fetchDia: jest.fn(async () => actual.parseDay(diarioJson('dia-top-1026'))),
+  }
+})
 
 const fetchRulesNow = regrasDb.fetchRulesNow as jest.MockedFunction<typeof regrasDb.fetchRulesNow>
 const mergePreferences = regrasDb.mergePreferences as jest.MockedFunction<typeof regrasDb.mergePreferences>
@@ -196,31 +208,31 @@ describe('PossoOperarHoje (the card, from props)', () => {
     render(<PossoOperarHoje state={ready('agora-seg-0930-et')} onRetry={jest.fn()} />)
 
     const [top] = items()
-    expect(within(top).getByText('Fora da sua janela').tagName).toBe('STRONG')
+    expect((top.querySelector('.hub-posso__palavra') as HTMLElement).tagName).toBe('STRONG')
+    expect(spoken(top.querySelector('.hub-posso__palavra') as HTMLElement)).toEqual(['Fora da sua janela'])
     expect(within(top).getByText('Top One #1').tagName).toBe('STRONG')
     expect(top.querySelector('.hub-posso__sep')).toHaveAttribute('aria-hidden', 'true')
-    expect(top.querySelector('.hub-posso__estado')).toHaveClass('hub-posso__estado--empilha')
   })
 
   it.each<[AgoraFixture, number, string[]]>([
     ['agora-seg-0930-et', 1, ['Fora da sua janela', 'abre às 20:00 de Brasília']],
     ['agora-seg-1045-et', 0, ['Encerrado por hoje', 'limite atingido às 10:31']],
     ['agora-antes-seg-0930-et', 0, ['Sem janela salva', 'Definir']],
-  ])('%s: keeps « · » with what follows it, so it wraps with it; a screen reader still reads only the words', (name, index, words) => {
+  ])('%s: ends the answer with « · » (board revision of 25 Oct), so a wrapped detail starts its line without it; a screen reader still reads only the words', (name, index, words) => {
     render(<PossoOperarHoje state={ready(name)} onRetry={jest.fn()} />)
 
     const estado = items()[index].querySelector('.hub-posso__estado') as HTMLElement
-    // Two pieces: the answer, then the separator and the detail together (hub-posso.css clips a
-    // separator whose piece starts a line)
-    const [word, mais] = Array.from(estado.children) as HTMLElement[]
+    // Two pieces: the answer with its separator last, then the detail (hub-posso.css: they wrap, 6px apart)
+    const [word, detail] = Array.from(estado.children) as HTMLElement[]
     expect(estado.children).toHaveLength(2)
     expect(word).toHaveClass('hub-posso__palavra')
-    expect(mais).toHaveClass('hub-posso__mais')
-    const [sep, detail] = Array.from(mais.children) as HTMLElement[]
-    expect(mais.children).toHaveLength(2)
+    const sep = word.lastElementChild as HTMLElement
     expect(sep).toHaveClass('hub-posso__sep')
     expect(sep).toHaveAttribute('aria-hidden', 'true')
-    expect(sep).toHaveTextContent(/^·$/)
+    // Before a text detail it keeps its trailing space (board `.sep-fim-esp`); before a link it does not
+    const texto = detail.tagName !== 'A'
+    expect(sep.textContent).toBe(texto ? '· ' : '·')
+    expect(sep.classList.contains('hub-posso__sep--esp')).toBe(texto)
     expect(detail).toHaveTextContent(words[1])
     expect(spoken(estado)).toEqual(words)
   })
@@ -229,7 +241,7 @@ describe('PossoOperarHoje (the card, from props)', () => {
     render(<PossoOperarHoje state={ready('agora-seg-0930-et')} onRetry={jest.fn()} />)
 
     const [top] = items()
-    const sub = top.querySelector('.hub-posso__sep')?.nextElementSibling as HTMLElement
+    const sub = (top.querySelector('.hub-posso__estado') as HTMLElement).children[1] as HTMLElement
     expect(sub).toHaveTextContent('abre às 10:00 ET')
     expect(sub).toHaveClass('hub-tom--muted')
     const [used, of] = Array.from((top.querySelector('.hub-posso__valores') as HTMLElement).children)
@@ -505,8 +517,6 @@ describe('PossoOperarHoje in six markets (Fase 2b)', () => {
     const limit = clear.querySelector('.hub-posso__limite') as HTMLElement
     expect(spoken(limit)).toEqual(['Limite do dia', brl('0'), `de ${brl('500')}`])
     expect(limit.querySelector('[aria-label]')).toBeNull()
-    // The answer and its sub stack as on the board (.empilha)
-    expect(clear.querySelector('.hub-posso__estado')).toHaveClass('hub-posso__estado--empilha')
   })
 
   it('PossoOperarHojeDiario: the six lines from rules_now()', async () => {
@@ -740,29 +750,41 @@ describe('PossoOperarHojeDiario with the app’s query defaults (QueryProvider)'
 })
 
 describe('/diario', () => {
-  it('places the card between the Diário header and «Operações do dia», then the placeholder, and the window under the selector', async () => {
+  it('places the card between the Diário header and the open day’s region, and the window under the selector', async () => {
     const ids = idsDono()
     fetchAccounts.mockResolvedValue([
       makeAccount({ id: ids.topOne, label: 'Top One #1', market: 'futures' }),
       makeAccount({ id: ids.ebinex, label: 'Ebinex', market: 'binary', is_primary: true }),
     ])
-    renderHub(<DiarioPage />)
+    const view = renderHub(<DiarioPage />)
+    // As the app's QueryProvider (staleTime 60 s): the open day's region, drawn once the calendar answered, shares
+    // the card's rules_now answer instead of reading it again
+    view.queryClient.setDefaultOptions({ queries: { ...view.queryClient.getDefaultOptions().queries, staleTime: 60_000 } })
 
     const selector = await screen.findByRole('button', { name: /^Conta: / })
     const h1 = screen.getByRole('heading', { level: 1, name: 'Diário' })
     const card = await screen.findByRole('region', { name: 'Posso operar hoje?' })
-    const bridge = await screen.findByRole('region', { name: 'Operações do dia' })
-    const placeholder = screen.getByText('O Diário chega na Fase 4.')
+    // Phase 4 (telas): the open day's region (lane L2's «o dia», section#dia); the placeholder is gone
+    await waitFor(() => expect(document.getElementById('dia')).not.toBeNull())
+    const bridge = document.getElementById('dia') as HTMLElement
+    expect(screen.queryByText('O Diário chega na Fase 4.')).toBeNull()
     const follows = (a: Node, b: Node) => (a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0
     expect(follows(h1, selector)).toBe(true)
     expect(follows(selector, card)).toBe(true)
     expect(follows(card, bridge)).toBe(true)
-    expect(follows(bridge, placeholder)).toBe(true)
 
-    expect(await within(card).findAllByRole('listitem')).toHaveLength(2)
+    // Phase 4 (lane L1): the card shows the account open in the Diário (Ebinex, the primary) and one line for the other
+    expect(await within(card).findAllByRole('listitem')).toHaveLength(1)
+    expect(within(card).getByText('Ebinex')).toBeInTheDocument()
+    expect(within(card).getByText('Outra conta:')).toBeInTheDocument()
+    await userEvent.click(within(card).getByRole('button', { name: 'Ver a outra conta' }))
+    expect(within(card).getByRole('list', { name: 'Outras contas' })).toHaveTextContent('Top One #1')
     await waitFor(() => expect(selector).toHaveAccessibleDescription('Janela 20:00–21:00 · Brasília'))
-    // One read of rules_now serves the card, the window line and the day of «Operações do dia»
-    expect(await within(bridge).findByText('Nenhuma operação registrada hoje.')).toBeInTheDocument()
+    // One read of rules_now serves the card, the window line and the open day (a region named by its day's H2)
+    expect(bridge).toHaveAttribute('aria-labelledby', 't-dia')
+    const titulo = within(bridge).getByRole('heading', { level: 2 })
+    expect(titulo.textContent).toMatch(/^(Segunda|Terça|Quarta|Quinta|Sexta)-feira|^(Sábado|Domingo), /)
+    expect(screen.getByRole('region', { name: titulo.textContent ?? '' })).toBe(bridge)
     expect(fetchRulesNow).toHaveBeenCalledTimes(1)
   })
 })

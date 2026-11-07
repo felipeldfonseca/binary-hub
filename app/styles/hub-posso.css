@@ -1,12 +1,15 @@
 /*
  * «Posso operar hoje?» on /diario and the window line under the account selector (Phase 2, lane
  * B). Scoped to .hub like styles/hub.css; tokens and shared classes (.hub-tom--*) come from there.
- * Imported by app/(hub)/layout.tsx. Only lane B edits this file.
+ * Imported by app/(hub)/layout.tsx. Phase 4 · telas, lane L1 (the Diário boards DiarioDezEnxuto /
+ * DiarioHojeEnxuto, canvas version 84): the open account's line and one line for the others
+ * («Ver todas»), «somando as contas de Futuros» under its limit, and the «·» that ends the part
+ * before it (board revision of 25 Oct). Only lane L1 edits this file.
  */
 
 /* The card (Início board `section[aria-labelledby=t-posso]`): title block beside the lines */
 
-.hub-posso {
+.hub .hub-posso {
   display: flex;
   flex-wrap: wrap;
   align-items: flex-start;
@@ -16,7 +19,7 @@
   border: 1px solid var(--border);
   background: var(--surface);
 }
-.hub-posso__cab {
+.hub .hub-posso__cab {
   flex: 0 0 auto;
   display: flex;
   align-items: center;
@@ -32,15 +35,20 @@
   text-transform: uppercase;
   color: var(--text-2);
 }
-.hub-posso__lista {
+.hub .hub-posso__lista {
   flex: 1 1 560px;
   min-width: 0;
   margin: 0;
   padding: 0;
   list-style: none;
 }
+/* The Diário's body (board `.posso-corpo`): the open account, the others line, their lines */
+.hub .hub-posso__corpo {
+  flex: 1 1 560px;
+  min-width: 0;
+}
 /* «Carregando…» and the load error take the place of the lines */
-.hub-posso__aviso {
+.hub .hub-posso__aviso {
   flex: 1 1 560px;
   min-width: 0;
   display: flex;
@@ -54,58 +62,50 @@
   margin: 0 0 12px;
 }
 
-/* One account (board `li.conta-hoje`): name · answer · limit */
-.hub-posso__conta {
+/*
+ * One account (board `li.posso-conta`): name · answer · limit. The board's row is content-box: 44 px inside the 1 px
+ * border between rows (45 px from the second row on), and inside the 8 px padding on phones
+ */
+.hub .hub-posso__conta {
+  box-sizing: content-box;
   display: grid;
-  grid-template-columns: 84px minmax(0, 1fr) auto;
+  grid-template-columns: 92px minmax(0, 1fr) auto;
   align-items: center;
   gap: 0 16px;
-  min-height: 48px;
+  min-height: 44px;
   font-size: 13px;
 }
-.hub-posso__conta + .hub-posso__conta {
+/* From 10 accounts the name column widens (board `.posso-largo`) */
+.hub .hub-posso__corpo--largo .hub-posso__conta {
+  grid-template-columns: 120px minmax(0, 1fr) auto;
+}
+.hub .hub-posso__conta + .hub-posso__conta {
   border-top: 1px solid var(--border);
 }
-.hub-posso__nome {
+.hub .hub-posso__nome {
   font-size: 14px;
   overflow-wrap: anywhere;
 }
 /*
- * «answer · detail» on one line when it fits, spaced as the board's `.conta-hoje-st` (6px, «·», 6px).
- * The « · » belongs to the detail (`.hub-posso__mais`) and sits in the room every piece keeps on
- * its left; the box starts that room further left and clips its left edge, so when the detail
- * wraps to its own line its separator falls outside and no line ends or starts with «·». The clip
- * keeps the 4px of a focus ring (hub.css: outline 2px, offset 2px) and cuts the separator, 6px out.
+ * «answer · detail» (board `.posso-estado`): the pieces wrap, 6px apart. The « · » sits at the end of the answer's
+ * own piece (`.hub-posso__sep`, board `.sep-fim`), so a detail that wraps starts its line without it and no line
+ * starts with «·». Before a text detail it keeps its trailing space (board `.sep-fim-esp`).
  */
-.hub-posso__estado {
-  /* 6px + «·» (0.196em in Comfortaa) + 6px */
-  --posso-sep: calc(12px + 0.196em);
+.hub .hub-posso__estado {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 0;
-  min-width: 0;
-  margin-left: calc(-1 * var(--posso-sep));
-  clip-path: inset(-100vmax -100vmax -100vmax calc(var(--posso-sep) - 5px));
-}
-.hub-posso__estado > * {
-  margin-left: var(--posso-sep);
-}
-.hub-posso__mais {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
+  gap: 0 6px;
   min-width: 0;
 }
-.hub-posso__sep {
-  position: absolute;
-  top: 0;
-  right: 100%;
-  bottom: 0;
-  display: flex;
-  align-items: center;
-  padding-right: 6px;
+.hub .hub-posso__sep {
+  margin-left: 6px;
+  font-weight: 400;
   color: var(--text-2);
+}
+.hub .hub-posso__sep--esp {
+  white-space: pre;
+  margin-right: -6px;
 }
 /*
  * «Definir», «Ajustar», «Tentar de novo» inside a line: bold, underlined links with a 44px target
@@ -128,50 +128,94 @@
 .hub .hub-posso__acao:hover {
   color: var(--text);
 }
-.hub-posso__limite {
+.hub .hub-posso__limite {
   display: inline-flex;
   align-items: center;
   flex-wrap: wrap;
   gap: 0 8px;
-  min-height: 44px;
   justify-self: end;
 }
-.hub-posso__valores {
+/* The open account's limit, with «somando as contas de Futuros» under it (board `.posso-lim-col`) */
+.hub .hub-posso__limite--col {
+  flex-direction: column;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 0;
+}
+.hub .hub-posso__limite-linha {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0 8px;
+}
+.hub .hub-posso__valores {
   display: inline-flex;
   align-items: center;
   gap: 8px;
   white-space: nowrap;
 }
-.hub-posso__usado {
+.hub .hub-posso__usado {
   font-family: var(--mono);
   font-variant-numeric: tabular-nums;
   font-weight: 700;
 }
 
-@media (max-width: 640px) {
-  .hub-posso__conta {
+/* The others line (board `.posso-outras`): «Outras 7 contas: 5 fora da janela · 2 sem janela salva» and «Ver todas» */
+.hub .hub-posso__outras {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  min-height: 44px;
+  padding: 4px 0;
+  border-top: 1px solid var(--border);
+  font-size: 13px;
+}
+.hub .hub-posso__resumo {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0 6px;
+  margin: 0;
+  min-width: 0;
+}
+/* Their lines after «Ver todas» (board `.posso-todas`) */
+.hub .hub-posso__todas {
+  border-top: 1px solid var(--border);
+}
+
+/* Phones (board ≤ 700 px): one column, the answer over its sub, no separator */
+@media (max-width: 700px) {
+  .hub .hub-posso__conta,
+  .hub .hub-posso__corpo--largo .hub-posso__conta {
     grid-template-columns: minmax(0, 1fr);
     gap: 0;
     padding: 8px 0;
   }
-  .hub-posso__limite {
-    justify-self: start;
-  }
-}
-/* Narrow phones and tablets: the answer and its sub stack (board `.conta-hoje-st.empilha`) */
-@media (max-width: 359px), (min-width: 641px) and (max-width: 1000px) {
-  .hub-posso__estado--empilha {
+  .hub .hub-posso__estado {
     flex-direction: column;
     align-items: flex-start;
   }
-  .hub-posso__estado--empilha .hub-posso__sep {
+  .hub .hub-posso__estado .hub-posso__sep {
     display: none;
+  }
+  .hub .hub-posso__limite {
+    justify-self: start;
+  }
+  .hub .hub-posso__limite--col {
+    align-items: flex-start;
+  }
+}
+@media (max-width: 540px) {
+  .hub .hub-posso {
+    padding: 8px 16px;
   }
 }
 
 /* The window line under the account selector (Diário board `{{ contaAtual.janela }}`) */
 
-.hub-seletor__janela {
+.hub .hub-seletor__janela {
   padding-left: 16px;
   font-size: 11px;
   color: var(--text-2);

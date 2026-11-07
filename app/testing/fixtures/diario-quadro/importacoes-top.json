@@ -1,0 +1,196 @@
+{
+ "account_id": "aba5cd0c-35ec-5491-96c2-7b98d1be8271",
+ "batches": [
+  {
+   "id": "2d423ff7-3836-50df-a0c5-a71b44cece3f",
+   "platform": "topone",
+   "file_name": "TopOne_1124.csv",
+   "rows_total": 20,
+   "rows_inserted": 0,
+   "rows_duplicate": 0,
+   "rows_completed": 0,
+   "rows_other_account": 0,
+   "rows_error": 0,
+   "rows_linked": 20,
+   "is_legacy": false,
+   "status": "done",
+   "created_at": "2026-11-26T00:08:00+00:00",
+   "undone_at": null
+  },
+  {
+   "id": "7ca3afa6-6a54-5800-9d43-21a95efb19e1",
+   "platform": "topone",
+   "file_name": "TopOne_1117.csv",
+   "rows_total": 13,
+   "rows_inserted": 4,
+   "rows_duplicate": 0,
+   "rows_completed": 0,
+   "rows_other_account": 0,
+   "rows_error": 0,
+   "rows_linked": 9,
+   "is_legacy": false,
+   "status": "done",
+   "created_at": "2026-11-19T00:05:00+00:00",
+   "undone_at": null
+  },
+  {
+   "id": "8272044f-b2bf-526b-b61a-f0a03141d33e",
+   "platform": "topone",
+   "file_name": "TopOne_1110.csv",
+   "rows_total": 18,
+   "rows_inserted": 5,
+   "rows_duplicate": 0,
+   "rows_completed": 0,
+   "rows_other_account": 0,
+   "rows_error": 0,
+   "rows_linked": 13,
+   "is_legacy": false,
+   "status": "done",
+   "created_at": "2026-11-12T00:12:00+00:00",
+   "undone_at": null
+  },
+  {
+   "id": "bcce54f9-118f-50c0-9fc7-770cfd12d286",
+   "platform": "topone",
+   "file_name": "TopOne_1103.csv",
+   "rows_total": 16,
+   "rows_inserted": 5,
+   "rows_duplicate": 0,
+   "rows_completed": 0,
+   "rows_other_account": 0,
+   "rows_error": 0,
+   "rows_linked": 11,
+   "is_legacy": false,
+   "status": "done",
+   "created_at": "2026-11-05T00:08:00+00:00",
+   "undone_at": null
+  },
+  {
+   "id": "1f13effe-6b47-5e7b-8222-d1fd3a5f62f2",
+   "platform": "topone",
+   "file_name": "TopOne_1027.csv",
+   "rows_total": 13,
+   "rows_inserted": 0,
+   "rows_duplicate": 0,
+   "rows_completed": 0,
+   "rows_other_account": 0,
+   "rows_error": 0,
+   "rows_linked": 13,
+   "is_legacy": false,
+   "status": "done",
+   "created_at": "2026-10-28T23:08:00+00:00",
+   "undone_at": null
+  },
+  {
+   "id": "4871904e-4986-51a0-8991-385fbe22a373",
+   "platform": "topone",
+   "file_name": "TopOne_1021.csv",
+   "rows_total": 16,
+   "rows_inserted": 1,
+   "rows_duplicate": 0,
+   "rows_completed": 0,
+   "rows_other_account": 0,
+   "rows_error": 0,
+   "rows_linked": 15,
+   "is_legacy": false,
+   "status": "done",
+   "created_at": "2026-10-22T23:08:00+00:00",
+   "undone_at": null
+  },
+  {
+   "id": "f319f138-6cb9-5a5d-84cb-64b621288072",
+   "platform": "topone",
+   "file_name": "TopOne_historico.csv",
+   "rows_total": 84,
+   "rows_inserted": 84,
+   "rows_duplicate": 0,
+   "rows_completed": 0,
+   "rows_other_account": 0,
+   "rows_error": 0,
+   "rows_linked": 0,
+   "is_legacy": false,
+   "status": "done",
+   "created_at": "2026-10-13T23:08:00+00:00",
+   "undone_at": null
+  }
+ ],
+ "undo": {
+  "f319f138-6cb9-5a5d-84cb-64b621288072": {
+   "trades": 84,
+   "exits": 84,
+   "registered": 0,
+   "existing": 0,
+   "diario": {
+    "marks": 0,
+    "images": 0,
+    "notes": 0
+   }
+  },
+  "4871904e-4986-51a0-8991-385fbe22a373": {
+   "trades": 1,
+   "exits": 1,
+   "registered": 15,
+   "existing": 0,
+   "diario": {
+    "marks": 0,
+    "images": 0,
+    "notes": 0
+   }
+  },
+  "1f13effe-6b47-5e7b-8222-d1fd3a5f62f2": {
+   "trades": 0,
+   "exits": 0,
+   "registered": 13,
+   "existing": 0,
+   "diario": {
+    "marks": 0,
+    "images": 0,
+    "notes": 0
+   }
+  },
+  "bcce54f9-118f-50c0-9fc7-770cfd12d286": {
+   "trades": 5,
+   "exits": 5,
+   "registered": 11,
+   "existing": 0,
+   "diario": {
+    "marks": 0,
+    "images": 0,
+    "notes": 0
+   }
+  },
+  "8272044f-b2bf-526b-b61a-f0a03141d33e": {
+   "trades": 5,
+   "exits": 5,
+   "registered": 13,
+   "existing": 0,
+   "diario": {
+    "marks": 2,
+    "images": 0,
+    "notes": 1
+   }
+  },
+  "7ca3afa6-6a54-5800-9d43-21a95efb19e1": {
+   "trades": 4,
+   "exits": 4,
+   "registered": 9,
+   "existing": 0,
+   "diario": {
+    "marks": 0,
+    "images": 0,
+    "notes": 0
+   }
+  },
+  "2d423ff7-3836-50df-a0c5-a71b44cece3f": {
+   "trades": 0,
+   "exits": 0,
+   "registered": 20,
+   "existing": 0,
+   "diario": {
+    "marks": 0,
+    "images": 0,
+    "notes": 0
+   }
+  }
+ }
+}

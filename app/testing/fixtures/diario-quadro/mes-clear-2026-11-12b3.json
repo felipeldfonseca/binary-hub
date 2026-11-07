@@ -1,0 +1,235 @@
+{
+ "v": 1,
+ "server_now": "2026-11-12T14:20:00+00:00",
+ "account": {
+  "id": "c06c9e56-fd0c-5945-ab47-cce6240b19b2",
+  "day": {
+   "tz": "America/Sao_Paulo",
+   "start_min": 0
+  },
+  "label": "Clear",
+  "market": "b3",
+  "file_tz": "UTC",
+  "archived": false,
+  "currency": "BRL",
+  "platform": null,
+  "is_example": false,
+  "tz_confirmed": true,
+  "guessed_clock": 0
+ },
+ "today": "2026-11-12",
+ "desde": "2026-10-13T12:30:00+00:00",
+ "desde_day": "2026-10-13",
+ "to": "2026-12-06",
+ "from": "2026-10-26",
+ "month": "2026-11",
+ "days": [
+  {
+   "day": "2026-10-26",
+   "fora": {
+    "n": 0,
+    "net": 0,
+    "open": 0
+   },
+   "limit": {
+    "net": -96,
+    "scope": "conta",
+    "worst": -96,
+    "amount": 500,
+    "hit_at": null,
+    "trades": 2,
+    "at_limit": "encerrar",
+    "worst_at_hit": null
+   },
+   "weekday": 1,
+   "recalculated": 0
+  },
+  {
+   "day": "2026-10-28",
+   "fora": {
+    "n": 0,
+    "net": 0,
+    "open": 0
+   },
+   "limit": {
+    "net": 89,
+    "scope": "conta",
+    "worst": 0,
+    "amount": 500,
+    "hit_at": null,
+    "trades": 2,
+    "at_limit": "encerrar",
+    "worst_at_hit": null
+   },
+   "weekday": 3,
+   "recalculated": 0
+  },
+  {
+   "day": "2026-10-29",
+   "fora": {
+    "n": 0,
+    "net": 0,
+    "open": 0
+   },
+   "limit": {
+    "net": 195,
+    "scope": "conta",
+    "worst": 0,
+    "amount": 500,
+    "hit_at": null,
+    "trades": 3,
+    "at_limit": "encerrar",
+    "worst_at_hit": null
+   },
+   "weekday": 4,
+   "recalculated": 0
+  },
+  {
+   "day": "2026-10-30",
+   "fora": {
+    "n": 0,
+    "net": 0,
+    "open": 0
+   },
+   "limit": {
+    "net": 63,
+    "scope": "conta",
+    "worst": -102,
+    "amount": 500,
+    "hit_at": null,
+    "trades": 3,
+    "at_limit": "encerrar",
+    "worst_at_hit": null
+   },
+   "weekday": 5,
+   "recalculated": 0
+  },
+  {
+   "day": "2026-11-03",
+   "fora": {
+    "n": 0,
+    "net": 0,
+    "open": 0
+   },
+   "limit": {
+    "net": 72,
+    "scope": "conta",
+    "worst": 0,
+    "amount": 500,
+    "hit_at": null,
+    "trades": 1,
+    "at_limit": "encerrar",
+    "worst_at_hit": null
+   },
+   "weekday": 2,
+   "recalculated": 0
+  },
+  {
+   "day": "2026-11-04",
+   "fora": {
+    "n": 0,
+    "net": 0,
+    "open": 0
+   },
+   "limit": {
+    "net": -223,
+    "scope": "conta",
+    "worst": -223,
+    "amount": 500,
+    "hit_at": null,
+    "trades": 3,
+    "at_limit": "encerrar",
+    "worst_at_hit": null
+   },
+   "weekday": 3,
+   "recalculated": 0
+  },
+  {
+   "day": "2026-11-05",
+   "fora": {
+    "n": 0,
+    "net": 0,
+    "open": 0
+   },
+   "limit": {
+    "net": -243,
+    "scope": "conta",
+    "worst": -273,
+    "amount": 500,
+    "hit_at": null,
+    "trades": 3,
+    "at_limit": "encerrar",
+    "worst_at_hit": null
+   },
+   "weekday": 4,
+   "recalculated": 0
+  },
+  {
+   "day": "2026-11-06",
+   "fora": {
+    "n": 0,
+    "net": 0,
+    "open": 0
+   },
+   "limit": {
+    "net": -13,
+    "scope": "conta",
+    "worst": -13,
+    "amount": 500,
+    "hit_at": null,
+    "trades": 1,
+    "at_limit": "encerrar",
+    "worst_at_hit": null
+   },
+   "weekday": 5,
+   "recalculated": 0
+  },
+  {
+   "day": "2026-11-12",
+   "fora": {
+    "n": 0,
+    "net": 0,
+    "open": 0
+   },
+   "limit": {
+    "net": -90,
+    "scope": "conta",
+    "worst": -180,
+    "amount": 500,
+    "hit_at": null,
+    "trades": 2,
+    "at_limit": "encerrar",
+    "worst_at_hit": null
+   },
+   "weekday": 4,
+   "recalculated": 0
+  }
+ ],
+ "weeks": [
+  {
+   "fora": {
+    "n": 0,
+    "net": 0,
+    "open": 0
+   },
+   "week_of": "2026-10-26"
+  },
+  {
+   "fora": {
+    "n": 0,
+    "net": 0,
+    "open": 0
+   },
+   "week_of": "2026-11-02"
+  },
+  {
+   "fora": {
+    "n": 0,
+    "net": 0,
+    "open": 0
+   },
+   "week_of": "2026-11-09"
+  }
+ ],
+ "fora_trades": []
+}

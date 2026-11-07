@@ -1,0 +1,844 @@
+{
+ "cen": "8",
+ "rotulo": "8 · B3 em reais · Clear, quinta 12 nov, 11:20 de Brasília",
+ "dataLinha": "quinta-feira, 12 de novembro, 11:20 de Brasília",
+ "conta": {
+  "nome": "Clear",
+  "janela": "Janela 10:00–11:00 · Brasília",
+  "valores": "Valores em R$."
+ },
+ "flags": {
+  "semRegras": false,
+  "temAviso": true,
+  "offline": false,
+  "carregando": false,
+  "erro": false,
+  "pronto": true,
+  "infos": {
+   "posso": false,
+   "cal": false,
+   "resumo": false,
+   "plano": false,
+   "ops": false,
+   "semana": false,
+   "grava": false,
+   "marcas": false
+  }
+ },
+ "possoSel": [
+  {
+   "nome": "Clear",
+   "pal": "Fora da sua janela",
+   "sub": "abre amanhã às 10:00 de Brasília",
+   "acao": null,
+   "acaoAria": null,
+   "lim": "R$ 180 de R$ 500",
+   "soma": false,
+   "tom": "tom-amber"
+  }
+ ],
+ "outras": {
+  "titulo": "Outras 7 contas:",
+  "partes": [
+   {
+    "texto": "1 liberada",
+    "tom": "tom-mint"
+   },
+   {
+    "texto": "4 fora da janela",
+    "tom": "tom-amber"
+   },
+   {
+    "texto": "2 sem janela salva",
+    "tom": "tom-muted"
+   }
+  ],
+  "botao": "Ver todas",
+  "abertas": false
+ },
+ "possoOutras": [
+  {
+   "nome": "Top One",
+   "pal": "Fora da sua janela",
+   "sub": "abre às 10:00 ET",
+   "acao": null,
+   "acaoAria": null,
+   "lim": "US$ 0 de US$ 400",
+   "soma": false,
+   "tom": "tom-amber"
+  },
+  {
+   "nome": "Lucid 50k",
+   "pal": "Fora da sua janela",
+   "sub": "abre às 10:00 ET",
+   "acao": null,
+   "acaoAria": null,
+   "lim": "US$ 0 de US$ 400",
+   "soma": false,
+   "tom": "tom-amber"
+  },
+  {
+   "nome": "Ylos 50k",
+   "pal": "Sem janela salva",
+   "sub": null,
+   "acao": "Definir",
+   "acaoAria": "Definir a janela da Ylos 50k em Personalizar",
+   "lim": null,
+   "soma": false,
+   "tom": "tom-muted"
+  },
+  {
+   "nome": "Ebinex",
+   "pal": "Fora da sua janela",
+   "sub": "abre às 20:00 de Brasília",
+   "acao": null,
+   "acaoAria": null,
+   "lim": null,
+   "soma": false,
+   "tom": "tom-amber"
+  },
+  {
+   "nome": "FTMO",
+   "pal": "Liberado",
+   "sub": "até 10:00 ET",
+   "acao": null,
+   "acaoAria": null,
+   "lim": "US$ 0 de US$ 1.000",
+   "soma": false,
+   "tom": "tom-mint"
+  },
+  {
+   "nome": "IBKR",
+   "pal": "Sem janela salva",
+   "sub": null,
+   "acao": "Definir",
+   "acaoAria": "Definir a janela da IBKR em Personalizar",
+   "lim": null,
+   "soma": false,
+   "tom": "tom-muted"
+  },
+  {
+   "nome": "Binance",
+   "pal": "Fora da sua janela",
+   "sub": "abre às 20:00 de Brasília",
+   "acao": null,
+   "acaoAria": null,
+   "lim": null,
+   "soma": false,
+   "tom": "tom-amber"
+  }
+ ],
+ "linhaTopo": "Diário desde 13 out: 33 operações em 15 pregões",
+ "aviso": "9 pregões sem revisão",
+ "mes": {
+  "titulo": "Novembro de 2026",
+  "status": "Mês: Novembro de 2026.",
+  "colunas": [
+   "Seg",
+   "Ter",
+   "Qua",
+   "Qui",
+   "Sex"
+  ],
+  "anterior": true,
+  "proximo": false,
+  "noMesDeHoje": true
+ },
+ "infoCal": "Cada pregão é pintado pelo resultado: verde ganho, vermelho perda, mais forte quanto maior (quartis do resultado diário, ganhos e perdas à parte). O pregão desta conta vai da meia-noite à meia-noite de Brasília. Traço (—): dia sem operações. Hachurado: Histórico importado, antes das suas regras, só com resultado, nunca somado ao diário e com uma escala de cor própria. Ponto verde: hoje. Borda branca: dia aberto. Tracejado: dia do mês vizinho. A coluna Semana soma só o diário; o histórico aparece à parte, com ▨. Toque numa semana para abri-la. Passe o mouse num dia para ver operações, ganhos e perdas. Pregões sem revisão de meses anteriores ficam no mês deles: use ‹.",
+ "semanas": [
+  {
+   "rotulo": "26–30 out",
+   "botao": true,
+   "res": "+251,00",
+   "n": "10 op.",
+   "fora": null,
+   "hist": null,
+   "aria": "Semana de 26 a 30 de outubro: +251,00 reais, 10 op. Abrir a semana.",
+   "vazia": false,
+   "traco": null,
+   "dias": [
+    {
+     "id": "2026-10-26",
+     "clicavel": false,
+     "tab": null,
+     "aberto": false,
+     "classe": "cal-fora dica-e",
+     "res": "",
+     "curto": "",
+     "marcas": null,
+     "dica": "",
+     "aria": ""
+    },
+    {
+     "id": "2026-10-27",
+     "clicavel": false,
+     "tab": null,
+     "aberto": false,
+     "classe": "cal-fora",
+     "res": "",
+     "curto": "",
+     "marcas": null,
+     "dica": "",
+     "aria": ""
+    },
+    {
+     "id": "2026-10-28",
+     "clicavel": false,
+     "tab": null,
+     "aberto": false,
+     "classe": "cal-fora",
+     "res": "",
+     "curto": "",
+     "marcas": null,
+     "dica": "",
+     "aria": ""
+    },
+    {
+     "id": "2026-10-29",
+     "clicavel": false,
+     "tab": null,
+     "aberto": false,
+     "classe": "cal-fora dica-d",
+     "res": "",
+     "curto": "",
+     "marcas": null,
+     "dica": "",
+     "aria": ""
+    },
+    {
+     "id": "2026-10-30",
+     "clicavel": false,
+     "tab": null,
+     "aberto": false,
+     "classe": "cal-fora dica-d",
+     "res": "",
+     "curto": "",
+     "marcas": null,
+     "dica": "",
+     "aria": ""
+    }
+   ]
+  },
+  {
+   "rotulo": "2–6 nov",
+   "botao": true,
+   "res": "−407,00",
+   "n": "8 op.",
+   "fora": null,
+   "hist": null,
+   "aria": "Semana de 2 a 6 de novembro: −407,00 reais, 8 op. Abrir a semana.",
+   "vazia": false,
+   "traco": null,
+   "dias": [
+    {
+     "id": "2026-11-02",
+     "clicavel": false,
+     "tab": null,
+     "aberto": false,
+     "classe": "dica-e",
+     "res": "sem op.",
+     "curto": "—",
+     "marcas": null,
+     "dica": "2 nov · sem operações",
+     "aria": "2 nov, sem operações"
+    },
+    {
+     "id": "2026-11-03",
+     "clicavel": true,
+     "tab": "-1",
+     "aberto": false,
+     "classe": "",
+     "res": "+72,00",
+     "curto": "+72",
+     "marcas": {
+      "fora": false,
+      "limite": false,
+      "revisao": true
+     },
+     "dica": "3 nov · +R$ 72,00 · 1 op.: 1 ganho, 0 perdas · revisão escrita",
+     "aria": "3 nov, +72,00 reais, 1 op., revisão escrita"
+    },
+    {
+     "id": "2026-11-04",
+     "clicavel": true,
+     "tab": "-1",
+     "aberto": false,
+     "classe": "",
+     "res": "−223,00",
+     "curto": "−223",
+     "marcas": {
+      "fora": false,
+      "limite": false,
+      "revisao": true
+     },
+     "dica": "4 nov · −R$ 223,00 · 3 op.: 0 ganhos, 3 perdas · revisão escrita",
+     "aria": "4 nov, −223,00 reais, 3 op., revisão escrita"
+    },
+    {
+     "id": "2026-11-05",
+     "clicavel": true,
+     "tab": "-1",
+     "aberto": false,
+     "classe": "dica-d",
+     "res": "−243,00",
+     "curto": "−243",
+     "marcas": null,
+     "dica": "5 nov · −R$ 243,00 · 3 op.: 1 ganho, 2 perdas · sem revisão",
+     "aria": "5 nov, −243,00 reais, 3 op., sem revisão"
+    },
+    {
+     "id": "2026-11-06",
+     "clicavel": true,
+     "tab": "-1",
+     "aberto": false,
+     "classe": "dica-d",
+     "res": "−13,00",
+     "curto": "−13",
+     "marcas": null,
+     "dica": "6 nov · −R$ 13,00 · 1 op.: 0 ganhos, 1 perda · sem revisão",
+     "aria": "6 nov, −13,00 reais, 1 op., sem revisão"
+    }
+   ]
+  },
+  {
+   "rotulo": "9–13 nov",
+   "botao": true,
+   "res": "−90,00",
+   "n": "2 op.",
+   "fora": null,
+   "hist": null,
+   "aria": "Semana de 9 a 13 de novembro: −90,00 reais, 2 op. Abrir a semana.",
+   "vazia": false,
+   "traco": null,
+   "dias": [
+    {
+     "id": "2026-11-09",
+     "clicavel": false,
+     "tab": null,
+     "aberto": false,
+     "classe": "dica-e",
+     "res": "sem op.",
+     "curto": "—",
+     "marcas": null,
+     "dica": "9 nov · sem operações",
+     "aria": "9 nov, sem operações"
+    },
+    {
+     "id": "2026-11-10",
+     "clicavel": false,
+     "tab": null,
+     "aberto": false,
+     "classe": "",
+     "res": "sem op.",
+     "curto": "—",
+     "marcas": null,
+     "dica": "10 nov · sem operações",
+     "aria": "10 nov, sem operações"
+    },
+    {
+     "id": "2026-11-11",
+     "clicavel": false,
+     "tab": null,
+     "aberto": false,
+     "classe": "",
+     "res": "sem op.",
+     "curto": "—",
+     "marcas": null,
+     "dica": "11 nov · sem operações",
+     "aria": "11 nov, sem operações"
+    },
+    {
+     "id": "2026-11-12",
+     "clicavel": true,
+     "tab": "0",
+     "aberto": true,
+     "classe": "cal-hoje  dica-d",
+     "res": "−90,00",
+     "curto": "−90",
+     "marcas": null,
+     "dica": "12 nov · −R$ 90,00 · 2 op.: 1 ganho, 1 perda",
+     "aria": "12 nov, −90,00 reais, 2 op., hoje"
+    },
+    {
+     "id": "2026-11-13",
+     "clicavel": false,
+     "tab": null,
+     "aberto": false,
+     "classe": "dica-d",
+     "res": "",
+     "curto": "",
+     "marcas": null,
+     "dica": "",
+     "aria": "13 nov, ainda não aconteceu"
+    }
+   ]
+  },
+  {
+   "rotulo": "16–20 nov",
+   "botao": false,
+   "res": null,
+   "n": null,
+   "fora": null,
+   "hist": null,
+   "aria": null,
+   "vazia": true,
+   "traco": "",
+   "dias": [
+    {
+     "id": "2026-11-16",
+     "clicavel": false,
+     "tab": null,
+     "aberto": false,
+     "classe": "dica-e",
+     "res": "",
+     "curto": "",
+     "marcas": null,
+     "dica": "",
+     "aria": "16 nov, ainda não aconteceu"
+    },
+    {
+     "id": "2026-11-17",
+     "clicavel": false,
+     "tab": null,
+     "aberto": false,
+     "classe": "",
+     "res": "",
+     "curto": "",
+     "marcas": null,
+     "dica": "",
+     "aria": "17 nov, ainda não aconteceu"
+    },
+    {
+     "id": "2026-11-18",
+     "clicavel": false,
+     "tab": null,
+     "aberto": false,
+     "classe": "",
+     "res": "",
+     "curto": "",
+     "marcas": null,
+     "dica": "",
+     "aria": "18 nov, ainda não aconteceu"
+    },
+    {
+     "id": "2026-11-19",
+     "clicavel": false,
+     "tab": null,
+     "aberto": false,
+     "classe": "dica-d",
+     "res": "",
+     "curto": "",
+     "marcas": null,
+     "dica": "",
+     "aria": "19 nov, ainda não aconteceu"
+    },
+    {
+     "id": "2026-11-20",
+     "clicavel": false,
+     "tab": null,
+     "aberto": false,
+     "classe": "dica-d",
+     "res": "",
+     "curto": "",
+     "marcas": null,
+     "dica": "",
+     "aria": "20 nov, ainda não aconteceu"
+    }
+   ]
+  },
+  {
+   "rotulo": "23–27 nov",
+   "botao": false,
+   "res": null,
+   "n": null,
+   "fora": null,
+   "hist": null,
+   "aria": null,
+   "vazia": true,
+   "traco": "",
+   "dias": [
+    {
+     "id": "2026-11-23",
+     "clicavel": false,
+     "tab": null,
+     "aberto": false,
+     "classe": "dica-e",
+     "res": "",
+     "curto": "",
+     "marcas": null,
+     "dica": "",
+     "aria": "23 nov, ainda não aconteceu"
+    },
+    {
+     "id": "2026-11-24",
+     "clicavel": false,
+     "tab": null,
+     "aberto": false,
+     "classe": "",
+     "res": "",
+     "curto": "",
+     "marcas": null,
+     "dica": "",
+     "aria": "24 nov, ainda não aconteceu"
+    },
+    {
+     "id": "2026-11-25",
+     "clicavel": false,
+     "tab": null,
+     "aberto": false,
+     "classe": "",
+     "res": "",
+     "curto": "",
+     "marcas": null,
+     "dica": "",
+     "aria": "25 nov, ainda não aconteceu"
+    },
+    {
+     "id": "2026-11-26",
+     "clicavel": false,
+     "tab": null,
+     "aberto": false,
+     "classe": "dica-d",
+     "res": "",
+     "curto": "",
+     "marcas": null,
+     "dica": "",
+     "aria": "26 nov, ainda não aconteceu"
+    },
+    {
+     "id": "2026-11-27",
+     "clicavel": false,
+     "tab": null,
+     "aberto": false,
+     "classe": "dica-d",
+     "res": "",
+     "curto": "",
+     "marcas": null,
+     "dica": "",
+     "aria": "27 nov, ainda não aconteceu"
+    }
+   ]
+  },
+  {
+   "rotulo": "30 nov–4 dez",
+   "botao": false,
+   "res": null,
+   "n": null,
+   "fora": null,
+   "hist": null,
+   "aria": null,
+   "vazia": true,
+   "traco": "",
+   "dias": [
+    {
+     "id": "2026-11-30",
+     "clicavel": false,
+     "tab": null,
+     "aberto": false,
+     "classe": "dica-e",
+     "res": "",
+     "curto": "",
+     "marcas": null,
+     "dica": "",
+     "aria": "30 nov, ainda não aconteceu"
+    },
+    {
+     "id": "2026-12-01",
+     "clicavel": false,
+     "tab": null,
+     "aberto": false,
+     "classe": "cal-fora",
+     "res": "",
+     "curto": "",
+     "marcas": null,
+     "dica": "",
+     "aria": ""
+    },
+    {
+     "id": "2026-12-02",
+     "clicavel": false,
+     "tab": null,
+     "aberto": false,
+     "classe": "cal-fora",
+     "res": "",
+     "curto": "",
+     "marcas": null,
+     "dica": "",
+     "aria": ""
+    },
+    {
+     "id": "2026-12-03",
+     "clicavel": false,
+     "tab": null,
+     "aberto": false,
+     "classe": "cal-fora dica-d",
+     "res": "",
+     "curto": "",
+     "marcas": null,
+     "dica": "",
+     "aria": ""
+    },
+    {
+     "id": "2026-12-04",
+     "clicavel": false,
+     "tab": null,
+     "aberto": false,
+     "classe": "cal-fora dica-d",
+     "res": "",
+     "curto": "",
+     "marcas": null,
+     "dica": "",
+     "aria": ""
+    }
+   ]
+  }
+ ],
+ "legendaLimite": true,
+ "dia": {
+  "titulo": "Quinta-feira, 12 de novembro",
+  "tags": [],
+  "nota": null
+ },
+ "rs": {
+  "res": "−R$ 90,00",
+  "resCor": "var(--red)",
+  "ops": "2",
+  "opsSub": "1 ganho, 1 perda",
+  "fora": "nenhuma",
+  "foraSub": "",
+  "foraCor": "var(--text)",
+  "lim": "R$ 180,00 de R$ 500",
+  "limSub": "pior momento",
+  "temBarra": true,
+  "bar": "36%",
+  "barCor": "var(--amber)"
+ },
+ "infoResumo": "Limite do dia: a maior perda acumulada no pregão, no pior momento, contra o seu limite de R$ 500. Pelas suas regras, ao atingir o limite o app encerra o dia. Fora do plano: operações fora da janela ou depois do limite.",
+ "comPlano": true,
+ "infoPlano": "Cada linha compara as regras que valiam neste dia, em Personalizar, com o que o diário registrou: janela e limite. Uma operação fora da janela ou depois do limite fica fora do plano, mesmo quando a tela só avisava.",
+ "plano": [
+  {
+   "item": "Janela",
+   "plano": "10:00–11:00 · Brasília",
+   "fato": "2 de 2 dentro",
+   "marca": "No plano",
+   "tipo": "ok",
+   "link": null
+  },
+  {
+   "item": "Limite",
+   "plano": "R$ 500 · encerra o dia",
+   "fato": "pior momento: R$ 180",
+   "marca": "No plano",
+   "tipo": "ok",
+   "link": null
+  }
+ ],
+ "versao": [],
+ "antes": {
+  "ver": true,
+  "txt": "WIN só a favor do primeiro rompimento.",
+  "nota": "anotado às 09:51, antes da 1ª entrada",
+  "editar": true,
+  "nada": false,
+  "campo": false
+ },
+ "anterior": "Nada trazido do pregão anterior.",
+ "semOps": null,
+ "trades": [
+  {
+   "h": "10:05–10:14",
+   "op": "WIN · Venda · 3 ct",
+   "chip": null,
+   "sub": null,
+   "res": "−R$ 180,00",
+   "plano": "No plano",
+   "planoAria": null,
+   "acao": null,
+   "acaoAria": null,
+   "clip": null,
+   "rot": "Detalhes da operação: Venda de WIN às 10:05",
+   "aberto": true
+  },
+  {
+   "h": "10:32–10:40",
+   "op": "WIN · Compra · 2 ct",
+   "chip": null,
+   "sub": null,
+   "res": "+R$ 90,00",
+   "plano": "No plano",
+   "planoAria": null,
+   "acao": null,
+   "acaoAria": null,
+   "clip": null,
+   "rot": "Detalhes da operação: Compra de WIN às 10:32",
+   "aberto": false
+  }
+ ],
+ "drills": [
+  {
+   "op": "WIN · Venda · 3 ct",
+   "fatos": [
+    [
+     "Hora",
+     "10:05–10:14"
+    ],
+    [
+     "Entrada → saída",
+     "128.450 → 128.750 · −300 pts"
+    ],
+    [
+     "Stop · alvo",
+     "não anotados"
+    ],
+    [
+     "Resultado",
+     "−R$ 180,00"
+    ],
+    [
+     "Posso operar hoje?",
+     "Liberado"
+    ]
+   ],
+   "linhas": [],
+   "tempo": null,
+   "be": null,
+   "ax": null,
+   "adicionar": true,
+   "marcas": [
+    {
+     "rot": "Setup · sua nota, de A a C",
+     "valor": "B",
+     "tempo": "às 10:05 · antes da saída"
+    },
+    {
+     "rot": "Execução",
+     "valor": null,
+     "tempo": null
+    },
+    {
+     "rot": "Emoção",
+     "valor": null,
+     "tempo": null
+    }
+   ]
+  },
+  {
+   "op": "WIN · Compra · 2 ct",
+   "fatos": [
+    [
+     "Hora",
+     "10:32–10:40"
+    ],
+    [
+     "Entrada → saída",
+     "128.600 → 128.825 · +225 pts"
+    ],
+    [
+     "Stop · alvo",
+     "não anotados"
+    ],
+    [
+     "Resultado",
+     "+R$ 90,00"
+    ],
+    [
+     "Posso operar hoje?",
+     "Liberado"
+    ]
+   ],
+   "linhas": [],
+   "tempo": null,
+   "be": null,
+   "ax": null,
+   "adicionar": true,
+   "marcas": [
+    {
+     "rot": "Setup · sua nota, de A a C",
+     "valor": "A",
+     "tempo": "às 10:32 · antes da saída"
+    },
+    {
+     "rot": "Execução",
+     "valor": null,
+     "tempo": null
+    },
+    {
+     "rot": "Emoção",
+     "valor": null,
+     "tempo": null
+    }
+   ]
+  }
+ ],
+ "apagadas": null,
+ "abertaOntem": null,
+ "revisao": {
+  "tem": true,
+  "fechada": true,
+  "salva": false,
+  "linha": "",
+  "ver": false,
+  "botao": "Ver revisão",
+  "form": false,
+  "mudou": null,
+  "versoes": null,
+  "erro": null
+ },
+ "revisaoAtual": null,
+ "formulario": null,
+ "versoes": null,
+ "semana": {
+  "titulo": "Semana em andamento · 4 de 5 pregões",
+  "info": "Pregões de 9 a 13 de novembro. Fora do plano: fora da janela ou depois do limite. Revisões: dos pregões com operação registrada no app ou com revisão, quantos têm revisão; hoje só entra depois que você escrever a revisão dele. A coluna Semana do calendário traz os mesmos números.",
+  "numeros": [
+   [
+    "Resultado",
+    "−R$ 90,00"
+   ],
+   [
+    "Operações",
+    "2"
+   ],
+   [
+    "Fora do plano",
+    "nenhuma"
+   ],
+   [
+    "Revisões",
+    "—"
+   ]
+  ],
+  "vazia": null,
+  "barras": [
+   [
+    "seg",
+    "—",
+    "—"
+   ],
+   [
+    "ter",
+    "—",
+    "—"
+   ],
+   [
+    "qua",
+    "—",
+    "—"
+   ],
+   [
+    "qui",
+    "−90,00",
+    "−90"
+   ],
+   [
+    "sex",
+    "",
+    ""
+   ]
+  ],
+  "leitor": "Resultado por dia: seg, sem operações · ter, sem operações · qua, sem operações · qui, −90,00 · sex, ainda não aconteceu.",
+  "fora": []
+ },
+ "quadro": "hoje"
+}

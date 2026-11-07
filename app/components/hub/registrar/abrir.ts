@@ -21,9 +21,14 @@ export interface OpenRegistrarOptions {
   opener?: HTMLElement | null
   /** Gets focus when the opener is gone; defaults to the page's H1 */
   fallback?: HTMLElement | null
+  /**
+   * Phase 4 (D16): a past trading day of the account ('YYYY-MM-DD'), the Diário's open day when it is one: the sheet
+   * opens «Já fechada» on that day, unless a draft is saved for the account (the draft wins: DEV-C3)
+   */
+  day?: string | null
 }
 
-/** How the sheet closes: `focusId` (e.g. «Ver no Diário» → the bridge's heading) takes the focus instead of the opener */
+/** How the sheet closes: `focusId` (e.g. «Ver no Diário» → the trade's row on the Diário) takes the focus instead of the opener */
 export interface CloseRegistrarOptions {
   focusId?: string
 }
@@ -42,5 +47,5 @@ export function useRegistrarSheet(): RegistrarSheetValue {
   return context
 }
 
-/** The id of the «Operações do dia» heading on /diario (tabIndex -1): «Ver no Diário» focuses it */
+/** The id of the Diário's «Operações do dia» heading (tabIndex -1): a row gone after the sheet focuses it */
 export const OPERACOES_DO_DIA_ID = 'operacoes-do-dia'

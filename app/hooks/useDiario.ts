@@ -1,6 +1,6 @@
 'use client';
 
-import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
+import { onlineManager, useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { useHubDb } from '@/hooks/useContas';
 import { recordServerNow } from '@/hooks/useRegistrar';
 import { monthOf, type CalendarRead, type Day, type MonthRead, type NotePayloadV1, type ReviewPayloadV1 } from '@/lib/domain/diario';
@@ -123,6 +123,20 @@ export function useDayImages(accountId: string | null, tradeId: string | null, p
   });
 }
 
+/**
+ * Phase 4 · telas (B0, contract §3.2): the Diário's writes fail at once offline, as the Registrar's do, instead of
+ * waiting paused for the connection (the screen says «Sem conexão. A revisão não foi salva.» and keeps the text; a
+ * retry is the owner's tap with the same client_key). Throws DiarioDataError('network') when React Query's
+ * onlineManager or the browser says the device is offline.
+ */
+export function assertDiarioOnline(): void {
+  const navegadorOffline = typeof navigator !== 'undefined' && navigator.onLine === false;
+  if (!onlineManager.isOnline() || navegadorOffline) throw new DiarioDataError('network');
+}
+
+/** The Diário's writes: never paused offline, never retried behind the owner's back */
+const WRITE = { networkMode: 'always', retry: false } as const;
+
 export interface SaveReviewVariables {
   accountId: string;
   day: Day;
@@ -136,7 +150,11 @@ export function useSaveDayReview() {
   const { db, userId } = useHubDb();
   const queryClient = useQueryClient();
   return useMutation<ReviewSaved, DiarioDataError, SaveReviewVariables>({
-    mutationFn: ({ accountId, day, payload, dryRun = false }) => saveDayReview(db, accountId, day, payload, { dryRun }),
+    ...WRITE,
+    mutationFn: async ({ accountId, day, payload, dryRun = false }) => {
+      assertDiarioOnline();
+      return saveDayReview(db, accountId, day, payload, { dryRun });
+    },
     onSuccess: (result, { accountId }) => {
       recordServerNow(queryClient, userId, result.serverNow);
       if (result.dryRun) return undefined;
@@ -158,7 +176,11 @@ export function useSaveDayNote() {
   const { db, userId } = useHubDb();
   const queryClient = useQueryClient();
   return useMutation<NoteSaved, DiarioDataError, SaveNoteVariables>({
-    mutationFn: ({ accountId, day, payload, dryRun = false }) => saveDayNote(db, accountId, day, payload, { dryRun }),
+    ...WRITE,
+    mutationFn: async ({ accountId, day, payload, dryRun = false }) => {
+      assertDiarioOnline();
+      return saveDayNote(db, accountId, day, payload, { dryRun });
+    },
     onSuccess: (result, { accountId, day }) => {
       recordServerNow(queryClient, userId, result.serverNow);
       if (result.dryRun) return undefined;

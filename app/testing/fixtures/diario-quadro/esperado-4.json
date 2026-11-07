@@ -1,0 +1,1578 @@
+{
+ "cen": "4",
+ "rotulo": "4 · Calendário · Top One em outubro: histórico, o dia em que as regras começaram e revisões pendentes",
+ "dataLinha": "terça-feira, 1º de dezembro, 11:35 ET",
+ "conta": {
+  "nome": "Top One",
+  "janela": "Janela 10:00–11:00 ET",
+  "valores": "Valores em US$."
+ },
+ "flags": {
+  "semRegras": false,
+  "temAviso": true,
+  "offline": false,
+  "carregando": false,
+  "erro": false,
+  "pronto": true,
+  "infos": {
+   "posso": false,
+   "cal": true,
+   "resumo": false,
+   "plano": false,
+   "ops": false,
+   "semana": false,
+   "grava": false,
+   "marcas": false
+  }
+ },
+ "possoSel": [
+  {
+   "nome": "Top One",
+   "pal": "Fora da sua janela",
+   "sub": "abre amanhã às 10:00 ET",
+   "acao": null,
+   "acaoAria": null,
+   "lim": "US$ 45 de US$ 400",
+   "soma": false,
+   "tom": "tom-amber"
+  }
+ ],
+ "outras": {
+  "titulo": "Outras 7 contas:",
+  "partes": [
+   {
+    "texto": "5 fora da janela",
+    "tom": "tom-amber"
+   },
+   {
+    "texto": "2 sem janela salva",
+    "tom": "tom-muted"
+   }
+  ],
+  "botao": "Ver todas",
+  "abertas": false
+ },
+ "possoOutras": [
+  {
+   "nome": "Lucid 50k",
+   "pal": "Fora da sua janela",
+   "sub": "abre amanhã às 10:00 ET",
+   "acao": null,
+   "acaoAria": null,
+   "lim": "US$ 172,25 de US$ 400",
+   "soma": false,
+   "tom": "tom-amber"
+  },
+  {
+   "nome": "Ylos 50k",
+   "pal": "Sem janela salva",
+   "sub": null,
+   "acao": "Definir",
+   "acaoAria": "Definir a janela da Ylos 50k em Personalizar",
+   "lim": null,
+   "soma": false,
+   "tom": "tom-muted"
+  },
+  {
+   "nome": "Ebinex",
+   "pal": "Fora da sua janela",
+   "sub": "abre às 20:00 de Brasília",
+   "acao": null,
+   "acaoAria": null,
+   "lim": null,
+   "soma": false,
+   "tom": "tom-amber"
+  },
+  {
+   "nome": "FTMO",
+   "pal": "Fora da sua janela",
+   "sub": "abre amanhã às 08:00 ET",
+   "acao": null,
+   "acaoAria": null,
+   "lim": "US$ 0 de US$ 1.000",
+   "soma": false,
+   "tom": "tom-amber"
+  },
+  {
+   "nome": "IBKR",
+   "pal": "Sem janela salva",
+   "sub": null,
+   "acao": "Definir",
+   "acaoAria": "Definir a janela da IBKR em Personalizar",
+   "lim": null,
+   "soma": false,
+   "tom": "tom-muted"
+  },
+  {
+   "nome": "Binance",
+   "pal": "Fora da sua janela",
+   "sub": "abre às 20:00 de Brasília",
+   "acao": null,
+   "acaoAria": null,
+   "lim": null,
+   "soma": false,
+   "tom": "tom-amber"
+  },
+  {
+   "nome": "Clear",
+   "pal": "Fora da sua janela",
+   "sub": "abre amanhã às 10:00 de Brasília",
+   "acao": null,
+   "acaoAria": null,
+   "lim": "R$ 0 de R$ 500",
+   "soma": false,
+   "tom": "tom-amber"
+  }
+ ],
+ "linhaTopo": "Diário desde 14 out: 110 operações em 32 pregões · 85 antes, em Histórico importado · só resultado",
+ "aviso": "5 pregões sem revisão, 3 nas últimas 4 semanas",
+ "mes": {
+  "titulo": "Outubro de 2026",
+  "status": "Mês: Outubro de 2026.",
+  "colunas": [
+   "Seg",
+   "Ter",
+   "Qua",
+   "Qui",
+   "Sex"
+  ],
+  "anterior": true,
+  "proximo": true,
+  "noMesDeHoje": false
+ },
+ "infoCal": "Cada pregão é pintado pelo resultado: verde ganho, vermelho perda, mais forte quanto maior (quartis do resultado diário, ganhos e perdas à parte). O pregão de futuros vai das 18:00 da véspera às 17:00 ET. Traço (—): dia sem operações. Hachurado: Histórico importado, antes das suas regras, só com resultado, nunca somado ao diário e com uma escala de cor própria. Ponto verde: hoje. Borda branca: dia aberto. Tracejado: dia do mês vizinho. A coluna Semana soma só o diário; o histórico aparece à parte, com ▨. Toque numa semana para abri-la. Passe o mouse num dia para ver operações, ganhos e perdas. Pregões sem revisão de meses anteriores ficam no mês deles: use ‹.",
+ "semanas": [
+  {
+   "rotulo": "28 set–2 out",
+   "botao": true,
+   "res": "−18,26",
+   "n": "11 op.",
+   "fora": null,
+   "hist": null,
+   "aria": "Semana de 28 de setembro a 2 de outubro: histórico importado, −18,26 dólares. Abrir a semana.",
+   "vazia": false,
+   "traco": null,
+   "dias": [
+    {
+     "id": "2026-09-28",
+     "clicavel": false,
+     "tab": null,
+     "aberto": false,
+     "classe": "cal-fora dica-e",
+     "res": "",
+     "curto": "",
+     "marcas": null,
+     "dica": "",
+     "aria": ""
+    },
+    {
+     "id": "2026-09-29",
+     "clicavel": false,
+     "tab": null,
+     "aberto": false,
+     "classe": "cal-fora",
+     "res": "",
+     "curto": "",
+     "marcas": null,
+     "dica": "",
+     "aria": ""
+    },
+    {
+     "id": "2026-09-30",
+     "clicavel": false,
+     "tab": null,
+     "aberto": false,
+     "classe": "cal-fora",
+     "res": "",
+     "curto": "",
+     "marcas": null,
+     "dica": "",
+     "aria": ""
+    },
+    {
+     "id": "2026-10-01",
+     "clicavel": true,
+     "tab": "-1",
+     "aberto": false,
+     "classe": "cal-imp   dica-d",
+     "res": "+59,07",
+     "curto": "+59",
+     "marcas": null,
+     "dica": "1º out · +US$ 59,07 · 5 op.: 3 ganhos, 2 perdas · Histórico importado · só resultado",
+     "aria": "1º out, +59,07 dólares, 5 op., Histórico importado"
+    },
+    {
+     "id": "2026-10-02",
+     "clicavel": true,
+     "tab": "-1",
+     "aberto": false,
+     "classe": "cal-imp   dica-d",
+     "res": "−97,11",
+     "curto": "−97",
+     "marcas": null,
+     "dica": "2 out · −US$ 97,11 · 3 op.: 1 ganho, 2 perdas · Histórico importado · só resultado",
+     "aria": "2 out, −97,11 dólares, 3 op., Histórico importado"
+    }
+   ]
+  },
+  {
+   "rotulo": "5–9 out",
+   "botao": true,
+   "res": "−280,42",
+   "n": "15 op.",
+   "fora": null,
+   "hist": null,
+   "aria": "Semana de 5 a 9 de outubro: histórico importado, −280,42 dólares. Abrir a semana.",
+   "vazia": false,
+   "traco": null,
+   "dias": [
+    {
+     "id": "2026-10-05",
+     "clicavel": true,
+     "tab": "-1",
+     "aberto": false,
+     "classe": "cal-imp-forte   dica-e",
+     "res": "−214,95",
+     "curto": "−215",
+     "marcas": null,
+     "dica": "5 out · −US$ 214,95 · 2 op.: 0 ganhos, 2 perdas · Histórico importado · só resultado",
+     "aria": "5 out, −214,95 dólares, 2 op., Histórico importado"
+    },
+    {
+     "id": "2026-10-06",
+     "clicavel": true,
+     "tab": "-1",
+     "aberto": false,
+     "classe": "cal-imp-forte",
+     "res": "+125,38",
+     "curto": "+125",
+     "marcas": null,
+     "dica": "6 out · +US$ 125,38 · 3 op.: 3 ganhos, 0 perdas · Histórico importado · só resultado",
+     "aria": "6 out, +125,38 dólares, 3 op., Histórico importado"
+    },
+    {
+     "id": "2026-10-07",
+     "clicavel": false,
+     "tab": null,
+     "aberto": false,
+     "classe": "",
+     "res": "sem op.",
+     "curto": "—",
+     "marcas": null,
+     "dica": "7 out · sem operações",
+     "aria": "7 out, sem operações"
+    },
+    {
+     "id": "2026-10-08",
+     "clicavel": true,
+     "tab": "-1",
+     "aberto": false,
+     "classe": "cal-imp-forte   dica-d",
+     "res": "−458,16",
+     "curto": "−458",
+     "marcas": null,
+     "dica": "8 out · −US$ 458,16 · 5 op.: 0 ganhos, 5 perdas · Histórico importado · só resultado",
+     "aria": "8 out, −458,16 dólares, 5 op., Histórico importado"
+    },
+    {
+     "id": "2026-10-09",
+     "clicavel": true,
+     "tab": "-1",
+     "aberto": false,
+     "classe": "cal-imp-forte   dica-d",
+     "res": "+267,31",
+     "curto": "+267",
+     "marcas": null,
+     "dica": "9 out · +US$ 267,31 · 5 op.: 5 ganhos, 0 perdas · Histórico importado · só resultado",
+     "aria": "9 out, +267,31 dólares, 5 op., Histórico importado"
+    }
+   ]
+  },
+  {
+   "rotulo": "12–16 out",
+   "botao": true,
+   "res": "−42,68",
+   "n": "8 op.",
+   "fora": "1",
+   "hist": "+163,29",
+   "aria": "Semana de 12 a 16 de outubro: −42,68 dólares, 8 op., 1 fora do plano, histórico importado à parte: +163,29. Abrir a semana.",
+   "vazia": false,
+   "traco": null,
+   "dias": [
+    {
+     "id": "2026-10-12",
+     "clicavel": false,
+     "tab": null,
+     "aberto": false,
+     "classe": "dica-e",
+     "res": "sem op.",
+     "curto": "—",
+     "marcas": null,
+     "dica": "12 out · sem operações",
+     "aria": "12 out, sem operações"
+    },
+    {
+     "id": "2026-10-13",
+     "clicavel": true,
+     "tab": "-1",
+     "aberto": false,
+     "classe": "cal-imp-forte",
+     "res": "+143,28",
+     "curto": "+143",
+     "marcas": null,
+     "dica": "13 out · +US$ 143,28 · 3 op.: 3 ganhos, 0 perdas · Histórico importado · só resultado",
+     "aria": "13 out, +143,28 dólares, 3 op., Histórico importado"
+    },
+    {
+     "id": "2026-10-14",
+     "clicavel": true,
+     "tab": "0",
+     "aberto": true,
+     "classe": "",
+     "res": "+83,14",
+     "curto": "+83",
+     "marcas": {
+      "fora": true,
+      "limite": false,
+      "revisao": true
+     },
+     "dica": "14 out · +US$ 83,14 · 3 op.: 2 ganhos, 1 perda · 1 fora do plano · + 1 do histórico, à parte · revisão escrita",
+     "aria": "14 out, +83,14 dólares, 3 op., com operação fora do plano, com histórico importado à parte, revisão escrita"
+    },
+    {
+     "id": "2026-10-15",
+     "clicavel": true,
+     "tab": "-1",
+     "aberto": false,
+     "classe": "dica-d",
+     "res": "+84,12",
+     "curto": "+84",
+     "marcas": {
+      "fora": false,
+      "limite": false,
+      "revisao": true
+     },
+     "dica": "15 out · +US$ 84,12 · 2 op.: 2 ganhos, 0 perdas · revisão escrita",
+     "aria": "15 out, +84,12 dólares, 2 op., revisão escrita"
+    },
+    {
+     "id": "2026-10-16",
+     "clicavel": true,
+     "tab": "-1",
+     "aberto": false,
+     "classe": "dica-d",
+     "res": "−209,94",
+     "curto": "−210",
+     "marcas": {
+      "fora": false,
+      "limite": false,
+      "revisao": true
+     },
+     "dica": "16 out · −US$ 209,94 · 3 op.: 0 ganhos, 3 perdas · revisão escrita",
+     "aria": "16 out, −209,94 dólares, 3 op., revisão escrita"
+    }
+   ]
+  },
+  {
+   "rotulo": "19–23 out",
+   "botao": true,
+   "res": "+153,74",
+   "n": "14 op.",
+   "fora": null,
+   "hist": null,
+   "aria": "Semana de 19 a 23 de outubro: +153,74 dólares, 14 op. Abrir a semana.",
+   "vazia": false,
+   "traco": null,
+   "dias": [
+    {
+     "id": "2026-10-19",
+     "clicavel": true,
+     "tab": "-1",
+     "aberto": false,
+     "classe": "dica-e",
+     "res": "−54,97",
+     "curto": "−55",
+     "marcas": {
+      "fora": false,
+      "limite": false,
+      "revisao": true
+     },
+     "dica": "19 out · −US$ 54,97 · 2 op.: 1 ganho, 1 perda · revisão escrita",
+     "aria": "19 out, −54,97 dólares, 2 op., revisão escrita"
+    },
+    {
+     "id": "2026-10-20",
+     "clicavel": true,
+     "tab": "-1",
+     "aberto": false,
+     "classe": "",
+     "res": "−72,46",
+     "curto": "−72",
+     "marcas": null,
+     "dica": "20 out · −US$ 72,46 · 2 op.: 1 ganho, 1 perda · sem revisão",
+     "aria": "20 out, −72,46 dólares, 2 op., sem revisão"
+    },
+    {
+     "id": "2026-10-21",
+     "clicavel": true,
+     "tab": "-1",
+     "aberto": false,
+     "classe": "",
+     "res": "+212,59",
+     "curto": "+213",
+     "marcas": {
+      "fora": false,
+      "limite": false,
+      "revisao": true
+     },
+     "dica": "21 out · +US$ 212,59 · 4 op.: 3 ganhos, 1 perda · revisão escrita",
+     "aria": "21 out, +212,59 dólares, 4 op., revisão escrita"
+    },
+    {
+     "id": "2026-10-22",
+     "clicavel": true,
+     "tab": "-1",
+     "aberto": false,
+     "classe": "dica-d",
+     "res": "−47,46",
+     "curto": "−47",
+     "marcas": {
+      "fora": false,
+      "limite": false,
+      "revisao": true
+     },
+     "dica": "22 out · −US$ 47,46 · 3 op.: 1 ganho, 2 perdas · revisão escrita",
+     "aria": "22 out, −47,46 dólares, 3 op., revisão escrita"
+    },
+    {
+     "id": "2026-10-23",
+     "clicavel": true,
+     "tab": "-1",
+     "aberto": false,
+     "classe": "dica-d",
+     "res": "+116,04",
+     "curto": "+116",
+     "marcas": {
+      "fora": false,
+      "limite": false,
+      "revisao": true
+     },
+     "dica": "23 out · +US$ 116,04 · 3 op.: 3 ganhos, 0 perdas · revisão escrita",
+     "aria": "23 out, +116,04 dólares, 3 op., revisão escrita"
+    }
+   ]
+  },
+  {
+   "rotulo": "26–30 out",
+   "botao": true,
+   "res": "+237,11",
+   "n": "16 op.",
+   "fora": "2",
+   "hist": null,
+   "aria": "Semana de 26 a 30 de outubro: +237,11 dólares, 16 op., 2 fora do plano. Abrir a semana.",
+   "vazia": false,
+   "traco": null,
+   "dias": [
+    {
+     "id": "2026-10-26",
+     "clicavel": true,
+     "tab": "-1",
+     "aberto": false,
+     "classe": "dica-e",
+     "res": "−33,68",
+     "curto": "−34",
+     "marcas": {
+      "fora": true,
+      "limite": false,
+      "revisao": true
+     },
+     "dica": "26 out · −US$ 33,68 · 4 op.: 1 ganho, 3 perdas · 1 fora do plano · revisão escrita",
+     "aria": "26 out, −33,68 dólares, 4 op., com operação fora do plano, revisão escrita"
+    },
+    {
+     "id": "2026-10-27",
+     "clicavel": true,
+     "tab": "-1",
+     "aberto": false,
+     "classe": "",
+     "res": "+77,13",
+     "curto": "+77",
+     "marcas": null,
+     "dica": "27 out · +US$ 77,13 · 3 op.: 3 ganhos, 0 perdas · sem revisão",
+     "aria": "27 out, +77,13 dólares, 3 op., sem revisão"
+    },
+    {
+     "id": "2026-10-28",
+     "clicavel": true,
+     "tab": "-1",
+     "aberto": false,
+     "classe": "",
+     "res": "+106,08",
+     "curto": "+106",
+     "marcas": {
+      "fora": true,
+      "limite": false,
+      "revisao": false
+     },
+     "dica": "28 out · +US$ 106,08 · 5 op.: 3 ganhos, 2 perdas · 1 fora do plano",
+     "aria": "28 out, +106,08 dólares, 5 op., com operação fora do plano"
+    },
+    {
+     "id": "2026-10-29",
+     "clicavel": true,
+     "tab": "-1",
+     "aberto": false,
+     "classe": "dica-d",
+     "res": "+87,58",
+     "curto": "+88",
+     "marcas": {
+      "fora": false,
+      "limite": false,
+      "revisao": true
+     },
+     "dica": "29 out · +US$ 87,58 · 4 op.: 3 ganhos, 1 perda · revisão escrita",
+     "aria": "29 out, +87,58 dólares, 4 op., revisão escrita"
+    },
+    {
+     "id": "2026-10-30",
+     "clicavel": false,
+     "tab": null,
+     "aberto": false,
+     "classe": "dica-d",
+     "res": "sem op.",
+     "curto": "—",
+     "marcas": null,
+     "dica": "30 out · sem operações",
+     "aria": "30 out, sem operações"
+    }
+   ]
+  }
+ ],
+ "legendaLimite": true,
+ "dia": {
+  "titulo": "Quarta-feira, 14 de outubro",
+  "tags": [
+   "Revisão escrita"
+  ],
+  "nota": "Suas regras começaram às 09:12: a operação das 08:50 fica em Histórico importado · só resultado, à parte do dia."
+ },
+ "rs": {
+  "res": "+US$ 83,14",
+  "resCor": "var(--mint)",
+  "ops": "3",
+  "opsSub": "2 ganhos, 1 perda",
+  "fora": "1 operação · −US$ 34,64",
+  "foraSub": "",
+  "foraCor": "var(--amber)",
+  "lim": "nenhuma perda acumulada",
+  "limSub": "pior momento",
+  "temBarra": false,
+  "bar": "0%",
+  "barCor": "var(--amber)"
+ },
+ "infoResumo": "Resultado líquido. Bruto +US$ 88,50 · comissões −US$ 5,36. Limite do dia: a maior perda acumulada no pregão, no pior momento, já com a comissão quando o arquivo a trouxe, contra o seu limite de US$ 400. Pelas suas regras, ao atingir o limite o app encerra o dia. Fora do plano: operações fora da janela ou depois do limite. As outras 2 somaram +US$ 117,78: conta simples, não é o que teria acontecido. + 1 operação do histórico, à parte: +US$ 20,01; o limite do dia contou essa também.",
+ "comPlano": true,
+ "infoPlano": "Cada linha compara as regras que valiam neste dia, em Personalizar, com o que o diário registrou: janela e limite. Uma operação fora da janela ou depois do limite fica fora do plano, mesmo quando a tela só avisava. Bloqueio de dados, viés e regra do estado chegam na Fase 5.",
+ "plano": [
+  {
+   "item": "Janela",
+   "plano": "10:00–11:00 ET",
+   "fato": "2 de 3 dentro",
+   "marca": "Fora do plano",
+   "tipo": "fora",
+   "link": null
+  },
+  {
+   "item": "Limite",
+   "plano": "US$ 400 · encerra o dia",
+   "fato": "nenhuma perda acumulada",
+   "marca": "No plano",
+   "tipo": "ok",
+   "link": null
+  }
+ ],
+ "versao": [],
+ "antes": {
+  "ver": true,
+  "txt": "Primeiro dia com regras: só dentro da janela.",
+  "nota": "anotado às 09:30, antes da 1ª entrada",
+  "editar": false,
+  "nada": false,
+  "campo": false
+ },
+ "anterior": "Nada trazido do pregão anterior.",
+ "semOps": null,
+ "trades": [
+  {
+   "h": "08:50–08:58",
+   "op": "MES · Compra · 1 ct",
+   "chip": null,
+   "sub": null,
+   "res": "+US$ 20,01",
+   "plano": "hist",
+   "planoAria": null,
+   "acao": null,
+   "acaoAria": null,
+   "clip": null,
+   "rot": "Detalhes da operação: Compra de MES às 08:50",
+   "aberto": false
+  },
+  {
+   "h": "10:07–10:16",
+   "op": "MES · Compra · 2 ct",
+   "chip": null,
+   "sub": null,
+   "res": "+US$ 70,02",
+   "plano": "No plano",
+   "planoAria": null,
+   "acao": null,
+   "acaoAria": null,
+   "clip": null,
+   "rot": "Detalhes da operação: Compra de MES às 10:07",
+   "aberto": false
+  },
+  {
+   "h": "10:41–10:52",
+   "op": "MNQ · Venda · 1 ct",
+   "chip": null,
+   "sub": null,
+   "res": "+US$ 47,76",
+   "plano": "No plano",
+   "planoAria": null,
+   "acao": null,
+   "acaoAria": null,
+   "clip": null,
+   "rot": "Detalhes da operação: Venda de MNQ às 10:41",
+   "aberto": false
+  },
+  {
+   "h": "11:12–11:20",
+   "op": "MGC · Compra · 1 ct",
+   "chip": null,
+   "sub": null,
+   "res": "−US$ 34,64",
+   "plano": "● fora da janela",
+   "planoAria": "fora do plano: fora da janela",
+   "acao": null,
+   "acaoAria": null,
+   "clip": null,
+   "rot": "Detalhes da operação: Compra de MGC às 11:12",
+   "aberto": false
+  }
+ ],
+ "drills": [
+  {
+   "op": "MES · Compra · 1 ct",
+   "fatos": [
+    [
+     "Hora",
+     "08:50–08:58"
+    ],
+    [
+     "Pontos",
+     "+4,25 pts"
+    ],
+    [
+     "Resultado",
+     "+US$ 20,01 · bruto +US$ 21,25"
+    ],
+    [
+     "Comissão",
+     "US$ 1,24"
+    ]
+   ],
+   "linhas": [
+    "Antes das suas regras: só o que o arquivo trouxe, sem plano, marcas, imagens nem nota."
+   ],
+   "tempo": null,
+   "be": null,
+   "ax": null,
+   "adicionar": false,
+   "marcas": null
+  },
+  {
+   "op": "MES · Compra · 2 ct",
+   "fatos": [
+    [
+     "Hora",
+     "10:07–10:16"
+    ],
+    [
+     "Entrada → saída",
+     "8.024,50 → 8.031,75 · +7,25 pts"
+    ],
+    [
+     "Stop · alvo",
+     "stop 8 · alvo 16 pts · às 10:07"
+    ],
+    [
+     "R",
+     "+0,9 R · com stop de 8 pts"
+    ],
+    [
+     "Resultado",
+     "+US$ 70,02 · bruto +US$ 72,50"
+    ],
+    [
+     "Comissão",
+     "US$ 2,48"
+    ],
+    [
+     "Posso operar hoje?",
+     "Liberado"
+    ]
+   ],
+   "linhas": [
+    "Completada pelo arquivo de 22 out: comissão US$ 2,48."
+   ],
+   "tempo": null,
+   "be": null,
+   "ax": null,
+   "adicionar": true,
+   "marcas": [
+    {
+     "rot": "Setup · sua nota, de A a C",
+     "valor": "A",
+     "tempo": "às 10:07 · antes da saída"
+    },
+    {
+     "rot": "Execução",
+     "valor": "no ponto",
+     "tempo": "às 10:15 · antes da saída"
+    },
+    {
+     "rot": "Emoção",
+     "valor": "Calmo",
+     "tempo": "às 10:08 · antes da saída"
+    }
+   ]
+  },
+  {
+   "op": "MNQ · Venda · 1 ct",
+   "fatos": [
+    [
+     "Hora",
+     "10:41–10:52"
+    ],
+    [
+     "Entrada → saída",
+     "25.512,50 → 25.488,00 · +24,50 pts"
+    ],
+    [
+     "Stop · alvo",
+     "não anotados"
+    ],
+    [
+     "Resultado",
+     "+US$ 47,76 · bruto +US$ 49,00"
+    ],
+    [
+     "Comissão",
+     "US$ 1,24"
+    ],
+    [
+     "Posso operar hoje?",
+     "Liberado"
+    ]
+   ],
+   "linhas": [
+    "Completada pelo arquivo de 22 out: comissão US$ 1,24."
+   ],
+   "tempo": null,
+   "be": null,
+   "ax": null,
+   "adicionar": true,
+   "marcas": [
+    {
+     "rot": "Setup · sua nota, de A a C",
+     "valor": "B",
+     "tempo": "às 10:41 · antes da saída"
+    },
+    {
+     "rot": "Execução",
+     "valor": null,
+     "tempo": null
+    },
+    {
+     "rot": "Emoção",
+     "valor": null,
+     "tempo": null
+    }
+   ]
+  },
+  {
+   "op": "MGC · Compra · 1 ct",
+   "fatos": [
+    [
+     "Hora",
+     "11:12–11:20"
+    ],
+    [
+     "Entrada → saída",
+     "4.051,2 → 4.047,9 · −3,30 pts"
+    ],
+    [
+     "Stop · alvo",
+     "não anotados"
+    ],
+    [
+     "Resultado",
+     "−US$ 34,64 · bruto −US$ 33,00"
+    ],
+    [
+     "Comissão",
+     "US$ 1,64"
+    ],
+    [
+     "Posso operar hoje?",
+     "Fora da sua janela"
+    ]
+   ],
+   "linhas": [
+    "Completada pelo arquivo de 22 out: comissão US$ 1,64."
+   ],
+   "tempo": null,
+   "be": null,
+   "ax": null,
+   "adicionar": true,
+   "marcas": [
+    {
+     "rot": "Setup · sua nota, de A a C",
+     "valor": "C",
+     "tempo": "às 11:25 · depois do resultado"
+    },
+    {
+     "rot": "Execução",
+     "valor": null,
+     "tempo": null
+    },
+    {
+     "rot": "Emoção",
+     "valor": null,
+     "tempo": null
+    }
+   ]
+  }
+ ],
+ "apagadas": null,
+ "abertaOntem": null,
+ "revisao": {
+  "tem": true,
+  "fechada": false,
+  "salva": true,
+  "linha": "Salva às 11:41 · Seguiu o plano? Em parte · pela sua resposta, depois do resultado",
+  "ver": false,
+  "botao": "Ver revisão",
+  "form": false,
+  "mudou": "Depois da revisão, o dia mudou: agora 3 operações, +US$ 83,14.",
+  "versoes": null,
+  "erro": null
+ },
+ "revisaoAtual": null,
+ "formulario": null,
+ "versoes": null,
+ "semana": {
+  "titulo": "12 a 16 de outubro · 3 pregões com operações",
+  "info": "Pregões de 12 a 16 de outubro. Fora do plano: fora da janela ou depois do limite. Revisões: dos pregões com operação registrada no app ou com revisão, quantos têm revisão; hoje só entra depois que você escrever a revisão dele. A coluna Semana do calendário traz os mesmos números.",
+  "numeros": [
+   [
+    "Resultado",
+    "−US$ 42,68"
+   ],
+   [
+    "Operações",
+    "8"
+   ],
+   [
+    "Fora do plano",
+    "1 · −US$ 34,64"
+   ],
+   [
+    "Revisões",
+    "3 de 3"
+   ]
+  ],
+  "vazia": null,
+  "barras": [
+   [
+    "seg",
+    "—",
+    "—"
+   ],
+   [
+    "ter",
+    "—",
+    "—"
+   ],
+   [
+    "qua",
+    "+83,14",
+    "+83"
+   ],
+   [
+    "qui",
+    "+84,12",
+    "+84"
+   ],
+   [
+    "sex",
+    "−209,94",
+    "−210"
+   ]
+  ],
+  "leitor": "Resultado por dia: seg, sem operações · ter, sem operações · qua, +83,14 · qui, +84,12 · sex, −209,94.",
+  "fora": [
+   "qua 14 · 11:12 · Compra MGC · fora da janela · −US$ 34,64"
+  ]
+ },
+ "quadro": "dez",
+ "extras": {
+  "2026-10-21": {
+   "dia": {
+    "titulo": "Quarta-feira, 21 de outubro",
+    "tags": [
+     "Revisão escrita"
+    ],
+    "nota": null
+   },
+   "rs": {
+    "res": "+US$ 212,59",
+    "resCor": "var(--mint)",
+    "ops": "4",
+    "opsSub": "3 ganhos, 1 perda",
+    "fora": "nenhuma",
+    "foraSub": "",
+    "foraCor": "var(--text)",
+    "lim": "nenhuma perda acumulada",
+    "limSub": "pior momento",
+    "temBarra": false,
+    "bar": "0%",
+    "barCor": "var(--amber)"
+   },
+   "infoResumo": "Resultado líquido. Bruto +US$ 223,75 · comissões −US$ 11,16. Limite do dia: a maior perda acumulada no pregão, no pior momento, já com a comissão quando o arquivo a trouxe, contra o seu limite de US$ 400. Pelas suas regras, ao atingir o limite o app encerra o dia. Fora do plano: operações fora da janela ou depois do limite.",
+   "comPlano": true,
+   "infoPlano": "Cada linha compara as regras que valiam neste dia, em Personalizar, com o que o diário registrou: janela e limite. Uma operação fora da janela ou depois do limite fica fora do plano, mesmo quando a tela só avisava. Bloqueio de dados, viés e regra do estado chegam na Fase 5.",
+   "plano": [
+    {
+     "item": "Janela",
+     "plano": "10:00–11:00 ET",
+     "fato": "4 de 4 dentro",
+     "marca": "No plano",
+     "tipo": "ok",
+     "link": null
+    },
+    {
+     "item": "Limite",
+     "plano": "US$ 400 · encerra o dia",
+     "fato": "nenhuma perda acumulada",
+     "marca": "No plano",
+     "tipo": "ok",
+     "link": null
+    }
+   ],
+   "versao": [],
+   "antes": {
+    "ver": false,
+    "txt": "",
+    "nota": "",
+    "editar": false,
+    "nada": true,
+    "campo": false
+   },
+   "anterior": "Nada trazido do pregão anterior.",
+   "semOps": null,
+   "trades": [
+    {
+     "h": "10:01–10:10",
+     "op": "MES · Compra · 3 ct",
+     "chip": "Registrada depois",
+     "sub": null,
+     "res": "+US$ 75,03",
+     "plano": "No plano",
+     "planoAria": null,
+     "acao": null,
+     "acaoAria": null,
+     "clip": null,
+     "rot": "Detalhes da operação: Compra de MES às 10:01",
+     "aberto": false
+    },
+    {
+     "h": "10:22–10:32",
+     "op": "MES · Compra · 3 ct",
+     "chip": "Registrada depois",
+     "sub": null,
+     "res": "+US$ 142,53",
+     "plano": "No plano",
+     "planoAria": null,
+     "acao": null,
+     "acaoAria": null,
+     "clip": null,
+     "rot": "Detalhes da operação: Compra de MES às 10:22",
+     "aberto": false
+    },
+    {
+     "h": "10:36–10:48",
+     "op": "MES · Venda · 2 ct",
+     "chip": null,
+     "sub": null,
+     "res": "−US$ 27,48",
+     "plano": "No plano",
+     "planoAria": null,
+     "acao": null,
+     "acaoAria": null,
+     "clip": null,
+     "rot": "Detalhes da operação: Venda de MES às 10:36",
+     "aberto": false
+    },
+    {
+     "h": "10:58–11:06",
+     "op": "MES · Venda · 1 ct",
+     "chip": "Página antiga",
+     "sub": null,
+     "res": "+US$ 22,51",
+     "plano": "No plano",
+     "planoAria": null,
+     "acao": null,
+     "acaoAria": null,
+     "clip": null,
+     "rot": "Detalhes da operação: Venda de MES às 10:58",
+     "aberto": false
+    }
+   ],
+   "drills": [
+    {
+     "op": "MES · Compra · 3 ct",
+     "fatos": [
+      [
+       "Hora",
+       "10:01–10:10"
+      ],
+      [
+       "Entrada → saída",
+       "7.975,25 → 7.980,50 · +5,25 pts"
+      ],
+      [
+       "Stop · alvo",
+       "não anotados"
+      ],
+      [
+       "Resultado",
+       "+US$ 75,03 · bruto +US$ 78,75"
+      ],
+      [
+       "Comissão",
+       "US$ 3,72"
+      ],
+      [
+       "Posso operar hoje?",
+       "Liberado"
+      ]
+     ],
+     "linhas": [
+      "Registrada às 17:26, depois do resultado: as marcas contam como depois do resultado.",
+      "Completada pelo arquivo de 22 out: comissão US$ 3,72."
+     ],
+     "tempo": null,
+     "be": null,
+     "ax": null,
+     "adicionar": true,
+     "marcas": [
+      {
+       "rot": "Setup · sua nota, de A a C",
+       "valor": "B",
+       "tempo": "às 17:26 · depois do resultado"
+      },
+      {
+       "rot": "Execução",
+       "valor": null,
+       "tempo": null
+      },
+      {
+       "rot": "Emoção",
+       "valor": null,
+       "tempo": null
+      }
+     ]
+    },
+    {
+     "op": "MES · Compra · 3 ct",
+     "fatos": [
+      [
+       "Hora",
+       "10:22–10:32"
+      ],
+      [
+       "Entrada → saída",
+       "7.972,75 → 7.982,50 · +9,75 pts"
+      ],
+      [
+       "Stop · alvo",
+       "não anotados"
+      ],
+      [
+       "Resultado",
+       "+US$ 142,53 · bruto +US$ 146,25"
+      ],
+      [
+       "Comissão",
+       "US$ 3,72"
+      ],
+      [
+       "Posso operar hoje?",
+       "Liberado"
+      ]
+     ],
+     "linhas": [
+      "Registrada às 17:25, depois do resultado: as marcas contam como depois do resultado.",
+      "Completada pelo arquivo de 22 out: comissão US$ 3,72."
+     ],
+     "tempo": null,
+     "be": null,
+     "ax": null,
+     "adicionar": true,
+     "marcas": [
+      {
+       "rot": "Setup · sua nota, de A a C",
+       "valor": "B",
+       "tempo": "às 17:25 · depois do resultado"
+      },
+      {
+       "rot": "Execução",
+       "valor": null,
+       "tempo": null
+      },
+      {
+       "rot": "Emoção",
+       "valor": null,
+       "tempo": null
+      }
+     ]
+    },
+    {
+     "op": "MES · Venda · 2 ct",
+     "fatos": [
+      [
+       "Hora",
+       "10:36–10:48"
+      ],
+      [
+       "Entrada → saída",
+       "7.974,25 → 7.976,75 · −2,50 pts"
+      ],
+      [
+       "Stop · alvo",
+       "stop 10 · alvo 20 pts · às 10:36"
+      ],
+      [
+       "R",
+       "−0,3 R · com stop de 10 pts"
+      ],
+      [
+       "Resultado",
+       "−US$ 27,48 · bruto −US$ 25,00"
+      ],
+      [
+       "Comissão",
+       "US$ 2,48"
+      ],
+      [
+       "Posso operar hoje?",
+       "Liberado"
+      ]
+     ],
+     "linhas": [
+      "Completada pelo arquivo de 22 out: comissão US$ 2,48."
+     ],
+     "tempo": null,
+     "be": null,
+     "ax": null,
+     "adicionar": true,
+     "marcas": [
+      {
+       "rot": "Setup · sua nota, de A a C",
+       "valor": "C",
+       "tempo": "às 10:36 · antes da saída"
+      },
+      {
+       "rot": "Execução",
+       "valor": null,
+       "tempo": null
+      },
+      {
+       "rot": "Emoção",
+       "valor": "Confiante",
+       "tempo": "às 10:37 · antes da saída"
+      }
+     ]
+    },
+    {
+     "op": "MES · Venda · 1 ct",
+     "fatos": [
+      [
+       "Hora",
+       "10:58–11:06"
+      ],
+      [
+       "Entrada → saída",
+       "7.962,00 → 7.957,25 · +4,75 pts"
+      ],
+      [
+       "Stop · alvo",
+       "não anotados"
+      ],
+      [
+       "Resultado",
+       "+US$ 22,51 · bruto +US$ 23,75"
+      ],
+      [
+       "Comissão",
+       "US$ 1,24"
+      ],
+      [
+       "Posso operar hoje?",
+       "Liberado"
+      ]
+     ],
+     "linhas": [
+      "Lançada na página antiga: o “Posso operar hoje?” desta operação foi recalculado pelas regras do dia."
+     ],
+     "tempo": null,
+     "be": null,
+     "ax": null,
+     "adicionar": true,
+     "marcas": [
+      {
+       "rot": "Setup · sua nota, de A a C",
+       "valor": null,
+       "tempo": null
+      },
+      {
+       "rot": "Execução",
+       "valor": null,
+       "tempo": null
+      },
+      {
+       "rot": "Emoção",
+       "valor": null,
+       "tempo": null
+      }
+     ]
+    }
+   ],
+   "apagadas": null,
+   "abertaOntem": null,
+   "revisao": {
+    "tem": true,
+    "fechada": false,
+    "salva": true,
+    "linha": "Salva às 11:40 · Seguiu o plano? Em parte · pela sua resposta, depois do resultado",
+    "ver": false,
+    "botao": "Ver revisão",
+    "form": false,
+    "mudou": "Depois da revisão, o dia mudou: agora 4 operações, +US$ 212,59.",
+    "versoes": null,
+    "erro": null
+   },
+   "revisaoAtual": null,
+   "formulario": null,
+   "versoes": null
+  },
+  "2026-10-23": {
+   "dia": {
+    "titulo": "Sexta-feira, 23 de outubro",
+    "tags": [
+     "Revisão escrita"
+    ],
+    "nota": null
+   },
+   "rs": {
+    "res": "+US$ 116,04",
+    "resCor": "var(--mint)",
+    "ops": "3",
+    "opsSub": "3 ganhos, 0 perdas",
+    "fora": "nenhuma",
+    "foraSub": "",
+    "foraCor": "var(--text)",
+    "lim": "nenhuma perda acumulada",
+    "limSub": "pior momento",
+    "temBarra": false,
+    "bar": "0%",
+    "barCor": "var(--amber)"
+   },
+   "infoResumo": "Resultado líquido. Bruto +US$ 121,00 · comissões −US$ 4,96. Limite do dia: a maior perda acumulada no pregão, no pior momento, já com a comissão quando o arquivo a trouxe, contra o seu limite de US$ 400. Pelas suas regras, ao atingir o limite o app encerra o dia. Fora do plano: operações fora da janela ou depois do limite.",
+   "comPlano": true,
+   "infoPlano": "Cada linha compara as regras que valiam neste dia, em Personalizar, com o que o diário registrou: janela e limite. Uma operação fora da janela ou depois do limite fica fora do plano, mesmo quando a tela só avisava. Breakeven: a sua regra e em quantas operações que chegaram ao ponto dela o stop foi para a entrada; quem confere é Análises. Bloqueio de dados, viés e regra do estado chegam na Fase 5.",
+   "plano": [
+    {
+     "item": "Janela",
+     "plano": "10:00–11:00 ET",
+     "fato": "3 de 3 dentro",
+     "marca": "No plano",
+     "tipo": "ok",
+     "link": null
+    },
+    {
+     "item": "Limite",
+     "plano": "US$ 400 · encerra o dia",
+     "fato": "nenhuma perda acumulada",
+     "marca": "No plano",
+     "tipo": "ok",
+     "link": null
+    },
+    {
+     "item": "Breakeven",
+     "plano": "MES +8 pts · MNQ +30 pts",
+     "fato": "nenhuma chegou ao ponto da regra",
+     "marca": "Registrado",
+     "tipo": "neutro",
+     "link": null
+    }
+   ],
+   "versao": [
+    "Até 09:40 valia a versão 1: sem regra de breakeven."
+   ],
+   "antes": {
+    "ver": true,
+    "txt": "Esperar a primeira meia hora.",
+    "nota": "anotado às 09:42, antes da 1ª entrada",
+    "editar": false,
+    "nada": false,
+    "campo": false
+   },
+   "anterior": "“Uma operação por vez.” · 22 out",
+   "semOps": null,
+   "trades": [
+    {
+     "h": "10:05–10:21",
+     "op": "MES · Venda · 2 ct",
+     "chip": null,
+     "sub": null,
+     "res": "+US$ 75,02",
+     "plano": "No plano",
+     "planoAria": null,
+     "acao": null,
+     "acaoAria": null,
+     "clip": null,
+     "rot": "Detalhes da operação: Venda de MES às 10:05",
+     "aberto": false
+    },
+    {
+     "h": "10:32–10:41",
+     "op": "MES · Venda · 1 ct",
+     "chip": null,
+     "sub": null,
+     "res": "+US$ 21,26",
+     "plano": "No plano",
+     "planoAria": null,
+     "acao": null,
+     "acaoAria": null,
+     "clip": null,
+     "rot": "Detalhes da operação: Venda de MES às 10:32",
+     "aberto": false
+    },
+    {
+     "h": "10:45–10:55",
+     "op": "MNQ · Venda · 1 ct",
+     "chip": null,
+     "sub": null,
+     "res": "+US$ 19,76",
+     "plano": "No plano",
+     "planoAria": null,
+     "acao": null,
+     "acaoAria": null,
+     "clip": null,
+     "rot": "Detalhes da operação: Venda de MNQ às 10:45",
+     "aberto": false
+    }
+   ],
+   "drills": [
+    {
+     "op": "MES · Venda · 2 ct",
+     "fatos": [
+      [
+       "Hora",
+       "10:05–10:21"
+      ],
+      [
+       "Entrada → saída",
+       "8.030,00 → 8.022,25 · +7,75 pts"
+      ],
+      [
+       "Stop · alvo",
+       "stop 8 · alvo 16 pts · às 10:05"
+      ],
+      [
+       "R",
+       "+1 R · com stop de 8 pts"
+      ],
+      [
+       "Resultado",
+       "+US$ 75,02 · bruto +US$ 77,50"
+      ],
+      [
+       "Comissão",
+       "US$ 2,48"
+      ],
+      [
+       "Posso operar hoje?",
+       "Liberado"
+      ]
+     ],
+     "linhas": [
+      "Completada pelo arquivo de 28 out: comissão US$ 2,48.",
+      "Breakeven: o stop não foi movido · sua regra: +8 pts."
+     ],
+     "tempo": null,
+     "be": null,
+     "ax": null,
+     "adicionar": true,
+     "marcas": [
+      {
+       "rot": "Setup · sua nota, de A a C",
+       "valor": "B",
+       "tempo": "às 10:05 · antes da saída"
+      },
+      {
+       "rot": "Execução",
+       "valor": null,
+       "tempo": null
+      },
+      {
+       "rot": "Emoção",
+       "valor": "Ansioso",
+       "tempo": "às 10:06 · antes da saída"
+      }
+     ]
+    },
+    {
+     "op": "MES · Venda · 1 ct",
+     "fatos": [
+      [
+       "Hora",
+       "10:32–10:41"
+      ],
+      [
+       "Entrada → saída",
+       "8.027,00 → 8.022,50 · +4,50 pts"
+      ],
+      [
+       "Stop · alvo",
+       "stop 10 · alvo 20 pts · às 10:32"
+      ],
+      [
+       "R",
+       "+0,5 R · com stop de 10 pts"
+      ],
+      [
+       "Resultado",
+       "+US$ 21,26 · bruto +US$ 22,50"
+      ],
+      [
+       "Comissão",
+       "US$ 1,24"
+      ],
+      [
+       "Posso operar hoje?",
+       "Liberado"
+      ]
+     ],
+     "linhas": [
+      "Completada pelo arquivo de 28 out: comissão US$ 1,24.",
+      "Breakeven: o stop não foi movido · sua regra: +8 pts."
+     ],
+     "tempo": null,
+     "be": null,
+     "ax": null,
+     "adicionar": true,
+     "marcas": [
+      {
+       "rot": "Setup · sua nota, de A a C",
+       "valor": "A",
+       "tempo": "às 10:32 · antes da saída"
+      },
+      {
+       "rot": "Execução",
+       "valor": null,
+       "tempo": null
+      },
+      {
+       "rot": "Emoção",
+       "valor": null,
+       "tempo": null
+      }
+     ]
+    },
+    {
+     "op": "MNQ · Venda · 1 ct",
+     "fatos": [
+      [
+       "Hora",
+       "10:45–10:55"
+      ],
+      [
+       "Entrada → saída",
+       "25.536,50 → 25.526,00 · +10,50 pts"
+      ],
+      [
+       "Stop · alvo",
+       "não anotados"
+      ],
+      [
+       "Resultado",
+       "+US$ 19,76 · bruto +US$ 21,00"
+      ],
+      [
+       "Comissão",
+       "US$ 1,24"
+      ],
+      [
+       "Posso operar hoje?",
+       "Liberado"
+      ]
+     ],
+     "linhas": [
+      "Completada pelo arquivo de 28 out: comissão US$ 1,24."
+     ],
+     "tempo": null,
+     "be": null,
+     "ax": null,
+     "adicionar": true,
+     "marcas": [
+      {
+       "rot": "Setup · sua nota, de A a C",
+       "valor": null,
+       "tempo": null
+      },
+      {
+       "rot": "Execução",
+       "valor": "no ponto",
+       "tempo": "às 10:54 · antes da saída"
+      },
+      {
+       "rot": "Emoção",
+       "valor": "Ansioso",
+       "tempo": "às 10:46 · antes da saída"
+      }
+     ]
+    }
+   ],
+   "apagadas": null,
+   "abertaOntem": null,
+   "revisao": {
+    "tem": true,
+    "fechada": false,
+    "salva": true,
+    "linha": "Salva às 11:15 · Seguiu o plano? Sim · pela sua resposta, depois do resultado",
+    "ver": false,
+    "botao": "Ver revisão",
+    "form": false,
+    "mudou": "Depois da revisão, o dia mudou: agora 3 operações, +US$ 116,04.",
+    "versoes": null,
+    "erro": null
+   },
+   "revisaoAtual": null,
+   "formulario": null,
+   "versoes": null
+  }
+ }
+}
