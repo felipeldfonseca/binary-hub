@@ -11,7 +11,7 @@ import { useTradesSupabase } from '@/hooks/useTradesSupabase'
 /** A query builder whose every step chains and whose answer is empty */
 function chain(): Record<string, unknown> {
   const c: Record<string, unknown> = {}
-  for (const m of ['select', 'insert', 'update', 'delete', 'eq', 'order', 'gte', 'lte', 'limit', 'single', 'in']) c[m] = () => c
+  for (const m of ['select', 'insert', 'update', 'delete', 'eq', 'order', 'gte', 'lte', 'limit', 'range', 'single', 'in']) c[m] = () => c
   c.then = (res: (v: unknown) => unknown, rej: (e: unknown) => unknown) => Promise.resolve({ data: [], error: null }).then(res, rej)
   return c
 }

@@ -15,6 +15,9 @@ interface TradeFilters {
   limit?: number;
 }
 
+/** PostgREST's row cap for one select */
+const TRADES_PAGE = 1000;
+
 export function useTradesSupabase(filters?: TradeFilters) {
   const { user, session } = useAuth();
   const db = useMemo(() => createDataClient(session?.access_token ?? null), [session?.access_token]);
@@ -29,43 +32,56 @@ export function useTradesSupabase(filters?: TradeFilters) {
     void invalidateDiario(queryClient, user?.id);
   };
 
-  // Get trades with filters
+  // Get trades with filters. PostgREST caps a select at 1,000 rows, and the old list (delete and
+  // export, until Phase 9) must read every trade: read pages of 1,000 under a total order (entry_time,
+  // then id, so ties never skip or repeat a row across pages) until a short page, or until the limit
   const tradesQuery = useQuery({
     queryKey: ['trades', user?.id, filters],
     queryFn: async () => {
       if (!user) throw new Error('Not authenticated');
 
-      let query = db
-        .from('trades')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('entry_time', { ascending: false });
+      const cap = filters?.limit && filters.limit > 0 ? filters.limit : Infinity;
+      const pageOf = (from: number, to: number) => {
+        let query = db
+          .from('trades')
+          .select('*')
+          .eq('user_id', user.id);
 
-      if (filters?.symbol) {
-        query = query.eq('symbol', filters.symbol);
-      }
-      if (filters?.result) {
-        query = query.eq('result', filters.result);
-      }
-      if (filters?.sessionId) {
-        query = query.eq('session_id', filters.sessionId);
-      }
-      if (filters?.marketType) {
-        query = query.eq('market_type', filters.marketType);
-      }
-      if (filters?.dateFrom) {
-        query = query.gte('entry_time', filters.dateFrom);
-      }
-      if (filters?.dateTo) {
-        query = query.lte('entry_time', filters.dateTo);
-      }
-      if (filters?.limit) {
-        query = query.limit(filters.limit);
-      }
+        if (filters?.symbol) {
+          query = query.eq('symbol', filters.symbol);
+        }
+        if (filters?.result) {
+          query = query.eq('result', filters.result);
+        }
+        if (filters?.sessionId) {
+          query = query.eq('session_id', filters.sessionId);
+        }
+        if (filters?.marketType) {
+          query = query.eq('market_type', filters.marketType);
+        }
+        if (filters?.dateFrom) {
+          query = query.gte('entry_time', filters.dateFrom);
+        }
+        if (filters?.dateTo) {
+          query = query.lte('entry_time', filters.dateTo);
+        }
 
-      const { data, error } = await query;
-      if (error) throw error;
-      return data as Trade[];
+        return query
+          .order('entry_time', { ascending: false })
+          .order('id', { ascending: false })
+          .range(from, to);
+      };
+
+      const trades: Trade[] = [];
+      while (trades.length < cap) {
+        const size = Math.min(TRADES_PAGE, cap - trades.length);
+        const { data, error } = await pageOf(trades.length, trades.length + size - 1);
+        if (error) throw error;
+        const rows = (data ?? []) as Trade[];
+        trades.push(...rows);
+        if (rows.length < size) break;
+      }
+      return trades;
     },
     enabled: !!user,
   });
