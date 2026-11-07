@@ -28,7 +28,7 @@ const nextConfig = {
       { source: '/trades', missing: [{ type: 'query', key: 'antiga' }], destination: '/diario', permanent: false },
     ];
   },
-  webpack:(config, { buildId, dev, isServer, defaultLoaders, webpack }) => {
+  webpack: (config, { buildId, dev, isServer, defaultLoaders, webpack }) => {
     // Optimization for production builds
     if (!dev) {
       config.optimization = {

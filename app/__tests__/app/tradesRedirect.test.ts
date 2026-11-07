@@ -19,7 +19,6 @@ import { matchHas, prepareDestination } from 'next/dist/shared/lib/router/utils/
 import { getRedirectStatus } from 'next/dist/lib/redirect-status'
 import { stringifyQuery } from 'next/dist/server/server-route-utils'
 
-// eslint-disable-next-line @typescript-eslint/no-var-requires
 const nextConfig = require('../../next.config.js') as NextConfig
 
 const TRADES_REDIRECT = {
