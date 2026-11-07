@@ -27,7 +27,7 @@ Inside `app/`, `npx jest --ci <path>` runs one suite. Use Node 22 (`.nvmrc`). Be
 
 - `app/`: the only application. Next.js 14 (app router), TypeScript, Tailwind, Jest + Testing Library.
   - `app/app/(hub)/`: the new screens, built from the approved boards (today `/diario`, the Diário of Phase 4).
-  - `app/app/*`: the old pages (`/dashboard`, `/trades`, `/analytics`, `/market`, ...). They stay until each one is replaced; they are removed in the last phase.
+  - `app/app/*`: the old pages (`/dashboard`, `/trades`, `/analytics`, `/market`, ...). They stay until each one is replaced; they are removed in the last phase. `/trades` now opens `/diario` (a 307 in `app/next.config.js`); the old list stays at `/trades?antiga=1` (the Diário footer's «Página antiga de operações»), where delete and export live, until Phase 9. It reads every trade: `useTradesSupabase` pages past PostgREST's 1,000-row cap.
   - `app/app/api/`: route handlers.
   - `app/components/hub/`: the hub frame (`HubRoot` theme, `HubGate`, `AppShell`, `HubHeader`, `ThemeSwitch`).
   - `app/lib/apiAuth.ts`: session and allow-list checks for API routes.

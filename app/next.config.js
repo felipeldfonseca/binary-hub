@@ -22,6 +22,12 @@ const nextConfig = {
   },
   poweredByHeader: false,
   generateEtags: false,
+  // /trades opens the Diário (a 307); the old list stays at /trades?antiga=1 until Phase 9
+  async redirects() {
+    return [
+      { source: '/trades', missing: [{ type: 'query', key: 'antiga' }], destination: '/diario', permanent: false },
+    ];
+  },
   webpack: (config, { buildId, dev, isServer, defaultLoaders, webpack }) => {
     // Optimization for production builds
     if (!dev) {
