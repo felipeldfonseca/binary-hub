@@ -363,7 +363,8 @@ describe('Fase 3c \u00b7 \u00abMover para o breakeven\u00bb in the version notes
 // (c3 §3.10) and «Próximos dados» (c3 §4.3): the boards' world (testing/agenda), limit US$ 500
 // ---------------------------------------------------------------------------------------------
 import { releasesOf, type AgendaRead, type AgendaRow, type ReleaseCode, type ReleaseMode } from '@/lib/domain/gate'
-import { et as etQ, leituraDoDia } from '@/testing/agenda'
+import { et as etQ, leituraDoDia, proximosDoQuadro } from '@/testing/agenda'
+import { proximosDados } from '@/lib/hub/comoFicaHoje'
 
 /** The world's Top One (limit US$ 500) with these behaviours over the app's default (the long form) */
 function quadro(patch: Partial<Record<ReleaseCode, ReleaseMode>> = {}, block: Partial<NonNullable<Rules['block']>> = {}): Rules {
@@ -496,6 +497,47 @@ describe('«Como fica hoje» with the day\'s releases (Phase 5-1, c3 §4.2)', ()
     expect(linhas(comoFicaHoje(r, brt('2026-12-10 12:00'), win(r), leituraDoDia(etQ('2026-12-10 09:00'))))).toEqual(
       linhas(comoFicaHoje(r, brt('2026-12-10 12:00'), win(r))),
     )
+  })
+})
+
+describe('«Próximos dados» and «Como fica hoje» agree (c3 §4.2, §4.3)', () => {
+  /** «head hour / behaviour wait / não toca» */
+  const prox = (r: Rules, when: string, covered?: AgendaRead['covered'] | null) => {
+    const p = proximosDados(r, etQ(when), proximosDoQuadro(etQ(when)), covered)
+    return { depoisDe: p.depoisDe, linhas: p.linhas.map((l) => [`${l.cabeca}${l.hora}`, `${l.comportamento ?? l.texto ?? ''}${l.espera ?? ''}`, l.naoToca ? 'não toca' : ''].filter(Boolean).join(' / ')) }
+  }
+
+  it('two releases at one instant with different behaviours: each line its own wait, in both lists', () => {
+    const r = quadro({ pce: 'depois', pib_us: 'volta' })
+    expect(prox(r, '2026-12-22 07:00').linhas.filter((l) => l.startsWith('Amanhã'))).toEqual([
+      `Amanhã${SEP}PCE${SEP}08:30 ET / Só opero depois do dado${SEP}espera até 08:40 / não toca`,
+      `Amanhã${SEP}PIB dos EUA${SEP}08:30 ET / Aguardo em volta do horário${SEP}08:25–08:40 / não toca`,
+    ])
+    expect(hojeQ(r, '2026-12-23 07:00')).toEqual([
+      `Até 08:40 ET${SEP}só depois do PCE → Aguardar até 08:40 · desde as 18:00 de ontem [amber]`,
+      `08:25–08:40 ET${SEP}espera do PIB dos EUA → Aguardar até 08:40 [amber]`,
+      `${JANELA} → Liberado [mint]`,
+      'No resto do dia → Fora da sua janela [amber]',
+      LIMITE,
+    ])
+  })
+
+  it('after 18:00 New York «Hoje» is the trading day that has turned, as «Como fica hoje»', () => {
+    const p = prox(quadro(), '2026-12-09 19:00')
+    expect(p.linhas[0]).toBe(`Hoje${SEP}CPI${SEP}08:30 ET / Aguardo em volta do horário${SEP}08:25–08:40 / não toca`)
+    expect(p.depoisDe).toBe('Depois de dom 13: datas previstas, podem mudar.')
+    expect(hojeQ(quadro(), '2026-12-09 19:00')[0]).toBe(`08:25–08:40 ET${SEP}espera do CPI → Aguardar até 08:40 [amber]`)
+    // before 18:00 the CPI is still tomorrow's
+    expect(prox(quadro(), '2026-12-09 17:00').linhas.find((l) => l.includes('CPI'))).toMatch(/^Amanhã/)
+  })
+
+  it('«Depois de {dia}»: the last day the day\'s read (E5) shows covered, never past today + 3', () => {
+    const us = (...days: string[]) => days.map((day) => ({ calendar: 'us' as const, day }))
+    expect(prox(quadro(), '2026-12-10 09:00', us('2026-12-09', '2026-12-10', '2026-12-11')).depoisDe).toBe('Depois de dom 13: datas previstas, podem mudar.')
+    expect(prox(quadro(), '2026-12-10 09:00', us('2026-12-09', '2026-12-10')).depoisDe).toBe('Depois de qui 10: datas previstas, podem mudar.')
+    expect(prox(quadro(), '2026-12-10 09:00', []).depoisDe).toBe('Depois de qua 9: datas previstas, podem mudar.')
+    // the world's read: covered D − 1..D + 1
+    expect(prox(quadro(), '2026-12-10 09:00', leituraDoDia(etQ('2026-12-10 09:00')).covered).depoisDe).toBe('Depois de dom 13: datas previstas, podem mudar.')
   })
 })
 

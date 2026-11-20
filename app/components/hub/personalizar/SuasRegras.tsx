@@ -134,7 +134,7 @@ function Regras({
   const proximos = !comDados
     ? null
     : dados!.proximos
-      ? { estado: 'pronto' as const, ...proximosDados(rules, agora, dados!.proximos) }
+      ? { estado: 'pronto' as const, ...proximosDados(rules, agora, dados!.proximos, dados!.dia === null ? [] : dados!.dia?.covered) }
       : dados!.proximos === null
         ? { estado: 'erro' as const }
         : { estado: 'carregando' as const }

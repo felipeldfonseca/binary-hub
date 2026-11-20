@@ -249,6 +249,12 @@ function intervalosDoDia(rules: Rules, clockDay: string, entries: readonly Agend
   return blockIntervals(rules, rules.day, entries).filter((iv) => iv.start < end && iv.end > start);
 }
 
+/** The «Aguardo em volta do horário» span of one instant: at − before .. at + after (no merging) */
+function esperaPropria(rules: Rules, at: Date): { start: Date; end: Date } {
+  const b = rules.block!;
+  return { start: new Date(at.getTime() - b.beforeMin * 60_000), end: new Date(at.getTime() + b.afterMin * 60_000) };
+}
+
 /** A data line with its sort key (the start it shows) */
 interface LinhaOrdenada {
   at: number;
@@ -308,16 +314,33 @@ export function linhasDeDados(
         },
       });
     } else if (iv.releases.some((r) => r.mode === 'depois')) {
+      // A «Só depois» wait merged with «Aguardo em volta» releases: each behaviour its own line (c3 §4.2),
+      // the «volta» ones with their own span (at − before .. at + after), grouped by instant
+      const depois = Array.from(new Set(iv.releases.filter((r) => r.mode === 'depois').map((r) => r.code)));
       out.push({
         at: iv.start.getTime(),
         linha: {
-          esquerda: [{ t: HOJE.ate }, { t: horaEt(iv.end, tz), mono: true }, { t: HOJE.soDepois(nomesDoDa(codes)) }],
+          esquerda: [{ t: HOJE.ate }, { t: horaEt(iv.end, tz), mono: true }, { t: HOJE.soDepois(nomesDoDa(depois)) }],
           estado: PALAVRAS_DADOS.aguardarAte(hhmm(iv.end, tz)),
           tom: 'amber',
           forte: true,
           sub: iv.start.getTime() <= S ? HOJE.desdeOntem : null,
         },
       });
+      for (const grupo of porInstante(iv.releases.filter((r) => r.mode !== 'depois'))) {
+        const { start, end } = esperaPropria(rules, grupo[0].at);
+        if (end <= start) continue;
+        out.push({
+          at: start.getTime(),
+          linha: {
+            esquerda: [{ t: `${hhmm(start, tz)}–${hhmm(end, tz)} ${sufixoRelogio(tz)}`, mono: true }, { t: HOJE.espera(nomesDoDa(Array.from(new Set(grupo.map((r) => r.code))))) }],
+            estado: PALAVRAS_DADOS.aguardarAte(hhmm(end, tz)),
+            tom: 'amber',
+            forte: true,
+            sub: null,
+          },
+        });
+      }
     } else {
       out.push({
         at: iv.start.getTime(),
@@ -384,11 +407,18 @@ export const PROXIMOS_VISIVEIS = 5;
  * off or everything «Opero normalmente» the lines end «Opero normalmente · sem espera». Two releases at
  * the same instant with the same behaviour share a line. Closes with «Depois de {today + 3}: …».
  */
-export function proximosDados(rules: Rules, now: Date, rows: readonly AgendaRow[]): { linhas: LinhaProximo[]; depoisDe: string } {
+export function proximosDados(
+  rules: Rules,
+  now: Date,
+  rows: readonly AgendaRow[],
+  covered?: AgendaRead['covered'] | null,
+): { linhas: LinhaProximo[]; depoisDe: string } {
   const tz = relogioDe(rules);
   const cals = rules.block?.calendars ?? [];
-  const hoje = dataEm(now, tz);
+  // The account's trading day (18:00 New York on Futuros), as «Como fica hoje» and the gate count it
+  const hoje = tradingDayOn(now, rules.day);
   const amanha = addDays(hoje, 1);
+  const diaDe = (at: Date) => tradingDayOn(at, rules.day);
   const diaPalavra = (date: string) => (date === hoje ? PROXIMOS.hoje : date === amanha ? PROXIMOS.amanha : maiuscula(diaCurto(date)));
   const nossas = rows.filter((r): r is AgendaRow & { code: ReleaseCode } => r.code !== null && cals.includes(r.calendar));
   const vivas = nossas.filter((r) => vivo(r) && r.at >= now).sort((a, b) => a.at.getTime() - b.at.getTime() || releaseOrd(a.code) - releaseOrd(b.code));
@@ -412,13 +442,15 @@ export function proximosDados(rules: Rules, now: Date, rows: readonly AgendaRow[
     itens.push({ at: r.at.getTime(), modo, codes: [r.code], atDate: r.at, linha: null as unknown as LinhaProximo });
   }
   const linhaDe = (it: Item): LinhaProximo => {
-    const cabeca = PROXIMOS.cabeca(diaPalavra(dataEm(it.atDate, tz)), nomesLinha(it.codes));
+    const cabeca = PROXIMOS.cabeca(diaPalavra(diaDe(it.atDate)), nomesLinha(it.codes));
     const hora = horaEt(it.atDate, tz);
     const iv = it.modo && it.modo !== 'normal' ? doDado({ code: it.codes[0], at: it.atDate }) : undefined;
     if (!iv) return { cabeca, hora, comportamento: null, espera: null, texto: PROXIMOS.semEspera, naoToca: false, cinza: false };
     const modo = it.modo as Exclude<ReleaseMode, 'normal'>;
-    const espera = modo === 'volta' ? `${hhmm(iv.start, tz)}–${hhmm(iv.end, tz)}` : modo === 'depois' ? `${PROXIMOS.esperaAte}${hhmm(iv.end, tz)}` : PROXIMOS.oDiaInteiro;
-    return { cabeca, hora, comportamento: PROXIMOS.comportamento(DADOS.modo[modo]), espera, texto: null, naoToca: rules.windows.length > 0 && !toca(iv.start, iv.end), cinza: false };
+    // «volta»: the release's own span, never the merged interval of a «Só depois» release at the same instant
+    const span = modo === 'volta' ? esperaPropria(rules, it.atDate) : iv;
+    const espera = modo === 'volta' ? `${hhmm(span.start, tz)}–${hhmm(span.end, tz)}` : modo === 'depois' ? `${PROXIMOS.esperaAte}${hhmm(iv.end, tz)}` : PROXIMOS.oDiaInteiro;
+    return { cabeca, hora, comportamento: PROXIMOS.comportamento(DADOS.modo[modo]), espera, texto: null, naoToca: rules.windows.length > 0 && !toca(span.start, span.end), cinza: false };
   };
   for (const it of itens) it.linha = linhaDe(it);
   // Cancelled, postponed without a date, and a moved release on its old date: grey, no behaviour
@@ -430,7 +462,7 @@ export function proximosDados(rules: Rules, now: Date, rows: readonly AgendaRow[
         modo: null,
         codes: [r.code],
         atDate: at,
-        linha: { cabeca: PROXIMOS.cabeca(diaPalavra(dataEm(at, tz)), NOMES_DADOS[r.code].nome) + texto, hora: '', comportamento: null, espera: null, texto: null, naoToca: false, cinza: true },
+        linha: { cabeca: PROXIMOS.cabeca(diaPalavra(diaDe(at)), NOMES_DADOS[r.code].nome) + texto, hora: '', comportamento: null, espera: null, texto: null, naoToca: false, cinza: true },
       });
     if (r.status === 'cancelado' && r.at >= now) cinza(r.at, PROXIMOS.cancelado);
     else if (r.status === 'adiado' && r.at >= now) cinza(r.at, PROXIMOS.adiadoSemData);
@@ -439,7 +471,23 @@ export function proximosDados(rules: Rules, now: Date, rows: readonly AgendaRow[
     }
   }
   itens.sort((a, b) => a.at - b.at);
-  return { linhas: itens.map((x) => x.linha), depoisDe: PROXIMOS.depoisDe(diaCurto(addDays(hoje, 3))) };
+  return { linhas: itens.map((x) => x.linha), depoisDe: PROXIMOS.depoisDe(diaCurto(ultimoDiaCoberto(cals, hoje, covered))) };
+}
+
+/**
+ * {dia} of «Depois de {dia}» (c3 §4.3 l.817-819: the last covered date; the agenda answers up to three days
+ * ahead): the last day of an unbroken run from today that the day's read (E5, D − 1..D + 1) shows covered
+ * for every calendar followed, the day before today when today is not. E5 sees no further than tomorrow:
+ * covered through tomorrow → today + 3 (the daily route's reach; the coverage of D + 2 and D + 3 is not
+ * read, an open point). No read (undefined) → today + 3.
+ */
+export function ultimoDiaCoberto(cals: readonly CalendarCode[], hoje: string, covered?: AgendaRead['covered'] | null): string {
+  const max = addDays(hoje, 3);
+  if (covered == null || cals.length === 0) return max;
+  const tem = (day: string) => cals.every((c) => covered.some((x) => x.calendar === c && x.day === day));
+  if (!tem(hoje)) return addDays(hoje, -1);
+  if (!tem(addDays(hoje, 1))) return hoje;
+  return max;
 }
 
 // ---------------------------------------------------------------------------------------------
