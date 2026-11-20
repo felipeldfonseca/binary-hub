@@ -246,13 +246,16 @@ export const DADOS_OP = {
   /** «Só opero depois do dado»: «… pelo seu plano, você só operava a partir das 08:40, 10 min depois do CPI (08:30).» */
   soDepois: (resposta: string, ate: string, min: number, doDado: string, hora: string) =>
     `Na entrada, o “Posso operar hoje?” dizia “${resposta}”: pelo seu plano, você só operava a partir das ${ate}, ${minutos(min)} depois ${doDado} (${hora}).`,
-  /** «… era dia de CPI (08:30), que você marcou como “Não opero no dia”.» */
-  dia: (resposta: string, diaDe: string, hora: string) =>
-    `Na entrada, o “Posso operar hoje?” dizia “${resposta}”: era ${diaDe} (${hora}), que você marcou como “Não opero no dia”.`,
+  /**
+   * «… era dia de CPI (08:30), que você marcou como “Não opero no dia”.»; `diaDe` carries the hours (NEW, review
+   * 2026-11-20: two releases at different hours «era dia de CPI (08:30) e dia de Fed (14:00), …»)
+   */
+  dia: (resposta: string, diaDe: string) =>
+    `Na entrada, o “Posso operar hoje?” dizia “${resposta}”: era ${diaDe}, que você marcou como “Não opero no dia”.`,
   /** A trade from a file or the old page, after «Sem registro no app: …»: «Pelas regras do dia, a entrada caiu na espera do ISM de serviços (09:55 às 10:10).» */
   arquivoEspera: (doDado: string, de: string, ate: string) => `Pelas regras do dia, a entrada caiu na espera ${doDado} (${de} às ${ate}).`,
   /** NEW (c3 §6.4 gives only the wait): the same on a whole day */
-  arquivoDia: (diaDe: string, hora: string) => `Pelas regras do dia, a entrada caiu em ${diaDe} (${hora}).`,
+  arquivoDia: (diaDe: string) => `Pelas regras do dia, a entrada caiu em ${diaDe}.`,
   semAgenda: 'Dados econômicos: não conferidos nesta entrada (o app estava sem a agenda).',
   /** An entry frozen before Phase 5 (`fase5`) */
   antesDaRegra: 'Dados econômicos: não conferidos nesta entrada.',

@@ -2,7 +2,7 @@
 
 import { useQuery } from '@tanstack/react-query'
 import type { AgendaRead, AgendaRow, Rules } from '@/lib/domain/gate'
-import { MARKET_SPEC, type AccountMarket } from '@/lib/domain/markets'
+import type { AccountMarket } from '@/lib/domain/markets'
 import { addDays, tradingDayBounds, type DayClock } from '@/lib/domain/tempo'
 import { weekOf, type Day } from '@/lib/domain/diario'
 import { AGENDA_STALE_MS, agendaKeys, calendarsKeyOf, useDadosDaSemana } from '@/hooks/useAgenda'
@@ -18,13 +18,22 @@ import { temLinhaDeDados } from '@/lib/hub/diario'
  * - `useSemanaDoDia` (L6's labels): the open day's week through useDadosDaSemana, on the account's day clock.
  */
 
-/** The account's day clock: the version's, else the market's (market_caps sets trading_accounts.day_tz/day_start_min) */
-export const relogioDoDia = (market: AccountMarket, rules: Rules | null): DayClock => rules?.day ?? MARKET_SPEC[market].day
+/**
+ * The open day's clock: the day's version's, else the account's own stored day clock (trading_accounts.day_tz /
+ * day_start_min, the `account.day` of every Diário answer: before the first version only that clock applies), the one
+ * diario_dia counts the day on
+ */
+export const relogioDoDia = (account: { day: DayClock }, rules: Rules | null): DayClock => rules?.day ?? account.day
 
-export function useAgendaDoDiaAberto(market: AccountMarket, rules: Rules | null, day: Day, { enabled = true }: { enabled?: boolean } = {}) {
+export function useAgendaDoDiaAberto(
+  market: AccountMarket,
+  rules: Rules | null,
+  day: Day,
+  clock: DayClock,
+  { enabled = true }: { enabled?: boolean } = {},
+) {
   const { db, userId } = useHubDb()
   const calendars = rules?.block?.on ? rules.block.calendars : []
-  const clock = relogioDoDia(market, rules)
   const on = enabled && temLinhaDeDados(market) && calendars.length > 0
   return useQuery<AgendaRead, AgendaDataError>({
     queryKey: agendaKeys.dia(userId, calendarsKeyOf(calendars), day),
@@ -43,8 +52,8 @@ export function semanaDoDia(day: Day, clock: DayClock): { weekOf: string; start:
 }
 
 /** The week's releases for the labels (null while unread, on an error, or in another market) */
-export function useSemanaDoDia(market: AccountMarket, rules: Rules | null, day: Day | null): readonly AgendaRow[] | null {
+export function useSemanaDoDia(market: AccountMarket, clock: DayClock, day: Day | null): readonly AgendaRow[] | null {
   const on = temLinhaDeDados(market) && !!day
-  const q = useDadosDaSemana(on ? semanaDoDia(day!, relogioDoDia(market, rules)) : null, { enabled: on })
+  const q = useDadosDaSemana(on ? semanaDoDia(day!, clock) : null, { enabled: on })
   return on && q.data ? q.data : null
 }

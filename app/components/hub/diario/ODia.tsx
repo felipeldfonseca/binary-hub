@@ -99,11 +99,12 @@ function CorpoDoDia({ p, d }: { p: DiarioPaginaValor; d: DayRead }) {
   const nota = notaDoDia(d.kind, p.contaDiario, d.desde, historia)
   const comPlano = !!d.plan.rules && d.kind !== 'historico'
   // Phase 5-1 (c3 §6.5, Q32): the day's releases and holiday, in grey between the numbers and «O plano do dia»
-  const semanaLida = useSemanaDoDia(p.contaDiario.market, d.plan.rules, d.day)
+  const relogio = relogioDoDia(d.account, d.plan.rules)
+  const semanaLida = useSemanaDoDia(p.contaDiario.market, relogio, d.day)
   const cinza = linhaCinzaDoDia(semanaLida, d.day, {
     market: p.contaDiario.market,
     tz: p.contaDiario.tz,
-    clock: relogioDoDia(p.contaDiario.market, d.plan.rules),
+    clock: relogio,
     calendars: d.plan.rules?.block?.calendars ?? [],
   })
 

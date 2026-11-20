@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import type { Day } from '@/lib/domain/diario'
+import { tradingDayOn } from '@/lib/domain/tempo'
 import {
   blocoDoDia,
   comoLerOPlano,
@@ -51,11 +52,16 @@ export default function PlanoDoDia({ d, hoje, accountId, conta }: { d: DayRead; 
   const [info, setInfo] = useState(false)
   const rules = d.plan.rules
   const entradas = entradasDosDados(d.trades)
-  const precisaLer = entradas.length === 0 && temLinhaDeDados(conta.market) && !!rules?.block?.on && rules.block.calendars.length > 0
-  const agenda = useAgendaDoDiaAberto(conta.market, rules, d.day, { enabled: precisaLer })
+  const relogio = relogioDoDia(d.account, rules)
+  // The day's own block (G6) is needed without entries, and when no checked entry has the Diário day as its clock day
+  // (an entry inside an overnight window past the turn: its answer's `today` is the next day's; review 2026-11-20)
+  const avaliadas = entradas.filter((e) => e.block.evaluated)
+  const precisaDoDia = entradas.length === 0 || (avaliadas.length > 0 && !avaliadas.some((e) => tradingDayOn(e.at, relogio) === d.day))
+  const precisaLer = precisaDoDia && temLinhaDeDados(conta.market) && !!rules?.block?.on && rules.block.calendars.length > 0
+  const agenda = useAgendaDoDiaAberto(conta.market, rules, d.day, relogio, { enabled: precisaLer })
   if (!rules) return null
-  const daConta = { market: conta.market, dayClock: relogioDoDia(conta.market, rules) }
-  const semEntrada = entradas.length
+  const daConta = { market: conta.market, dayClock: relogio }
+  const semEntrada = !precisaDoDia
     ? undefined
     : !precisaLer
       ? blocoDoDia(rules, daConta, d.day, null)
@@ -64,7 +70,7 @@ export default function PlanoDoDia({ d, hoje, accountId, conta }: { d: DayRead; 
         : agenda.isError
           ? blocoDoDia(rules, daConta, d.day, null)
           : undefined
-  const linhas = linhasDoPlano(rules, d.facts, conta, linhaDosDadosDoPlano(entradas, semEntrada, conta))
+  const linhas = linhasDoPlano(rules, d.facts, conta, linhaDosDadosDoPlano(entradas, semEntrada, conta, { day: d.day, clock: relogio }))
   return (
     <>
       <div className="hub-dr-plano-bloco">

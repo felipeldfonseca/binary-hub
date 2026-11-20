@@ -95,3 +95,10 @@ describe('holidays from the code list (feriados.ts), Futuros only', () => {
     expect(feriadosDaSemana(['2026-12-01'], 'futures')).toEqual([])
   })
 })
+
+describe('review 2026-11-20: two releases at the same minute (finding 8)', () => {
+  it('one item, the names joined as the plan line joins them: «PCE e PIB dos EUA, 08:30»', () => {
+    const rows = [linha('pce', '2026-12-23 08:30'), linha('pib_us', '2026-12-23 08:30'), linha('confianca_us', '2026-12-23 10:00')]
+    expect(linhaCinzaDoDia(rows, '2026-12-23', TOP)).toBe('PCE e PIB dos EUA, 08:30 · Confiança do consumidor, 10:00')
+  })
+})

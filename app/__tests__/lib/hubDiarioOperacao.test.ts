@@ -21,6 +21,7 @@ import {
   clipDaLinha,
   detalhesAria,
   fatosDaOperacao,
+  fatosDosDados,
   horaDaLinha,
   linhaDosDados,
   linhasDaOperacao,
@@ -41,6 +42,7 @@ import {
 } from '@/lib/hub/diarioOperacao'
 import { CENARIOS, quadro, type Cenario, type EsperadoDia, type Quadro } from '@/testing/diarioQuadro'
 import { agendaJson } from '@/testing/agenda'
+import { entradasDosDados, fatosTexto } from '@/lib/hub/diario'
 
 const NBSP = / /g
 const limpo = (s: unknown): any => (typeof s === 'string' ? s.replace(NBSP, ' ') : Array.isArray(s) ? s.map(limpo) : s)
@@ -600,5 +602,48 @@ describe('«Dados econômicos» in the Diário (Phase 5 · telas-diario): marks 
     const d = quadro('2').dias['2026-11-10']
     const t = d.trades.find((x) => x.plan && x.gate && !x.gate.block.evaluated)!
     expect(linhaDosDados(t, NY)).toEqual(['Dados econômicos: não conferidos nesta entrada.'])
+  })
+})
+
+describe('review 2026-11-20: the whole day of two releases at two hours (finding 9); the day\'s facts (finding 7)', () => {
+  const espera = parseDay(agendaJson('dia-espera'))
+  const inteiro = parseDay(agendaJson('dia-inteiro'))
+  const NY = 'America/New_York'
+  const em = (d: DayRead, hhmm: string) => d.trades.find((t) => horaDaLinha(t, NY).startsWith(hhmm))!
+  const nb = (s: string | null) => (s === null ? null : s.replace(/\u00a0/g, ' '))
+
+  it('«era dia de CPI (08:30) e dia de Fed (14:00)»: each name with its own hour, frozen and from a file', () => {
+    const t = em(inteiro, '10:31')
+    const g = t.gate!
+    const blk = g.block as Extract<typeof g.block, { evaluated: true }>
+    const dia = {
+      ...blk.active!,
+      releases: [
+        { code: 'cpi' as const, at: new Date('2026-12-10T13:30:00Z'), mode: 'dia' as const },
+        { code: 'fomc_decisao' as const, at: new Date('2026-12-10T19:00:00Z'), mode: 'dia' as const },
+      ],
+    }
+    const dois = { ...t, gate: { ...g, at: new Date('2026-12-10T20:00:00Z'), block: { ...blk, active: dia, today: [dia] } } }
+    expect(nb(linhaDosDados(dois, NY)![0])).toBe(
+      'Na entrada, o “Posso operar hoje?” dizia “Não opero hoje”: era dia de CPI (08:30) e dia de Fed (14:00), que você marcou como “Não opero no dia”.',
+    )
+    expect(linhaDosDados({ ...dois, plan: null, planNow: dois.plan, gate: null, gateNow: dois.gate }, NY)).toEqual([
+      'Pelas regras do dia, a entrada caiu em dia de CPI (08:30) e dia de Fed (14:00).',
+    ])
+  })
+
+  it('c3 §6.2: «2 na espera do ISM de serviços, às 09:57 e 10:05», «2 em dia de CPI, às 10:05 e 10:31», after «fora da janela»', () => {
+    expect(fatosDosDados(entradasDosDados(espera.trades), NY)).toEqual(['2 na espera do ISM de serviços, às 09:57 e 10:05'])
+    expect(fatosDosDados(entradasDosDados(espera.trades.filter((t) => horaDaLinha(t, NY).startsWith('10:05'))), NY)).toEqual([
+      '1 na espera do ISM de serviços, às 10:05',
+    ])
+    expect(fatosDosDados(entradasDosDados(inteiro.trades), NY)).toEqual(['2 em dia de CPI, às 10:05 e 10:31'])
+    const conta = { currency: 'USD' as const, market: 'futures' as const, tz: NY }
+    const txt = fatosTexto(espera.facts, conta as any, fatosDosDados(entradasDosDados(espera.trades), NY))
+    expect(txt).toContain(' · 2 na espera do ISM de serviços, às 09:57 e 10:05')
+    expect(txt.indexOf('fora da janela')).toBeLessThan(txt.indexOf('na espera do ISM'))
+    expect(txt).not.toContain('no plano')
+    // Without the data parts (a review's older version): as before
+    expect(fatosTexto(espera.facts, conta as any)).not.toContain('na espera')
   })
 })

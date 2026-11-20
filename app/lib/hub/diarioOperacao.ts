@@ -30,7 +30,7 @@ import {
   acaoAria,
 } from '@/components/hub/diario/copyDia'
 import { NOMES_DADOS, PALAVRAS_DADOS, horaDeVolta, soDepois } from './dadosEconomicos'
-import { diaCurto, diaDeDados, dinheiro, hora, tomDe } from './diario'
+import { diaCurto, diaDeDados, diaDeDadosComHoras, dinheiro, hora, listaE, tomDe, type EntradaDosDados } from './diario'
 import type { DiaryDayTrade, OpenElsewhere } from './diarioDb'
 import { formatDecimal } from './numero'
 import { dinheiroCompacto, sufixoRelogio, type Tom } from './posso'
@@ -191,6 +191,30 @@ export function marcaDadosLonga(interval: { kind: 'espera' | 'dia'; releases: re
   }
   if (codes.length >= 3) return `na espera de ${codes.length} dados`
   return `na espera ${NOMES_DADOS[codes[0]].doDa}${codes[1] ? ` e ${NOMES_DADOS[codes[1]].frase}` : ''}`
+}
+
+/**
+ * The data part of the day's facts (c3 §6.2; review 2026-11-20): the entries inside a wait or on a whole day,
+ * one part per interval in the order of its start, with full names and the entries' hours on `tz`: «1 na espera do ISM
+ * de serviços, às 10:04», «2 em dia de CPI, às 10:04 e 10:31». From the gate answers of the day's entries
+ * (diario.entradasDosDados: frozen, or recalculated for a file); SPEC §6 G3 gives the facts no key for it.
+ */
+export function fatosDosDados(entradas: readonly EntradaDosDados[], tz: string): string[] {
+  const grupos = new Map<string, { iv: BlockInterval; horas: Date[] }>()
+  for (const e of entradas) {
+    const b = e.block
+    if (!b.evaluated || b.state !== 'no_bloqueio' || !b.active) continue
+    const k = `${b.active.kind}${b.active.start.getTime()}${b.active.end.getTime()}`
+    const g = grupos.get(k) ?? { iv: b.active, horas: [] }
+    g.horas.push(e.at)
+    grupos.set(k, g)
+  }
+  return Array.from(grupos.values())
+    .sort((a, b) => a.iv.start.getTime() - b.iv.start.getTime())
+    .map((g) => {
+      const hs = [...g.horas].sort((a, b) => a.getTime() - b.getTime()).map((h) => hora(h, tz))
+      return `${hs.length} ${marcaDadosLonga(g.iv)}, às ${listaE(hs)}`
+    })
 }
 
 /** «fora da janela e na espera do ISM de serviços»: the row's breaks for a screen reader, joined by « e » */
@@ -553,11 +577,11 @@ export function linhaDosDados(t: Pick<DiaryDayTrade, 'history' | 'plan' | 'planN
   const de = hora(iv.start, tz)
   const ate = hora(iv.end, tz)
   if (!t.plan) {
-    if (iv.kind === 'dia') return [DADOS_OP.arquivoDia(diaDeDados(iv.releases), hora(iv.releases[0].at, tz))]
+    if (iv.kind === 'dia') return [DADOS_OP.arquivoDia(diaDeDadosComHoras(iv.releases, tz))]
     return [DADOS_OP.arquivoEspera(doDado(maisPerto(iv.releases, g.at)), de, ate)]
   }
   const resposta = possoNaEntrada(g, tz)
-  if (iv.kind === 'dia') return [DADOS_OP.dia(resposta, diaDeDados(iv.releases), hora(iv.releases[0].at, tz))]
+  if (iv.kind === 'dia') return [DADOS_OP.dia(resposta, diaDeDadosComHoras(iv.releases, tz))]
   const rs = maisPerto(iv.releases, g.at)
   const r = rs[0]
   if (soDepois(iv.releases)) return [DADOS_OP.soDepois(resposta, ate, Math.round((iv.end.getTime() - r.at.getTime()) / 60_000), doDado(rs), hora(r.at, tz))]

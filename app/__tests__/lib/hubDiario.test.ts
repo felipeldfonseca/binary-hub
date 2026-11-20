@@ -16,7 +16,7 @@ import {
   type DayReview,
   type GridCell,
 } from '@/lib/domain/diario';
-import type { Rules } from '@/lib/domain/gate';
+import { agendaFor, evaluateGate, type Rules } from '@/lib/domain/gate';
 import { parseDay } from '@/lib/hub/diarioDb';
 import { RELOGIO_TOP, agendaJson, leituraDoDia } from '@/testing/agenda';
 import { quadro } from '@/testing/diarioQuadro';
@@ -884,5 +884,44 @@ describe('«O plano do dia» · the «Dados econômicos» line (Phase 5 · telas
     expect(intervaloDoPlano(iv(['fomc_decisao']), NY)).toBe('Decisão do Fed às 14:00 · espera 13:55–14:10');
     expect(intervaloDoPlano(iv(['pce', 'pib_us']), NY)).toBe('PCE e PIB dos EUA às 14:00 · espera 13:55–14:10');
     expect(intervaloDoPlano(iv(['pce', 'pib_us'], 'dia'), NY)).toBe('dia de PCE e PIB dos EUA (14:00) · não opero no dia');
+  });
+});
+
+describe('review 2026-11-20: «O plano do dia» on the Diário day itself (findings 4 and 6)', () => {
+  const espera = parseDay(agendaJson('dia-espera'));
+  const conta = { market: 'futures' as const, dayClock: RELOGIO_TOP };
+  const ler = (day: string) => leituraDoDia(et(`${day} 09:00`));
+  const dia = (day: string) => ({ day, clock: RELOGIO_TOP });
+
+  it('an entry inside an overnight window after 18:00 ET counts on the day the window opened: the plan is that day\'s', () => {
+    // The window 17:00–19:00 ET: an entry on Wed 2 Dec at 18:30 counts on Wed 2 Dec, though its clock day is Thu 3 Dec
+    const r: Rules = { ...espera.plan.rules!, windows: [{ ...espera.plan.rules!.windows[0], startMin: 17 * 60, endMin: 19 * 60 }] };
+    const at = et('2026-12-02 18:30');
+    const block = evaluateGate(at, { market: 'futures', dayClock: RELOGIO_TOP } as any, { rules: r } as any, null, {
+      agenda: agendaFor(r, r.day, at, ler('2026-12-03')),
+    }).block;
+    expect(block.evaluated && block.today.length).toBe(1); // Thursday's ISM, in the entry's own answer
+    const g6 = blocoDoDia(r, conta, '2026-12-02', ler('2026-12-02'));
+    expect(sp(linhaDosDadosDoPlano([{ at, block }], g6, TOP, dia('2026-12-02')))).toMatchObject({
+      plano: 'nenhum dado com espera neste dia',
+      fato: '—',
+      marca: 'No plano',
+    });
+    // Waiting for the day's read: the line waits
+    expect(linhaDosDadosDoPlano([{ at, block }], undefined, TOP, dia('2026-12-02'))).toBeNull();
+    // An entry on the day's own clock day keeps its own intervals (no read needed)
+    const e = entradasDosDados(espera.trades);
+    expect(sp(linhaDosDadosDoPlano(e, undefined, TOP, dia('2026-12-03')))!.plano).toBe('ISM de serviços às 10:00 · espera 09:55–10:10');
+  });
+
+  it('a wait carried into the next account day names the release\'s weekday (the leftover of «Não opero no dia» past 18:00)', () => {
+    const iv = {
+      kind: 'espera' as const,
+      start: et('2026-12-10 18:00'),
+      end: et('2026-12-10 18:30'),
+      releases: [{ code: 'cpi' as const, at: et('2026-12-10 17:00'), mode: 'volta' as const }],
+    };
+    expect(intervaloDoPlano(iv, NY, '2026-12-11')).toBe('CPI qui às 17:00 · espera 18:00–18:30');
+    expect(intervaloDoPlano(iv, NY, '2026-12-10')).toBe('CPI às 17:00 · espera 18:00–18:30');
   });
 });

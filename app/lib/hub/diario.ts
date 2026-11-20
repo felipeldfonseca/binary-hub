@@ -11,7 +11,7 @@
  * the Diário's clock (`tz`: the account's window clock, ET for Futuros, Forex and Ações, Brasília
  * for binárias, Cripto and B3).
  */
-import { EVERY_DAY, MON_TO_FRI, formatHhMm, isoWeekdayOf, tradingDayBounds, tradingDayOn, utcToLocal, type DayClock } from '@/lib/domain/tempo';
+import { EVERY_DAY, MON_TO_FRI, formatHhMm, isoWeekdayOf, localToUtc, tradingDayBounds, tradingDayOn, utcToLocal, type DayClock } from '@/lib/domain/tempo';
 import { MARKET_SPEC, type AccountMarket, type Currency } from '@/lib/domain/markets';
 import {
   agendaFor,
@@ -656,13 +656,37 @@ export function diaDeDados(releases: readonly Pick<BlockRelease, 'code'>[]): str
 }
 
 /**
- * One interval as the plan writes it (c3 §6.3): «ISM de serviços às 10:00 · espera 09:55–10:10», «CPI às 08:30 · só
- * depois das 08:40», «dia de CPI (08:30) · não opero no dia»; hours on the Diário's clock
+ * A whole day's names with their hours: «dia de CPI (08:30)», «dia de PCE e PIB dos EUA (08:30)» (one hour), and, when
+ * the releases fall at different hours, each group with its own (NEW, review 2026-11-20): «dia de CPI (08:30) e dia de
+ * Fed (14:00)»; hours on `tz`
  */
-export function intervaloDoPlano(iv: BlockInterval, tz: string): string {
+export function diaDeDadosComHoras(releases: readonly BlockRelease[], tz: string): string {
+  const grupos: BlockRelease[][] = [];
+  for (const r of [...releases].sort((a, b) => a.at.getTime() - b.at.getTime())) {
+    const g = grupos.find((x) => hora(x[0].at, tz) === hora(r.at, tz));
+    if (g) g.push(r);
+    else grupos.push([r]);
+  }
+  if (grupos.length <= 1) return `${diaDeDados(releases)} (${hora(releases[0].at, tz)})`;
+  return listaE(grupos.map((g) => `${diaDeDados(g)} (${hora(g[0].at, tz)})`));
+}
+
+/** An instant on `day`'s date on `tz` (its noon): the reference of the date rule for a release shown on that day */
+function meioDia(day: Day, tz: string): Date {
+  const [year, month, d] = day.split('-').map(Number);
+  return localToUtc({ year, month, day: d, hour: 12, minute: 0 }, tz);
+}
+
+/**
+ * One interval as the plan writes it (c3 §6.3): «ISM de serviços às 10:00 · espera 09:55–10:10», «CPI às 08:30 · só
+ * depois das 08:40», «dia de CPI (08:30) · não opero no dia»; hours on the Diário's clock. With `day` (the Diário
+ * day), a release on another date of that clock takes its weekday: the wait left over from a «Não opero no dia» past
+ * 18:00 shows on the next day as «CPI qui às 17:00 · espera 18:00–18:30» (review 2026-11-20)
+ */
+export function intervaloDoPlano(iv: BlockInterval, tz: string, day?: Day): string {
   const r0 = iv.releases[0];
-  if (iv.kind === 'dia') return `${diaDeDados(iv.releases)} (${hora(r0.at, tz)}) · não opero no dia`;
-  const nome = cap(rotuloDados(iv.releases, r0.at, tz, { outraData: true }));
+  if (iv.kind === 'dia') return `${diaDeDadosComHoras(iv.releases, tz)} · não opero no dia`;
+  const nome = cap(rotuloDados(iv.releases, day ? meioDia(day, tz) : r0.at, tz, { outraData: true }));
   return soDepois(iv.releases) ? `${nome} · só depois das ${hora(iv.end, tz)}` : `${nome} · espera ${hora(iv.start, tz)}–${hora(iv.end, tz)}`;
 }
 
@@ -723,6 +747,7 @@ export function linhaDosDadosDoPlano(
   entradas: readonly EntradaDosDados[],
   semEntrada: BlockCheck | null | undefined,
   conta: ContaDiario,
+  dia?: { day: Day; clock: DayClock },
 ): LinhaDoPlano | null {
   if (!temLinhaDeDados(conta.market)) return null;
   const tz = conta.tz;
@@ -736,19 +761,40 @@ export function linhaDosDadosDoPlano(
   });
   const naoConferido = () => linha('não conferidos neste dia', '—', 'Não conferido', 'neutro');
   const desligada = () => linha('regra desligada', '—', 'Sem regra', 'neutro');
-  const blocks = entradas.length ? entradas.map((e) => e.block) : semEntrada ? [semEntrada] : [];
-  if (!blocks.length) return null;
-  const avaliadas = entradas.length ? entradas.filter((e) => e.block.evaluated) : [];
-  const dia = blocks.find((b): b is Extract<BlockCheck, { evaluated: true }> => b.evaluated);
-  if (!dia) {
-    if (blocks.some((b) => !b.evaluated && NAO_CONFERIDO.includes(b.reason))) return naoConferido();
-    if (blocks.some((b) => !b.evaluated && DESLIGADA.includes(b.reason))) return desligada();
-    return null;
+  type Avaliado = Extract<BlockCheck, { evaluated: true }>;
+  const avaliadas = entradas.filter((e) => e.block.evaluated);
+  let ivs: readonly BlockInterval[];
+  if (!avaliadas.length) {
+    const blocks = entradas.length ? entradas.map((e) => e.block) : semEntrada ? [semEntrada] : [];
+    if (!blocks.length) return null;
+    const b = blocks.find((x): x is Avaliado => x.evaluated);
+    if (!b) {
+      if (blocks.some((x) => !x.evaluated && NAO_CONFERIDO.includes(x.reason))) return naoConferido();
+      if (blocks.some((x) => !x.evaluated && DESLIGADA.includes(x.reason))) return desligada();
+      return null;
+    }
+    ivs = b.today;
+  } else {
+    // An answer's `today` is the entry's CLOCK day: an entry inside an overnight window past the day's turn counts on
+    // the day the window opened, but its `today` holds the next day's waits (review 2026-11-20). The day's intervals
+    // come from an entry whose clock day is the Diário day; failing that, from the day's own G6 block.
+    const doDia = dia ? avaliadas.find((e) => tradingDayOn(e.at, dia.clock) === dia.day) : avaliadas[0];
+    if (doDia) ivs = (doDia.block as Avaliado).today;
+    else if (!semEntrada) return null;
+    else if (semEntrada.evaluated) ivs = semEntrada.today;
+    else {
+      // The day's agenda could not be read: the entries' intervals that touch the day (NEW: possibly incomplete)
+      const { start, end } = tradingDayBounds(dia!.day, dia!.clock);
+      const vistos = new Map<string, BlockInterval>();
+      for (const e of avaliadas)
+        for (const iv of (e.block as Avaliado).today)
+          if (iv.start.getTime() < end.getTime() && iv.end.getTime() > start.getTime()) vistos.set(`${iv.kind}${iv.start.getTime()}${iv.end.getTime()}`, iv);
+      ivs = Array.from(vistos.values()).sort((a, b) => a.start.getTime() - b.start.getTime());
+    }
   }
-  const ivs = dia.today;
-  const plano = ivs.length ? ivs.map((iv) => intervaloDoPlano(iv, tz)).join(' · ') : 'nenhum dado com espera neste dia';
+  const plano = ivs.length ? ivs.map((iv) => intervaloDoPlano(iv, tz, dia?.day)).join(' · ') : 'nenhum dado com espera neste dia';
   const dentro = avaliadas.filter((e) => e.block.evaluated && e.block.state === 'no_bloqueio' && e.block.active);
-  const ativos = dentro.map((e) => (e.block as Extract<BlockCheck, { evaluated: true }>).active!);
+  const ativos = dentro.map((e) => (e.block as Avaliado).active!);
   const naoChecadas = entradas.some((e) => !e.block.evaluated && NAO_CONFERIDO.includes(e.block.reason));
   const esperas = ivs.filter((iv) => iv.kind === 'espera');
   const soDepoisDoDado = esperas.length > 0 && esperas.every((iv) => soDepois(iv.releases));
@@ -804,7 +850,7 @@ export function linhaCinzaDoDia(
   o: { market: AccountMarket; tz: string; clock: DayClock; calendars: readonly CalendarCode[] },
 ): string | null {
   if (!temLinhaDeDados(o.market)) return null;
-  const itens: { t: number; texto: string }[] = [];
+  const itens: { t: number; texto: string; nomes?: string[]; h?: string }[] = [];
   for (const r of rows ?? []) {
     if (!r.code || !o.calendars.includes(r.calendar)) continue;
     const nome = NOMES_DADOS[r.code].nome;
@@ -813,13 +859,18 @@ export function linhaCinzaDoDia(
     if (noDia) {
       if (r.status === 'cancelado') itens.push({ t: r.at.getTime(), texto: `${nome} · cancelado` });
       else if (r.status === 'adiado') itens.push({ t: r.at.getTime(), texto: `${nome} · adiado, sem data nova` });
-      else itens.push({ t: r.at.getTime(), texto: `${nome}, ${hora(r.at, o.tz)}` });
+      else {
+        // Two releases at one instant are one item, as the plan line writes them: «PCE e PIB dos EUA, 08:30»
+        const junto = itens.find((x) => x.t === r.at.getTime() && x.nomes);
+        if (junto) junto.nomes!.push(nome);
+        else itens.push({ t: r.at.getTime(), texto: '', nomes: [nome], h: hora(r.at, o.tz) });
+      }
     } else if (antes && r.status !== 'cancelado') {
       itens.push({ t: r.wasAt!.getTime(), texto: `${nome} · adiado para ${diaDaSemanaCurto(tradingDayOn(r.at, o.clock))}` });
     }
   }
   itens.sort((a, b) => a.t - b.t);
-  const partes = itens.map((x) => x.texto);
+  const partes = itens.map((x) => (x.nomes ? `${listaE(x.nomes)}, ${x.h}` : x.texto));
   const feriado = feriadoDoDia(day);
   if (feriado) partes.push(feriado);
   return partes.length ? partes.join(' · ') : null;
@@ -865,10 +916,12 @@ export function comoLerOPlano(market: AccountMarket, temBreakeven: boolean): str
 
 /**
  * «5 operações · −US$ 465,40 · limite atingido às 10:38 · 1 depois do limite, às 10:52 · limite:
- * US$ 465,40 de US$ 400 no pior momento» (live facts, or a review's frozen ones). Without the data
- * marks (the day's facts carry no key for them, SPEC §6 G3) and «viés».
+ * US$ 465,40 de US$ 400 no pior momento» (live facts, or a review's frozen ones). The data marks (c3 §6.2: «1 na
+ * espera do ISM de serviços, às 10:04», «2 em dia de CPI, às 10:04 e 10:31») are not in the facts (SPEC §6 G3: no
+ * key): the screen derives them from the day's trades (diarioOperacao.fatosDosDados) and passes them as `dados`, put
+ * where «no bloqueio» stood, between «fora da janela» and «depois do limite». Without «viés».
  */
-export function fatosTexto(f: DayFacts, conta: ContaDiario): string {
+export function fatosTexto(f: DayFacts, conta: ContaDiario, dados: readonly string[] = []): string {
   const m = conta.currency;
   const out = [pl(f.trades, 'operação', 'operações')];
   if (f.trades) out.push(dinheiro(f.net, m));
@@ -876,8 +929,9 @@ export function fatosTexto(f: DayFacts, conta: ContaDiario): string {
   const fj = f.window?.outside ?? [];
   const dl = f.limit?.after ?? [];
   if (fj.length) out.push(`${fj.length} fora da janela, às ${listaE(fj.map((x) => hora(x.at, conta.tz)))}`);
+  out.push(...dados);
   if (dl.length) out.push(`${dl.length} depois do limite, às ${listaE(dl.map((x) => hora(x.at, conta.tz)))}`);
-  if (!fj.length && !dl.length && f.window && f.trades) out.push(f.trades > 1 ? 'todas no plano' : 'no plano');
+  if (!fj.length && !dados.length && !dl.length && f.window && f.trades) out.push(f.trades > 1 ? 'todas no plano' : 'no plano');
   if (f.limit) out.push(`limite: ${dinheiroCompacto(f.limit.worst, m)} de ${dinheiroCompacto(f.limit.amount, m)} no pior momento`);
   return out.join(' · ');
 }
