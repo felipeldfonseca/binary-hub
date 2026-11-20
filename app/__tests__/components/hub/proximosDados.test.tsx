@@ -107,7 +107,8 @@ describe('«Próximos dados» on the screen (board Q23)', () => {
     expect(screen.getByText('Depois de dom 6: datas previstas, podem mudar.')).toHaveClass('hub-nota')
     expect(within(items[1]).getByText('não toca a sua janela')).toHaveClass('hub-tom--muted')
     await userEvent.click(screen.getByRole('button', { name: 'Mostrar mais' }))
-    expect(within(screen.getByRole('list', { name: 'Próximos dados' })).getAllByRole('listitem')).toHaveLength(6)
+    // Six from the world's rows, then PPI (Tue 15) and Vendas no varejo (Wed 16) of the list's next dates (one world)
+    expect(within(screen.getByRole('list', { name: 'Próximos dados' })).getAllByRole('listitem')).toHaveLength(8)
     expect(screen.queryByRole('button', { name: 'Mostrar mais' })).not.toBeInTheDocument()
   })
 
@@ -127,6 +128,18 @@ describe('«Próximos dados» on the screen (board Q23)', () => {
       '10:00–11:00 ET · sua janelaLiberadoa partir das 10:10, depois da espera',
       'No resto do diaFora da sua janela',
       'Se a perda do dia chegar a US$ 500Encerrado por hoje',
+    ])
+  })
+
+  it('the same rows as the list\'s next dates (review): on Thu 10 Dec PPI (Tue 15) and Vendas no varejo (Wed 16) come first', () => {
+    window.localStorage.setItem(entendiKey(configDoEstado('q19-como-fica-normal').accounts[0].id), '1')
+    render(<RegrasDoQuadro estado="q19-como-fica-normal" />)
+    const items = within(screen.getByRole('list', { name: 'Próximos dados' })).getAllByRole('listitem').map(texto)
+    expect(items.map((x) => x.split(' ET')[0])).toEqual([
+      'Ter 15 · PPI · 08:30',
+      'Qua 16 · Vendas no varejo · 08:30',
+      'Qua 23 · PCE e PIB dos EUA · 08:30',
+      'Qua 23 · Vendas de casas novas · 10:00',
     ])
   })
 

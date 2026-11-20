@@ -13,7 +13,7 @@ import type { AgendaRow, ReleaseCode } from '@/lib/domain/gate'
 import { activeAccounts, parseRulesConfig, pendingVersions, type RulesConfig, type RulesSettings } from '@/lib/hub/regras'
 import SuasRegras, { type DadosLidos } from '@/components/hub/personalizar/SuasRegras'
 import type { FormLimite } from '@/components/hub/personalizar/PersonalizarProvider'
-import { ESTADOS_DADOS, NY, agendaDoEstado, configDoQuadro, et, linhasDoQuadro, proximosDoEstado, type EstadoDados } from './agenda'
+import { ESTADOS_DADOS, NY, agendaDoEstado, configDoQuadro, et, linhasDoQuadro, proximosDoQuadro, type EstadoDados } from './agenda'
 
 /** The board's dates of the US releases the world's rows do not hold (c2 §4; boards Q04, Q05, Q42) */
 const EXTRAS: readonly [ReleaseCode, string][] = [
@@ -45,6 +45,17 @@ export function proximasDoQuadro(at: Date): AgendaRow[] {
   return [...linhasDoQuadro(), ...PROXIMAS_EXTRAS].filter((r) => r.at >= from).sort((a, b) => a.at.getTime() - b.at.getTime())
 }
 
+/**
+ * What «Próximos dados» reads in the world (E6, 14 days from `at`): the world's rows and PROXIMAS_EXTRAS, so the
+ * block and the list's next dates come from one table, as in production (review: PPI on Tue 15 Dec comes first
+ * on Thu 10 Dec)
+ */
+export function proximosDoMundo(at: Date, days = 14): AgendaRow[] {
+  const to = new Date(at.getTime() + days * 86_400_000)
+  const extras = PROXIMAS_EXTRAS.filter((r) => r.at >= at && r.at < to)
+  return [...proximosDoQuadro(at, days), ...extras].sort((a, b) => a.at.getTime() - b.at.getTime())
+}
+
 /** The configuration's rules_config, parsed */
 /**
  * Q41's account is «a conta antiga» (c3 §3.9): its rules were saved before the delivery (contaAntiga, D4), so
@@ -72,7 +83,7 @@ export function dadosDoEstado(e: EstadoDados, over: Partial<DadosLidos> = {}): D
   return {
     agora: s.agora,
     dia: agendaDoEstado(e),
-    proximos: s.semAgenda ? null : proximosDoEstado(e),
+    proximos: s.semAgenda ? null : proximosDoMundo(s.agora),
     proximas: s.semAgenda ? null : proximasDoQuadro(s.agora),
     onAbrirLista: () => {},
     onTentar: () => {},
