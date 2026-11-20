@@ -495,10 +495,11 @@ export const HOJE = {
   nenhumDadoHoje: 'nenhum dado hoje',
   naoConferido: 'não conferido: sem a agenda de hoje',
   // c3 §12.5, SPEC §7.2 «Dado de hoje cancelado ou adiado»
-  canceladoHoje: (nome: string) => `${nome} de hoje cancelado: sem espera hoje.`,
-  adiadoHoje: (nome: string, para: string) => `${nome} adiado para ${para}: sem espera hoje.`,
+  // `cancelado`/`adiado` agree with the release's name (lib/hub/posso.concorda), as the «Posso» card says it
+  canceladoHoje: (nome: string, cancelado = 'cancelado') => `${nome} de hoje ${cancelado}: sem espera hoje.`,
+  adiadoHoje: (nome: string, para: string, adiado = 'adiado') => `${nome} ${adiado} para ${para}: sem espera hoje.`,
   /** NEW (open point for the owner): c3 §12.5 gives «adiado, sem data nova» and the «: sem espera hoje.» ending, not this join */
-  adiadoSemDataHoje: (nome: string) => `${nome} adiado, sem data nova: sem espera hoje.`,
+  adiadoSemDataHoje: (nome: string, adiado = 'adiado') => `${nome} ${adiado}, sem data nova: sem espera hoje.`,
   avisoSemJanela: 'Sem janela: a regra da janela não age. Defina em Quando você opera.',
   avisoCorrija: 'Corrija a janela em Quando você opera.',
 }

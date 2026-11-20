@@ -346,7 +346,8 @@ const GENERO: Partial<Record<ReleaseCode, 'a' | 'os' | 'as'>> = {
   casas_novas: 'as',
   casas_usadas: 'as',
 };
-const concorda = (code: ReleaseCode, palavra: 'cancelad' | 'adiad') => `${palavra}${GENERO[code] ?? 'o'}`;
+/** «cancelado»/«cancelada»/«canceladas» …: one agreement for every screen that says it in a sentence (Posso, Como fica hoje) */
+export const concorda = (code: ReleaseCode, palavra: 'cancelad' | 'adiad') => `${palavra}${GENERO[code] ?? 'o'}`;
 
 /**
  * The grey line of a release of today cancelled or postponed (c3 §5.2 case 17, §12.5; SPEC §7.2 l.1166 and l.1234):
@@ -372,7 +373,12 @@ export function dadosCanceladosHoje(read: AgendaRead | null | undefined, gate: G
     const nome = `${NOMES_DADOS[row.code].nome} de hoje`;
     if (row.status === 'cancelado' && tradingDayOn(row.at, clock) === gate.tradingDay) {
       out.push(`${nome} ${concorda(row.code, 'cancelad')}: sem espera hoje.`);
-    } else if (row.status === 'adiado' && row.wasAt && tradingDayOn(row.wasAt, clock) === gate.tradingDay && tradingDayOn(row.at, clock) !== gate.tradingDay) {
+    } else if (row.status === 'adiado' && !row.wasAt && tradingDayOn(row.at, clock) === gate.tradingDay) {
+      // Postponed without a new date (the row keeps its day, status 'adiado'): the same NEW words as «Como fica hoje»
+      out.push(`${NOMES_DADOS[row.code].nome} ${concorda(row.code, 'adiad')}, sem data nova: sem espera hoje.`);
+    } else if (row.status !== 'cancelado' && row.wasAt && tradingDayOn(row.wasAt, clock) === gate.tradingDay && tradingDayOn(row.at, clock) !== gate.tradingDay) {
+      // Moved out of today: the daily load writes `was_at` and keeps the row 'agendado' at its new instant
+      // (lib/domain/agenda/carga.ts), so the status is not what tells it
       const d = utcToLocal(row.at, wtz);
       const quando = `${WEEKDAYS[d.isoWeekday - 1]} ${Number(d.date.slice(8, 10))} ${MESES[Number(d.date.slice(5, 7)) - 1]}`;
       out.push(`${NOMES_DADOS[row.code].nome} ${concorda(row.code, 'adiad')} para ${quando}: sem espera hoje.`);

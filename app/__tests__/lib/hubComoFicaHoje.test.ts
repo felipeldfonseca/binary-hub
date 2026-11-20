@@ -472,6 +472,11 @@ describe('«Como fica hoje» with the day\'s releases (Phase 5-1, c3 §4.2)', ()
     it('cancelled: no wait, the grey line', () => {
       expect(dia(comCpi({ status: 'cancelado' }))).toEqual(['CPI de hoje cancelado: sem espera hoje. →  [muted, leve]', `${JANELA} → Liberado [mint]`, ...RESTO])
     })
+    it('a feminine name agrees, as on the «Posso» card (integration): «Decisão do Fed de hoje cancelada»', () => {
+      const read = leituraDoDia(etQ(AGORA))
+      const fed = { ...read, rows: read.rows.map((r) => (r.code === 'cpi' && r.day === '2026-12-10' ? { ...r, code: 'fomc_decisao' as const, status: 'cancelado' as const } : r)) }
+      expect(dia(fed)[0]).toBe('Decisão do Fed de hoje cancelada: sem espera hoje. →  [muted, leve]')
+    })
     it('postponed without a new date: no wait, never «adiado para» today', () => {
       expect(dia(comCpi({ status: 'adiado' }))).toEqual(['CPI adiado, sem data nova: sem espera hoje. →  [muted, leve]', `${JANELA} → Liberado [mint]`, ...RESTO])
     })

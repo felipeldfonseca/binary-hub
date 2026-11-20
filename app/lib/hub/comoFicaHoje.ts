@@ -31,7 +31,7 @@ import {
   type ReleaseMode,
   type Rules,
 } from '@/lib/domain/gate';
-import { dinheiroCompacto, type Tom } from './posso';
+import { concorda, dinheiroCompacto, type Tom } from './posso';
 import { formatDayMonth, formatDiaMes } from './formato';
 import { effectiveDayAt, type ConfigVersion, type PendingVersion, type WindowSetting } from './regras';
 import { faixaJanela, resumoDias } from './janelas';
@@ -366,7 +366,7 @@ export function linhasDeDados(
   for (const r of rows.filter((x) => !vivo(x))) {
     if (semEspera || modos[r.code] === 'normal') continue;
     const nome = NOMES_DADOS[r.code].nome;
-    const t = r.status === 'cancelado' ? HOJE.canceladoHoje(nome) : HOJE.adiadoSemDataHoje(nome);
+    const t = r.status === 'cancelado' ? HOJE.canceladoHoje(nome, concorda(r.code, 'cancelad')) : HOJE.adiadoSemDataHoje(nome, concorda(r.code, 'adiad'));
     out.push({ at: r.at.getTime(), linha: { esquerda: [{ t, fraco: true }], estado: '', tom: 'muted', forte: false, sub: null } });
   }
   // A moved release shows on its old date too (was_at today, at later)
@@ -376,7 +376,7 @@ export function linhasDeDados(
     if (tradingDayOn(r.wasAt, rules.day) !== day) continue;
     out.push({
       at: r.wasAt.getTime(),
-      linha: { esquerda: [{ t: HOJE.adiadoHoje(NOMES_DADOS[r.code].nome, diaComMes(dataEm(r.at, tz))), fraco: true }], estado: '', tom: 'muted', forte: false, sub: null },
+      linha: { esquerda: [{ t: HOJE.adiadoHoje(NOMES_DADOS[r.code].nome, diaComMes(dataEm(r.at, tz)), concorda(r.code, 'adiad')), fraco: true }], estado: '', tom: 'muted', forte: false, sub: null },
     });
   }
   if (out.length === 0) out.push(fraca(HOJE.nenhumDadoHoje));

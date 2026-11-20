@@ -533,6 +533,15 @@ describe('«Posso operar hoje?»: rows of SPEC §7.2 not drawn (Phase 5 · telas
     expect(dadosCanceladosHoje(read([row({ status: 'adiado', at: et('2026-12-18 08:30'), wasAt: et('2026-12-10 08:30'), day: '2026-12-18' })]), g, r)).toEqual([
       'CPI adiado para sex 18 dez: sem espera hoje.',
     ]);
+    // Integration (one world with «Como fica hoje»): a release moved out of today as the daily load writes it (status
+    // 'agendado', was_at today), postponed without a new date, and a feminine name agreeing
+    expect(dadosCanceladosHoje(read([row({ status: 'agendado', at: et('2026-12-18 08:30'), wasAt: et('2026-12-10 08:30'), day: '2026-12-18' })]), g, r)).toEqual([
+      'CPI adiado para sex 18 dez: sem espera hoje.',
+    ]);
+    expect(dadosCanceladosHoje(read([row({ status: 'adiado' })]), g, r)).toEqual(['CPI adiado, sem data nova: sem espera hoje.']);
+    const fed = { ...r, block: { ...r.block!, releases: { fomc_decisao: 'volta' as const } } };
+    const gf = evaluateGate(et('2026-12-10 07:00'), TOP_ONE, version(fed), null, { agenda: [] });
+    expect(dadosCanceladosHoje(read([row({ code: 'fomc_decisao', at: et('2026-12-10 14:00') })]), gf, fed)).toEqual(['Decisão do Fed de hoje cancelada: sem espera hoje.']);
     // Another day's cancellation, a release the account does not wait on, the rule off: nothing
     expect(dadosCanceladosHoje(read([row({ at: et('2026-12-11 08:30'), day: '2026-12-11' })]), g, r)).toEqual([]);
     expect(dadosCanceladosHoje(read([row({ code: 'jolts' })]), g, r)).toEqual([]);
