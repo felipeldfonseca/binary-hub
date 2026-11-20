@@ -16,8 +16,13 @@ import {
   type StateRuleCheck,
 } from '@/lib/domain/gate';
 import {
+  avisoDezMinTexto,
+  avisoPrimeiraEspera,
   conferidos,
+  conferidosDoGate,
+  dadosCanceladosHoje,
   dinheiroCompacto,
+  maisTarde,
   janelaLinha,
   marcaDoPlano,
   possoLinha,
@@ -25,6 +30,10 @@ import {
   regraDoEstado,
 } from '@/lib/hub/posso';
 import { brt, EBINEX, ebinexRules, et, SP, TOP_ONE, topOneRules, trade, version } from '@/testing/gate';
+import type { AgendaRead, AgendaRow } from '@/lib/domain/gate';
+import { relogioDados } from '@/hooks/useRegras';
+import { parseRulesNow } from '@/lib/hub/regras';
+import { agoraDoEstado, ESTADOS_DADOS, type EstadoDados } from '@/testing/agenda';
 
 function linha(conta: string, now: Date, rules: Rules | null, account: GateAccount, trades: DayTrade[] = []) {
   const ver = rules && version(rules);
@@ -224,7 +233,7 @@ describe('plan marks', () => {
   });
 
   it('«Conferidos: …»', () => {
-    expect(conferidos(['janela', 'bloqueio', 'limite'])).toBe('Conferidos: janela, bloqueio e limite.');
+    expect(conferidos(['janela', 'bloqueio', 'limite'])).toBe('Conferidos: janela, dados econômicos e limite.');
     expect(conferidos(['janela', 'limite'])).toBe('Conferidos: janela e limite.');
     expect(conferidos(['janela'])).toBe('Conferidos: janela.');
     expect(conferidos(['janela', 'limite', 'estado'])).toBe('Conferidos: janela, limite e regra do estado.');
@@ -350,10 +359,10 @@ describe('«Dados econômicos» in the line (Phase 5 · base, SPEC §7.2)', () =
     expect(possoTexto(possoLinha('Top One', g, r))).toBe('Não opero hoje · decisão do Copom às 16:30');
   });
 
-  it('without the agenda, «Liberado» is grey, never mint', () => {
+  it('without the agenda, «Liberado» is grey (the text colour, as Q12 draws it), never mint, with «Tentar de novo»', () => {
     const g = evaluateGate(et('2026-10-19 10:30'), TOP_ONE, version(r), dayUsage([], { tradingDay: '2026-10-19', until: et('2026-10-19 10:30'), limitCents: 40000 }), { agenda: null });
     const l = possoLinha('Top One', g, r);
-    expect([possoTexto(l), l.tom]).toEqual(['Liberado · dados econômicos não conferidos · sem a agenda de hoje', 'muted']);
+    expect([possoTexto(l), l.tom, l.tentar]).toEqual(['Liberado · dados econômicos não conferidos · sem a agenda de hoje', 'neutral', true]);
   });
 
   it('without the agenda and with a warning, the warning and «dados econômicos não conferidos» both (SPEC §7.2 «em nenhuma linha»)', () => {
@@ -361,12 +370,161 @@ describe('«Dados econômicos» in the line (Phase 5 · base, SPEC §7.2)', () =
     const usage = dayUsage([trade('2026-10-19 10:00', '2026-10-19 10:12', -400)], { tradingDay: '2026-10-19', until: et('2026-10-19 10:30'), limitCents: 40000 });
     const g = evaluateGate(et('2026-10-19 10:30'), TOP_ONE, version(rw), usage, { agenda: null });
     const l = possoLinha('Top One', g, rw);
-    expect([possoTexto(l), l.tom]).toEqual(['Liberado · com aviso do limite · dados econômicos não conferidos · sem a agenda de hoje', 'muted']);
+    expect([possoTexto(l), l.tom]).toEqual(['Liberado · com aviso do limite · dados econômicos não conferidos · sem a agenda de hoje', 'neutral']);
   });
 
   it('the window off, no limit, no agenda: «Dados econômicos não conferidos», grey (C9)', () => {
     const off = { ...r, windowRule: { on: false, outside: 'fora' as const }, limit: null };
     const l = possoLinha('Top One', evaluateGate(et('2026-10-19 10:30'), TOP_ONE, version(off), null, { agenda: null }), off);
-    expect([l.palavra, l.tom, l.sub]).toEqual(['Dados econômicos não conferidos', 'muted', null]);
+    expect([l.palavra, l.tom, l.sub, l.tentar]).toEqual(['Dados econômicos não conferidos', 'muted', null, true]);
+  });
+});
+
+describe('«Posso operar hoje?» on the boards (Phase 5 · telas-posso: the SQL\'s recorded answers, testing/agenda)', () => {
+  const doEstado = (e: EstadoDados) => {
+    const a = parseRulesNow(agoraDoEstado(e)).accounts[0];
+    const agora = ESTADOS_DADOS[e].agora;
+    const l = possoLinha(a.label, a.gate, a.rules, agora);
+    return { a, agora, l, texto: possoTexto(l) };
+  };
+  const TUDO = 'Conferidos: janela, dados econômicos e limite.';
+  const SEM_AGENDA = 'Conferidos: janela e limite. Não conferido: dados econômicos (o app está sem a agenda de hoje).';
+
+  it.each<[EstadoDados, string, string, string, string | null]>([
+    ['q06-posso-espera-ism', 'Aguardar até 10:10 · ISM de serviços às 10:00', 'amber', TUDO, null],
+    ['q07-posso-depois-cpi', 'Aguardar até 08:40 · CPI às 08:30 · só opero depois do dado', 'amber', TUDO, null],
+    ['q08-posso-dia-cpi', 'Não opero hoje · dia de CPI, às 08:30', 'amber', TUDO, null],
+    ['q09-posso-pce-pib', 'Aguardar até 08:40 · PCE e PIB dos EUA às 08:30', 'amber', TUDO, null],
+    ['q10-posso-liberado', 'Liberado · até 11:00 ET', 'mint', TUDO, null],
+    ['q11-posso-mais-tarde', 'Fora da sua janela · abre às 10:00 ET', 'amber', TUDO, 'Mais tarde: ISM de serviços às 10:00, espera das 09:55 às 10:10.'],
+    ['q12-posso-sem-agenda', 'Liberado · dados econômicos não conferidos · sem a agenda de hoje', 'neutral', SEM_AGENDA, null],
+    ['q15-posso-espera-acabou', 'Fora da sua janela · abre às 10:00 ET', 'amber', TUDO, null],
+    ['q16-posso-sem-agenda-fora', 'Fora da sua janela · abre às 10:00 ET', 'amber', SEM_AGENDA, null],
+    ['q17-posso-encerrado-na-espera', 'Encerrado por hoje · limite atingido às 10:38', 'red', TUDO, null],
+    ['q18-posso-primeira-espera', 'Aguardar até 10:10 · ISM de serviços às 10:00', 'amber', TUDO, null],
+  ])('%s: «%s» (%s), the checked sentence and «Mais tarde»', (e, texto, tom, frase, depois) => {
+    const { a, agora, l } = doEstado(e);
+    expect([possoTexto(l), l.tom]).toEqual([texto, tom]);
+    expect(conferidosDoGate(a.gate)).toBe(frase);
+    expect(maisTarde(a.gate, a.rules, agora)).toBe(depois);
+  });
+
+  it('«Tentar de novo» only on the grey «Liberado» (Q12), never on «Fora da sua janela» without the agenda (Q16, as drawn)', () => {
+    expect(doEstado('q12-posso-sem-agenda').l.tentar).toBe(true);
+    expect(doEstado('q16-posso-sem-agenda-fora').l.tentar).toBeFalsy();
+    expect(doEstado('q10-posso-liberado').l.tentar).toBeFalsy();
+  });
+
+  it('Q18: the first-wait notice, with the account\'s own minutes, only while it waits on the short form', () => {
+    const { a } = doEstado('q18-posso-primeira-espera');
+    expect(avisoPrimeiraEspera(a.gate, a.rules)).toBe(
+      'Esta espera vem da regra “Dados econômicos” desta conta (5 min antes e 10 depois dos dados fortes). O app passou a conferi-la; você muda em Personalizar.',
+    );
+    const minutos = { ...a.rules!, block: { ...a.rules!.block!, beforeMin: 3, afterMin: 15 } };
+    expect(avisoPrimeiraEspera(a.gate, minutos)).toContain('(3 min antes e 15 depois dos dados fortes)');
+    // A rule saved in the long form (with `releases`) is not «a conta antiga»; a free answer has no wait to explain
+    const q07 = doEstado('q07-posso-depois-cpi').a;
+    expect(avisoPrimeiraEspera(q07.gate, q07.rules)).toBeNull();
+    const q11 = doEstado('q11-posso-mais-tarde').a;
+    expect(avisoPrimeiraEspera(q11.gate, q11.rules)).toBeNull();
+  });
+
+  it('Q37: the 10-minute notice\'s words from the clock of the answer (09:50: the ISM wait starts at 09:55)', () => {
+    const { a, agora } = doEstado('q37-aviso-10min-diario');
+    const today = a.gate.block.evaluated ? a.gate.block.today : [];
+    const r = relogioDados(agora, { today, tz: 'America/New_York', preferences: null });
+    expect(r.avisoDezMin && avisoDezMinTexto(r.avisoDezMin, 'America/New_York')).toBe('Às 09:55 começa a espera do ISM de serviços (10:00), até 10:10.');
+  });
+
+  it('the notice of two releases at once: «do PCE e do PIB dos EUA (08:30)»', () => {
+    const releases = [
+      { code: 'pce' as const, at: et('2026-12-23 08:30'), mode: 'volta' as const },
+      { code: 'pib_us' as const, at: et('2026-12-23 08:30'), mode: 'volta' as const },
+    ];
+    expect(avisoDezMinTexto({ start: et('2026-12-23 08:25'), end: et('2026-12-23 08:40'), releases }, 'America/New_York')).toBe(
+      'Às 08:25 começa a espera do PCE e do PIB dos EUA (08:30), até 08:40.',
+    );
+  });
+});
+
+describe('«Posso operar hoje?»: rows of SPEC §7.2 not drawn (Phase 5 · telas-posso)', () => {
+  const r = topOneRules();
+  const gate = (now: string, agenda: { code: 'ism_serv' | 'fomc_decisao' | 'cpi'; at: string }[]) =>
+    evaluateGate(et(now), TOP_ONE, version(r), dayUsage([], { tradingDay: '2026-12-03', until: et(now), limitCents: 40000 }), {
+      agenda: agenda.map((x) => ({ code: x.code, at: et(x.at) })),
+    });
+
+  it('NEW (not drawn): free inside the window with a wait still to come, «Liberado · até 10:25 ET» (the wait\'s start, liberado.until)', () => {
+    const g = gate('2026-12-03 10:05', [{ code: 'ism_serv', at: '2026-12-03 10:30' }]);
+    expect(possoTexto(possoLinha('Top One', g, r))).toBe('Liberado · até 10:25 ET');
+    expect(maisTarde(g, r)).toBe('Mais tarde: ISM de serviços às 10:30, espera das 10:25 às 10:40.');
+  });
+
+  it('«Mais tarde» names only the next wait, «e mais 1 hoje.» when another follows; gone in a wait or a closed day', () => {
+    const g = gate('2026-12-03 10:05', [
+      { code: 'ism_serv', at: '2026-12-03 10:30' },
+      { code: 'fomc_decisao', at: '2026-12-03 14:00' },
+    ]);
+    expect(maisTarde(g, r)).toBe('Mais tarde: ISM de serviços às 10:30, espera das 10:25 às 10:40, e mais 1 hoje.');
+    const na = gate('2026-12-03 10:27', [{ code: 'ism_serv', at: '2026-12-03 10:30' }]);
+    expect(possoTexto(possoLinha('Top One', na, r))).toBe('Aguardar até 10:40 · ISM de serviços às 10:30');
+    expect(maisTarde(na, r)).toBeNull();
+  });
+
+  it('a leftover of «Não opero no dia» past the day\'s end (R7d): «Aguardar até 18:15»; three releases in one wait: «e mais 2 dados»', () => {
+    const base = evaluateGate(et('2026-12-09 17:40'), TOP_ONE, version(r), null, { agenda: [] });
+    const copom = { kind: 'espera' as const, start: et('2026-12-09 17:25'), end: et('2026-12-09 18:15'), releases: [{ code: 'copom' as const, at: et('2026-12-09 17:30'), mode: 'volta' as const }] };
+    const sobra = { ...base, status: 'aguardar' as const, block: { evaluated: true as const, state: 'no_bloqueio' as const, active: copom, today: [copom], freeAt: copom.end } };
+    expect(possoTexto(possoLinha('Top One', sobra, r))).toBe('Aguardar até 18:15 · decisão do Copom às 17:30');
+    const tres = {
+      kind: 'espera' as const,
+      start: et('2026-12-10 08:10'),
+      end: et('2026-12-10 08:55'),
+      releases: [
+        { code: 'bce_decisao' as const, at: et('2026-12-10 08:15'), mode: 'volta' as const },
+        { code: 'cpi' as const, at: et('2026-12-10 08:30'), mode: 'volta' as const },
+        { code: 'ppi' as const, at: et('2026-12-10 08:45'), mode: 'volta' as const },
+      ],
+    };
+    const g3 = { ...base, at: et('2026-12-10 08:20'), status: 'aguardar' as const, block: { evaluated: true as const, state: 'no_bloqueio' as const, active: tres, today: [tres], freeAt: tres.end } };
+    expect(possoTexto(possoLinha('Top One', g3, r))).toBe('Aguardar até 08:55 · decisão do BCE às 08:15 e mais 2 dados');
+  });
+
+  it('what was not checked: the window off («Conferido: limite.»), the limit unread too («Não conferidos: limite do dia e dados econômicos …»)', () => {
+    const off = { ...r, windowRule: { on: false, outside: 'fora' as const } };
+    const usage = dayUsage([], { tradingDay: '2026-10-19', until: et('2026-10-19 10:30'), limitCents: 40000 });
+    expect(conferidosDoGate(evaluateGate(et('2026-10-19 10:30'), TOP_ONE, version(off), usage, { agenda: null }))).toBe(
+      'Conferido: limite. Não conferido: dados econômicos (o app está sem a agenda de hoje).',
+    );
+    expect(conferidosDoGate(evaluateGate(et('2026-10-19 10:30'), TOP_ONE, version(off), null, { agenda: null }))).toBe(
+      'Não conferidos: limite do dia e dados econômicos (o app está sem a agenda de hoje).',
+    );
+    // The rule off: nothing about data
+    const desligada = { ...r, block: { ...r.block!, on: false } };
+    expect(conferidosDoGate(evaluateGate(et('2026-10-19 10:30'), TOP_ONE, version(desligada), usage, { agenda: null }))).toBe('Conferidos: janela e limite.');
+  });
+
+  it('a release of today cancelled or postponed: «CPI de hoje cancelado: sem espera hoje.», «CPI adiado para sex 18 dez: sem espera hoje.» (NEW, not drawn)', () => {
+    const g = evaluateGate(et('2026-12-10 07:00'), TOP_ONE, version(r), null, { agenda: [] });
+    const row = (over: Partial<AgendaRow>): AgendaRow => ({
+      code: 'cpi',
+      calendar: 'us',
+      at: et('2026-12-10 08:30'),
+      wasAt: null,
+      status: 'cancelado',
+      day: '2026-12-10',
+      localTz: 'America/New_York',
+      ...over,
+    });
+    const read = (rows: AgendaRow[]): AgendaRead => ({ rows, covered: [{ calendar: 'us', day: '2026-12-10' }] });
+    expect(dadosCanceladosHoje(read([row({})]), g, r)).toEqual(['CPI de hoje cancelado: sem espera hoje.']);
+    expect(dadosCanceladosHoje(read([row({ status: 'adiado', at: et('2026-12-18 08:30'), wasAt: et('2026-12-10 08:30'), day: '2026-12-18' })]), g, r)).toEqual([
+      'CPI adiado para sex 18 dez: sem espera hoje.',
+    ]);
+    // Another day's cancellation, a release the account does not wait on, the rule off: nothing
+    expect(dadosCanceladosHoje(read([row({ at: et('2026-12-11 08:30'), day: '2026-12-11' })]), g, r)).toEqual([]);
+    expect(dadosCanceladosHoje(read([row({ code: 'jolts' })]), g, r)).toEqual([]);
+    expect(dadosCanceladosHoje(read([row({})]), g, { ...r, block: { ...r.block!, on: false } })).toEqual([]);
+    expect(dadosCanceladosHoje(null, g, r)).toEqual([]);
   });
 });

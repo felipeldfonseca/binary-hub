@@ -173,7 +173,7 @@ describe('PossoOperarHoje (the card, from props)', () => {
   it.each<[AgoraFixture, Line[]]>([
     ['agora-seg-0930-et', [TOP_FORA, EBX_FORA]],
     // Re-recorded on the Phase 5-1 SQL with an empty agenda: the block is sem_agenda, never a green «Liberado» (L4)
-    ['agora-seg-1005-et', [{ conta: 'Top One #1', texto: 'Liberado · dados econômicos não conferidos · sem a agenda de hoje', tom: 'muted', limite: limite('0', '400') }, EBX_FORA]],
+    ['agora-seg-1005-et', [{ conta: 'Top One #1', texto: 'Liberado · dados econômicos não conferidos · sem a agenda de hoje', tom: 'neutral', limite: limite('0', '400') }, EBX_FORA]],
     [
       'agora-seg-1045-et',
       [{ conta: 'Top One #1', texto: 'Encerrado por hoje · limite atingido às 10:31', tom: 'red', limite: limite('430', '400') }, EBX_FORA],
@@ -321,9 +321,9 @@ describe('PossoOperarHoje (the card, from props)', () => {
 
     render(<PossoOperarHoje state={{ status: 'ready', accounts: now.accounts }} onRetry={jest.fn()} />)
 
-    expect(lines()[0]).toEqual({ conta: 'Top One #1', texto: 'Liberado · com aviso: fora da janela · dados econômicos não conferidos · sem a agenda de hoje', tom: 'muted', limite: limite('0', '400') })
-    // sem_agenda: «Liberado» is not emphasised (never green), L4's re-recording
-    expect(within(items()[0]).getByText('Liberado').tagName).toBe('SPAN')
+    expect(lines()[0]).toEqual({ conta: 'Top One #1', texto: 'Liberado · com aviso: fora da janela · dados econômicos não conferidos · sem a agenda de hoje', tom: 'neutral', limite: limite('0', '400') })
+    // sem_agenda: «Liberado» in the text colour, never green; bold as Q12 draws it (`strong.hub-tom--neutral`)
+    expect(within(items()[0]).getByText('Liberado').tagName).toBe('STRONG')
   })
 
   it('«Sem regra ativa · Ajustar» when the window rule is off and there is no limit', () => {
@@ -558,7 +558,7 @@ describe('PossoOperarHojeDiario (the card, from rules_now)', () => {
     })
 
     await waitFor(() => expect(lines()[0].texto).toBe('Liberado · dados econômicos não conferidos · sem a agenda de hoje'))
-    expect(lines()[0].tom).toBe('muted')
+    expect(lines()[0].tom).toBe('neutral')
     expect(fetchRulesNow).toHaveBeenCalledTimes(2)
   })
 
