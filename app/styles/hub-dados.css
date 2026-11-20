@@ -106,16 +106,21 @@
 /* Two columns of choices and the three-column list only where the value column fits them (Q03 at 1280) */
 @media (min-width: 1200px) {
   /*
-   * Side by side, each pill on one line (Q03 draws a 2 × 2 grid in a wider card; in the app's column at 1280 px a
-   * grid of max-content columns passes the card or breaks the pills' words, so the pills flow in rows instead)
+   * Q03's two columns, read top to bottom (Aguardo · Só opero | Não opero · Personalizado; contract §5 Q03,
+   * SPEC §7.1). The app's column at 1280 px is narrower than the board's card: each column takes half and a
+   * pill wraps its words inside it rather than passing the card.
    */
   .hub .hub-dd-atalhos {
-    flex-direction: row;
-    flex-wrap: wrap;
+    display: grid;
+    grid-auto-flow: column;
+    grid-template-rows: auto auto;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
     gap: 6px 12px;
   }
   .hub .hub-dd-atalhos .hub-pill {
-    white-space: nowrap;
+    white-space: normal;
+    min-width: 0;
+    text-align: left;
   }
   /* The list as a table of three columns: Dado · Próxima · O que você faz (SPEC §7.1) */
   .hub .hub-dd-lista .hub-dd-linha {
