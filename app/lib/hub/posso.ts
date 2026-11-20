@@ -285,7 +285,7 @@ export function maisTarde(gate: GateResult, rules: Rules | null, agora: Date = g
 }
 
 /** «do ISM de serviços», «do PCE e do PIB dos EUA», «da decisão do BCE e mais 2 dados» */
-function doDaDados(releases: readonly BlockRelease[]): string {
+export function doDaDados(releases: readonly BlockRelease[]): string {
   const codes = Array.from(new Set(releases.map((r) => r.code)));
   if (codes.length >= 3) return `${NOMES_DADOS[codes[0]].doDa} e mais ${codes.length - 1} dados`;
   return codes.map((c) => NOMES_DADOS[c].doDa).join(' e ');

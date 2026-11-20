@@ -86,6 +86,30 @@ export const ENTRADA = {
   limite: 'Limite do dia', // RO l.331
   limiteDe: (valor: string) => `de ${valor}`,
   fora: 'Fora do plano, conferido pelo hub. Você pode registrar.', // RO l.408
+  /**
+   * Phase 5-1 (c3 §7.2 l.1179-1193; boards Q33–Q36): the plan sentence of «Dados econômicos», beside the mark, in the
+   * text colour (the mark is amber), always ending «Você pode registrar.». {nome} = «do ISM de serviços»; {de}/{ate}
+   * = the wait's start and end on the window clock
+   */
+  dados: {
+    /** 1: «Na espera do ISM de serviços (09:55 às 10:10): fora do plano. Você pode registrar.» */
+    espera: (doDa: string, de: string, ate: string) => `Na espera ${doDa} (${de} às ${ate}): fora do plano. Você pode registrar.`,
+    /** 4: «Fora da janela e na espera do ISM de serviços (09:55 às 10:10): fora do plano. Você pode registrar.» */
+    foraEEspera: (doDa: string, de: string, ate: string) => `Fora da janela e na espera ${doDa} (${de} às ${ate}): fora do plano. Você pode registrar.`,
+    /** 5: «Na espera do ISM de serviços e depois do limite: fora do plano. Você pode registrar.» */
+    esperaELimite: (doDa: string) => `Na espera ${doDa} e depois do limite: fora do plano. Você pode registrar.`,
+    /** NEW (4 + 5, not written by c3): the three breaks at once */
+    foraEsperaELimite: (doDa: string) => `Fora da janela, na espera ${doDa} e depois do limite: fora do plano. Você pode registrar.`,
+    /** 2: «CPI às 08:30: pelo seu plano, você só opera a partir das 08:40. Você pode registrar.» */
+    soDepois: (rotulo: string, ate: string) => `${rotulo}: pelo seu plano, você só opera a partir das ${ate}. Você pode registrar.`,
+    /** 3: «Dia de CPI: pelo seu plano, você não opera neste dia. Você pode registrar.» */
+    dia: (nomes: string) => `Dia de ${nomes}: pelo seu plano, você não opera neste dia. Você pode registrar.`,
+    /** 6: the app without the day's agenda */
+    semAgenda: 'Não foi possível conferir os dados econômicos agora. Você pode registrar; a operação fica sem essa conferência.',
+    /** NEW (the built sentence + 6): another break (window, limit) with the app without the agenda */
+    foraSemAgenda:
+      'Fora do plano, conferido pelo hub. Não foi possível conferir os dados econômicos agora. Você pode registrar; a operação fica sem essa conferência.',
+  },
   /** «Operação anterior: 2 imagens e nota salvas às 10:21.» (RO l.1452) */
   anterior: (quem: string, hora: string) => `Operação anterior: ${quem} às ${hora}.`,
   /** «Entrada das 10:31 desfeita às 10:32.» (RO l.1279) */
@@ -100,8 +124,9 @@ export const GATE = {
   naoConferido: 'Não foi possível conferir agora.',
   infoAria: 'Como ler: Posso operar hoje?', // RO l.329
   // RO l.1143 (v57): Futuros
+  // Phase 5-1, C10: c3 §7.2 l.1205-1206
   infoFuturos:
-    'Calculado pelas regras desta conta, na hora da entrada: janela e limite do dia (o bloqueio de dados fica ativo na Fase 5). Ele nunca impede o registro: fora do plano, a operação só ganha a marca.',
+    'Calculado pelas regras desta conta, na hora da entrada: janela, dados econômicos e limite do dia. Ele nunca impede o registro: fora do plano, a operação só ganha a marca.',
   // RO l.1144 (v57): every other market
   infoOutros:
     'Calculado pelas regras desta conta, na hora da entrada: janela e limite do dia. Ele nunca impede o registro: fora do plano, a operação só ganha a marca.',

@@ -3,11 +3,12 @@
 import { Fragment, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useAfterPreview, useEntryPreview, useGateAt, useRegisterAfter, useRegisterEntry, useServerNow } from '@/hooks/useRegistrar'
+import { relogioDados } from '@/hooks/useRegras'
 import { addDays } from '@/lib/domain/tempo'
 import type { GateResult, Rules } from '@/lib/domain/gate'
 import { groupByMarket, type TradingAccount } from '@/lib/hub/contas'
 import type { AccountNow } from '@/lib/hub/regras'
-import { janelaLinha, type Tom } from '@/lib/hub/posso'
+import { avisoDezMinTexto, janelaLinha, relogioDaJanela, type Tom } from '@/lib/hub/posso'
 import { avisoDoLimite, type AvisoDoLimite, type RegistrarDefaults } from '@/lib/hub/registrar'
 import { RegistrarDataError, type RegistrarErrorCode } from '@/lib/hub/registrarDb'
 import { formatDecimal } from '@/lib/hub/numero'
@@ -17,6 +18,7 @@ import {
   alternarCorrigir,
   avisoLimiteEntrada,
   descricaoSimilar,
+  fraseDoPlano,
   diaDe,
   horaRel,
   linhaGate,
@@ -54,6 +56,21 @@ export interface GateMostrado {
   /** null: nothing answered yet; 'falhou': «Não foi possível conferir agora.» */
   linha: ReturnType<typeof linhaGate> | 'falhou' | null
   limite: { usado: string; de: string } | null
+  /**
+   * Phase 5-1 (c3 §8.2; board Q38): «Às 09:55 começa a espera do ISM de serviços (10:00), até 10:10.», under the
+   * answer, only for an entry «now» in the 10 minutes before a wait, unless the preference is off
+   */
+  avisoDezMin?: string | null
+}
+
+/** The clock of the 10-minute notice (board Q38) */
+function Relogio() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true" className="hub-reg-aviso10__relogio">
+      <circle cx="8" cy="8" r="6.5" fill="none" stroke="currentColor" strokeWidth="1.6" />
+      <path d="M8 4.5V8l2.4 1.6" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+    </svg>
+  )
 }
 
 export function ContextoConta({
@@ -172,6 +189,12 @@ export function ContextoConta({
             <InfoButton panelId="info-gate" label={GATE.infoAria} open={infoAberto} onToggle={alternarInfo} />
           </div>
           {infoAberto && <InfoPanel id="info-gate">{info}</InfoPanel>}
+          {gate.avisoDezMin && (
+            <div className="hub-reg-ctx-linha hub-reg-aviso10" role="status">
+              <Relogio />
+              <span>{gate.avisoDezMin}</span>
+            </div>
+          )}
           {gate.limite && (
             <div className="hub-reg-ctx-linha">
               <span className="hub-reg-rot">{ENTRADA.limite}</span>
@@ -470,6 +493,8 @@ export interface PassoEntradaProps {
   /** «Operação anterior: …», «Entrada das 10:31 desfeita às 10:32.», «Esta operação não foi encontrada.» */
   aviso: string | null
   pref80: boolean
+  /** Phase 5-1: the 10-minute notice of a wait (alerts.before_block !== false: on by default, contract §3.8) */
+  avisoDados?: boolean
   aoRegistrar: (x: Registrado) => void
   aoSemRegras: () => void
   /** The step's heading takes the focus when it appears */
@@ -484,6 +509,7 @@ export interface PassoEntradaProps {
  */
 export default function PassoEntrada(props: PassoEntradaProps) {
   const { conta, contas, aoTrocarConta, agora, rulesNowFalhou, hoje, rules, defaults, r, inicial, setR, aviso, pref80, aoRegistrar, aoSemRegras, headingRef } = props
+  const avisoDados = props.avisoDados !== false
   const now = useServerNow(1000)
   const [tentou, setTentou] = useState(false)
   const [erroServidor, setErroServidor] = useState<{ campo: CampoEntrada; texto: string } | null>(null)
@@ -516,10 +542,17 @@ export default function PassoEntrada(props: PassoEntradaProps) {
   const pergunta = perguntaGate(m, r.modo)
   const presente = !fechada && m.agora
   const outroDia = m.dia !== m.hoje
+  // The 10-minute notice (c3 §8.2): only for an entry «now» (the minute the form proposes), on the server clock; the
+  // answer drawn is then rules_now's for this minute
+  const aviso10 =
+    presente && !noGateAt && gate && gate.block.evaluated
+      ? relogioDados(now, { today: gate.block.today, tz: relogioDaJanela(rulesDoGate), preferences: { alerts: { before_block: avisoDados } } }).avisoDezMin
+      : null
   const gateMostrado: GateMostrado = {
     pergunta,
     linha: falhou ? 'falhou' : gate ? linhaGate(conta, gate, rulesDoGate, { presente, outroDia }) : null,
     limite: gate ? linhaLimite(conta, gate, rulesDoGate) : null,
+    avisoDezMin: aviso10 ? avisoDezMinTexto(aviso10, relogioDaJanela(rulesDoGate)) : null,
   }
 
   // The dry run: the plan, the limit's room, `similar` (only a complete form is asked)
@@ -529,6 +562,8 @@ export default function PassoEntrada(props: PassoEntradaProps) {
   const dryAtual = dry.data && !dry.isPlaceholderData ? dry.data : null
   const quebras = m.diaRecusado ? [] : dryAtual ? dryAtual.plan.breaks : gate ? quebrasDoGate(gate) : []
   const plano = textoQuebras(quebras, dryAtual ? dryAtual.gate : gate)
+  // Phase 5-1: one sentence for the plan (c3 §7.2), beside the mark or alone (the app without the agenda)
+  const frasePlano = m.diaRecusado ? null : fraseDoPlano(quebras, dryAtual ? dryAtual.gate : gate, rulesDoGate, { outraData: !presente })
   const aviso2 = avisoLimiteEntrada(conta, m, gate, dryAtual ? dryAtual.limitRoom : undefined)
 
   // Errors on screen: the local ones, or the server's refusal of a field the form let through
@@ -734,10 +769,10 @@ export default function PassoEntrada(props: PassoEntradaProps) {
       ) : (
         <CamposPrecos conta={conta} r={r} m={m} rules={rules} erros={erros} mudar={mudar} aviso={aviso2} padroes={defaults} aoRecomecar={() => setTentou(false)} />
       )}
-      {plano && (
+      {(plano || frasePlano) && (
         <div className="hub-reg-plano-linha">
-          <PlanoPill fora={plano} noPlano="" semPlano="" />
-          <span>{ENTRADA.fora}</span>
+          {plano && <PlanoPill fora={plano} noPlano="" semPlano="" />}
+          {frasePlano && <span>{frasePlano}</span>}
         </div>
       )}
       {fechada &&
