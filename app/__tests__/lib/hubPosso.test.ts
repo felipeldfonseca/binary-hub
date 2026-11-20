@@ -230,6 +230,9 @@ describe('plan marks', () => {
     });
     const nothing = { ...rules(), windowRule: { on: false, outside: 'fora' as const }, limit: null };
     expect(marcaDoPlano(plan('2026-11-19 10:05', { version: version(nothing) }))).toEqual({ texto: '—', tom: 'muted' });
+    // Phase 5-1 (c3 §9.2 item 13): the data break worded from the entry's wait, never «no bloqueio»
+    const ism = plan('2026-11-19 10:05', { agenda: [{ code: 'ism_serv', at: et('2026-11-19 10:05') }] });
+    expect(marcaDoPlano(ism)).toEqual({ texto: '●\u00a0na espera do ISM', tom: 'amber' });
   });
 
   it('«Conferidos: …»', () => {

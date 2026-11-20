@@ -28,7 +28,7 @@ import {
   type Rules,
   type StateRuleCheck,
 } from '@/lib/domain/gate';
-import { NOMES_DADOS, PALAVRAS_DADOS, horaDeVolta, rotuloDados, rotuloDia, soDepois } from './dadosEconomicos';
+import { NOMES_DADOS, PALAVRAS_DADOS, horaDeVolta, marcaDados, rotuloDados, rotuloDia, soDepois } from './dadosEconomicos';
 import { formatMoney } from './formato';
 
 /** Board colour tokens: --mint, --amber, --red, --text (neutral), --text-2 (muted) */
@@ -218,16 +218,24 @@ export function possoTexto(l: PossoLinha): string {
   return [l.palavra, l.sub ?? l.acao?.texto].filter(Boolean).join(' · ');
 }
 
-const MARCAS: Record<PlanBreak, string> = {
+// The data break keeps its code (`no_bloqueio`, c3 §9.1); its words come from the entry's gate (c3 §9.2 item 13)
+const MARCAS: Record<Exclude<PlanBreak, 'no_bloqueio'>, string> = {
   fora_da_janela: 'fora da janela',
-  no_bloqueio: 'no bloqueio',
   depois_do_limite: 'depois do limite',
   contra_a_regra: 'contra a regra',
 };
 
-/** The «Plano» column: «No plano», «● fora da janela · depois do limite», «—», or the imported history */
+/**
+ * The «Plano» column: «No plano», «● fora da janela · depois do limite», «● na espera do ISM», «● em dia de CPI», «—», or
+ * the imported history. The data break is worded from the plan's gate (`block.active`, marcaDados; «na espera de dado»
+ * when the answer does not carry it)
+ */
 export function marcaDoPlano(p: PlanResult): { texto: string; tom: Tom } {
-  if (p.verdict === 'fora_do_plano') return { texto: `●${NBSP}${p.breaks.map((b) => MARCAS[b]).join(' · ')}`, tom: 'amber' };
+  if (p.verdict === 'fora_do_plano') {
+    const active = p.gate.block.evaluated ? p.gate.block.active : null;
+    const words = p.breaks.map((b) => (b === 'no_bloqueio' ? marcaDados(active) : MARCAS[b]));
+    return { texto: `●${NBSP}${words.join(' · ')}`, tom: 'amber' };
+  }
   if (p.verdict === 'no_plano') return { texto: 'No plano', tom: 'mint' };
   if (!p.gate.window.evaluated && p.gate.window.reason === 'sem_versao') {
     return { texto: 'Histórico importado · só resultado', tom: 'muted' };
