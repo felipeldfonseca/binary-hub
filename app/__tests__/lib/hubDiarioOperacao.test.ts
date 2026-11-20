@@ -22,7 +22,9 @@ import {
   detalhesAria,
   fatosDaOperacao,
   horaDaLinha,
+  linhaDosDados,
   linhasDaOperacao,
+  marcaDadosLonga,
   marcasDaOperacao,
   operacaoDaLinha,
   operacaoDeOutroDia,
@@ -38,6 +40,7 @@ import {
   type ContaDaOperacao,
 } from '@/lib/hub/diarioOperacao'
 import { CENARIOS, quadro, type Cenario, type EsperadoDia, type Quadro } from '@/testing/diarioQuadro'
+import { agendaJson } from '@/testing/agenda'
 
 const NBSP = / /g
 const limpo = (s: unknown): any => (typeof s === 'string' ? s.replace(NBSP, ' ') : Array.isArray(s) ? s.map(limpo) : s)
@@ -124,7 +127,12 @@ describe('every trade of every scenario day: the row and the drill say what the 
       const ed = e.drills[i]
       const app = drillDoApp(t, conta, d)
       expect(sem({ i, fatos: app.fatos })).toEqual(sem({ i, fatos: ed.fatos }))
-      expect(sem({ i, linhas: app.linhas })).toEqual(sem({ i, linhas: ed.linhas }))
+      // Phase 5-1 adds one line the Phase 4 boards predate: a Futuros entry frozen before the rule (`fase5`) or
+      // recalculated without the agenda (`sem_agenda`) says so (c3 §6.4); the board's lines are the others, in order
+      const dados = linhaDosDados(t, conta.tz) ?? []
+      if (conta.market === 'futures' && !t.history && (t.plan || t.planNow)) expect(dados.length).toBe(1)
+      else expect(dados).toEqual([])
+      expect(sem({ i, linhas: app.linhas.filter((l: string) => !dados.includes(l)) })).toEqual(sem({ i, linhas: ed.linhas }))
       expect(sem({ i, tempo: app.tempo, be: app.be })).toEqual(sem({ i, tempo: ed.tempo, be: ed.be }))
       expect(sem({ i, ax: app.ax })).toEqual(sem({ i, ax: ed.ax ? { quando: ed.ax.quando, imgs: ed.ax.imgs, nota: ed.ax.nota } : null }))
       expect(sem({ i, adicionar: app.adicionar })).toEqual(sem({ i, adicionar: ed.adicionar }))
@@ -495,7 +503,8 @@ describe('«Dados econômicos» in the Diário (Phase 5 · base; G1 and the Plan
   it('the Plan column: a trade only «no_bloqueio» shows its mark, not «—»', () => {
     const p = (aberta.plan ?? aberta.planNow)!
     const t = { ...aberta, plan: { ...p, verdict: 'fora_do_plano' as const, breaks: ['no_bloqueio'] as PlanBreak[] }, gate: naEspera(ism, min(5)) }
-    expect(planoDaLinha(t)).toEqual({ tipo: 'fora', texto: 'na espera do ISM', aria: 'fora do plano: na espera do ISM' })
+    // Short names in the row, full names for a screen reader (Q24, the owner's summary)
+    expect(planoDaLinha(t)).toEqual({ tipo: 'fora', texto: 'na espera do ISM', aria: 'fora do plano: na espera do ISM de serviços' })
     const dia = { ...t, gate: naEspera(cpiDia, cpiDia.end), plan: { ...t.plan, breaks: ['fora_da_janela', 'no_bloqueio'] as PlanBreak[] } }
     expect(planoDaLinha(dia)).toEqual({ tipo: 'fora', texto: 'fora da janela · em dia de CPI', aria: 'fora do plano: fora da janela e em dia de CPI' })
   })
@@ -504,5 +513,92 @@ describe('«Dados econômicos» in the Diário (Phase 5 · base; G1 and the Plan
     const p = (aberta.plan ?? aberta.planNow)!
     const t = { ...aberta, plan: null, planNow: { ...p, verdict: 'fora_do_plano' as const, breaks: ['no_bloqueio'] as PlanBreak[] }, gate: null, gateNow: naEspera(cpiDia, cpiDia.end) }
     expect(planoDaLinha(t)).toMatchObject({ tipo: 'fora', texto: 'em dia de CPI' })
+  })
+})
+
+describe('«Dados econômicos» in the Diário (Phase 5 · telas-diario): marks and the drill, on the SQL\'s recorded days', () => {
+  // testing/agenda: the boards' world recorded from the real SQL (fixtures/agenda): Thu 3 Dec (ISM de serviços 10:00 ET,
+  // wait 09:55–10:10; entries 09:57 and 10:05) and Thu 10 Dec (CPI 08:30 ET marked «Não opero no dia»; 10:05 and 10:31)
+  const espera = parseDay(agendaJson('dia-espera'))
+  const inteiro = parseDay(agendaJson('dia-inteiro'))
+  const NY = 'America/New_York'
+  const em = (d: DayRead, hhmm: string) => d.trades.find((t) => horaDaLinha(t, NY).startsWith(hhmm))!
+  const nb = (s: string | null) => (s === null ? null : s.replace(/\u00a0/g, ' '))
+
+  it('Q24, Q25, Q26: the row\'s mark and its screen-reader words', () => {
+    expect(planoDaLinha(em(espera, '10:05'))).toEqual({ tipo: 'fora', texto: 'na espera do ISM', aria: 'fora do plano: na espera do ISM de serviços' })
+    expect(planoDaLinha(em(espera, '09:57'))).toEqual({
+      tipo: 'fora',
+      texto: 'fora da janela · na espera do ISM',
+      aria: 'fora do plano: fora da janela e na espera do ISM de serviços',
+    })
+    for (const h of ['10:05', '10:31']) expect(planoDaLinha(em(inteiro, h))).toEqual({ tipo: 'fora', texto: 'em dia de CPI', aria: 'fora do plano: em dia de CPI' })
+  })
+
+  it('marcaDadosLonga: two releases, three, the whole day of two names, no interval', () => {
+    const at = new Date('2026-12-23T13:30:00Z')
+    const r = (code: any) => ({ code, at, mode: 'volta' as const })
+    expect(marcaDadosLonga({ kind: 'espera', releases: [r('pce'), r('pib_us')] })).toBe('na espera do PCE e PIB dos EUA')
+    expect(marcaDadosLonga({ kind: 'espera', releases: [r('pce'), r('pib_us'), r('cpi')] })).toBe('na espera de 3 dados')
+    expect(marcaDadosLonga({ kind: 'dia', releases: [r('pce'), r('pib_us')] })).toBe('em dia de PCE e PIB dos EUA')
+    expect(marcaDadosLonga({ kind: 'dia', releases: [r('fomc_decisao'), r('fomc_entrevista')] })).toBe('em dia de Fed')
+    expect(marcaDadosLonga(null)).toBe('na espera de dado')
+  })
+
+  it('Q30: the wait, after the release; before it (the double mark: one sentence, the data one)', () => {
+    expect(nb(linhaDosDados(em(espera, '10:05'), NY)![0])).toBe(
+      'Na entrada, o “Posso operar hoje?” dizia “Aguardar até 10:10”: a operação entrou 5 min depois do ISM de serviços (10:00), dentro da sua espera das 09:55 às 10:10.',
+    )
+    expect(linhaDosDados(em(espera, '10:05'), NY)![0]).toContain('5\u00a0min')
+    expect(nb(linhaDosDados(em(espera, '09:57'), NY)![0])).toBe(
+      'Na entrada, o “Posso operar hoje?” dizia “Aguardar até 10:10”: a operação entrou 3 min antes do ISM de serviços (10:00), dentro da sua espera das 09:55 às 10:10.',
+    )
+  })
+
+  it('Q31: the whole day', () => {
+    expect(linhaDosDados(em(inteiro, '10:05'), NY)).toEqual([
+      'Na entrada, o “Posso operar hoje?” dizia “Não opero hoje”: era dia de CPI (08:30), que você marcou como “Não opero no dia”.',
+    ])
+  })
+
+  it('the drill lists the sentence (linhasDaOperacao), on the Diário\'s clock', () => {
+    const t = em(inteiro, '10:05')
+    const conta: ContaDaOperacao = { market: 'futures', currency: 'USD', tz: 'America/Sao_Paulo', reg: null as any }
+    expect(linhasDaOperacao(t, conta)).toContain('Na entrada, o “Posso operar hoje?” dizia “Não opero hoje”: era dia de CPI (10:30), que você marcou como “Não opero no dia”.')
+  })
+
+  it('«Só opero depois do dado», the release\'s own minute, a file\'s trade (recalculated), no agenda, frozen before the rule', () => {
+    const t = em(espera, '10:05')
+    const g = t.gate!
+    const blk = g.block as Extract<typeof g.block, { evaluated: true }>
+    const iv = blk.active!
+    const cpi = { kind: 'espera' as const, start: new Date('2026-12-10T05:00:00Z'), end: new Date('2026-12-10T13:40:00Z'), releases: [{ code: 'cpi' as const, at: new Date('2026-12-10T13:30:00Z'), mode: 'depois' as const }] }
+    const depois = { ...t, gate: { ...g, at: new Date('2026-12-10T13:32:00Z'), block: { ...blk, active: cpi, today: [cpi], freeAt: cpi.end } } }
+    expect(nb(linhaDosDados(depois, NY)![0])).toBe(
+      'Na entrada, o “Posso operar hoje?” dizia “Aguardar até 08:40”: pelo seu plano, você só operava a partir das 08:40, 10 min depois do CPI (08:30).',
+    )
+    const naHora = { ...t, gate: { ...g, at: new Date('2026-12-03T15:00:20Z') } }
+    expect(nb(linhaDosDados(naHora, NY)![0])).toBe(
+      'Na entrada, o “Posso operar hoje?” dizia “Aguardar até 10:10”: a operação entrou na hora do ISM de serviços (10:00), dentro da sua espera das 09:55 às 10:10.',
+    )
+    const arquivo = { ...t, plan: null, planNow: t.plan, gate: null, gateNow: g }
+    expect(linhaDosDados(arquivo, NY)).toEqual(['Pelas regras do dia, a entrada caiu na espera do ISM de serviços (09:55 às 10:10).'])
+    const ti = em(inteiro, '10:31')
+    expect(linhaDosDados({ ...ti, plan: null, planNow: ti.plan, gate: null, gateNow: ti.gate }, NY)).toEqual(['Pelas regras do dia, a entrada caiu em dia de CPI (08:30).'])
+    const nao = (reason: string) => ({ ...t, gate: { ...g, block: { evaluated: false, state: 'nao_avaliado', reason } as any } })
+    expect(linhaDosDados(nao('sem_agenda'), NY)).toEqual(['Dados econômicos: não conferidos nesta entrada (o app estava sem a agenda).'])
+    expect(linhaDosDados(nao('fase5'), NY)).toEqual(['Dados econômicos: não conferidos nesta entrada.'])
+    for (const r of ['regra_desligada', 'so_futuros', 'sem_versao', 'sem_calendario']) expect(linhaDosDados(nao(r), NY)).toBeNull()
+    // Outside every wait: nothing
+    expect(linhaDosDados({ ...t, gate: { ...g, block: { ...blk, state: 'ok', active: null, freeAt: null } } }, NY)).toBeNull()
+    expect(iv.kind).toBe('espera')
+    // A history trade: nothing
+    expect(linhaDosDados({ ...t, history: true }, NY)).toBeNull()
+  })
+
+  it('a frozen entry of the Phase 4 boards (fase5) says «não conferidos nesta entrada» in the drill', () => {
+    const d = quadro('2').dias['2026-11-10']
+    const t = d.trades.find((x) => x.plan && x.gate && !x.gate.block.evaluated)!
+    expect(linhaDosDados(t, NY)).toEqual(['Dados econômicos: não conferidos nesta entrada.'])
   })
 })
