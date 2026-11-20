@@ -115,7 +115,7 @@ describe('«Posso operar hoje?» on step 1', () => {
     expect(linha).toHaveTextContent('Posso operar hoje?Fora da sua janela· 10:00–11:00 ET')
     expect(within(linha).getByText('Fora da sua janela').tagName).toBe('B')
     expect(screen.getByText('fora da janela')).toBeInTheDocument()
-    expect(screen.getByText('Fora do plano, conferido pelo hub. Não foi possível conferir os dados econômicos agora. Você pode registrar; a operação fica sem essa conferência.')).toBeInTheDocument()
+    expect(screen.getByText('Não foi possível conferir os dados econômicos agora. Você pode registrar; a operação fica sem essa conferência.')).toBeInTheDocument()
     // «Hora (ET)» starts on the server's minute
     expect(screen.getByLabelText('Hora (ET)')).toHaveValue('11:05')
     // Nothing was registered or asked of gate_at: the cached rules_now answers the current minute
@@ -750,7 +750,7 @@ describe('the plan line on the current minute follows the clock (the owner’s 1
     })
     expect(screen.getByLabelText('Hora (ET)')).toHaveValue('11:00')
     await waitFor(() => expect(db.previewEntry.mock.calls.some((c) => c[2].entry === '11:00')).toBe(true))
-    expect(await screen.findByText('Fora do plano, conferido pelo hub. Não foi possível conferir os dados econômicos agora. Você pode registrar; a operação fica sem essa conferência.')).toBeInTheDocument()
+    expect(await screen.findByText('Não foi possível conferir os dados econômicos agora. Você pode registrar; a operação fica sem essa conferência.')).toBeInTheDocument()
     expect(screen.getByText('fora da janela')).toBeInTheDocument()
     // The registration itself still leaves the hour to the server's clock
     db.registerEntry.mockResolvedValue(entradaTelas('entry-mes'))

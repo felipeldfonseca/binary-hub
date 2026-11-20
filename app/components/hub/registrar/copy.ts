@@ -98,17 +98,17 @@ export const ENTRADA = {
     foraEEspera: (doDa: string, de: string, ate: string) => `Fora da janela e na espera ${doDa} (${de} às ${ate}): fora do plano. Você pode registrar.`,
     /** 5: «Na espera do ISM de serviços e depois do limite: fora do plano. Você pode registrar.» */
     esperaELimite: (doDa: string) => `Na espera ${doDa} e depois do limite: fora do plano. Você pode registrar.`,
-    /** NEW (4 + 5, not written by c3): the three breaks at once */
-    foraEsperaELimite: (doDa: string) => `Fora da janela, na espera ${doDa} e depois do limite: fora do plano. Você pode registrar.`,
-    /** 2: «CPI às 08:30: pelo seu plano, você só opera a partir das 08:40. Você pode registrar.» */
-    soDepois: (rotulo: string, ate: string) => `${rotulo}: pelo seu plano, você só opera a partir das ${ate}. Você pode registrar.`,
-    /** 3: «Dia de CPI: pelo seu plano, você não opera neste dia. Você pode registrar.» */
+    /**
+     * 2: «CPI às 08:30: pelo seu plano, você só opera a partir das 08:40. Você pode registrar.»; `volta` is horaDeVolta's
+     * free_at («08:40», «amanhã às 08:40», «qui 08:40»): «a partir de amanhã às 08:40», «a partir de qui 08:40» (the
+     * day word as the line «Aguardar até …» writes it)
+     */
+    soDepois: (rotulo: string, volta: string) =>
+      `${rotulo}: pelo seu plano, você só opera a partir ${/^\d\d:\d\d$/.test(volta) ? 'das' : 'de'} ${volta}. Você pode registrar.`,
+    /** 3: «Dia de CPI: pelo seu plano, você não opera neste dia. Você pode registrar.»; `nomes` = the «dia de …» names */
     dia: (nomes: string) => `Dia de ${nomes}: pelo seu plano, você não opera neste dia. Você pode registrar.`,
     /** 6: the app without the day's agenda */
     semAgenda: 'Não foi possível conferir os dados econômicos agora. Você pode registrar; a operação fica sem essa conferência.',
-    /** NEW (the built sentence + 6): another break (window, limit) with the app without the agenda */
-    foraSemAgenda:
-      'Fora do plano, conferido pelo hub. Não foi possível conferir os dados econômicos agora. Você pode registrar; a operação fica sem essa conferência.',
   },
   /** «Operação anterior: 2 imagens e nota salvas às 10:21.» (RO l.1452) */
   anterior: (quem: string, hora: string) => `Operação anterior: ${quem} às ${hora}.`,
