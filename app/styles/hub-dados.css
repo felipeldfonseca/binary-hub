@@ -107,14 +107,15 @@
 @media (min-width: 1200px) {
   /*
    * Q03's two columns, read top to bottom (Aguardo · Só opero | Não opero · Personalizado; contract §5 Q03,
-   * SPEC §7.1). The app's column at 1280 px is narrower than the board's card: each column takes half and a
-   * pill wraps its words inside it rather than passing the card.
+   * SPEC §7.1). Each column as wide as its widest pill and each pill at its own width, as the board draws them
+   * (one line each on the page at 1280 px); only where the column is narrower does a pill wrap its words.
    */
   .hub .hub-dd-atalhos {
     display: grid;
     grid-auto-flow: column;
     grid-template-rows: auto auto;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-columns: repeat(2, minmax(0, max-content));
+    justify-items: start;
     gap: 6px 12px;
   }
   .hub .hub-dd-atalhos .hub-pill {
