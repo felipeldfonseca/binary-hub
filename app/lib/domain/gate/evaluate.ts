@@ -158,9 +158,9 @@ export interface GateAccount {
 export interface GateOptions {
   /**
    * The releases the gate waits for (gate_agenda's list); `[]` = a known agenda with nothing in
-   * range; `null` = the agenda is not known (`sem_agenda`). Transitional (Phase 5 · base): an
-   * absent option still gives `fase5`, as the database's answers recorded in gate/cases.json do;
-   * the domain lane makes absent mean `null`.
+   * range; absent or `null` = the agenda is not known (`sem_agenda`, as the 4-argument gate_eval
+   * passes null). The block never answers `fase5` here: only parseServerGate reads it, from
+   * entries frozen before Phase 5.
    */
   agenda?: readonly AgendaEntry[] | null;
 }
@@ -270,9 +270,8 @@ export function evaluateGate(
   else if (!MARKET_SPEC[rules.market].rules.block) block = notEvaluated('so_futuros');
   else if (!rules.block || !rules.block.on || rules.block.beforeMin + rules.block.afterMin === 0) {
     block = notEvaluated('regra_desligada');
-  } else if (agenda === undefined) block = notEvaluated('fase5');
-  else if (rules.block.calendars.length === 0) block = notEvaluated('sem_calendario');
-  else if (agenda === null) block = notEvaluated('sem_agenda');
+  } else if (rules.block.calendars.length === 0) block = notEvaluated('sem_calendario');
+  else if (agenda === undefined || agenda === null) block = notEvaluated('sem_agenda');
   else {
     const marked: readonly string[] = rules.block.calendars;
     blocks = mergeBlocks(

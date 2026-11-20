@@ -56,7 +56,7 @@ function gate(
     until: now,
     limitCents: rules?.limit?.cents ?? null,
   });
-  // No agenda given: the transitional `fase5` (Phase 5 · base), as gate/cases.json still records
+  // No agenda given: «the agenda is not known» (sem_agenda), as the 4-argument gate_eval passes null
   return evaluateGate(now, account, ver, day, agenda ? { agenda } : {});
 }
 
@@ -288,7 +288,7 @@ describe('Ebinex (binary): no data block, no state rule', () => {
   });
 });
 
-describe('the owner\'s Phase 2 test (the data block is «ativo na Fase 5»)', () => {
+describe('the owner\'s Phase 2 test (no agenda given: the data block is «não conferido», sem_agenda)', () => {
   it.each([
     ['Mon 19 Oct 09:30', '2026-10-19 09:30', 'fora_janela', 'antes', '2026-10-19T14:00:00Z'],
     ['Mon 10:00', '2026-10-19 10:00', 'liberado', 'dentro', '2026-10-20T14:00:00Z'],
@@ -304,7 +304,7 @@ describe('the owner\'s Phase 2 test (the data block is «ativo na Fase 5»)', ()
     expect(g.status).toBe(status);
     expect(g.window).toMatchObject({ evaluated: true, position });
     expect(g.window.evaluated && iso(g.window.next?.start)).toBe(next);
-    expect(g.block).toEqual({ evaluated: false, state: 'nao_avaliado', reason: 'fase5' });
+    expect(g.block).toEqual({ evaluated: false, state: 'nao_avaliado', reason: 'sem_agenda' });
     expect(g.checksEvaluated).toEqual(['janela', 'limite']);
   });
 
@@ -458,12 +458,13 @@ describe('the data block (Phase 5 input)', () => {
     expect(gate(et('2026-10-14 08:30'), topOneRules(), [], [ev('08:30', 'bce_decisao')]).status).toBe('fora_janela');
   });
 
-  it('the agenda input, transitional (contract §3.6): undefined → fase5; null → sem_agenda, after so_futuros and sem_calendario', () => {
+  it('the agenda input (contract §3.6): absent and null → sem_agenda, after so_futuros and sem_calendario; never fase5', () => {
     const now = et('2026-10-14 08:30');
     const r = topOneRules();
     const day = dayUsage([], { tradingDay: '2026-10-14', until: now, limitCents: null });
     const reason = (g: GateResult) => (g.block.evaluated ? 'evaluated' : g.block.reason);
-    expect(reason(evaluateGate(now, TOP_ONE, version(r), day, {}))).toBe('fase5');
+    expect(reason(evaluateGate(now, TOP_ONE, version(r), day, {}))).toBe('sem_agenda');
+    expect(reason(evaluateGate(now, TOP_ONE, version(r), day))).toBe('sem_agenda');
     expect(reason(evaluateGate(now, TOP_ONE, version(r), day, { agenda: null }))).toBe('sem_agenda');
     const noCal = { ...r, block: { ...r.block!, calendars: [] } };
     expect(reason(evaluateGate(now, TOP_ONE, version(noCal), day, { agenda: null }))).toBe('sem_calendario');
@@ -738,7 +739,7 @@ describe('versions and the trading day of an entry', () => {
 
 describe('answerOf', () => {
   it('Liberado inside the window says until when', () => {
-    expect(answerOf(gate(et('2026-10-19 10:15'), topOneRules()))).toEqual({
+    expect(answerOf(gate(et('2026-10-19 10:15'), topOneRules(), [], []))).toEqual({
       kind: 'liberado',
       position: 'dentro',
       until: et('2026-10-19 11:00'),
@@ -764,7 +765,10 @@ describe('answerOf', () => {
 
   it('the window rule off and no limit: nothing evaluated, reason regra_desligada', () => {
     const off = { ...topOneRules(), windowRule: { on: false, outside: 'fora' as const }, limit: null };
-    expect(answerOf(gate(et('2026-10-19 10:15'), off))).toEqual({ kind: 'sem_janela', reason: 'regra_desligada' });
+    // With the data block on and no agenda, it is «Dados econômicos não conferidos» (C9)
+    expect(answerOf(gate(et('2026-10-19 10:15'), off))).toEqual({ kind: 'indisponivel', reason: 'sem_agenda' });
+    const allOff = { ...off, block: { ...off.block!, on: false } };
+    expect(answerOf(gate(et('2026-10-19 10:15'), allOff))).toEqual({ kind: 'sem_janela', reason: 'regra_desligada' });
   });
 
   it('the window rule off and the limit\'s day not loaded: «indisponível», never «Sem regra ativa»', () => {
