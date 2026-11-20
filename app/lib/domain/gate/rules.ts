@@ -10,10 +10,9 @@
  *    "windows_from": "market" | "account" | null (null exactly when windows = []),
  *    "window_rule": {"on": bool, "outside": "fora" | "aviso"},
  *    "block": null (every market but futures) | {"on", "before_min": 0..60, "after_min": 0..120, "calendars": ["us" | "eu" | "br"]}
- *             plus, in the long form only (Phase 5-1), "releases": {CODE: "volta" | "depois" | "dia"} (read here,
- *             kept as read, checked as SPEC §3.7 fixes rules_check_resolved, code `bad_releases`; this side
- *             lands first, read only, and the SQL with its computed cases follows in the Phase 5 domain
- *             lane, which also brings the writer and the evaluation),
+ *             plus, in the long form only (Phase 5-1), "releases": {CODE: "volta" | "depois" | "dia"} (kept as
+ *             read; checked as rules_check_block and rules_check_resolved of 20261120000001_dados_economicos.sql,
+ *             code `bad_releases`, in SPEC §3.7's order; cases computed by that SQL in gate/cases.json),
  *    "limit": null | {"usd" (US$ markets) | "brl" (B3): > 0, ≤ 1 000 000, whole cents,
  *                     "mode": "conta" | "soma" (futures), "at_limit": "encerrar" | "avisar"},
  *    "states": null (every market but futures) | {"alinhadas" | "so_tecnica" | "so_fundamentos" | "em_conflito" | "sem_direcao": choice | null},
