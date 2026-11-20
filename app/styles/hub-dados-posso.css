@@ -39,7 +39,7 @@
  * The Registrar (boards Q33–Q38): the 10-minute notice is a line of the context block, under the answer, amber with
  * its clock (Q38); the plan sentence stays in the text colour beside the amber mark (Q33: the built line).
  */
-.hub .hub-reg-aviso10 {
+.hub .hub-reg-ctx-linha.hub-reg-aviso10 {
   flex-wrap: nowrap;
   align-items: flex-start;
 }
