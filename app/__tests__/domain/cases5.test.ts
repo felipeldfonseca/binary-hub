@@ -21,7 +21,6 @@ import raw from './cases5.json';
 import {
   AGENDA_RELEASES,
   agendaFor,
-  answerOf,
   blockIntervals,
   checkRules,
   evaluateGate,
@@ -196,6 +195,11 @@ describe('agenda: gate_agenda = agendaFor', () => {
       covered: [...read.covered].reverse(),
     });
     expect(reversed).toEqual(got);
+    // With a version, its day clock is read, never the clock argument (gate_agenda's coalesce
+    // order; every SQL case passes the version's own clock, so a decoy holds the order)
+    if (resolved) {
+      expect(agendaFor(resolved, { tz: 'America/Sao_Paulo', startMin: 720 }, new Date(c.at), read)).toEqual(got);
+    }
   });
 });
 
@@ -221,7 +225,6 @@ describe('gate: the whole gate_eval answer (§5.1 rows, §5.4 cells) = evaluateG
   it.each(cases.gate.cases.map((c) => [c.label, c] as const))('%s', (_label, c) => {
     const g = gate(new Date(c.at), c.resolved, c.clock, c.usage, c.agenda === null ? null : agendaOf(c.agenda));
     expect(g).toEqual(parseServerGate(c.expected));
-    expect(answerOf(g)).toEqual(answerOf(parseServerGate(c.expected)));
   });
 
   it('never answers fase5 for the block', () => {
