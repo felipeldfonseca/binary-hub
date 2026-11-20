@@ -8,7 +8,7 @@ import { addDays } from '@/lib/domain/tempo'
 import type { GateResult, Rules } from '@/lib/domain/gate'
 import { groupByMarket, type TradingAccount } from '@/lib/hub/contas'
 import type { AccountNow } from '@/lib/hub/regras'
-import { avisoDezMinTexto, janelaLinha, relogioDaJanela, type Tom } from '@/lib/hub/posso'
+import { avisoDezMinCabe, avisoDezMinTexto, janelaLinha, relogioDaJanela, type Tom } from '@/lib/hub/posso'
 import { avisoDoLimite, type AvisoDoLimite, type RegistrarDefaults } from '@/lib/hub/registrar'
 import { RegistrarDataError, type RegistrarErrorCode } from '@/lib/hub/registrarDb'
 import { formatDecimal } from '@/lib/hub/numero'
@@ -545,7 +545,7 @@ export default function PassoEntrada(props: PassoEntradaProps) {
   // The 10-minute notice (c3 §8.2): only for an entry «now» (the minute the form proposes), on the server clock; the
   // answer drawn is then rules_now's for this minute
   const aviso10 =
-    presente && !noGateAt && gate && gate.block.evaluated
+    presente && !noGateAt && gate && gate.block.evaluated && avisoDezMinCabe(gate)
       ? relogioDados(now, { today: gate.block.today, tz: relogioDaJanela(rulesDoGate), preferences: { alerts: { before_block: avisoDados } } }).avisoDezMin
       : null
   const gateMostrado: GateMostrado = {

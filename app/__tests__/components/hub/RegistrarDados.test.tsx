@@ -88,6 +88,28 @@ describe('the Registrar with «Dados econômicos» (boards Q33–Q38)', () => {
     expect(screen.queryByText(AVISO)).toBeNull()
   })
 
+  it('the notice held back while the preferences are being read (a switched-off notice must not flash), as the Diário card', async () => {
+    renderRegistrarDados('q38-aviso-10min-registrar', { prefsPendentes: true })
+    await aberto()
+    expect(linhaDoGate()).toHaveTextContent('Fora da sua janela')
+    expect(screen.queryByText(AVISO)).toBeNull()
+  })
+
+  it('never under «Encerrado por hoje» (c3 §5.2, SPEC §7.2 «nada sobre dados»): the limit hit at 09:30, ISM at 10:00', async () => {
+    renderRegistrarDados('q38-aviso-10min-registrar', {
+      mudaAgora: (j) => {
+        const a = j.accounts[0]
+        a.limit = { ...a.limit, state: 'atingido', hit_at: '2026-12-03T14:30:00+00:00', used: 500, net_usd: -500, worst_usd: -500, trades: 1 }
+        a.today = { trades: 1, net_usd: -500, worst_usd: -500 }
+        a.status = 'encerrado'
+        return j
+      },
+    })
+    await aberto()
+    expect(linhaDoGate()).toHaveTextContent('Encerrado por hoje')
+    expect(screen.queryByText(AVISO)).toBeNull()
+  })
+
   it('from 09:45 to 09:55 on the server clock, without a new answer', async () => {
     renderRegistrarDados('q38-aviso-10min-registrar', { em: et('2026-12-03 09:44:50') })
     await aberto()

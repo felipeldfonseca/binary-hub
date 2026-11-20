@@ -126,8 +126,9 @@ export default function RegistrarSheet({ accountId, tradeId, onClose, dia = null
   const trade = useTradeView(alvo, { enabled: !!alvo })
   const defaults = useRegistrarDefaults(account ? { id: account.id, market: account.market } : null)
   const pref80 = prefs.data?.alerts?.limit_80 === true
-  // Phase 5-1: unlike limit_80, the 10-minute notice is on unless switched off (contract §3.8, Q39)
-  const prefAvisoDados = avisoAntesDaEsperaLigado(prefs.data)
+  // Phase 5-1: unlike limit_80, the 10-minute notice is on unless switched off (contract §3.8, Q39); held back while the
+  // preferences are being read, as the Diário card (a switched-off notice must not flash)
+  const prefAvisoDados = prefs.isPending && prefs.fetchStatus === 'fetching' ? false : avisoAntesDaEsperaLigado(prefs.data)
 
   // The last view of each trade (an undo empties its cache entry before the sheet moves on)
   const ultimaVista = useRef<Record<string, TradeView>>({})

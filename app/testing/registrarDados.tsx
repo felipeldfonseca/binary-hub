@@ -49,7 +49,10 @@ export function contaDoEstado(e: EstadoDados): TradingAccount {
  * device's now each time (so the server clock follows the fake one), the dry run with the recorded one, the preferences
  * as given ({} = nothing saved: the 10-minute notice on).
  */
-export function renderRegistrarDados(e: EstadoDados, { prefs = {}, em }: { prefs?: Json; em?: Date } = {}) {
+export function renderRegistrarDados(
+  e: EstadoDados,
+  { prefs = {}, em, prefsPendentes, mudaAgora }: { prefs?: Json; em?: Date; prefsPendentes?: boolean; mudaAgora?: (j: Json) => Json } = {},
+) {
   const contasDb = jest.requireMock('@/lib/hub/contasDb')
   const regrasDb = jest.requireMock('@/lib/hub/regrasDb')
   const registrarDb = jest.requireMock('@/lib/hub/registrarDb')
@@ -58,10 +61,13 @@ export function renderRegistrarDados(e: EstadoDados, { prefs = {}, em }: { prefs
   jest.useFakeTimers({ now: em ?? ESTADOS_DADOS[e].agora, advanceTimers: true })
   const conta = contaDoEstado(e)
   contasDb.fetchAccounts.mockReset().mockResolvedValue([conta])
-  contasDb.fetchPreferences.mockReset().mockResolvedValue(prefs)
+  // prefsPendentes: the preferences' read never answers (the sheet while they load)
+  if (prefsPendentes) contasDb.fetchPreferences.mockReset().mockImplementation(() => new Promise(() => {}))
+  else contasDb.fetchPreferences.mockReset().mockResolvedValue(prefs)
   const agora = () => {
-    const j = agoraDoEstado(e) as Json
+    let j = JSON.parse(JSON.stringify(agoraDoEstado(e))) as Json
     j.server_now = new Date().toISOString()
+    if (mudaAgora) j = mudaAgora(j)
     return parseRulesNow(j)
   }
   regrasDb.fetchRulesNow.mockReset().mockImplementation(async () => agora())
