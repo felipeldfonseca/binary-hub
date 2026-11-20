@@ -107,7 +107,7 @@ const PERMITIDAS: { onde: RegExp; aceita: (app: string, quadro: string) => boole
           .replace('registrou: janela e limite.', 'registrou: janela, dados econômicos e limite.')
           .replace(
             'Uma operação fora da janela ou depois do limite fica',
-            'Uma operação fora da janela, numa espera de dado econômico, em dia em que você escolheu não operar ou depois do limite fica',
+            'Uma operação fora da janela, numa espera de dado, em dia em que você escolheu não operar ou depois do limite fica',
           )
           .replace(' Bloqueio de dados, viés e regra do estado chegam na Fase 5.', ' Viés e regra do estado chegam na Fase 5.'),
     motivo: 'Phase 5-1 (c3 §6.3, §9.2 item 17): the plan\'s ⓘ of a Futuros account names the data rule; the Phase 4 boards predate it',

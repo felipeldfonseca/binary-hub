@@ -173,7 +173,7 @@ describe('F · «O plano do dia»', () => {
     const dia = await oDia()
     await user.click(within(dia).getByRole('button', { name: 'Como ler: O plano do dia' }))
     expect(texto(document.getElementById('info-plano'))).toBe(
-      'Cada linha compara as regras que valiam neste dia, em Personalizar, com o que o diário registrou: janela, dados econômicos e limite. Uma operação fora da janela, numa espera de dado econômico, em dia em que você escolheu não operar ou depois do limite fica fora do plano, mesmo quando a tela só avisava. Breakeven: a sua regra e em quantas operações que chegaram ao ponto dela o stop foi para a entrada; quem confere é Análises. Viés e regra do estado chegam na Fase 5.',
+      'Cada linha compara as regras que valiam neste dia, em Personalizar, com o que o diário registrou: janela, dados econômicos e limite. Uma operação fora da janela, numa espera de dado, em dia em que você escolheu não operar ou depois do limite fica fora do plano, mesmo quando a tela só avisava. Breakeven: a sua regra e em quantas operações que chegaram ao ponto dela o stop foi para a entrada; quem confere é Análises. Viés e regra do estado chegam na Fase 5.',
     )
   })
 

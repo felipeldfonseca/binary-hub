@@ -639,8 +639,10 @@ export function linhasDoPlano(rules: Rules, f: DayFacts, conta: ContaDiario, dad
 // «Dados econômicos» (Phase 5-1): the plan's line, the words of «fora do plano», the day's labels
 // ---------------------------------------------------------------------------------------------
 
-/** «fora da janela, numa espera de dado, em dia em que você escolheu não operar ou depois do limite» (c3 §6.2, §6.3) */
+/** The top sentence's «Fora do plano: operações …» (c3 §6.2 l.1083-1085, «numa espera de dado econômico») */
 const FORA_COM_DADOS = 'fora da janela, numa espera de dado econômico, em dia em que você escolheu não operar ou depois do limite';
+/** The plan's ⓘ (c3 §6.3 l.1109-1111: «numa espera de dado», without «econômico») */
+const FORA_COM_DADOS_INFO = 'fora da janela, numa espera de dado, em dia em que você escolheu não operar ou depois do limite';
 
 /** The market has the data rule (Futuros): the plan shows the «Dados econômicos» line, the drill its sentences */
 export const temLinhaDeDados = (market: AccountMarket): boolean => MARKET_SPEC[market].rules.block;
@@ -850,7 +852,7 @@ export function comoLerOPlano(market: AccountMarket, temBreakeven: boolean): str
   const dados = temLinhaDeDados(market);
   return (
     (dados
-      ? `Cada linha compara as regras que valiam neste dia, em Personalizar, com o que o diário registrou: janela, dados econômicos e limite. Uma operação ${FORA_COM_DADOS} fica fora do plano, mesmo quando a tela só avisava.`
+      ? `Cada linha compara as regras que valiam neste dia, em Personalizar, com o que o diário registrou: janela, dados econômicos e limite. Uma operação ${FORA_COM_DADOS_INFO} fica fora do plano, mesmo quando a tela só avisava.`
       : 'Cada linha compara as regras que valiam neste dia, em Personalizar, com o que o diário registrou: janela e limite. Uma operação fora da janela ou depois do limite fica fora do plano, mesmo quando a tela só avisava.') +
     (temBreakeven ? ' Breakeven: a sua regra e em quantas operações que chegaram ao ponto dela o stop foi para a entrada; quem confere é Análises.' : '') +
     (dados ? ' Viés e regra do estado chegam na Fase 5.' : '')
