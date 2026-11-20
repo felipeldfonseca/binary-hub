@@ -284,3 +284,66 @@ describe('F · «O plano do dia»', () => {
     await waitFor(() => expect(mocks.fetchDia.mock.calls.length).toBeGreaterThan(leituras))
   })
 })
+
+describe('Phase 5 · telas-diario: «Dados econômicos» on a day without entries (G6) and the grey line', () => {
+  /** 11b (Top One, 1º dez, in testing/agenda's coverage: ISM da indústria 10:00 ET) with the day's trades taken out */
+  async function semEntradas() {
+    const r = await renderDiario('11b')
+    await oDia()
+    const raw = r.cru[r.q.info.contaId].dias[r.q.info.dia]
+    raw.trades = []
+    await act(async () => {
+      await r.queryClient.refetchQueries({ queryKey: diarioKeys.dia(USUARIO_DO_QUADRO, r.q.info.contaId, r.q.info.dia) })
+    })
+    return r
+  }
+  const linhaDados = async () => {
+    const lista = within(await oDia()).getByRole('list', { name: 'O plano do dia' })
+    return waitFor(() => {
+      const li = within(lista).getByText('Dados econômicos').closest('li')!
+      return Array.from(li.querySelectorAll('strong, .hub-dr-plano-meio > *, .hub-dr-plano-marca')).map(texto).join(' ')
+    })
+  }
+
+  it('reads that day\'s agenda (agendaKeys.dia, the day\'s calendars) and computes the wait: «No plano»', async () => {
+    await semEntradas()
+    await waitFor(async () => expect(await linhaDados()).toBe('Dados econômicos ISM da indústria às 10:00 · espera 09:55–10:10 nenhuma operação na espera No plano'))
+    const lida = mocks.fetchAgendaDoDia.mock.calls.find(([, o]) => o.calendars.join() === 'us')
+    expect(lida).toBeTruthy()
+    // The range «09:55–10:10» is kept on one line (Q27)
+    const nowrap = Array.from(document.querySelectorAll('.hub-dr-plano-meio span[style]')).map((x) => x.textContent)
+    expect(nowrap).toEqual(['09:55–10:10'])
+  })
+
+  it('the read fails: «não conferidos neste dia» · «Não conferido»', async () => {
+    const r = await renderDiario('11b')
+    await oDia()
+    mocks.fetchAgendaDoDia.mockRejectedValue(new (jest.requireActual('@/lib/hub/agendaDb').AgendaDataError)('network'))
+    r.cru[r.q.info.contaId].dias[r.q.info.dia].trades = []
+    await act(async () => {
+      await r.queryClient.refetchQueries({ queryKey: diarioKeys.dia(USUARIO_DO_QUADRO, r.q.info.contaId, r.q.info.dia) })
+    })
+    await waitFor(async () => expect(await linhaDados()).toBe('Dados econômicos não conferidos neste dia — Não conferido'), { timeout: 4000 })
+  })
+
+  it('the grey line of the open day: 1º dez «ISM da indústria, 10:00», between the numbers and «O plano do dia»', async () => {
+    await renderDiario('11b')
+    const dia = await oDia()
+    const cinza = await waitFor(() => {
+      const p = Array.from(dia.querySelectorAll(':scope > p.hub-dr-sub')).find((x) => x.textContent === 'ISM da indústria, 10:00')
+      expect(p).toBeTruthy()
+      return p!
+    })
+    expect(cinza.previousElementSibling).toHaveClass('hub-dr-dia-numeros')
+    expect(cinza.nextElementSibling).toHaveClass('hub-dr-plano-bloco')
+  })
+
+  it('another market (6, Ebinex): no data line, no grey line, no agenda read', async () => {
+    await renderDiario('6')
+    const dia = await oDia()
+    expect(within(dia).queryByText('Dados econômicos')).toBeNull()
+    expect(dia.querySelector(':scope > p.hub-dr-sub')).toBeNull()
+    expect(mocks.fetchAgendaDoDia).not.toHaveBeenCalled()
+    expect(mocks.fetchDadosDaSemana).not.toHaveBeenCalled()
+  })
+})
