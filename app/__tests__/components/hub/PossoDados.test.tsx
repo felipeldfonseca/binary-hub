@@ -139,8 +139,13 @@ describe('«Posso operar hoje?» with «Dados econômicos» (the boards, recorde
   })
 
   it('a cancelled release of today: the grey «CPI de hoje cancelado: sem espera hoje.» (NEW, not drawn)', async () => {
-    // Q15's morning (CPI in «Só opero depois do dado», the wait over) with the CPI cancelled in the day's read
+    // Q15's morning (CPI in «Só opero depois do dado») with the CPI cancelled: in the day's read, and gone from rules_now's
+    // block.today as the gate would answer it (SPEC 5.9: the gate never receives a cancelled release)
     const { card } = await montar('q15-posso-espera-acabou', {
+      edit: (j) => {
+        const b = j.accounts[0].block
+        b.today = b.today.filter((i: Json) => !i.releases.some((r: Json) => r.code === 'cpi'))
+      },
       agenda: (o) => {
         const r = leituraDoDia(o.at)
         return { ...r, rows: r.rows.map((x) => (x.code === 'cpi' ? { ...x, status: 'cancelado' as const } : x)) }
@@ -148,6 +153,25 @@ describe('«Posso operar hoje?» with «Dados econômicos» (the boards, recorde
     })
     expect(await within(card).findByText('CPI de hoje cancelado: sem espera hoje.')).toBeInTheDocument()
     expect(notas(card)).toEqual(['CPI de hoje cancelado: sem espera hoje.', 'Conferidos: janela, dados econômicos e limite.'])
+  })
+
+  it('the window clock\'s midnight redraws the words without a new answer: «amanhã às 08:40» becomes «08:40»', async () => {
+    // Q07's CPI «Só opero depois do dado» (the wait from 18:00 to 08:40), answered on the eve at 23:50 ET
+    const { card } = await montar('q07-posso-depois-cpi', {
+      em: new Date('2026-12-10T04:50:00Z'),
+      edit: (j) => {
+        j.accounts[0].at = new Date().toISOString()
+      },
+    })
+    expect(card).toHaveTextContent('Aguardar até amanhã às 08:40')
+    expect(card).toHaveTextContent('CPI amanhã às 08:30')
+    const lidas = fetchRulesNow.mock.calls.length
+    await act(async () => {
+      jest.advanceTimersByTime(11 * 60_000)
+    })
+    expect(card).toHaveTextContent('Aguardar até 08:40')
+    expect(card).not.toHaveTextContent('amanhã')
+    expect(fetchRulesNow.mock.calls.length).toBe(lidas)
   })
 
   it('without a cancellation in the read, no such line', async () => {
