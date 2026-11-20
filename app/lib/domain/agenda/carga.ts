@@ -8,7 +8,6 @@
  * never deletes. A moved release moves the row first written for it (`source_key = '<code>:<original date>'`);
  * `was_at` keeps the first published instant: written once, when the row's clock first moves (SPEC §5.9).
  */
-import type { SupabaseClient } from '@supabase/supabase-js';
 import { AGENDA_RELEASES, type ReleaseCode } from '../gate/agenda';
 import type { CalendarCode } from '../gate/rules';
 import { addDays, utcToLocal } from '../tempo';
@@ -323,14 +322,33 @@ const PAGE = 1000;
 const CHUNK = 500;
 
 type DbError = { code?: string } | null;
+type DbAnswer = PromiseLike<{ data?: unknown; error: DbError }>;
+interface SelectQuery extends DbAnswer {
+  order(column: string, options: { ascending: boolean }): SelectQuery;
+  range(from: number, to: number): SelectQuery;
+  limit(count: number): SelectQuery;
+}
+interface TableQuery {
+  select(columns: string): SelectQuery;
+  upsert(rows: readonly object[], options: { onConflict: string }): DbAnswer;
+  update(patch: object): { eq(column: string, value: unknown): DbAnswer };
+}
+
+/**
+ * The client runLoad writes with: a Supabase client (the service-role one of lib/server/supabaseAdmin.ts, or the
+ * PG tests' `pgServiceClient()`). Typed by shape, because lib/domain imports nothing from Supabase (eslint).
+ */
+export interface AgendaClient {
+  from(table: string): unknown;
+}
+const table = (client: AgendaClient, name: string) => client.from(name) as TableQuery;
 
 const STORED_COLUMNS = 'id, source, source_key, code, calendar, title, local_at, local_tz, at, status, was_at';
 
-async function readStored(client: SupabaseClient): Promise<StoredRow[] | 'sem_tabelas'> {
+async function readStored(client: AgendaClient): Promise<StoredRow[] | 'sem_tabelas'> {
   const rows: StoredRow[] = [];
   for (let start = 0; ; start += PAGE) {
-    const { data, error } = (await client
-      .from('economic_events')
+    const { data, error } = (await table(client, 'economic_events')
       .select(STORED_COLUMNS)
       .order('id', { ascending: true })
       .range(start, start + PAGE - 1)) as { data: StoredRow[] | null; error: DbError };
@@ -343,8 +361,8 @@ async function readStored(client: SupabaseClient): Promise<StoredRow[] | 'sem_ta
   }
 }
 
-async function coverageTableMissing(client: SupabaseClient): Promise<boolean> {
-  const { error } = (await client.from('economic_calendar_days').select('calendar').limit(1)) as { error: DbError };
+async function coverageTableMissing(client: AgendaClient): Promise<boolean> {
+  const { error } = (await table(client, 'economic_calendar_days').select('calendar').limit(1)) as { error: DbError };
   if (!error) return false;
   if (error.code && TABLE_MISSING.has(error.code)) return true;
   throw new AgendaLoadError(error.code);
@@ -360,7 +378,7 @@ function check(error: DbError): void {
  * and the answer is `sem_tabelas`. Any other database error throws `AgendaLoadError`.
  */
 export async function runLoad(
-  client: SupabaseClient,
+  client: AgendaClient,
   now: Date,
   sources: { lists: AgendaLists; bea: BeaResult },
 ): Promise<LoadResult> {
@@ -373,18 +391,17 @@ export async function runLoad(
   const { inserts, updates, unchanged } = reconcile(stored, plan.events, { today: plan.today, beaRanges: plan.beaRanges });
 
   for (let i = 0; i < inserts.length; i += CHUNK) {
-    const { error } = (await client
-      .from('economic_events')
+    const { error } = (await table(client, 'economic_events')
       .upsert(inserts.slice(i, i + CHUNK), { onConflict: 'source,source_key' })) as { error: DbError };
     check(error);
   }
   for (const { id, patch } of updates) {
-    const { error } = (await client.from('economic_events').update(patch).eq('id', id)) as { error: DbError };
+    const { error } = (await table(client, 'economic_events').update(patch).eq('id', id)) as { error: DbError };
     check(error);
   }
   if (plan.coverage.length > 0) {
     const fetchedAt = now.toISOString();
-    const { error } = (await client.from('economic_calendar_days').upsert(
+    const { error } = (await table(client, 'economic_calendar_days').upsert(
       plan.coverage.map((c) => ({ calendar: c.calendar, day: c.day, source: 'rota', fetched_at: fetchedAt })),
       { onConflict: 'calendar,day' },
     )) as { error: DbError };
