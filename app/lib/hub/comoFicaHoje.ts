@@ -86,6 +86,14 @@ export function comoFicaHoje(rules: Rules, now: Date, edited: readonly WindowSet
   // Phase 5-1: the data lines of the day (c3 §4.2), sorted with the window's by their start
   const dados = rules.block && agenda !== undefined ? linhasDeDados(rules, now, agenda) : null;
   const diaInteiro = !!dados?.diaInteiro;
+  // The agenda missing while the rule waits: never a green «Liberado» (c3 §4.2 l.761-762). As the gate
+  // (answerOf): with the window rule off and nothing else checked, «Dados econômicos não conferidos»;
+  // otherwise «Liberado» stays, muted (its «semAgenda»)
+  const naoConferido = !!dados?.naoConferido;
+  if (naoConferido && !on && !rules.limit) {
+    return { linhas: [{ esquerda: [{ t: HOJE.oDiaTodo }], estado: PALAVRAS_DADOS.naoConferidos, tom: 'muted', forte: false, sub: null }], sub, aviso };
+  }
+  const verde: Tom = naoConferido ? 'muted' : 'mint';
   const janelas: { at: number; linha: LinhaHoje }[] = hoje.map((o) => {
     const faixa = { t: `${faixaJanela(o.window.startMin, o.window.endMin)} ${RELOGIO[o.window.tz as keyof typeof RELOGIO].curto}`, mono: true };
     const qual = { t: rules.windows.length > 1 ? HOJE.umaDasJanelas : HOJE.suaJanela };
@@ -102,7 +110,7 @@ export function comoFicaHoje(rules: Rules, now: Date, edited: readonly WindowSet
       linha: {
         esquerda: [faixa, qual],
         estado: HOJE.liberado,
-        tom: 'mint',
+        tom: verde,
         forte: true,
         sub: corte ? HOJE.janelaDepoisDaEspera(hhmm(corte.end, dados!.tz)) : null,
       },
@@ -128,7 +136,7 @@ export function comoFicaHoje(rules: Rules, now: Date, edited: readonly WindowSet
     linhas.push({ esquerda: [{ t: resto }], estado: HOJE.semJanelaSalva, tom: 'muted', forte: false, sub: null });
   } else {
     // The rule is off and the limit is checked
-    linhas.push({ esquerda: [{ t: resto }], estado: HOJE.liberado, tom: 'mint', forte: true, sub: null });
+    linhas.push({ esquerda: [{ t: resto }], estado: HOJE.liberado, tom: verde, forte: true, sub: null });
   }
 
   if (rules.limit) {
@@ -255,7 +263,7 @@ export function linhasDeDados(
   rules: Rules,
   now: Date,
   agenda: AgendaRead | null,
-): { linhas: LinhaOrdenada[]; esperas: BlockInterval[]; diaInteiro: boolean; tz: string } {
+): { linhas: LinhaOrdenada[]; esperas: BlockInterval[]; diaInteiro: boolean; naoConferido: boolean; tz: string } {
   const tz = relogioDe(rules);
   const day = tradingDayOn(now, rules.day);
   const S = tradingDayBounds(day, rules.day).start.getTime();
@@ -267,7 +275,7 @@ export function linhasDeDados(
   const entries = agenda ? agendaFor(rules, rules.day, now, agenda) : null;
   if (!agenda || (!semEspera && entries === null)) {
     // Not loaded: never «Liberado» for want of the agenda; nothing to say when the rule waits for nothing
-    return { linhas: semEspera ? [] : [fraca(HOJE.naoConferido)], esperas: [], diaInteiro: false, tz };
+    return { linhas: semEspera ? [] : [fraca(HOJE.naoConferido)], esperas: [], diaInteiro: false, naoConferido: !semEspera, tz };
   }
   const rows = linhasDoDia(rules, agenda, day);
   const modos = modosDaRegra(rules);
@@ -347,7 +355,7 @@ export function linhasDeDados(
     });
   }
   if (out.length === 0) out.push(fraca(HOJE.nenhumDadoHoje));
-  return { linhas: out, esperas: ivs.filter((iv) => iv.kind === 'espera'), diaInteiro: ivs.some((iv) => iv.kind === 'dia'), tz };
+  return { linhas: out, esperas: ivs.filter((iv) => iv.kind === 'espera'), diaInteiro: ivs.some((iv) => iv.kind === 'dia'), naoConferido: false, tz };
 }
 
 /** One line of «Próximos dados» (board Q23) */

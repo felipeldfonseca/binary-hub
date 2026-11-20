@@ -427,11 +427,36 @@ describe('«Como fica hoje» with the day\'s releases (Phase 5-1, c3 §4.2)', ()
     expect(hojeQ(quadro({}, { on: false }), '2026-12-03 09:00')[0]).toBe('ISM de serviços às 10:00 ET → Opero normalmente [muted, leve]')
   })
 
-  it('no release today: «Dados econômicos · nenhum dado hoje»; the agenda missing: «não conferido», never «Liberado» for it', () => {
+  it('no release today: «Dados econômicos · nenhum dado hoje»', () => {
     expect(hojeQ(quadro(), '2026-12-08 09:00')).toContain('Dados econômicos → nenhum dado hoje [muted, leve]')
-    expect(hojeQ(quadro(), '2026-12-10 09:00', true)).toContain('Dados econômicos → não conferido: sem a agenda de hoje [muted, leve]')
-    // with the rule off nothing is waited for: nothing to say
+    // with the rule off nothing is waited for: nothing to say when the agenda is missing
     expect(hojeQ(quadro({}, { on: false }), '2026-12-10 09:00', true)).not.toContain('Dados econômicos → não conferido: sem a agenda de hoje [muted, leve]')
+  })
+
+  describe('the agenda missing: «não conferido», never a green «Liberado» (c3 §4.2 l.761-762; answerOf\'s semAgenda)', () => {
+    const NAO_CONFERIDO = 'Dados econômicos → não conferido: sem a agenda de hoje [muted, leve]'
+    const semVerde = (ls: string[]) => expect(ls.some((l) => /Liberado.*\[mint/.test(l))).toBe(false)
+    const desligada = (r: Rules, limit: Rules['limit']): Rules => ({ ...r, windowRule: { on: false, outside: 'fora' }, limit })
+    it('window rule on, with the limit: the window\'s «Liberado» muted', () => {
+      for (const ls of [hojeQ(quadro(), '2026-12-10 09:00', true), linhas(comoFicaHoje(quadro(), etQ('2026-12-10 09:00'), win(quadro()), null))]) {
+        expect(ls).toEqual([`${JANELA} → Liberado [muted]`, 'No resto do dia → Fora da sua janela [amber]', LIMITE, NAO_CONFERIDO])
+        semVerde(ls)
+      }
+    })
+    it('window rule off, with the limit: «Liberado» muted, as the gate\'s «Liberado» semAgenda', () => {
+      const r = desligada(quadro(), { cents: 50000, mode: 'conta', atLimit: 'encerrar' })
+      const ls = linhas(comoFicaHoje(r, etQ('2026-12-10 07:00'), win(r), null))
+      expect(ls).toEqual([`${JANELA} → Liberado [muted]`, 'No resto do dia → Liberado [muted]', LIMITE, NAO_CONFERIDO])
+      semVerde(ls)
+    })
+    it('window rule off and no limit: nothing else is checked, the gate\'s «Dados econômicos não conferidos»', () => {
+      const r = desligada(quadro(), null)
+      for (const agenda of [null, leituraDoDia(etQ('2026-12-10 07:00'), { semAgenda: true })]) {
+        const ls = linhas(comoFicaHoje(r, etQ('2026-12-10 07:00'), win(r), agenda))
+        expect(ls).toEqual(['O dia todo → Dados econômicos não conferidos [muted, leve]'])
+        semVerde(ls)
+      }
+    })
   })
 
   it('a market without the rule never gets a data line', () => {
