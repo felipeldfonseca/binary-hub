@@ -173,7 +173,7 @@ describe('PossoOperarHoje (the card, from props)', () => {
   it.each<[AgoraFixture, Line[]]>([
     ['agora-seg-0930-et', [TOP_FORA, EBX_FORA]],
     // Re-recorded on the Phase 5-1 SQL with an empty agenda: the block is sem_agenda, never a green «Liberado» (L4)
-    ['agora-seg-1005-et', [{ conta: 'Top One #1', texto: 'Liberado · dados econômicos não conferidos · sem a agenda de hoje', tom: 'muted', limite: limite('0', '400') }, EBX_FORA]],
+    ['agora-seg-1005-et', [{ conta: 'Top One #1', texto: 'Liberado · dados econômicos não conferidos · sem a agenda de hoje · Tentar de novo', tom: 'neutral', limite: limite('0', '400') }, EBX_FORA]],
     [
       'agora-seg-1045-et',
       [{ conta: 'Top One #1', texto: 'Encerrado por hoje · limite atingido às 10:31', tom: 'red', limite: limite('430', '400') }, EBX_FORA],
@@ -321,9 +321,9 @@ describe('PossoOperarHoje (the card, from props)', () => {
 
     render(<PossoOperarHoje state={{ status: 'ready', accounts: now.accounts }} onRetry={jest.fn()} />)
 
-    expect(lines()[0]).toEqual({ conta: 'Top One #1', texto: 'Liberado · com aviso: fora da janela · dados econômicos não conferidos · sem a agenda de hoje', tom: 'muted', limite: limite('0', '400') })
-    // sem_agenda: «Liberado» is not emphasised (never green), L4's re-recording
-    expect(within(items()[0]).getByText('Liberado').tagName).toBe('SPAN')
+    expect(lines()[0]).toEqual({ conta: 'Top One #1', texto: 'Liberado · com aviso: fora da janela · dados econômicos não conferidos · sem a agenda de hoje · Tentar de novo', tom: 'neutral', limite: limite('0', '400') })
+    // sem_agenda: «Liberado» in the text colour, never green; bold as Q12 draws it (`strong.hub-tom--neutral`)
+    expect(within(items()[0]).getByText('Liberado').tagName).toBe('STRONG')
   })
 
   it('«Sem regra ativa · Ajustar» when the window rule is off and there is no limit', () => {
@@ -469,7 +469,8 @@ describe('PossoOperarHoje (the card, from props)', () => {
     await userEvent.click(info)
     expect(info).toHaveAttribute('aria-expanded', 'true')
     expect(document.getElementById('info-posso')).toHaveTextContent(
-      'Cada conta responde pelas regras dela: janela e limite do dia. O bloqueio de dados fica ativo na Fase 5 e, por enquanto, vale só em Futuros. ' +
+      'Cada conta responde pelas regras dela: janela, dados econômicos e limite do dia. Dados econômicos: numa espera, a tela diz “Aguardar até” e a hora em que ela termina; ' +
+        'num dia que você marcou como “Não opero no dia”, diz “Não opero hoje”. Por enquanto, essa regra vale só em Futuros. O app nunca impede uma operação. ' +
         'Limite do dia: a maior perda do dia, no pior momento, contra o limite da conta, na moeda dela (R$ na B3; US$ nos outros mercados, com USDT e USDC contados como dólar). ' +
         'Contas de mercados diferentes nunca são somadas. Vem das suas regras, nunca da IA.',
     )
@@ -557,15 +558,15 @@ describe('PossoOperarHojeDiario (the card, from rules_now)', () => {
       jest.advanceTimersByTime(1000)
     })
 
-    await waitFor(() => expect(lines()[0].texto).toBe('Liberado · dados econômicos não conferidos · sem a agenda de hoje'))
-    expect(lines()[0].tom).toBe('muted')
+    await waitFor(() => expect(lines()[0].texto).toBe('Liberado · dados econômicos não conferidos · sem a agenda de hoje · Tentar de novo'))
+    expect(lines()[0].tom).toBe('neutral')
     expect(fetchRulesNow).toHaveBeenCalledTimes(2)
   })
 
   it('asks again when the tab gets focus back', async () => {
     fetchRulesNow.mockReset().mockResolvedValueOnce(agora('agora-seg-1005-et')).mockResolvedValue(agora('agora-seg-1045-et'))
     renderHub(<PossoOperarHojeDiario />)
-    await waitFor(() => expect(lines()[0].texto).toBe('Liberado · dados econômicos não conferidos · sem a agenda de hoje'))
+    await waitFor(() => expect(lines()[0].texto).toBe('Liberado · dados econômicos não conferidos · sem a agenda de hoje · Tentar de novo'))
 
     act(() => {
       focusManager.setFocused(false)
@@ -583,7 +584,7 @@ describe('PossoOperarHojeDiario (the card, from rules_now)', () => {
       .mockRejectedValueOnce(new regrasDb.RegrasDataError('network'))
       .mockResolvedValue(agora('agora-seg-1045-et'))
     renderHub(<PossoOperarHojeDiario />)
-    await waitFor(() => expect(lines()[0].texto).toBe('Liberado · dados econômicos não conferidos · sem a agenda de hoje'))
+    await waitFor(() => expect(lines()[0].texto).toBe('Liberado · dados econômicos não conferidos · sem a agenda de hoje · Tentar de novo'))
 
     act(() => {
       focusManager.setFocused(false)
@@ -607,7 +608,7 @@ describe('PossoOperarHojeDiario (the card, from rules_now)', () => {
     screen.getByRole('button', { name: 'Tentar de novo' }).focus()
     await userEvent.keyboard('{Enter}')
 
-    await waitFor(() => expect(lines()[0].texto).toBe('Liberado · dados econômicos não conferidos · sem a agenda de hoje'))
+    await waitFor(() => expect(lines()[0].texto).toBe('Liberado · dados econômicos não conferidos · sem a agenda de hoje · Tentar de novo'))
     expect(title()).toHaveFocus()
     expect(document.activeElement).not.toBe(document.body)
   })
@@ -656,7 +657,7 @@ describe('PossoOperarHojeDiario with the app’s query defaults (QueryProvider)'
       .mockRejectedValueOnce(new regrasDb.RegrasDataError('network'))
       .mockResolvedValue(agora('agora-seg-1045-et'))
     renderApp(<PossoOperarHojeDiario />)
-    await waitFor(() => expect(lines()[0].texto).toBe('Liberado · dados econômicos não conferidos · sem a agenda de hoje'))
+    await waitFor(() => expect(lines()[0].texto).toBe('Liberado · dados econômicos não conferidos · sem a agenda de hoje · Tentar de novo'))
 
     // 11:00:01 ET: the read fails; the default retry waits 1 s
     await advance(55 * 60_000 + 1000)
@@ -675,12 +676,12 @@ describe('PossoOperarHojeDiario with the app’s query defaults (QueryProvider)'
     jest.setSystemTime(new Date('2026-10-19T14:05:00Z'))
     fetchRulesNow.mockReset().mockResolvedValueOnce(agora('agora-seg-1005-et')).mockResolvedValue(agora('agora-seg-1045-et'))
     renderApp(<PossoOperarHojeDiario />)
-    await waitFor(() => expect(lines()[0].texto).toBe('Liberado · dados econômicos não conferidos · sem a agenda de hoje'))
+    await waitFor(() => expect(lines()[0].texto).toBe('Liberado · dados econômicos não conferidos · sem a agenda de hoje · Tentar de novo'))
 
     act(() => onlineManager.setOnline(false))
     // Still before 11:00: the answer holds
     await advance(25 * 60_000)
-    expect(lines()[0].texto).toBe('Liberado · dados econômicos não conferidos · sem a agenda de hoje')
+    expect(lines()[0].texto).toBe('Liberado · dados econômicos não conferidos · sem a agenda de hoje · Tentar de novo')
 
     // 11:10 ET, offline since 10:30: the read at 11:00:01 is paused, never failed
     await advance(40 * 60_000)
@@ -712,7 +713,7 @@ describe('PossoOperarHojeDiario with the app’s query defaults (QueryProvider)'
       .mockResolvedValueOnce(answeredAt('agora-seg-1005-et', '2026-10-19T14:59:30+00:00'))
       .mockResolvedValue(answeredAt('agora-seg-1045-et', '2026-10-19T15:00:20+00:00'))
     const view = renderApp(<CardOn shown />)
-    await waitFor(() => expect(lines()[0].texto).toBe('Liberado · dados econômicos não conferidos · sem a agenda de hoje'))
+    await waitFor(() => expect(lines()[0].texto).toBe('Liberado · dados econômicos não conferidos · sem a agenda de hoje · Tentar de novo'))
 
     await advance(10_000)
     view.rerender(<CardOn shown={false} />)
@@ -733,14 +734,14 @@ describe('PossoOperarHojeDiario with the app’s query defaults (QueryProvider)'
       .mockResolvedValueOnce(answeredAt('agora-seg-1005-et', '2026-10-19T14:59:30+00:00'))
       .mockResolvedValue(answeredAt('agora-seg-1045-et', '2026-10-19T15:00:01+00:00'))
     const view = renderApp(<CardOn shown />)
-    await waitFor(() => expect(lines()[0].texto).toBe('Liberado · dados econômicos não conferidos · sem a agenda de hoje'))
+    await waitFor(() => expect(lines()[0].texto).toBe('Liberado · dados econômicos não conferidos · sem a agenda de hoje · Tentar de novo'))
 
     await advance(5000)
     view.rerender(<CardOn shown={false} />)
     await advance(15_000)
     // Back at 10:59:50 ET: the answer still holds until 11:00
     view.rerender(<CardOn shown />)
-    expect(lines()[0].texto).toBe('Liberado · dados econômicos não conferidos · sem a agenda de hoje')
+    expect(lines()[0].texto).toBe('Liberado · dados econômicos não conferidos · sem a agenda de hoje · Tentar de novo')
 
     await advance(10_000)
     expect(fetchRulesNow).toHaveBeenCalledTimes(1)

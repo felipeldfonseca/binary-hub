@@ -1,1 +1,54 @@
 /* Phase 5-1 · «Dados econômicos» in «Posso operar hoje?» and the Registrar (lane L6 fills it; scoped to .hub) */
+
+/*
+ * Under the open account's line (boards Q11, Q12, Q16, Q18, Q37): the grey «Mais tarde: …» and the amber 10-minute
+ * notice sit right under the line (padding 0 0 10px); the first-wait notice and «Conferidos: …» each open with the
+ * card's rule (padding 10px 0, border-top).
+ */
+.hub .hub-posso__depois {
+  padding: 0 0 10px;
+}
+.hub .hub-posso__aviso10 {
+  display: flex;
+  gap: 6px;
+  align-items: flex-start;
+  padding: 0 0 10px;
+  font-size: 13px;
+}
+.hub .hub-posso__relogio {
+  flex: none;
+  margin-top: 2px;
+}
+.hub .hub-posso__primeira {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 16px;
+  padding: 10px 0;
+  border-top: 1px solid var(--border);
+}
+.hub .hub-posso__primeira > .hub-nota {
+  flex: 1 1 220px;
+}
+.hub .hub-posso__conferidos {
+  padding: 10px 0;
+  border-top: 1px solid var(--border);
+}
+
+/*
+ * The Registrar (boards Q33–Q38): the 10-minute notice is a line of the context block, under the answer, amber with
+ * its clock (Q38); the plan sentence stays in the text colour beside the amber mark (Q33: the built line).
+ */
+.hub .hub-reg-ctx-linha.hub-reg-aviso10 {
+  flex-wrap: nowrap;
+  align-items: flex-start;
+}
+.hub .hub-reg-aviso10__relogio {
+  flex: 0 0 auto;
+  margin-top: 3px;
+  color: var(--amber);
+}
+.hub .hub-reg-aviso10 > span {
+  min-width: 0;
+  color: var(--amber);
+}

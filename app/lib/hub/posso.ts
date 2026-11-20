@@ -8,9 +8,14 @@
  * the rules' market (currencyOf: R$ on B3, US$ everywhere else).
  */
 import { formatHhMm, utcToLocal } from '@/lib/domain';
+import { tradingDayOn } from '@/lib/domain/tempo';
 import {
   ACCOUNT_MARKETS,
   answerOf,
+  releasesOf,
+  type AgendaRead,
+  type BlockRelease,
+  type ReleaseCode,
   centsToUsd,
   currencyOf,
   type AccountMarket,
@@ -23,7 +28,7 @@ import {
   type Rules,
   type StateRuleCheck,
 } from '@/lib/domain/gate';
-import { PALAVRAS_DADOS, horaDeVolta, rotuloDados, rotuloDia, soDepois } from './dadosEconomicos';
+import { NOMES_DADOS, PALAVRAS_DADOS, horaDeVolta, marcaDados, rotuloDados, rotuloDia, soDepois } from './dadosEconomicos';
 import { formatMoney } from './formato';
 
 /** Board colour tokens: --mint, --amber, --red, --text (neutral), --text-2 (muted) */
@@ -42,6 +47,11 @@ export interface PossoLinha {
   acao: { texto: string; href: string; aria: string } | null;
   /** «Limite do dia US$ 0 de US$ 400» («R$ 0 de R$ 500» on B3); null when the account has no limit */
   limite: { usado: string; de: string; aria: string; indisponivel: boolean } | null;
+  /**
+   * «Tentar de novo» after the sub: only the grey «Liberado» without the agenda and «Dados econômicos não
+   * conferidos» (c3 §5.4; Q12 draws it, Q16 «Fora da sua janela» without the agenda does not)
+   */
+  tentar?: boolean;
 }
 
 const NBSP = ' ';
@@ -79,6 +89,11 @@ export function janelaLinha(rules: Rules | null): string {
   return rules.windows[0].tz === 'America/Sao_Paulo' ? `Janela ${faixas} · Brasília` : `Janela ${faixas}${sufixoRelogio(rules.windows[0].tz)}`;
 }
 
+/** The window clock of an account's rules (hours of «Dados econômicos» show on it, SPEC §5.6) */
+export function relogioDaJanela(rules: Rules | null): string {
+  return rules?.windows[0]?.tz ?? rules?.day.tz ?? 'America/New_York';
+}
+
 /** '' (same date), 'amanhã ', or 'seg ' … on the window's clock */
 function quando(next: Date, now: Date, tz: string): string {
   const a = utcToLocal(now, tz);
@@ -106,7 +121,7 @@ export const LIBERADO_SEM_AGENDA = `${PALAVRAS_DADOS.naoConferidosSub} · sem a 
  */
 export function possoLinha(conta: string, r: GateResult, rules: Rules | null, agora: Date = r.at): PossoLinha {
   const a = answerOf(r);
-  const wtz = rules?.windows[0]?.tz ?? rules?.day.tz ?? 'America/New_York';
+  const wtz = relogioDaJanela(rules);
   const dtz = rules?.day.tz ?? wtz;
 
   let limite: PossoLinha['limite'] = null;
@@ -162,8 +177,11 @@ export function possoLinha(conta: string, r: GateResult, rules: Rules | null, ag
       };
     case 'liberado': {
       const aviso = avisos(a.warnings, a.position === 'nao_e_dia');
-      // Without the agenda «Liberado» is never green (SPEC §5.4 rule 4)
-      if (a.semAgenda) return { ...base, palavra: 'Liberado', tom: 'muted', sub: [aviso, LIBERADO_SEM_AGENDA].filter(Boolean).join(' · ') };
+      // Without the agenda «Liberado» is never green (SPEC §5.4 rule 4): the text colour, as Q12 draws it
+      // (resumo_para_o_dono: «na cor do texto»), with «Tentar de novo»
+      if (a.semAgenda) {
+        return { ...base, palavra: 'Liberado', tom: 'neutral', sub: [aviso, LIBERADO_SEM_AGENDA].filter(Boolean).join(' · '), tentar: true };
+      }
       return {
         ...base,
         palavra: 'Liberado',
@@ -174,7 +192,7 @@ export function possoLinha(conta: string, r: GateResult, rules: Rules | null, ag
     case 'indisponivel':
       // The screen offers «Tentar de novo» from `limite.indisponivel`
       return a.reason === 'sem_agenda'
-        ? { ...base, palavra: 'Dados econômicos não conferidos', tom: 'muted', sub: null }
+        ? { ...base, palavra: PALAVRAS_DADOS.naoConferidos, tom: 'muted', sub: null, tentar: true }
         : { ...base, palavra: 'Limite do dia indisponível', tom: 'muted', sub: null };
     case 'sem_janela':
       return a.reason === 'regra_desligada'
@@ -200,16 +218,24 @@ export function possoTexto(l: PossoLinha): string {
   return [l.palavra, l.sub ?? l.acao?.texto].filter(Boolean).join(' · ');
 }
 
-const MARCAS: Record<PlanBreak, string> = {
+// The data break keeps its code (`no_bloqueio`, c3 §9.1); its words come from the entry's gate (c3 §9.2 item 13)
+const MARCAS: Record<Exclude<PlanBreak, 'no_bloqueio'>, string> = {
   fora_da_janela: 'fora da janela',
-  no_bloqueio: 'no bloqueio',
   depois_do_limite: 'depois do limite',
   contra_a_regra: 'contra a regra',
 };
 
-/** The «Plano» column: «No plano», «● fora da janela · depois do limite», «—», or the imported history */
+/**
+ * The «Plano» column: «No plano», «● fora da janela · depois do limite», «● na espera do ISM», «● em dia de CPI», «—», or
+ * the imported history. The data break is worded from the plan's gate (`block.active`, marcaDados; «na espera de dado»
+ * when the answer does not carry it)
+ */
 export function marcaDoPlano(p: PlanResult): { texto: string; tom: Tom } {
-  if (p.verdict === 'fora_do_plano') return { texto: `●${NBSP}${p.breaks.map((b) => MARCAS[b]).join(' · ')}`, tom: 'amber' };
+  if (p.verdict === 'fora_do_plano') {
+    const active = p.gate.block.evaluated ? p.gate.block.active : null;
+    const words = p.breaks.map((b) => (b === 'no_bloqueio' ? marcaDados(active) : MARCAS[b]));
+    return { texto: `●${NBSP}${words.join(' · ')}`, tom: 'amber' };
+  }
   if (p.verdict === 'no_plano') return { texto: 'No plano', tom: 'mint' };
   if (!p.gate.window.evaluated && p.gate.window.reason === 'sem_versao') {
     return { texto: 'Histórico importado · só resultado', tom: 'muted' };
@@ -217,14 +243,138 @@ export function marcaDoPlano(p: PlanResult): { texto: string; tom: Tom } {
   return { texto: '—', tom: 'muted' };
 }
 
-const NOMES: Record<CheckKey, string> = { janela: 'janela', bloqueio: 'bloqueio', limite: 'limite', estado: 'regra do estado' };
+// The code name `bloqueio` stays (c3 §9.1); the screen says «dados econômicos» (c3 §9.2 item 14)
+const NOMES: Record<CheckKey, string> = { janela: 'janela', bloqueio: 'dados econômicos', limite: 'limite', estado: 'regra do estado' };
 
-/** «Conferidos: janela, bloqueio e limite.»; null when nothing was checked */
+const lista = (names: readonly string[]) => (names.length === 1 ? names[0] : `${names.slice(0, -1).join(', ')} e ${names[names.length - 1]}`);
+
+/** «Conferidos: janela, dados econômicos e limite.»; null when nothing was checked */
 export function conferidos(checks: readonly CheckKey[]): string | null {
   if (checks.length === 0) return null;
-  const names = checks.map((c) => NOMES[c]);
-  const list = names.length === 1 ? names[0] : `${names.slice(0, -1).join(', ')} e ${names[names.length - 1]}`;
-  return `Conferidos: ${list}.`;
+  return `Conferidos: ${lista(checks.map((c) => NOMES[c]))}.`;
+}
+
+/** The ending of what the agenda's absence left unchecked (c3 §5.4) */
+const SEM_AGENDA_DE_HOJE = '(o app está sem a agenda de hoje)';
+
+/**
+ * The sentence under «Posso operar hoje?» (c3 §5.2 l.941, §5.4; SPEC §7.2): «Conferidos: janela, dados econômicos e
+ * limite.»; without the day's agenda it also says what was not checked: «Conferidos: janela e limite. Não conferido:
+ * dados econômicos (o app está sem a agenda de hoje).», «Conferido: limite. Não conferido: …» (the window off) and,
+ * when the limit has no reading either, «Não conferidos: limite do dia e dados econômicos (o app está sem a agenda de
+ * hoje).» With the agenda there, it lists only what was checked, as before (the limit's absence alone is Phase 2's,
+ * SPEC §5.4 last line). null when nothing was checked and nothing is missing.
+ */
+export function conferidosDoGate(gate: GateResult): string | null {
+  const semAgenda = !gate.block.evaluated && gate.block.reason === 'sem_agenda';
+  if (!semAgenda) return conferidos(gate.checksEvaluated);
+  const feitos = gate.checksEvaluated.map((c) => NOMES[c]);
+  const faltam = [...(!gate.limit.evaluated && gate.limit.reason === 'sem_dados' ? ['limite do dia'] : []), 'dados econômicos'];
+  const naoConferido = `${faltam.length === 1 ? 'Não conferido' : 'Não conferidos'}: ${lista(faltam)} ${SEM_AGENDA_DE_HOJE}.`;
+  if (feitos.length === 0) return naoConferido;
+  return `${feitos.length === 1 ? 'Conferido' : 'Conferidos'}: ${lista(feitos)}. ${naoConferido}`;
+}
+
+/**
+ * The grey line «Mais tarde: ISM de serviços às 10:00, espera das 09:55 às 10:10.» (c3 §5.2 case 12; SPEC §7.2
+ * l.1163): the next wait of the answer's day still to start at `agora`, under «Liberado» and «Fora da sua janela» only
+ * («… , e mais 1 hoje.» when another follows). Hours on the window clock. The screen hides it while the 10-minute
+ * notice shows (c3 §5.2 l.937). null otherwise.
+ */
+export function maisTarde(gate: GateResult, rules: Rules | null, agora: Date = gate.at): string | null {
+  const a = answerOf(gate);
+  if ((a.kind !== 'liberado' && a.kind !== 'fora_janela') || !gate.block.evaluated) return null;
+  const wtz = relogioDaJanela(rules);
+  const futuras = gate.block.today.filter((i) => i.kind === 'espera' && i.start.getTime() > agora.getTime());
+  if (futuras.length === 0) return null;
+  const [p] = futuras;
+  const frase = `Mais tarde: ${rotuloDados(p.releases, agora, wtz)}, espera das ${horaNoRelogio(p.start, wtz)} às ${horaNoRelogio(p.end, wtz)}`;
+  return futuras.length > 1 ? `${frase}, e mais ${futuras.length - 1} hoje.` : `${frase}.`;
+}
+
+/** «do ISM de serviços», «do PCE e do PIB dos EUA», «da decisão do BCE e mais 2 dados» */
+export function doDaDados(releases: readonly BlockRelease[]): string {
+  const codes = Array.from(new Set(releases.map((r) => r.code)));
+  if (codes.length >= 3) return `${NOMES_DADOS[codes[0]].doDa} e mais ${codes.length - 1} dados`;
+  return codes.map((c) => NOMES_DADOS[c].doDa).join(' e ');
+}
+
+/**
+ * The 10-minute notice (c3 §8.2; SPEC §7.2 l.1187): «Às 09:55 começa a espera do ISM de serviços (10:00), até 10:10.»,
+ * two releases «Às 08:25 começa a espera do PCE e do PIB dos EUA (08:30), até 08:40.». The wait is the one the screen's
+ * clock gives (useRelogioDados / relogioDados: `avisoDezMin`); its hour in parentheses is the first release's. On the
+ * window clock.
+ */
+export function avisoDezMinTexto(aviso: { start: Date; end: Date; releases: readonly BlockRelease[] }, clock: string): string {
+  const dado = aviso.releases[0] ? ` (${horaNoRelogio(aviso.releases[0].at, clock)})` : '';
+  return `Às ${horaNoRelogio(aviso.start, clock)} começa a espera ${doDaDados(aviso.releases)}${dado}, até ${horaNoRelogio(aviso.end, clock)}.`;
+}
+
+/**
+ * The first-wait notice under the answer (c3 §3.9 l.652-654; SPEC §7.2 l.1191; Q18): «Esta espera vem da regra “Dados
+ * econômicos” desta conta (5 min antes e 10 depois dos dados fortes). O app passou a conferi-la; você muda em
+ * Personalizar.», with the account's own minutes. Only while the answer is a wait («Aguardar até») of an account whose
+ * rule is still in the form saved before this delivery (the short form: no `releases`, c3 §3.9 «a conta antiga»),
+ * switched on with minutes. The screen also hides it once «Entendi» was pressed on this device (lib/hub/avisoDados).
+ */
+export function avisoPrimeiraEspera(gate: GateResult, rules: Rules | null): string | null {
+  const b = rules?.block;
+  if (!b || !b.on || b.releases || b.beforeMin + b.afterMin === 0) return null;
+  if (answerOf(gate).kind !== 'aguardar') return null;
+  return (
+    `Esta espera vem da regra “Dados econômicos” desta conta (${b.beforeMin} min antes e ${b.afterMin} depois dos dados fortes). ` +
+    'O app passou a conferi-la; você muda em Personalizar.'
+  );
+}
+
+const MESES = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
+
+/** Agreement of «cancelado» / «adiado» with each release's name (c3 §2.2's line forms) */
+const GENERO: Partial<Record<ReleaseCode, 'a' | 'os' | 'as'>> = {
+  fomc_decisao: 'a',
+  fomc_entrevista: 'a',
+  bce_decisao: 'a',
+  bce_entrevista: 'a',
+  copom: 'a',
+  confianca_us: 'a',
+  hicp_eu: 'a',
+  varejo_us: 'as',
+  casas_novas: 'as',
+  casas_usadas: 'as',
+};
+const concorda = (code: ReleaseCode, palavra: 'cancelad' | 'adiad') => `${palavra}${GENERO[code] ?? 'o'}`;
+
+/**
+ * The grey line of a release of today cancelled or postponed (c3 §5.2 case 17, §12.5; SPEC §7.2 l.1166 and l.1234):
+ * «CPI de hoje cancelado: sem espera hoje.», «CPI adiado para sex 18 dez: sem espera hoje.». From the day's agenda read
+ * the screen already makes (E5, with each row's status; the gate never receives a cancelled release), only for a code
+ * the account waits on (its rule on, the code in its map) and a row of the account's day (`at`, or `wasAt` for a
+ * postponed one). NEW (not drawn). One line per row, in the read's order.
+ */
+export function dadosCanceladosHoje(read: AgendaRead | null | undefined, gate: GateResult, rules: Rules | null): string[] {
+  const b = rules?.block;
+  if (!read || !b || !b.on) return [];
+  // Only where the gate would have waited (SPEC §7.2 l.1234): not for a rule the gate itself sets aside (0+0 minutes,
+  // `regra_desligada`; outside Futuros), and a «volta» code only with minutes around it
+  if (!gate.block.evaluated && gate.block.reason !== 'sem_agenda') return [];
+  const mapa = releasesOf(b);
+  const semMinutos = b.beforeMin + b.afterMin === 0;
+  const clock = { tz: rules.day.tz, startMin: rules.day.startMin };
+  const wtz = rules.windows[0]?.tz ?? rules.day.tz;
+  const out: string[] = [];
+  for (const row of read.rows) {
+    if (!row.code || !mapa[row.code] || !b.calendars.includes(row.calendar)) continue;
+    if (mapa[row.code] === 'volta' && semMinutos) continue;
+    const nome = `${NOMES_DADOS[row.code].nome} de hoje`;
+    if (row.status === 'cancelado' && tradingDayOn(row.at, clock) === gate.tradingDay) {
+      out.push(`${nome} ${concorda(row.code, 'cancelad')}: sem espera hoje.`);
+    } else if (row.status === 'adiado' && row.wasAt && tradingDayOn(row.wasAt, clock) === gate.tradingDay && tradingDayOn(row.at, clock) !== gate.tradingDay) {
+      const d = utcToLocal(row.at, wtz);
+      const quando = `${WEEKDAYS[d.isoWeekday - 1]} ${Number(d.date.slice(8, 10))} ${MESES[Number(d.date.slice(5, 7)) - 1]}`;
+      out.push(`${NOMES_DADOS[row.code].nome} ${concorda(row.code, 'adiad')} para ${quando}: sem espera hoje.`);
+    }
+  }
+  return out;
 }
 
 const ESCOLHAS = { opero: 'opero', so_a_favor: 'só a favor', nao_opero: 'não opero' } as const;
@@ -360,14 +510,14 @@ const marketRank = (m: AccountMarket) => {
  * janela · 3 sem janela salva»; «todas fora da janela» when they all share one state; the state
  * alone with one other account). The view of every account goes to the Início (Phase 8).
  */
-export function possoNoDiario(accounts: readonly ContaPosso[], selectedId: string): PossoNoDiario {
+export function possoNoDiario(accounts: readonly ContaPosso[], selectedId: string, agora?: Date): PossoNoDiario {
   const ordered = accounts
     .map((a, i) => ({ a, i }))
     .sort((x, y) => marketRank(x.a.market) - marketRank(y.a.market) || x.i - y.i)
     .map((x) => x.a);
   const sel = ordered.find((a) => a.accountId === selectedId) ?? null;
   const others = ordered.filter((a) => a.accountId !== selectedId);
-  const linhaDe = (a: ContaPosso): LinhaDaConta => ({ accountId: a.accountId, label: a.label, linha: possoLinha(a.label, a.gate, a.rules) });
+  const linhaDe = (a: ContaPosso): LinhaDaConta => ({ accountId: a.accountId, label: a.label, linha: possoLinha(a.label, a.gate, a.rules, agora ?? a.gate.at) });
 
   let outras: OutrasContas | null = null;
   if (others.length) {
@@ -401,3 +551,47 @@ export function outrasTexto(o: OutrasContas): string {
 
 /** The sentence the card's ⓘ gains on the Diário (owner's revision of 25 Oct) */
 export const POSSO_NO_DIARIO_INFO = 'Aqui aparece a conta aberta no Diário; as outras ficam numa linha, e “Ver todas” mostra a resposta de cada uma.';
+
+/** What the Diário's card draws under the open account's line (Phase 5-1; the boards Q11, Q12, Q16, Q18, Q37) */
+export interface NotasDaConta {
+  /** The amber 10-minute notice with the clock (Q37); while it shows, «Mais tarde» does not (c3 §5.2 l.937) */
+  avisoDezMin: string | null;
+  /** The grey «Mais tarde: …» line (Q11) */
+  maisTarde: string | null;
+  /** The grey lines of a release of today cancelled or postponed (NEW, not drawn) */
+  cancelados: string[];
+  /** The first-wait notice with «Entendi» (Q18); null once «Entendi» was pressed on this device */
+  primeiraEspera: string | null;
+  /** «Conferidos: …» / «… Não conferido: …» (every frame) */
+  conferidos: string | null;
+}
+
+/**
+ * The notes of the open account at `agora` (the screen's server clock): `aviso` is useRelogioDados' `avisoDezMin`
+ * (already null with the preference off), `agenda` the day's read (null while unread or failed: no cancelled line),
+ * `entendi` whether this device dismissed the «Dados econômicos» notice of the account (lib/hub/avisoDados).
+ */
+/**
+ * Whether the 10-minute notice may show under this answer: only where «Mais tarde» would (c3 §5.2: the notice takes
+ * that line's place), «Liberado» and «Fora da sua janela»; never under «Encerrado por hoje» («nada sobre dados») nor a
+ * whole day «Não opero hoje» («a espera não aparece», SPEC §7.2). The Registrar uses the same gate.
+ */
+export function avisoDezMinCabe(gate: GateResult): boolean {
+  const k = answerOf(gate).kind;
+  return k === 'liberado' || k === 'fora_janela';
+}
+
+export function notasDaConta(
+  conta: Pick<ContaPosso, 'gate' | 'rules'>,
+  o: { agora: Date; aviso: { start: Date; end: Date; releases: readonly BlockRelease[] } | null; agenda: AgendaRead | null; entendi: boolean },
+): NotasDaConta {
+  const wtz = relogioDaJanela(conta.rules);
+  const avisoDezMin = o.aviso && avisoDezMinCabe(conta.gate) ? avisoDezMinTexto(o.aviso, wtz) : null;
+  return {
+    avisoDezMin,
+    maisTarde: avisoDezMin ? null : maisTarde(conta.gate, conta.rules, o.agora),
+    cancelados: dadosCanceladosHoje(o.agenda, conta.gate, conta.rules),
+    primeiraEspera: o.entendi ? null : avisoPrimeiraEspera(conta.gate, conta.rules),
+    conferidos: conferidosDoGate(conta.gate),
+  };
+}

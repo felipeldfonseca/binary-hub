@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import { useIsMutating, useQuery } from '@tanstack/react-query'
 import { hubKeys, useHubDb, usePreferences } from '@/hooks/useContas'
 import { useRulesNow } from '@/hooks/useRegras'
+import { avisoAntesDaEsperaLigado } from '@/lib/hub/regrasDb'
 import { useImageTrashSweep, useOpenTrades, useRegistrarDefaults, useServerNow, useTradeView } from '@/hooks/useRegistrar'
 import { visibleAccounts, type TradingAccount } from '@/lib/hub/contas'
 import { fetchAccounts } from '@/lib/hub/contasDb'
@@ -125,6 +126,9 @@ export default function RegistrarSheet({ accountId, tradeId, onClose, dia = null
   const trade = useTradeView(alvo, { enabled: !!alvo })
   const defaults = useRegistrarDefaults(account ? { id: account.id, market: account.market } : null)
   const pref80 = prefs.data?.alerts?.limit_80 === true
+  // Phase 5-1: unlike limit_80, the 10-minute notice is on unless switched off (contract §3.8, Q39); held back while the
+  // preferences are being read, as the Diário card (a switched-off notice must not flash)
+  const prefAvisoDados = prefs.isPending && prefs.fetchStatus === 'fetching' ? false : avisoAntesDaEsperaLigado(prefs.data)
 
   // The last view of each trade (an undo empties its cache entry before the sheet moves on)
   const ultimaVista = useRef<Record<string, TradeView>>({})
@@ -382,6 +386,7 @@ export default function RegistrarSheet({ accountId, tradeId, onClose, dia = null
           setR={setR}
           aviso={vista.aviso}
           pref80={pref80}
+          avisoDados={prefAvisoDados}
           headingRef={headingRef}
           aoSemRegras={() => ir({ passo: 'semRegras' })}
           aoRegistrar={(x) => {

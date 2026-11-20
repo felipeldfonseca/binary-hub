@@ -80,10 +80,10 @@ import {
   TIPO_EUA,
   VSV,
 } from '@/components/hub/registrar/copy';
-import { PALAVRAS_DADOS, horaDeVolta, marcaDados, rotuloDados, rotuloDia, soDepois } from './dadosEconomicos';
+import { NOMES_DADOS, PALAVRAS_DADOS, horaDeVolta, marcaDados, rotuloDados, rotuloDia, soDepois } from './dadosEconomicos';
 import { formatDiaMes, formatMoney } from './formato';
 import { formatDecimal, lerNumero } from './numero';
-import { LIBERADO_SEM_AGENDA, dinheiroCompacto, horaNoRelogio, sufixoRelogio, type Tom } from './posso';
+import { LIBERADO_SEM_AGENDA, dinheiroCompacto, doDaDados, horaNoRelogio, relogioDaJanela, sufixoRelogio, type Tom } from './posso';
 import type { AvisoDoLimite, RegistrarDefaults } from './registrar';
 import { COTACOES, CONTRACT_CHIPS, type Cotacao } from './registrar';
 import { buscarAtivos, chipsDoAtivo, formaDoAtivo, simboloRegistrado, statusBusca, type FormaAtivo } from './registrarAtivos';
@@ -1670,6 +1670,57 @@ export function textoQuebras(breaks: readonly PlanBreak[], gate: GateResult | nu
   const active = gate && gate.block.evaluated ? gate.block.active : null;
   const words = breaks.map((b) => (b === 'no_bloqueio' ? marcaDados(active) : PALAVRA_QUEBRA[b])).filter((w): w is string => !!w);
   return words.length ? words.join(' · ') : null;
+}
+
+/**
+ * The sentence beside the plan's mark (c3 §7.2, the six sentences; boards Q33–Q36), one for the whole plan: every one
+ * ends «Você pode registrar.» (the rule never blocks). From the breaks and the gate answer of the entry (the dry run's
+ * when it answered, as textoQuebras):
+ *   - a wait «em volta do horário» (`block.active` kind 'espera', not every release «só depois»): 1, 4 (with the
+ *     window), 5 (with the limit; no hours, as c3 writes it); the three breaks at once: 4 (c3 writes no sentence for
+ *     them; the mark names the limit);
+ *   - a wait of «Só opero depois do dado»: 2, «CPI às 08:30: pelo seu plano, você só opera a partir das 08:40.», the
+ *     hour being `block.freeAt` with the date rule (horaDeVolta, as «Aguardar até»; SPEC §7.2: never `active.end`); the
+ *     name opens the sentence in capitals («Decisão do Fed às 14:00: …»); with no free_at (R13b: the wait runs into a
+ *     whole day) no hour is promised: the built sentence;
+ *   - a whole day: 3, «Dia de CPI: pelo seu plano, você não opera neste dia.», in the «dia de …» names (c3 §2.2:
+ *     «Dia de ISM», «Dia de Fed»), each once, as rotuloDia;
+ *   - the app without the agenda (`block` not evaluated, `sem_agenda`): 6, alone also beside another break (the mark
+ *     names it);
+ *   - other breaks only (window, limit): the built «Fora do plano, conferido pelo hub. Você pode registrar.».
+ * Sentences 2 and 3 stand alone with another break (the mark names it). Hours on the window clock; an entry that is not
+ * «now» (`outraData`) never says «hoje» nor «amanhã» (rotuloDados, horaDeVolta). null when in the plan and nothing is
+ * missing.
+ */
+export function fraseDoPlano(
+  breaks: readonly PlanBreak[],
+  gate: GateResult | null,
+  rules: Rules | null,
+  o: { outraData?: boolean } = {},
+): string | null {
+  const semAgenda = !!gate && !gate.block.evaluated && gate.block.reason === 'sem_agenda';
+  if (semAgenda) return ENTRADA.dados.semAgenda;
+  const active = gate && gate.block.evaluated ? gate.block.active : null;
+  if (!breaks.includes('no_bloqueio') || !active || active.releases.length === 0 || !gate || !gate.block.evaluated) return breaks.length ? ENTRADA.fora : null;
+  const wtz = relogioDaJanela(rules);
+  if (active.kind === 'dia') {
+    const nomes = Array.from(new Set(active.releases.map((r) => NOMES_DADOS[r.code].diaDe.replace(/^dia de /, ''))));
+    return ENTRADA.dados.dia(nomes.length >= 3 ? `${nomes[0]} e mais ${nomes.length - 1} dados` : nomes.join(' e '));
+  }
+  if (soDepois(active.releases)) {
+    const freeAt = gate.block.freeAt;
+    if (!freeAt) return ENTRADA.fora;
+    const rotulo = rotuloDados(active.releases, gate.at, wtz, { outraData: o.outraData });
+    const volta = horaDeVolta(freeAt, gate.at, wtz, { outraData: o.outraData });
+    return ENTRADA.dados.soDepois(rotulo.charAt(0).toUpperCase() + rotulo.slice(1), volta);
+  }
+  const doDa = doDaDados(active.releases);
+  const fora = breaks.includes('fora_da_janela');
+  const limite = breaks.includes('depois_do_limite');
+  if (limite && !fora) return ENTRADA.dados.esperaELimite(doDa);
+  const de = horaNoRelogio(active.start, wtz);
+  const ate = horaNoRelogio(active.end, wtz);
+  return fora ? ENTRADA.dados.foraEEspera(doDa, de, ate) : ENTRADA.dados.espera(doDa, de, ate);
 }
 
 /**
