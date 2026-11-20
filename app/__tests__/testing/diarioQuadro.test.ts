@@ -82,6 +82,13 @@ import { CENARIOS, quadro, type Cenario, type EsperadoDia, type Quadro } from '@
  * and breakeven, DEV 5 a hit that moved; DEV 1 is «Sem mesa», which 9b has none of; DEV 4 is on the boards). What this
  * test found is B0-1, reported to the owner with the PR. Nothing else may differ.
  */
+/**
+ * Phase 5 · telas-diario: the boards' rules_now answers were re-exported with the Futuros data block `sem_agenda` (the
+ * boards' days are outside the agenda: SPEC §5.10), so a Futuros «Liberado» says the data were not checked and is not
+ * green (SPEC §5.4; the words are the Posso lane's)
+ */
+const SEM_AGENDA = 'Phase 5-1: rules_now re-exported with the Futuros block sem_agenda; «Liberado» says «dados econômicos não conferidos»'
+
 const PERMITIDAS: { onde: RegExp; aceita: (app: string, quadro: string) => boolean; motivo: string }[] = [
   {
     onde: /\.anterior$/,
@@ -104,6 +111,35 @@ const PERMITIDAS: { onde: RegExp; aceita: (app: string, quadro: string) => boole
           )
           .replace(' Bloqueio de dados, viés e regra do estado chegam na Fase 5.', ' Viés e regra do estado chegam na Fase 5.'),
     motivo: 'Phase 5-1 (c3 §6.3, §9.2 item 17): the plan\'s ⓘ of a Futuros account names the data rule; the Phase 4 boards predate it',
+  },
+  {
+    onde: /^(possoSel|possoOutras)$/,
+    aceita: (app, quadro) => {
+      const a = JSON.parse(app)
+      const b = JSON.parse(quadro)
+      const um = (x: any, y: any) => (x && y && x.pal === y.pal && typeof x.sub === 'string' && /não conferidos/.test(x.sub) ? { ...x, sub: y.sub } : x)
+      const norm = Array.isArray(a) ? a.map((x: any, i: number) => um(x, b[i])) : um(a, b)
+      return JSON.stringify(norm) === JSON.stringify(b)
+    },
+    motivo: SEM_AGENDA,
+  },
+  {
+    onde: /^outras$/,
+    aceita: (app, quadro) => {
+      const a = JSON.parse(app)
+      const b = JSON.parse(quadro)
+      if (!a || !b) return false
+      const partes = a.partes.map((x: any, i: number) =>
+        /não conferidos/.test(x.texto) && b.partes[i] && x.texto.startsWith(b.partes[i].texto) && x.tom !== 'mint' ? b.partes[i] : x,
+      )
+      return JSON.stringify({ ...a, partes }) === JSON.stringify(b)
+    },
+    motivo: SEM_AGENDA,
+  },
+  {
+    onde: /^outrasTexto$/,
+    aceita: (app, quadro) => app.replace(/(liberadas?), dados não conferidos/g, '$1') === quadro,
+    motivo: SEM_AGENDA,
   },
 ]
 
@@ -489,10 +525,46 @@ describe('9b · the selector of many accounts', () => {
       expect(p.conta!.linha.sub).toBe(e.possoSel[0].sub)
       expect(`${p.conta!.linha.limite!.usado} ${p.conta!.linha.limite!.de}`.replace(NBSP, ' ')).toBe(e.possoSel[0].lim)
       expect(p.conta!.somando).toBe(e.possoSel[0].soma)
-      expect(outrasTexto(p.outras!)).toBe(`${e.outras.titulo} ${e.outras.partes.map((x) => x.texto).join(' · ')}`)
+      // SEM_AGENDA: «19 liberadas, dados não conferidos» stands for the board's «19 liberadas»
+      expect(outrasTexto(p.outras!).replace(/(liberadas?), dados não conferidos/g, '$1')).toBe(`${e.outras.titulo} ${e.outras.partes.map((x) => x.texto).join(' · ')}`)
       const dia = q.porConta[id].dias[q.info.dia]
       expect(diaLongo(dia.day)).toBe(e.dia)
       expect(limpo(numerosDoDia(dayTiles(dia.facts, dia.account.market), contaDiario(q, id)).res)).toBe(e.res)
     }
+  })
+})
+
+describe('Phase 5 · telas-diario: the «now» answers re-exported (contract §5, item I), the frozen entries kept', () => {
+  it('rules_now: every Futuros account\'s block is `sem_agenda` (the state rule keeps `fase5`); elsewhere `so_futuros`', () => {
+    for (const cen of CENARIOS) {
+      for (const a of quadro(cen).rulesNow.accounts) {
+        const b = a.gate.block as { evaluated: boolean; reason?: string }
+        if (a.market === 'futures' && a.gate.status !== null) expect({ cen, conta: a.label, reason: b.reason }).toEqual({ cen, conta: a.label, reason: 'sem_agenda' })
+        else if (a.market !== 'futures') expect({ cen, conta: a.label, reason: b.reason }).toEqual({ cen, conta: a.label, reason: 'so_futuros' })
+      }
+    }
+  })
+
+  it('diario_dia: a recalculated plan\'s gate is `sem_agenda`, an entry frozen before the rule keeps `fase5` (Futuros)', () => {
+    let agora = 0
+    let congeladas = 0
+    for (const cen of CENARIOS) {
+      const q = quadro(cen)
+      for (const d of Object.values(q.dias)) {
+        if (d.account.market !== 'futures') continue
+        for (const t of d.trades) {
+          if (t.gateNow) {
+            agora++
+            expect(t.gateNow.block).toMatchObject({ evaluated: false, reason: 'sem_agenda' })
+          }
+          if (t.gate) {
+            congeladas++
+            expect(t.gate.block).toMatchObject({ evaluated: false, reason: 'fase5' })
+          }
+        }
+      }
+    }
+    expect(agora).toBeGreaterThan(0)
+    expect(congeladas).toBeGreaterThan(0)
   })
 })
