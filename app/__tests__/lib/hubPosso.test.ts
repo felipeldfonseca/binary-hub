@@ -111,13 +111,16 @@ describe('«Liberado, com aviso» and the other answers', () => {
     expect(possoTexto(l)).toBe('Liberado · com aviso: fora da janela · com aviso do limite');
   });
 
-  it('Aguardar até (Phase 5): the block\'s end on the account clock', () => {
+  it('Aguardar até (Phase 5): the hour the account is free again and the release, on the window clock', () => {
     const now = et('2026-10-14 08:30');
     const r = topOneRules();
     const g = evaluateGate(now, TOP_ONE, version(r), null, {
-      events: { available: true, value: [{ at: et('2026-10-14 08:30'), label: 'CPI', calendar: 'us' }] },
+      agenda: [{ code: 'cpi', at: et('2026-10-14 08:30') }],
     });
-    expect(possoTexto(possoLinha('Top One', g, r))).toBe('Aguardar até 08:40 · bloqueio: CPI');
+    expect(possoTexto(possoLinha('Top One', g, r))).toBe('Aguardar até 08:40 · CPI às 08:30');
+    expect(possoLinha('Top One', g, r).tom).toBe('amber');
+    // Drawn the evening before (SPEC §5.6): «amanhã»
+    expect(possoTexto(possoLinha('Top One', g, r, et('2026-10-13 19:00')))).toBe('Aguardar até amanhã às 08:40 · CPI amanhã às 08:30');
   });
 
   it('the window rule off and no limit: «Sem regra ativa · Ajustar»', () => {
@@ -141,7 +144,7 @@ describe('«Liberado, com aviso» and the other answers', () => {
     expect(possoTexto(linha('Top One', et('2026-10-19 10:30'), r, TOP_ONE))).toBe('Liberado');
   });
 
-  it('a window on Brasília\'s clock for a futures account: window times on Brasília, the hit and block times on ET', () => {
+  it('a window on Brasília\'s clock for a futures account: window times on Brasília, the hit on ET, the data block on the window clock (Brasília)', () => {
     // 11:00–12:00 Brasília is 10:00–11:00 ET in October
     const r = { ...topOneRules(), windows: [{ tz: SP, startMin: 660, endMin: 720, weekdays: 31 }], windowsFrom: 'account' as const };
     expect(possoTexto(linha('Top One', et('2026-10-19 10:30'), r, TOP_ONE))).toBe('Liberado · até 12:00 de Brasília');
@@ -149,9 +152,9 @@ describe('«Liberado, com aviso» and the other answers', () => {
     const lost = [trade('2026-10-19 10:00', '2026-10-19 10:12', -400)];
     expect(possoTexto(linha('Top One', et('2026-10-19 10:30'), r, TOP_ONE, lost))).toBe('Encerrado por hoje · limite atingido às 10:12');
     const g = evaluateGate(et('2026-10-14 08:30'), TOP_ONE, version(r), null, {
-      events: { available: true, value: [{ at: et('2026-10-14 08:30'), label: 'CPI', calendar: 'us' }] },
+      agenda: [{ code: 'cpi', at: et('2026-10-14 08:30') }],
     });
-    expect(possoTexto(possoLinha('Top One', g, r))).toBe('Aguardar até 08:40 · bloqueio: CPI');
+    expect(possoTexto(possoLinha('Top One', g, r))).toBe('Aguardar até 09:40 · CPI às 09:30');
   });
 
   it('the day not loaded: the limit says so instead of «US$ 0»', () => {

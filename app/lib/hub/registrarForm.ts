@@ -80,6 +80,7 @@ import {
   TIPO_EUA,
   VSV,
 } from '@/components/hub/registrar/copy';
+import { PALAVRAS_DADOS, horaDeVolta, marcaDados, rotuloDados, rotuloDia } from './dadosEconomicos';
 import { formatDiaMes, formatMoney } from './formato';
 import { formatDecimal, lerNumero } from './numero';
 import { dinheiroCompacto, horaNoRelogio, sufixoRelogio, type Tom } from './posso';
@@ -1606,7 +1607,9 @@ export function linhaGate(conta: Pick<ContaReg, 'label' | 'currency'>, gate: Gat
       const avisos: string[] = [];
       if (a.warnings.includes('fora_janela')) avisos.push(a.position === 'nao_e_dia' ? GATE.avisoNaoEDia : GATE.avisoFora);
       if (a.warnings.includes('limite')) avisos.push(GATE.avisoLimite);
-      if (avisos.length) return { ...base, palavra: GATE.liberado, sub: avisos.join(' '), tom: 'neutral' };
+      if (avisos.length) return { ...base, palavra: GATE.liberado, sub: avisos.join(' '), tom: a.semAgenda ? 'muted' : 'neutral' };
+      // Without the agenda «Liberado» is never green (SPEC §5.4 rule 4)
+      if (a.semAgenda) return { ...base, palavra: GATE.liberado, sub: '', tom: 'muted' };
       const wtz = rules?.windows[0]?.tz ?? dtz;
       return { ...base, palavra: GATE.liberado, sub: o.presente && a.until ? GATE.ate(`${horaNoRelogio(a.until, wtz)}${sufixoRelogio(wtz)}`) : '', tom: 'mint' };
     }
@@ -1615,11 +1618,25 @@ export function linhaGate(conta: Pick<ContaReg, 'label' | 'currency'>, gate: Gat
         ? { palavra: GATE.semRegra, sub: '', tom: 'muted', acao: { texto: GATE.ajustar, href: GATE.ajustarHref, aria: GATE.ajustarAria(conta.label) } }
         : { palavra: GATE.semJanela, sub: '', tom: 'muted', acao: { texto: GATE.definir, href: GATE.definirHref, aria: GATE.definirAria(conta.label) } };
     case 'indisponivel':
-      return { ...base, palavra: GATE.indisponivel, sub: '', tom: 'muted' };
-    case 'aguardar':
-    default:
-      // A data block is Phase 5: never answered in 3-3
-      return { ...base, palavra: GATE.liberado, sub: '', tom: 'neutral' };
+      return { ...base, palavra: a.reason === 'sem_agenda' ? PALAVRAS_DADOS.naoConferidos : GATE.indisponivel, sub: '', tom: 'muted' };
+    // «Dados econômicos» (Phase 5): words only, the sheet never blocks. On the window clock; an entry
+    // that is not «now» never says «hoje» nor «amanhã» (SPEC §7.2)
+    case 'aguardar': {
+      const wtz = rules?.windows[0]?.tz ?? dtz;
+      const opts = { outraData: !o.presente };
+      return {
+        ...base,
+        palavra: PALAVRAS_DADOS.aguardarAte(horaDeVolta(a.until, gate.at, wtz, opts)),
+        sub: `· ${rotuloDados(a.releases, gate.at, wtz, opts)}`,
+        tom: 'amber',
+      };
+    }
+    case 'dia': {
+      const wtz = rules?.windows[0]?.tz ?? dtz;
+      const opts = { outraData: !o.presente };
+      const rotulo = a.source === 'dia' ? rotuloDia(a.releases, gate.at, wtz, opts) : rotuloDados(a.releases, gate.at, wtz, opts);
+      return { ...base, palavra: o.presente ? PALAVRAS_DADOS.naoOperoHoje : PALAVRAS_DADOS.naoOperoNoDia, sub: `· ${rotulo}`, tom: 'amber' };
+    }
   }
 }
 
@@ -1633,17 +1650,23 @@ export function linhaLimite(conta: Pick<ContaReg, 'currency'>, gate: GateResult,
 
 const PALAVRA_QUEBRA: Partial<Record<PlanBreak, string>> = { fora_da_janela: 'fora da janela', depois_do_limite: 'depois do limite' };
 
-/** The plan's marks a gate answer gives (the window and the limit; Phase 5's stay out) */
+/** The plan's marks a gate answer gives (the window, the data block, the limit; the state rule is the plan's), in BREAK_ORDER */
 export function quebrasDoGate(gate: GateResult): PlanBreak[] {
   const out: PlanBreak[] = [];
   if (gate.window.evaluated && gate.window.state === 'fora') out.push('fora_da_janela');
+  if (gate.block.evaluated && gate.block.state === 'no_bloqueio') out.push('no_bloqueio');
   if (gate.limit.evaluated && gate.limit.state === 'atingido') out.push('depois_do_limite');
   return out;
 }
 
-/** «fora da janela · depois do limite» (the «●» is drawn apart, aria-hidden); null when in the plan */
-export function textoQuebras(breaks: readonly PlanBreak[]): string | null {
-  const words = breaks.map((b) => PALAVRA_QUEBRA[b]).filter((w): w is string => !!w);
+/**
+ * «fora da janela · na espera do ISM · depois do limite» (the «●» is drawn apart, aria-hidden); null
+ * when in the plan. The data break (stored `no_bloqueio`) is worded from the gate answer of the entry
+ * (`block.active`: «na espera do ISM» / «em dia de CPI», c3 §6.2); without it, «na espera de dado».
+ */
+export function textoQuebras(breaks: readonly PlanBreak[], gate: GateResult | null = null): string | null {
+  const active = gate && gate.block.evaluated ? gate.block.active : null;
+  const words = breaks.map((b) => (b === 'no_bloqueio' ? marcaDados(active) : PALAVRA_QUEBRA[b])).filter((w): w is string => !!w);
   return words.length ? words.join(' · ') : null;
 }
 
