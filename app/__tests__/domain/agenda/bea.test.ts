@@ -27,13 +27,18 @@ describe('parseBea', () => {
     expect(s.ok && s.blocks.pce[0].entries.map((e) => e.time)).toEqual(['08:30', '08:30'])
   })
 
-  it('keeps 2026 on, a year of 12+ dates whole, a shorter year up to its last date', () => {
+  it('keeps 2026 on; a year of 12+ dates or followed by another is whole; the last short year ends at its last date', () => {
     const r = parseBea(file(['2025-12-23T13:30:00+00:00', '2026-12-23T13:30:00+00:00', ...monthly2027]), '2026-11-20')
     expect(r.ok).toBe(true)
     if (!r.ok) return
     expect(r.blocks.pce.map((b) => [b.year, b.from, b.through, b.entries.length])).toEqual([
-      [2026, '2026-01-01', '2026-12-23', 1],
+      [2026, '2026-01-01', '2026-12-31', 1], // followed by 2027 in the file: whole
       [2027, '2027-01-01', '2027-12-31', 12],
+    ])
+    const short = parseBea(file([...monthly2027, '2028-01-27T13:30:00+00:00']), '2026-11-20')
+    expect(short.ok && short.blocks.pib_us.map((b) => [b.year, b.through])).toEqual([
+      [2027, '2027-12-31'],
+      [2028, '2028-01-27'], // the file's last year, just started
     ])
     expect(r.blocks.pce[0].source).toBe(BEA_URL)
     expect(r.blocks.pce[0].read).toBe('2026-11-20')

@@ -74,7 +74,10 @@ const BCB_COPOM = 'https://www.bcb.gov.br/api/exportarics/sitebcb/agendaics?list
 // 2027 as the page updated on 18 Nov 2026 lists it: no December meeting, one on 16-17 November.
 const FOMC_2026 = ['01-28', '03-18', '04-29', '06-17', '07-29', '09-16', '10-28', '12-09'];
 const FOMC_2027 = ['01-27', '03-17', '04-28', '06-09', '07-28', '09-15', '10-27', '11-17'];
-// ECB: the page lists only what is ahead (from 25 Nov 2026); the 2026 block is complete from the read date.
+// ECB: the schedule page lists only what is ahead (from 25 Nov 2026: 17 Dec); the decisions page
+// (ecb.europa.eu/press/govcdec/mopo/html/index.en.html, read 20 Nov 2026) names 29 October 2026 as the latest
+// monetary policy press conference, so the 2026 block is complete from 29 Oct.
+const ECB_2026 = ['10-29', '12-17'];
 const ECB_2027 = ['02-04', '03-18', '04-29', '06-10', '07-22', '09-09', '10-28', '12-16'];
 
 const ruleBlocks = (code: RuleCode): readonly ListBlock[] =>
@@ -127,8 +130,8 @@ const LISTED: Readonly<Record<Exclude<ListCode, RuleCode>, readonly ListBlock[]>
   casas_usadas: [
     fullYear(2026, NAR_2026, ['01-14', '02-12', '03-10', '04-13', '05-11', '06-09', '07-09', '08-11', '09-10', '10-13', '11-12', '12-09']),
   ],
-  bce_decisao: [block(2026, READ, '2026-12-31', ECB, ['12-17']), fullYear(2027, ECB, ECB_2027)],
-  bce_entrevista: [block(2026, READ, '2026-12-31', ECB, ['12-17']), fullYear(2027, ECB, ECB_2027)],
+  bce_decisao: [block(2026, '2026-10-29', '2026-12-31', ECB, ECB_2026), fullYear(2027, ECB, ECB_2027)],
+  bce_entrevista: [block(2026, '2026-10-29', '2026-12-31', ECB, ECB_2026), fullYear(2027, ECB, ECB_2027)],
   hicp_eu: [
     block(2026, '2026-11-01', '2026-12-31', EUROSTAT, ['11-04', '12-01']),
     fullYear(2027, EUROSTAT, ['01-06', '02-02', '03-02', '04-01', '05-03', '06-01', '07-01', '08-03', '09-01', '10-01', '11-04', '12-01']),

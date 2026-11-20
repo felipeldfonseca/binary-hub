@@ -12,9 +12,9 @@
  * `local_at` (no offset) and `local_tz = 'America/New_York'`, and the database computes `at` (only offset-less wall
  * clocks go through AT TIME ZONE; CLAUDE.md «Time zones»).
  *
- * Years: only 2026 on (the lists' period). A year with 12 or more dates of a code is taken as that year's whole
- * list (from 1 Jan to 31 Dec); a year with fewer is complete only up to its last date (a year the BEA has just
- * started to publish).
+ * Years: only 2026 on (the lists' period). A year with 12 or more dates of a code, or followed by a later year in
+ * the file, is taken as that year's whole list (from 1 Jan to 31 Dec); the file's last year with fewer dates is
+ * complete only up to its last date (a year the BEA has just started to publish).
  *
  * A postponed release (settled here, SPEC §8 L4 left it open): the BEA's file carries no «original date». When a
  * stored BEA row dated today or later, inside a range the file covers, is no longer in the file, the route moves
@@ -75,11 +75,12 @@ function blocksOf(dates: unknown, read: string): ListBlock[] | null {
     if (!years.has(year)) years.set(year, []);
     years.get(year)!.push(Object.freeze({ date, time }));
   }
+  const lastYear = Math.max(...Array.from(years.keys()));
   return Array.from(years.entries()).map(([year, entries]) =>
     Object.freeze({
       year,
       from: `${year}-01-01`,
-      through: entries.length >= 12 ? `${year}-12-31` : entries[entries.length - 1].date,
+      through: entries.length >= 12 || year < lastYear ? `${year}-12-31` : entries[entries.length - 1].date,
       source: BEA_URL,
       read,
       entries: Object.freeze(entries),
