@@ -27,8 +27,8 @@ export const agendaKeys = {
 /** How long a read stays fresh */
 export const AGENDA_STALE_MS = 10 * 60_000;
 
-/** The calendars in the fixed order us, eu, br, joined by ',' (the key's part) */
-export const calendarsKeyOf = (calendars: readonly CalendarCode[]): string => CALENDAR_CODES.filter((c) => calendars.includes(c)).join(',');
+/** The key's part (contract §3.8): the calendars sorted by code point, joined by ','. Screens build agendaKeys.dia only with it. */
+export const calendarsKeyOf = (calendars: readonly CalendarCode[]): string => CALENDAR_CODES.filter((c) => calendars.includes(c)).sort().join(',');
 
 /** What useAgendaDoDia needs of an account: the calendars its version follows and its day clock */
 export interface AgendaConta {
@@ -39,8 +39,9 @@ export interface AgendaConta {
 
 /**
  * E5: the agenda around the account's clock day D, on the server clock, for agendaFor. D is
- * recomputed every minute from the server clock, so the read changes key (and repeats) when the
- * clock day turns (after 18:00 New York for futures), and on an account change. Null account →
+ * recomputed on every tick of useServerNow(60_000), which useAgora aligns to the whole minute of
+ * the server clock; the day's edges (18:00 New York for futures, a whole minute) are such ticks, so
+ * the read changes key (and repeats) as the clock day turns, and on an account change. Null account →
  * nothing read.
  */
 export function useAgendaDoDia(account: AgendaConta | null, { enabled = true }: { enabled?: boolean } = {}) {
