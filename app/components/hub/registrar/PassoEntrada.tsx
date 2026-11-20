@@ -63,6 +63,19 @@ export interface GateMostrado {
   avisoDezMin?: string | null
 }
 
+/** An answer's sub without its last two words, and those two words (board Q34: they never break from the ⓘ) */
+function cabecaDe(sub: string): string {
+  const i = posCauda(sub)
+  return i > 0 ? sub.slice(0, i) : ''
+}
+function caudaDe(sub: string): string {
+  return sub.slice(Math.max(0, posCauda(sub)))
+}
+function posCauda(sub: string): number {
+  const ultimo = sub.lastIndexOf(' ')
+  return ultimo > 0 ? sub.lastIndexOf(' ', ultimo - 1) + 1 : 0
+}
+
 /** The clock of the 10-minute notice (board Q38) */
 function Relogio() {
   return (
@@ -94,6 +107,10 @@ export function ContextoConta({
   info: string
 }) {
   const [infoAberto, alternarInfo] = useToggle()
+  const botaoInfo = <InfoButton panelId="info-gate" label={GATE.infoAria} open={infoAberto} onToggle={alternarInfo} />
+  const linhaGate = mostrarGate && gate.linha && gate.linha !== 'falhou' ? gate.linha : null
+  // Inside the answer's last words (Q34) when it has a sub and no action link
+  const infoPreso = !!linhaGate?.sub && !linhaGate.acao
   const [lista, setLista] = useState(false)
   const botaoRef = useRef<HTMLButtonElement>(null)
   const listaRef = useRef<HTMLDivElement>(null)
@@ -176,7 +193,17 @@ export function ContextoConta({
                 <span className="hub-reg-ponto" aria-hidden="true" style={{ background: COR[gate.linha.tom] }} />
                 <span className="hub-reg-rot">{gate.pergunta}</span>
                 <b>{gate.linha.palavra}</b>
-                {gate.linha.sub && <span>{gate.linha.sub}</span>}
+                {gate.linha.sub && !gate.linha.acao && (
+                  // Board Q34's revision: the ⓘ stays with the last two words, never alone on a line
+                  <span>
+                    {cabecaDe(gate.linha.sub)}
+                    <span className="hub-reg-nowrap">
+                      {caudaDe(gate.linha.sub)}
+                      {botaoInfo}
+                    </span>
+                  </span>
+                )}
+                {gate.linha.sub && gate.linha.acao && <span>{gate.linha.sub}</span>}
                 {gate.linha.acao && (
                   <Link href={gate.linha.acao.href} className="hub-reg-link" aria-label={gate.linha.acao.aria}>
                     {gate.linha.acao.texto}
@@ -186,7 +213,7 @@ export function ContextoConta({
             ) : (
               <span className="hub-reg-rot">{gate.pergunta}</span>
             )}
-            <InfoButton panelId="info-gate" label={GATE.infoAria} open={infoAberto} onToggle={alternarInfo} />
+            {!infoPreso && botaoInfo}
           </div>
           {infoAberto && <InfoPanel id="info-gate">{info}</InfoPanel>}
           {gate.avisoDezMin && (

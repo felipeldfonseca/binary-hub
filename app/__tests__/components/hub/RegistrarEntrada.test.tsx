@@ -104,7 +104,7 @@ function abrir(accountId: string = ids.accounts.topOne) {
 }
 
 const pill = (grupo: string, nome: string) => within(screen.getByRole('group', { name: grupo })).getByRole('button', { name: nome })
-const linhaDoGate = () => screen.getByRole('button', { name: 'Como ler: Posso operar hoje?' }).parentElement as HTMLElement
+const linhaDoGate = () => screen.getByRole('button', { name: 'Como ler: Posso operar hoje?' }).closest('.hub-reg-ctx-linha') as HTMLElement
 
 describe('«Posso operar hoje?» on step 1', () => {
   it('the owner’s test: at 11:05 ET, «Fora da sua janela · 10:00–11:00 ET» and «● fora da janela», before registering', async () => {

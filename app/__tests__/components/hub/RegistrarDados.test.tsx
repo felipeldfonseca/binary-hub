@@ -19,7 +19,7 @@ jest.mock('next/navigation', () => require('@/testing/registrarDadosMocks').mock
 beforeEach(() => sessionStorage.clear())
 afterEach(() => jest.useRealTimers())
 
-const linhaDoGate = () => screen.getByRole('button', { name: 'Como ler: Posso operar hoje?' }).parentElement as HTMLElement
+const linhaDoGate = () => screen.getByRole('button', { name: 'Como ler: Posso operar hoje?' }).closest('.hub-reg-ctx-linha') as HTMLElement
 const linhaDoPlano = () => document.querySelector('.hub-reg-plano-linha') as HTMLElement
 const AVISO = 'Às 09:55 começa a espera do ISM de serviços (10:00), até 10:10.'
 
@@ -44,6 +44,15 @@ describe('the Registrar with «Dados econômicos» (boards Q33–Q38)', () => {
     expect(within(plano).getByText(frase)).toBeInTheDocument()
     expect(within(plano).getByText(frase)).not.toHaveClass('hub-tom--amber')
     expect(screen.getByRole('button', { name: 'Registrar entrada' })).toBeEnabled()
+  })
+
+  it('Q34: the ⓘ stays with the last two words of the answer («do dado ⓘ» never break; the board\'s revision)', async () => {
+    renderRegistrarDados('q34-registrar-depois')
+    await aberto()
+    const preso = screen.getByRole('button', { name: 'Como ler: Posso operar hoje?' }).parentElement as HTMLElement
+    expect(preso).toHaveClass('hub-reg-nowrap')
+    expect(preso).toHaveTextContent(/^do dado ?i$/) // the button's text is «i»
+    expect(linhaDoGate()).toHaveTextContent('Posso operar hoje?Aguardar até 10:10· ISM de serviços às 10:00 · só opero depois do dado')
   })
 
   it('Q36: the risk notice stays under the stop (as built), then the mark and sentence 1', async () => {

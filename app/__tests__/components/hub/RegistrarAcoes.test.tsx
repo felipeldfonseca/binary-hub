@@ -108,7 +108,7 @@ async function digitar(rotulo: string, texto: string) {
   await userEvent.clear(campo(rotulo))
   await userEvent.type(campo(rotulo), texto)
 }
-const linhaDoGate = () => screen.getByRole('button', { name: 'Como ler: Posso operar hoje?' }).parentElement as HTMLElement
+const linhaDoGate = () => screen.getByRole('button', { name: 'Como ler: Posso operar hoje?' }).closest('.hub-reg-ctx-linha') as HTMLElement
 /** The plan pill under the fields; IBKR has no window and no limit, so its dry runs never draw one */
 const plano = () => document.querySelector('.hub-reg-plano-linha')
 
