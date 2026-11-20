@@ -329,6 +329,16 @@ describe('fetchCoberturaProxima and «Depois de {dia}»', () => {
     expect(ultimoDiaCoberto(['us'], '2026-12-03', null, { covered: dias('us', '2026-12-04', 5), ate: '2026-12-17' })).toBe('2026-12-02');
   });
 
+  it('after 18:00 ET the read starts on the account\'s day (NY + 1) and still ends on the load\'s last New York date (review)', () => {
+    // The daily load of Thu 3 Dec covers the NY dates 2..6 Dec; at 18:30 ET the futures day is already Fri 4 Dec
+    const covered = dias('us', '2026-12-02', 5);
+    const morning = tradingDayOn(et('2026-12-03 09:00'), TOP_CLOCK);
+    const evening = tradingDayOn(et('2026-12-03 18:30'), TOP_CLOCK);
+    expect([morning, evening]).toEqual(['2026-12-03', '2026-12-04']);
+    expect(ultimoDiaCoberto(['us'], morning, null, { covered, ate: '2026-12-17' })).toBe('2026-12-06');
+    expect(ultimoDiaCoberto(['us'], evening, null, { covered, ate: '2026-12-18' })).toBe('2026-12-06');
+  });
+
   it('without the coverage read: E5\'s three days and board Q23\'s today + 3', () => {
     expect(ultimoDiaCoberto(['us'], '2026-12-03', dias('us', '2026-12-02', 3))).toBe('2026-12-06');
     expect(ultimoDiaCoberto(['us'], '2026-12-03', dias('us', '2026-12-02', 2))).toBe('2026-12-03');
