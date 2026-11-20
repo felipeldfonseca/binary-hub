@@ -199,7 +199,7 @@ export const linhaFora = (t: Parameters<typeof planoDaLinha>[0]) => planoDaLinha
 /**
  * H2: «Posso operar hoje?» at the entry, the answer only (DIFF #6): «Liberado», «Fora da sua janela», «Fora da sua
  * janela · hoje não é dia da janela», «Encerrado por hoje», «Liberado · com aviso do limite», «Sem janela salva»;
- * «Dados econômicos» (Phase 5): «Aguardar até 10:10» (on the Diário's clock `tz`, the entry's date as «now») and
+ * «Dados econômicos» (Phase 5): «Aguardar até 10:10» (on the Diário's clock `tz`; another date by its weekday) and
  * «Não opero hoje» (c3 §6.4)
  */
 export function possoNaEntrada(g: GateResult, tz = 'America/New_York'): string {
@@ -208,7 +208,8 @@ export function possoNaEntrada(g: GateResult, tz = 'America/New_York'): string {
   if (g.status === 'encerrado') return GATE.encerrado
   if (g.status === 'aguardar') {
     const a = answerOf(g)
-    if (a.kind === 'aguardar') return PALAVRAS_DADOS.aguardarAte(horaDeVolta(a.until, g.at, tz))
+    // The entry is not «now»: the weekday, never «amanhã» (contract §3.6, SPEC §7.2)
+    if (a.kind === 'aguardar') return PALAVRAS_DADOS.aguardarAte(horaDeVolta(a.until, g.at, tz, { outraData: true }))
     if (a.kind === 'dia') return PALAVRAS_DADOS.naoOperoHoje
   }
   if (g.status === 'fora_janela') return w.evaluated && w.position === 'nao_e_dia' ? `${GATE.fora} ${GATE.hojeNaoEDia}` : GATE.fora

@@ -477,9 +477,17 @@ describe('«Dados econômicos» in the Diário (Phase 5 · base; G1 and the Plan
   })
 
   it('possoNaEntrada: «Aguardar até HH:MM» (free_at on the Diário clock) and «Não opero hoje», never «Liberado»', () => {
-    const free = min(5)
-    const hh = new Intl.DateTimeFormat('pt-BR', { timeZone: conta1.tz, hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(free)
-    expect(possoNaEntrada(naEspera(ism, free), conta1.tz)).toBe(`Aguardar até ${hh}`)
+    // An ISM wait at 08:31 ET on Thu 10 Dec 2026, free at 08:40 ET
+    const at = new Date('2026-12-10T13:31:00Z')
+    const free = new Date('2026-12-10T13:40:00Z')
+    const wait = { kind: 'espera' as const, start: new Date('2026-12-10T13:25:00Z'), end: free, releases: [{ code: 'cpi' as const, at: new Date('2026-12-10T13:30:00Z'), mode: 'volta' as const }] }
+    const g1 = { ...naEspera(wait, free), at }
+    expect(possoNaEntrada(g1, 'America/New_York')).toBe('Aguardar até 08:40')
+    expect(possoNaEntrada(g1, 'America/Sao_Paulo')).toBe('Aguardar até 10:40')
+    // The eve (20:00 ET on Wed 9 Dec): the entry is not «now», so the weekday, never «amanhã» (contract §3.6)
+    const eve = { ...naEspera({ ...wait, start: new Date('2026-12-09T23:00:00Z') }, free), at: new Date('2026-12-10T01:00:00Z') }
+    expect(possoNaEntrada(eve, 'America/New_York')).toBe('Aguardar até qui 08:40')
+    expect(possoNaEntrada(eve, 'America/Sao_Paulo')).toBe('Aguardar até qui 10:40')
     expect(possoNaEntrada(naEspera(cpiDia, cpiDia.end), conta1.tz)).toBe('Não opero hoje')
     expect(possoNaEntrada(naEspera(ism, null), conta1.tz)).toBe('Não opero hoje')
   })
