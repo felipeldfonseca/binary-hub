@@ -102,6 +102,19 @@ begin
 end;
 $$;
 
+-- 'SQLSTATE:message' of the error a statement raises, or null when it succeeds (its writes kept)
+create or replace function tests.err_state84(p_sql text)
+returns text language plpgsql as $$
+declare st text; msg text;
+begin
+  execute p_sql;
+  return null;
+exception when others then
+  get stacked diagnostics st = returned_sqlstate, msg = message_text;
+  return st || ':' || msg;
+end;
+$$;
+
 grant execute on all functions in schema tests to anon, authenticated;
 
 -- =============================================================================================
@@ -297,6 +310,21 @@ select tests.eq((select g->'block'->>'state'
                                                     "windows_from": "market", "window_rule": {"on": true, "outside": "fora"}}',
                                                '{}', tests.ny84('2027-01-12 10:00'), null, tests.ag84('[["cpi", "2027-01-13 08:30"]]')) g) x),
                 'ok', 'R9: Tuesday 10:00 is not yet the CPI''s day');
+-- R9, today and changes_at (SPEC §5.3, §4.2): "today" is the account's CLOCK day, never the gate's day.
+-- Asked Wed 08:00 the gate's day is the 12th (whose clock day [11 18:00, 12 18:00) holds no release),
+-- yet today is the CPI's clock day; changes_at = the window's close at 09:00, before the block's edge.
+-- Asked Tue 19:00 (gate's day 12, inside the occurrence opened at 17:00; clock day 13): today again
+-- the CPI's day, and the entry is already in it
+select tests.eq((select string_agg(x.t || ' ' || (g->>'trading_day') || ' ' || tests.today84(g->'block') || ' · ' || tests.i84(g->'block'->'active')
+                                   || ' · ' || tests.t84(g->'changes_at'), ' ; ' order by x.t)
+                 from unnest(array['2027-01-12 19:00', '2027-01-13 08:00']) x(t)
+                 cross join lateral (select public.gate_eval(tests.r84('{"cpi": "dia"}', 5, 10)
+                                               || '{"windows": [{"tz": "America/New_York", "start_min": 1020, "end_min": 540, "weekdays": 127}],
+                                                    "windows_from": "market", "window_rule": {"on": true, "outside": "fora"}}',
+                                               '{}', tests.ny84(x.t), null, tests.ag84('[["cpi", "2027-01-13 08:30"]]')) g) y),
+                '2027-01-12 19:00 2027-01-12 dia [12 18:00, 13 18:00) cpi:dia · dia [12 18:00, 13 18:00) cpi:dia · 13 09:00 ; '
+                '2027-01-13 08:00 2027-01-12 dia [12 18:00, 13 18:00) cpi:dia · dia [12 18:00, 13 18:00) cpi:dia · 13 09:00',
+                'R9: today is the clock day''s (the CPI''s), not the gate''s day 12; changes_at the window''s close 09:00');
 
 -- R7g: Copom Wed 9 Dec 2026 18:30 Brasília = 16:30 New York, dia: the leftover only past 18:00
 select tests.eq((select string_agg(x.a || '=' || tests.af84(tests.b84(tests.r84('{"copom": "dia"}', 5, x.a, '["br"]'),
@@ -776,6 +804,26 @@ select tests.eq(tests.saved84(jsonb_build_object('accounts', jsonb_build_object(
                 '-', 'an account choice equal to what it inherits resolves to the same bytes: no version');
 commit;
 
+-- save_rules refuses a bad releases map whole (contract §3.3): bad_releases, SQLSTATE 22023, nothing written
+create or replace function tests.snap84(p_account uuid) returns text language sql stable as $$
+  select (select count(*) from public.account_rule_versions v where v.account_id = p_account) || '/'
+         || coalesce((select md5(s.rules::text) || ':' || s.updated_at from public.account_rule_settings s where s.account_id = p_account), '-')
+$$;
+grant execute on function tests.snap84(uuid) to authenticated;
+select tests.snap84(:'t1') as snap84_t1 \gset
+begin;
+select set_config('request.jwt.claim.sub', :U, true);
+set local role authenticated;
+select tests.eq((select string_agg(x.label || '=' || coalesce(tests.err_state84(format('select public.save_rules(%L::jsonb)',
+                   jsonb_build_object('v', 1, 'base_rev', public.rules_rev(auth.uid()), 'accounts',
+                                      jsonb_build_object(:'t1', jsonb_build_object('rules', jsonb_build_object('v', 1, 'block', jsonb_build_object('releases', x.rel)), 'window', null))))), 'ok'),
+                   ' ' order by x.o)
+                 from (values (1, 'unknown code', '{"fed": "dia"}'::jsonb), (2, 'not an object', '[]'::jsonb)) x(o, label, rel)),
+                'unknown code=22023:bad_releases not an object=22023:bad_releases',
+                'save_rules: an unknown code or a releases that is not an object raises bad_releases (22023)');
+commit;
+select tests.eq(tests.snap84(:'t1'), :'snap84_t1', 'a refused save writes nothing: no setting changed, no version');
+
 begin;
 select set_config('request.jwt.claim.sub', :U, true);
 set local role authenticated;
@@ -872,9 +920,13 @@ select tests.eq(tests.saved84(jsonb_build_object('accounts', jsonb_build_object(
 commit;
 
 -- The agenda around now: a CPI at the current minute, every calendar covered from now − 3 to now + 3
--- (New York dates); both users' accounts follow us in the short form, 5/10
+-- (New York dates); both users' accounts follow us in the short form, 5/10. The release's wall clock is
+-- written in UTC: a New York wall clock of now is ambiguous in the first 01:00–01:59 of the fall-back
+-- Sunday (the later occurrence would put the CPI an hour after now)
 insert into public.economic_events (source, source_key, code, calendar, title, local_at, local_tz)
-values ('lista', 'cpi:now', 'cpi', 'us', 'CPI', date_trunc('minute', now() at time zone 'America/New_York'), 'America/New_York');
+values ('lista', 'cpi:now', 'cpi', 'us', 'CPI', date_trunc('minute', now() at time zone 'UTC'), 'UTC');
+select tests.eq((select e.at from public.economic_events e where e.source_key = 'cpi:now'), date_trunc('minute', now()),
+                'the release of now is at the current minute');
 insert into public.economic_calendar_days (calendar, day, source)
 select c, (now() at time zone 'America/New_York')::date + i, 'kit' from unnest(array['us', 'eu', 'br']) c cross join generate_series(-3, 3) i;
 
@@ -906,6 +958,17 @@ select tests.eq((select (r#>>'{gate,block,state}') || ' ' || (r#>>'{context,in_b
 select tests.eq((select g#>>'{block,reason}' from (select public.gate_at(:'tn', now()) g) x), 'sem_agenda',
                 'the same transaction again: the invoker path still reads nothing (gate_agenda is replanned per user, never the definer''s plan)');
 rollback;
+-- The other order: the SECURITY DEFINER path first, then the invoker paths in the same transaction never
+-- get the definer's rows (with gate_agenda in language sql the non-member read the agenda here)
+begin;
+select set_config('request.jwt.claim.sub', :N, true);
+set local role authenticated;
+select tests.eq((select r#>>'{gate,block,state}' from (select public.register_entry(:'tn', '{"v": 1, "symbol": "MES", "direction": "long", "quantity": "1", "entry_price": "7896.25"}', true) r) x),
+                'no_bloqueio', 'a non-member, definer path first: the block evaluated');
+select tests.eq((select (g#>>'{block,reason}') || ' ' || (public.rules_now()#>>'{accounts,0,block,reason}')
+                 from (select public.gate_at(:'tn', now()) g) x),
+                'sem_agenda sem_agenda', 'then gate_at and rules_now with his rights: still sem_agenda (no definer rows leak)');
+rollback;
 
 -- trade_context_from_gate: in_block only when the block ran
 select tests.eq((select string_agg(coalesce(public.trade_context_from_gate(g)->>'in_block', 'null'), ',' order by o) from (values
@@ -918,4 +981,4 @@ select tests.eq((select string_agg(coalesce(public.trade_context_from_gate(g)->>
 delete from public.economic_events;
 delete from public.economic_calendar_days;
 
-select 'ok 84_dados_economicos';
+select 'dados economicos: all tests passed' as result;

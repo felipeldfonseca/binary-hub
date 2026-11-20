@@ -2058,10 +2058,11 @@ select tests.eq((select count(*) from public.trade_entry_context c
                     or c.in_block is not null or c.rule_ok is not null or c.state_choice is not null), 0::bigint,
                 'every stored context is its frozen gate_at answer: «não avaliado» is null, never false');
 -- Phase 5 (20261120000001), the inverse: with the agenda loaded (a CPI at this minute, every calendar
--- covered around today) the block is evaluated, in_block is true and the plan breaks with no_bloqueio
+-- covered around today) the block is evaluated, in_block is true and the plan breaks with no_bloqueio.
+-- The release's wall clock is UTC: a New York wall clock of now is ambiguous on the fall-back Sunday
 begin;
 insert into public.economic_events (source, source_key, code, calendar, title, local_at, local_tz)
-values ('lista', 'cpi:p3', 'cpi', 'us', 'CPI', date_trunc('minute', now() at time zone 'America/New_York'), 'America/New_York');
+values ('lista', 'cpi:p3', 'cpi', 'us', 'CPI', date_trunc('minute', now() at time zone 'UTC'), 'UTC');
 insert into public.economic_calendar_days (calendar, day, source)
 select c, (now() at time zone 'America/New_York')::date + i, 'kit' from unnest(array['us', 'eu', 'br']) c cross join generate_series(-3, 3) i;
 select set_config('request.jwt.claim.sub', :P, true);
