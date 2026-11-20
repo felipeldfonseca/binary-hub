@@ -211,8 +211,8 @@ describe('the gate line, the limit line, the plan', () => {
   })
 
   it('«Liberado até 11:00 ET» only on the current minute; «US$ 245 de US$ 400»', () => {
-    expect(linhaGate(top, top1031.gate, top1031.rules, { presente: true, outroDia: false }).sub).toBe('até 11:00 ET')
-    expect(linhaGate(top, top1031.gate, top1031.rules, { presente: false, outroDia: false }).sub).toBe('')
+    expect(linhaGate(top, top1031.gate, top1031.rules, { presente: true, outroDia: false }).sub).toBe('· dados econômicos não conferidos · sem a agenda de hoje')
+    expect(linhaGate(top, top1031.gate, top1031.rules, { presente: false, outroDia: false }).sub).toBe('· dados econômicos não conferidos')
     expect(linhaLimite(top, top1031.gate, top1031.rules)).toEqual({ usado: 'US$ 245', de: 'de US$ 400' })
     expect(linhaLimite(ebx, ebx2024.gate, ebx2024.rules)).toBeNull()
   })

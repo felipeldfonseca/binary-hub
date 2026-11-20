@@ -129,7 +129,7 @@ describe('«Posso operar hoje?» on step 1', () => {
   it('at 10:31 ET: «Liberado até 11:00 ET» and «Limite do dia US$ 245 de US$ 400», no plan line', async () => {
     abrir()
     await screen.findByRole('heading', { level: 3, name: 'Entrada' })
-    expect(linhaDoGate()).toHaveTextContent('Posso operar hoje?Liberadoaté 11:00 ET')
+    expect(linhaDoGate()).toHaveTextContent('Posso operar hoje?Liberado· dados econômicos não conferidos · sem a agenda de hoje')
     const limite = screen.getByText('Limite do dia').parentElement as HTMLElement
     expect(limite).toHaveTextContent('Limite do diaUS$ 245de US$ 400')
     expect(screen.queryByText('Fora do plano, conferido pelo hub. Você pode registrar.')).not.toBeInTheDocument()

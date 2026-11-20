@@ -5,7 +5,7 @@
     "at": "2026-10-19T01:25:29.25651+00:00",
     "block": {
       "state": "nao_avaliado",
-      "reason": "fase5"
+      "reason": "sem_agenda"
     },
     "desde": "2026-09-19T01:25:28.796512+00:00",
     "label": "Registrar futures",
@@ -157,7 +157,7 @@
     "at": "2026-10-19T01:25:29.323447+00:00",
     "block": {
       "state": "nao_avaliado",
-      "reason": "fase5"
+      "reason": "sem_agenda"
     },
     "desde": "2026-09-19T01:25:28.796512+00:00",
     "label": "Registrar futures",
