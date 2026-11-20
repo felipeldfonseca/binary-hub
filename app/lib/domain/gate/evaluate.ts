@@ -221,8 +221,7 @@ export function blockIntervals(
   resolved: Rules,
   clock: DayClock,
   agenda: readonly AgendaEntry[],
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  at?: Date,
+  _at?: Date,
 ): BlockInterval[] {
   const block = resolved.block;
   if (!block) return [];

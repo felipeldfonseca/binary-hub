@@ -3,7 +3,7 @@
  * it as a suite. Every value here is invented.
  */
 import { localToUtc, MON_TO_FRI, tradingDayOn, type DayClock } from '@/lib/domain';
-import type { DayTrade, GateAccount, Rules, RuleVersion } from '@/lib/domain/gate';
+import type { CalendarCode, DayTrade, GateAccount, ReleaseCode, Rules, RuleVersion, WaitMode } from '@/lib/domain/gate';
 
 export const NY = 'America/New_York';
 export const SP = 'America/Sao_Paulo';
@@ -44,6 +44,27 @@ export const ebinexRules = (): Rules => ({
   states: null,
   day: BIN_CLOCK,
 });
+
+/**
+ * Futures rules with the data block as given (Phase 5-1): `releases` absent = the short form (the
+ * LISTA_A_V1 codes of `calendars` wait «volta»); given = the long form's whole effective map. No
+ * window and no limit unless `extra` says so, so only the block answers.
+ */
+export function blockRules(
+  block: { beforeMin?: number; afterMin?: number; on?: boolean; calendars?: CalendarCode[]; releases?: Partial<Record<ReleaseCode, WaitMode>> } = {},
+  extra: Partial<Rules> = {},
+): Rules {
+  const { beforeMin = 5, afterMin = 10, on = true, calendars = ['us'], releases } = block;
+  return {
+    ...topOneRules(),
+    windows: [],
+    windowsFrom: null,
+    windowRule: { on: false, outside: 'fora' },
+    limit: null,
+    block: { on, beforeMin, afterMin, calendars, ...(releases ? { releases } : {}) },
+    ...extra,
+  };
+}
 
 export const TOP_ONE: GateAccount = { market: 'futures', dayClock: TOP_CLOCK };
 export const EBINEX: GateAccount = { market: 'binary', dayClock: BIN_CLOCK };
