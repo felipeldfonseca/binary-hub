@@ -247,7 +247,7 @@ describe('SuasRegras', () => {
 
   it('a binary account: no block, no state rule; its edits are «não salvo» too', async () => {
     render(<Regras config={configDepois()} selecionado={ids.ebinex} />)
-    expect(screen.queryByRole('switch', { name: 'Bloqueio de dados' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('switch', { name: 'Dados econômicos' })).not.toBeInTheDocument()
     expect(screen.queryByText('Regra por estado')).not.toBeInTheDocument()
 
     await userEvent.click(screen.getByRole('button', { name: '“Liberado”, com aviso' }))
@@ -275,13 +275,14 @@ describe('SuasRegras', () => {
     expect(screen.getByText('Corrija a janela em Quando você opera.')).toBeInTheDocument()
   })
 
-  it('the block status line: on, off, 0 + 0, no calendar', async () => {
+  it('the «Dados econômicos» status line: on, off, 0 + 0, no calendar (c3 §3.10)', async () => {
     const c = configDepois()
     const { unmount } = render(<Regras config={c} selecionado={PADRAO_FUTUROS} />)
-    const status = () => document.getElementById('r-bloq-hoje') as HTMLElement
+    const status = () => document.getElementById('r-dados-hoje') as HTMLElement
     expect(status()).toHaveAttribute('role', 'status')
-    expect(status()).toHaveTextContent('Os dados econômicos chegam na Fase 5. Até lá, o bloqueio não muda o “Posso operar hoje?”.')
-    expect(screen.getAllByText('ativo na Fase 5').length).toBeGreaterThan(0)
+    // Phase 5-1: without the day's agenda read the line waits (empty); «ativo na Fase 5» left this rule
+    expect(status()).toHaveTextContent('')
+    expect(screen.getAllByText('ativo na Fase 5')).toHaveLength(1)
 
     const before = screen.getByLabelText('Minutos antes do dado')
     const after = screen.getByLabelText('Minutos depois do dado')
@@ -290,17 +291,17 @@ describe('SuasRegras', () => {
     await userEvent.type(before, '0')
     await userEvent.clear(after)
     await userEvent.type(after, '0')
-    expect(status()).toHaveTextContent('Com 0 minuto, não há bloqueio.')
+    expect(status()).toHaveTextContent('Com 0 minuto antes e depois, a regra não cria espera.')
     await userEvent.type(after, '999')
     expect(after).toHaveValue('120')
 
-    await userEvent.click(screen.getByRole('switch', { name: 'Bloqueio de dados' }))
-    expect(status()).toHaveTextContent('Desligado: dados não mudam o “Posso operar hoje?”.')
+    await userEvent.click(screen.getByRole('switch', { name: 'Dados econômicos' }))
+    expect(status()).toHaveTextContent('Desligado: você opera normalmente em todos os dados; eles não mudam o “Posso operar hoje?”.')
     expect(screen.queryByLabelText('Minutos antes do dado')).not.toBeInTheDocument()
     unmount()
 
     render(<Regras config={c} inicial={{ ...c.settings, calendars: [] }} selecionado={PADRAO_FUTUROS} />)
-    expect(document.getElementById('r-bloq-hoje')).toHaveTextContent('Nenhum calendário marcado: nada vai bloquear o dia.')
+    expect(document.getElementById('r-dados-hoje')).toHaveTextContent('Nenhum calendário marcado: a regra não tem dado para olhar.')
   })
 
   it('an emptied minutes field goes back to the saved value on blur', async () => {
@@ -325,7 +326,7 @@ describe('SuasRegras', () => {
     expect(before).toHaveValue('5')
     await userEvent.type(before, '2')
     expect(before).toHaveValue('52')
-    expect(document.getElementById('r-bloq-hoje')).not.toHaveTextContent('NaN')
+    expect(document.getElementById('r-dados-hoje')).not.toHaveTextContent('NaN')
   })
 
   it('an empty limit field is not «Sem limite»: OK says to type a value and keeps the limit', async () => {
@@ -621,7 +622,7 @@ describe('SuasRegras in six markets (Fase 2b)', () => {
     expect(screen.getByRole('heading', { level: 3, name: 'Clear' })).toBeInTheDocument()
     expect(screen.getByText('B3 · Pessoal')).toHaveClass('hub-chip-dado')
     expect(regraNomes()).toEqual(['Janela', 'Só operar dentro da sua janela', 'Limite do dia'])
-    expect(screen.queryByRole('switch', { name: 'Bloqueio de dados' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('switch', { name: 'Dados econômicos' })).not.toBeInTheDocument()
     expect(screen.queryByText('Regra por estado')).not.toBeInTheDocument()
     expect(screen.queryByText('padrão de Futuros')).not.toBeInTheDocument()
     expect(screen.queryByText('só nesta conta')).not.toBeInTheDocument()
@@ -742,7 +743,7 @@ describe('SuasRegras in six markets (Fase 2b)', () => {
     await userEvent.click(info)
     // In US$, on the account's own day (Brasília midnight)
     expect(document.getElementById('info-regras-mk')?.textContent).toBe(
-      'Nas contas de Opções, as regras são a janela e o limite do dia, em US$. Bloqueio de dados e regra por estado valem só para Futuros até a Fase 5. O limite zera quando o dia vira, à meia-noite de Brasília; numa conta de mesa, a mesa pode zerar o limite dela em outro horário.',
+      'Nas contas de Opções, as regras são a janela e o limite do dia, em US$. “Dados econômicos” e a regra por estado valem só para Futuros. O limite zera quando o dia vira, à meia-noite de Brasília; numa conta de mesa, a mesa pode zerar o limite dela em outro horário.',
     )
   })
 
@@ -771,22 +772,22 @@ describe('SuasRegras in six markets (Fase 2b)', () => {
     [
       'FTMO',
       'Como ler: regras de Forex',
-      'Nas contas de Forex, as regras são a janela e o limite do dia, em US$. Bloqueio de dados e regra por estado valem só para Futuros até a Fase 5. O limite zera quando o dia vira, às 17:00 ET; numa conta de mesa, a mesa pode zerar o limite dela em outro horário.',
+      'Nas contas de Forex, as regras são a janela e o limite do dia, em US$. “Dados econômicos” e a regra por estado valem só para Futuros. O limite zera quando o dia vira, às 17:00 ET; numa conta de mesa, a mesa pode zerar o limite dela em outro horário.',
     ],
     [
       'IBKR',
       'Como ler: regras de Ações',
-      'Nas contas de Ações, as regras são a janela e o limite do dia, em US$. Bloqueio de dados e regra por estado valem só para Futuros até a Fase 5. O limite zera quando o dia vira, às 20:00 ET; numa conta de mesa, a mesa pode zerar o limite dela em outro horário.',
+      'Nas contas de Ações, as regras são a janela e o limite do dia, em US$. “Dados econômicos” e a regra por estado valem só para Futuros. O limite zera quando o dia vira, às 20:00 ET; numa conta de mesa, a mesa pode zerar o limite dela em outro horário.',
     ],
     [
       'Binance',
       'Como ler: regras de Cripto',
-      'Nas contas de Cripto, as regras são a janela e o limite do dia, em US$. USDT e USDC contam como dólar. Bloqueio de dados e regra por estado valem só para Futuros até a Fase 5. O limite zera quando o dia vira, à meia-noite de Brasília; numa conta de mesa, a mesa pode zerar o limite dela em outro horário.',
+      'Nas contas de Cripto, as regras são a janela e o limite do dia, em US$. USDT e USDC contam como dólar. “Dados econômicos” e a regra por estado valem só para Futuros. O limite zera quando o dia vira, à meia-noite de Brasília; numa conta de mesa, a mesa pode zerar o limite dela em outro horário.',
     ],
     [
       'Clear',
       'Como ler: regras da B3',
-      'Nas contas da B3, as regras são a janela e o limite do dia, em R$. Bloqueio de dados e regra por estado valem só para Futuros até a Fase 5. O limite zera quando o dia vira, à meia-noite de Brasília; numa conta de mesa, a mesa pode zerar o limite dela em outro horário.',
+      'Nas contas da B3, as regras são a janela e o limite do dia, em R$. “Dados econômicos” e a regra por estado valem só para Futuros. O limite zera quando o dia vira, à meia-noite de Brasília; numa conta de mesa, a mesa pode zerar o limite dela em outro horário.',
     ],
   ])('%s: the market’s ⓘ next to the chip', async (label, aria, texto) => {
     const c = configMercados()
@@ -849,7 +850,7 @@ describe('SuasRegras in six markets (Fase 2b)', () => {
     const info = document.getElementById('info-regras') as HTMLElement
     // Fase 3c: the breakeven sentence sits between these two (Personalizar approved 21 Oct, P l.758)
     expect(info).toHaveTextContent(
-      'Bloqueio de dados e regra por estado valem só para Futuros até a Fase 5; a regra por estado é uma só para o mercado. “Mover para o breakeven” (Futuros) não muda o “Posso operar hoje?”: o Registrar sugere, sem bloquear, e as Análises conferem depois. Nos outros mercados, as regras são a janela e o limite do dia.',
+      '“Dados econômicos” e a regra por estado valem só para Futuros; a regra por estado é uma só para o mercado. “Mover para o breakeven” (Futuros) não muda o “Posso operar hoje?”: o Registrar sugere, sem bloquear, e as Análises conferem depois. Nos outros mercados, as regras são a janela e o limite do dia.',
     )
     expect(info).toHaveTextContent('O limite do dia fica na moeda da conta, R$ na B3 e US$ nos outros mercados, e nunca soma contas de mercados diferentes.')
     expect(info).not.toHaveTextContent('Futuros com binárias')

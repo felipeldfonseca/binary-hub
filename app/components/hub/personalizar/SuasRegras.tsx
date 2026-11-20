@@ -4,7 +4,8 @@ import { useMemo } from 'react'
 import { MARKET_SPEC, currencyOf } from '@/lib/domain/gate'
 import { resolveRules, type AccountConfig, type PendingVersion, type RulesConfig, type RulesSettings } from '@/lib/hub/regras'
 import { comCalendario, janelasEfetivas, mudancasDaEntidade, PADRAO_FUTUROS, PADRAO_FUTUROS_CONTA, type Entidade } from '@/lib/hub/rascunho'
-import { comoFicaHoje } from '@/lib/hub/comoFicaHoje'
+import { comoFicaHoje, proximosDados } from '@/lib/hub/comoFicaHoje'
+import type { AgendaRead, AgendaRow } from '@/lib/domain/gate'
 import { SIMBOLO_MOEDA } from '@/lib/hub/formato'
 import { entidadesRegrasDe, temInfoDoMercado } from '@/lib/hub/personalizarRegras'
 import { viraODia } from '@/components/hub/copyMercados'
@@ -15,7 +16,8 @@ import ComoFicaHoje from './ComoFicaHoje'
 import { MERCADO_NOME, REGRAS } from './copy'
 import type { FormLimite } from './PersonalizarProvider'
 import RegraBreakeven from './RegraBreakeven'
-import { RegraBloqueio, RegraEstado, RegraJanela, RegraLimite, RegraSoDentro } from './RegrasLinhas'
+import DadosEconomicos from './DadosEconomicos'
+import { RegraEstado, RegraJanela, RegraLimite, RegraSoDentro } from './RegrasLinhas'
 import { EstadoCarga, useFocoPendente, type Carga } from './ui'
 
 type Editar = (fn: (draft: RulesSettings) => RulesSettings) => void
@@ -40,13 +42,31 @@ export interface SuasRegrasProps {
   onEditar: Editar
   onComecarHoje: (accountId: string) => void
   onIrJanelas: () => void
+  /** Phase 5-1: the agenda as the page reads it (PersonalizarPagina's useDadosDaRegra); absent = not read */
+  dados?: DadosLidos
+}
+
+/**
+ * Phase 5-1 (D12): what the page reads of the agenda for the selected entity, on the server clock: the
+ * day (E5: undefined while it loads, null when it did not load), «Próximos dados» (E6: undefined while
+ * it loads, null when it failed) and each release's next date (read once the list opens)
+ */
+export interface DadosLidos {
+  agora: Date
+  dia: AgendaRead | null | undefined
+  proximos: readonly AgendaRow[] | null | undefined
+  proximas: readonly AgendaRow[] | null
+  onAbrirLista: () => void
+  onTentar: () => void
 }
 
 /**
  * «Suas regras» (board #regras): the rules of «Padrão Futuros» or one account, today under them, the
- * versions, the calendars. The rows follow the market (MARKET_SPEC[m].rules): the data block and
- * the state rule only where it has them (Futuros until Phase 5), the window and the daily limit
- * everywhere, the limit in the account's currency.
+ * versions, the calendars. The rows follow the market (MARKET_SPEC[m].rules): «Dados econômicos» and
+ * the state rule only where it has them (Futuros), the window and the daily limit everywhere, the
+ * limit in the account's currency. Phase 5-1 (D12): where the market has the data rule, the day's
+ * agenda (E5) and «Próximos dados» (E6) are read on the server clock, for the rule's status line,
+ * «Como fica hoje» and the list under it; the calendars card stays (D8).
  */
 export default function SuasRegras(props: SuasRegrasProps) {
   const { carga, onTentar, config, draft, ativas } = props
@@ -92,6 +112,7 @@ function Regras({
   onEditar,
   onComecarHoje,
   onIrJanelas,
+  dados,
 }: SuasRegrasProps & { config: RulesConfig; draft: RulesSettings }) {
   const pedirFoco = useFocoPendente()
   // One toggle for the market ⓘ, kept across «Regras de» (board `infAb.regrasMk`)
@@ -105,7 +126,18 @@ function Regras({
   const salvo = config.settings
   const mud = mudancasDaEntidade(salvo, draft, entidade)
   const rules = resolveRules(conta ?? PADRAO_FUTUROS_CONTA, draft)
-  const hoje = comoFicaHoje(rules, now, janelasEfetivas(draft, entidade).windows)
+  // Phase 5-1: the agenda, only where the market has the data rule (Futuros), on the server clock
+  const comDados = caps.block && !!rules.block && !!dados
+  const agora = dados?.agora ?? now
+  const agenda = comDados ? (draft.calendars.length === 0 ? null : dados!.dia) : undefined
+  const hoje = comoFicaHoje(rules, now, janelasEfetivas(draft, entidade).windows, agenda)
+  const proximos = !comDados
+    ? null
+    : dados!.proximos
+      ? { estado: 'pronto' as const, ...proximosDados(rules, agora, dados!.proximos, dados!.dia === null ? [] : dados!.dia?.covered) }
+      : dados!.proximos === null
+        ? { estado: 'erro' as const }
+        : { estado: 'carregando' as const }
 
   const opcoes = entidadesRegrasDe(ativas).map((id) => ({
     id,
@@ -145,7 +177,21 @@ function Regras({
       <ul className="hub-pz-regras">
         <RegraJanela entidade={entidade} draft={draft} mudou={mud.janela} onIrJanelas={onIrJanelas} />
         <RegraSoDentro entidade={entidade} draft={draft} mudou={mud.regraJanela} onEditar={onEditar} onIrJanelas={onIrJanelas} />
-        {caps.block && <RegraBloqueio entidade={entidade} draft={draft} salvo={salvo} mudou={mud.bloqueio} onEditar={onEditar} />}
+        {caps.block && (
+          <DadosEconomicos
+            entidade={entidade}
+            draft={draft}
+            salvo={salvo}
+            mudou={mud.bloqueio}
+            onEditar={onEditar}
+            rules={rules}
+            agenda={agenda}
+            proximas={dados?.proximas ?? null}
+            onAbrirLista={dados?.onAbrirLista}
+            now={agora}
+            onIrCalendarios={() => pedirFoco('r-calendarios')}
+          />
+        )}
         <RegraLimite
           entidade={entidade}
           draft={draft}
@@ -162,7 +208,11 @@ function Regras({
       {/* Fase 3c: «Durante a operação» › «Mover para o breakeven», on «Padrão Futuros» and futures accounts */}
       {market === 'futures' && <RegraBreakeven entidade={entidade} draft={draft} salvo={salvo} onEditar={onEditar} futuros={futuros} />}
 
-      <ComoFicaHoje dados={hoje} />
+      <ComoFicaHoje
+        dados={hoje}
+        proximos={proximos}
+        onTentar={dados?.onTentar}
+      />
 
       <BlocoVersao
         conta={conta}
