@@ -131,7 +131,9 @@ create table public.economic_events (
   title         text not null check (char_length(title) between 1 and 120),
   -- the publisher's wall clock and zone; "at" and "day" are set by the trigger below
   local_at      timestamp not null,
-  local_tz      text not null,
+  -- the publishers' zones (America/New_York, Europe/Berlin, Europe/Luxembourg, America/Sao_Paulo) or UTC:
+  -- AT TIME ZONE also takes abbreviations and POSIX offsets, and reads '-03' as UTC+3
+  local_tz      text not null check (local_tz in ('America/New_York', 'Europe/Berlin', 'Europe/Luxembourg', 'America/Sao_Paulo', 'UTC')),
   at            timestamptz not null,
   day           date not null,
   status        text not null default 'agendado' check (status in ('agendado', 'divulgado', 'adiado', 'cancelado')),
@@ -162,7 +164,8 @@ create table public.economic_calendar_days (
   primary key (calendar, day)
 );
 
--- The instant comes only from Postgres: writers never send "at" or "day"
+-- The instant comes only from Postgres: writers never send "at" or "day", and any insert or update
+-- (whatever its SET list, an upsert's included) recomputes both from local_at and local_tz
 create or replace function public.economic_events_instant()
 returns trigger
 language plpgsql
@@ -176,7 +179,7 @@ end;
 $$;
 
 create trigger economic_events_instant
-  before insert or update of local_at, local_tz on public.economic_events
+  before insert or update on public.economic_events
   for each row execute function public.economic_events_instant();
 
 -- Any update (a status change included) refreshes updated_at
@@ -910,7 +913,8 @@ as $$
 $$;
 
 -- =============================================================================================
--- 5. Privileges of the new functions (Supabase grants EXECUTE on every new function to the API roles)
+-- 5. Privileges of the new functions (Supabase grants EXECUTE on every new function to the API roles,
+--    service_role included: revoked here from service_role too, except the CHECK's two)
 -- =============================================================================================
 
 -- The invoker chain gate_at → gate_agenda / gate_eval → block_releases → agenda_releases runs as the
@@ -918,10 +922,10 @@ $$;
 -- agenda_release_calendar as the inserting role (the route = service_role)
 revoke all on function public.agenda_releases() from public, anon;
 revoke all on function public.agenda_release_calendar(text) from public, anon;
-revoke all on function public.block_releases(jsonb) from public, anon;
-revoke all on function public.is_hub_member() from public, anon;
-revoke all on function public.gate_agenda(jsonb, jsonb, timestamptz) from public, anon;
-revoke all on function public.gate_eval(jsonb, jsonb, timestamptz, jsonb, jsonb) from public, anon;
+revoke all on function public.block_releases(jsonb) from public, anon, service_role;
+revoke all on function public.is_hub_member() from public, anon, service_role;
+revoke all on function public.gate_agenda(jsonb, jsonb, timestamptz) from public, anon, service_role;
+revoke all on function public.gate_eval(jsonb, jsonb, timestamptz, jsonb, jsonb) from public, anon, service_role;
 -- agenda_releases also to service_role: agenda_release_calendar (sql) reads it inside the CHECK
 grant execute on function public.agenda_releases() to authenticated, service_role;
 grant execute on function public.agenda_release_calendar(text) to authenticated, service_role;
@@ -930,5 +934,5 @@ grant execute on function public.is_hub_member() to authenticated;
 grant execute on function public.gate_agenda(jsonb, jsonb, timestamptz) to authenticated;
 grant execute on function public.gate_eval(jsonb, jsonb, timestamptz, jsonb, jsonb) to authenticated;
 -- A trigger function needs no EXECUTE when it fires
-revoke all on function public.economic_events_instant() from public, anon, authenticated;
-revoke all on function public.economic_events_touched() from public, anon, authenticated;
+revoke all on function public.economic_events_instant() from public, anon, authenticated, service_role;
+revoke all on function public.economic_events_touched() from public, anon, authenticated, service_role;

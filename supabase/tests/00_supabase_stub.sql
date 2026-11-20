@@ -48,6 +48,9 @@ $$;
 grant usage on schema public, auth to anon, authenticated, service_role;
 alter default privileges in schema public grant all on tables to anon, authenticated, service_role;
 alter default privileges in schema public grant all on sequences to anon, authenticated, service_role;
+-- and EXECUTE on every new function to service_role (Supabase grants it to anon and authenticated too;
+-- the migrations revoke those explicitly and the tests have always run without them)
+alter default privileges in schema public grant execute on functions to service_role;
 
 -- Supabase Storage, as far as the migrations and tests use it: the tables in Supabase's shape (the
 -- Storage API inserts and deletes object rows as the signed-in user, under RLS), its path helpers,

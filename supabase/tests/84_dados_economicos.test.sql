@@ -87,6 +87,21 @@ returns text language sql stable as $$
   select tests.i84(p_block->'active') || ' · ' || tests.t84(p_block->'free_at')
 $$;
 
+-- The check constraint a statement violates, or null when it succeeds (its writes undone either way)
+create or replace function tests.err84(p_sql text)
+returns text language plpgsql as $$
+declare c text;
+begin
+  begin
+    execute p_sql;
+    raise exception 'tests.err84: undo';
+  exception
+    when check_violation then get stacked diagnostics c = constraint_name; return c;
+    when raise_exception then return null;
+  end;
+end;
+$$;
+
 grant execute on all functions in schema tests to anon, authenticated;
 
 -- =============================================================================================
@@ -499,6 +514,16 @@ select tests.eq((select string_agg(to_char(e.at at time zone 'America/New_York',
 update public.economic_events set local_at = '2027-01-13 10:00' where source_key = 'cpi:2027-01-13';
 select tests.eq((select to_char(e.at at time zone 'America/New_York', 'DD HH24:MI') from public.economic_events e where e.source_key = 'cpi:2027-01-13'),
                 '13 10:00', 'a new wall clock moves the instant');
+-- Any update recomputes the instant: a sent at or day never sticks, not even in an upsert that sets only at
+update public.economic_events set at = '2027-01-20 13:30Z', day = '2027-01-20' where source_key = 'cpi:2027-01-13';
+select tests.eq((select to_char(e.at at time zone 'America/New_York', 'YYYY-MM-DD HH24:MI') || ' ' || e.day from public.economic_events e where e.source_key = 'cpi:2027-01-13'),
+                '2027-01-13 10:00 2027-01-13', 'a direct update of at and day is recomputed from local_at and local_tz');
+insert into public.economic_events (source, source_key, code, calendar, title, local_at, local_tz)
+values ('lista', 'cpi:2027-01-13', 'cpi', 'us', 'CPI (again)', '2027-01-13 09:30', 'America/New_York')
+on conflict (source, source_key) do update set title = excluded.title, at = excluded.at;
+select tests.eq((select e.title || ' ' || to_char(e.local_at, 'HH24:MI') || ' ' || to_char(e.at at time zone 'America/New_York', 'YYYY-MM-DD HH24:MI') || ' ' || e.day
+                 from public.economic_events e where e.source_key = 'cpi:2027-01-13'),
+                'CPI (again) 10:00 2027-01-13 10:00 2027-01-13', 'an upsert that sets at but not local_at keeps at = the stored wall clock''s instant');
 rollback;
 
 -- CHECKs
@@ -515,6 +540,15 @@ select tests.raises($$insert into public.economic_events (source, source_key, co
 select tests.raises($$insert into public.economic_events (source, source_key, code, calendar, title, local_at, local_tz)
                       values ('rss', 'cpi:a', 'cpi', 'us', 'CPI', '2027-01-13 08:30', 'America/New_York')$$,
                     'new row for relation "economic_events" violates check constraint "economic_events_source_check"', 'source is lista or bea');
+-- local_tz: the four publishers' zones and UTC; AT TIME ZONE would read a POSIX offset with its sign inverted
+select tests.eq((select string_agg(z || '=' || coalesce(tests.err84(format($$insert into public.economic_events (source, source_key, code, calendar, title, local_at, local_tz)
+                                                                          values ('lista', 'cpi:tz', 'cpi', 'us', 'CPI', '2027-01-13 08:30', %L)$$, z)), 'ok'), ' ' order by o)
+                 from unnest(array['America/New_York', 'Europe/Berlin', 'Europe/Luxembourg', 'America/Sao_Paulo', 'UTC',
+                                   '-03', 'UTC-3', 'EST', 'america/new_york', 'Europe/Paris']) with ordinality x(z, o)),
+                'America/New_York=ok Europe/Berlin=ok Europe/Luxembourg=ok America/Sao_Paulo=ok UTC=ok '
+                '-03=economic_events_local_tz_check UTC-3=economic_events_local_tz_check EST=economic_events_local_tz_check '
+                'america/new_york=economic_events_local_tz_check Europe/Paris=economic_events_local_tz_check',
+                'local_tz: only America/New_York, Europe/Berlin, Europe/Luxembourg, America/Sao_Paulo or UTC');
 begin;
 insert into public.economic_events (source, source_key, code, calendar, title, local_at, local_tz, status) values
   ('lista', 'cpi:a', 'cpi', 'us', 'CPI', '2027-01-13 08:30', 'America/New_York', 'cancelado'),
@@ -546,14 +580,18 @@ select tests.eq((select string_agg(f || ':' || concat_ws(',', case when has_func
                                    'public.gate_eval(jsonb,jsonb,timestamptz,jsonb,jsonb)', 'public.gate_eval(jsonb,jsonb,timestamptz,jsonb)',
                                    'public.gate_at(uuid,timestamptz)', 'public.rules_resolve(text,text,int,jsonb,jsonb,jsonb,jsonb,jsonb)',
                                    'public.rules_check_block(jsonb,boolean)', 'public.rules_check_resolved(jsonb)',
-                                   'public.trade_context_from_gate(jsonb)']) with ordinality x(f, o)),
+                                   'public.trade_context_from_gate(jsonb)', 'public.economic_events_instant()',
+                                   'public.economic_events_touched()']) with ordinality x(f, o)),
                 'public.agenda_releases():authenticated,service_role public.agenda_release_calendar(text):authenticated,service_role '
                 'public.block_releases(jsonb):authenticated public.is_hub_member():authenticated '
                 'public.gate_agenda(jsonb,jsonb,timestamptz):authenticated public.gate_eval(jsonb,jsonb,timestamptz,jsonb,jsonb):authenticated '
-                'public.gate_eval(jsonb,jsonb,timestamptz,jsonb):authenticated public.gate_at(uuid,timestamptz):authenticated '
-                'public.rules_resolve(text,text,int,jsonb,jsonb,jsonb,jsonb,jsonb):authenticated '
-                'public.rules_check_block(jsonb,boolean): public.rules_check_resolved(jsonb): public.trade_context_from_gate(jsonb):',
-                'A19 functions: the new ones to authenticated (the CHECK''s two also to service_role), never anon; the replaced keep theirs');
+                'public.gate_eval(jsonb,jsonb,timestamptz,jsonb):authenticated,service_role public.gate_at(uuid,timestamptz):authenticated,service_role '
+                'public.rules_resolve(text,text,int,jsonb,jsonb,jsonb,jsonb,jsonb):authenticated,service_role '
+                'public.rules_check_block(jsonb,boolean):service_role public.rules_check_resolved(jsonb):service_role '
+                'public.trade_context_from_gate(jsonb):service_role public.economic_events_instant(): public.economic_events_touched():',
+                'A19 functions (the stub grants EXECUTE on new functions to service_role, as Supabase does): the new ones to '
+                'authenticated only (the CHECK''s two also to service_role), never anon, the triggers'' to nobody; the replaced keep '
+                'theirs (service_role from the default privileges, as on the hosted project)');
 select tests.eq((select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
                  where n.nspname = 'public'
                    and p.proname in ('agenda_releases', 'agenda_release_calendar', 'block_releases', 'is_hub_member', 'gate_agenda', 'gate_eval',
