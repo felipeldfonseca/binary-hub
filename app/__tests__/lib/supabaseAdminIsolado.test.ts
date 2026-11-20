@@ -27,7 +27,7 @@ const stripComments = (text: string) => text.replace(/\/\*[\s\S]*?\*\//g, '').re
 /** The files a source imports, resolved (relative paths against its folder, '@/' against app/); packages skipped */
 function importsOf(file: string, text: string): string[] {
   const out: string[] = []
-  for (const m of stripComments(text).matchAll(SPECIFIER)) {
+  for (const m of Array.from(stripComments(text).matchAll(SPECIFIER))) {
     const spec = m[1]
     const base = spec.startsWith('@/')
       ? path.join(APP, spec.slice(2))
