@@ -9,7 +9,11 @@
  *                 "end_min": 0..1439 (≠ start_min; lower = ends the next day), "weekdays": 1..127}] (0..2, one clock),
  *    "windows_from": "market" | "account" | null (null exactly when windows = []),
  *    "window_rule": {"on": bool, "outside": "fora" | "aviso"},
- *    "block": null (every market but futures) | {"on", "before_min": 0..60, "after_min": 0..120, "calendars": ["us" | "eu" | "br"]},
+ *    "block": null (every market but futures) | {"on", "before_min": 0..60, "after_min": 0..120, "calendars": ["us" | "eu" | "br"]}
+ *             plus, in the long form only (Phase 5-1), "releases": {CODE: "volta" | "depois" | "dia"} (read here,
+ *             kept as read, checked as SPEC §3.7 fixes rules_check_resolved, code `bad_releases`; this side
+ *             lands first, read only, and the SQL with its computed cases follows in the Phase 5 domain
+ *             lane, which also brings the writer and the evaluation),
  *    "limit": null | {"usd" (US$ markets) | "brl" (B3): > 0, ≤ 1 000 000, whole cents,
  *                     "mode": "conta" | "soma" (futures), "at_limit": "encerrar" | "avisar"},
  *    "states": null (every market but futures) | {"alinhadas" | "so_tecnica" | "so_fundamentos" | "em_conflito" | "sem_direcao": choice | null},
@@ -38,6 +42,7 @@ import {
   type AccountMarket,
   type WindowTz,
 } from '../markets';
+import { AGENDA_RELEASES, isReleaseCode, type ReleaseCode, type WaitMode } from './agenda';
 import { tradeMatchKey, type StopUnit } from '../registro/caps';
 import { decimalFromJson } from '../registro/numeric';
 import { assertTimeZone, type DayClock, type TradingWindow } from '../tempo';
@@ -88,7 +93,14 @@ export interface Rules {
    * «Bloqueio de dados» with the economic calendars marked when it was saved; null where the market
    * has none (every market but futures)
    */
-  block: { on: boolean; beforeMin: number; afterMin: number; calendars: CalendarCode[] } | null;
+  block: {
+    on: boolean;
+    beforeMin: number;
+    afterMin: number;
+    calendars: CalendarCode[];
+    /** The long form's effective map (Phase 5-1, contract §3.4); absent in the short form */
+    releases?: Partial<Record<ReleaseCode, WaitMode>>;
+  } | null;
   /** «Limite do dia», in cents of the market's currency (currencyOf(market)); null = «Sem limite» */
   limit: { cents: number; mode: LimitMode; atLimit: AtLimit } | null;
   /**
@@ -128,6 +140,7 @@ export type RulesErrorCode =
   | 'invalid_tz'
   | 'window_tz_mismatch'
   | 'bad_block'
+  | 'bad_releases'
   | 'bad_limit'
   | 'bad_state_rule'
   | 'bad_state_choice'
@@ -222,6 +235,26 @@ function checkBlock(b: Obj): RulesErrorCode | null {
   if (!(has(b, 'on') && has(b, 'before_min') && has(b, 'after_min'))) return 'bad_block';
   if (typeof b.on !== 'boolean') return 'bad_block';
   if (!isInt(b.before_min, 0, 60) || !isInt(b.after_min, 0, 120)) return 'bad_block';
+  return null;
+}
+
+/**
+ * The long form's map in a version, SPEC §3.7: rules_check_block rows 7–9 (an object of known codes,
+ * each `normal`, `volta`, `depois` or `dia`), then rules_check_resolved rows 4–6 (no `normal`, no code
+ * of a calendar not followed, not the app default for `calendars`, which is the short form).
+ */
+function checkResolvedReleases(r: Json, calendars: readonly string[]): RulesErrorCode | null {
+  if (!isObj(r)) return 'bad_releases';
+  for (const [k, v] of Object.entries(r)) {
+    if (!isReleaseCode(k) || (v !== 'normal' && v !== 'volta' && v !== 'depois' && v !== 'dia')) return 'bad_releases';
+  }
+  const followed = AGENDA_RELEASES.filter((x) => calendars.includes(x.calendar));
+  for (const [k, v] of Object.entries(r)) {
+    if (v === 'normal' || !followed.some((x) => x.code === k)) return 'bad_releases';
+  }
+  const appDefault = followed.filter((x) => x.inListA);
+  const keys = Object.keys(r);
+  if (keys.length === appDefault.length && appDefault.every((x) => r[x.code] === 'volta')) return 'bad_releases';
   return null;
 }
 
@@ -334,10 +367,16 @@ export function checkRules(p: unknown): RulesErrorCode | null {
   // The data block and the state rule, only where the market has them (futures)
   if (caps.block) {
     if (!isObj(p.block) || !has(p.block, 'calendars') || !checkCalendars(p.block.calendars)) return 'bad_block';
+    // SPEC §3.7: unknown_key and on/before/after (rows 1–6) before the map (rows 7–9, then 4–6)
     const rest: Obj = { ...p.block };
     delete rest.calendars;
+    delete rest.releases;
     const bcode = checkBlock(rest);
     if (bcode) return bcode;
+    if (has(p.block, 'releases')) {
+      const rcode = checkResolvedReleases(p.block.releases, p.block.calendars as string[]);
+      if (rcode) return rcode;
+    }
   } else if (p.block !== null) {
     return 'not_for_market';
   }
@@ -391,6 +430,7 @@ export function parseRules(json: unknown): Rules {
       beforeMin: b.before_min as number,
       afterMin: b.after_min as number,
       calendars: [...(b.calendars as CalendarCode[])],
+      ...(has(b, 'releases') ? { releases: { ...(b.releases as Partial<Record<ReleaseCode, WaitMode>>) } } : {}),
     },
     limit: l && {
       cents: usdToCents(l[limitKey(currencyOf(market))]) as number,
@@ -432,6 +472,7 @@ export function toResolvedJson(r: Rules): Record<string, unknown> {
       before_min: r.block.beforeMin,
       after_min: r.block.afterMin,
       calendars: [...r.block.calendars],
+      ...(r.block.releases ? { releases: { ...r.block.releases } } : {}),
     },
     limit: r.limit && {
       [limitKey(currencyOf(r.market))]: centsToUsd(r.limit.cents),

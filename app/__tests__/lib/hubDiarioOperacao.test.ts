@@ -460,3 +460,49 @@ describe('G14 · three open trades of one day', () => {
     expect(l.tradeId).toBe('primeira')
   })
 })
+
+describe('«Dados econômicos» in the Diário (Phase 5 · base; G1 and the Plan column)', () => {
+  const q1 = quadro('1')
+  const d1 = q1.dias['2026-11-12']
+  const conta1 = contaDa(q1, d1)
+  const aberta = d1.trades.find((t) => t.trade.status === 'open')!
+  const g = quadro('2').dias['2026-11-10'].trades[0].gate!
+  const min = (m: number) => new Date(g.at.getTime() + m * 60_000)
+  const ism = { kind: 'espera' as const, start: min(-10), end: min(5), releases: [{ code: 'ism_serv' as const, at: min(-5), mode: 'volta' as const }] }
+  const cpiDia = { kind: 'dia' as const, start: min(-12 * 60), end: min(12 * 60), releases: [{ code: 'cpi' as const, at: min(-90), mode: 'dia' as const }] }
+  const naEspera = (active: import('@/lib/domain/gate').BlockInterval, freeAt: Date | null) => ({
+    ...g,
+    status: 'aguardar' as const,
+    block: { evaluated: true as const, state: 'no_bloqueio' as const, active, today: [active], freeAt },
+  })
+
+  it('possoNaEntrada: «Aguardar até HH:MM» (free_at on the Diário clock) and «Não opero hoje», never «Liberado»', () => {
+    // An ISM wait at 08:31 ET on Thu 10 Dec 2026, free at 08:40 ET
+    const at = new Date('2026-12-10T13:31:00Z')
+    const free = new Date('2026-12-10T13:40:00Z')
+    const wait = { kind: 'espera' as const, start: new Date('2026-12-10T13:25:00Z'), end: free, releases: [{ code: 'cpi' as const, at: new Date('2026-12-10T13:30:00Z'), mode: 'volta' as const }] }
+    const g1 = { ...naEspera(wait, free), at }
+    expect(possoNaEntrada(g1, 'America/New_York')).toBe('Aguardar até 08:40')
+    expect(possoNaEntrada(g1, 'America/Sao_Paulo')).toBe('Aguardar até 10:40')
+    // The eve (20:00 ET on Wed 9 Dec): the entry is not «now», so the weekday, never «amanhã» (contract §3.6)
+    const eve = { ...naEspera({ ...wait, start: new Date('2026-12-09T23:00:00Z') }, free), at: new Date('2026-12-10T01:00:00Z') }
+    expect(possoNaEntrada(eve, 'America/New_York')).toBe('Aguardar até qui 08:40')
+    expect(possoNaEntrada(eve, 'America/Sao_Paulo')).toBe('Aguardar até qui 10:40')
+    expect(possoNaEntrada(naEspera(cpiDia, cpiDia.end), conta1.tz)).toBe('Não opero hoje')
+    expect(possoNaEntrada(naEspera(ism, null), conta1.tz)).toBe('Não opero hoje')
+  })
+
+  it('the Plan column: a trade only «no_bloqueio» shows its mark, not «—»', () => {
+    const p = (aberta.plan ?? aberta.planNow)!
+    const t = { ...aberta, plan: { ...p, verdict: 'fora_do_plano' as const, breaks: ['no_bloqueio'] as PlanBreak[] }, gate: naEspera(ism, min(5)) }
+    expect(planoDaLinha(t)).toEqual({ tipo: 'fora', texto: 'na espera do ISM', aria: 'fora do plano: na espera do ISM' })
+    const dia = { ...t, gate: naEspera(cpiDia, cpiDia.end), plan: { ...t.plan, breaks: ['fora_da_janela', 'no_bloqueio'] as PlanBreak[] } }
+    expect(planoDaLinha(dia)).toEqual({ tipo: 'fora', texto: 'fora da janela · em dia de CPI', aria: 'fora do plano: fora da janela e em dia de CPI' })
+  })
+
+  it('a recalculated plan reads the recalculated gate (gateNow)', () => {
+    const p = (aberta.plan ?? aberta.planNow)!
+    const t = { ...aberta, plan: null, planNow: { ...p, verdict: 'fora_do_plano' as const, breaks: ['no_bloqueio'] as PlanBreak[] }, gate: null, gateNow: naEspera(cpiDia, cpiDia.end) }
+    expect(planoDaLinha(t)).toMatchObject({ tipo: 'fora', texto: 'em dia de CPI' })
+  })
+})

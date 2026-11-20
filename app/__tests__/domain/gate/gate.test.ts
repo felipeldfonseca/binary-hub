@@ -12,13 +12,12 @@ import {
   evaluateGate,
   evaluatePlan,
   gateTradingDay,
-  NOT_YET,
   parseServerGate,
   ServerGateError,
   toEntryContext,
   versionAt,
   type DayTrade,
-  type EconomicEvent,
+  type AgendaEntry,
   type GateAccount,
   type GateResult,
   type Rules,
@@ -48,7 +47,7 @@ function gate(
   now: Date,
   rules: Rules | null,
   trades: readonly DayTrade[] = [],
-  events: readonly EconomicEvent[] | null = null,
+  agenda: readonly AgendaEntry[] | null = null,
   account: GateAccount = TOP_ONE,
 ): GateResult {
   const ver = rules && version(rules);
@@ -57,7 +56,8 @@ function gate(
     until: now,
     limitCents: rules?.limit?.cents ?? null,
   });
-  return evaluateGate(now, account, ver, day, { events: events ? { available: true, value: events } : NOT_YET });
+  // No agenda given: the transitional `fase5` (Phase 5 · base), as gate/cases.json still records
+  return evaluateGate(now, account, ver, day, agenda ? { agenda } : {});
 }
 
 const state = (name: StateAtEntry['name'], direction: 1 | -1 | 0, suspended = false) => ({
@@ -66,7 +66,7 @@ const state = (name: StateAtEntry['name'], direction: 1 | -1 | 0, suspended = fa
 });
 
 describe('the boards, 14 out (Wednesday): CPI 08:30 with a 5/10 min block', () => {
-  const cpi: EconomicEvent[] = [{ at: et('2026-10-14 08:30'), label: 'CPI', calendar: 'us' }];
+  const cpi: AgendaEntry[] = [{ code: 'cpi', at: et('2026-10-14 08:30') }];
   const d14 = [
     trade('2026-10-14 10:07', '2026-10-14 10:21', 75),
     trade('2026-10-14 10:34', '2026-10-14 10:41', -53),
@@ -87,7 +87,7 @@ describe('the boards, 14 out (Wednesday): CPI 08:30 with a 5/10 min block', () =
 
   it('«Aguardar até 08:40»: the block names its end', () => {
     const a = answerOf(gate(et('2026-10-14 08:25'), topOneRules(), d14, cpi));
-    expect(a).toEqual({ kind: 'aguardar', until: et('2026-10-14 08:40'), label: 'CPI', warnings: [] });
+    expect(a).toEqual({ kind: 'aguardar', until: et('2026-10-14 08:40'), releases: [{ code: 'cpi', at: et('2026-10-14 08:30'), mode: 'volta' }], warnings: [] });
   });
 
   it('worst moment US$ 11,00 (+75, −53, −33)', () => {
@@ -103,7 +103,7 @@ describe('the boards, 14 out (Wednesday): CPI 08:30 with a 5/10 min block', () =
       version: version(topOneRules()),
       trades: d14,
       direction: 1,
-      events: { available: true, value: cpi },
+      agenda: cpi,
       state: state('alinhadas', 1),
     });
     expect([p.breaks, p.verdict, p.checksEvaluated]).toEqual([[], 'no_plano', ['janela', 'bloqueio', 'limite']]);
@@ -118,7 +118,7 @@ describe('the boards, 14 out (Wednesday): CPI 08:30 with a 5/10 min block', () =
       version: version(topOneRules()),
       trades: d14,
       direction: 1,
-      events: { available: true, value: cpi },
+      agenda: cpi,
     });
     expect([p.gate.status, p.breaks, p.verdict]).toEqual(['fora_janela', ['fora_da_janela'], 'fora_do_plano']);
   });
@@ -146,7 +146,7 @@ describe('the boards, 19 nov (Thursday): the limit reached at 10:38', () => {
       trades: d19,
       direction,
       state: st,
-      events: { available: true, value: [] },
+      agenda: [],
     });
 
   it('10:33 sell in «Em conflito» with «Opero»: Liberado, no plan break (the trade that reaches the limit is not "after" it)', () => {
@@ -195,7 +195,7 @@ describe('the boards, 19 nov (Thursday): the limit reached at 10:38', () => {
 });
 
 describe('the boards, 1º dez (Tuesday): ISM 10:00 inside the window', () => {
-  const ism: EconomicEvent[] = [{ at: et('2026-12-01 10:00'), label: 'ISM industrial', calendar: 'us' }];
+  const ism: AgendaEntry[] = [{ code: 'ism_ind', at: et('2026-12-01 10:00') }];
   const rules = (): Rules => ({ ...topOneRules(), states: { ...topOneRules().states!, em_conflito: 'opero', alinhadas: 'so_a_favor' } });
   const d1 = [
     trade('2026-12-01 10:04', '2026-12-01 10:06', -45),
@@ -212,11 +212,11 @@ describe('the boards, 1º dez (Tuesday): ISM 10:00 inside the window', () => {
       version: version(rules()),
       trades: d1,
       direction: -1,
-      events: { available: true, value: ism },
+      agenda: ism,
       state: state('alinhadas', 1, true),
     });
     expect(p.gate.status).toBe('aguardar');
-    expect(answerOf(p.gate)).toMatchObject({ kind: 'aguardar', until: et('2026-12-01 10:10'), label: 'ISM industrial' });
+    expect(answerOf(p.gate)).toMatchObject({ kind: 'aguardar', until: et('2026-12-01 10:10'), releases: [{ code: 'ism_ind', at: et('2026-12-01 10:00'), mode: 'volta' }] });
     expect(p.breaks).toEqual(['no_bloqueio']);
     expect(p.stateRule).toEqual({ evaluated: false, state: 'nao_avaliado', reason: 'comparacao_suspensa' });
     expect(toEntryContext(p)).toEqual({
@@ -240,7 +240,7 @@ describe('the boards, 1º dez (Tuesday): ISM 10:00 inside the window', () => {
       version: version(rules()),
       trades: d1,
       direction: 1,
-      events: { available: true, value: ism },
+      agenda: ism,
       state: state('em_conflito', 0),
     });
     expect([p.gate.status, p.breaks]).toEqual(['fora_janela', ['fora_da_janela']]);
@@ -272,7 +272,7 @@ describe('Ebinex (binary): no data block, no state rule', () => {
       version: version(ebinexRules()),
       trades: [],
       direction: 1,
-      events: { available: true, value: [] },
+      agenda: [],
       state: state('alinhadas', 1),
     });
     expect(p.gate.block).toEqual({ evaluated: false, state: 'nao_avaliado', reason: 'so_futuros' });
@@ -388,7 +388,7 @@ describe('when the answer changes (changesAt)', () => {
   });
 
   it('with the data block (Phase 5): its start and its end', () => {
-    const cpi: EconomicEvent[] = [{ at: et('2026-10-14 08:30'), label: 'CPI', calendar: 'us' }];
+    const cpi: AgendaEntry[] = [{ code: 'cpi', at: et('2026-10-14 08:30') }];
     expect(gate(et('2026-10-14 08:00'), topOneRules(), [], cpi).changesAt).toEqual(et('2026-10-14 08:25'));
     expect(gate(et('2026-10-14 08:25'), topOneRules(), [], cpi).changesAt).toEqual(et('2026-10-14 08:40'));
   });
@@ -400,71 +400,94 @@ describe('when the answer changes (changesAt)', () => {
   it('a block inside a window open across the 18:00 turn (Phase 5): «Aguardar» ends when the block does', () => {
     const across = { ...topOneRules(), windows: [{ tz: NY, startMin: 1020, endMin: 1140, weekdays: MON_TO_FRI }] };
     const at = et('2026-10-19 18:27');
-    const g = gate(at, across, [], [{ at: et('2026-10-19 18:30'), label: 'Discurso', calendar: 'us' }]);
+    const g = gate(at, across, [], [{ code: 'fomc_entrevista', at: et('2026-10-19 18:30') }]);
     // Still Monday's trading day (the window opened at 17:00), whose bounds ended at 18:00
     expect([g.tradingDay, g.status, g.changesAt]).toEqual(['2026-10-19', 'aguardar', et('2026-10-19 18:40')]);
     expect(answerOf(g)).toMatchObject({ kind: 'aguardar', until: et('2026-10-19 18:40') });
     // A block that starts before the window closes is an edge too
-    const later = gate(at, across, [], [{ at: et('2026-10-19 18:50'), label: 'Discurso', calendar: 'us' }]);
+    const later = gate(at, across, [], [{ code: 'fomc_entrevista', at: et('2026-10-19 18:50') }]);
     expect([later.status, later.changesAt]).toEqual(['liberado', et('2026-10-19 18:45')]);
   });
 });
 
 describe('the data block (Phase 5 input)', () => {
-  const ev = (time: string, label: string, calendar: EconomicEvent['calendar'] = 'us'): EconomicEvent => ({
-    at: et(`2026-10-14 ${time}`),
-    label,
-    calendar,
-  });
+  const ev = (time: string, code: AgendaEntry['code']): AgendaEntry => ({ code, at: et(`2026-10-14 ${time}`) });
+  const codes = (b: { releases: { code: string }[] } | null | undefined) => b?.releases.map((r) => r.code);
 
   it('overlapping and touching blocks are one, so «Aguardar até» names the real end', () => {
-    const g = gate(et('2026-10-14 08:41'), topOneRules(), [], [ev('08:30', 'CPI'), ev('08:35', 'Auxílio'), ev('08:50', 'Varejo')]);
-    expect(g.block).toMatchObject({ state: 'no_bloqueio', active: { start: et('2026-10-14 08:25'), end: et('2026-10-14 09:00'), label: 'CPI e Auxílio e Varejo' } });
+    const g = gate(et('2026-10-14 08:41'), topOneRules(), [], [ev('08:30', 'cpi'), ev('08:35', 'ppi'), ev('08:50', 'varejo_us')]);
+    expect(g.block).toMatchObject({ state: 'no_bloqueio', active: { kind: 'espera', start: et('2026-10-14 08:25'), end: et('2026-10-14 09:00') }, freeAt: et('2026-10-14 09:00') });
+    expect(codes(g.block.evaluated ? g.block.active : null)).toEqual(['cpi', 'ppi', 'varejo_us']);
   });
 
-  it('merges events given in any order, and names a repeated event once', () => {
-    const two = gate(et('2026-10-14 08:30'), topOneRules(), [], [ev('08:50', 'Varejo'), ev('08:30', 'CPI')]);
-    expect(two.block).toMatchObject({ active: { start: et('2026-10-14 08:25'), end: et('2026-10-14 08:40'), label: 'CPI' } });
+  it('merges releases given in any order, their releases by instant', () => {
+    const two = gate(et('2026-10-14 08:30'), topOneRules(), [], [ev('08:50', 'varejo_us'), ev('08:30', 'cpi')]);
+    expect(two.block).toMatchObject({ active: { start: et('2026-10-14 08:25'), end: et('2026-10-14 08:40') } });
+    expect(codes(two.block.evaluated ? two.block.active : null)).toEqual(['cpi']);
     expect(answerOf(two)).toMatchObject({ kind: 'aguardar', until: et('2026-10-14 08:40') });
-    const chain = gate(et('2026-10-14 08:30'), topOneRules(), [], [ev('08:50', 'Varejo'), ev('08:35', 'Auxílio'), ev('08:30', 'CPI')]);
-    expect(answerOf(chain)).toMatchObject({ kind: 'aguardar', until: et('2026-10-14 09:00'), label: 'CPI e Auxílio e Varejo' });
-    const repeated = gate(et('2026-10-14 08:30'), topOneRules(), [], [ev('08:35', 'CPI'), ev('08:30', 'CPI')]);
-    expect(repeated.block).toMatchObject({ active: { start: et('2026-10-14 08:25'), end: et('2026-10-14 08:45'), label: 'CPI' } });
+    const chain = gate(et('2026-10-14 08:30'), topOneRules(), [], [ev('08:50', 'varejo_us'), ev('08:35', 'ppi'), ev('08:30', 'cpi')]);
+    const a = answerOf(chain);
+    expect(a).toMatchObject({ kind: 'aguardar', until: et('2026-10-14 09:00') });
+    expect(a.kind === 'aguardar' && a.releases.map((r) => r.code)).toEqual(['cpi', 'ppi', 'varejo_us']);
+    // Two releases at one instant: in `ord` order
+    const same = gate(et('2026-10-14 08:30'), topOneRules(), [], [ev('08:30', 'pib_us'), ev('08:30', 'pce')]);
+    expect(codes(same.block.evaluated ? same.block.active : null)).toEqual(['pce', 'pib_us']);
+  });
+
+  it('a release repeated at two instants: both kept, so the label names each (the label is the answer\'s, L2 owns dedupe)', () => {
+    const g = gate(et('2026-10-14 08:31'), topOneRules(), [], [ev('08:35', 'cpi'), ev('08:30', 'cpi')]);
+    expect(g.block.evaluated && g.block.active?.releases.map((r) => [r.code, r.at])).toEqual([
+      ['cpi', et('2026-10-14 08:30')],
+      ['cpi', et('2026-10-14 08:35')],
+    ]);
   });
 
   it('lists as today\'s the blocks that touch the trading day (18:00 to 18:00 ET), and only those', () => {
-    const today = (events: EconomicEvent[]) => {
-      const b = gate(et('2026-10-14 12:00'), topOneRules(), [], events).block;
-      return b.evaluated ? b.today.map((x) => x.label) : null;
+    const today = (agenda: AgendaEntry[]) => {
+      const b = gate(et('2026-10-14 12:00'), topOneRules(), [], agenda).block;
+      return b.evaluated ? b.today.map((x) => x.releases[0].code) : null;
     };
-    const at = (text: string, label: string): EconomicEvent => ({ at: et(text), label, calendar: 'us' });
+    const at = (text: string, code: AgendaEntry['code']): AgendaEntry => ({ code, at: et(text) });
     // 17:45–18:00 the day before ends as the day starts; 18:00–18:15 starts as it ends
-    expect(today([at('2026-10-13 17:50', 'Véspera'), at('2026-10-14 08:30', 'CPI'), at('2026-10-14 18:05', 'Noite')])).toEqual(['CPI']);
+    expect(today([at('2026-10-13 17:50', 'ppi'), at('2026-10-14 08:30', 'cpi'), at('2026-10-14 18:05', 'jolts')])).toEqual(['cpi']);
     // 17:51–18:06 on either side of the day crosses a turn; the next day's 08:30 does not touch it
-    expect(today([at('2026-10-13 17:56', 'Véspera'), at('2026-10-14 17:56', 'Fim'), at('2026-10-15 08:30', 'Amanhã')])).toEqual(['Véspera', 'Fim']);
+    expect(today([at('2026-10-13 17:56', 'ppi'), at('2026-10-14 17:56', 'jolts'), at('2026-10-15 08:30', 'cpi')])).toEqual(['ppi', 'jolts']);
   });
 
   it('events of calendars not marked do not block', () => {
-    expect(gate(et('2026-10-14 08:30'), topOneRules(), [], [ev('08:30', 'BCE', 'eu')]).status).toBe('fora_janela');
+    expect(gate(et('2026-10-14 08:30'), topOneRules(), [], [ev('08:30', 'bce_decisao')]).status).toBe('fora_janela');
+  });
+
+  it('the agenda input, transitional (contract §3.6): undefined → fase5; null → sem_agenda, after so_futuros and sem_calendario', () => {
+    const now = et('2026-10-14 08:30');
+    const r = topOneRules();
+    const day = dayUsage([], { tradingDay: '2026-10-14', until: now, limitCents: null });
+    const reason = (g: GateResult) => (g.block.evaluated ? 'evaluated' : g.block.reason);
+    expect(reason(evaluateGate(now, TOP_ONE, version(r), day, {}))).toBe('fase5');
+    expect(reason(evaluateGate(now, TOP_ONE, version(r), day, { agenda: null }))).toBe('sem_agenda');
+    const noCal = { ...r, block: { ...r.block!, calendars: [] } };
+    expect(reason(evaluateGate(now, TOP_ONE, version(noCal), day, { agenda: null }))).toBe('sem_calendario');
+    expect(reason(evaluateGate(brt('2026-10-14 10:00'), EBINEX, version(ebinexRules()), null, { agenda: null }))).toBe('so_futuros');
+    expect(reason(evaluateGate(now, TOP_ONE, version(r), day, { agenda: [] }))).toBe('evaluated');
   });
 
   it('no calendar marked: not evaluated (sem_calendario)', () => {
     const r = topOneRules();
     r.block!.calendars = [];
-    expect(gate(et('2026-10-14 08:30'), r, [], [ev('08:30', 'CPI')]).block).toEqual({ evaluated: false, state: 'nao_avaliado', reason: 'sem_calendario' });
+    expect(gate(et('2026-10-14 08:30'), r, [], [ev('08:30', 'cpi')]).block).toEqual({ evaluated: false, state: 'nao_avaliado', reason: 'sem_calendario' });
   });
 
   it('0 minutes before and after: no block (regra_desligada)', () => {
     const r = topOneRules();
     r.block = { ...r.block!, beforeMin: 0, afterMin: 0 };
-    expect(gate(et('2026-10-14 08:30'), r, [], [ev('08:30', 'CPI')]).block).toMatchObject({ reason: 'regra_desligada' });
+    expect(gate(et('2026-10-14 08:30'), r, [], [ev('08:30', 'cpi')]).block).toMatchObject({ reason: 'regra_desligada' });
   });
 
   it('a block beats the window and a limit with «Só avisar», but not «Encerrar»', () => {
     const avisar = { ...topOneRules(), limit: { cents: 40000, mode: 'conta' as const, atLimit: 'avisar' as const } };
     const lost = [trade('2026-10-14 07:00', '2026-10-14 07:10', -500)];
-    expect(gate(et('2026-10-14 08:30'), avisar, lost, [ev('08:30', 'CPI')])).toMatchObject({ status: 'aguardar', warnings: ['limite'] });
-    expect(gate(et('2026-10-14 08:30'), topOneRules(), lost, [ev('08:30', 'CPI')]).status).toBe('encerrado');
+    expect(gate(et('2026-10-14 08:30'), avisar, lost, [ev('08:30', 'cpi')])).toMatchObject({ status: 'aguardar', warnings: ['limite'] });
+    expect(gate(et('2026-10-14 08:30'), topOneRules(), lost, [ev('08:30', 'cpi')]).status).toBe('encerrado');
   });
 });
 
@@ -721,6 +744,7 @@ describe('answerOf', () => {
       until: et('2026-10-19 11:00'),
       next: expect.objectContaining({ start: et('2026-10-20 10:00') }),
       warnings: [],
+      semAgenda: false,
     });
   });
 
@@ -786,7 +810,7 @@ describe('parseServerGate', () => {
     ['a window without its state', (s: Record<string, any>) => { delete s.window.state; }],
     ['an unknown skip reason', (s: Record<string, any>) => { s.window = { state: 'nao_avaliado', reason: 'x' }; }],
     ['money that is not a number', (s: Record<string, any>) => { s.limit.worst_usd = '-250'; }],
-    ['an evaluated data block (not before Phase 5)', (s: Record<string, any>) => { s.block = { state: 'ok' }; }],
+    ['an evaluated data block without its keys', (s: Record<string, any>) => { s.block = { state: 'ok' }; }],
     ['a bad instant', (s: Record<string, any>) => { s.at = 'ontem'; }],
     ['an unknown check', (s: Record<string, any>) => { s.checks_evaluated = ['janela', 'humor']; }],
     ['an unknown window position', (s: Record<string, any>) => { s.window.position = 'quase'; }],
@@ -868,7 +892,7 @@ describe('Forex: window and limit only; the day turns at 17:00 New York', () => 
       version: version(ftmoRules()),
       trades: [],
       direction: 1,
-      events: { available: true, value: [{ at: et('2026-10-19 08:30'), label: 'CPI', calendar: 'us' }] },
+      agenda: [{ code: 'cpi', at: et('2026-10-19 08:30') }],
       state: state('em_conflito', 0),
     });
     expect(p.gate.status).toBe('liberado');

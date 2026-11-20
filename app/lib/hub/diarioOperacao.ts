@@ -12,7 +12,7 @@
  */
 import { addDays, formatHhMm, utcToLocal } from '@/lib/domain/tempo'
 import type { AccountMarket, Currency } from '@/lib/domain/markets'
-import type { GateResult, PlanBreak } from '@/lib/domain/gate'
+import { answerOf, type GateResult, type PlanBreak } from '@/lib/domain/gate'
 import { COMMISSION_FROM_FILE, type Day } from '@/lib/domain/diario'
 import { averageExit, countingExits, firstExitCut, isClean, type MarkEvent } from '@/lib/domain/registro'
 import { abs, fromInt, mul, numeric, numericText, plainText, round, sign, sub, trimScale } from '@/lib/domain/registro/numeric'
@@ -28,6 +28,7 @@ import {
   TEMPO_OP,
   acaoAria,
 } from '@/components/hub/diario/copyDia'
+import { PALAVRAS_DADOS, horaDeVolta } from './dadosEconomicos'
 import { diaCurto, dinheiro, hora, tomDe } from './diario'
 import type { DiaryDayTrade, OpenElsewhere } from './diarioDb'
 import { formatDecimal } from './numero'
@@ -155,17 +156,22 @@ export type PlanoDaLinha =
   | { tipo: 'historico' }
   | { tipo: 'nada' }
 
-/** The breaks the Diário shows (window and limit; Phase 5's stay out) */
-const QUEBRAS_DA_LINHA: readonly PlanBreak[] = ['fora_da_janela', 'depois_do_limite']
+/** The breaks the Diário shows (window, the data block, limit; the state rule is Phase 5-2's) */
+const QUEBRAS_DA_LINHA: readonly PlanBreak[] = ['fora_da_janela', 'no_bloqueio', 'depois_do_limite']
 
-/** G10: «No plano», «● fora da janela · depois do limite» (sr «fora do plano: fora da janela e depois do limite»), the history, «—» */
-export function planoDaLinha(t: Pick<DiaryDayTrade, 'history' | 'plan' | 'planNow'>): PlanoDaLinha {
+/**
+ * G10: «No plano», «● fora da janela · depois do limite» (sr «fora do plano: fora da janela e depois do limite»), «● na
+ * espera do ISM» / «● em dia de CPI» (the data break, worded from the gate answer of the plan shown), the history, «—»
+ */
+export function planoDaLinha(
+  t: Pick<DiaryDayTrade, 'history' | 'plan' | 'planNow'> & Partial<Pick<DiaryDayTrade, 'gate' | 'gateNow'>>,
+): PlanoDaLinha {
   if (t.history) return { tipo: 'historico' }
   const p = t.plan ?? t.planNow
   if (!p) return { tipo: 'nada' }
   if (p.verdict === 'fora_do_plano') {
     const breaks = p.breaks.filter((b) => QUEBRAS_DA_LINHA.includes(b))
-    const texto = textoQuebras(breaks)
+    const texto = textoQuebras(breaks, (t.plan ? t.gate : t.gateNow) ?? null)
     if (texto) return { tipo: 'fora', texto, aria: OPERACOES.foraAria(texto.split(' · ').join(' e ')) }
   }
   return p.verdict === 'no_plano' ? { tipo: 'ok' } : { tipo: 'nada' }
@@ -192,12 +198,20 @@ export const linhaFora = (t: Parameters<typeof planoDaLinha>[0]) => planoDaLinha
 
 /**
  * H2: «Posso operar hoje?» at the entry, the answer only (DIFF #6): «Liberado», «Fora da sua janela», «Fora da sua
- * janela · hoje não é dia da janela», «Encerrado por hoje», «Liberado · com aviso do limite», «Sem janela salva»
+ * janela · hoje não é dia da janela», «Encerrado por hoje», «Liberado · com aviso do limite», «Sem janela salva»;
+ * «Dados econômicos» (Phase 5): «Aguardar até 10:10» (on the Diário's clock `tz`; another date by its weekday) and
+ * «Não opero hoje» (c3 §6.4)
  */
-export function possoNaEntrada(g: GateResult): string {
+export function possoNaEntrada(g: GateResult, tz = 'America/New_York'): string {
   const w = g.window as { evaluated: boolean; position?: string; reason?: string }
   if (g.status === null) return GATE.semJanela
   if (g.status === 'encerrado') return GATE.encerrado
+  if (g.status === 'aguardar') {
+    const a = answerOf(g)
+    // The entry is not «now»: the weekday, never «amanhã» (contract §3.6, SPEC §7.2)
+    if (a.kind === 'aguardar') return PALAVRAS_DADOS.aguardarAte(horaDeVolta(a.until, g.at, tz, { outraData: true }))
+    if (a.kind === 'dia') return PALAVRAS_DADOS.naoOperoHoje
+  }
   if (g.status === 'fora_janela') return w.evaluated && w.position === 'nao_e_dia' ? `${GATE.fora} ${GATE.hojeNaoEDia}` : GATE.fora
   const avisos: string[] = []
   if (g.warnings.includes('fora_janela')) avisos.push(w.position === 'nao_e_dia' ? GATE.avisoNaoEDia : GATE.avisoFora)
@@ -306,7 +320,7 @@ export function fatosDaOperacao(t: DiaryDayTrade, conta: ContaDaOperacao): [stri
   const out: [string, string][] = []
   const g = t.gate ?? t.gateNow
   const posso = () => {
-    if (!t.history && g) out.push([DRILL.posso, possoNaEntrada(g)])
+    if (!t.history && g) out.push([DRILL.posso, possoNaEntrada(g, tz)])
   }
   if (ehBinaria(conta.market)) {
     const fim = tr.expiresAt

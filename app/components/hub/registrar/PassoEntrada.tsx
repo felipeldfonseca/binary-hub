@@ -528,7 +528,7 @@ export default function PassoEntrada(props: PassoEntradaProps) {
   const dry = fechada ? dryFechada : dryAberta
   const dryAtual = dry.data && !dry.isPlaceholderData ? dry.data : null
   const quebras = m.diaRecusado ? [] : dryAtual ? dryAtual.plan.breaks : gate ? quebrasDoGate(gate) : []
-  const plano = textoQuebras(quebras)
+  const plano = textoQuebras(quebras, dryAtual ? dryAtual.gate : gate)
   const aviso2 = avisoLimiteEntrada(conta, m, gate, dryAtual ? dryAtual.limitRoom : undefined)
 
   // Errors on screen: the local ones, or the server's refusal of a field the form let through

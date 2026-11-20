@@ -162,3 +162,57 @@ describe('the others line', () => {
     expect(possoNoDiario(oito(), 'nenhuma').conta).toBeNull();
   });
 });
+
+describe('the others line with «Dados econômicos» (Phase 5 · base, SPEC §7.2 C12)', () => {
+  const AT = et('2026-12-01 10:05');
+  const ISM = [{ code: 'ism_ind' as const, at: et('2026-12-01 10:00') }];
+  /** An account answered with the agenda given (null = the agenda not known) */
+  function comAgenda(accountId: string, agenda: { code: 'ism_ind'; at: Date }[] | null): ContaPosso {
+    const rules = HORA(400);
+    const account = { market: 'futures' as const, dayClock: MARKET_SPEC.futures.day };
+    const v = version(rules);
+    const day = dayUsage([], { tradingDay: gateTradingDay(AT, account, v), until: AT, limitCents: rules.limit!.cents });
+    return { accountId, label: accountId, market: 'futures', gate: evaluateGate(AT, account, v, day, { agenda }), rules };
+  }
+  /** The same answer inside a whole day (the domain lane computes it; the answer's shape is fixed) */
+  function emDia(accountId: string): ContaPosso {
+    const c = comAgenda(accountId, ISM);
+    const dia = {
+      kind: 'dia' as const,
+      start: et('2026-11-30 18:00'),
+      end: et('2026-12-01 18:00'),
+      releases: [{ code: 'cpi' as const, at: et('2026-12-01 08:30'), mode: 'dia' as const }],
+    };
+    return { ...c, gate: { ...c.gate, block: { evaluated: true, state: 'no_bloqueio', active: dia, today: [dia], freeAt: dia.end } } };
+  }
+
+  it('«aguardando dado» and «em dia sem operar» (amber), «liberadas, dados não conferidos» (grey), never in the green «liberadas»', () => {
+    const contas = [comAgenda('sel', []), comAgenda('livre', []), comAgenda('semA', null), comAgenda('semB', null), comAgenda('espera', ISM), emDia('dia')];
+    const o = possoNoDiario(contas, 'sel').outras!;
+    expect(outrasTexto(o)).toBe('Outras 5 contas: 1 liberada · 2 liberadas, dados não conferidos · 1 aguardando dado · 1 em dia sem operar');
+    expect(o.partes.map((p) => p.tom)).toEqual(['mint', 'muted', 'amber', 'amber']);
+    expect(o.contas.map((c) => possoTexto(c.linha))).toEqual([
+      'Liberado · até 11:00 ET',
+      'Liberado · dados econômicos não conferidos · sem a agenda de hoje',
+      'Liberado · dados econômicos não conferidos · sem a agenda de hoje',
+      'Aguardar até 10:10 · ISM da indústria às 10:00',
+      'Não opero hoje · dia de CPI, às 08:30',
+    ]);
+  });
+
+  it('one other account alone; «todas» when they share the state', () => {
+    expect(outrasTexto(possoNoDiario([comAgenda('sel', []), comAgenda('semA', null)], 'sel').outras!)).toBe('Outra conta: liberada, dados não conferidos');
+    expect(outrasTexto(possoNoDiario([comAgenda('sel', []), comAgenda('a', ISM), comAgenda('b', ISM)], 'sel').outras!)).toBe(
+      'Outras 2 contas: todas aguardando dado',
+    );
+  });
+
+  it('estadoDaConta of each answer', () => {
+    expect([comAgenda('x', ISM), emDia('y'), comAgenda('z', null), comAgenda('w', [])].map((c) => estadoDaConta(c.gate))).toEqual([
+      'aguardando',
+      'dia_sem_operar',
+      'liberada_sem_agenda',
+      'liberada',
+    ]);
+  });
+});

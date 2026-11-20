@@ -23,16 +23,20 @@ import {
   type Rules,
   type StateRuleCheck,
 } from '@/lib/domain/gate';
+import { PALAVRAS_DADOS, horaDeVolta, rotuloDados, rotuloDia, soDepois } from './dadosEconomicos';
 import { formatMoney } from './formato';
 
 /** Board colour tokens: --mint, --amber, --red, --text (neutral), --text-2 (muted) */
 export type Tom = 'mint' | 'amber' | 'red' | 'neutral' | 'muted';
 
 export interface PossoLinha {
-  /** «Liberado», «Fora da sua janela», «Encerrado por hoje», «Aguardar até 08:40», «Sem janela salva», «Limite do dia indisponível» */
+  /**
+   * «Liberado», «Fora da sua janela», «Encerrado por hoje», «Aguardar até 08:40», «Não opero hoje»,
+   * «Sem janela salva», «Limite do dia indisponível», «Dados econômicos não conferidos»
+   */
   palavra: string;
   tom: Tom;
-  /** What follows « · »: «abre às 10:00 ET», «até 11:00 ET», «com aviso do limite» */
+  /** What follows « · »: «abre às 10:00 ET», «até 11:00 ET», «com aviso do limite», «ISM de serviços às 10:00» */
   sub: string | null;
   /** «Definir» → Personalizar, when nothing was evaluated */
   acao: { texto: string; href: string; aria: string } | null;
@@ -91,11 +95,16 @@ function avisos(warnings: GateWarning[], naoEDia: boolean): string | null {
   return parts.length ? parts.join(' · ') : null;
 }
 
+/** The sub of «Liberado» when the agenda was missing (SPEC §7.2 «Nunca verde») */
+export const LIBERADO_SEM_AGENDA = `${PALAVRAS_DADOS.naoConferidosSub} · sem a agenda de hoje`;
+
 /**
  * One account's line of «Posso operar hoje?» (Início card, Diário in Phase 2) from its answer
  * (evaluateGate or parseServerGate) and the rules that produced it (null before version 1).
+ * `agora` is when the screen draws (the day words of «Dados econômicos»: «amanhã», the weekday);
+ * by default the answer's instant.
  */
-export function possoLinha(conta: string, r: GateResult, rules: Rules | null): PossoLinha {
+export function possoLinha(conta: string, r: GateResult, rules: Rules | null, agora: Date = r.at): PossoLinha {
   const a = answerOf(r);
   const wtz = rules?.windows[0]?.tz ?? rules?.day.tz ?? 'America/New_York';
   const dtz = rules?.day.tz ?? wtz;
@@ -121,8 +130,24 @@ export function possoLinha(conta: string, r: GateResult, rules: Rules | null): P
         tom: 'red',
         sub: a.hitAt ? `limite atingido às ${horaNoRelogio(a.hitAt, dtz)}` : 'limite atingido',
       };
+    // «Dados econômicos»: the hours on the window clock (SPEC §5.6)
     case 'aguardar':
-      return { ...base, palavra: `Aguardar até ${horaNoRelogio(a.until, dtz)}`, tom: 'amber', sub: `bloqueio: ${a.label}` };
+      return {
+        ...base,
+        palavra: `Aguardar até ${horaDeVolta(a.until, agora, wtz)}`,
+        tom: 'amber',
+        sub: `${rotuloDados(a.releases, agora, wtz)}${soDepois(a.releases) ? ` · ${PALAVRAS_DADOS.soDepois}` : ''}`,
+      };
+    case 'dia': {
+      // The start of the account day: the `dia` interval's start (SPEC §4.1, [S(R), E(R)))
+      const inicioDoDia = r.block.evaluated && r.block.active?.kind === 'dia' ? r.block.active.start : undefined;
+      return {
+        ...base,
+        palavra: 'Não opero hoje',
+        tom: 'amber',
+        sub: a.source === 'dia' ? rotuloDia(a.releases, agora, wtz, { inicioDoDia }) : rotuloDados(a.releases, agora, wtz),
+      };
+    }
     case 'fora_janela':
       return {
         ...base,
@@ -137,6 +162,8 @@ export function possoLinha(conta: string, r: GateResult, rules: Rules | null): P
       };
     case 'liberado': {
       const aviso = avisos(a.warnings, a.position === 'nao_e_dia');
+      // Without the agenda «Liberado» is never green (SPEC §5.4 rule 4)
+      if (a.semAgenda) return { ...base, palavra: 'Liberado', tom: 'muted', sub: [aviso, LIBERADO_SEM_AGENDA].filter(Boolean).join(' · ') };
       return {
         ...base,
         palavra: 'Liberado',
@@ -146,7 +173,9 @@ export function possoLinha(conta: string, r: GateResult, rules: Rules | null): P
     }
     case 'indisponivel':
       // The screen offers «Tentar de novo» from `limite.indisponivel`
-      return { ...base, palavra: 'Limite do dia indisponível', tom: 'muted', sub: null };
+      return a.reason === 'sem_agenda'
+        ? { ...base, palavra: 'Dados econômicos não conferidos', tom: 'muted', sub: null }
+        : { ...base, palavra: 'Limite do dia indisponível', tom: 'muted', sub: null };
     case 'sem_janela':
       return a.reason === 'regra_desligada'
         ? {
@@ -232,17 +261,43 @@ export interface ContaPosso {
   rules: Rules | null;
 }
 
-/** The others line's states, in its order (board choice 9: «liberadas · encerradas por hoje · fora da janela · sem janela salva») */
-export type EstadoDaConta = 'liberada' | 'liberada_com_aviso' | 'encerrada' | 'fora_da_janela' | 'sem_janela' | 'outra';
-export const ORDEM_DOS_ESTADOS: readonly EstadoDaConta[] = ['liberada', 'liberada_com_aviso', 'encerrada', 'fora_da_janela', 'sem_janela', 'outra'];
+/**
+ * The others line's states, in its order (board choice 9: «liberadas · encerradas por hoje · fora da
+ * janela · sem janela salva»; Phase 5: «aguardando dado», «em dia sem operar» and «liberadas, dados não
+ * conferidos», never counted in the green «liberadas», SPEC §7.2 C12)
+ */
+export type EstadoDaConta =
+  | 'liberada'
+  | 'liberada_com_aviso'
+  | 'liberada_sem_agenda'
+  | 'encerrada'
+  | 'aguardando'
+  | 'dia_sem_operar'
+  | 'fora_da_janela'
+  | 'sem_janela'
+  | 'outra';
+export const ORDEM_DOS_ESTADOS: readonly EstadoDaConta[] = [
+  'liberada',
+  'liberada_com_aviso',
+  'liberada_sem_agenda',
+  'encerrada',
+  'aguardando',
+  'dia_sem_operar',
+  'fora_da_janela',
+  'sem_janela',
+  'outra',
+];
 
 const ESTADO_PALAVRAS: Record<EstadoDaConta, { um: string; varios: string; tom: Tom }> = {
   liberada: { um: 'liberada', varios: 'liberadas', tom: 'mint' },
   liberada_com_aviso: { um: 'liberada com aviso', varios: 'liberadas com aviso', tom: 'neutral' },
+  liberada_sem_agenda: { um: 'liberada, dados não conferidos', varios: 'liberadas, dados não conferidos', tom: 'muted' },
   encerrada: { um: 'encerrada por hoje', varios: 'encerradas por hoje', tom: 'red' },
+  aguardando: { um: 'aguardando dado', varios: 'aguardando dado', tom: 'amber' },
+  dia_sem_operar: { um: 'em dia sem operar', varios: 'em dia sem operar', tom: 'amber' },
   fora_da_janela: { um: 'fora da janela', varios: 'fora da janela', tom: 'amber' },
   sem_janela: { um: 'sem janela salva', varios: 'sem janela salva', tom: 'muted' },
-  // «Aguardar até …» (Phase 5), «Sem regra ativa», «Limite do dia indisponível»
+  // «Sem regra ativa», «Limite do dia indisponível», «Dados econômicos não conferidos»
   outra: { um: 'com outra resposta', varios: 'com outra resposta', tom: 'muted' },
 };
 
@@ -251,9 +306,14 @@ export function estadoDaConta(gate: GateResult): EstadoDaConta {
   const a = answerOf(gate);
   switch (a.kind) {
     case 'liberado':
+      if (a.semAgenda) return 'liberada_sem_agenda';
       return avisos(a.warnings, a.position === 'nao_e_dia') ? 'liberada_com_aviso' : 'liberada';
     case 'encerrado':
       return 'encerrada';
+    case 'aguardar':
+      return 'aguardando';
+    case 'dia':
+      return 'dia_sem_operar';
     case 'fora_janela':
       return 'fora_da_janela';
     case 'sem_janela':
@@ -312,7 +372,7 @@ export function possoNoDiario(accounts: readonly ContaPosso[], selectedId: strin
   let outras: OutrasContas | null = null;
   if (others.length) {
     const n = others.length;
-    const contagem: Record<EstadoDaConta, number> = { liberada: 0, liberada_com_aviso: 0, encerrada: 0, fora_da_janela: 0, sem_janela: 0, outra: 0 };
+    const contagem = Object.fromEntries(ORDEM_DOS_ESTADOS.map((e) => [e, 0])) as Record<EstadoDaConta, number>;
     for (const a of others) contagem[estadoDaConta(a.gate)] += 1;
     const presentes = ORDEM_DOS_ESTADOS.filter((e) => contagem[e] > 0);
     outras = {

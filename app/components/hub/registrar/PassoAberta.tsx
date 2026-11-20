@@ -87,9 +87,9 @@ const CAMPO_DO_SERVIDOR: Partial<Record<string, CampoSaida>> = { exit_price: 'sp
 const CAMPO_PARCIAL: Partial<Record<string, CampoParcial>> = { quantity: 'pq', exit_price: 'ppreco', exit: 'phora', pnl: 'pres' }
 
 /** The plan pill of a registered trade: «No plano» / «● fora da janela» / «—» */
-export function PlanoDaOperacao({ view, nota }: { view: Pick<TradeView, 'plan'>; nota?: React.ReactNode }) {
+export function PlanoDaOperacao({ view, nota }: { view: Pick<TradeView, 'plan'> & Partial<Pick<TradeView, 'gate'>>; nota?: React.ReactNode }) {
   const plan = view.plan
-  const fora = plan && plan.verdict === 'fora_do_plano' ? textoQuebras(plan.breaks) : null
+  const fora = plan && plan.verdict === 'fora_do_plano' ? textoQuebras(plan.breaks, view.gate ?? null) : null
   const ok = plan && plan.verdict === 'no_plano'
   return (
     <div className="hub-reg-plano-linha">

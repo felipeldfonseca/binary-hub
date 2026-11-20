@@ -111,13 +111,16 @@ describe('«Liberado, com aviso» and the other answers', () => {
     expect(possoTexto(l)).toBe('Liberado · com aviso: fora da janela · com aviso do limite');
   });
 
-  it('Aguardar até (Phase 5): the block\'s end on the account clock', () => {
+  it('Aguardar até (Phase 5): the hour the account is free again and the release, on the window clock', () => {
     const now = et('2026-10-14 08:30');
     const r = topOneRules();
     const g = evaluateGate(now, TOP_ONE, version(r), null, {
-      events: { available: true, value: [{ at: et('2026-10-14 08:30'), label: 'CPI', calendar: 'us' }] },
+      agenda: [{ code: 'cpi', at: et('2026-10-14 08:30') }],
     });
-    expect(possoTexto(possoLinha('Top One', g, r))).toBe('Aguardar até 08:40 · bloqueio: CPI');
+    expect(possoTexto(possoLinha('Top One', g, r))).toBe('Aguardar até 08:40 · CPI às 08:30');
+    expect(possoLinha('Top One', g, r).tom).toBe('amber');
+    // Drawn the evening before (SPEC §5.6): «amanhã»
+    expect(possoTexto(possoLinha('Top One', g, r, et('2026-10-13 19:00')))).toBe('Aguardar até amanhã às 08:40 · CPI amanhã às 08:30');
   });
 
   it('the window rule off and no limit: «Sem regra ativa · Ajustar»', () => {
@@ -141,7 +144,7 @@ describe('«Liberado, com aviso» and the other answers', () => {
     expect(possoTexto(linha('Top One', et('2026-10-19 10:30'), r, TOP_ONE))).toBe('Liberado');
   });
 
-  it('a window on Brasília\'s clock for a futures account: window times on Brasília, the hit and block times on ET', () => {
+  it('a window on Brasília\'s clock for a futures account: window times on Brasília, the hit on ET, the data block on the window clock (Brasília)', () => {
     // 11:00–12:00 Brasília is 10:00–11:00 ET in October
     const r = { ...topOneRules(), windows: [{ tz: SP, startMin: 660, endMin: 720, weekdays: 31 }], windowsFrom: 'account' as const };
     expect(possoTexto(linha('Top One', et('2026-10-19 10:30'), r, TOP_ONE))).toBe('Liberado · até 12:00 de Brasília');
@@ -149,9 +152,9 @@ describe('«Liberado, com aviso» and the other answers', () => {
     const lost = [trade('2026-10-19 10:00', '2026-10-19 10:12', -400)];
     expect(possoTexto(linha('Top One', et('2026-10-19 10:30'), r, TOP_ONE, lost))).toBe('Encerrado por hoje · limite atingido às 10:12');
     const g = evaluateGate(et('2026-10-14 08:30'), TOP_ONE, version(r), null, {
-      events: { available: true, value: [{ at: et('2026-10-14 08:30'), label: 'CPI', calendar: 'us' }] },
+      agenda: [{ code: 'cpi', at: et('2026-10-14 08:30') }],
     });
-    expect(possoTexto(possoLinha('Top One', g, r))).toBe('Aguardar até 08:40 · bloqueio: CPI');
+    expect(possoTexto(possoLinha('Top One', g, r))).toBe('Aguardar até 09:40 · CPI às 09:30');
   });
 
   it('the day not loaded: the limit says so instead of «US$ 0»', () => {
@@ -303,5 +306,66 @@ describe('the new markets (Fase 2b)', () => {
       'Liberado · até 22:00 de Brasília',
     );
     expect(janelaLinha(binance)).toBe('Janela 20:00–22:00 · Brasília');
+  });
+});
+
+describe('«Dados econômicos» in the line (Phase 5 · base, SPEC §7.2)', () => {
+  const r = topOneRules();
+  const cpiDia = {
+    kind: 'dia' as const,
+    start: et('2026-12-09 18:00'),
+    end: et('2026-12-10 18:00'),
+    releases: [{ code: 'cpi' as const, at: et('2026-12-10 08:30'), mode: 'dia' as const }],
+  };
+  const comBloco = (now: Date, block: Parameters<typeof possoLinha>[1]['block'], rules: Rules = r) => {
+    const g = evaluateGate(now, TOP_ONE, version(rules), null, { agenda: [] });
+    return { ...g, status: 'aguardar' as const, block, checksEvaluated: g.checksEvaluated };
+  };
+
+  it('a whole day: «Não opero hoje · dia de CPI, às 08:30» (amber); the evening before, «amanhã»', () => {
+    const g = comBloco(et('2026-12-10 10:05'), { evaluated: true, state: 'no_bloqueio', active: cpiDia, today: [cpiDia], freeAt: cpiDia.end });
+    const l = possoLinha('Top One', g, r);
+    expect([possoTexto(l), l.tom]).toEqual(['Não opero hoje · dia de CPI, às 08:30', 'amber']);
+    const eve = comBloco(et('2026-12-09 19:00'), { evaluated: true, state: 'no_bloqueio', active: cpiDia, today: [cpiDia], freeAt: cpiDia.end });
+    expect(possoTexto(possoLinha('Top One', eve, r))).toBe('Não opero hoje · dia de CPI, amanhã às 08:30 · o dia da conta começou às 18:00');
+  });
+
+  it('a wait of a release in «Só opero depois do dado»: « · só opero depois do dado» (SPEC §7.2, c3 §5.2 case 2)', () => {
+    const cpi = { kind: 'espera' as const, start: et('2026-12-09 18:00'), end: et('2026-12-10 08:40'), releases: [{ code: 'cpi' as const, at: et('2026-12-10 08:30'), mode: 'depois' as const }] };
+    const g = comBloco(et('2026-12-10 07:00'), { evaluated: true, state: 'no_bloqueio', active: cpi, today: [cpi], freeAt: cpi.end });
+    expect(possoTexto(possoLinha('Top One', g, r))).toBe('Aguardar até 08:40 · CPI às 08:30 · só opero depois do dado');
+    expect(possoTexto(possoLinha('Top One', g, r, et('2026-12-09 19:00')))).toBe(
+      'Aguardar até amanhã às 08:40 · CPI amanhã às 08:30 · só opero depois do dado',
+    );
+    // A wait of «volta» releases has no ending
+    const volta = { ...cpi, start: et('2026-12-10 08:25'), releases: [{ ...cpi.releases[0], mode: 'volta' as const }] };
+    const gv = comBloco(et('2026-12-10 08:26'), { evaluated: true, state: 'no_bloqueio', active: volta, today: [volta], freeAt: volta.end });
+    expect(possoTexto(possoLinha('Top One', gv, r))).toBe('Aguardar até 08:40 · CPI às 08:30');
+  });
+
+  it('a wait with no way back (R13b): «Não opero hoje» with the wait\'s label, no hour', () => {
+    const copom = { kind: 'espera' as const, start: et('2026-12-09 16:25'), end: et('2026-12-09 17:15'), releases: [{ code: 'copom' as const, at: et('2026-12-09 16:30'), mode: 'volta' as const }] };
+    const g = comBloco(et('2026-12-09 16:40'), { evaluated: true, state: 'no_bloqueio', active: copom, today: [copom], freeAt: null });
+    expect(possoTexto(possoLinha('Top One', g, r))).toBe('Não opero hoje · decisão do Copom às 16:30');
+  });
+
+  it('without the agenda, «Liberado» is grey, never mint', () => {
+    const g = evaluateGate(et('2026-10-19 10:30'), TOP_ONE, version(r), dayUsage([], { tradingDay: '2026-10-19', until: et('2026-10-19 10:30'), limitCents: 40000 }), { agenda: null });
+    const l = possoLinha('Top One', g, r);
+    expect([possoTexto(l), l.tom]).toEqual(['Liberado · dados econômicos não conferidos · sem a agenda de hoje', 'muted']);
+  });
+
+  it('without the agenda and with a warning, the warning and «dados econômicos não conferidos» both (SPEC §7.2 «em nenhuma linha»)', () => {
+    const rw = { ...r, limit: { cents: 40000, mode: 'conta' as const, atLimit: 'avisar' as const } };
+    const usage = dayUsage([trade('2026-10-19 10:00', '2026-10-19 10:12', -400)], { tradingDay: '2026-10-19', until: et('2026-10-19 10:30'), limitCents: 40000 });
+    const g = evaluateGate(et('2026-10-19 10:30'), TOP_ONE, version(rw), usage, { agenda: null });
+    const l = possoLinha('Top One', g, rw);
+    expect([possoTexto(l), l.tom]).toEqual(['Liberado · com aviso do limite · dados econômicos não conferidos · sem a agenda de hoje', 'muted']);
+  });
+
+  it('the window off, no limit, no agenda: «Dados econômicos não conferidos», grey (C9)', () => {
+    const off = { ...r, windowRule: { on: false, outside: 'fora' as const }, limit: null };
+    const l = possoLinha('Top One', evaluateGate(et('2026-10-19 10:30'), TOP_ONE, version(off), null, { agenda: null }), off);
+    expect([l.palavra, l.tom, l.sub]).toEqual(['Dados econômicos não conferidos', 'muted', null]);
   });
 });
