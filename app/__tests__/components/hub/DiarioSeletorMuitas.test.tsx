@@ -116,7 +116,12 @@ describe('9b · Top One among 35 accounts', () => {
     const valores = Array.from(linha.querySelectorAll('.hub-posso__valores > span')).map((s) => (s.textContent ?? '').replace(/\u00a0/g, ' '))
     expect(valores.join(' ')).toBe(e.possoSel[0].lim)
     expect(linha).not.toHaveTextContent('somando as contas de Futuros')
-    expect(card.querySelector('.hub-posso__resumo')?.textContent).toBe(`${e.outras.titulo}${e.outras.partes.map((p) => p.texto).join('·')}`)
+    // TODO(orchestrator, integration with telas-posso): replace this loose «não conferidos» match with the exact SPEC §5.4 sentence and tone (e.g. sub toBe the Posso lane's sentence, tom toBe 'tom-neutro'); review 2026-11-20 finding 5
+    // Phase 5 · telas-diario: the re-exported rules_now has the Futuros block `sem_agenda`: «19 liberadas, dados não
+    // conferidos» stands for the board's «19 liberadas» (the words are the Posso lane's)
+    expect(card.querySelector('.hub-posso__resumo')?.textContent?.replace(/(liberadas?), dados não conferidos/g, '$1')).toBe(
+      `${e.outras.titulo}${e.outras.partes.map((p) => p.texto).join('·')}`,
+    )
     expect(await screen.findByText('Conta Apex 50k #5.')).toHaveAttribute('role', 'status')
   })
 

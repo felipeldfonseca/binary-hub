@@ -1324,7 +1324,7 @@
     "at": "2026-11-10T16:19:59.999999+00:00",
     "block": {
      "state": "nao_avaliado",
-     "reason": "fase5"
+     "reason": "sem_agenda"
     },
     "desde": "2026-10-14T13:12:00+00:00",
     "label": "Top One",

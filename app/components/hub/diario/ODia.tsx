@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { diaLongo, etiquetasDoDia, notaDoDia } from '@/lib/hub/diario'
+import { diaLongo, etiquetasDoDia, linhaCinzaDoDia, notaDoDia } from '@/lib/hub/diario'
 import type { DayRead } from '@/lib/hub/diarioDb'
 import type { ContaDaOperacao } from '@/lib/hub/diarioOperacao'
 import { LOADING } from '@/components/hub/contas/copy'
@@ -12,6 +12,7 @@ import OperacoesTabela from './OperacoesTabela'
 import RevisaoDoDia from './RevisaoDoDia'
 import type { GuardaDoDrill } from './OperacaoDetalhe'
 import { useDiarioPagina, type DiarioPaginaValor } from './useDiarioPagina'
+import { relogioDoDia, useSemanaDoDia } from './useDadosDoDia'
 import { SECAO, TITULO, drillId, linhaId } from './ids'
 
 /**
@@ -97,11 +98,21 @@ function CorpoDoDia({ p, d }: { p: DiarioPaginaValor; d: DayRead }) {
   const historia = d.trades.filter((t) => t.history).map((t) => t.trade.entryTime)
   const nota = notaDoDia(d.kind, p.contaDiario, d.desde, historia)
   const comPlano = !!d.plan.rules && d.kind !== 'historico'
+  // Phase 5-1 (c3 §6.5, Q32): the day's releases and holiday, in grey between the numbers and «O plano do dia»
+  const relogio = relogioDoDia(d.account, d.plan.rules)
+  const semanaLida = useSemanaDoDia(p.contaDiario.market, relogio, d.day)
+  const cinza = linhaCinzaDoDia(semanaLida, d.day, {
+    market: p.contaDiario.market,
+    tz: p.contaDiario.tz,
+    clock: relogio,
+    calendars: d.plan.rules?.block?.calendars ?? [],
+  })
 
   return (
     <>
       {nota && <p className="hub-dr-dia-nota">{nota}</p>}
       <NumerosDoDia d={d} calDay={calDay} conta={p.contaDiario} />
+      {cinza && <p className="hub-dr-sub">{cinza}</p>}
       {comPlano && <PlanoDoDia d={d} hoje={p.hoje} accountId={p.conta.id} conta={p.contaDiario} />}
       <OperacoesTabela
         ref={tituloOps}

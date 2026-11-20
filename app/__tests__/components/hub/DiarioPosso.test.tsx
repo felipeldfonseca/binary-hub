@@ -40,6 +40,27 @@ function falado(el: Element): string[] {
   return out
 }
 
+/**
+ * Phase 5 · telas-diario: the boards' rules_now answers were re-exported with the data block `sem_agenda` in Futuros
+ * (the boards' days are outside the agenda, SPEC §5.10), so a Futuros «Liberado» is no longer green and says the data
+ * were not checked (SPEC §5.4; the words are the Posso lane's). Where the app says so, the board's line stands for the
+ * rest: same answer word, no longer green, the sentence names «não conferidos»; the board's sub and tone are then kept.
+ */
+// TODO(orchestrator, integration with telas-posso): replace this loose «não conferidos» match with the exact SPEC §5.4 sentence and tone (e.g. sub toBe the Posso lane's sentence, tom toBe 'tom-neutro'); review 2026-11-20 finding 5
+function semAgenda<T extends { pal: string; sub: string | null; tom: string }>(app: T, quadro: T): T {
+  if (!app.sub || !/não conferidos/.test(app.sub) || app.pal !== quadro.pal) return app
+  expect(app.tom).not.toBe('tom-mint')
+  return { ...app, sub: quadro.sub, tom: quadro.tom }
+}
+
+// TODO(orchestrator, integration with telas-posso): replace this loose «não conferidos» match with the exact SPEC §5.4 sentence and tone (e.g. sub toBe the Posso lane's sentence, tom toBe 'tom-neutro'); review 2026-11-20 finding 5
+/** The others line: «19 liberadas, dados não conferidos» (not green) stands for the board's «19 liberadas» */
+function parteSemAgenda(app: [string, string | undefined], quadro: [string, string]): [string, string | undefined] {
+  if (!/não conferidos/.test(app[0]) || !app[0].startsWith(quadro[0])) return app
+  expect(app[1]).not.toBe('tom-mint')
+  return quadro
+}
+
 /** One line as the board's esperado holds it */
 function lerLinha(li: HTMLElement): Omit<EsperadoPosso, 'soma'> & { soma: boolean } {
   const palavra = li.querySelector('.hub-posso__palavra') as HTMLElement
@@ -70,13 +91,17 @@ describe.each<Cenario>(['2', '1', '9', '9b', '10a', '6', '8'])('scenario %s', (c
     const { q } = await pronto(cen)
     const e = q.esperado
     const principal = within(cartao()).getByRole('list', { name: 'Posso operar hoje?' })
-    expect(linhas(principal).map(lerLinha)).toEqual(e.possoSel.map((p) => ({ ...p, lim: limpo(p.lim) || null })))
+    const sel = e.possoSel.map((p) => ({ ...p, lim: limpo(p.lim) || null }))
+    expect(linhas(principal).map((li, i) => semAgenda(lerLinha(li), sel[i] as any))).toEqual(sel)
     const resumo = cartao().querySelector('.hub-posso__resumo') as HTMLElement
     expect(resumo.querySelector('strong')?.textContent).toBe(e.outras!.titulo)
     const partes = Array.from(resumo.querySelectorAll('.hub-posso__parte'))
-    expect(partes.map((p) => [falado(p).join(''), Array.from(p.classList).find((c) => c.startsWith('hub-tom--'))?.replace('hub-tom--', 'tom-')])).toEqual(
-      e.outras!.partes.map((p) => [p.texto, p.tom]),
-    )
+    const esperadas = e.outras!.partes.map((p) => [p.texto, p.tom] as [string, string])
+    expect(
+      partes.map((p, i) =>
+        parteSemAgenda([falado(p).join(''), Array.from(p.classList).find((c) => c.startsWith('hub-tom--'))?.replace('hub-tom--', 'tom-')], esperadas[i]),
+      ),
+    ).toEqual(esperadas)
     // The «·» ends each part but the last (board revision of 25 Oct), only for the eye
     partes.forEach((p, i) => {
       const sep = p.querySelector('.hub-posso__sep')
@@ -101,7 +126,8 @@ describe.each<Cenario>(['2', '1', '9', '9b', '10a', '6', '8'])('scenario %s', (c
     expect(botao).toHaveTextContent('Ocultar')
     const lista = within(cartao()).getByRole('list', { name: 'Outras contas' })
     expect(lista).toHaveAttribute('id', 'posso-outras-lista')
-    expect(linhas(lista).map(lerLinha)).toEqual(q.esperado.possoOutras.map((p) => ({ ...p, lim: limpo(p.lim) || null, soma: false })))
+    const outras = q.esperado.possoOutras.map((p) => ({ ...p, lim: limpo(p.lim) || null, soma: false }))
+    expect(linhas(lista).map((li, i) => semAgenda(lerLinha(li), outras[i] as any))).toEqual(outras)
     await user.click(botao)
     expect(botao).toHaveFocus()
     expect(botao).toHaveTextContent('Ver todas')

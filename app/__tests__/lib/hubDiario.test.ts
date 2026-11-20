@@ -16,10 +16,18 @@ import {
   type DayReview,
   type GridCell,
 } from '@/lib/domain/diario';
-import type { Rules } from '@/lib/domain/gate';
+import { agendaFor, evaluateGate, type Rules } from '@/lib/domain/gate';
+import { parseDay } from '@/lib/hub/diarioDb';
+import { RELOGIO_TOP, agendaJson, leituraDoDia } from '@/testing/agenda';
+import { quadro } from '@/testing/diarioQuadro';
 import {
   apagadasTexto,
   avisoDeRevisoes,
+  blocoDoDia,
+  entradasDosDados,
+  hora,
+  intervaloDoPlano,
+  linhaDosDadosDoPlano,
   breakevenDoPlano,
   camposDaRevisao,
   celulaDaSemana,
@@ -623,9 +631,13 @@ describe('«O plano do dia»', () => {
     expect(versaoAnterior({ versionNo: 2, until: et('2026-11-02 10:45'), rules: r }, r, TOP)).toBe('Até 10:45 valia a versão 2.');
   });
 
-  it('the plan\'s ⓘ (Futuros mention Phase 5)', () => {
-    expect(comoLerOPlano('futures', true)).toContain('quem confere é Análises. Bloqueio de dados, viés e regra do estado chegam na Fase 5.');
+  it('the plan\'s ⓘ (Futuros: the data rule of Phase 5-1, c3 §6.3; the closing sentence without it)', () => {
+    expect(comoLerOPlano('futures', true)).toBe(
+      'Cada linha compara as regras que valiam neste dia, em Personalizar, com o que o diário registrou: janela, dados econômicos e limite. Uma operação fora da janela, numa espera de dado, em dia em que você escolheu não operar ou depois do limite fica fora do plano, mesmo quando a tela só avisava. Breakeven: a sua regra e em quantas operações que chegaram ao ponto dela o stop foi para a entrada; quem confere é Análises. Viés e regra do estado chegam na Fase 5.',
+    );
+    expect(comoLerOPlano('futures', false)).not.toMatch(/bloqueio/i);
     expect(comoLerOPlano('binary', false)).not.toContain('Fase 5');
+    expect(comoLerOPlano('binary', false)).toContain('janela e limite. Uma operação fora da janela ou depois do limite');
   });
 });
 
@@ -779,5 +791,137 @@ describe('the selector\'s words with many accounts', () => {
       'Nenhuma conta encontrada.',
     ]);
     expect(SELETOR_MUITAS.nenhuma(' xyz ')).toBe('Nenhuma conta com “xyz”.');
+  });
+});
+
+describe('«Dados econômicos» (Phase 5 · telas-diario): the words of «fora do plano», the week\'s list', () => {
+  it('«Como ler os números do dia» and the week\'s ⓘ name the data rule when the account has it (c3 §6.2)', () => {
+    const f = facts({ trades: 1 });
+    const t = dayTiles(f, 'futures');
+    expect(sp(comoLerOsNumeros(t, TOP, f, { dados: true }))).toContain(
+      'Fora do plano: operações fora da janela, numa espera de dado econômico, em dia em que você escolheu não operar ou depois do limite.',
+    );
+    expect(sp(comoLerOsNumeros(t, TOP, f))).toContain('Fora do plano: operações fora da janela ou depois do limite.');
+  });
+
+  it('the week\'s «Fora do plano» list writes the data break without its name (diario_mes carries no gate)', () => {
+    const t = { tradeId: 't', day: '2026-12-03', entryTime: et('2026-12-03 10:05'), symbol: 'MES', direction: 'long' as const, open: false, net: '30.01', breaks: ['no_bloqueio' as const], planKind: 'congelado' as const };
+    expect(sp(foraDaSemanaItem(t as any, TOP))).toBe('qui 3 · 10:05 · Compra MES · dado econômico · +US$ 30,01');
+  });
+});
+
+describe('«O plano do dia» · the «Dados econômicos» line (Phase 5 · telas-diario; c3 §6.3, SPEC §6 G6)', () => {
+  // The boards' world recorded from the SQL (testing/agenda): Thu 3 Dec, ISM de serviços 10:00 ET in «Aguardo em
+  // volta» (09:55–10:10), entries 09:57 and 10:05; Thu 10 Dec, CPI 08:30 ET in «Não opero no dia», entries 10:05, 10:31
+  const espera = parseDay(agendaJson('dia-espera'));
+  const inteiro = parseDay(agendaJson('dia-inteiro'));
+  const rEspera = espera.plan.rules!;
+  const rInteiro = inteiro.plan.rules!;
+  const conta = { market: 'futures' as const, dayClock: RELOGIO_TOP };
+  const ler = (day: string, o: { semAgenda?: boolean } = {}) => leituraDoDia(et(`${day} 09:00`), o);
+  const semEntrada = (rules: Rules, day: string, o: { semAgenda?: boolean } = {}) =>
+    sp(linhaDosDadosDoPlano([], blocoDoDia(rules, conta, day, ler(day, o)), TOP));
+  const comEntradas = (d: typeof espera, horas: string[]) =>
+    sp(linhaDosDadosDoPlano(entradasDosDados(d.trades.filter((t) => horas.some((h) => hora(t.trade.entryTime, NY) === h))), undefined, TOP));
+  const L = (plano: string, fato: string, marca: string, tipo: string) => ({ item: 'Dados econômicos', plano, fato, marca, tipo, link: null });
+
+  it('1, 2: a wait without entry; with one (Q27); with two', () => {
+    expect(semEntrada(rEspera, '2026-12-03')).toEqual(L('ISM de serviços às 10:00 · espera 09:55–10:10', 'nenhuma operação na espera', 'No plano', 'ok'));
+    expect(comEntradas(espera, ['10:05'])).toEqual(L('ISM de serviços às 10:00 · espera 09:55–10:10', '1 operação na espera, às 10:05', 'Fora do plano', 'fora'));
+    expect(comEntradas(espera, ['09:57', '10:05'])!.fato).toBe('2 operações na espera, às 09:57 e 10:05');
+  });
+
+  it('3: «Só opero depois do dado» without entry', () => {
+    const r: Rules = { ...rEspera, block: { ...rEspera.block!, releases: { cpi: 'depois' } } };
+    expect(semEntrada(r, '2026-12-10')).toEqual(L('CPI às 08:30 · só depois das 08:40', 'nenhuma operação antes das 08:40', 'No plano', 'ok'));
+  });
+
+  it('4, 5: a whole day kept; with two entries (Q28)', () => {
+    expect(semEntrada(rInteiro, '2026-12-10')).toEqual(L('dia de CPI (08:30) · não opero no dia', 'nenhuma operação', 'No plano', 'ok'));
+    expect(comEntradas(inteiro, ['10:05', '10:31'])).toEqual(L('dia de CPI (08:30) · não opero no dia', '2 operações, às 10:05 e 10:31', 'Fora do plano', 'fora'));
+  });
+
+  it('6: a day without a release that waits (Wed 2 Dec)', () => {
+    expect(semEntrada(rEspera, '2026-12-02')).toEqual(L('nenhum dado com espera neste dia', '—', 'No plano', 'ok'));
+  });
+
+  it('7: the rule off that day', () => {
+    const r: Rules = { ...rEspera, block: { ...rEspera.block!, on: false } };
+    expect(semEntrada(r, '2026-12-03')).toEqual(L('regra desligada', '—', 'Sem regra', 'neutro'));
+  });
+
+  it('8: the day\'s agenda not loaded, or not read («Não conferido», Q29); entries frozen before the rule', () => {
+    const nao = L('não conferidos neste dia', '—', 'Não conferido', 'neutro');
+    expect(semEntrada(rEspera, '2026-12-03', { semAgenda: true })).toEqual(nao);
+    expect(sp(linhaDosDadosDoPlano([], blocoDoDia(rEspera, conta, '2026-12-03', null), TOP))).toEqual(nao);
+    // Before the world's coverage (10 Nov, Q29's day)
+    expect(semEntrada(rEspera, '2026-11-10')).toEqual(nao);
+    // Q29: the Phase 4 board's 10 Nov, every entry frozen with `fase5`
+    const q29 = quadro('2').dias['2026-11-10'];
+    expect(sp(linhaDosDadosDoPlano(entradasDosDados(q29.trades), undefined, TOP))).toEqual(nao);
+  });
+
+  it('an entry the app could not check next to one outside every wait: «Não conferido», not «No plano»', () => {
+    const [a] = entradasDosDados(espera.trades.filter((t) => hora(t.trade.entryTime, NY) === '10:05'));
+    const ok = { ...a, block: { ...(a.block as any), state: 'ok', active: null, freeAt: null } };
+    const sem = { at: a.at, block: { evaluated: false, state: 'nao_avaliado', reason: 'sem_agenda' } as any };
+    expect(sp(linhaDosDadosDoPlano([ok, sem], undefined, TOP))).toMatchObject({ fato: 'nenhuma operação na espera', marca: 'Não conferido', tipo: 'neutro' });
+  });
+
+  it('no line: another market, still reading (G6), no version; linhasDoPlano puts it between Janela and Limite', () => {
+    expect(linhaDosDadosDoPlano(entradasDosDados(espera.trades), undefined, EBX)).toBeNull();
+    expect(linhaDosDadosDoPlano([], undefined, TOP)).toBeNull();
+    expect(linhaDosDadosDoPlano([], null, TOP)).toBeNull();
+    expect(linhaDosDadosDoPlano([], blocoDoDia(null, conta, '2026-12-03', ler('2026-12-03')), TOP)).toBeNull();
+    const dados = linhaDosDadosDoPlano(entradasDosDados(espera.trades), undefined, TOP);
+    expect(linhasDoPlano(rEspera, espera.facts, TOP, dados).map((l) => l.item)).toEqual(['Janela', 'Dados econômicos', 'Limite']);
+    expect(linhasDoPlano(rEspera, espera.facts, TOP).map((l) => l.item)).toEqual(['Janela', 'Limite']);
+  });
+
+  it('the interval\'s words: a release whose name starts in lower case; two at one instant; three', () => {
+    const at = new Date('2026-12-09T19:00:00Z');
+    const iv = (codes: any[], kind: 'espera' | 'dia' = 'espera') => ({ kind, start: new Date(at.getTime() - 5 * 60_000), end: new Date(at.getTime() + 10 * 60_000), releases: codes.map((code) => ({ code, at, mode: 'volta' as const })) });
+    expect(intervaloDoPlano(iv(['fomc_decisao']), NY)).toBe('Decisão do Fed às 14:00 · espera 13:55–14:10');
+    expect(intervaloDoPlano(iv(['pce', 'pib_us']), NY)).toBe('PCE e PIB dos EUA às 14:00 · espera 13:55–14:10');
+    expect(intervaloDoPlano(iv(['pce', 'pib_us'], 'dia'), NY)).toBe('dia de PCE e PIB dos EUA (14:00) · não opero no dia');
+  });
+});
+
+describe('review 2026-11-20: «O plano do dia» on the Diário day itself (findings 4 and 6)', () => {
+  const espera = parseDay(agendaJson('dia-espera'));
+  const conta = { market: 'futures' as const, dayClock: RELOGIO_TOP };
+  const ler = (day: string) => leituraDoDia(et(`${day} 09:00`));
+  const dia = (day: string) => ({ day, clock: RELOGIO_TOP });
+
+  it('an entry inside an overnight window after 18:00 ET counts on the day the window opened: the plan is that day\'s', () => {
+    // The window 17:00–19:00 ET: an entry on Wed 2 Dec at 18:30 counts on Wed 2 Dec, though its clock day is Thu 3 Dec
+    const r: Rules = { ...espera.plan.rules!, windows: [{ ...espera.plan.rules!.windows[0], startMin: 17 * 60, endMin: 19 * 60 }] };
+    const at = et('2026-12-02 18:30');
+    const block = evaluateGate(at, { market: 'futures', dayClock: RELOGIO_TOP } as any, { rules: r } as any, null, {
+      agenda: agendaFor(r, r.day, at, ler('2026-12-03')),
+    }).block;
+    expect(block.evaluated && block.today.length).toBe(1); // Thursday's ISM, in the entry's own answer
+    const g6 = blocoDoDia(r, conta, '2026-12-02', ler('2026-12-02'));
+    expect(sp(linhaDosDadosDoPlano([{ at, block }], g6, TOP, dia('2026-12-02')))).toMatchObject({
+      plano: 'nenhum dado com espera neste dia',
+      fato: '—',
+      marca: 'No plano',
+    });
+    // Waiting for the day's read: the line waits
+    expect(linhaDosDadosDoPlano([{ at, block }], undefined, TOP, dia('2026-12-02'))).toBeNull();
+    // An entry on the day's own clock day keeps its own intervals (no read needed)
+    const e = entradasDosDados(espera.trades);
+    expect(sp(linhaDosDadosDoPlano(e, undefined, TOP, dia('2026-12-03')))!.plano).toBe('ISM de serviços às 10:00 · espera 09:55–10:10');
+  });
+
+  it('a wait carried into the next account day names the release\'s weekday (the leftover of «Não opero no dia» past 18:00)', () => {
+    const iv = {
+      kind: 'espera' as const,
+      start: et('2026-12-10 18:00'),
+      end: et('2026-12-10 18:30'),
+      releases: [{ code: 'cpi' as const, at: et('2026-12-10 17:00'), mode: 'volta' as const }],
+    };
+    expect(intervaloDoPlano(iv, NY, '2026-12-11')).toBe('CPI qui às 17:00 · espera 18:00–18:30');
+    expect(intervaloDoPlano(iv, NY, '2026-12-10')).toBe('CPI às 17:00 · espera 18:00–18:30');
   });
 });

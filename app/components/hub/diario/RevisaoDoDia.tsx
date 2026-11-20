@@ -5,6 +5,7 @@ import { REVIEW_FIELDS_MAX, dayChanged, previousVersions, reviewPayload, type Da
 import {
   camposDaRevisao,
   diaMudouTexto,
+  entradasDosDados,
   fatosTexto,
   linhaDaRevisao,
   revisaoSalvaStatus,
@@ -14,6 +15,7 @@ import {
   type ContaDiario,
 } from '@/lib/hub/diario'
 import type { DayRead } from '@/lib/hub/diarioDb'
+import { fatosDosDados } from '@/lib/hub/diarioOperacao'
 import { newClientKey } from '@/lib/hub/registrarDb'
 import { useSaveDayReview } from '@/hooks/useDiario'
 import { REVISAO } from './copyDia'
@@ -62,6 +64,9 @@ function Registrou({ texto }: { texto: string }) {
  * anteriores (1)»). One client_key per form, kept across retries; offline the save fails at once and the text stays.
  */
 export default function RevisaoDoDia({ d, accountId, conta }: { d: DayRead; accountId: string; conta: ContaDiario }) {
+  // The data part of the day's facts (c3 §6.2), from the day's trades: on the live facts, and on the saved review while
+  // the day has not changed since (an older version's frozen facts stay as they were)
+  const dados = fatosDosDados(entradasDosDados(d.trades), conta.tz)
   const save = useSaveDayReview()
   // The save's answer until the day is read again (its versions come with that read)
   const [local, setLocal] = useState<DayReview | null>(null)
@@ -149,7 +154,7 @@ export default function RevisaoDoDia({ d, accountId, conta }: { d: DayRead; acco
       </div>
       {salva && r && ver && !form && (
         <div id="rev-texto" className="hub-dr-rev-texto">
-          <Registrou texto={fatosTexto(r.autoSummary, conta)} />
+          <Registrou texto={fatosTexto(r.autoSummary, conta, dayChanged(r.autoSummary, d.facts) ? [] : dados)} />
           {dayChanged(r.autoSummary, d.facts) && <p className="hub-dr-rev-mudou">{diaMudouTexto(d.facts, conta)}</p>}
           <Campos v={r} />
           {versoes.length > 0 && (
@@ -176,7 +181,7 @@ export default function RevisaoDoDia({ d, accountId, conta }: { d: DayRead; acco
       )}
       {form && (
         <div id="rev-form" className="hub-dr-rev-form">
-          <Registrou texto={fatosTexto(d.facts, conta)} />
+          <Registrou texto={fatosTexto(d.facts, conta, dados)} />
           <div className="hub-dr-rev-textos">
             <div className="hub-dr-rev-campo-form">
               <label htmlFor="rev-func" className="hub-dr-rev-rot">
