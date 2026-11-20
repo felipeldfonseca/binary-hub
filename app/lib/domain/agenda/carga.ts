@@ -68,6 +68,8 @@ export interface LoadPlan {
   today: string;
   /** The dates the BEA's file covers, per code (empty when it failed) */
   beaRanges: Readonly<Record<BeaCode, readonly DateRange[]>>;
+  /** The source_keys of the list entries that declare a move (`original`): only these write was_at */
+  declaredMoves: ReadonlySet<string>;
 }
 
 export const CALENDARS: readonly CalendarCode[] = ['us', 'eu', 'br'];
@@ -116,6 +118,7 @@ export function missingCodes(
 export function planLoad(lists: AgendaLists, bea: BeaResult, now: Date): LoadPlan {
   const blocks = blocksByCode(lists, bea);
   const events: RowToWrite[] = [];
+  const declaredMoves = new Set<string>();
   for (const r of AGENDA_RELEASES) {
     const source: EventSource = isBeaCode(r.code) ? 'bea' : 'lista';
     for (const block of blocks[r.code] ?? []) {
@@ -130,6 +133,7 @@ export function planLoad(lists: AgendaLists, bea: BeaResult, now: Date): LoadPla
           local_tz: PUBLISHER_TZ[r.code],
           status: entry.status ?? 'agendado',
         });
+        if (source === 'lista' && entry.original !== undefined) declaredMoves.add(`${r.code}:${entry.original}`);
       }
     }
   }
@@ -150,7 +154,7 @@ export function planLoad(lists: AgendaLists, bea: BeaResult, now: Date): LoadPla
     BEA_CODES.map((code) => [code, bea.ok ? bea.blocks[code].map((b) => ({ from: b.from, through: b.through })) : []]),
   ) as Record<BeaCode, DateRange[]>;
 
-  return { events, coverage, missing, sources: { bea: bea.ok ? 'ok' : 'falhou' }, today, beaRanges };
+  return { events, coverage, missing, sources: { bea: bea.ok ? 'ok' : 'falhou' }, today, beaRanges, declaredMoves };
 }
 
 /**
@@ -174,6 +178,21 @@ export function coverableUntil(
   return last;
 }
 
+/**
+ * The export's `coverableUntil` for the paste kit (contract §6 4.3): the kit covers from its paste day − 1, so the
+ * run starts at the export's New York day − 1; null when that day cannot be covered, and `us` is null when the BEA
+ * failed.
+ */
+export function exportCoverableUntil(
+  calendar: CalendarCode,
+  today: string,
+  lists: AgendaLists,
+  bea: BeaResult,
+): string | null {
+  if (calendar === 'us' && !bea.ok) return null;
+  return coverableUntil(calendar, addDays(today, -1), lists, bea);
+}
+
 export interface RowUpdate {
   id: number;
   patch: Partial<Pick<RowToWrite, 'code' | 'calendar' | 'title' | 'local_at' | 'local_tz' | 'status'>> & {
@@ -194,14 +213,18 @@ export function normalLocal(text: string): string {
 
 const keyOf = (r: { source: string; source_key: string }) => `${r.source}\u0000${r.source_key}`;
 
-function diff(existing: StoredRow, wanted: RowToWrite): RowUpdate | null {
+/**
+ * The patch that takes a stored row to the wanted one. A move the publisher made (`declared`) writes was_at once;
+ * a corrected hour of our own (a list entry without `original`) moves only a row dated today or later, without was_at.
+ */
+function diff(existing: StoredRow, wanted: RowToWrite, declared: boolean, today: string): RowUpdate | null {
   const patch: RowUpdate['patch'] = {};
   const localAt = normalLocal(existing.local_at);
   const moved = localAt !== wanted.local_at || existing.local_tz !== wanted.local_tz;
-  if (moved) {
+  if (moved && (declared || dayOf(existing) >= today)) {
     patch.local_at = wanted.local_at;
     patch.local_tz = wanted.local_tz;
-    if (existing.was_at === null) patch.was_at = existing.at;
+    if (declared && existing.was_at === null) patch.was_at = existing.at;
   }
   if (existing.code !== wanted.code) patch.code = wanted.code;
   if (existing.calendar !== wanted.calendar) patch.calendar = wanted.calendar;
@@ -212,28 +235,29 @@ function diff(existing: StoredRow, wanted: RowToWrite): RowUpdate | null {
   return Object.keys(patch).length > 0 ? { id: existing.id, patch } : null;
 }
 
-export interface ReconcileOptions {
-  /** The New York date of the run: the BEA's postponed releases are looked for only from it on */
-  today: string;
-  beaRanges: Readonly<Record<BeaCode, readonly DateRange[]>>;
-}
+/** What reconcile needs from the plan (pass the LoadPlan itself) */
+export type WantedRows = Pick<LoadPlan, 'events' | 'today' | 'beaRanges' | 'declaredMoves'>;
+
+const dayOf = (r: { local_at: string }) => normalLocal(r.local_at).slice(0, 10);
+const daysBetween = (a: string, b: string) => Math.abs(Date.parse(`${a}T00:00:00Z`) - Date.parse(`${b}T00:00:00Z`));
 
 /**
- * What to insert and update so the table holds `wanted`. Never deletes. List rows are found by
+ * What to insert and update so the table holds `wanted.events`. Never deletes. List rows are found by
  * (source, source_key); a BEA row by its key or, failing that, by its code and current date (a row moved before
- * keeps its first key). A stored BEA row the file no longer lists (from `today` on, inside the file's ranges) is
- * moved to the code's first new date before its next stored date, or becomes `adiado` (bea.ts header).
+ * keeps its first key). was_at is written only for a move the publisher made: a BEA row, or a list entry with
+ * `original` (`wanted.declaredMoves`); a corrected default hour of a list code moves only rows dated today or later
+ * and writes no was_at. A stored BEA row the file no longer lists (from `today` on, inside the file's ranges), or
+ * one already `adiado` whatever its date, is moved to the code's nearest new date between its neighbours still in
+ * the file (later or earlier), or becomes `adiado` (bea.ts header).
  */
-export function reconcile(
-  existing: readonly StoredRow[],
-  wanted: readonly RowToWrite[],
-  options?: ReconcileOptions,
-): Reconciled {
+export function reconcile(existing: readonly StoredRow[], wanted: WantedRows): Reconciled {
+  const { today } = wanted;
+  const declared = (w: RowToWrite) => w.source === 'bea' || wanted.declaredMoves.has(w.source_key);
   const byKey = new Map(existing.map((r) => [keyOf(r), r]));
   const beaByCodeDay = new Map(
     existing
       .filter((r) => r.source === 'bea' && r.code !== null && r.status !== 'cancelado')
-      .map((r) => [`${r.code}\u0000${normalLocal(r.local_at).slice(0, 10)}`, r]),
+      .map((r) => [`${r.code}\u0000${dayOf(r)}`, r]),
   );
   const used = new Set<number>();
   const inserts: RowToWrite[] = [];
@@ -241,7 +265,7 @@ export function reconcile(
   const beaNew: RowToWrite[] = [];
   let unchanged = 0;
 
-  for (const w of wanted) {
+  for (const w of wanted.events) {
     let found = byKey.get(keyOf(w));
     if (found && used.has(found.id)) found = undefined;
     if (!found && w.source === 'bea') {
@@ -254,44 +278,84 @@ export function reconcile(
       continue;
     }
     used.add(found.id);
-    const update = diff(found, w);
+    const update = diff(found, w, declared(w), today);
     if (update) updates.push(update);
     else unchanged += 1;
   }
 
-  if (options) {
-    for (const code of BEA_CODES) {
-      const ranges = options.beaRanges[code];
-      const dayOf = (r: StoredRow) => normalLocal(r.local_at).slice(0, 10);
-      const stored = existing.filter((r) => r.source === 'bea' && r.code === code).sort((a, b) => (dayOf(a) < dayOf(b) ? -1 : 1));
-      const stale = stored.filter(
-        (r) =>
-          !used.has(r.id) &&
-          r.status !== 'cancelado' &&
-          dayOf(r) >= options.today &&
-          ranges.some((g) => g.from <= dayOf(r) && dayOf(r) <= g.through),
-      );
-      for (const row of stale) {
-        const day = dayOf(row);
-        const nextLive = stored.find((r) => used.has(r.id) && dayOf(r) > day);
-        const limit = nextLive ? dayOf(nextLive) : '9999-12-31';
-        const i = beaNew.findIndex((w) => w.code === code && w.local_at.slice(0, 10) > day && w.local_at.slice(0, 10) < limit);
-        if (i >= 0) {
-          const [target] = beaNew.splice(i, 1);
-          used.add(row.id);
-          const moved = diff(row, { ...target, status: 'agendado' });
-          if (moved) updates.push(moved);
-          else unchanged += 1;
-        } else if (row.status !== 'adiado') {
-          used.add(row.id);
-          updates.push({ id: row.id, patch: { status: 'adiado' } });
-        }
+  for (const code of BEA_CODES) {
+    const ranges = wanted.beaRanges[code];
+    const stored = existing
+      .filter((r) => r.source === 'bea' && r.code === code)
+      .sort((a, b) => (dayOf(a) < dayOf(b) ? -1 : dayOf(a) > dayOf(b) ? 1 : a.id - b.id));
+    const stale = stored.filter(
+      (r) =>
+        !used.has(r.id) &&
+        r.status !== 'cancelado' &&
+        (r.status === 'adiado' ||
+          (dayOf(r) >= today && ranges.some((g) => g.from <= dayOf(r) && dayOf(r) <= g.through))),
+    );
+    for (const row of stale) {
+      const day = dayOf(row);
+      const live = stored.filter((r) => used.has(r.id) && r.status !== 'cancelado');
+      const prev = [...live].reverse().find((r) => dayOf(r) < day);
+      const next = live.find((r) => dayOf(r) > day);
+      const low = prev ? dayOf(prev) : '0000-01-01';
+      const high = next ? dayOf(next) : '9999-12-31';
+      let best = -1;
+      beaNew.forEach((w, i) => {
+        const d = w.local_at.slice(0, 10);
+        if (w.code !== code || d <= low || d >= high || d === day) return;
+        if (best < 0) return void (best = i);
+        const b = beaNew[best].local_at.slice(0, 10);
+        const closer = daysBetween(d, day) - daysBetween(b, day);
+        if (closer < 0 || (closer === 0 && d > b)) best = i;
+      });
+      if (best >= 0) {
+        const [target] = beaNew.splice(best, 1);
+        used.add(row.id);
+        const moved = diff(row, { ...target, status: 'agendado' }, true, today);
+        if (moved) updates.push(moved);
+        else unchanged += 1;
+      } else if (row.status !== 'adiado') {
+        used.add(row.id);
+        updates.push({ id: row.id, patch: { status: 'adiado' } });
       }
     }
   }
 
   inserts.push(...beaNew);
   return { inserts, updates, unchanged };
+}
+
+/**
+ * The order to apply updates in: a row moving onto a (code, day) that another moving row still holds goes after
+ * that row (the unique index economic_events_code_day). A cycle keeps the given order (it would need a third,
+ * free day; the lists and the BEA never swap two dates of one code).
+ */
+export function orderUpdates(existing: readonly StoredRow[], updates: readonly RowUpdate[]): RowUpdate[] {
+  const byId = new Map(existing.map((r) => [r.id, r]));
+  const slot = (code: string | null | undefined, day: string) => `${code ?? ''}\u0000${day}`;
+  const moveOf = (u: RowUpdate) => {
+    const row = byId.get(u.id);
+    if (!row || u.patch.local_at === undefined) return null;
+    return { from: slot(row.code, dayOf(row)), to: slot(u.patch.code ?? row.code, u.patch.local_at.slice(0, 10)) };
+  };
+  const pending = [...updates];
+  const out: RowUpdate[] = [];
+  while (pending.length > 0) {
+    const held = new Set(pending.map(moveOf).flatMap((m) => (m && m.from !== m.to ? [m.from] : [])));
+    const ready = pending.filter((u) => {
+      const m = moveOf(u);
+      return !m || m.from === m.to || !held.has(m.to);
+    });
+    const batch = ready.length > 0 ? ready : pending.slice();
+    for (const u of batch) {
+      out.push(u);
+      pending.splice(pending.indexOf(u), 1);
+    }
+  }
+  return out;
 }
 
 // ---------------------------------------------------------------------------------------------------------------
@@ -388,15 +452,16 @@ export async function runLoad(
   if (stored === 'sem_tabelas') return { ok: false, error: 'sem_tabelas' };
   if (await coverageTableMissing(client)) return { ok: false, error: 'sem_tabelas' };
 
-  const { inserts, updates, unchanged } = reconcile(stored, plan.events, { today: plan.today, beaRanges: plan.beaRanges });
+  const { inserts, updates, unchanged } = reconcile(stored, plan);
 
+  // updates first: a move frees its (code, day) before a new row takes it (economic_events_code_day)
+  for (const { id, patch } of orderUpdates(stored, updates)) {
+    const { error } = (await table(client, 'economic_events').update(patch).eq('id', id)) as { error: DbError };
+    check(error);
+  }
   for (let i = 0; i < inserts.length; i += CHUNK) {
     const { error } = (await table(client, 'economic_events')
       .upsert(inserts.slice(i, i + CHUNK), { onConflict: 'source,source_key' })) as { error: DbError };
-    check(error);
-  }
-  for (const { id, patch } of updates) {
-    const { error } = (await table(client, 'economic_events').update(patch).eq('id', id)) as { error: DbError };
     check(error);
   }
   if (plan.coverage.length > 0) {

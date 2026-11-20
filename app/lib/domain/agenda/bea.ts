@@ -16,11 +16,13 @@
  * the file, is taken as that year's whole list (from 1 Jan to 31 Dec); the file's last year with fewer dates is
  * complete only up to its last date (a year the BEA has just started to publish).
  *
- * A postponed release (settled here, SPEC §8 L4 left it open): the BEA's file carries no «original date». When a
- * stored BEA row dated today or later, inside a range the file covers, is no longer in the file, the route moves
- * it to the code's first new date after it (a date the file has and no stored row has) that comes before the
- * code's next stored date; with none, the row becomes `adiado`. The row keeps its `source_key` (its first date)
- * and `was_at` is written once (carga.ts `reconcile`).
+ * A moved release (settled here, SPEC §8 L4 left it open): the BEA's file carries no «original date». A stored BEA
+ * row the file no longer lists is stale when it is dated today or later inside a range the file covers, or when it
+ * is already `adiado` (whatever its date: the new date may come after the original day has passed). A stale row
+ * moves to the code's nearest new date (a date the file has and no stored row has) strictly between the code's
+ * previous and next stored dates still in the file, later or earlier (ties → the later); with none it becomes
+ * `adiado` and waits. The row keeps its `source_key` (its first date) and `was_at` is written once (carga.ts
+ * `reconcile`).
  */
 import { utcToLocal } from '../tempo';
 import type { BeaCode, ListBlock, ListEntry } from './listas';

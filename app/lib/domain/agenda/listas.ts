@@ -8,7 +8,10 @@
  * .claude/backup-fase5/construcao/progresso_agenda.md, keep the details). An entry's time is the publisher's wall
  * clock (regrasOrgaos.ts PUBLISHER_TZ); with no `time`, the code's PUBLISHING_TIME. A release the publisher moves
  * stays here with its new `date` and its `original` date (the route moves the row it wrote for the original,
- * never adds a second one); a cancelled one keeps its date with `status: 'cancelado'`.
+ * never adds a second one); a cancelled one keeps its date with `status: 'cancelado'`; one postponed with no new
+ * date yet keeps its date with `status: 'adiado'` (SPEC §5.9 «adiado sem data nova»), and when the new date is
+ * published the entry takes it with `original` (the row moves, `was_at` once, back to agendado). Changing a
+ * code's default hour (a guess corrected, no `original`) moves only rows from today on and writes no `was_at`.
  */
 import type { ReleaseCode } from '../gate/agenda';
 import { RULE_CODES, RULE_YEARS, ruleDates, type RuleCode } from './regrasOrgaos';
@@ -20,7 +23,8 @@ export interface ListEntry {
   time?: string;
   /** A moved release: the date it was first published for */
   original?: string;
-  status?: 'cancelado';
+  /** 'adiado' = postponed, no new date yet (SPEC §5.9) */
+  status?: 'cancelado' | 'adiado';
 }
 
 export interface ListBlock {

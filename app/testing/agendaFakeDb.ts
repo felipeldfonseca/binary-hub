@@ -149,8 +149,14 @@ export function fakeAgendaDb(options: { missing?: readonly ('economic_events' | 
             writes.push(`update ${table} #${String(value)}`);
             const row = events.find((e) => e.id === value);
             if (row) {
+              const before = { ...row };
               Object.assign(row, patch);
               applyTrigger(row);
+              // the unique index economic_events_code_day: Postgres refuses the update and keeps the row
+              if (liveClash(row)) {
+                Object.assign(row, before);
+                return { error: { code: '23505', message: 'duplicate' } };
+              }
             }
             return { error: null };
           },
