@@ -126,6 +126,14 @@ describe('R1–R6: one release, the four behaviours, unions', () => {
 describe('R7: the 18:00 turn and daylight saving', () => {
   const copom: [ReleaseCode, string][] = [['copom', '2027-06-16 17:30']];
 
+  it('R7a 08:30 New York = 13:30Z on 13 Jan 2027 and 12:30Z on 14 Jul 2027 (daylight saving); the wait follows', () => {
+    expect(et('2027-01-13 08:30').toISOString()).toBe('2027-01-13T13:30:00.000Z');
+    expect(et('2027-07-14 08:30').toISOString()).toBe('2027-07-14T12:30:00.000Z');
+    const rules = blockRules({ releases: { cpi: 'volta' } });
+    const [iv] = blockIntervals(rules, rules.day, agendaOf([['cpi', '2027-07-14 08:30']]));
+    expect([iv.start.toISOString(), iv.end.toISOString()]).toEqual(['2027-07-14T12:25:00.000Z', '2027-07-14T12:40:00.000Z']);
+  });
+
   it('R7b Copom 18:30 Brasília = 16:30 NY in Dec 2026, 17:30 NY in Jun 2027 (*)', () => {
     expect(ny(brt('2026-12-09 18:30'))).toBe('2026-12-09 16:30');
     expect(ny(brt('2027-06-16 18:30'))).toBe('2027-06-16 17:30');
