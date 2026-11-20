@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { requireUser } from '@/lib/apiAuth';
+import { denyHubAccess, requireUser } from '@/lib/apiAuth';
 
 // Yahoo Finance API via their unofficial API
 // Note: For production, consider using a paid API like Alpha Vantage, Polygon, or Twelve Data
@@ -43,6 +43,9 @@ interface YahooResponse {
 export async function GET(request: NextRequest) {
   const auth = await requireUser(request);
   if (auth instanceof NextResponse) return auth;
+  // Market data reaches a third party: hub logins only (HUB_USERS)
+  const denied = denyHubAccess(auth.user);
+  if (denied) return denied;
 
   const searchParams = request.nextUrl.searchParams;
   const symbol = searchParams.get('symbol');
