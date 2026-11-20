@@ -6,7 +6,7 @@ import { usePreferences } from '@/hooks/useContas'
 import { useRelogioDados, useRulesNow } from '@/hooks/useRegras'
 import { useServerClock } from '@/hooks/useRegistrar'
 import { useDiarioPaginaOpcional } from '@/components/hub/diario/useDiarioPagina'
-import { entendiLido, marcarEntendi } from '@/lib/hub/avisoDados'
+import { entendiLido, marcarEntendi, ouvirEntendi } from '@/lib/hub/avisoDados'
 import { relogioDaJanela } from '@/lib/hub/posso'
 import PossoOperarHoje, { type PossoEstado } from './PossoOperarHoje'
 import { rulesNowFailed, useRulesNowCatchUp } from './rulesNowRead'
@@ -53,6 +53,8 @@ export default function PossoOperarHojeDiario({ aguardandoConta = false }: { agu
   const [entendi, setEntendi] = useState(true)
   useEffect(() => {
     setEntendi(selecionada ? entendiLido(selecionada) : true)
+    // «Entendi» pressed in another tab (Personalizar) reaches this card without a reload
+    return selecionada ? ouvirEntendi(selecionada, setEntendi) : undefined
   }, [selecionada])
 
   // A read that failed, is being retried or waits offline wins over older lines: «Liberado · até

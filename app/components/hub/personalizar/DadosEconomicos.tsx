@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import type { AgendaRead, AgendaRow, ReleaseCode, ReleaseMode, Rules } from '@/lib/domain/gate'
 import type { RulesSettings } from '@/lib/hub/regras'
-import { entendiLido, marcarEntendi } from '@/lib/hub/avisoDados'
+import { entendiLido, marcarEntendi, ouvirEntendi } from '@/lib/hub/avisoDados'
 import { aplicarAtalho, comBloqueio, escolherDado, restaurarMinutos, voltarAoPadraoDados, type AtalhoDados, type Entidade } from '@/lib/hub/rascunho'
 import { Disclosure, InfoButton, InfoPanel, useToggle } from '@/components/hub/contas/ui'
 import { DADOS, REGRAS } from './copy'
@@ -70,6 +70,8 @@ export default function DadosEconomicos({
   const contaId = conta?.id ?? null
   useEffect(() => {
     setLido(contaId ? entendiLido(contaId) : true)
+    // «Entendi» pressed in another tab («Posso operar hoje?») reaches this rule without a reload
+    return contaId ? ouvirEntendi(contaId, setLido) : undefined
   }, [contaId])
   const aviso = !!conta && contaAntiga(conta.versions) && lido === false
   const status = statusDados(e, rules, agenda, now)

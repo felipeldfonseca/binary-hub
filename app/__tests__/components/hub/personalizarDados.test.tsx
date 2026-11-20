@@ -6,7 +6,7 @@
  * the keyboard and the 44 px pieces.
  */
 import React from 'react'
-import { cleanup, render, screen, within } from '@testing-library/react'
+import { act, cleanup, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { escolherDado } from '@/lib/hub/rascunho'
 import { entendiKey } from '@/lib/hub/avisoDados'
@@ -183,6 +183,16 @@ describe('«Dados econômicos»: the frames (boards Q01–Q05, Q40–Q43)', () =
     expect(within(nomeDaRegra()).getByText('padrão de Futuros')).toBeInTheDocument()
     expect(within(nomeDaRegra()).getByText('não salvo')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /Voltar ao padrão de Futuros/ })).not.toBeInTheDocument()
+  })
+
+  it('Q41: «Entendi» pressed in another tab hides the notice without a reload (review)', () => {
+    const id = renderEstado('q41-personalizar-conta-antiga', { aviso: true })
+    expect(screen.getByRole('note')).toBeInTheDocument()
+    act(() => {
+      window.localStorage.setItem(entendiKey(id), '1')
+      window.dispatchEvent(new StorageEvent('storage', { key: entendiKey(id), newValue: '1' }))
+    })
+    expect(screen.queryByRole('note')).not.toBeInTheDocument()
   })
 
   it('Q41: the notice once dismissed stays hidden (the Q18 notice\'s «Entendi» hides it too)', () => {

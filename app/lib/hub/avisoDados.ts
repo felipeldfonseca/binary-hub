@@ -44,3 +44,17 @@ export function marcarEntendi(accountId: string): void {
     // Nothing to do: the screen hides the notice for this visit
   }
 }
+
+/**
+ * Calls `cb` with the account's «Entendi» whenever another tab of this device changes it (the storage event; a
+ * cleared storage too), so an open «Posso operar hoje?» or Personalizar follows without a reload. Returns the stop.
+ */
+export function ouvirEntendi(accountId: string, cb: (entendi: boolean) => void): () => void {
+  if (typeof window === 'undefined') return () => {};
+  const key = entendiKey(accountId);
+  const ouvir = (e: StorageEvent) => {
+    if (e.key === key || e.key === null) cb(entendiLido(accountId));
+  };
+  window.addEventListener('storage', ouvir);
+  return () => window.removeEventListener('storage', ouvir);
+}
