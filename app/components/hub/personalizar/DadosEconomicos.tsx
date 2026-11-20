@@ -8,7 +8,7 @@ import { aplicarAtalho, comBloqueio, escolherDado, restaurarMinutos, voltarAoPad
 import { Disclosure, InfoButton, InfoPanel, useToggle } from '@/components/hub/contas/ui'
 import { DADOS, REGRAS } from './copy'
 import { CampoMinutos, Regra, TagOrigem, temPadrao } from './RegrasLinhas'
-import { avisoContaAntiga, codigosSeguidos, estadoDados, gruposDados, resumoDados, statusDados, type GrupoDados } from './regraDados'
+import { avisoContaAntiga, codigosSeguidos, contaAntiga, estadoDados, gruposDados, resumoDados, statusDados, type GrupoDados } from './regraDados'
 import { Interruptor, Pilulas, TagNaoSalvo } from './ui'
 
 type Editar = (fn: (draft: RulesSettings) => RulesSettings) => void
@@ -64,14 +64,14 @@ export default function DadosEconomicos({
     if (aberto) onAbrirLista?.()
   }, [aberto, onAbrirLista])
   const conta = entidade.tipo === 'conta' ? entidade.conta : null
-  // The old account, the first time (c3 §3.9; Q41): an account with saved rules whose «Entendi» was not
-  // pressed on this device (the key is shared with the first wait's notice in «Posso operar hoje?»)
+  // The old account, the first time (c3 §3.9; Q41): an account with rules saved before the delivery
+  // (contaAntiga, D4) whose «Entendi» was not pressed on this device (the key is shared with the first wait's notice in «Posso operar hoje?»)
   const [lido, setLido] = useState<boolean | null>(null)
   const contaId = conta?.id ?? null
   useEffect(() => {
     setLido(contaId ? entendiLido(contaId) : true)
   }, [contaId])
-  const aviso = !!conta && conta.versions.length > 0 && lido === false
+  const aviso = !!conta && contaAntiga(conta.versions) && lido === false
   const status = statusDados(e, rules, agenda, now)
 
   return (

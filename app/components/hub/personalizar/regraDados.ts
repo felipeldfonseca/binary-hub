@@ -220,6 +220,19 @@ export function statusDados(estado: EstadoDados, rules: Rules, agenda: AgendaRea
 // The old account, the first time (c3 §3.9; board Q41)
 // ---------------------------------------------------------------------------------------------
 
+/**
+ * The day «Dados econômicos» reaches the app. DECISION D4 (open point for the orchestrator: set it to the
+ * deploy day at integration): a rule saved before it was saved by the old code («na forma de hoje», c3 §3.9).
+ * Today it is the day the construction started; every account the hub creates gets a version on its
+ * creation day, so a version count cannot tell an old account from a new one.
+ */
+export const ENTREGA_DADOS_ECONOMICOS = '2026-11-20'
+
+/** The old account (c3 §3.9; Q41): its first rules version took effect before the delivery */
+export function contaAntiga(versions: readonly { effectiveDay: string }[], entrega: string = ENTREGA_DADOS_ECONOMICOS): boolean {
+  return versions.some((v) => v.effectiveDay < entrega)
+}
+
 /** The notice's sentence with the account's minutes (never 5 and 10 fixed) */
 export function avisoContaAntiga(estado: Pick<EstadoDados, 'on' | 'beforeMin' | 'afterMin'>): string {
   if (!estado.on) return DADOS.avisoDesligada

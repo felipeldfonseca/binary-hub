@@ -6,7 +6,7 @@
  * the keyboard and the 44 px pieces.
  */
 import React from 'react'
-import { render, screen, within } from '@testing-library/react'
+import { cleanup, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { escolherDado } from '@/lib/hub/rascunho'
 import { entendiKey } from '@/lib/hub/avisoDados'
@@ -149,6 +149,15 @@ describe('«Dados econômicos»: the frames (boards Q01–Q05, Q40–Q43)', () =
     expect(screen.queryByRole('button', { name: /Escolher dado por dado/ })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /Voltar ao padrão de Futuros/ })).not.toBeInTheDocument()
     expect(status()).toHaveTextContent('Desligado: você opera normalmente em todos os dados; eles não mudam o “Posso operar hoje?”.')
+  })
+
+  it('Q01 and Q42 on a clean device: an account created after the delivery never shows the old account\'s notice', () => {
+    for (const e of ['q01-personalizar-padrao', 'q42-personalizar-etiquetas'] as const) {
+      renderEstado(e, { aviso: true })
+      expect(screen.queryByRole('note')).not.toBeInTheDocument()
+      expect(screen.queryByText(/agora se chama/)).not.toBeInTheDocument()
+      cleanup()
+    }
   })
 
   it('Q41: an old account, 3 and 15 min, the first time: the notice and «Entendi» (the key shared with Q18)', async () => {

@@ -46,7 +46,25 @@ export function proximasDoQuadro(at: Date): AgendaRow[] {
 }
 
 /** The configuration's rules_config, parsed */
-export const configDoEstado = (e: EstadoDados): RulesConfig => parseRulesConfig(configDoQuadro(ESTADOS_DADOS[e].config))
+/**
+ * Q41's account is «a conta antiga» (c3 §3.9): its rules were saved before the delivery (contaAntiga, D4), so
+ * its versions are dated 19 Oct (the owner's accounts' day in the earlier boards); every other state's account
+ * keeps the world's creation day (30 Nov), after the delivery, and shows no notice (Q01).
+ */
+const ANTIGAS: readonly EstadoDados[] = ['q41-personalizar-conta-antiga']
+const DIA_ANTIGO = '2026-10-19'
+
+export function configDoEstado(e: EstadoDados): RulesConfig {
+  const c = parseRulesConfig(configDoQuadro(ESTADOS_DADOS[e].config))
+  if (!ANTIGAS.includes(e)) return c
+  return {
+    ...c,
+    accounts: c.accounts.map((a) => ({
+      ...a,
+      versions: a.versions.map((v) => ({ ...v, effectiveDay: DIA_ANTIGO, effectiveFrom: new Date(`${DIA_ANTIGO}T14:00:00Z`) })),
+    })),
+  }
+}
 
 /** The page's agenda for a state (PersonalizarPagina's useDadosDaRegra, answered) */
 export function dadosDoEstado(e: EstadoDados, over: Partial<DadosLidos> = {}): DadosLidos {
