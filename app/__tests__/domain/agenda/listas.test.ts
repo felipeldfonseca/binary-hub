@@ -107,9 +107,10 @@ describe('the publishers rules', () => {
     expect(nthUsBusinessDay(2026, 12, 3)).toBe('2026-12-03')
     expect(nthUsBusinessDay(2027, 1, 1)).toBe('2027-01-04')
     expect(nthUsBusinessDay(2027, 1, 3)).toBe('2027-01-06')
-    // a holiday inside the count: Labor Day, Mon 7 Sep 2026
-    expect(nthUsBusinessDay(2026, 9, 1)).toBe('2026-09-01')
-    expect(nthUsBusinessDay(2027, 9, 1)).toBe('2027-09-01')
+    // a holiday inside the count: Fri 3 Jul 2026 (Independence Day observed) → the 3rd is Mon 6 Jul
+    expect(nthUsBusinessDay(2026, 7, 2)).toBe('2026-07-02')
+    expect(nthUsBusinessDay(2026, 7, 3)).toBe('2026-07-06')
+    expect(nthUsBusinessDay(2027, 7, 1)).toBe('2027-07-01')
     expect(nthUsBusinessDay(2027, 2, 1)).toBe('2027-02-01')
   })
 
