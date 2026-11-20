@@ -919,7 +919,7 @@ export function comoLerOPlano(market: AccountMarket, temBreakeven: boolean): str
  * US$ 465,40 de US$ 400 no pior momento» (live facts, or a review's frozen ones). The data marks (c3 §6.2: «1 na
  * espera do ISM de serviços, às 10:04», «2 em dia de CPI, às 10:04 e 10:31») are not in the facts (SPEC §6 G3: no
  * key): the screen derives them from the day's trades (diarioOperacao.fatosDosDados) and passes them as `dados`, put
- * where «no bloqueio» stood, between «fora da janela» and «depois do limite». Without «viés».
+ * in the order of the breaks, between «fora da janela» and «depois do limite». Without «viés».
  */
 export function fatosTexto(f: DayFacts, conta: ContaDiario, dados: readonly string[] = []): string {
   const m = conta.currency;
