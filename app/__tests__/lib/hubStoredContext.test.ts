@@ -48,9 +48,7 @@ describe('the frozen gate answer of an entry inside a wait (contract §3.5)', ()
     j.gate = {
       ...j.gate,
       status: 'aguardar',
-      checks_evaluated: [...new Set(['janela', 'bloqueio', ...(j.gate.checks_evaluated as string[])])].sort(
-        (a, b) => ['janela', 'bloqueio', 'limite', 'estado'].indexOf(a) - ['janela', 'bloqueio', 'limite', 'estado'].indexOf(b),
-      ),
+      checks_evaluated: ['janela', 'bloqueio', 'limite', 'estado'].filter((k) => k === 'bloqueio' || (j.gate.checks_evaluated as string[]).includes(k)),
       block: { state: 'no_bloqueio', active: ism, today: [ism], free_at: '2026-12-03T15:10:00+00:00' },
     }
     j.context = { ...j.context, in_block: true, gate_status: 'aguardar' }

@@ -9,7 +9,9 @@
  *                 "end_min": 0..1439 (≠ start_min; lower = ends the next day), "weekdays": 1..127}] (0..2, one clock),
  *    "windows_from": "market" | "account" | null (null exactly when windows = []),
  *    "window_rule": {"on": bool, "outside": "fora" | "aviso"},
- *    "block": null (every market but futures) | {"on", "before_min": 0..60, "after_min": 0..120, "calendars": ["us" | "eu" | "br"]},
+ *    "block": null (every market but futures) | {"on", "before_min": 0..60, "after_min": 0..120, "calendars": ["us" | "eu" | "br"]}
+ *             plus, in the long form only (Phase 5-1), "releases": {CODE: "volta" | "depois" | "dia"} (read here,
+ *             kept as read; its writer and its evaluation come with the Phase 5 domain lane),
  *    "limit": null | {"usd" (US$ markets) | "brl" (B3): > 0, ≤ 1 000 000, whole cents,
  *                     "mode": "conta" | "soma" (futures), "at_limit": "encerrar" | "avisar"},
  *    "states": null (every market but futures) | {"alinhadas" | "so_tecnica" | "so_fundamentos" | "em_conflito" | "sem_direcao": choice | null},
@@ -38,6 +40,7 @@ import {
   type AccountMarket,
   type WindowTz,
 } from '../markets';
+import { isReleaseCode, type ReleaseCode, type WaitMode } from './agenda';
 import { tradeMatchKey, type StopUnit } from '../registro/caps';
 import { decimalFromJson } from '../registro/numeric';
 import { assertTimeZone, type DayClock, type TradingWindow } from '../tempo';
@@ -88,7 +91,14 @@ export interface Rules {
    * «Bloqueio de dados» with the economic calendars marked when it was saved; null where the market
    * has none (every market but futures)
    */
-  block: { on: boolean; beforeMin: number; afterMin: number; calendars: CalendarCode[] } | null;
+  block: {
+    on: boolean;
+    beforeMin: number;
+    afterMin: number;
+    calendars: CalendarCode[];
+    /** The long form's effective map (Phase 5-1, contract §3.4); absent in the short form */
+    releases?: Partial<Record<ReleaseCode, WaitMode>>;
+  } | null;
   /** «Limite do dia», in cents of the market's currency (currencyOf(market)); null = «Sem limite» */
   limit: { cents: number; mode: LimitMode; atLimit: AtLimit } | null;
   /**
@@ -225,6 +235,11 @@ function checkBlock(b: Obj): RulesErrorCode | null {
   return null;
 }
 
+/** The long form's map in a version (rules_check_resolved, Phase 5-1): known codes, waiting modes only */
+function resolvedReleasesOk(r: Json): boolean {
+  return isObj(r) && Object.entries(r).every(([k, v]) => isReleaseCode(k) && (v === 'volta' || v === 'depois' || v === 'dia'));
+}
+
 function stateChoiceOk(state: string, choice: Json): boolean {
   if (choice === null) return true;
   if (typeof choice !== 'string') return false;
@@ -334,8 +349,10 @@ export function checkRules(p: unknown): RulesErrorCode | null {
   // The data block and the state rule, only where the market has them (futures)
   if (caps.block) {
     if (!isObj(p.block) || !has(p.block, 'calendars') || !checkCalendars(p.block.calendars)) return 'bad_block';
+    if (has(p.block, 'releases') && !resolvedReleasesOk(p.block.releases)) return 'bad_block';
     const rest: Obj = { ...p.block };
     delete rest.calendars;
+    delete rest.releases;
     const bcode = checkBlock(rest);
     if (bcode) return bcode;
   } else if (p.block !== null) {
@@ -391,6 +408,7 @@ export function parseRules(json: unknown): Rules {
       beforeMin: b.before_min as number,
       afterMin: b.after_min as number,
       calendars: [...(b.calendars as CalendarCode[])],
+      ...(has(b, 'releases') ? { releases: { ...(b.releases as Partial<Record<ReleaseCode, WaitMode>>) } } : {}),
     },
     limit: l && {
       cents: usdToCents(l[limitKey(currencyOf(market))]) as number,
@@ -432,6 +450,7 @@ export function toResolvedJson(r: Rules): Record<string, unknown> {
       before_min: r.block.beforeMin,
       after_min: r.block.afterMin,
       calendars: [...r.block.calendars],
+      ...(r.block.releases ? { releases: { ...r.block.releases } } : {}),
     },
     limit: r.limit && {
       [limitKey(currencyOf(r.market))]: centsToUsd(r.limit.cents),
