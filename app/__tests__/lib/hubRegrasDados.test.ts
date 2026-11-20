@@ -182,7 +182,7 @@ describe('the version a save freezes: short and long form (contract §3.4)', () 
     const payload = buildSavePayload(config, s)!;
     expect(payload.defaults!.futures!.rules.block).toEqual({ on: true, before_min: 5, after_min: 10, releases: { jolts: 'depois' } });
     expect(payload.accounts).toBeUndefined();
-    expect(blockJson(s)!.releases).toMatchObject({ jolts: 'depois', cpi: 'volta' });
+    expect((blockJson(s) as { releases?: unknown }).releases).toMatchObject({ jolts: 'depois', cpi: 'volta' });
   });
 
   it('every us code «Opero normalmente» = releases {} (differs from no key)', () => {
