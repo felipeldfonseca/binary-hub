@@ -230,24 +230,36 @@ function checkCalendars(c: Json): boolean {
   );
 }
 
-function checkBlock(b: Obj): RulesErrorCode | null {
-  if (!keysOk(b, ['on', 'before_min', 'after_min'])) return 'unknown_key';
-  if (!(has(b, 'on') && has(b, 'before_min') && has(b, 'after_min'))) return 'bad_block';
-  if (typeof b.on !== 'boolean') return 'bad_block';
-  if (!isInt(b.before_min, 0, 60) || !isInt(b.after_min, 0, 120)) return 'bad_block';
+/**
+ * = rules_check_block(p, partial), SPEC §3.7 table 1, the first failing row wins: not an object →
+ * bad_block; a key other than on/before_min/after_min/releases → unknown_key; (not partial) one of
+ * the three missing → bad_block; `on` not a boolean, `before_min` not an integer 0–60, `after_min`
+ * not an integer 0–120 → bad_block; `releases` not an object (null included), a code not in the
+ * list (case-sensitive) or a value other than the strings normal/volta/depois/dia → bad_releases.
+ * Partial = an account's setting (any subset); whole = a market default. Null = valid.
+ */
+export function checkBlockSetting(b: unknown, partial: boolean): RulesErrorCode | null {
+  if (!isObj(b)) return 'bad_block';
+  if (!keysOk(b, ['on', 'before_min', 'after_min', 'releases'])) return 'unknown_key';
+  if (!partial && !(has(b, 'on') && has(b, 'before_min') && has(b, 'after_min'))) return 'bad_block';
+  if (has(b, 'on') && typeof b.on !== 'boolean') return 'bad_block';
+  if (has(b, 'before_min') && !isInt(b.before_min, 0, 60)) return 'bad_block';
+  if (has(b, 'after_min') && !isInt(b.after_min, 0, 120)) return 'bad_block';
+  if (has(b, 'releases')) {
+    const r = b.releases;
+    if (!isObj(r)) return 'bad_releases';
+    if (Object.keys(r).some((k) => !isReleaseCode(k))) return 'bad_releases';
+    if (Object.values(r).some((v) => v !== 'normal' && v !== 'volta' && v !== 'depois' && v !== 'dia')) return 'bad_releases';
+  }
   return null;
 }
 
 /**
- * The long form's map in a version, SPEC §3.7: rules_check_block rows 7–9 (an object of known codes,
- * each `normal`, `volta`, `depois` or `dia`), then rules_check_resolved rows 4–6 (no `normal`, no code
- * of a calendar not followed, not the app default for `calendars`, which is the short form).
+ * The long form's map in a version after rules_check_block: rules_check_resolved rows 4–6 (no
+ * `normal`, no code of a calendar not followed, not the app default for `calendars`, which is the
+ * short form).
  */
-function checkResolvedReleases(r: Json, calendars: readonly string[]): RulesErrorCode | null {
-  if (!isObj(r)) return 'bad_releases';
-  for (const [k, v] of Object.entries(r)) {
-    if (!isReleaseCode(k) || (v !== 'normal' && v !== 'volta' && v !== 'depois' && v !== 'dia')) return 'bad_releases';
-  }
+function checkResolvedReleases(r: Obj, calendars: readonly string[]): RulesErrorCode | null {
   const followed = AGENDA_RELEASES.filter((x) => calendars.includes(x.calendar));
   for (const [k, v] of Object.entries(r)) {
     if (v === 'normal' || !followed.some((x) => x.code === k)) return 'bad_releases';
@@ -367,14 +379,14 @@ export function checkRules(p: unknown): RulesErrorCode | null {
   // The data block and the state rule, only where the market has them (futures)
   if (caps.block) {
     if (!isObj(p.block) || !has(p.block, 'calendars') || !checkCalendars(p.block.calendars)) return 'bad_block';
-    // SPEC §3.7: unknown_key and on/before/after (rows 1–6) before the map (rows 7–9, then 4–6)
+    // SPEC §3.7: rules_check_block(block − calendars, whole) (rows 1–9), then the map against the
+    // calendars (rules_check_resolved rows 4–6)
     const rest: Obj = { ...p.block };
     delete rest.calendars;
-    delete rest.releases;
-    const bcode = checkBlock(rest);
+    const bcode = checkBlockSetting(rest, false);
     if (bcode) return bcode;
     if (has(p.block, 'releases')) {
-      const rcode = checkResolvedReleases(p.block.releases, p.block.calendars as string[]);
+      const rcode = checkResolvedReleases(p.block.releases as Obj, p.block.calendars as string[]);
       if (rcode) return rcode;
     }
   } else if (p.block !== null) {

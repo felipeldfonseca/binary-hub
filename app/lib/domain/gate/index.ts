@@ -28,6 +28,7 @@ export {
   STATE_NAMES,
   STATES_WITHOUT_DIRECTION,
   centsToUsd,
+  checkBlockSetting,
   checkBreakevenSetting,
   checkRules,
   isBreakevenKey,
