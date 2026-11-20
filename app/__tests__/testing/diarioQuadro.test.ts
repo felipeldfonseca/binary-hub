@@ -87,6 +87,7 @@ import { CENARIOS, quadro, type Cenario, type EsperadoDia, type Quadro } from '@
  * boards' days are outside the agenda: SPEC §5.10), so a Futuros «Liberado» says the data were not checked and is not
  * green (SPEC §5.4; the words are the Posso lane's)
  */
+// TODO(orchestrator, integration with telas-posso): replace this loose «não conferidos» match with the exact SPEC §5.4 sentence and tone (e.g. sub toBe the Posso lane's sentence, tom toBe 'tom-neutro'); review 2026-11-20 finding 5
 const SEM_AGENDA = 'Phase 5-1: rules_now re-exported with the Futuros block sem_agenda; «Liberado» says «dados econômicos não conferidos»'
 
 const PERMITIDAS: { onde: RegExp; aceita: (app: string, quadro: string) => boolean; motivo: string }[] = [
@@ -525,6 +526,7 @@ describe('9b · the selector of many accounts', () => {
       expect(p.conta!.linha.sub).toBe(e.possoSel[0].sub)
       expect(`${p.conta!.linha.limite!.usado} ${p.conta!.linha.limite!.de}`.replace(NBSP, ' ')).toBe(e.possoSel[0].lim)
       expect(p.conta!.somando).toBe(e.possoSel[0].soma)
+      // TODO(orchestrator, integration with telas-posso): replace this loose «não conferidos» match with the exact SPEC §5.4 sentence and tone (e.g. sub toBe the Posso lane's sentence, tom toBe 'tom-neutro'); review 2026-11-20 finding 5
       // SEM_AGENDA: «19 liberadas, dados não conferidos» stands for the board's «19 liberadas»
       expect(outrasTexto(p.outras!).replace(/(liberadas?), dados não conferidos/g, '$1')).toBe(`${e.outras.titulo} ${e.outras.partes.map((x) => x.texto).join(' · ')}`)
       const dia = q.porConta[id].dias[q.info.dia]

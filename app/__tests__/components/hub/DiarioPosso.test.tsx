@@ -46,12 +46,14 @@ function falado(el: Element): string[] {
  * were not checked (SPEC §5.4; the words are the Posso lane's). Where the app says so, the board's line stands for the
  * rest: same answer word, no longer green, the sentence names «não conferidos»; the board's sub and tone are then kept.
  */
+// TODO(orchestrator, integration with telas-posso): replace this loose «não conferidos» match with the exact SPEC §5.4 sentence and tone (e.g. sub toBe the Posso lane's sentence, tom toBe 'tom-neutro'); review 2026-11-20 finding 5
 function semAgenda<T extends { pal: string; sub: string | null; tom: string }>(app: T, quadro: T): T {
   if (!app.sub || !/não conferidos/.test(app.sub) || app.pal !== quadro.pal) return app
   expect(app.tom).not.toBe('tom-mint')
   return { ...app, sub: quadro.sub, tom: quadro.tom }
 }
 
+// TODO(orchestrator, integration with telas-posso): replace this loose «não conferidos» match with the exact SPEC §5.4 sentence and tone (e.g. sub toBe the Posso lane's sentence, tom toBe 'tom-neutro'); review 2026-11-20 finding 5
 /** The others line: «19 liberadas, dados não conferidos» (not green) stands for the board's «19 liberadas» */
 function parteSemAgenda(app: [string, string | undefined], quadro: [string, string]): [string, string | undefined] {
   if (!/não conferidos/.test(app[0]) || !app[0].startsWith(quadro[0])) return app

@@ -1017,7 +1017,9 @@ export function semanaTexto(w: WeekCard, conta: ContaDiario, regras: { temLimite
 const LADO: Record<ForaTrade['direction'], string> = { long: 'Compra', short: 'Venda', call: 'Alta', put: 'Baixa' };
 const QUEBRA: Record<PlanBreak, string> = {
   fora_da_janela: 'fora da janela',
-  // The month's list carries the break, not the gate: which data and which kind are unknown here (SPEC §6 G3)
+  // NEW · OPEN POINT for the owner (contract conflict SPEC §6 C4 «as duas marcas novas» against G3 «os fatos do dia
+  // não ganham chave»): the month's list carries the break, not the gate, so which data and which kind are unknown
+  // here; c3's fallbacks «na espera de dado» / «em dia de dado» each assume a kind. Not a lane decision: escalated.
   no_bloqueio: 'dado econômico',
   depois_do_limite: 'depois do limite',
   contra_a_regra: 'contra a regra',
