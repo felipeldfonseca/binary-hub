@@ -12,7 +12,7 @@ import { MANY_ACCOUNTS } from '@/lib/hub/seletorContas'
 import { LOADING, POSSO, POSSO_DADOS, POSSO_DIARIO, TRY_AGAIN } from './copy'
 
 /** What a line needs from one account of rules_now() */
-export type PossoConta = Pick<AccountNow, 'accountId' | 'label' | 'market' | 'gate' | 'rules'>
+export type PossoConta = Pick<AccountNow, 'accountId' | 'label' | 'market' | 'gate' | 'rules'> & Partial<Pick<AccountNow, 'desdeDay'>>
 
 export type PossoEstado =
   | { status: 'loading' }

@@ -30,6 +30,7 @@ import {
 } from '@/lib/domain/gate';
 import { NOMES_DADOS, PALAVRAS_DADOS, horaDeVolta, marcaDados, rotuloDados, rotuloDia, soDepois } from './dadosEconomicos';
 import { formatMoney } from './formato';
+import { contaAntigaDesde } from './avisoDados';
 
 /** Board colour tokens: --mint, --amber, --red, --text (neutral), --text-2 (muted) */
 export type Tom = 'mint' | 'amber' | 'red' | 'neutral' | 'muted';
@@ -313,12 +314,15 @@ export function avisoDezMinTexto(aviso: { start: Date; end: Date; releases: read
 /**
  * The first-wait notice under the answer (c3 §3.9 l.652-654; SPEC §7.2 l.1191; Q18): «Esta espera vem da regra “Dados
  * econômicos” desta conta (5 min antes e 10 depois dos dados fortes). O app passou a conferi-la; você muda em
- * Personalizar.», with the account's own minutes. Only while the answer is a wait («Aguardar até») of an account whose
- * rule is still in the form saved before this delivery (the short form: no `releases`, c3 §3.9 «a conta antiga»),
- * switched on with minutes. The screen also hides it once «Entendi» was pressed on this device (lib/hub/avisoDados).
+ * Personalizar.», with the account's own minutes. Only while the answer is a wait («Aguardar até») of «a conta antiga»
+ * (c3 §3.9): its first rules version took effect before the delivery (`desdeDay`, lib/hub/avisoDados'
+ * ENTREGA_DADOS_ECONOMICOS, the same date as Personalizar's notice) and its rule is still in the form saved by the old
+ * code (the short form: no `releases`), switched on with minutes. The screen also hides it once «Entendi» was pressed
+ * on this device (lib/hub/avisoDados).
  */
-export function avisoPrimeiraEspera(gate: GateResult, rules: Rules | null): string | null {
+export function avisoPrimeiraEspera(gate: GateResult, rules: Rules | null, desdeDay: string | null | undefined): string | null {
   const b = rules?.block;
+  if (!contaAntigaDesde(desdeDay)) return null;
   if (!b || !b.on || b.releases || b.beforeMin + b.afterMin === 0) return null;
   if (answerOf(gate).kind !== 'aguardar') return null;
   return (
@@ -409,6 +413,8 @@ export interface ContaPosso {
   gate: GateResult;
   /** null before version 1 */
   rules: Rules | null;
+  /** The trading day of version 1 (rules_now's desde_day; null before it): «a conta antiga» of the Q18 notice */
+  desdeDay?: string | null;
 }
 
 /**
@@ -582,7 +588,7 @@ export function avisoDezMinCabe(gate: GateResult): boolean {
 }
 
 export function notasDaConta(
-  conta: Pick<ContaPosso, 'gate' | 'rules'>,
+  conta: Pick<ContaPosso, 'gate' | 'rules' | 'desdeDay'>,
   o: { agora: Date; aviso: { start: Date; end: Date; releases: readonly BlockRelease[] } | null; agenda: AgendaRead | null; entendi: boolean },
 ): NotasDaConta {
   const wtz = relogioDaJanela(conta.rules);
@@ -591,7 +597,7 @@ export function notasDaConta(
     avisoDezMin,
     maisTarde: avisoDezMin ? null : maisTarde(conta.gate, conta.rules, o.agora),
     cancelados: dadosCanceladosHoje(o.agenda, conta.gate, conta.rules),
-    primeiraEspera: o.entendi ? null : avisoPrimeiraEspera(conta.gate, conta.rules),
+    primeiraEspera: o.entendi ? null : avisoPrimeiraEspera(conta.gate, conta.rules, conta.desdeDay),
     conferidos: conferidosDoGate(conta.gate),
   };
 }

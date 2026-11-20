@@ -138,6 +138,13 @@ describe('«Posso operar hoje?» with «Dados econômicos» (the boards, recorde
     expect(within(card).queryByRole('button', { name: 'Entendi' })).toBeNull()
   })
 
+  it('the same wait on an account created after the delivery (Q06: the world\'s 30 Nov, ENTREGA_DADOS_ECONOMICOS): no notice', async () => {
+    const { card } = await montar('q06-posso-espera-ism')
+    expect(within(card).getByText('Aguardar até 10:10')).toBeInTheDocument()
+    expect(within(card).queryByText(/^Esta espera vem da regra/)).toBeNull()
+    expect(within(card).queryByRole('button', { name: 'Entendi' })).toBeNull()
+  })
+
   it('a cancelled release of today: the grey «CPI de hoje cancelado: sem espera hoje.» (NEW, not drawn)', async () => {
     // Q15's morning (CPI in «Só opero depois do dado») with the CPI cancelled: in the day's read, and gone from rules_now's
     // block.today as the gate would answer it (SPEC 5.9: the gate never receives a cancelled release)

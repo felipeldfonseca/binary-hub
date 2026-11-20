@@ -35,6 +35,8 @@ import type { AgendaRead, AgendaRow } from '@/lib/domain/gate';
 import { relogioDados } from '@/hooks/useRegras';
 import { parseRulesNow } from '@/lib/hub/regras';
 import { agoraDoEstado, ESTADOS_DADOS, type EstadoDados } from '@/testing/agenda';
+import { ENTREGA_DADOS_ECONOMICOS } from '@/lib/hub/avisoDados';
+import { addDays } from '@/lib/domain/tempo';
 
 function linha(conta: string, now: Date, rules: Rules | null, account: GateAccount, trades: DayTrade[] = []) {
   const ver = rules && version(rules);
@@ -419,18 +421,24 @@ describe('«Posso operar hoje?» on the boards (Phase 5 · telas-posso: the SQL\
     expect(doEstado('q10-posso-liberado').l.tentar).toBeFalsy();
   });
 
-  it('Q18: the first-wait notice, with the account\'s own minutes, only while it waits on the short form', () => {
+  it('Q18: the first-wait notice, with the account\'s own minutes, only while «a conta antiga» waits on the short form', () => {
     const { a } = doEstado('q18-posso-primeira-espera');
-    expect(avisoPrimeiraEspera(a.gate, a.rules)).toBe(
+    expect(a.desdeDay).toBe('2026-10-19');
+    expect(avisoPrimeiraEspera(a.gate, a.rules, a.desdeDay)).toBe(
       'Esta espera vem da regra “Dados econômicos” desta conta (5 min antes e 10 depois dos dados fortes). O app passou a conferi-la; você muda em Personalizar.',
     );
     const minutos = { ...a.rules!, block: { ...a.rules!.block!, beforeMin: 3, afterMin: 15 } };
-    expect(avisoPrimeiraEspera(a.gate, minutos)).toContain('(3 min antes e 15 depois dos dados fortes)');
+    expect(avisoPrimeiraEspera(a.gate, minutos, a.desdeDay)).toContain('(3 min antes e 15 depois dos dados fortes)');
+    // An account whose rules start on or after the delivery day (ENTREGA_DADOS_ECONOMICOS, the same date as
+    // Personalizar's Q41 notice) is not «a conta antiga»; neither is one before version 1
+    expect(avisoPrimeiraEspera(a.gate, a.rules, ENTREGA_DADOS_ECONOMICOS)).toBeNull();
+    expect(avisoPrimeiraEspera(a.gate, a.rules, addDays(ENTREGA_DADOS_ECONOMICOS, -1))).not.toBeNull();
+    expect(avisoPrimeiraEspera(a.gate, a.rules, null)).toBeNull();
     // A rule saved in the long form (with `releases`) is not «a conta antiga»; a free answer has no wait to explain
     const q07 = doEstado('q07-posso-depois-cpi').a;
-    expect(avisoPrimeiraEspera(q07.gate, q07.rules)).toBeNull();
+    expect(avisoPrimeiraEspera(q07.gate, q07.rules, '2026-10-19')).toBeNull();
     const q11 = doEstado('q11-posso-mais-tarde').a;
-    expect(avisoPrimeiraEspera(q11.gate, q11.rules)).toBeNull();
+    expect(avisoPrimeiraEspera(q11.gate, q11.rules, '2026-10-19')).toBeNull();
   });
 
   it('Q37: the 10-minute notice\'s words from the clock of the answer (09:50: the ISM wait starts at 09:55)', () => {

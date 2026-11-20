@@ -321,10 +321,27 @@ export const agendaDoEstado = (e: EstadoDados): AgendaRead => leituraDoDia(ESTAD
 export const proximosDoEstado = (e: EstadoDados): AgendaRow[] => (ESTADOS_DADOS[e].semAgenda ? [] : proximosDoQuadro(ESTADOS_DADOS[e].agora));
 
 /** The recorded rules_now shape of a state (one account: the configuration's Top One) */
+/**
+ * Q18's account is «a conta antiga» (c3 §3.9, lib/hub/avisoDados' ENTREGA_DADOS_ECONOMICOS): its rules took effect
+ * before the delivery, so its version 1 is dated 19 Oct (as Q41's in testing/telasRegras); every other state keeps
+ * the recorded creation day (30 Nov, after the delivery: no first-wait notice). Only `desde`, `desde_day` and the
+ * version's `effective_from` move; the gate's answer is the recorded one.
+ */
+const AGORA_ANTIGAS: readonly EstadoDados[] = ['q18-posso-primeira-espera'];
+const DESDE_ANTIGO = '2026-10-19T14:00:00+00:00';
+
 export function agoraDoEstado(e: EstadoDados): Record<string, unknown> {
   const name = ESTADOS_DADOS[e].fixtures.agora;
   if (!name) throw new Error(`agoraDoEstado: ${e} has no rules_now`);
-  return agendaJson(name);
+  const raw = agendaJson(name);
+  if (!AGORA_ANTIGAS.includes(e)) return raw;
+  const accounts = (raw.accounts as Record<string, unknown>[]).map((a) => ({
+    ...a,
+    desde: DESDE_ANTIGO,
+    desde_day: DESDE_ANTIGO.slice(0, 10),
+    version: a.version ? { ...(a.version as Record<string, unknown>), effective_from: DESDE_ANTIGO } : a.version,
+  }));
+  return { ...raw, accounts };
 }
 
 /** The recorded register_entry dry run of a Registrar state */
