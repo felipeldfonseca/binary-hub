@@ -40,6 +40,15 @@ export const AGENDA_LEAD_MIN = 120;
 /** «Próximos dados»: the days read (SPEC §6 E6) */
 export const PROXIMOS_DIAS = 14;
 
+/** Personalizar's «Próxima» column: how far each release's next date is looked for (the yearly lists' period) */
+export const PROXIMAS_DATAS_DIAS = 400;
+
+/** PostgREST's row cap (max-rows): a page this long may have more rows after it */
+export const AGENDA_PAGE = 1000;
+
+/** A bound on the pages of one read (400 days of the lists are about 600 rows today) */
+export const AGENDA_MAX_PAGES = 20;
+
 type Obj = Record<string, unknown>;
 const isObj = (x: unknown): x is Obj => typeof x === 'object' && x !== null && !Array.isArray(x);
 const bad = (): never => {
@@ -152,6 +161,70 @@ export async function fetchAgendaDoDia(
 /** E6, «Próximos dados»: the rows whose `at` or `was_at` falls in the `days` days from `from` (every calendar) */
 export async function fetchProximosDados(db: SupabaseClient, { from, days = PROXIMOS_DIAS }: { from: Date; days?: number }): Promise<AgendaRow[]> {
   return readRows(db, from, new Date(from.getTime() + days * 86_400_000));
+}
+
+/**
+ * Personalizar's «Próxima» column (c3 l.481-483; SPEC §8: economic_events keeps every known release of the lists'
+ * period «para a coluna “Próxima”»): the rows whose `at` or `was_at` falls in the `days` days from `from`, every
+ * calendar, paged past PostgREST's 1,000-row cap in pages ordered by (`at`, `id`), as useTradesSupabase pages. Still
+ * full after AGENDA_MAX_PAGES pages: the rows of the last instant read are dropped (a release past the cut shows no
+ * next date rather than a wrong one).
+ */
+export async function fetchProximasDatas(
+  db: SupabaseClient,
+  { from, days = PROXIMAS_DATAS_DIAS, pageSize = AGENDA_PAGE }: { from: Date; days?: number; pageSize?: number },
+): Promise<AgendaRow[]> {
+  const to = new Date(from.getTime() + days * 86_400_000);
+  const rows: AgendaRow[] = [];
+  for (let page = 0; page < AGENDA_MAX_PAGES; page++) {
+    const q = db
+      .from('economic_events')
+      .select(AGENDA_COLUMNS)
+      .or(atOrWasAtIn(from, to))
+      .order('at', { ascending: true })
+      .order('id', { ascending: true })
+      .range(page * pageSize, (page + 1) * pageSize - 1);
+    const got = await run(q as unknown as PromiseLike<Answer>);
+    rows.push(...got.map(parseAgendaRow));
+    if (got.length < pageSize) return rows.sort(byAt);
+  }
+  rows.sort(byAt);
+  const last = rows[rows.length - 1].at.getTime();
+  return rows.filter((r) => r.at.getTime() < last);
+}
+
+/** What fetchCoberturaProxima answers: the covered dates, and the last date it looked at */
+export interface CoberturaLida {
+  covered: AgendaRead['covered'];
+  /** The last date read ('YYYY-MM-DD'): an unbroken run that reaches it may go on past it */
+  ate: string;
+}
+
+/**
+ * «Depois de {dia}» of «Próximos dados» (c3 §4.3 l.817-819: {dia} = the last covered date): the coverage rows of
+ * `calendars` for the dates `from` .. `from` + PROXIMOS_DIAS (at most 3 × 15 rows: one request). No calendar →
+ * nothing read.
+ */
+export async function fetchCoberturaProxima(
+  db: SupabaseClient,
+  { calendars, from, days = PROXIMOS_DIAS }: { calendars: readonly CalendarCode[]; from: string; days?: number },
+): Promise<CoberturaLida> {
+  const ate = addDays(from, days);
+  if (calendars.length === 0) return { covered: [], ate };
+  const got = await run(
+    db
+      .from('economic_calendar_days')
+      .select('calendar, day')
+      .in('calendar', [...calendars])
+      .gte('day', from)
+      .lte('day', ate)
+      .order('day', { ascending: true }) as unknown as PromiseLike<Answer>,
+  );
+  const covered = got.map((x) => {
+    if (!isObj(x) || typeof x.day !== 'string' || !DAY.test(x.day)) return bad();
+    return { calendar: calendar(x.calendar), day: x.day };
+  });
+  return { covered, ate };
 }
 
 /** L6, the Diário's labels: the rows whose `at` or `was_at` falls in the open week [start, end) (every calendar) */

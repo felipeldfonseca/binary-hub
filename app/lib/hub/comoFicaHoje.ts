@@ -405,13 +405,15 @@ export const PROXIMOS_VISIVEIS = 5;
  * «Próximos dados» (c3 §4.3; SPEC §7.3 items 12 and 14): the next 14 days' releases of the calendars
  * followed (E6's rows), each with what the rule (as edited) does and the wait it makes; with the rule
  * off or everything «Opero normalmente» the lines end «Opero normalmente · sem espera». Two releases at
- * the same instant with the same behaviour share a line. Closes with «Depois de {today + 3}: …».
+ * the same instant with the same behaviour share a line. Closes with «Depois de {the last covered date}: …»
+ * (ultimoDiaCoberto).
  */
 export function proximosDados(
   rules: Rules,
   now: Date,
   rows: readonly AgendaRow[],
   covered?: AgendaRead['covered'] | null,
+  cobertura?: { covered: AgendaRead['covered']; ate: string } | null,
 ): { linhas: LinhaProximo[]; depoisDe: string } {
   const tz = relogioDe(rules);
   const cals = rules.block?.calendars ?? [];
@@ -471,20 +473,35 @@ export function proximosDados(
     }
   }
   itens.sort((a, b) => a.at - b.at);
-  return { linhas: itens.map((x) => x.linha), depoisDe: PROXIMOS.depoisDe(diaCurto(ultimoDiaCoberto(cals, hoje, covered))) };
+  return { linhas: itens.map((x) => x.linha), depoisDe: PROXIMOS.depoisDe(diaCurto(ultimoDiaCoberto(cals, hoje, covered, cobertura))) };
 }
 
 /**
- * {dia} of «Depois de {dia}» (c3 §4.3 l.817-819: the last covered date; the agenda answers up to three days
- * ahead): the last day of an unbroken run from today that the day's read (E5, D − 1..D + 1) shows covered
- * for every calendar followed, the day before today when today is not. E5 sees no further than tomorrow:
- * covered through tomorrow → today + 3 (the daily route's reach; the coverage of D + 2 and D + 3 is not
- * read, an open point). No read (undefined) → today + 3.
+ * {dia} of «Depois de {dia}» (c3 §4.3 l.817-819: the last covered date): the last day of an unbroken run from today
+ * covered for every calendar followed, the day before today when today is not.
+ * - With the coverage read (`cobertura`, agendaDb.fetchCoberturaProxima: today .. today + 14): the run as far as
+ *   that read goes (a run that reaches its last date is shown ending there: it may go on past it).
+ * - Without it (loading or failed), the day's read (E5, D − 1..D + 1): covered through tomorrow → today + 3 (the
+ *   daily route's reach, board Q23's rule). No read at all (undefined) → today + 3.
  */
-export function ultimoDiaCoberto(cals: readonly CalendarCode[], hoje: string, covered?: AgendaRead['covered'] | null): string {
+export function ultimoDiaCoberto(
+  cals: readonly CalendarCode[],
+  hoje: string,
+  covered?: AgendaRead['covered'] | null,
+  cobertura?: { covered: AgendaRead['covered']; ate: string } | null,
+): string {
+  if (cals.length === 0) return addDays(hoje, 3);
+  const em = (lista: AgendaRead['covered']) => (day: string) => cals.every((c) => lista.some((x) => x.calendar === c && x.day === day));
+  if (cobertura) {
+    const tem = em(cobertura.covered);
+    if (!tem(hoje)) return addDays(hoje, -1);
+    let d = hoje;
+    while (d < cobertura.ate && tem(addDays(d, 1))) d = addDays(d, 1);
+    return d;
+  }
   const max = addDays(hoje, 3);
-  if (covered == null || cals.length === 0) return max;
-  const tem = (day: string) => cals.every((c) => covered.some((x) => x.calendar === c && x.day === day));
+  if (covered == null) return max;
+  const tem = em(covered);
   if (!tem(hoje)) return addDays(hoje, -1);
   if (!tem(addDays(hoje, 1))) return hoje;
   return max;

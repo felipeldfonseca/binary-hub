@@ -111,6 +111,14 @@ describe('«Próximos dados» on the screen (board Q23)', () => {
     expect(screen.queryByRole('button', { name: 'Mostrar mais' })).not.toBeInTheDocument()
   })
 
+  it('with the coverage read (integration): «Depois de {dia}» follows the real end of the coverage', () => {
+    const us = (de: number, ate: number) => Array.from({ length: ate - de + 1 }, (_, i) => ({ calendar: 'us' as const, day: `2026-12-${String(de + i).padStart(2, '0')}` }))
+    const { rerender } = render(<RegrasDoQuadro estado="q23-como-fica-ism-proximos" dados={{ cobertura: { covered: us(3, 17), ate: '2026-12-17' } }} />)
+    expect(screen.getByText('Depois de qui 17: datas previstas, podem mudar.')).toHaveClass('hub-nota')
+    rerender(<RegrasDoQuadro estado="q23-como-fica-ism-proximos" dados={{ cobertura: { covered: us(3, 4), ate: '2026-12-17' } }} />)
+    expect(screen.getByText('Depois de sex 4: datas previstas, podem mudar.')).toBeInTheDocument()
+  })
+
   it('«Como fica hoje» above it: the ISM wait, then the window from 10:10', () => {
     render(<RegrasDoQuadro estado="q23-como-fica-ism-proximos" />)
     const hoje = screen.getByRole('list', { name: 'Como fica hoje' })

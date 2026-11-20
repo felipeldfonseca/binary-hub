@@ -5,8 +5,18 @@ import { useHubDb } from '@/hooks/useContas';
 import { useServerNow } from '@/hooks/useRegistrar';
 import type { AgendaRead, AgendaRow, CalendarCode } from '@/lib/domain/gate';
 import { CALENDAR_CODES } from '@/lib/domain/gate';
-import { tradingDayOn, type DayClock } from '@/lib/domain/tempo';
-import { AgendaDataError, PROXIMOS_DIAS, fetchAgendaDoDia, fetchDadosDaSemana, fetchProximosDados } from '@/lib/hub/agendaDb';
+import { tradingDayBounds, tradingDayOn, type DayClock } from '@/lib/domain/tempo';
+import {
+  AgendaDataError,
+  PROXIMAS_DATAS_DIAS,
+  PROXIMOS_DIAS,
+  fetchAgendaDoDia,
+  fetchCoberturaProxima,
+  fetchDadosDaSemana,
+  fetchProximasDatas,
+  fetchProximosDados,
+  type CoberturaLida,
+} from '@/lib/hub/agendaDb';
 
 /**
  * The agenda in React Query (Phase 5-1, contract §3.8). Every key sits under ['hub', uid, 'agenda'],
@@ -22,6 +32,10 @@ export const agendaKeys = {
   proximos: (uid: string | undefined, fromDay: string) => ['hub', uid, 'agenda', 'proximos', fromDay] as const,
   /** `weekOf`: the open week's first day, 'YYYY-MM-DD' */
   semana: (uid: string | undefined, weekOf: string) => ['hub', uid, 'agenda', 'semana', weekOf] as const,
+  /** Personalizar's «Próxima» column (integration of 5-1, beyond contract §3.8): `fromDay` = today on the account's clock */
+  proximas: (uid: string | undefined, fromDay: string) => ['hub', uid, 'agenda', 'proximas', fromDay] as const,
+  /** «Depois de {dia}» of «Próximos dados» (integration of 5-1): the coverage of `calendarsKey` from `fromDay` */
+  cobertura: (uid: string | undefined, calendarsKey: string, fromDay: string) => ['hub', uid, 'agenda', 'cobertura', calendarsKey, fromDay] as const,
 };
 
 /** How long a read stays fresh */
@@ -83,6 +97,42 @@ export function useDadosDaSemana(weekOf: { weekOf: string; start: Date; end: Dat
     queryKey: agendaKeys.semana(userId, weekOf?.weekOf ?? ''),
     queryFn: () => fetchDadosDaSemana(db, { start: weekOf!.start, end: weekOf!.end }),
     enabled: !!userId && !!weekOf && enabled,
+    staleTime: AGENDA_STALE_MS,
+    refetchOnWindowFocus: true,
+  });
+}
+
+/**
+ * Personalizar's «Próxima» column in «Escolher dado por dado»: every release of the next PROXIMAS_DATAS_DIAS days
+ * from the start of today's clock day (a release earlier today still reads «hoje · 08:30 ET»), paged. Read only while
+ * the list is open (`enabled`).
+ */
+export function useProximasDatas(clock: DayClock, { enabled = true }: { enabled?: boolean } = {}) {
+  const { db, userId } = useHubDb();
+  const now = useServerNow(60_000);
+  const day = tradingDayOn(now, clock);
+  return useQuery<AgendaRow[], AgendaDataError>({
+    queryKey: agendaKeys.proximas(userId, day),
+    queryFn: () => fetchProximasDatas(db, { from: tradingDayBounds(day, clock).start, days: PROXIMAS_DATAS_DIAS }),
+    enabled: !!userId && enabled,
+    staleTime: AGENDA_STALE_MS,
+    refetchOnWindowFocus: true,
+  });
+}
+
+/**
+ * «Depois de {dia}»: the coverage of the account's calendars from today (its clock day) over «Próximos dados»' 14
+ * days. Null account → nothing read.
+ */
+export function useCoberturaProxima(account: AgendaConta | null, { enabled = true }: { enabled?: boolean } = {}) {
+  const { db, userId } = useHubDb();
+  const now = useServerNow(60_000);
+  const day = account ? tradingDayOn(now, account.clock) : '';
+  const calendarsKey = account ? calendarsKeyOf(account.calendars) : '';
+  return useQuery<CoberturaLida, AgendaDataError>({
+    queryKey: agendaKeys.cobertura(userId, calendarsKey, day),
+    queryFn: () => fetchCoberturaProxima(db, { calendars: account!.calendars, from: day, days: PROXIMOS_DIAS }),
+    enabled: !!userId && !!account && enabled,
     staleTime: AGENDA_STALE_MS,
     refetchOnWindowFocus: true,
   });

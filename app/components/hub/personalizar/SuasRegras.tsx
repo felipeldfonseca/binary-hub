@@ -6,6 +6,7 @@ import { resolveRules, type AccountConfig, type PendingVersion, type RulesConfig
 import { comCalendario, janelasEfetivas, mudancasDaEntidade, PADRAO_FUTUROS, PADRAO_FUTUROS_CONTA, type Entidade } from '@/lib/hub/rascunho'
 import { comoFicaHoje, proximosDados } from '@/lib/hub/comoFicaHoje'
 import type { AgendaRead, AgendaRow } from '@/lib/domain/gate'
+import type { CoberturaLida } from '@/lib/hub/agendaDb'
 import { SIMBOLO_MOEDA } from '@/lib/hub/formato'
 import { entidadesRegrasDe, temInfoDoMercado } from '@/lib/hub/personalizarRegras'
 import { viraODia } from '@/components/hub/copyMercados'
@@ -56,6 +57,8 @@ export interface DadosLidos {
   dia: AgendaRead | null | undefined
   proximos: readonly AgendaRow[] | null | undefined
   proximas: readonly AgendaRow[] | null
+  /** The coverage from today over «Próximos dados» (agendaDb.fetchCoberturaProxima): undefined/null → E5's rule */
+  cobertura?: CoberturaLida | null
   onAbrirLista: () => void
   onTentar: () => void
 }
@@ -134,7 +137,7 @@ function Regras({
   const proximos = !comDados
     ? null
     : dados!.proximos
-      ? { estado: 'pronto' as const, ...proximosDados(rules, agora, dados!.proximos, dados!.dia === null ? [] : dados!.dia?.covered) }
+      ? { estado: 'pronto' as const, ...proximosDados(rules, agora, dados!.proximos, dados!.dia === null ? [] : dados!.dia?.covered, dados!.cobertura) }
       : dados!.proximos === null
         ? { estado: 'erro' as const }
         : { estado: 'carregando' as const }

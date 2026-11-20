@@ -7,7 +7,7 @@ import React from 'react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { act, renderHook, waitFor } from '@testing-library/react'
 import * as agendaDb from '@/lib/hub/agendaDb'
-import { agendaKeys, calendarsKeyOf, useAgendaDoDia, useDadosDaSemana, type AgendaConta } from '@/hooks/useAgenda'
+import { agendaKeys, calendarsKeyOf, useAgendaDoDia, useCoberturaProxima, useDadosDaSemana, useProximasDatas, type AgendaConta } from '@/hooks/useAgenda'
 import { RELOGIO_TOP, et } from '@/testing/agenda'
 
 jest.mock('@/lib/supabase', () => ({ createDataClient: jest.fn(() => ({})) }))
@@ -18,6 +18,8 @@ jest.mock('@/lib/hub/agendaDb', () => ({
   ...jest.requireActual('@/lib/hub/agendaDb'),
   fetchAgendaDoDia: jest.fn(),
   fetchDadosDaSemana: jest.fn(),
+  fetchProximasDatas: jest.fn(),
+  fetchCoberturaProxima: jest.fn(),
 }))
 
 const db = agendaDb as jest.Mocked<typeof agendaDb>
@@ -43,6 +45,8 @@ beforeEach(() => {
   jest.clearAllMocks()
   db.fetchAgendaDoDia.mockResolvedValue(vazio)
   db.fetchDadosDaSemana.mockResolvedValue([])
+  db.fetchProximasDatas.mockResolvedValue([])
+  db.fetchCoberturaProxima.mockResolvedValue({ covered: [], ate: '2026-12-17' })
 })
 
 afterEach(() => {
@@ -119,5 +123,41 @@ describe('useDadosDaSemana', () => {
     rerender({ w })
     await waitFor(() => expect(db.fetchDadosDaSemana).toHaveBeenCalledWith(expect.anything(), { start: w.start, end: w.end }))
     expect(queryClient.getQueryCache().find({ queryKey: agendaKeys.semana('user-1', '2026-12-07') })).toBeDefined()
+  })
+})
+
+describe('useProximasDatas (Personalizar\'s «Próxima» column)', () => {
+  it('agendaKeys.proximas on today\'s clock day; 400 days from that day\'s start; enabled: false reads nothing', async () => {
+    jest.useFakeTimers({ now: et('2026-12-03 19:00') }) // after 18:00 ET: the Top One day is 4 Dec
+    const { queryClient, wrapper } = setup()
+    const { rerender } = renderHook(({ on }: { on: boolean }) => useProximasDatas(RELOGIO_TOP, { enabled: on }), { wrapper, initialProps: { on: false } })
+    await act(async () => {
+      jest.advanceTimersByTime(100)
+    })
+    expect(db.fetchProximasDatas).not.toHaveBeenCalled()
+    rerender({ on: true })
+    await waitFor(() => expect(db.fetchProximasDatas).toHaveBeenCalledTimes(1))
+    expect(db.fetchProximasDatas.mock.calls[0][1]).toEqual({ from: et('2026-12-03 18:00'), days: agendaDb.PROXIMAS_DATAS_DIAS })
+    expect(queryClient.getQueryCache().find({ queryKey: agendaKeys.proximas('user-1', '2026-12-04') })).toBeDefined()
+    expect(agendaKeys.proximas('user-1', '2026-12-04').slice(0, 3)).toEqual(agendaKeys.all('user-1'))
+  })
+})
+
+describe('useCoberturaProxima («Depois de {dia}»)', () => {
+  it('the account\'s calendars from today on its clock, 14 days; a null account reads nothing', async () => {
+    jest.useFakeTimers({ now: et('2026-12-03 09:00') })
+    const { queryClient, wrapper } = setup()
+    const { rerender } = renderHook(({ conta }: { conta: AgendaConta | null }) => useCoberturaProxima(conta), {
+      wrapper,
+      initialProps: { conta: null as AgendaConta | null },
+    })
+    await act(async () => {
+      jest.advanceTimersByTime(100)
+    })
+    expect(db.fetchCoberturaProxima).not.toHaveBeenCalled()
+    rerender({ conta: { calendars: ['us', 'eu'], clock: RELOGIO_TOP } })
+    await waitFor(() => expect(db.fetchCoberturaProxima).toHaveBeenCalledTimes(1))
+    expect(db.fetchCoberturaProxima.mock.calls[0][1]).toEqual({ calendars: ['us', 'eu'], from: '2026-12-03', days: 14 })
+    expect(queryClient.getQueryCache().find({ queryKey: agendaKeys.cobertura('user-1', 'eu,us', '2026-12-03') })).toBeDefined()
   })
 })

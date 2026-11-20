@@ -38,6 +38,8 @@ jest.mock('@/lib/hub/agendaDb', () => ({
   ...jest.requireActual('@/lib/hub/agendaDb'),
   fetchAgendaDoDia: jest.fn(async () => ({ rows: [], covered: [] })),
   fetchProximosDados: jest.fn(async () => []),
+  fetchProximasDatas: jest.fn(async () => []),
+  fetchCoberturaProxima: jest.fn(async () => ({ covered: [], ate: '' })),
   fetchDadosDaSemana: jest.fn(async () => []),
 }))
 jest.mock('@/lib/hub/regrasDb', () => ({

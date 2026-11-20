@@ -6,7 +6,7 @@ import { useHubTheme } from '@/components/hub/HubRoot'
 import { useImportSheet } from '@/components/hub/importar/ImportSheetProvider'
 import { usePreferences } from '@/hooks/useContas'
 import { useMergePreferences } from '@/hooks/useRegras'
-import { useAgendaDoDia, useProximosDados } from '@/hooks/useAgenda'
+import { useAgendaDoDia, useCoberturaProxima, useProximasDatas, useProximosDados } from '@/hooks/useAgenda'
 import { useServerNow } from '@/hooks/useRegistrar'
 import { currencyOf } from '@/lib/domain/markets'
 import { agendaFor, blockIntervals, type AgendaRead, type CalendarCode, type ReleaseCode, type Rules } from '@/lib/domain/gate'
@@ -24,7 +24,6 @@ import PersonalizarProvider, { usePersonalizar } from './PersonalizarProvider'
 import Preferencias, { type AvisoPreferencia } from './Preferencias'
 import QuandoVoceOpera from './QuandoVoceOpera'
 import SuasRegras, { type DadosLidos } from './SuasRegras'
-import { useProximasDatas } from './useProximasDatas'
 
 /**
  * Personalizar's body (board Personalizar.dc.html): the header with the save status, the section
@@ -162,21 +161,26 @@ function useDadosDaRegra(p: ReturnType<typeof usePersonalizar>, agora: Date): Da
   const rules = p.draft ? resolveRules(conta ?? PADRAO_FUTUROS_CONTA, p.draft) : null
   const comDados = !!rules?.block && !!p.selecionado
   const calendars = p.draft?.calendars ?? []
-  const dia = useAgendaDoDia(comDados && calendars.length > 0 ? { calendars, clock: rules!.day } : null)
+  const conta5 = comDados && calendars.length > 0 ? { calendars, clock: rules!.day } : null
+  const dia = useAgendaDoDia(conta5)
+  const cobertura = useCoberturaProxima(conta5)
   const proximos = useProximosDados({ enabled: comDados })
   const proximas = useProximasDatas(rules?.day ?? PADRAO_FUTUROS_CONTA.day, { enabled: comDados && listaAberta })
   const onAbrirLista = useCallback(() => setListaAberta(true), [])
   const { refetch: refetchDia } = dia
   const { refetch: refetchProximos } = proximos
+  const { refetch: refetchCobertura } = cobertura
   const onTentar = useCallback(() => {
     void refetchDia()
     void refetchProximos()
-  }, [refetchDia, refetchProximos])
+    void refetchCobertura()
+  }, [refetchDia, refetchProximos, refetchCobertura])
   return {
     agora,
     dia: dia.data ?? (dia.isError ? null : undefined),
     proximos: proximos.data ?? (proximos.isError ? null : undefined),
     proximas: proximas.data ?? null,
+    cobertura: cobertura.data ?? null,
     onAbrirLista,
     onTentar,
   }

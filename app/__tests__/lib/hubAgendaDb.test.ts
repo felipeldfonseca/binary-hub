@@ -11,10 +11,13 @@ import {
   AgendaDataError,
   agendaRange,
   fetchAgendaDoDia,
+  fetchCoberturaProxima,
   fetchDadosDaSemana,
+  fetchProximasDatas,
   fetchProximosDados,
   parseAgendaRow,
 } from '@/lib/hub/agendaDb';
+import { ultimoDiaCoberto } from '@/lib/hub/comoFicaHoje';
 import { TOP_CLOCK, blockRules, et } from '@/testing/gate';
 import fs from 'fs';
 import path from 'path';
@@ -204,6 +207,132 @@ describe('fetchProximosDados (E6) and fetchDadosDaSemana (L6)', () => {
       'or',
       'and(at.gte."2026-12-06T23:00:00.000Z",at.lt."2026-12-13T23:00:00.000Z"),and(was_at.gte."2026-12-06T23:00:00.000Z",was_at.lt."2026-12-13T23:00:00.000Z")',
     ]);
+  });
+});
+
+/** A client whose economic_events answer pages: `rows` cut by each request's range(from, to), up to `cap` rows */
+function pagedDb(rows: unknown[], cap = 1000) {
+  const calls: Call[] = [];
+  const db = {
+    from: (table: string) => {
+      const call: Call = { table, ops: [] };
+      calls.push(call);
+      const chain: Record<string, unknown> = {};
+      for (const op of ['select', 'or', 'in', 'gte', 'lte', 'order', 'range']) {
+        chain[op] = (...args: unknown[]) => (call.ops.push([op, ...args]), chain);
+      }
+      chain.then = (resolve: (v: unknown) => unknown) => {
+        const range = call.ops.find((o) => o[0] === 'range') as [string, number, number] | undefined;
+        const [lo, hi] = range ? [range[1], Math.min(range[2], range[1] + cap - 1)] : [0, cap - 1];
+        return Promise.resolve({ data: rows.slice(lo, hi + 1), error: null }).then(resolve);
+      };
+      return chain;
+    },
+  } as unknown as SupabaseClient;
+  return { db, calls };
+}
+
+describe('fetchProximasDatas (Personalizar\'s «Próxima» column, paged)', () => {
+  const from = new Date('2026-12-03T23:00:00Z');
+  const many = (n: number) =>
+    Array.from({ length: n }, (_, i) => row({ at: new Date(Date.UTC(2026, 11, 4) + i * 3_600_000).toISOString(), day: '2026-12-04' }));
+
+  it('400 days from the start of the clock day, by at or was_at, every calendar, ordered by (at, id), in pages', async () => {
+    const { db, calls } = pagedDb([row()]);
+    const rows = await fetchProximasDatas(db, { from });
+    expect(rows).toHaveLength(1);
+    expect(calls).toHaveLength(1);
+    expect(calls[0].ops).toEqual([
+      ['select', AGENDA_COLUMNS],
+      ['or', 'and(at.gte."2026-12-03T23:00:00.000Z",at.lt."2028-01-07T23:00:00.000Z"),and(was_at.gte."2026-12-03T23:00:00.000Z",was_at.lt."2028-01-07T23:00:00.000Z")'],
+      ['order', 'at', { ascending: true }],
+      ['order', 'id', { ascending: true }],
+      ['range', 0, 999],
+    ]);
+  });
+
+  it('past PostgREST\'s 1,000 rows: reads the next page until one comes back short', async () => {
+    const { db, calls } = pagedDb(many(2300));
+    const rows = await fetchProximasDatas(db, { from });
+    expect(rows).toHaveLength(2300);
+    expect(calls.map((c) => c.ops.find((o) => o[0] === 'range'))).toEqual([
+      ['range', 0, 999],
+      ['range', 1000, 1999],
+      ['range', 2000, 2999],
+    ]);
+  });
+
+  it('exactly a page: one more read, empty', async () => {
+    const { db, calls } = pagedDb(many(6));
+    await expect(fetchProximasDatas(db, { from, pageSize: 3 })).resolves.toHaveLength(6);
+    expect(calls).toHaveLength(3);
+  });
+
+  it('still full after the last page: the rows of the last instant read are dropped, never a wrong next date', async () => {
+    const { db, calls } = pagedDb(many(30), 1);
+    const rows = await fetchProximasDatas(db, { from, pageSize: 1 });
+    expect(calls).toHaveLength(20);
+    expect(rows).toHaveLength(19);
+  });
+
+  it('a second page that fails → network (never half a list); a bad row → bad_answer', async () => {
+    const { db } = pagedDb(many(1500));
+    const from0 = db.from.bind(db);
+    let n = 0;
+    (db as unknown as { from: (t: string) => unknown }).from = (t: string) => {
+      const chain = from0(t) as unknown as Record<string, unknown>;
+      if (++n === 2) chain.then = (resolve: (v: unknown) => unknown) => Promise.resolve({ data: null, error: { message: 'x' } }).then(resolve);
+      return chain;
+    };
+    await expect(fetchProximasDatas(db, { from })).rejects.toMatchObject({ code: 'network' });
+    const { db: bad } = pagedDb([row({ status: 'remarcado' })]);
+    await expect(fetchProximasDatas(bad, { from })).rejects.toMatchObject({ code: 'bad_answer' });
+  });
+});
+
+describe('fetchCoberturaProxima and «Depois de {dia}»', () => {
+  it('the coverage of the calendars from today over 14 days: one request', async () => {
+    const { db, calls } = pagedDb([{ calendar: 'us', day: '2026-12-03' }]);
+    await expect(fetchCoberturaProxima(db, { calendars: ['us', 'eu'], from: '2026-12-03' })).resolves.toEqual({
+      covered: [{ calendar: 'us', day: '2026-12-03' }],
+      ate: '2026-12-17',
+    });
+    expect(calls[0].table).toBe('economic_calendar_days');
+    expect(calls[0].ops).toEqual([
+      ['select', 'calendar, day'],
+      ['in', 'calendar', ['us', 'eu']],
+      ['gte', 'day', '2026-12-03'],
+      ['lte', 'day', '2026-12-17'],
+      ['order', 'day', { ascending: true }],
+    ]);
+  });
+
+  it('no calendar: nothing read; a bad row → bad_answer', async () => {
+    const { db, calls } = pagedDb([]);
+    await expect(fetchCoberturaProxima(db, { calendars: [], from: '2026-12-03' })).resolves.toEqual({ covered: [], ate: '2026-12-17' });
+    expect(calls).toEqual([]);
+    const bad = pagedDb([{ calendar: 'us', day: '3/12' }]);
+    await expect(fetchCoberturaProxima(bad.db, { calendars: ['us'], from: '2026-12-03' })).rejects.toMatchObject({ code: 'bad_answer' });
+  });
+
+  const dias = (cal: 'us' | 'eu', de: string, n: number) =>
+    Array.from({ length: n }, (_, i) => ({ calendar: cal, day: new Date(Date.parse(`${de}T12:00:00Z`) + i * 86_400_000).toISOString().slice(0, 10) }));
+
+  it('the real end of the coverage: the last day of the unbroken run of every calendar followed', () => {
+    // us covered through 31 Dec, eu through 8 Dec: the run ends on 8 Dec
+    const covered = [...dias('us', '2026-12-03', 29), ...dias('eu', '2026-12-03', 6)];
+    expect(ultimoDiaCoberto(['us'], '2026-12-03', null, { covered, ate: '2026-12-17' })).toBe('2026-12-17');
+    expect(ultimoDiaCoberto(['eu', 'us'], '2026-12-03', null, { covered, ate: '2026-12-17' })).toBe('2026-12-08');
+    // A hole (5 Dec) ends the run on the 4th; today not covered → yesterday
+    const furo = dias('us', '2026-12-03', 15).filter((x) => x.day !== '2026-12-05');
+    expect(ultimoDiaCoberto(['us'], '2026-12-03', null, { covered: furo, ate: '2026-12-17' })).toBe('2026-12-04');
+    expect(ultimoDiaCoberto(['us'], '2026-12-03', null, { covered: dias('us', '2026-12-04', 5), ate: '2026-12-17' })).toBe('2026-12-02');
+  });
+
+  it('without the coverage read: E5\'s three days and board Q23\'s today + 3', () => {
+    expect(ultimoDiaCoberto(['us'], '2026-12-03', dias('us', '2026-12-02', 3))).toBe('2026-12-06');
+    expect(ultimoDiaCoberto(['us'], '2026-12-03', dias('us', '2026-12-02', 2))).toBe('2026-12-03');
+    expect(ultimoDiaCoberto(['us'], '2026-12-03', undefined, null)).toBe('2026-12-06');
   });
 });
 

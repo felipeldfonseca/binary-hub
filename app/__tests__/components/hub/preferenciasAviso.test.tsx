@@ -47,6 +47,8 @@ jest.mock('@/lib/hub/agendaDb', () => {
     ...actual,
     fetchAgendaDoDia: jest.fn(async (_db: unknown, { at }: { at: Date }) => world.leituraDoDia(at)),
     fetchProximosDados: jest.fn(async (_db: unknown, { from }: { from: Date }) => world.proximosDoQuadro(from)),
+    fetchProximasDatas: jest.fn(async (_db: unknown, { from }: { from: Date }) => world.proximosDoQuadro(from, 400)),
+    fetchCoberturaProxima: jest.fn(async () => ({ covered: [], ate: '' })),
     fetchDadosDaSemana: jest.fn(async () => []),
   }
 })
