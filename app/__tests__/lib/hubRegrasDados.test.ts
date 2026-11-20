@@ -94,13 +94,15 @@ describe('the account, canonical per code against what it inherits', () => {
     expect(dadosEfetivos(s, PADRAO).modos.cpi).toBe('dia');
   });
 
-  it('«Voltar ao padrão de Futuros» removes the account\'s choices of the rule, minutes and switch included', () => {
+  it('«Voltar ao padrão de Futuros» deletes only the account\'s releases (contract §3.4, SPEC §3.3): switch and minutes stay', () => {
     let s = comBloqueio(escolherDado(base(), CONTA, 'ppi', 'depois'), CONTA, { beforeMin: 3, on: false });
     expect(s.accounts[topOne.id].block).toEqual({ on: false, beforeMin: 3, releases: { ppi: 'depois' } });
     s = voltarAoPadraoDados(s, CONTA);
-    expect(s.accounts[topOne.id].block).toEqual({});
-    expect(accountRulesJson('futures', s.accounts[topOne.id]).block).toBeUndefined();
+    expect(s.accounts[topOne.id].block).toEqual({ on: false, beforeMin: 3 });
+    expect(accountRulesJson('futures', s.accounts[topOne.id]).block).toEqual({ on: false, before_min: 3 });
     expect(voltarAoPadraoDados(s, PADRAO)).toBe(s);
+    const soDados = voltarAoPadraoDados(escolherDado(base(), CONTA, 'cpi', 'dia'), CONTA);
+    expect(accountRulesJson('futures', soDados.accounts[topOne.id]).block).toBeUndefined();
   });
 
   it('reads a stored account map strictly: an unknown code or value is not the as-built shape', () => {

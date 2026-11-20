@@ -338,12 +338,17 @@ export const escolherDado = (s: RulesSettings, e: Entidade, code: ReleaseCode, m
 export const aplicarAtalho = (s: RulesSettings, e: Entidade, atalho: AtalhoDados): RulesSettings => comDados(s, e, mapaDoAtalho(atalho));
 
 /**
- * «Voltar ao padrão de Futuros» of «Dados econômicos» (c3 §3.8): the account's own choices of this
- * rule go, minutes and the switch included; nothing on «Padrão Futuros».
+ * «Voltar ao padrão de Futuros» of «Dados econômicos»: deletes the account's `releases` only
+ * (contract §3.4, SPEC §3.3 l.203, which rank above c3 §3.8's «minutos incluídos»); the switch and
+ * the minutes saved on the account stay. Nothing on «Padrão Futuros».
  */
 export function voltarAoPadraoDados(s: RulesSettings, e: Entidade): RulesSettings {
   if (e.tipo === 'padrao') return s;
-  return withAccount(s, e.conta.id, { block: {} });
+  const cur = s.accounts[e.conta.id]?.block;
+  if (!cur || cur.releases === undefined) return s;
+  const { releases: _drop, ...rest } = cur;
+  void _drop;
+  return withAccount(s, e.conta.id, { block: rest });
 }
 
 /** «Limite do dia» of an account (never inherited); null = «Sem limite» */
