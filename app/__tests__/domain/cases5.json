@@ -795,6 +795,54 @@
      "source_key": "cpi:2027-01-12"
     },
     {
+     "at": "2027-01-20T13:30:00+00:00",
+     "day": "2027-01-20",
+     "code": "cpi",
+     "source": "lista",
+     "status": "agendado",
+     "was_at": null,
+     "calendar": "us",
+     "local_at": "2027-01-20T08:30:00",
+     "local_tz": "America/New_York",
+     "source_key": "cpi:2027-01-20"
+    },
+    {
+     "at": "2027-03-15T21:59:00+00:00",
+     "day": "2027-03-15",
+     "code": "cpi",
+     "source": "lista",
+     "status": "agendado",
+     "was_at": null,
+     "calendar": "us",
+     "local_at": "2027-03-15T17:59:00",
+     "local_tz": "America/New_York",
+     "source_key": "cpi:2027-03-15"
+    },
+    {
+     "at": "2027-11-07T22:45:00+00:00",
+     "day": "2027-11-07",
+     "code": "cpi",
+     "source": "lista",
+     "status": "agendado",
+     "was_at": null,
+     "calendar": "us",
+     "local_at": "2027-11-07T17:45:00",
+     "local_tz": "America/New_York",
+     "source_key": "cpi:2027-11-07"
+    },
+    {
+     "at": "2027-01-20T13:30:00+00:00",
+     "day": "2027-01-20",
+     "code": "hicp_eu",
+     "source": "lista",
+     "status": "agendado",
+     "was_at": null,
+     "calendar": "eu",
+     "local_at": "2027-01-20T14:30:00",
+     "local_tz": "Europe/Luxembourg",
+     "source_key": "hicp_eu:2027-01-20"
+    },
+    {
      "at": "2027-01-13T15:00:00+00:00",
      "day": "2027-01-13",
      "code": "ism_ind",
@@ -879,6 +927,30 @@
      "source_key": "ppi:2027-01-12"
     },
     {
+     "at": "2027-03-15T22:30:00+00:00",
+     "day": "2027-03-15",
+     "code": "ppi",
+     "source": "lista",
+     "status": "agendado",
+     "was_at": null,
+     "calendar": "us",
+     "local_at": "2027-03-15T18:30:00",
+     "local_tz": "America/New_York",
+     "source_key": "ppi:2027-03-15"
+    },
+    {
+     "at": "2027-11-07T23:00:00+00:00",
+     "day": "2027-11-07",
+     "code": "ppi",
+     "source": "lista",
+     "status": "agendado",
+     "was_at": null,
+     "calendar": "us",
+     "local_at": "2027-11-07T18:00:00",
+     "local_tz": "America/New_York",
+     "source_key": "ppi:2027-11-07"
+    },
+    {
      "at": "2027-01-13T13:30:00+00:00",
      "day": "2027-01-13",
      "code": "varejo_us",
@@ -923,6 +995,21 @@
      "calendar": "eu"
     },
     {
+     "day": "2027-01-19",
+     "source": "kit",
+     "calendar": "eu"
+    },
+    {
+     "day": "2027-01-20",
+     "source": "kit",
+     "calendar": "eu"
+    },
+    {
+     "day": "2027-01-21",
+     "source": "kit",
+     "calendar": "eu"
+    },
+    {
      "day": "2027-01-10",
      "source": "kit",
      "calendar": "us"
@@ -954,6 +1041,51 @@
     },
     {
      "day": "2027-01-16",
+     "source": "kit",
+     "calendar": "us"
+    },
+    {
+     "day": "2027-01-19",
+     "source": "kit",
+     "calendar": "us"
+    },
+    {
+     "day": "2027-01-20",
+     "source": "kit",
+     "calendar": "us"
+    },
+    {
+     "day": "2027-01-21",
+     "source": "kit",
+     "calendar": "us"
+    },
+    {
+     "day": "2027-03-13",
+     "source": "kit",
+     "calendar": "us"
+    },
+    {
+     "day": "2027-03-14",
+     "source": "kit",
+     "calendar": "us"
+    },
+    {
+     "day": "2027-03-15",
+     "source": "kit",
+     "calendar": "us"
+    },
+    {
+     "day": "2027-11-05",
+     "source": "kit",
+     "calendar": "us"
+    },
+    {
+     "day": "2027-11-06",
+     "source": "kit",
+     "calendar": "us"
+    },
+    {
+     "day": "2027-11-07",
      "source": "kit",
      "calendar": "us"
     }
@@ -1516,6 +1648,150 @@
      "start_min": 1080
     },
     "expected": []
+   },
+   {
+    "label": "DST, fall back: asked Fri 5 Nov 2027 18:30 EDT (D = Sat 6), the range ends at E(7) = Sun 7 18:00 EST (23:00Z), after p + 48 h (22:30Z): the CPI at 17:45 EST enters, the PPI at 18:00 EST does not",
+    "local": "2027-11-05 18:30 America/New_York",
+    "at": "2027-11-05T22:30:00+00:00",
+    "resolved": {
+     "v": 1,
+     "day": {
+      "tz": "America/New_York",
+      "start_min": 1080
+     },
+     "block": {
+      "on": true,
+      "after_min": 10,
+      "calendars": [
+       "us"
+      ],
+      "before_min": 5
+     },
+     "limit": null,
+     "market": "futures",
+     "states": {
+      "alinhadas": null,
+      "so_tecnica": null,
+      "em_conflito": null,
+      "sem_direcao": null,
+      "so_fundamentos": null
+     },
+     "windows": [],
+     "window_rule": {
+      "on": false,
+      "outside": "fora"
+     },
+     "windows_from": null
+    },
+    "clock": {
+     "tz": "America/New_York",
+     "start_min": 1080
+    },
+    "expected": [
+     {
+      "at": "2027-11-07T22:45:00+00:00",
+      "code": "cpi"
+     }
+    ]
+   },
+   {
+    "label": "DST, spring forward: asked Sat 13 Mar 2027 18:30 EST (D = Sun 14), the range ends at E(15) = Mon 15 18:00 EDT (22:00Z), before p + 48 h (23:30Z): the CPI at 17:59 EDT enters, the PPI at 18:30 EDT does not",
+    "local": "2027-03-13 18:30 America/New_York",
+    "at": "2027-03-13T23:30:00+00:00",
+    "resolved": {
+     "v": 1,
+     "day": {
+      "tz": "America/New_York",
+      "start_min": 1080
+     },
+     "block": {
+      "on": true,
+      "after_min": 10,
+      "calendars": [
+       "us"
+      ],
+      "before_min": 5
+     },
+     "limit": null,
+     "market": "futures",
+     "states": {
+      "alinhadas": null,
+      "so_tecnica": null,
+      "em_conflito": null,
+      "sem_direcao": null,
+      "so_fundamentos": null
+     },
+     "windows": [],
+     "window_rule": {
+      "on": false,
+      "outside": "fora"
+     },
+     "windows_from": null
+    },
+    "clock": {
+     "tz": "America/New_York",
+     "start_min": 1080
+    },
+    "expected": [
+     {
+      "at": "2027-03-15T21:59:00+00:00",
+      "code": "cpi"
+     }
+    ]
+   },
+   {
+    "label": "a tie: the CPI at 08:30 New York and the HICP at 14:30 Luxembourg are the same instant (13:30Z): ordered by at, then ord",
+    "local": "2027-01-20 10:00 America/New_York",
+    "at": "2027-01-20T15:00:00+00:00",
+    "resolved": {
+     "v": 1,
+     "day": {
+      "tz": "America/New_York",
+      "start_min": 1080
+     },
+     "block": {
+      "on": true,
+      "releases": {
+       "cpi": "volta",
+       "hicp_eu": "volta"
+      },
+      "after_min": 10,
+      "calendars": [
+       "us",
+       "eu"
+      ],
+      "before_min": 5
+     },
+     "limit": null,
+     "market": "futures",
+     "states": {
+      "alinhadas": null,
+      "so_tecnica": null,
+      "em_conflito": null,
+      "sem_direcao": null,
+      "so_fundamentos": null
+     },
+     "windows": [],
+     "window_rule": {
+      "on": false,
+      "outside": "fora"
+     },
+     "windows_from": null
+    },
+    "clock": {
+     "tz": "America/New_York",
+     "start_min": 1080
+    },
+    "expected": [
+     {
+      "at": "2027-01-20T13:30:00+00:00",
+      "code": "cpi"
+     },
+     {
+      "at": "2027-01-20T13:30:00+00:00",
+      "code": "hicp_eu"
+     }
+    ]
    }
   ]
  },
