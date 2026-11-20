@@ -370,10 +370,16 @@ insert into tests.phase2_gate_golden values
   (13, 'No version, Brasilia clock', null, '{"tz": "America/Sao_Paulo", "start_min": 0}', '2026-10-19 23:30:00+00', '{"hit_at": null, "trades": 0, "net_usd": 0, "worst_usd": 0}', '{"at": "2026-10-19T23:30:00+00:00", "block": {"state": "nao_avaliado", "reason": "sem_versao"}, "limit": {"state": "nao_avaliado", "reason": "sem_versao"}, "status": null, "window": {"state": "nao_avaliado", "reason": "sem_versao"}, "warnings": [], "changes_at": "2026-10-20T03:00:00+00:00", "state_rule": {"state": "nao_avaliado", "reason": "sem_versao"}, "trading_day": "2026-10-19", "checks_evaluated": []}'),
   (14, 'No version, futures clock', null, '{"tz": "America/New_York", "start_min": 1080}', '2026-10-19 22:30:00+00', '{"hit_at": null, "trades": 0, "net_usd": 0, "worst_usd": 0}', '{"at": "2026-10-19T22:30:00+00:00", "block": {"state": "nao_avaliado", "reason": "sem_versao"}, "limit": {"state": "nao_avaliado", "reason": "sem_versao"}, "status": null, "window": {"state": "nao_avaliado", "reason": "sem_versao"}, "warnings": [], "changes_at": "2026-10-20T22:00:00+00:00", "state_rule": {"state": "nao_avaliado", "reason": "sem_versao"}, "trading_day": "2026-10-20", "checks_evaluated": []}');
 
+-- Phase 5 (20261120000001): with no agenda the Top One block (["us"]) is «sem_agenda» instead of
+-- «fase5»; nothing else of the 8 Top One answers moves, and the other 6 stay byte for byte
 select tests.eq((select string_agg(label, '; ' order by ord) from tests.phase2_gate_golden g
                  where public.gate_eval(case g.r when 'T' then tests.topone_v1() when 'E' then tests.binary_v1() else g.r::jsonb end,
-                                        g.clock, g.at_, g.usage)::text is distinct from g.expected::text),
-                null, 'gate_eval answers the owner''s Phase 2 versions byte for byte as the Phase 2 function did');
+                                        g.clock, g.at_, g.usage)::text
+                       is distinct from (case when g.ord <= 8 then jsonb_set(g.expected, '{block,reason}', '"sem_agenda"') else g.expected end)::text),
+                null, 'gate_eval answers the owner''s Phase 2 versions as the Phase 2 function did (Top One: block.reason sem_agenda)');
+select tests.eq((select string_agg(g.ord || ':' || (g.expected#>>'{block,reason}'), ' ' order by g.ord) from tests.phase2_gate_golden g),
+                '1:fase5 2:fase5 3:fase5 4:fase5 5:fase5 6:fase5 7:fase5 8:fase5 9:so_futuros 10:so_futuros 11:so_futuros 12:so_futuros 13:sem_versao 14:sem_versao',
+                'the recorded answers: 8 Top One with fase5, 4 Ebinex so_futuros, 2 without version');
 
 -- (b) O's rows exactly as the Phase 2 save_rules wrote them (owner payload: Top One 10:00–11:00 ET
 --     Mon–Fri, US$ 400 per account that closes the day; Ebinex 20:00–21:00 Brasília Mon–Fri), and

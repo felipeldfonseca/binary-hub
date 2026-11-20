@@ -36,10 +36,18 @@ exception when duplicate_object then null;
 end
 $$;
 
+-- The server-side role (Phase 5: the daily agenda route writes with it), as on Supabase: it bypasses RLS
+do $$
+begin
+  create role service_role nologin bypassrls;
+exception when duplicate_object then null;
+end
+$$;
+
 -- Supabase grants table access to the API roles and lets RLS decide
-grant usage on schema public, auth to anon, authenticated;
-alter default privileges in schema public grant all on tables to anon, authenticated;
-alter default privileges in schema public grant all on sequences to anon, authenticated;
+grant usage on schema public, auth to anon, authenticated, service_role;
+alter default privileges in schema public grant all on tables to anon, authenticated, service_role;
+alter default privileges in schema public grant all on sequences to anon, authenticated, service_role;
 
 -- Supabase Storage, as far as the migrations and tests use it: the tables in Supabase's shape (the
 -- Storage API inserts and deletes object rows as the signed-in user, under RLS), its path helpers,
