@@ -11,7 +11,9 @@
  *    "window_rule": {"on": bool, "outside": "fora" | "aviso"},
  *    "block": null (every market but futures) | {"on", "before_min": 0..60, "after_min": 0..120, "calendars": ["us" | "eu" | "br"]}
  *             plus, in the long form only (Phase 5-1), "releases": {CODE: "volta" | "depois" | "dia"} (read here,
- *             kept as read; its writer and its evaluation come with the Phase 5 domain lane),
+ *             kept as read, checked as SPEC §3.7 fixes rules_check_resolved, code `bad_releases`; this side
+ *             lands first, read only, and the SQL with its computed cases follows in the Phase 5 domain
+ *             lane, which also brings the writer and the evaluation),
  *    "limit": null | {"usd" (US$ markets) | "brl" (B3): > 0, ≤ 1 000 000, whole cents,
  *                     "mode": "conta" | "soma" (futures), "at_limit": "encerrar" | "avisar"},
  *    "states": null (every market but futures) | {"alinhadas" | "so_tecnica" | "so_fundamentos" | "em_conflito" | "sem_direcao": choice | null},
@@ -40,7 +42,7 @@ import {
   type AccountMarket,
   type WindowTz,
 } from '../markets';
-import { isReleaseCode, type ReleaseCode, type WaitMode } from './agenda';
+import { AGENDA_RELEASES, isReleaseCode, type ReleaseCode, type WaitMode } from './agenda';
 import { tradeMatchKey, type StopUnit } from '../registro/caps';
 import { decimalFromJson } from '../registro/numeric';
 import { assertTimeZone, type DayClock, type TradingWindow } from '../tempo';
@@ -138,6 +140,7 @@ export type RulesErrorCode =
   | 'invalid_tz'
   | 'window_tz_mismatch'
   | 'bad_block'
+  | 'bad_releases'
   | 'bad_limit'
   | 'bad_state_rule'
   | 'bad_state_choice'
@@ -235,9 +238,24 @@ function checkBlock(b: Obj): RulesErrorCode | null {
   return null;
 }
 
-/** The long form's map in a version (rules_check_resolved, Phase 5-1): known codes, waiting modes only */
-function resolvedReleasesOk(r: Json): boolean {
-  return isObj(r) && Object.entries(r).every(([k, v]) => isReleaseCode(k) && (v === 'volta' || v === 'depois' || v === 'dia'));
+/**
+ * The long form's map in a version, SPEC §3.7: rules_check_block rows 7–9 (an object of known codes,
+ * each `normal`, `volta`, `depois` or `dia`), then rules_check_resolved rows 4–6 (no `normal`, no code
+ * of a calendar not followed, not the app default for `calendars`, which is the short form).
+ */
+function checkResolvedReleases(r: Json, calendars: readonly string[]): RulesErrorCode | null {
+  if (!isObj(r)) return 'bad_releases';
+  for (const [k, v] of Object.entries(r)) {
+    if (!isReleaseCode(k) || (v !== 'normal' && v !== 'volta' && v !== 'depois' && v !== 'dia')) return 'bad_releases';
+  }
+  const followed = AGENDA_RELEASES.filter((x) => calendars.includes(x.calendar));
+  for (const [k, v] of Object.entries(r)) {
+    if (v === 'normal' || !followed.some((x) => x.code === k)) return 'bad_releases';
+  }
+  const appDefault = followed.filter((x) => x.inListA);
+  const keys = Object.keys(r);
+  if (keys.length === appDefault.length && appDefault.every((x) => r[x.code] === 'volta')) return 'bad_releases';
+  return null;
 }
 
 function stateChoiceOk(state: string, choice: Json): boolean {
@@ -349,12 +367,16 @@ export function checkRules(p: unknown): RulesErrorCode | null {
   // The data block and the state rule, only where the market has them (futures)
   if (caps.block) {
     if (!isObj(p.block) || !has(p.block, 'calendars') || !checkCalendars(p.block.calendars)) return 'bad_block';
-    if (has(p.block, 'releases') && !resolvedReleasesOk(p.block.releases)) return 'bad_block';
+    // SPEC §3.7: unknown_key and on/before/after (rows 1–6) before the map (rows 7–9, then 4–6)
     const rest: Obj = { ...p.block };
     delete rest.calendars;
     delete rest.releases;
     const bcode = checkBlock(rest);
     if (bcode) return bcode;
+    if (has(p.block, 'releases')) {
+      const rcode = checkResolvedReleases(p.block.releases, p.block.calendars as string[]);
+      if (rcode) return rcode;
+    }
   } else if (p.block !== null) {
     return 'not_for_market';
   }

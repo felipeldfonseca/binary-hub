@@ -3,11 +3,12 @@
  *
  * Open point O2 (decided YES): the app never fails on a stored rule that carries the long form of
  * «Dados econômicos» (contract §3.4: `releases`), before the Phase 5 screens reach it. Read-only
- * tolerance: the version's checker and parser accept the map (twin of rules_check_resolved after
- * Phase 5-1) and keep it as read; the market default and the account settings keep reading their
+ * tolerance: the version's checker and parser accept the map (SPEC §3.7's checks of
+ * rules_check_resolved, in its order, with its code `bad_releases`; the SQL-computed cases come with
+ * the Phase 5 SQL, lane L2) and keep it as read; the market default and the account settings keep reading their
  * keys and leave `releases` alone. No writer, no evaluation here. Invented rules.
  */
-import { RulesError, checkRules, parseRules, toResolvedJson } from '@/lib/domain/gate'
+import { AGENDA_RELEASES, RulesError, checkRules, parseRules, toResolvedJson } from '@/lib/domain/gate'
 import { parseRulesConfig, parseRulesNow } from '@/lib/hub/regras'
 import { regrasJson } from '@/testing/regras'
 import { topOneRules } from '@/testing/gate'
@@ -51,15 +52,47 @@ describe('a version (resolved.block) in the long form', () => {
     expect(parseRules(resolved({})).block?.releases).toEqual({})
   })
 
+  /** The app default for these calendars: every list-A code of them in «volta», nothing else (SPEC §3.4) */
+  const appDefault = (calendars: string[]) =>
+    Object.fromEntries(AGENDA_RELEASES.filter((r) => r.inListA && calendars.includes(r.calendar)).map((r) => [r.code, 'volta']))
+
   it.each<[string, unknown]>([
-    ['an unknown code', { fed: 'volta' }],
-    ['«normal» (never stored in a version)', { cpi: 'normal' }],
-    ['an unknown mode', { cpi: 'sempre' }],
-    ['a list', ['cpi']],
-    ['null', null],
-  ])('refuses %s with bad_block', (_label, releases) => {
-    expect(checkRules(resolved(releases))).toBe('bad_block')
+    // rules_check_block rows 7–9
+    ['a list (row 7)', ['cpi']],
+    ['null (row 7)', null],
+    ['an unknown code (row 8)', { fed: 'volta' }],
+    ['an unknown mode (row 9)', { cpi: 'sempre' }],
+    // rules_check_resolved rows 4–6
+    ['«normal» (row 4: never stored in a version)', { cpi: 'normal' }],
+    ['a code whose calendar is not followed (row 5)', { ...LONG, hicp_eu: 'volta' }],
+    ['the app default, which belongs in the short form (row 6)', appDefault(['us'])],
+  ])('refuses %s with bad_releases', (_label, releases) => {
+    expect(checkRules(resolved(releases))).toBe('bad_releases')
     expect(() => parseRules(resolved(releases))).toThrow(RulesError)
+  })
+
+  it('accepts a followed calendar\'s code, and `{}` is the default only without calendars', () => {
+    const j = resolved({ ...LONG, hicp_eu: 'dia' })
+    j.block.calendars = ['us', 'eu']
+    expect(checkRules(j)).toBeNull()
+    const none = resolved({})
+    none.block.calendars = []
+    expect(checkRules(none)).toBe('bad_releases')
+  })
+
+  it('in SPEC §3.7\'s order: the calendars, then unknown_key, then on/before/after, then the map', () => {
+    const badCal = resolved(null)
+    badCal.block.calendars = ['xx']
+    expect(checkRules(badCal)).toBe('bad_block')
+    const extra = resolved(null)
+    extra.block.x = 1
+    expect(checkRules(extra)).toBe('unknown_key')
+    const noOn = resolved(null)
+    delete noOn.block.on
+    expect(checkRules(noOn)).toBe('bad_block')
+    const badMin = resolved({ cpi: 'normal' })
+    badMin.block.before_min = 61
+    expect(checkRules(badMin)).toBe('bad_block')
   })
 })
 
