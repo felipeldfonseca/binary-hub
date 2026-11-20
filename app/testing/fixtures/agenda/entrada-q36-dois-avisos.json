@@ -1,0 +1,159 @@
+{
+  "gate": {
+    "at": "2026-12-03T15:05:00.177243+00:00",
+    "block": {
+      "state": "no_bloqueio",
+      "today": [
+        {
+          "end": "2026-12-03T15:10:00+00:00",
+          "kind": "espera",
+          "start": "2026-12-03T14:55:00+00:00",
+          "releases": [
+            {
+              "at": "2026-12-03T15:00:00+00:00",
+              "code": "ism_serv",
+              "mode": "volta"
+            }
+          ]
+        }
+      ],
+      "active": {
+        "end": "2026-12-03T15:10:00+00:00",
+        "kind": "espera",
+        "start": "2026-12-03T14:55:00+00:00",
+        "releases": [
+          {
+            "at": "2026-12-03T15:00:00+00:00",
+            "code": "ism_serv",
+            "mode": "volta"
+          }
+        ]
+      },
+      "free_at": "2026-12-03T15:10:00+00:00"
+    },
+    "desde": "2026-11-30T17:00:05.325068+00:00",
+    "label": "Top One",
+    "limit": {
+      "usd": 500,
+      "mode": "conta",
+      "near": false,
+      "used": 0.69,
+      "state": "ok",
+      "hit_at": null,
+      "reason": null,
+      "trades": 1,
+      "net_usd": -345,
+      "at_limit": "encerrar",
+      "worst_usd": -345
+    },
+    "today": {
+      "trades": 1,
+      "net_usd": -345,
+      "worst_usd": -345
+    },
+    "market": "futures",
+    "status": "aguardar",
+    "window": {
+      "next": {
+        "opens_at": "2026-12-04T15:00:00+00:00",
+        "closes_at": "2026-12-04T16:00:00+00:00",
+        "trading_day": "2026-12-04"
+      },
+      "state": "dentro",
+      "reason": null,
+      "current": {
+        "opens_at": "2026-12-03T15:00:00+00:00",
+        "closes_at": "2026-12-03T16:00:00+00:00"
+      },
+      "position": "dentro"
+    },
+    "version": {
+      "id": "94625d73-a85d-4c58-9318-8ea9e3033fdb",
+      "origin": "criar",
+      "version_no": 1,
+      "effective_from": "2026-11-30T17:00:05.325068+00:00"
+    },
+    "warnings": [],
+    "desde_day": "2026-11-30",
+    "account_id": "61e1aea4-3f9d-46df-be38-9660289ddfbd",
+    "changes_at": "2026-12-03T15:10:00+00:00",
+    "state_rule": {
+      "state": "nao_avaliado",
+      "reason": "fase5"
+    },
+    "trading_day": "2026-12-03",
+    "checks_evaluated": [
+      "janela",
+      "bloqueio",
+      "limite"
+    ]
+  },
+  "plan": {
+    "breaks": [
+      "no_bloqueio"
+    ],
+    "verdict": "fora_do_plano",
+    "checks_evaluated": [
+      "janela",
+      "bloqueio",
+      "limite"
+    ]
+  },
+  "context": {
+    "rule_ok": null,
+    "in_block": true,
+    "warnings": [],
+    "in_window": true,
+    "after_limit": false,
+    "gate_status": "aguardar",
+    "state_choice": null,
+    "checks_evaluated": [
+      "janela",
+      "bloqueio",
+      "limite"
+    ],
+    "day_pnl_at_entry": -345,
+    "day_worst_at_entry": -345
+  },
+  "dry_run": true,
+  "preview": {
+    "risk": 200,
+    "reward": null,
+    "stop_points": 4,
+    "target_points": null
+  },
+  "similar": [],
+  "version": {
+    "id": "94625d73-a85d-4c58-9318-8ea9e3033fdb",
+    "version_no": 1
+  },
+  "entry_at": "2026-12-03T15:05:00.177243+00:00",
+  "repeated": false,
+  "expires_at": null,
+  "instrument": {
+    "key": "ES",
+    "pip": null,
+    "pnl": "prices",
+    "mult": "50",
+    "tick": "0.25",
+    "costs": false,
+    "known": true,
+    "stops": "pts",
+    "qty_dp": 0,
+    "correct": false,
+    "price_dp": 8,
+    "asset_type": "futures"
+  },
+  "limit_room": {
+    "usd": 500,
+    "left": 155,
+    "risk": 200,
+    "above": true,
+    "net_usd": -345,
+    "reached": false
+  },
+  "server_now": "2026-12-03T15:05:00.177243+00:00",
+  "stop_price": 7908.25,
+  "trading_day": "2026-12-03",
+  "target_price": null
+}
