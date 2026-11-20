@@ -14,13 +14,13 @@ import {
   gateTradingDay,
   NOT_YET,
   type CheckKey,
-  type EconomicEvent,
   type GateAccount,
   type GateResult,
   type GateStatus,
   type NotEvaluated,
   type Phase5,
 } from './evaluate';
+import type { AgendaEntry } from './agenda';
 import type { RuleVersion, StateChoice, StateName } from './rules';
 import { dayUsage, type DayTrade } from './usage';
 
@@ -57,8 +57,8 @@ export interface PlanInput {
   direction: 1 | -1;
   /** Phase 5: the state at entry (null = no fresh reading for the symbol) */
   state?: Phase5<StateAtEntry | null>;
-  /** Phase 5: the day's economic events */
-  events?: Phase5<readonly EconomicEvent[]>;
+  /** The releases the gate waits for (GateOptions.agenda: null = not known; absent = transitional `fase5`) */
+  agenda?: readonly AgendaEntry[] | null;
 }
 
 export type PlanBreak = 'fora_da_janela' | 'no_bloqueio' | 'depois_do_limite' | 'contra_a_regra';
@@ -95,7 +95,7 @@ export function evaluatePlan(input: PlanInput): PlanResult {
   const day = input.trades
     ? dayUsage(input.trades, { tradingDay, until: entryAt, limitCents: rules?.limit?.cents ?? null, excludeId: input.tradeId })
     : null;
-  const gate = evaluateGate(entryAt, account, version, day, { events: input.events ?? NOT_YET });
+  const gate = evaluateGate(entryAt, account, version, day, input.agenda === undefined ? {} : { agenda: input.agenda });
 
   const state = input.state ?? NOT_YET;
   let stateRule: StateRuleCheck;

@@ -12,7 +12,7 @@ import {
   evaluatePlan,
   gateTradingDay,
   NOT_YET,
-  type EconomicEvent,
+  type AgendaEntry,
   type Phase5,
   type Rules,
   type StateAtEntry,
@@ -36,10 +36,9 @@ function gateRow(janela: string, bloqueio: string, limite: string) {
       limite === 'sem limite' ? null : { cents: 40000, mode: 'conta', atLimit: limite.endsWith('avisar') ? 'avisar' : 'encerrar' };
     if (bloqueio === 'desligado') rules.block!.on = false;
   }
-  const events: Phase5<readonly EconomicEvent[]> =
-    bloqueio === 'Fase 5'
-      ? NOT_YET
-      : { available: true, value: bloqueio === 'ativo' ? [{ at: now, label: 'CPI', calendar: 'us' }] : [] };
+  // «Fase 5»: no agenda given (the transitional `fase5` of Phase 5 · base)
+  const agenda: readonly AgendaEntry[] | undefined =
+    bloqueio === 'Fase 5' ? undefined : bloqueio === 'ativo' ? [{ code: 'cpi', at: now }] : [];
   const trades = limite.startsWith('atingido')
     ? [trade('2026-10-19 09:05', '2026-10-19 09:10', -400)]
     : limite === 'abaixo'
@@ -51,8 +50,8 @@ function gateRow(janela: string, bloqueio: string, limite: string) {
     until: now,
     limitCents: rules?.limit?.cents ?? null,
   });
-  const gate = evaluateGate(now, TOP_ONE, ver, day, { events });
-  const plan = evaluatePlan({ tradeId: null, entryAt: now, account: TOP_ONE, version: ver, trades, direction: 1, events, state: NOT_YET });
+  const gate = evaluateGate(now, TOP_ONE, ver, day, agenda === undefined ? {} : { agenda });
+  const plan = evaluatePlan({ tradeId: null, entryAt: now, account: TOP_ONE, version: ver, trades, direction: 1, agenda, state: NOT_YET });
   return { gate, plan };
 }
 

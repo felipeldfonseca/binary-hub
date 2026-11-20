@@ -4,8 +4,8 @@
  * 20261019000001_markets.sql replaced it), so a preview in the browser (unsaved edits, «Como fica
  * hoje») says what the server would say.
  *
- * Precedence: Encerrado por hoje > Aguardar até HH:MM (data block, Phase 5) > Fora da sua janela >
- * Liberado; nothing evaluated → no status («Sem janela salva»), never «Liberado». A check that was
+ * Precedence: Encerrado por hoje > Aguardar até HH:MM / Não opero hoje (the data block, «Dados
+ * econômicos», Phase 5) > Fora da sua janela > Liberado; nothing evaluated → no status («Sem janela salva»), never «Liberado». A check that was
  * not evaluated says why ("não avaliado") and is never folded into a pass or a false.
  *
  * Every market has the window and the daily limit. The data block and the state rule exist only
@@ -21,7 +21,8 @@ import {
   windowOccurrences,
   type DayClock,
 } from '../tempo';
-import { usdToCents, versionAt, type AtLimit, type CalendarCode, type LimitMode, type RuleVersion } from './rules';
+import { AGENDA_RELEASES, isReleaseCode, type AgendaEntry, type ReleaseCode, type WaitMode } from './agenda';
+import { usdToCents, versionAt, type AtLimit, type LimitMode, type RuleVersion } from './rules';
 import type { DayResult } from './usage';
 
 export type CheckKey = 'janela' | 'bloqueio' | 'limite' | 'estado';
@@ -35,6 +36,8 @@ export type SkipReason =
   | 'sem_limite'
   | 'sem_dados'
   | 'sem_calendario'
+  /** The agenda has no coverage for the day (the block is «não conferido») */
+  | 'sem_agenda'
   /** The market has no such rule (the data block and the state rule are futures only) */
   | 'so_futuros'
   | 'fase5'
@@ -92,22 +95,33 @@ export interface LimitEvaluated {
 }
 export type LimitCheck = LimitEvaluated | NotEvaluated<'sem_versao' | 'sem_limite' | 'sem_dados'>;
 
+/** One release an interval comes from: its code (never a name: the answer is frozen with an entry), instant and mode */
+export interface BlockRelease {
+  code: ReleaseCode;
+  at: Date;
+  mode: WaitMode;
+}
+/** A wait («espera») or a whole day («dia», «Não opero no dia»); end exclusive */
 export interface BlockInterval {
+  kind: 'espera' | 'dia';
   start: Date;
   end: Date;
-  /** The events it comes from, joined with « e » */
-  label: string;
+  /** By `at`, then `ord` */
+  releases: BlockRelease[];
 }
 export interface BlockEvaluated {
   evaluated: true;
   state: 'ok' | 'no_bloqueio';
+  /** The interval p is in (a `dia` wins over an `espera`) */
   active: BlockInterval | null;
-  /** Intervals that touch the trading day */
+  /** Intervals that touch the day of p */
   today: BlockInterval[];
+  /** The first instant from p on outside every interval: when the account is free again; null with `ok` or past the horizon */
+  freeAt: Date | null;
 }
 export type BlockCheck =
   | BlockEvaluated
-  | NotEvaluated<'sem_versao' | 'so_futuros' | 'regra_desligada' | 'fase5' | 'sem_calendario'>;
+  | NotEvaluated<'sem_versao' | 'so_futuros' | 'regra_desligada' | 'sem_calendario' | 'sem_agenda' | 'fase5'>;
 
 export type GateStatus = 'liberado' | 'aguardar' | 'fora_janela' | 'encerrado';
 /** Facts the copy shows next to «Liberado»: outside the window with “Liberado”, com aviso; limit reached with «Só avisar» */
@@ -135,13 +149,6 @@ export interface GateResult {
 export type Phase5<T> = { available: false } | { available: true; value: T };
 export const NOT_YET: { readonly available: false } = Object.freeze({ available: false as const });
 
-/** A high-impact release from the economic calendar (Phase 5) */
-export interface EconomicEvent {
-  at: Date;
-  label: string;
-  calendar: CalendarCode;
-}
-
 export interface GateAccount {
   market: AccountMarket;
   /** trading_accounts.day_tz / day_start_min: the day clock before version 1 (a version carries its own) */
@@ -149,8 +156,13 @@ export interface GateAccount {
 }
 
 export interface GateOptions {
-  /** The day's economic events (Phase 5). Until then the data block is «ativo na Fase 5». */
-  events?: Phase5<readonly EconomicEvent[]>;
+  /**
+   * The releases the gate waits for (gate_agenda's list); `[]` = a known agenda with nothing in
+   * range; `null` = the agenda is not known (`sem_agenda`). Transitional (Phase 5 · base): an
+   * absent option still gives `fase5`, as the database's answers recorded in gate/cases.json do;
+   * the domain lane makes absent mean `null`.
+   */
+  agenda?: readonly AgendaEntry[] | null;
 }
 
 const notEvaluated = <R extends SkipReason>(reason: R): NotEvaluated<R> => ({ evaluated: false, state: 'nao_avaliado', reason });
@@ -176,12 +188,20 @@ function ratio4(a: number, b: number): number {
   return Math.floor((20000 * a + b) / (2 * b)) / 10000;
 }
 
-function mergeBlocks(events: readonly EconomicEvent[], beforeMin: number, afterMin: number): BlockInterval[] {
-  const intervals = events
+const ORD: ReadonlyMap<ReleaseCode, number> = new Map(AGENDA_RELEASES.map((r) => [r.code, r.ord]));
+const byAtThenOrd = (a: BlockRelease, b: BlockRelease) => a.at.getTime() - b.at.getTime() || ORD.get(a.code)! - ORD.get(b.code)!;
+
+/**
+ * Transitional (Phase 5 · base): every release as a wait around it («volta»), merged when they
+ * overlap or touch. The four modes, the `dia` apart and `free_at`'s walk come with the domain lane.
+ */
+function mergeBlocks(agenda: readonly AgendaEntry[], beforeMin: number, afterMin: number): BlockInterval[] {
+  const intervals = agenda
     .map((e) => ({
+      kind: 'espera' as const,
       start: new Date(e.at.getTime() - beforeMin * 60_000),
       end: new Date(e.at.getTime() + afterMin * 60_000),
-      label: e.label,
+      releases: [{ code: e.code, at: e.at, mode: 'volta' as const }],
     }))
     .sort((a, b) => a.start.getTime() - b.start.getTime());
   const merged: BlockInterval[] = [];
@@ -190,13 +210,15 @@ function mergeBlocks(events: readonly EconomicEvent[], beforeMin: number, afterM
     // Overlapping or touching intervals are one block, so «Aguardar até» names its real end
     if (last && iv.start.getTime() <= last.end.getTime()) {
       if (iv.end.getTime() > last.end.getTime()) last.end = iv.end;
-      if (!last.label.split(' e ').includes(iv.label)) last.label = `${last.label} e ${iv.label}`;
+      last.releases = [...last.releases, ...iv.releases].sort(byAtThenOrd);
     } else {
       merged.push({ ...iv });
     }
   }
   return merged;
 }
+
+const CALENDAR_OF: ReadonlyMap<ReleaseCode, string> = new Map(AGENDA_RELEASES.map((r) => [r.code, r.calendar]));
 
 /**
  * The answer at `now` for an account, from the version in force at `now` (versionAt; or a draft
@@ -239,7 +261,7 @@ export function evaluateGate(
   }
 
   // Data block (Phase 5)
-  const events = options.events ?? NOT_YET;
+  const agenda = options.agenda;
   // Every merged interval, not only today's: inside a window that opened before the day turned,
   // the instant is past the day's bounds
   let blocks: BlockInterval[] = [];
@@ -248,12 +270,13 @@ export function evaluateGate(
   else if (!MARKET_SPEC[rules.market].rules.block) block = notEvaluated('so_futuros');
   else if (!rules.block || !rules.block.on || rules.block.beforeMin + rules.block.afterMin === 0) {
     block = notEvaluated('regra_desligada');
-  } else if (!events.available) block = notEvaluated('fase5');
+  } else if (agenda === undefined) block = notEvaluated('fase5');
   else if (rules.block.calendars.length === 0) block = notEvaluated('sem_calendario');
+  else if (agenda === null) block = notEvaluated('sem_agenda');
   else {
-    const marked = rules.block.calendars;
+    const marked: readonly string[] = rules.block.calendars;
     blocks = mergeBlocks(
-      events.value.filter((e) => marked.includes(e.calendar)),
+      agenda.filter((e) => marked.includes(CALENDAR_OF.get(e.code) ?? '')),
       rules.block.beforeMin,
       rules.block.afterMin,
     );
@@ -263,6 +286,8 @@ export function evaluateGate(
       state: active ? 'no_bloqueio' : 'ok',
       active,
       today: blocks.filter((m) => m.end.getTime() > bounds.start.getTime() && m.start.getTime() < bounds.end.getTime()),
+      // Merged intervals never overlap or touch: the end of the active one is the first free instant
+      freeAt: active ? active.end : null,
     };
   }
 
@@ -344,52 +369,88 @@ export function evaluateGate(
 // The answer a screen shows
 // ---------------------------------------------------------------------------------------------
 
-/** One of the five answers of «Posso operar hoje?» (the words are pt-BR copy, in lib/hub/posso) */
+/** The answers of «Posso operar hoje?» (the words are pt-BR copy, in lib/hub/posso and lib/hub/dadosEconomicos) */
 export type Answer =
   /** «Encerrado por hoje»: the limit was reached with «Encerrar o dia no app»; lasts the trading day */
   | { kind: 'encerrado'; hitAt: Date | null; limitCents: number; worstCents: number; warnings: GateWarning[] }
-  /** «Aguardar até HH:MM»: inside a data block (Phase 5), even outside the window */
-  | { kind: 'aguardar'; until: Date; label: string; warnings: GateWarning[] }
+  /** «Aguardar até HH:MM»: inside a wait of the data block, even outside the window; `until` = `block.free_at` */
+  | { kind: 'aguardar'; until: Date; releases: readonly BlockRelease[]; warnings: GateWarning[] }
+  /**
+   * «Não opero hoje»: inside a whole day (`source: 'dia'`), or inside a wait the account does not
+   * come back from on this day (`free_at` null: `source: 'espera_sem_volta'`); never with an hour
+   */
+  | { kind: 'dia'; releases: readonly BlockRelease[]; source: 'dia' | 'espera_sem_volta'; warnings: GateWarning[] }
   /** «Fora da sua janela» */
   | { kind: 'fora_janela'; position: Exclude<WindowPosition, 'dentro'>; next: NextOccurrence | null; warnings: GateWarning[] }
-  /** «Liberado» (with `warnings`: «Liberado, com aviso»); `until` = the window's close while inside it */
-  | { kind: 'liberado'; position: WindowPosition | null; until: Date | null; next: NextOccurrence | null; warnings: GateWarning[] }
   /**
-   * «Sem janela salva · Definir»: nothing was evaluated (no version, no window, or the window rule
-   * off with no limit), or only a limit with no window saved and nothing to warn about
+   * «Liberado» (with `warnings`: «Liberado, com aviso»). `until` = the earlier of the window's close
+   * while inside it and the start of the next interval of the day («Liberado · até 09:55 ET»).
+   * `semAgenda`: the data block was not checked for lack of the agenda, so it is never green.
+   */
+  | {
+      kind: 'liberado';
+      position: WindowPosition | null;
+      until: Date | null;
+      next: NextOccurrence | null;
+      warnings: GateWarning[];
+      semAgenda: boolean;
+    }
+  /**
+   * «Sem janela salva · Definir» / «Sem regra ativa · Ajustar»: nothing was evaluated (no version,
+   * no window, or the window rule off with nothing else checked), or only a limit with no window
+   * saved and nothing to warn about
    */
   | { kind: 'sem_janela'; reason: 'sem_versao' | 'sem_janela' | 'regra_desligada' }
   /**
-   * «Limite do dia indisponível»: the window rule is off, so the limit is the only rule that can
-   * answer, and the day's result is not loaded (or is for another trading day, right after the
-   * turn). Never «Sem regra ativa» (there is a rule) and never «Liberado» (it was not checked).
+   * The window rule is off and what is left could not be checked: «Limite do dia indisponível»
+   * (`sem_dados`: the day's result is not loaded, whatever the block says, unless it waits) or
+   * «Dados econômicos não conferidos» (`sem_agenda`: nothing evaluated and the agenda missing).
+   * Never «Liberado» (it was not checked).
    */
-  | { kind: 'indisponivel'; reason: 'sem_dados' };
+  | { kind: 'indisponivel'; reason: 'sem_dados' | 'sem_agenda' };
 
+/** SPEC §5.4's table, cell by cell, in the order of the B11 note */
 export function answerOf(r: GateResult): Answer {
   const w = r.window;
-  if (r.status === null) {
-    if (!w.evaluated && w.reason === 'regra_desligada' && !r.limit.evaluated && r.limit.reason === 'sem_dados') {
-      return { kind: 'indisponivel', reason: 'sem_dados' };
-    }
-    return { kind: 'sem_janela', reason: w.evaluated ? 'sem_janela' : (w.reason as 'sem_versao' | 'sem_janela' | 'regra_desligada') };
-  }
+  const b = r.block;
+  // (1) «Encerrado por hoje» wins over everything
   if (r.status === 'encerrado' && r.limit.evaluated) {
     return { kind: 'encerrado', hitAt: r.limit.hitAt, limitCents: r.limit.cents, worstCents: r.limit.worstCents, warnings: r.warnings };
   }
-  if (r.status === 'aguardar' && r.block.evaluated && r.block.active) {
-    return { kind: 'aguardar', until: r.block.active.end, label: r.block.active.label, warnings: r.warnings };
+  // (2) A wait or a whole day answers for the block, with any window and any limit
+  if (r.status === 'aguardar' && b.evaluated && b.active) {
+    const { active } = b;
+    if (active.kind === 'dia') return { kind: 'dia', releases: active.releases, source: 'dia', warnings: r.warnings };
+    if (b.freeAt === null) return { kind: 'dia', releases: active.releases, source: 'espera_sem_volta', warnings: r.warnings };
+    return { kind: 'aguardar', until: b.freeAt, releases: active.releases, warnings: r.warnings };
   }
+  const windowOff = !w.evaluated && w.reason === 'regra_desligada';
+  // (3) Window off and the limit unread: «Limite do dia indisponível», whatever the status
+  if (windowOff && !r.limit.evaluated && r.limit.reason === 'sem_dados') return { kind: 'indisponivel', reason: 'sem_dados' };
+  const semAgenda = !b.evaluated && b.reason === 'sem_agenda';
+  if (r.status === null) {
+    // (4) Nothing evaluated, window off, the agenda missing: «Dados econômicos não conferidos»
+    if (windowOff && semAgenda) return { kind: 'indisponivel', reason: 'sem_agenda' };
+    return { kind: 'sem_janela', reason: w.evaluated ? 'sem_janela' : (w.reason as 'sem_versao' | 'sem_janela' | 'regra_desligada') };
+  }
+  // (5) «Fora da sua janela»
   if (r.status === 'fora_janela' && w.evaluated && w.position !== 'dentro') {
     return { kind: 'fora_janela', position: w.position, next: w.next, warnings: r.warnings };
   }
+  // (6) No window saved and nothing to warn about: «Sem janela salva», whatever the block
   if (!w.evaluated && w.reason === 'sem_janela' && r.warnings.length === 0) return { kind: 'sem_janela', reason: 'sem_janela' };
+  // (7) «Liberado»: until the window closes or the next interval of the day starts, whichever comes first
+  const t = r.at.getTime();
+  const ends: number[] = [];
+  if (w.evaluated && w.current) ends.push(w.current.end.getTime());
+  if (b.evaluated) for (const iv of b.today) if (iv.start.getTime() > t) ends.push(iv.start.getTime());
   return {
     kind: 'liberado',
     position: w.evaluated ? w.position : null,
-    until: w.evaluated && w.current ? w.current.end : null,
+    until: ends.length ? new Date(Math.min(...ends)) : null,
     next: w.evaluated ? w.next : null,
     warnings: r.warnings,
+    semAgenda,
   };
 }
 
@@ -421,6 +482,46 @@ function cents(x: unknown): number {
 function skipped<R extends SkipReason>(o: Obj, allowed: readonly R[]): NotEvaluated<R> {
   if (o.state !== 'nao_avaliado' || !(allowed as readonly unknown[]).includes(o.reason)) throw new ServerGateError();
   return notEvaluated(o.reason as R);
+}
+
+/** Exactly these keys, each present */
+const hasExactly = (o: Obj, keys: readonly string[]) =>
+  Object.keys(o).length === keys.length && keys.every((k) => Object.prototype.hasOwnProperty.call(o, k));
+
+const WAIT_MODES: readonly unknown[] = ['volta', 'depois', 'dia'];
+
+function blockRelease(x: unknown): BlockRelease {
+  if (!isObj(x) || !hasExactly(x, ['code', 'at', 'mode']) || !isReleaseCode(x.code) || !WAIT_MODES.includes(x.mode)) {
+    throw new ServerGateError();
+  }
+  return { code: x.code, at: date(x.at), mode: x.mode as WaitMode };
+}
+
+function blockInterval(x: unknown): BlockInterval {
+  if (!isObj(x) || !hasExactly(x, ['kind', 'start', 'end', 'releases']) || (x.kind !== 'espera' && x.kind !== 'dia')) {
+    throw new ServerGateError();
+  }
+  if (!Array.isArray(x.releases) || x.releases.length === 0) throw new ServerGateError();
+  return { kind: x.kind, start: date(x.start), end: date(x.end), releases: x.releases.map(blockRelease) };
+}
+
+/**
+ * The block of contract §3.5: not evaluated, with a reason of SPEC §5.1 (`fase5` stays readable
+ * forever: it is frozen in the entries saved before Phase 5), or evaluated with every key.
+ */
+function parseBlock(b: Obj): BlockCheck {
+  if (b.state === 'nao_avaliado') {
+    return skipped(b, ['sem_versao', 'so_futuros', 'regra_desligada', 'sem_calendario', 'sem_agenda', 'fase5'] as const);
+  }
+  if ((b.state !== 'ok' && b.state !== 'no_bloqueio') || !hasExactly(b, ['state', 'active', 'today', 'free_at'])) {
+    throw new ServerGateError();
+  }
+  if (!Array.isArray(b.today)) throw new ServerGateError();
+  const active = b.active === null ? null : blockInterval(b.active);
+  const freeAt = b.free_at === null ? null : date(b.free_at);
+  // `ok` ⇔ no active interval; `ok` never has a free_at (SPEC §5.3)
+  if ((b.state === 'ok') !== (active === null) || (b.state === 'ok' && freeAt !== null)) throw new ServerGateError();
+  return { evaluated: true, state: b.state, active, today: b.today.map(blockInterval), freeAt };
 }
 
 /**
@@ -477,10 +578,12 @@ export function parseServerGate(json: unknown): GateResult {
     };
   } else throw new ServerGateError();
 
-  const block = skipped(json.block, ['sem_versao', 'so_futuros', 'regra_desligada', 'fase5', 'sem_calendario'] as const);
+  const block = parseBlock(json.block);
   const stateRule = skipped(json.state_rule, ['sem_versao', 'so_futuros', 'fase5'] as const);
   const okList = (xs: unknown[], allowed: readonly string[]) => xs.every((x) => typeof x === 'string' && allowed.includes(x));
   if (!okList(json.warnings, ['fora_janela', 'limite']) || !okList(json.checks_evaluated, CHECK_ORDER)) throw new ServerGateError();
+  // An evaluated block is listed among the checks, and only then
+  if (block.evaluated !== json.checks_evaluated.includes('bloqueio')) throw new ServerGateError();
 
   return {
     at: date(json.at),
