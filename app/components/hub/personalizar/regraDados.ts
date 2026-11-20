@@ -184,10 +184,11 @@ export function statusDados(estado: EstadoDados, rules: Rules, agenda: AgendaRea
   const hojeRows = agenda.rows
     .filter((r): r is AgendaRow & { code: ReleaseCode } => r.code !== null && codes.includes(r.code) && (r.status === 'agendado' || r.status === 'divulgado') && r.at >= start && r.at < end)
     .sort((a, b) => a.at.getTime() - b.at.getTime() || releaseOrd(a.code) - releaseOrd(b.code))
-  if (hojeRows.length === 0) return DADOS.nenhumHoje
-
   const doDia = (code: ReleaseCode, at: Date) => hojeRows.some((r) => r.code === code && r.at.getTime() === at.getTime())
-  const ivs = blockIntervals(rules, rules.day, entries).filter((iv) => iv.releases.some((x) => doDia(x.code, x.at)))
+  // The day's intervals, also a wait carried over the turn of the day (a 17:55 release waits until 18:05 of
+  // the new day), as «Como fica hoje» shows them (intervalosDoDia: every interval that meets the day)
+  const ivs = blockIntervals(rules, rules.day, entries).filter((iv) => iv.releases.some((x) => doDia(x.code, x.at)) || (iv.start < end && iv.end > start))
+  if (hojeRows.length === 0 && ivs.length === 0) return DADOS.nenhumHoje
   const rotulo = (rs: readonly { code: ReleaseCode; at: Date }[]) => {
     const grupos: { at: Date; codes: ReleaseCode[] }[] = []
     for (const r of rs) {

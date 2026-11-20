@@ -408,7 +408,7 @@ export const DADOS = {
   naoOpera: (diaDe: string, hora: string) => `${diaDe} (${hora}), você não opera`,
   operaNormal: (rotulo: string) => `${rotulo}, você opera normalmente`,
   // c3 l.679: with 0 and 0 the day's sentence changes its ending (NEW wording of the join: «. »)
-  zeroFim: (rotulo: string) => `${rotulo}. Com 0 minuto antes e depois, “Aguardo em volta do horário” não cria espera`,
+  zeroFim: (rotulo: string) => `${rotulo}, com 0 minuto antes e depois, “Aguardo em volta do horário” não cria espera`,
   nenhumHoje: 'Hoje não sai nenhum dado dos calendários que você segue.',
   /** The old account, the first time (c3 §3.9 l.640-650; board Q41), with the account's minutes */
   avisoLigada: (antes: number, depois: number) =>
