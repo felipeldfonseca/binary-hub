@@ -65,8 +65,27 @@ export function proximosDoMundo(at: Date, days = 14): AgendaRow[] {
 const ANTIGAS: readonly EstadoDados[] = ['q41-personalizar-conta-antiga']
 const DIA_ANTIGO = '2026-10-19'
 
+/**
+ * Q42 draws «Só operar dentro da sua janela» with «padrão de Futuros», the contrast to the own tags of «Dados
+ * econômicos» (Q42.md): its account carries no own key of the window rule (the recorded config's equals the default)
+ */
+const JANELA_DO_PADRAO: readonly EstadoDados[] = ['q42-personalizar-etiquetas']
+
+function semJanelaPropria(raw: unknown): unknown {
+  const r = raw as { accounts: { settings?: { rules?: Record<string, unknown> } }[] }
+  return {
+    ...r,
+    accounts: r.accounts.map((a) => {
+      if (!a.settings?.rules) return a
+      const { window_rule: _omit, ...rules } = a.settings.rules
+      return { ...a, settings: { ...a.settings, rules } }
+    }),
+  }
+}
+
 export function configDoEstado(e: EstadoDados): RulesConfig {
-  const c = parseRulesConfig(configDoQuadro(ESTADOS_DADOS[e].config))
+  const raw = configDoQuadro(ESTADOS_DADOS[e].config)
+  const c = parseRulesConfig(JANELA_DO_PADRAO.includes(e) ? semJanelaPropria(raw) : raw)
   if (!ANTIGAS.includes(e)) return c
   return {
     ...c,

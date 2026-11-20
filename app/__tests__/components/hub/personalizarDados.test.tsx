@@ -196,6 +196,10 @@ describe('«Dados econômicos»: the frames (boards Q01–Q05, Q40–Q43)', () =
     expect(within(nomeDaRegra()).getByText('não salvo')).toHaveClass('hub-tag--mudou')
     expect(pressed()).toEqual(['Personalizado'])
     expect(screen.getByText('Não opero no dia: CPI, Decisão do Fed e Entrevista do Fed · Aguardo em volta do horário: 7 dados · Opero normalmente: 4 dados')).toBeInTheDocument()
+    // The contrast the frame draws: the rule above keeps «padrão de Futuros» (review)
+    const janela = document.getElementById('r-gate')!.parentElement!
+    expect(within(janela).getByText('padrão de Futuros')).toBeInTheDocument()
+    expect(within(janela).queryByText('só nesta conta')).not.toBeInTheDocument()
     expect(status()).toHaveTextContent('Hoje: dia de CPI (08:30 ET), você não opera.')
     const lista = await abrirLista()
     expect(linhasDaLista(lista).filter((l) => l.includes('[só nesta conta]')).map((l) => l.split(' [')[0])).toEqual([
