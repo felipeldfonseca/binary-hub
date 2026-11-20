@@ -8,7 +8,7 @@
  */
 import { act, screen, waitFor, within } from '@testing-library/react'
 import { regrasKeys } from '@/hooks/useRegras'
-import { POSSO_NO_DIARIO_INFO } from '@/lib/hub/posso'
+import { LIBERADO_SEM_AGENDA, POSSO_NO_DIARIO_INFO } from '@/lib/hub/posso'
 import { POSSO } from '@/components/hub/posso/copy'
 import { mocks, renderDiario } from '@/testing/diarioTelas'
 import { USUARIO_DO_QUADRO } from '@/testing/diarioTelasMocks'
@@ -46,18 +46,21 @@ function falado(el: Element): string[] {
  * were not checked (SPEC §5.4; the words are the Posso lane's). Where the app says so, the board's line stands for the
  * rest: same answer word, no longer green, the sentence names «não conferidos»; the board's sub and tone are then kept.
  */
-// TODO(orchestrator, integration with telas-posso): replace this loose «não conferidos» match with the exact SPEC §5.4 sentence and tone (e.g. sub toBe the Posso lane's sentence, tom toBe 'tom-neutro'); review 2026-11-20 finding 5
 function semAgenda<T extends { pal: string; sub: string | null; tom: string }>(app: T, quadro: T): T {
-  if (!app.sub || !/não conferidos/.test(app.sub) || app.pal !== quadro.pal) return app
-  expect(app.tom).not.toBe('tom-mint')
-  return { ...app, sub: quadro.sub, tom: quadro.tom }
+  if (!app.sub?.endsWith(LIBERADO_SEM_AGENDA)) return app
+  // Exactly the Posso lane's words (posso.ts): the board's green «Liberado» («até 11:00 ET») in the text colour, the
+  // sentence alone as its sub (no «até»: the end depends on the agenda)
+  expect(quadro).toMatchObject({ pal: 'Liberado', tom: 'tom-mint' })
+  expect(quadro.sub === null || /^até /.test(quadro.sub)).toBe(true)
+  expect(app).toEqual({ ...quadro, sub: LIBERADO_SEM_AGENDA, tom: 'tom-neutral' })
+  return quadro
 }
 
-// TODO(orchestrator, integration with telas-posso): replace this loose «não conferidos» match with the exact SPEC §5.4 sentence and tone (e.g. sub toBe the Posso lane's sentence, tom toBe 'tom-neutro'); review 2026-11-20 finding 5
-/** The others line: «19 liberadas, dados não conferidos» (not green) stands for the board's «19 liberadas» */
+/** The others line: the board's «19 liberadas» (green) reads «19 liberadas, dados não conferidos», muted */
 function parteSemAgenda(app: [string, string | undefined], quadro: [string, string]): [string, string | undefined] {
-  if (!/não conferidos/.test(app[0]) || !app[0].startsWith(quadro[0])) return app
-  expect(app[1]).not.toBe('tom-mint')
+  if (!app[0].endsWith(', dados não conferidos')) return app
+  expect(quadro[1]).toBe('tom-mint')
+  expect(app).toEqual([quadro[0].replace(/liberadas?$/, (m) => `${m}, dados não conferidos`), 'tom-muted'])
   return quadro
 }
 

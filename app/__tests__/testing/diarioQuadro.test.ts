@@ -65,7 +65,7 @@ import {
   type ContaDiario,
   type NumerosTexto,
 } from '@/lib/hub/diario'
-import { janelaLinha, outrasTexto, possoNoDiario, type ContaPosso } from '@/lib/hub/posso'
+import { LIBERADO_SEM_AGENDA, janelaLinha, outrasTexto, possoNoDiario, type ContaPosso } from '@/lib/hub/posso'
 import { selectorView } from '@/lib/hub/seletorContas'
 import { sortAccounts } from '@/lib/hub/contas'
 import { IMPORTACOES, MARKET_LABEL } from '@/components/hub/contas/copy'
@@ -87,8 +87,14 @@ import { CENARIOS, quadro, type Cenario, type EsperadoDia, type Quadro } from '@
  * boards' days are outside the agenda: SPEC §5.10), so a Futuros «Liberado» says the data were not checked and is not
  * green (SPEC §5.4; the words are the Posso lane's)
  */
-// TODO(orchestrator, integration with telas-posso): replace this loose «não conferidos» match with the exact SPEC §5.4 sentence and tone (e.g. sub toBe the Posso lane's sentence, tom toBe 'tom-neutro'); review 2026-11-20 finding 5
 const SEM_AGENDA = 'Phase 5-1: rules_now re-exported with the Futuros block sem_agenda; «Liberado» says «dados econômicos não conferidos»'
+/**
+ * A green «Liberado» of the board («até 11:00 ET» or no sub) as the Posso lane words it without the agenda (posso.ts,
+ * SPEC §5.4): the sub is the sentence alone (no «até»: the end depends on the agenda)
+ */
+const subSemAgenda = (sub: string | null) => (sub === null || /^até /.test(sub) ? LIBERADO_SEM_AGENDA : null)
+/** The others line's part: «19 liberadas» → «19 liberadas, dados não conferidos» (posso.ts ESTADO_PALAVRAS) */
+const parteSemAgenda = (texto: string) => texto.replace(/liberadas?$/, (m) => `${m}, dados não conferidos`)
 
 const PERMITIDAS: { onde: RegExp; aceita: (app: string, quadro: string) => boolean; motivo: string }[] = [
   {
@@ -118,7 +124,10 @@ const PERMITIDAS: { onde: RegExp; aceita: (app: string, quadro: string) => boole
     aceita: (app, quadro) => {
       const a = JSON.parse(app)
       const b = JSON.parse(quadro)
-      const um = (x: any, y: any) => (x && y && x.pal === y.pal && typeof x.sub === 'string' && /não conferidos/.test(x.sub) ? { ...x, sub: y.sub } : x)
+      const um = (x: any, y: any) =>
+        x && y && y.pal === 'Liberado' && x.pal === 'Liberado' && x.sub === subSemAgenda(y.sub) && (x.tom === undefined || x.tom === 'neutral')
+          ? { ...x, sub: y.sub, ...(x.tom === undefined ? {} : { tom: y.tom }) }
+          : x
       const norm = Array.isArray(a) ? a.map((x: any, i: number) => um(x, b[i])) : um(a, b)
       return JSON.stringify(norm) === JSON.stringify(b)
     },
@@ -131,7 +140,7 @@ const PERMITIDAS: { onde: RegExp; aceita: (app: string, quadro: string) => boole
       const b = JSON.parse(quadro)
       if (!a || !b) return false
       const partes = a.partes.map((x: any, i: number) =>
-        /não conferidos/.test(x.texto) && b.partes[i] && x.texto.startsWith(b.partes[i].texto) && x.tom !== 'mint' ? b.partes[i] : x,
+        b.partes[i] && x.texto !== b.partes[i].texto && x.texto === parteSemAgenda(b.partes[i].texto) && x.tom === 'muted' ? b.partes[i] : x,
       )
       return JSON.stringify({ ...a, partes }) === JSON.stringify(b)
     },
@@ -139,7 +148,10 @@ const PERMITIDAS: { onde: RegExp; aceita: (app: string, quadro: string) => boole
   },
   {
     onde: /^outrasTexto$/,
-    aceita: (app, quadro) => app.replace(/(liberadas?), dados não conferidos/g, '$1') === quadro,
+    aceita: (app, quadro) => {
+      const [titulo, ...resto] = quadro.split(' ')
+      return app === `${titulo} ${resto.join(' ').split(' · ').map(parteSemAgenda).join(' · ')}`
+    },
     motivo: SEM_AGENDA,
   },
 ]
@@ -526,9 +538,9 @@ describe('9b · the selector of many accounts', () => {
       expect(p.conta!.linha.sub).toBe(e.possoSel[0].sub)
       expect(`${p.conta!.linha.limite!.usado} ${p.conta!.linha.limite!.de}`.replace(NBSP, ' ')).toBe(e.possoSel[0].lim)
       expect(p.conta!.somando).toBe(e.possoSel[0].soma)
-      // TODO(orchestrator, integration with telas-posso): replace this loose «não conferidos» match with the exact SPEC §5.4 sentence and tone (e.g. sub toBe the Posso lane's sentence, tom toBe 'tom-neutro'); review 2026-11-20 finding 5
-      // SEM_AGENDA: «19 liberadas, dados não conferidos» stands for the board's «19 liberadas»
-      expect(outrasTexto(p.outras!).replace(/(liberadas?), dados não conferidos/g, '$1')).toBe(`${e.outras.titulo} ${e.outras.partes.map((x) => x.texto).join(' · ')}`)
+      // SEM_AGENDA: the board's «19 liberadas» reads «19 liberadas, dados não conferidos», not green
+      expect(outrasTexto(p.outras!)).toBe(`${e.outras.titulo} ${e.outras.partes.map((x) => parteSemAgenda(x.texto)).join(' · ')}`)
+      p.outras!.partes.filter((x) => x.texto.endsWith('dados não conferidos')).forEach((x) => expect(x.tom).toBe('muted'))
       const dia = q.porConta[id].dias[q.info.dia]
       expect(diaLongo(dia.day)).toBe(e.dia)
       expect(limpo(numerosDoDia(dayTiles(dia.facts, dia.account.market), contaDiario(q, id)).res)).toBe(e.res)

@@ -246,7 +246,8 @@ describe('loading and error (C6, C7; hoje 10c, 10d)', () => {
     mocks.fetchCalendario.mockImplementation(async (_db, id) => parseCalendar(cru[id].calendario))
     mocks.fetchMes.mockImplementation(async (_db, id, month) => parseMonth(cru[id].meses[month]))
     mocks.fetchDia.mockImplementation(async (_db, id, day) => parseDay(cru[id].dias[day]))
-    await user.click(screen.getByRole('button', { name: 'Tentar de novo' }))
+    // The «Posso» card has its own «Tentar de novo» (grey «Liberado» without the agenda, Q12): press the Diário's
+    await user.click(within(alerta.closest('section') as HTMLElement).getByRole('button', { name: 'Tentar de novo' }))
     const cal = await screen.findByRole('region', { name: 'Calendário' })
     await waitFor(() => expect(within(cal).getByRole('heading', { level: 2, name: 'Calendário' })).toHaveFocus())
     expect(screen.queryByRole('alert')).toBeNull()

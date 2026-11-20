@@ -7,6 +7,7 @@
 import { act, screen, waitFor, within } from '@testing-library/react'
 import { onlineManager } from '@tanstack/react-query'
 import { diarioKeys } from '@/hooks/useDiario'
+import { agendaKeys } from '@/hooks/useAgenda'
 import { mocks, renderDiario } from '@/testing/diarioTelas'
 import { navegacao, USUARIO_DO_QUADRO } from '@/testing/diarioTelasMocks'
 import type { Cenario, EsperadoDia } from '@/testing/diarioQuadro'
@@ -321,6 +322,9 @@ describe('Phase 5 · telas-diario: «Dados econômicos» on a day without entrie
     mocks.fetchAgendaDoDia.mockRejectedValue(new (jest.requireActual('@/lib/hub/agendaDb').AgendaDataError)('network'))
     r.cru[r.q.info.contaId].dias[r.q.info.dia].trades = []
     await act(async () => {
+      // The «Posso» card (telas-posso) reads today's agenda under the same agendaKeys.dia, and the open day is today:
+      // drop that answer so the day's read really fails
+      await r.queryClient.resetQueries({ queryKey: agendaKeys.all(USUARIO_DO_QUADRO) })
       await r.queryClient.refetchQueries({ queryKey: diarioKeys.dia(USUARIO_DO_QUADRO, r.q.info.contaId, r.q.info.dia) })
     })
     await waitFor(async () => expect(await linhaDados()).toBe('Dados econômicos não conferidos neste dia — Não conferido'), { timeout: 4000 })
