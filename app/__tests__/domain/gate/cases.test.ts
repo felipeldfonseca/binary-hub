@@ -9,6 +9,10 @@
  * group. The rows marked "sql" are the inputs that
  * supabase/tests/30_phase2.test.sql asserts (§12 tests.gate_cases and tests.owner_cases; §13 for
  * the limit, with dates relative to now() there).
+ * Phase 5 (migration 20261120000001_dados_economicos.sql) re-asked every input of gate_eval and
+ * rules_check_resolved and added the long-form `resolved` cases: the generator in
+ * .claude/backup-fase5/gen5 (regravar_gate.sql, merged by mesclar.mjs) writes gate-cases.json,
+ * copied here as cases.json; how to run it is in ../cases5.test.ts. Never edit cases.json by hand.
  */
 import cases from './cases.json';
 import {
