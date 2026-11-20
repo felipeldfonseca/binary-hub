@@ -11,7 +11,7 @@ import { MON_TO_FRI } from '@/lib/domain/tempo';
 import type { AccountMarket, AtLimit, CalendarCode, LimitMode, ReleaseCode, ReleaseMode, StateChoice, StateName } from '@/lib/domain/gate';
 import { ACCOUNT_MARKETS, AGENDA_RELEASES, CALENDAR_CODES, MARKET_SPEC, STATE_NAMES } from '@/lib/domain/gate';
 import { SALVAR, ERRO_REGRAS } from '@/components/hub/personalizar/copy';
-import type { RegrasErrorCode } from './regrasDb';
+import { MENSAGENS_REGRAS, type RegrasErrorCode } from './regrasDb';
 import { formatDiaMes } from './formato';
 import {
   BLOCK_MAX,
@@ -547,7 +547,8 @@ export function statusSalvar(x: {
 }): StatusSalvar {
   const m = x.mensagem;
   if (x.salvando) return { texto: SALVAR.salvando, tom: 'ok' };
-  if (m?.tipo === 'erro') return { texto: ERRO_REGRAS[m.code], tom: 'mudou' };
+  // A code with its own words (regrasDb's MENSAGENS_REGRAS, contract §3.3: bad_releases) before the screens' generic ones
+  if (m?.tipo === 'erro') return { texto: MENSAGENS_REGRAS[m.code] ?? ERRO_REGRAS[m.code], tom: 'mudou' };
   if (x.aguardando && m?.tipo === 'salvo') return { texto: m.texto, tom: 'ok' };
   if (x.sujo) return { texto: x.temProblema ? SALVAR.corrija : SALVAR.naoSalvas, tom: 'mudou' };
   if (m?.tipo === 'salvo') return { texto: m.texto, tom: 'ok' };

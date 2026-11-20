@@ -26,6 +26,7 @@ import {
   escolherDado,
   mapaDoAtalho,
   mudancasDaEntidade,
+  statusSalvar,
   temProprio,
   voltarAoPadraoDados,
   type Entidade,
@@ -223,6 +224,15 @@ describe('bad_releases and the 10-minute notice', () => {
     expect(REGRAS_ERROR_CODES).toContain('bad_releases');
     expect(toRegrasError({ message: 'bad_releases' }).code).toBe('bad_releases');
     expect(MENSAGENS_REGRAS.bad_releases).toBe('Escolha de dado econômico inválida. Recarregue a página e tente de novo.');
+  });
+
+  it('a save answered bad_releases shows that sentence on the screen\'s status line, not the generic one', () => {
+    const x = { salvando: false, aguardando: false, sujo: true, temProblema: false };
+    expect(statusSalvar({ ...x, mensagem: { tipo: 'erro', code: 'bad_releases' } })).toEqual({
+      texto: 'Escolha de dado econômico inválida. Recarregue a página e tente de novo.',
+      tom: 'mudou',
+    });
+    expect(statusSalvar({ ...x, mensagem: { tipo: 'erro', code: 'network' } }).texto).not.toBe(MENSAGENS_REGRAS.bad_releases);
   });
 
   it('alerts.before_block: on by default («ligado de fábrica»), off only when saved as false', () => {

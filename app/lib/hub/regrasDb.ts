@@ -167,8 +167,8 @@ export interface PreferencesPatch {
 }
 
 /**
- * The pt-BR words of the rules codes that have their own (contract §3.3, chosen there): the screens'
- * ERRO_REGRAS (personalizar/copy.ts) takes these over its generic sentence.
+ * The pt-BR words of the rules codes that have their own (contract §3.3, chosen there): the save's
+ * status line (rascunho's statusSalvar) takes these over ERRO_REGRAS' generic sentence (personalizar/copy.ts).
  */
 export const MENSAGENS_REGRAS: Readonly<Partial<Record<RegrasErrorCode, string>>> = Object.freeze({
   bad_releases: 'Escolha de dado econômico inválida. Recarregue a página e tente de novo.',
