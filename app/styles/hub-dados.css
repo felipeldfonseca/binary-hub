@@ -109,12 +109,14 @@
     display: grid;
     grid-template-rows: repeat(2, auto);
     grid-auto-flow: column;
-    grid-template-columns: repeat(2, max-content);
+    /* max-content as drawn, but never wider than the card: a pill that does not fit wraps its words */
+    grid-template-columns: repeat(2, minmax(0, max-content));
     justify-items: start;
     gap: 6px 12px;
   }
   .hub .hub-dd-atalhos .hub-pill {
-    white-space: nowrap;
+    max-width: 100%;
+    text-align: left;
   }
   /* The list as a table of three columns: Dado · Próxima · O que você faz (SPEC §7.1) */
   .hub .hub-dd-lista .hub-dd-linha {
