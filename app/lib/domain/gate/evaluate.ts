@@ -506,7 +506,11 @@ function blockInterval(x: unknown): BlockInterval {
     throw new ServerGateError();
   }
   if (!Array.isArray(x.releases) || x.releases.length === 0) throw new ServerGateError();
-  return { kind: x.kind, start: date(x.start), end: date(x.end), releases: x.releases.map(blockRelease) };
+  const start = date(x.start);
+  const end = date(x.end);
+  // Half-open and never empty (SPEC §4.1)
+  if (start.getTime() >= end.getTime()) throw new ServerGateError();
+  return { kind: x.kind, start, end, releases: x.releases.map(blockRelease) };
 }
 
 /**
@@ -515,6 +519,7 @@ function blockInterval(x: unknown): BlockInterval {
  */
 function parseBlock(b: Obj): BlockCheck {
   if (b.state === 'nao_avaliado') {
+    if (!hasExactly(b, ['state', 'reason'])) throw new ServerGateError();
     return skipped(b, ['sem_versao', 'so_futuros', 'regra_desligada', 'sem_calendario', 'sem_agenda', 'fase5'] as const);
   }
   if ((b.state !== 'ok' && b.state !== 'no_bloqueio') || !hasExactly(b, ['state', 'active', 'today', 'free_at'])) {
@@ -588,9 +593,15 @@ export function parseServerGate(json: unknown): GateResult {
   if (!okList(json.warnings, ['fora_janela', 'limite']) || !okList(json.checks_evaluated, CHECK_ORDER)) throw new ServerGateError();
   // An evaluated block is listed among the checks, and only then
   if (block.evaluated !== json.checks_evaluated.includes('bloqueio')) throw new ServerGateError();
+  // status = aguardar ⇔ an active interval, unless the limit closed the day (contract §3.5, SPEC §5.4)
+  const waiting = block.evaluated && block.active !== null;
+  if (json.status !== 'encerrado' && (json.status === 'aguardar') !== waiting) throw new ServerGateError();
+  const at = date(json.at);
+  // free_at = the first free instant at or after p (SPEC §5.3)
+  if (block.evaluated && block.freeAt && block.freeAt.getTime() < at.getTime()) throw new ServerGateError();
 
   return {
-    at: date(json.at),
+    at,
     tradingDay: json.trading_day,
     status: json.status as GateStatus | null,
     warnings: json.warnings as GateWarning[],

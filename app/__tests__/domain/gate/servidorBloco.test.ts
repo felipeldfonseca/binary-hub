@@ -158,7 +158,33 @@ describe('every other shape is refused (ServerGateError), never read as «no rul
     ['ok with a free_at', () => ({ ...ok(), free_at: '2026-12-03T15:10:00+00:00' }), {}],
     ['evaluated without «bloqueio» among the checks', ok, { checks_evaluated: ['janela', 'limite'] }],
     ['not evaluated with «bloqueio» among the checks', () => ({ state: 'nao_avaliado', reason: 'sem_agenda' }), { checks_evaluated: ['janela', 'bloqueio', 'limite'] }],
+    // Review: the not-evaluated block is as strict as the evaluated one
+    ['not evaluated with an extra key', () => ({ state: 'nao_avaliado', reason: 'sem_agenda', active: null }), {}],
+    ['not evaluated without its reason', () => ({ state: 'nao_avaliado' }), {}],
+    // Contract §3.5 writes no `reason` on the evaluated block (and the Phase 5 SQL builds it without one)
+    ['evaluated with reason: null', () => ({ ...ok(), reason: null }), {}],
+    // Review: the status and the block agree (status = aguardar ⇔ an active interval, unless encerrado)
+    ['liberado during a wait', busy, { status: 'liberado' }],
+    ['fora_janela during a wait', busy, { status: 'fora_janela' }],
+    ['status null during a wait', busy, { status: null }],
+    ['aguardar with the block free', ok, { status: 'aguardar' }],
+    ['aguardar with the block not evaluated', () => ({ state: 'nao_avaliado', reason: 'sem_agenda' }), { status: 'aguardar' }],
+    // Review: free_at is the first free instant at or after p; an interval is not empty
+    ['free_at before the instant', () => ({ ...busy(), free_at: '2026-12-03T14:00:00+00:00' }), { status: 'aguardar' }],
+    ['an interval with start = end', () => ({ ...ok(), today: [{ ...ism(), end: ism().start }] }), {}],
+    ['an interval with start after end', () => ({ ...ok(), today: [{ ...ism(), start: ism().end, end: ism().start }] }), {}],
   ])('%s', (_label, block, extra) => {
     expect(() => parseServerGate(sample(block(), extra))).toThrow(ServerGateError);
+  });
+});
+
+describe('the status and the block agree (review)', () => {
+  const busy = () => ({ state: 'no_bloqueio', active: ism(), today: [ism()], free_at: '2026-12-03T15:10:00+00:00' });
+  it('«Encerrado por hoje» during a wait is read (the limit wins)', () => {
+    expect(parseServerGate(sample(busy(), { status: 'encerrado' })).status).toBe('encerrado');
+  });
+  it('aguardar during a wait is read; free_at equal to the instant is read', () => {
+    expect(parseServerGate(sample(busy(), { status: 'aguardar' })).status).toBe('aguardar');
+    expect(parseServerGate(sample({ ...busy(), free_at: '2026-12-03T15:05:00+00:00' }, { status: 'aguardar' })).block).toMatchObject({ evaluated: true });
   });
 });
