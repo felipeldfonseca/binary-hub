@@ -14,6 +14,7 @@ jest.mock('@/lib/hub/diarioDb', () => require('@/testing/diarioTelasMocks').mock
 jest.mock('@/lib/hub/regrasDb', () => require('@/testing/diarioTelasMocks').mockRegrasDb())
 jest.mock('@/lib/hub/contasDb', () => require('@/testing/diarioTelasMocks').mockContasDb())
 jest.mock('@/lib/hub/registrarDb', () => require('@/testing/diarioTelasMocks').mockRegistrarDb())
+jest.mock('@/lib/hub/agendaDb', () => require('@/testing/diarioTelasMocks').mockAgendaDb())
 
 const GRAVA =
   'Um pregão de cada vez: o que você planejou, o que você fez e a sua revisão. Cada operação registrada guarda o “Posso operar hoje?” da entrada, com a hora do servidor; as que chegam só pelo arquivo têm o “Posso operar hoje?” recalculado, e a operação mostra isso. As marcas guardam a hora: as de antes da saída contam como limpas. Cada revisão salva fica guardada com a hora; as anteriores ficam para ler.'

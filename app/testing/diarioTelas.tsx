@@ -21,6 +21,7 @@ import * as diarioDb from '@/lib/hub/diarioDb'
 import * as regrasDb from '@/lib/hub/regrasDb'
 import * as contasDb from '@/lib/hub/contasDb'
 import * as registrarDb from '@/lib/hub/registrarDb'
+import * as agendaDb from '@/lib/hub/agendaDb'
 import { diarioKeys } from '@/hooks/useDiario'
 import { addDays } from '@/lib/domain/tempo'
 import { monthOf, type Day } from '@/lib/domain/diario'
@@ -29,6 +30,7 @@ import DiarioPage from '@/app/(hub)/diario/page'
 import { renderHub } from './hubHarness'
 import { navegacao, USUARIO_DO_QUADRO } from './diarioTelasMocks'
 import { nomeDaConta, quadro, quadroJson, type Cenario, type Quadro } from './diarioQuadro'
+import { leituraDoDia, proximosDoQuadro, semanaDoQuadro } from './agenda'
 
 type Json = Record<string, any>
 const m = <T extends (...a: any[]) => any>(f: T) => f as unknown as jest.MockedFunction<T>
@@ -61,6 +63,9 @@ export const mocks = {
   addMarks: m(registrarDb.addMarks),
   imageSlots: m(registrarDb.imageSlots),
   saveExtras: m(registrarDb.saveExtras),
+  fetchAgendaDoDia: m(agendaDb.fetchAgendaDoDia),
+  fetchProximosDados: m(agendaDb.fetchProximosDados),
+  fetchDadosDaSemana: m(agendaDb.fetchDadosDaSemana),
 }
 
 /** Whether the test file declared the mock block of testing/diarioTelasMocks */
@@ -72,6 +77,7 @@ function blocoDeclarado(): string[] {
     ['@/lib/hub/regrasDb', regrasDb],
     ['@/lib/hub/contasDb', contasDb],
     ['@/lib/hub/registrarDb', registrarDb],
+    ['@/lib/hub/agendaDb', agendaDb],
   ]
   for (const [nome, mod] of marcados) if (!(mod as { __diarioTelas?: boolean }).__diarioTelas) faltam.push(nome)
   return faltam
@@ -158,7 +164,7 @@ export async function renderDiario(cen: Cenario, { tema, estado }: OpcoesDoDiari
   if (faltam.length) {
     throw new Error(
       `renderDiario: this test file lacks the mock block of testing/diarioTelasMocks (contract §4.5) for ${faltam.join(', ')}; ` +
-        'copy the seven jest.mock lines of that file to its top',
+        'copy the eight jest.mock lines of that file to its top',
     )
   }
   const q = quadro(cen)
@@ -281,6 +287,12 @@ export async function renderDiario(cen: Cenario, { tema, estado }: OpcoesDoDiari
   })
   mocks.imageSlots.mockReset().mockRejectedValue(new registrarDb.RegistrarDataError('unknown'))
   mocks.saveExtras.mockReset().mockRejectedValue(new registrarDb.RegistrarDataError('unknown'))
+
+  // ---- the agenda (Phase 5-1): testing/agenda's world, as the reads filter it. The Phase 4 scenarios (October and
+  // November 2026) fall outside its coverage, so their day reads «não conferido», as the real app would
+  mocks.fetchAgendaDoDia.mockReset().mockImplementation(async (_db, o) => leituraDoDia(o.at, { calendars: o.calendars, clock: o.clock }))
+  mocks.fetchProximosDados.mockReset().mockImplementation(async (_db, o) => proximosDoQuadro(o.from, o.days))
+  mocks.fetchDadosDaSemana.mockReset().mockImplementation(async (_db, o) => semanaDoQuadro(o.start, o.end))
 
   const ui = tema ? (
     <div className="hub" data-tema={tema}>
