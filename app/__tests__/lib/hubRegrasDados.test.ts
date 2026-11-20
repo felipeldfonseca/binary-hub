@@ -95,15 +95,20 @@ describe('the account, canonical per code against what it inherits', () => {
     expect(dadosEfetivos(s, PADRAO).modos.cpi).toBe('dia');
   });
 
-  it('«Voltar ao padrão de Futuros» deletes only the account\'s releases (contract §3.4, SPEC §3.3): switch and minutes stay', () => {
+  it('«Voltar ao padrão de Futuros» deletes every own key of the rule: switch, minutes and releases (orchestrator, Q41; c3 §3.8)', () => {
     let s = comBloqueio(escolherDado(base(), CONTA, 'ppi', 'depois'), CONTA, { beforeMin: 3, on: false });
     expect(s.accounts[topOne.id].block).toEqual({ on: false, beforeMin: 3, releases: { ppi: 'depois' } });
     s = voltarAoPadraoDados(s, CONTA);
-    expect(s.accounts[topOne.id].block).toEqual({ on: false, beforeMin: 3 });
-    expect(accountRulesJson('futures', s.accounts[topOne.id]).block).toEqual({ on: false, before_min: 3 });
+    expect(s.accounts[topOne.id].block).toEqual({});
+    expect(accountRulesJson('futures', s.accounts[topOne.id]).block).toBeUndefined();
     expect(voltarAoPadraoDados(s, PADRAO)).toBe(s);
-    const soDados = voltarAoPadraoDados(escolherDado(base(), CONTA, 'cpi', 'dia'), CONTA);
-    expect(accountRulesJson('futures', soDados.accounts[topOne.id]).block).toBeUndefined();
+    expect(voltarAoPadraoDados(s, CONTA)).toBe(s);
+    // Q41: only the minutes are the account's own; the button brings back the default's 5 and 10
+    const q41 = voltarAoPadraoDados(comBloqueio(base(), CONTA, { beforeMin: 3, afterMin: 15 }), CONTA);
+    expect(accountRulesJson('futures', q41.accounts[topOne.id]).block).toBeUndefined();
+    expect(blockJson(q41)).toMatchObject({ on: true, before_min: 5, after_min: 10 });
+    // the other rules of the account stay
+    expect(q41.accounts[topOne.id].limit).toEqual(base().accounts[topOne.id].limit);
   });
 
   it('reads a stored account map strictly: an unknown code or value is not the as-built shape', () => {
