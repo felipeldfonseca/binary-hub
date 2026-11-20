@@ -1,6 +1,7 @@
 /**
  * @jest-environment node
  */
+import { randomBytes } from 'crypto'
 import fs from 'fs'
 import path from 'path'
 import { NextRequest } from 'next/server'
@@ -106,20 +107,22 @@ describe('cron handlers require their secret', () => {
     process.env = env
   })
   const cron = () => handlers.filter((entry) => CRON_HANDLERS.includes(entry.name))
+  // made at run time: no secret-like literal in the public repository
+  const cronSecret = randomBytes(24).toString('hex')
 
   it('lists only handlers that exist', () => {
     expect(cron().map((entry) => entry.name).sort()).toEqual([...CRON_HANDLERS].sort())
   })
 
   it.each(CRON_HANDLERS)('%s turns away a request without the header', async (name) => {
-    process.env = { ...env, CRON_SECRET: 'invented-cron-secret' }
+    process.env = { ...env, CRON_SECRET: cronSecret }
     const response = await call(cron().find((entry) => entry.name === name)!)
     expect(response.status).toBe(401)
     expect(mockGetUser).not.toHaveBeenCalled()
   })
 
   it.each(CRON_HANDLERS)('%s turns away a wrong secret', async (name) => {
-    process.env = { ...env, CRON_SECRET: 'invented-cron-secret' }
+    process.env = { ...env, CRON_SECRET: cronSecret }
     const response = await call(cron().find((entry) => entry.name === name)!, { Authorization: 'Bearer forged' })
     expect(response.status).toBe(401)
     expect(mockGetUser).not.toHaveBeenCalled()

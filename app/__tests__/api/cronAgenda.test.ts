@@ -1,6 +1,7 @@
 /**
  * @jest-environment node
  */
+import { randomBytes } from 'crypto'
 import { fakeAgendaDb, type FakeAgendaDb } from '@/testing/agendaFakeDb'
 
 let db: FakeAgendaDb
@@ -11,9 +12,9 @@ jest.mock('@/lib/server/supabaseAdmin', () => ({
 
 import { GET } from '@/app/api/cron/agenda/route'
 
-// Invented values for the test only
-const SECRET = 'test-cron-secret-0123456789'
-const KEY = 'test-service-key'
+// Made at run time, so no secret-like literal sits in the public repository
+const SECRET = randomBytes(24).toString('hex')
+const KEY = randomBytes(24).toString('hex')
 const URL_ = 'https://example.invalid'
 const beaJson = {
   'Gross Domestic Product': { release_dates: Array.from({ length: 12 }, (_, m) => `2026-${String(m + 1).padStart(2, '0')}-25T13:30:00+00:00`).concat(Array.from({ length: 12 }, (_, m) => `2027-${String(m + 1).padStart(2, '0')}-25T13:30:00+00:00`)) },
