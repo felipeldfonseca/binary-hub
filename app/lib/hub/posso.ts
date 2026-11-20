@@ -354,12 +354,17 @@ const concorda = (code: ReleaseCode, palavra: 'cancelad' | 'adiad') => `${palavr
 export function dadosCanceladosHoje(read: AgendaRead | null | undefined, gate: GateResult, rules: Rules | null): string[] {
   const b = rules?.block;
   if (!read || !b || !b.on) return [];
+  // Only where the gate would have waited (SPEC §7.2 l.1234): not for a rule the gate itself sets aside (0+0 minutes,
+  // `regra_desligada`; outside Futuros), and a «volta» code only with minutes around it
+  if (!gate.block.evaluated && gate.block.reason !== 'sem_agenda') return [];
   const mapa = releasesOf(b);
+  const semMinutos = b.beforeMin + b.afterMin === 0;
   const clock = { tz: rules.day.tz, startMin: rules.day.startMin };
   const wtz = rules.windows[0]?.tz ?? rules.day.tz;
   const out: string[] = [];
   for (const row of read.rows) {
     if (!row.code || !mapa[row.code] || !b.calendars.includes(row.calendar)) continue;
+    if (mapa[row.code] === 'volta' && semMinutos) continue;
     const nome = `${NOMES_DADOS[row.code].nome} de hoje`;
     if (row.status === 'cancelado' && tradingDayOn(row.at, clock) === gate.tradingDay) {
       out.push(`${nome} ${concorda(row.code, 'cancelad')}: sem espera hoje.`);
@@ -566,12 +571,22 @@ export interface NotasDaConta {
  * (already null with the preference off), `agenda` the day's read (null while unread or failed: no cancelled line),
  * `entendi` whether this device dismissed the «Dados econômicos» notice of the account (lib/hub/avisoDados).
  */
+/**
+ * Whether the 10-minute notice may show under this answer: only where «Mais tarde» would (c3 §5.2: the notice takes
+ * that line's place), «Liberado» and «Fora da sua janela»; never under «Encerrado por hoje» («nada sobre dados») nor a
+ * whole day «Não opero hoje» («a espera não aparece», SPEC §7.2). The Registrar uses the same gate.
+ */
+export function avisoDezMinCabe(gate: GateResult): boolean {
+  const k = answerOf(gate).kind;
+  return k === 'liberado' || k === 'fora_janela';
+}
+
 export function notasDaConta(
   conta: Pick<ContaPosso, 'gate' | 'rules'>,
   o: { agora: Date; aviso: { start: Date; end: Date; releases: readonly BlockRelease[] } | null; agenda: AgendaRead | null; entendi: boolean },
 ): NotasDaConta {
   const wtz = relogioDaJanela(conta.rules);
-  const avisoDezMin = o.aviso ? avisoDezMinTexto(o.aviso, wtz) : null;
+  const avisoDezMin = o.aviso && avisoDezMinCabe(conta.gate) ? avisoDezMinTexto(o.aviso, wtz) : null;
   return {
     avisoDezMin,
     maisTarde: avisoDezMin ? null : maisTarde(conta.gate, conta.rules, o.agora),
