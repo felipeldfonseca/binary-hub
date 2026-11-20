@@ -89,6 +89,11 @@ export function janelaLinha(rules: Rules | null): string {
   return rules.windows[0].tz === 'America/Sao_Paulo' ? `Janela ${faixas} · Brasília` : `Janela ${faixas}${sufixoRelogio(rules.windows[0].tz)}`;
 }
 
+/** The window clock of an account's rules (hours of «Dados econômicos» show on it, SPEC §5.6) */
+export function relogioDaJanela(rules: Rules | null): string {
+  return rules?.windows[0]?.tz ?? rules?.day.tz ?? 'America/New_York';
+}
+
 /** '' (same date), 'amanhã ', or 'seg ' … on the window's clock */
 function quando(next: Date, now: Date, tz: string): string {
   const a = utcToLocal(now, tz);
@@ -116,7 +121,7 @@ export const LIBERADO_SEM_AGENDA = `${PALAVRAS_DADOS.naoConferidosSub} · sem a 
  */
 export function possoLinha(conta: string, r: GateResult, rules: Rules | null, agora: Date = r.at): PossoLinha {
   const a = answerOf(r);
-  const wtz = rules?.windows[0]?.tz ?? rules?.day.tz ?? 'America/New_York';
+  const wtz = relogioDaJanela(rules);
   const dtz = rules?.day.tz ?? wtz;
 
   let limite: PossoLinha['limite'] = null;
@@ -271,7 +276,7 @@ export function conferidosDoGate(gate: GateResult): string | null {
 export function maisTarde(gate: GateResult, rules: Rules | null, agora: Date = gate.at): string | null {
   const a = answerOf(gate);
   if ((a.kind !== 'liberado' && a.kind !== 'fora_janela') || !gate.block.evaluated) return null;
-  const wtz = rules?.windows[0]?.tz ?? rules?.day.tz ?? 'America/New_York';
+  const wtz = relogioDaJanela(rules);
   const futuras = gate.block.today.filter((i) => i.kind === 'espera' && i.start.getTime() > agora.getTime());
   if (futuras.length === 0) return null;
   const [p] = futuras;
@@ -492,14 +497,14 @@ const marketRank = (m: AccountMarket) => {
  * janela · 3 sem janela salva»; «todas fora da janela» when they all share one state; the state
  * alone with one other account). The view of every account goes to the Início (Phase 8).
  */
-export function possoNoDiario(accounts: readonly ContaPosso[], selectedId: string): PossoNoDiario {
+export function possoNoDiario(accounts: readonly ContaPosso[], selectedId: string, agora?: Date): PossoNoDiario {
   const ordered = accounts
     .map((a, i) => ({ a, i }))
     .sort((x, y) => marketRank(x.a.market) - marketRank(y.a.market) || x.i - y.i)
     .map((x) => x.a);
   const sel = ordered.find((a) => a.accountId === selectedId) ?? null;
   const others = ordered.filter((a) => a.accountId !== selectedId);
-  const linhaDe = (a: ContaPosso): LinhaDaConta => ({ accountId: a.accountId, label: a.label, linha: possoLinha(a.label, a.gate, a.rules) });
+  const linhaDe = (a: ContaPosso): LinhaDaConta => ({ accountId: a.accountId, label: a.label, linha: possoLinha(a.label, a.gate, a.rules, agora ?? a.gate.at) });
 
   let outras: OutrasContas | null = null;
   if (others.length) {
@@ -533,3 +538,37 @@ export function outrasTexto(o: OutrasContas): string {
 
 /** The sentence the card's ⓘ gains on the Diário (owner's revision of 25 Oct) */
 export const POSSO_NO_DIARIO_INFO = 'Aqui aparece a conta aberta no Diário; as outras ficam numa linha, e “Ver todas” mostra a resposta de cada uma.';
+
+/** What the Diário's card draws under the open account's line (Phase 5-1; the boards Q11, Q12, Q16, Q18, Q37) */
+export interface NotasDaConta {
+  /** The amber 10-minute notice with the clock (Q37); while it shows, «Mais tarde» does not (c3 §5.2 l.937) */
+  avisoDezMin: string | null;
+  /** The grey «Mais tarde: …» line (Q11) */
+  maisTarde: string | null;
+  /** The grey lines of a release of today cancelled or postponed (NEW, not drawn) */
+  cancelados: string[];
+  /** The first-wait notice with «Entendi» (Q18); null once «Entendi» was pressed on this device */
+  primeiraEspera: string | null;
+  /** «Conferidos: …» / «… Não conferido: …» (every frame) */
+  conferidos: string | null;
+}
+
+/**
+ * The notes of the open account at `agora` (the screen's server clock): `aviso` is useRelogioDados' `avisoDezMin`
+ * (already null with the preference off), `agenda` the day's read (null while unread or failed: no cancelled line),
+ * `entendi` whether this device dismissed the «Dados econômicos» notice of the account (lib/hub/avisoDados).
+ */
+export function notasDaConta(
+  conta: Pick<ContaPosso, 'gate' | 'rules'>,
+  o: { agora: Date; aviso: { start: Date; end: Date; releases: readonly BlockRelease[] } | null; agenda: AgendaRead | null; entendi: boolean },
+): NotasDaConta {
+  const wtz = relogioDaJanela(conta.rules);
+  const avisoDezMin = o.aviso ? avisoDezMinTexto(o.aviso, wtz) : null;
+  return {
+    avisoDezMin,
+    maisTarde: avisoDezMin ? null : maisTarde(conta.gate, conta.rules, o.agora),
+    cancelados: dadosCanceladosHoje(o.agenda, conta.gate, conta.rules),
+    primeiraEspera: o.entendi ? null : avisoPrimeiraEspera(conta.gate, conta.rules),
+    conferidos: conferidosDoGate(conta.gate),
+  };
+}
