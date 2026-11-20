@@ -337,11 +337,13 @@ export function linhasDeDados(
     const zero = !semEspera && grupo.every((r) => modos[r.code] === 'volta');
     out.push(info(grupo.map((r) => r.code), grupo[0].at, zero ? DADOS.modo.volta : HOJE.operoNormalmente));
   }
-  // A release of today cancelled or moved, where the account had a wait or a whole day (c3 §12.5)
-  for (const r of rows.filter((x) => !vivo(x) || (x.wasAt && x.wasAt.getTime() !== x.at.getTime()))) {
+  // A release of today cancelled or postponed without a new date, where the account had a wait or a
+  // whole day (c3 §12.5). A release moved INTO today (or within it) is live and has its wait above; one
+  // moved OUT of today shows in the loop below, on its old date
+  for (const r of rows.filter((x) => !vivo(x))) {
     if (semEspera || modos[r.code] === 'normal') continue;
     const nome = NOMES_DADOS[r.code].nome;
-    const t = r.status === 'cancelado' ? HOJE.canceladoHoje(nome) : HOJE.adiadoHoje(nome, diaComMes(dataEm(r.at, tz)));
+    const t = r.status === 'cancelado' ? HOJE.canceladoHoje(nome) : HOJE.adiadoSemDataHoje(nome);
     out.push({ at: r.at.getTime(), linha: { esquerda: [{ t, fraco: true }], estado: '', tom: 'muted', forte: false, sub: null } });
   }
   // A moved release shows on its old date too (was_at today, at later)

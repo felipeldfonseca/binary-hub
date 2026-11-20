@@ -362,7 +362,7 @@ describe('Fase 3c \u00b7 \u00abMover para o breakeven\u00bb in the version notes
 // Phase 5-1 · «Dados econômicos» in «Como fica hoje» (c3 §4.2; boards Q19–Q23), the version notes
 // (c3 §3.10) and «Próximos dados» (c3 §4.3): the boards' world (testing/agenda), limit US$ 500
 // ---------------------------------------------------------------------------------------------
-import { releasesOf, type ReleaseCode, type ReleaseMode } from '@/lib/domain/gate'
+import { releasesOf, type AgendaRead, type AgendaRow, type ReleaseCode, type ReleaseMode } from '@/lib/domain/gate'
 import { et as etQ, leituraDoDia } from '@/testing/agenda'
 
 /** The world's Top One (limit US$ 500) with these behaviours over the app's default (the long form) */
@@ -456,6 +456,38 @@ describe('«Como fica hoje» with the day\'s releases (Phase 5-1, c3 §4.2)', ()
         expect(ls).toEqual(['O dia todo → Dados econômicos não conferidos [muted, leve]'])
         semVerde(ls)
       }
+    })
+  })
+
+  describe('a release of today cancelled or moved (c3 §12.5, caso 17)', () => {
+    const AGORA = '2026-12-10 07:00'
+    /** The world's day with the CPI of 10 Dec changed */
+    const comCpi = (patch: Partial<AgendaRow>): AgendaRead => {
+      const read = leituraDoDia(etQ(AGORA))
+      return { ...read, rows: read.rows.map((r) => (r.code === 'cpi' && r.day === '2026-12-10' ? { ...r, ...patch } : r)) }
+    }
+    const dia = (read: AgendaRead) => linhas(comoFicaHoje(quadro(), etQ(AGORA), win(quadro()), read))
+    const RESTO = ['No resto do dia → Fora da sua janela [amber]', LIMITE]
+    it('cancelled: no wait, the grey line', () => {
+      expect(dia(comCpi({ status: 'cancelado' }))).toEqual(['CPI de hoje cancelado: sem espera hoje. →  [muted, leve]', `${JANELA} → Liberado [mint]`, ...RESTO])
+    })
+    it('postponed without a new date: no wait, never «adiado para» today', () => {
+      expect(dia(comCpi({ status: 'adiado' }))).toEqual(['CPI adiado, sem data nova: sem espera hoje. →  [muted, leve]', `${JANELA} → Liberado [mint]`, ...RESTO])
+    })
+    it('moved out of today: one grey line with the new date', () => {
+      expect(dia(comCpi({ at: etQ('2026-12-11 08:30'), wasAt: etQ('2026-12-10 08:30') }))).toEqual([
+        'CPI adiado para sex 11 dez: sem espera hoje. →  [muted, leve]',
+        `${JANELA} → Liberado [mint]`,
+        ...RESTO,
+      ])
+    })
+    it('moved into today, or within today: the wait only, no «adiado» line', () => {
+      expect(dia(comCpi({ wasAt: etQ('2026-12-08 08:30') }))).toEqual([`08:25–08:40 ET${SEP}espera do CPI → Aguardar até 08:40 [amber]`, `${JANELA} → Liberado [mint]`, ...RESTO])
+      expect(dia(comCpi({ at: etQ('2026-12-10 10:30'), wasAt: etQ('2026-12-10 08:30') }))).toEqual([
+        `${JANELA} → Liberado [mint]`,
+        `10:25–10:40 ET${SEP}espera do CPI → Aguardar até 10:40 [amber]`,
+        ...RESTO,
+      ])
     })
   })
 
