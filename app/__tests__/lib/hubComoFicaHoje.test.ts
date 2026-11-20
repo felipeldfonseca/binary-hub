@@ -30,7 +30,6 @@ describe('«Como fica hoje» (contrato §4.7)', () => {
       `10:00–11:00 ET${SEP}sua janela → Liberado [mint]`,
       'No resto do dia → Fora da sua janela [amber]',
       'Se a perda do dia chegar a US$\u00a0400 → Encerrado por hoje [red]',
-      'Bloqueio de dados → ativo na Fase 5 [muted, leve]',
     ])
     expect(h.sub).toBe('no relógio de Nova York')
     expect(h.aviso).toBeNull()
@@ -84,7 +83,7 @@ describe('«Como fica hoje» (contrato §4.7)', () => {
   it('rule on without a valid window: «Sem janela salva», never «Liberado», with or without a limit', () => {
     const r: Rules = { ...topOneRules(), windows: [], windowsFrom: null, limit: null }
     const h = comoFicaHoje(r, et('2026-10-22 12:00'), [])
-    expect(linhas(h)).toEqual(['O dia todo → Sem janela salva [muted, leve]', 'Bloqueio de dados → ativo na Fase 5 [muted, leve]'])
+    expect(linhas(h)).toEqual(['O dia todo → Sem janela salva [muted, leve]'])
     expect(h.aviso).toBe('Sem janela: a regra da janela não age. Defina em Quando você opera.')
     expect(h.sub).toBe('')
     const withLimit: Rules = { ...r, limit: { cents: 40000, mode: 'conta', atLimit: 'encerrar' } }
@@ -118,7 +117,7 @@ describe('«Como fica hoje» (contrato §4.7)', () => {
     )
   })
 
-  it('a block of 0 + 0 minutes, or off, has no block line', () => {
+  it('without the day\'s agenda (not a data screen), the data rule adds no line', () => {
     const zero: Rules = { ...topOneRules(), block: { on: true, beforeMin: 0, afterMin: 0, calendars: ['us'] } }
     const off: Rules = { ...topOneRules(), block: { on: false, beforeMin: 5, afterMin: 10, calendars: ['us'] } }
     for (const r of [zero, off]) expect(linhas(comoFicaHoje(r, et('2026-10-22 12:00'), win(r)))).toHaveLength(3)
@@ -130,7 +129,6 @@ describe('«Como fica hoje» (contrato §4.7)', () => {
     expect(linhas(comoFicaHoje(r, et('2026-10-22 12:00'), c.settings.markets.futures.windows))).toEqual([
       `10:00–11:00 ET${SEP}sua janela → Liberado [mint]`,
       'No resto do dia → Fora da sua janela [amber]',
-      'Bloqueio de dados → ativo na Fase 5 [muted, leve]',
     ])
   })
 
@@ -168,7 +166,7 @@ describe('version notes (board partesSig, contrato §4.8)', () => {
       janela: `janela 10:00–11:00 ET${SEP}seg–sex`,
       gate: 'só dentro da janela',
       fora: 'fora da janela: “Fora da sua janela”',
-      bloq: 'bloqueio 5 min antes e 10 depois',
+      bloq: 'dados: aguardo nos fortes, 5 min antes e 10 depois',
       lim: 'limite US$\u00a0400 por conta',
       est: 'regra por estado: nenhuma escolha',
       // Fase 3c: futures only; «sem breakeven» while the rule does not act
@@ -199,8 +197,9 @@ describe('version notes (board partesSig, contrato §4.8)', () => {
     // The «fora da janela» part exists only while the rule is on
     expect(note({ ...v1, windowRule: { on: false, outside: 'fora' } })).toBe('pode operar fora da janela')
     expect(note({ ...v1, windowRule: { on: true, outside: 'aviso' } })).toBe('fora da janela: “Liberado”, com aviso')
-    expect(note({ ...v1, block: { on: true, beforeMin: 0, afterMin: 0, calendars: ['us'] } })).toBe('sem bloqueio')
-    expect(note({ ...v1, block: { on: true, beforeMin: 10, afterMin: 15, calendars: ['us'] } })).toBe('bloqueio 10 min antes e 15 depois')
+    expect(note({ ...v1, block: { on: true, beforeMin: 0, afterMin: 0, calendars: ['us'] } })).toBe('dados: aguardo nos fortes, 0 min antes e 0 depois')
+    expect(note({ ...v1, block: { on: false, beforeMin: 5, afterMin: 10, calendars: ['us'] } })).toBe('dados econômicos desligados')
+    expect(note({ ...v1, block: { on: true, beforeMin: 10, afterMin: 15, calendars: ['us'] } })).toBe('dados: aguardo nos fortes, 10 min antes e 15 depois')
     expect(note({ ...v1, limit: { cents: 40000, mode: 'soma', atLimit: 'avisar' } })).toBe('limite US$\u00a0400 somando as contas de Futuros, só avisa')
     expect(note({ ...v1, limit: null })).toBe('sem limite')
     expect(note({ ...v1, states: { ...v1.states!, alinhadas: 'so_a_favor', em_conflito: 'opero' } })).toBe(
@@ -356,5 +355,104 @@ describe('Fase 3c \u00b7 \u00abMover para o breakeven\u00bb in the version notes
     const p = pendingVersions(c, comBreakeven(c.settings, padrao, { on: true, by: { MES: '8', MNQ: '30', MGC: '5' } }))
     expect(p.map((x) => x.accountId)).toEqual([ids.topOne])
     expect(partesVersao(p[0].rules).be).toBe('breakeven com +8 pts no MES, +30 no MNQ e +5 no MGC')
+  })
+})
+
+// ---------------------------------------------------------------------------------------------
+// Phase 5-1 · «Dados econômicos» in «Como fica hoje» (c3 §4.2; boards Q19–Q23), the version notes
+// (c3 §3.10) and «Próximos dados» (c3 §4.3): the boards' world (testing/agenda), limit US$ 500
+// ---------------------------------------------------------------------------------------------
+import { releasesOf, type ReleaseCode, type ReleaseMode } from '@/lib/domain/gate'
+import { et as etQ, leituraDoDia } from '@/testing/agenda'
+
+/** The world's Top One (limit US$ 500) with these behaviours over the app's default (the long form) */
+function quadro(patch: Partial<Record<ReleaseCode, ReleaseMode>> = {}, block: Partial<NonNullable<Rules['block']>> = {}): Rules {
+  const r = topOneRules()
+  const b = { ...r.block!, ...block }
+  const map: Record<string, ReleaseMode> = { ...releasesOf(b), ...patch }
+  const releases = Object.fromEntries(Object.entries(map).filter(([, v]) => v !== 'normal')) as NonNullable<Rules['block']>['releases']
+  return { ...r, limit: { cents: 50000, mode: 'conta', atLimit: 'encerrar' }, block: { ...b, releases } }
+}
+const hojeQ = (r: Rules, when: string, semAgenda = false) => linhas(comoFicaHoje(r, etQ(when), win(r), leituraDoDia(etQ(when), { semAgenda })))
+const JANELA = `10:00–11:00 ET${SEP}sua janela`
+const LIMITE = 'Se a perda do dia chegar a US$ 500 → Encerrado por hoje [red]'
+
+describe('«Como fica hoje» with the day\'s releases (Phase 5-1, c3 §4.2)', () => {
+  it('Q19: CPI in «Opero normalmente» is a muted line, before the window', () => {
+    const h = comoFicaHoje(quadro({ cpi: 'normal' }), etQ('2026-12-10 09:00'), win(topOneRules()), leituraDoDia(etQ('2026-12-10 09:00')))
+    expect(linhas(h)).toEqual([
+      'CPI às 08:30 ET → Opero normalmente [muted, leve]',
+      `${JANELA} → Liberado [mint]`,
+      'No resto do dia → Fora da sua janela [amber]',
+      LIMITE,
+    ])
+    expect(h.linhas[0].esquerda).toEqual([
+      { t: 'CPI às ', fraco: true },
+      { t: '08:30 ET', mono: true, fraco: true },
+    ])
+  })
+
+  it('Q20: «Aguardo em volta do horário» waits 08:25–08:40, amber; the window keeps no second line', () => {
+    expect(hojeQ(quadro(), '2026-12-10 09:00')).toEqual([
+      `08:25–08:40 ET${SEP}espera do CPI → Aguardar até 08:40 [amber]`,
+      `${JANELA} → Liberado [mint]`,
+      'No resto do dia → Fora da sua janela [amber]',
+      LIMITE,
+    ])
+  })
+
+  it('Q21: «Só opero depois do dado» waits from 18:00 of yesterday', () => {
+    expect(hojeQ(quadro({ cpi: 'depois' }), '2026-12-10 09:00')[0]).toBe(`Até 08:40 ET${SEP}só depois do CPI → Aguardar até 08:40 · desde as 18:00 de ontem [amber]`)
+  })
+
+  it('Q22: «Não opero no dia» takes the whole day: the window muted, no «No resto do dia», never green', () => {
+    expect(hojeQ(quadro({ cpi: 'dia' }), '2026-12-10 09:00')).toEqual([
+      `O dia inteiro${SEP}dia de CPI (08:30 ET) → Não opero hoje [amber]`,
+      `${JANELA} →  · a sua janela de hoje fica de fora [muted, leve]`,
+      LIMITE,
+    ])
+  })
+
+  it('Q23: the ISM wait cuts the window: «a partir das 10:10, depois da espera»', () => {
+    expect(hojeQ(quadro(), '2026-12-03 09:00')).toEqual([
+      `09:55–10:10 ET${SEP}espera do ISM de serviços → Aguardar até 10:10 [amber]`,
+      `${JANELA} → Liberado · a partir das 10:10, depois da espera [mint]`,
+      'No resto do dia → Fora da sua janela [amber]',
+      LIMITE,
+    ])
+  })
+
+  it('rule off: the day\'s releases still show as information, without colour (SPEC §7.3 item 14)', () => {
+    expect(hojeQ(quadro({}, { on: false }), '2026-12-10 09:00')[0]).toBe('CPI às 08:30 ET → Opero normalmente [muted, leve]')
+    expect(hojeQ(quadro({}, { on: false }), '2026-12-03 09:00')[0]).toBe('ISM de serviços às 10:00 ET → Opero normalmente [muted, leve]')
+  })
+
+  it('no release today: «Dados econômicos · nenhum dado hoje»; the agenda missing: «não conferido», never «Liberado» for it', () => {
+    expect(hojeQ(quadro(), '2026-12-08 09:00')).toContain('Dados econômicos → nenhum dado hoje [muted, leve]')
+    expect(hojeQ(quadro(), '2026-12-10 09:00', true)).toContain('Dados econômicos → não conferido: sem a agenda de hoje [muted, leve]')
+    // with the rule off nothing is waited for: nothing to say
+    expect(hojeQ(quadro({}, { on: false }), '2026-12-10 09:00', true)).not.toContain('Dados econômicos → não conferido: sem a agenda de hoje [muted, leve]')
+  })
+
+  it('a market without the rule never gets a data line', () => {
+    const r = ebinexRules()
+    expect(linhas(comoFicaHoje(r, brt('2026-12-10 12:00'), win(r), leituraDoDia(etQ('2026-12-10 09:00'))))).toEqual(
+      linhas(comoFicaHoje(r, brt('2026-12-10 12:00'), win(r))),
+    )
+  })
+})
+
+describe('the data rule\'s version note names the ready-made choice (c3 §3.10)', () => {
+  const bloq = (r: Rules) => partesVersao(r).bloq
+  it('the four choices and the rule off', () => {
+    expect(bloq(quadro())).toBe('dados: aguardo nos fortes, 5 min antes e 10 depois')
+    expect(bloq(quadro({ cpi: 'depois', ppi: 'depois', payroll: 'depois', pce: 'depois', pib_us: 'depois', varejo_us: 'depois' }))).toBe(
+      'dados: só depois dos das 08:30, 10 min depois; nos outros fortes, 5 min antes e 10 depois',
+    )
+    expect(bloq(quadro({ cpi: 'dia', payroll: 'dia', fomc_decisao: 'dia', fomc_entrevista: 'dia' }))).toBe(
+      'dados: sem operar em dia de CPI, Payroll e Fed; nos outros, 5 min antes e 10 depois',
+    )
+    expect(bloq(quadro({ cpi: 'dia' }))).toBe('dados: escolha por dado, 5 min antes e 10 depois')
+    expect(bloq(quadro({}, { on: false }))).toBe('dados econômicos desligados')
   })
 })

@@ -33,7 +33,7 @@ export const REGRAS_CONTA = {
   notaPadrao: 'Começa com o padrão do mercado.',
   /** What a copy brings: the market's rules (MARKET_SPEC: block and states only in Futuros) */
   notaCopia: (market: AccountMarket) =>
-    MARKET_SPEC[market].rules.block ? 'Copia janela, limite do dia, bloqueio de dados e regra do estado.' : 'Copia janela e limite do dia.',
+    MARKET_SPEC[market].rules.block ? 'Copia janela, limite do dia, dados econômicos e regra do estado.' : 'Copia janela e limite do dia.',
 
   mudar: 'Mudar',
   /**

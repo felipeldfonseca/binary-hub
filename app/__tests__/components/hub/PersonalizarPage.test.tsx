@@ -34,6 +34,13 @@ jest.mock('@/lib/hub/contasDb', () => ({
   fetchImportFormats: jest.fn(),
   fetchPreferences: jest.fn(),
 }))
+// Phase 5-1: the agenda reads of Personalizar (none written; an empty, uncovered agenda)
+jest.mock('@/lib/hub/agendaDb', () => ({
+  ...jest.requireActual('@/lib/hub/agendaDb'),
+  fetchAgendaDoDia: jest.fn(async () => ({ rows: [], covered: [] })),
+  fetchProximosDados: jest.fn(async () => []),
+  fetchDadosDaSemana: jest.fn(async () => []),
+}))
 jest.mock('@/lib/hub/regrasDb', () => ({
   ...jest.requireActual('@/lib/hub/regrasDb'),
   fetchRulesConfig: jest.fn(),
@@ -396,14 +403,16 @@ describe('«Suas regras»', () => {
     expect(within(regras()).getByRole('heading', { level: 3, name: 'Top One #1' })).toBeInTheDocument()
     expect(within(regras()).getByText('Futuros · Financiada')).toBeInTheDocument()
     expect(screen.getByRole('switch', { name: 'Só operar dentro da sua janela' })).toHaveAttribute('aria-checked', 'true')
-    expect(screen.getByRole('switch', { name: 'Bloqueio de dados' })).toHaveAttribute('aria-describedby', 'r-bloq-hoje')
+    expect(screen.getByRole('switch', { name: 'Dados econômicos' })).toHaveAttribute('aria-describedby', 'r-dados-hoje')
+    // Phase 5-1: October has no agenda coverage (the mocked read): the rule is not checked, never «Liberado» for it
+    await waitFor(() => expect(document.getElementById('r-dados-hoje')).toHaveTextContent('O app ainda não tem a agenda de hoje: a regra não foi conferida.'))
     expect(valorLimite()).toHaveTextContent('US$ 400')
     const hoje = screen.getByRole('list', { name: 'Como fica hoje' })
     expect(within(hoje).getAllByRole('listitem').map((li) => li.textContent)).toEqual([
       `10:00–11:00 ET${SEP}sua janelaLiberado`,
       'No resto do diaFora da sua janela',
       'Se a perda do dia chegar a US$\u00a0400Encerrado por hoje',
-      'Bloqueio de dadosativo na Fase 5',
+      'Dados econômicosnão conferido: sem a agenda de hoje',
     ])
     expect(screen.getByText('Regras v1 desde 17 out')).toBeInTheDocument()
     expect(await screen.findByText('3 operações do diário desde 17 out.')).toBeInTheDocument()
@@ -524,13 +533,13 @@ describe('«Suas regras»', () => {
     expect(saveRules.mock.calls[0][1].accounts?.[ids.ebinex]).toMatchObject({ version: 'force', window: null })
   })
 
-  it('the calendars: none marked says so, here and in the block line', async () => {
+  it('the calendars: none marked says so, here and in the «Dados econômicos» line', async () => {
     renderPage()
     await ready()
 
     await userEvent.click(screen.getByRole('checkbox', { name: 'EUA' }))
 
-    expect(screen.getAllByText('Nenhum calendário marcado: nada vai bloquear o dia.')).toHaveLength(2)
+    expect(screen.getAllByText('Nenhum calendário marcado: a regra não tem dado para olhar.')).toHaveLength(2)
     expect(statusTopo()).toHaveTextContent('Alterações não salvas')
   })
 })

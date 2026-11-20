@@ -12,20 +12,39 @@
  * Money is in the currency of the rules' market (R$ on B3, US$ elsewhere); the data block, the
  * state rule, the calendars and «somando» appear only where the market has them (MARKET_SPEC).
  */
-import { tradingDayOn, windowOccurrences, addDays } from '@/lib/domain/tempo';
-import { MARKET_SPEC, STATE_NAMES, currencyOf, type Rules, type CalendarCode } from '@/lib/domain/gate';
+import { tradingDayOn, tradingDayBounds, windowOccurrences, addDays, formatHhMm, isoWeekdayOf, utcToLocal } from '@/lib/domain/tempo';
+import {
+  AGENDA_RELEASES,
+  MARKET_SPEC,
+  STATE_NAMES,
+  agendaFor,
+  blockIntervals,
+  currencyOf,
+  releaseOrd,
+  releasesOf,
+  type AgendaEntry,
+  type AgendaRead,
+  type AgendaRow,
+  type BlockInterval,
+  type CalendarCode,
+  type ReleaseCode,
+  type ReleaseMode,
+  type Rules,
+} from '@/lib/domain/gate';
 import { dinheiroCompacto, type Tom } from './posso';
-import { formatDiaMes } from './formato';
+import { formatDayMonth, formatDiaMes } from './formato';
 import { effectiveDayAt, type ConfigVersion, type PendingVersion, type WindowSetting } from './regras';
 import { faixaJanela, resumoDias } from './janelas';
 import { itensBreakeven } from './personalizarBreakeven';
-import { ATIVO_NA_FASE_5, CALENDARIO_NOME, ESCOLHA_NOME, ESTADO_NOME, HOJE, NOTA, RELOGIO, SEP, VERSAO } from '@/components/hub/personalizar/copy';
+import { NOMES_DADOS, PALAVRAS_DADOS } from './dadosEconomicos';
+import { atalhoDoMapa } from './rascunho';
+import { CALENDARIO_NOME, DADOS, ESCOLHA_NOME, ESTADO_NOME, HOJE, NOTA, PROXIMOS, RELOGIO, SEP, VERSAO, lista } from '@/components/hub/personalizar/copy';
 
 export interface Trecho {
   t: string;
   /** Times and money: monospace, never broken */
   mono?: boolean;
-  /** Muted (text-2): «Bloqueio de dados» */
+  /** Muted (text-2): a release the trader operates normally, «Dados econômicos» */
   fraco?: boolean;
 }
 
@@ -33,7 +52,7 @@ export interface LinhaHoje {
   esquerda: Trecho[];
   estado: string;
   tom: Tom;
-  /** «Sem janela salva», «Sem regra ativa», «ativo na Fase 5» are not bold */
+  /** «Sem janela salva», «Sem regra ativa», the muted data lines are not bold */
   forte: boolean;
   sub: string | null;
 }
@@ -49,33 +68,53 @@ export interface ComoFicaHoje {
 /**
  * @param rules what the draft resolves to (resolveRules: windows with an error are left out)
  * @param edited the windows as edited (errors included), for the clock and the warning
+ * @param agenda Phase 5-1, where the market has the data rule (Futuros): the day's agenda read
+ *   (E5; null = it did not load, undefined = not read yet → no data line)
  */
-export function comoFicaHoje(rules: Rules, now: Date, edited: readonly WindowSetting[]): ComoFicaHoje {
+export function comoFicaHoje(rules: Rules, now: Date, edited: readonly WindowSetting[], agenda?: AgendaRead | null): ComoFicaHoje {
   const sub = edited.length ? HOJE.noRelogio(RELOGIO[edited[0].tz].relogio) : '';
   const on = rules.windowRule.on;
   const aviso = on && rules.windows.length === 0 ? (edited.length ? HOJE.avisoCorrija : HOJE.avisoSemJanela) : null;
 
-  // Nothing checked: the window rule is off and there is no limit
-  if (!on && !rules.limit) {
+  // Nothing checked: the window rule is off, there is no limit and the data rule waits for nothing
+  if (!on && !rules.limit && (agenda === undefined || regraSemEspera(rules))) {
     return { linhas: [{ esquerda: [{ t: HOJE.oDiaTodo }], estado: HOJE.semRegraAtiva, tom: 'muted', forte: false, sub: null }], sub, aviso };
   }
 
   const today = effectiveDayAt(now, rules);
   const hoje = windowOccurrences(now, rules.windows).filter((o) => tradingDayOn(o.start, rules.day) === today);
-  const linhas: LinhaHoje[] = hoje.map((o) => ({
-    esquerda: [
-      { t: `${faixaJanela(o.window.startMin, o.window.endMin)} ${RELOGIO[o.window.tz as keyof typeof RELOGIO].curto}`, mono: true },
-      { t: rules.windows.length > 1 ? HOJE.umaDasJanelas : HOJE.suaJanela },
-    ],
-    estado: HOJE.liberado,
-    tom: 'mint',
-    forte: true,
-    sub: null,
-  }));
-  const resto = linhas.length ? HOJE.noRestoDoDia : HOJE.oDiaTodo;
+  // Phase 5-1: the data lines of the day (c3 §4.2), sorted with the window's by their start
+  const dados = rules.block && agenda !== undefined ? linhasDeDados(rules, now, agenda) : null;
+  const diaInteiro = !!dados?.diaInteiro;
+  const janelas: { at: number; linha: LinhaHoje }[] = hoje.map((o) => {
+    const faixa = { t: `${faixaJanela(o.window.startMin, o.window.endMin)} ${RELOGIO[o.window.tz as keyof typeof RELOGIO].curto}`, mono: true };
+    const qual = { t: rules.windows.length > 1 ? HOJE.umaDasJanelas : HOJE.suaJanela };
+    if (diaInteiro) {
+      // «Não opero no dia» today: the window is out, never green (c3 §4.2; board Q22)
+      return {
+        at: o.start.getTime(),
+        linha: { esquerda: [{ ...faixa, fraco: true }, { ...qual, fraco: true }], estado: '', tom: 'muted', forte: false, sub: HOJE.janelaDeFora },
+      };
+    }
+    const corte = dados?.esperas.find((iv) => iv.end > o.start && iv.end < o.end && iv.start <= o.start);
+    return {
+      at: o.start.getTime(),
+      linha: {
+        esquerda: [faixa, qual],
+        estado: HOJE.liberado,
+        tom: 'mint',
+        forte: true,
+        sub: corte ? HOJE.janelaDepoisDaEspera(hhmm(corte.end, dados!.tz)) : null,
+      },
+    };
+  });
+  const linhas: LinhaHoje[] = [...(dados?.linhas ?? []).filter((x) => x.at !== FIM), ...janelas].sort((x, y) => x.at - y.at).map((x) => x.linha);
+  const resto = hoje.length ? HOJE.noRestoDoDia : HOJE.oDiaTodo;
   const aviso2 = rules.windowRule.outside === 'aviso';
 
-  if (on && rules.windows.length > 0) {
+  if (diaInteiro) {
+    // The whole clock day answers «Não opero hoje», before «Fora da sua janela»: the «O dia inteiro» line covers the rest (board Q22, as drawn)
+  } else if (on && rules.windows.length > 0) {
     const naoEDia = linhas.length === 0;
     linhas.push({
       esquerda: [{ t: resto }],
@@ -107,11 +146,290 @@ export function comoFicaHoje(rules: Rules, now: Date, edited: readonly WindowSet
     });
   }
 
-  if (rules.block && rules.block.on && rules.block.beforeMin + rules.block.afterMin > 0) {
-    linhas.push({ esquerda: [{ t: HOJE.bloqueio, fraco: true }], estado: ATIVO_NA_FASE_5, tom: 'muted', forte: false, sub: null });
-  }
+  // «Dados econômicos · nenhum dado hoje» / «… · não conferido» close the list, as the old data line did
+  for (const x of dados?.linhas ?? []) if (x.at === FIM) linhas.push(x.linha);
 
   return { linhas, sub, aviso };
+}
+
+// ---------------------------------------------------------------------------------------------
+// Phase 5-1 · «Dados econômicos»: shared helpers, the day's data lines (c3 §4.2) and «Próximos dados»
+// (c3 §4.3). Hours on the account's window clock (Futuros: New York, «ET»); the day is the account's
+// CLOCK day (rules.day: 18:00 New York), as the gate's intervals (SPEC §4.2).
+// ---------------------------------------------------------------------------------------------
+
+const WEEKDAYS = ['seg', 'ter', 'qua', 'qui', 'sex', 'sáb', 'dom'] as const;
+
+/** The sort key of the data lines that close the list (no release today, agenda not loaded) */
+const FIM = Number.MAX_SAFE_INTEGER;
+
+/** The window clock of rules: the first window's zone, else the day clock's */
+export const relogioDe = (rules: Pick<Rules, 'windows' | 'day'>): string => rules.windows[0]?.tz ?? rules.day.tz;
+
+/** «ET» / «Brasília» after a time */
+export const sufixoRelogio = (tz: string): string => (RELOGIO as Record<string, { curto: string }>)[tz]?.curto ?? 'ET';
+
+/** '08:30' on the clock */
+export const hhmm = (at: Date, tz: string): string => formatHhMm(utcToLocal(at, tz).minuteOfDay);
+
+/** '08:30 ET' */
+export const horaEt = (at: Date, tz: string): string => `${hhmm(at, tz)} ${sufixoRelogio(tz)}`;
+
+/** The calendar date on the clock, 'YYYY-MM-DD' */
+export const dataEm = (at: Date, tz: string): string => utcToLocal(at, tz).date;
+
+/** 'qua 9' (lowercase) */
+export const diaCurto = (date: string): string => `${WEEKDAYS[isoWeekdayOf(date) - 1]} ${Number(date.slice(8, 10))}`;
+
+/** 'ter 15 dez' */
+export const diaComMes = (date: string): string => `${WEEKDAYS[isoWeekdayOf(date) - 1]} ${formatDayMonth(date)}`;
+
+const maiuscula = (x: string) => x.charAt(0).toUpperCase() + x.slice(1);
+
+/** What the version's (or the draft's) rule does per release, all 20 codes; absent → «normal» */
+export function modosDaRegra(rules: Pick<Rules, 'block'>): Record<ReleaseCode, ReleaseMode> {
+  const map = releasesOf(rules.block) ?? {};
+  return Object.fromEntries(AGENDA_RELEASES.map((r) => [r.code, map[r.code] ?? 'normal'])) as Record<ReleaseCode, ReleaseMode>;
+}
+
+/** The rule waits for nothing: off, no calendar, or every followed release «Opero normalmente» */
+export function regraSemEspera(rules: Pick<Rules, 'block'>): boolean {
+  const b = rules.block;
+  if (!b || !b.on || b.calendars.length === 0) return true;
+  const m = modosDaRegra(rules);
+  return AGENDA_RELEASES.every((r) => !b.calendars.includes(r.calendar) || m[r.code] === 'normal');
+}
+
+const vivo = (r: AgendaRow) => r.status === 'agendado' || r.status === 'divulgado';
+
+/** The day's rows of the calendars followed, in the agenda's order (at, then ord) */
+function linhasDoDia(rules: Rules, read: AgendaRead, day: string): (AgendaRow & { code: ReleaseCode })[] {
+  const cals = rules.block?.calendars ?? [];
+  const { start, end } = tradingDayBounds(day, rules.day);
+  return read.rows
+    .filter((r): r is AgendaRow & { code: ReleaseCode } => r.code !== null && cals.includes(r.calendar) && r.at >= start && r.at < end)
+    .sort((a, b) => a.at.getTime() - b.at.getTime() || releaseOrd(a.code) - releaseOrd(b.code));
+}
+
+/** Releases grouped by instant: [[cpi], [ppi, varejo_us]] */
+function porInstante<T extends { at: Date }>(xs: readonly T[]): T[][] {
+  const out: T[][] = [];
+  for (const x of xs) {
+    const last = out[out.length - 1];
+    if (last && last[0].at.getTime() === x.at.getTime()) last.push(x);
+    else out.push([x]);
+  }
+  return out;
+}
+
+/** «PPI e vendas no varejo» (the sentence form) */
+const nomesFrase = (codes: readonly ReleaseCode[]) => lista(codes.map((c) => NOMES_DADOS[c].frase));
+/** «Vendas de casas usadas», «PPI e vendas no varejo» (a line's head: the first in the list form) */
+const nomesLinha = (codes: readonly ReleaseCode[]) => lista(codes.map((c, k) => (k === 0 ? NOMES_DADOS[c].nome : NOMES_DADOS[c].frase)));
+/** «do CPI», «do PCE e do PIB dos EUA» */
+const nomesDoDa = (codes: readonly ReleaseCode[]) => lista(codes.map((c) => NOMES_DADOS[c].doDa));
+/** «dia de CPI», «dia de CPI e Payroll», «dia de Fed» (each «dia de …» once) */
+function nomesDiaDe(codes: readonly ReleaseCode[]): string {
+  const forms = Array.from(new Set(codes.map((c) => NOMES_DADOS[c].diaDe)));
+  return forms.length ? `dia de ${lista(forms.map((f) => f.replace(/^dia de /, '')))}` : '';
+}
+
+/** The intervals of the day's agenda under rules (empty when the rule is off) */
+function intervalosDoDia(rules: Rules, clockDay: string, entries: readonly AgendaEntry[]): BlockInterval[] {
+  if (!rules.block?.on) return [];
+  const { start, end } = tradingDayBounds(clockDay, rules.day);
+  return blockIntervals(rules, rules.day, entries).filter((iv) => iv.start < end && iv.end > start);
+}
+
+/** A data line with its sort key (the start it shows) */
+interface LinhaOrdenada {
+  at: number;
+  linha: LinhaHoje;
+}
+
+/**
+ * The data lines of «Como fica hoje» (c3 §4.2; boards Q19–Q23), and what the window lines need: the
+ * waits that may cut a window and whether the whole day is out («Não opero no dia»).
+ */
+export function linhasDeDados(
+  rules: Rules,
+  now: Date,
+  agenda: AgendaRead | null,
+): { linhas: LinhaOrdenada[]; esperas: BlockInterval[]; diaInteiro: boolean; tz: string } {
+  const tz = relogioDe(rules);
+  const day = tradingDayOn(now, rules.day);
+  const S = tradingDayBounds(day, rules.day).start.getTime();
+  const fraca = (t: string): LinhaOrdenada => ({
+    at: FIM,
+    linha: { esquerda: [{ t: HOJE.dadosEconomicos, fraco: true }], estado: t, tom: 'muted', forte: false, sub: null },
+  });
+  const semEspera = regraSemEspera(rules);
+  const entries = agenda ? agendaFor(rules, rules.day, now, agenda) : null;
+  if (!agenda || (!semEspera && entries === null)) {
+    // Not loaded: never «Liberado» for want of the agenda; nothing to say when the rule waits for nothing
+    return { linhas: semEspera ? [] : [fraca(HOJE.naoConferido)], esperas: [], diaInteiro: false, tz };
+  }
+  const rows = linhasDoDia(rules, agenda, day);
+  const modos = modosDaRegra(rules);
+  const ivs = semEspera ? [] : intervalosDoDia(rules, day, entries ?? []);
+  const out: LinhaOrdenada[] = [];
+  const info = (grupo: readonly ReleaseCode[], at: Date, estado: string): LinhaOrdenada => ({
+    at: at.getTime(),
+    linha: {
+      esquerda: [{ t: HOJE.dadosAs(nomesLinha(grupo)), fraco: true }, { t: horaEt(at, tz), mono: true, fraco: true }],
+      estado,
+      tom: 'muted',
+      forte: false,
+      sub: null,
+    },
+  });
+  const comEspera = new Set<string>();
+  for (const iv of ivs) {
+    const codes = Array.from(new Set(iv.releases.map((r) => r.code)));
+    iv.releases.forEach((r) => comEspera.add(`${r.code}|${r.at.getTime()}`));
+    if (iv.kind === 'dia') {
+      const first = iv.releases[0];
+      out.push({
+        at: Math.min(iv.start.getTime(), S),
+        linha: {
+          esquerda: [{ t: HOJE.oDiaInteiro(nomesDiaDe(codes)) }, { t: horaEt(first.at, tz), mono: true }, { t: HOJE.fechaParen }],
+          estado: PALAVRAS_DADOS.naoOperoHoje,
+          tom: 'amber',
+          forte: true,
+          sub: null,
+        },
+      });
+    } else if (iv.releases.some((r) => r.mode === 'depois')) {
+      out.push({
+        at: iv.start.getTime(),
+        linha: {
+          esquerda: [{ t: HOJE.ate }, { t: horaEt(iv.end, tz), mono: true }, { t: HOJE.soDepois(nomesDoDa(codes)) }],
+          estado: PALAVRAS_DADOS.aguardarAte(hhmm(iv.end, tz)),
+          tom: 'amber',
+          forte: true,
+          sub: iv.start.getTime() <= S ? HOJE.desdeOntem : null,
+        },
+      });
+    } else {
+      out.push({
+        at: iv.start.getTime(),
+        linha: {
+          esquerda: [{ t: `${hhmm(iv.start, tz)}–${hhmm(iv.end, tz)} ${sufixoRelogio(tz)}`, mono: true }, { t: HOJE.espera(nomesDoDa(codes)) }],
+          estado: PALAVRAS_DADOS.aguardarAte(hhmm(iv.end, tz)),
+          tom: 'amber',
+          forte: true,
+          sub: null,
+        },
+      });
+    }
+  }
+  // The day's releases without a wait: information, no colour (rule off, «Opero normalmente», 0 and 0 min)
+  const vivas = rows.filter(vivo).filter((r) => !comEspera.has(`${r.code}|${r.at.getTime()}`));
+  for (const grupo of porInstante(vivas)) {
+    const zero = !semEspera && grupo.every((r) => modos[r.code] === 'volta');
+    out.push(info(grupo.map((r) => r.code), grupo[0].at, zero ? DADOS.modo.volta : HOJE.operoNormalmente));
+  }
+  // A release of today cancelled or moved, where the account had a wait or a whole day (c3 §12.5)
+  for (const r of rows.filter((x) => !vivo(x) || (x.wasAt && x.wasAt.getTime() !== x.at.getTime()))) {
+    if (semEspera || modos[r.code] === 'normal') continue;
+    const nome = NOMES_DADOS[r.code].nome;
+    const t = r.status === 'cancelado' ? HOJE.canceladoHoje(nome) : HOJE.adiadoHoje(nome, diaComMes(dataEm(r.at, tz)));
+    out.push({ at: r.at.getTime(), linha: { esquerda: [{ t, fraco: true }], estado: '', tom: 'muted', forte: false, sub: null } });
+  }
+  // A moved release shows on its old date too (was_at today, at later)
+  for (const r of agenda.rows) {
+    if (!r.code || !r.wasAt || rows.includes(r as AgendaRow & { code: ReleaseCode })) continue;
+    if (!(rules.block?.calendars ?? []).includes(r.calendar) || semEspera || modos[r.code] === 'normal') continue;
+    if (tradingDayOn(r.wasAt, rules.day) !== day) continue;
+    out.push({
+      at: r.wasAt.getTime(),
+      linha: { esquerda: [{ t: HOJE.adiadoHoje(NOMES_DADOS[r.code].nome, diaComMes(dataEm(r.at, tz))), fraco: true }], estado: '', tom: 'muted', forte: false, sub: null },
+    });
+  }
+  if (out.length === 0) out.push(fraca(HOJE.nenhumDadoHoje));
+  return { linhas: out, esperas: ivs.filter((iv) => iv.kind === 'espera'), diaInteiro: ivs.some((iv) => iv.kind === 'dia'), tz };
+}
+
+/** One line of «Próximos dados» (board Q23) */
+export interface LinhaProximo {
+  /** «Hoje · ISM de serviços · » (bold), then `hora` (mono) */
+  cabeca: string;
+  hora: string;
+  /** «Aguardo em volta do horário · » + `espera` (mono); null on a grey line */
+  comportamento: string | null;
+  espera: string | null;
+  /** «Opero normalmente · sem espera»: the whole second part (a grey line has it in `cabeca`: «Qui 10 · CPI · cancelado») */
+  texto: string | null;
+  naoToca: boolean;
+  /** A cancelled or moved release: grey, no behaviour (c3 §12.5) */
+  cinza: boolean;
+}
+
+/** How many lines show before «Mostrar mais» (c3 §4.3) */
+export const PROXIMOS_VISIVEIS = 5;
+
+/**
+ * «Próximos dados» (c3 §4.3; SPEC §7.3 items 12 and 14): the next 14 days' releases of the calendars
+ * followed (E6's rows), each with what the rule (as edited) does and the wait it makes; with the rule
+ * off or everything «Opero normalmente» the lines end «Opero normalmente · sem espera». Two releases at
+ * the same instant with the same behaviour share a line. Closes with «Depois de {today + 3}: …».
+ */
+export function proximosDados(rules: Rules, now: Date, rows: readonly AgendaRow[]): { linhas: LinhaProximo[]; depoisDe: string } {
+  const tz = relogioDe(rules);
+  const cals = rules.block?.calendars ?? [];
+  const hoje = dataEm(now, tz);
+  const amanha = addDays(hoje, 1);
+  const diaPalavra = (date: string) => (date === hoje ? PROXIMOS.hoje : date === amanha ? PROXIMOS.amanha : maiuscula(diaCurto(date)));
+  const nossas = rows.filter((r): r is AgendaRow & { code: ReleaseCode } => r.code !== null && cals.includes(r.calendar));
+  const vivas = nossas.filter((r) => vivo(r) && r.at >= now).sort((a, b) => a.at.getTime() - b.at.getTime() || releaseOrd(a.code) - releaseOrd(b.code));
+  const semEspera = regraSemEspera(rules);
+  const modos = modosDaRegra(rules);
+  const ivs = semEspera ? [] : blockIntervals(rules, rules.day, vivas.map((r) => ({ code: r.code, at: r.at })));
+  const doDado = (r: { code: ReleaseCode; at: Date }) =>
+    ivs.find((iv) => iv.releases.some((x) => x.code === r.code && x.at.getTime() === r.at.getTime()) && (iv.kind === 'dia') === (modos[r.code] === 'dia'));
+  const toca = (s: Date, e: Date) =>
+    windowOccurrences(s, rules.windows, -2, 2).some((o) => o.start < e && o.end > s);
+
+  type Item = { at: number; linha: LinhaProximo; modo: ReleaseMode | null; codes: ReleaseCode[]; atDate: Date };
+  const itens: Item[] = [];
+  for (const r of vivas) {
+    const modo: ReleaseMode = semEspera ? 'normal' : modos[r.code];
+    const prev = itens[itens.length - 1];
+    if (prev && prev.modo === modo && prev.atDate.getTime() === r.at.getTime()) {
+      prev.codes.push(r.code);
+      continue;
+    }
+    itens.push({ at: r.at.getTime(), modo, codes: [r.code], atDate: r.at, linha: null as unknown as LinhaProximo });
+  }
+  const linhaDe = (it: Item): LinhaProximo => {
+    const cabeca = PROXIMOS.cabeca(diaPalavra(dataEm(it.atDate, tz)), nomesLinha(it.codes));
+    const hora = horaEt(it.atDate, tz);
+    const iv = it.modo && it.modo !== 'normal' ? doDado({ code: it.codes[0], at: it.atDate }) : undefined;
+    if (!iv) return { cabeca, hora, comportamento: null, espera: null, texto: PROXIMOS.semEspera, naoToca: false, cinza: false };
+    const modo = it.modo as Exclude<ReleaseMode, 'normal'>;
+    const espera = modo === 'volta' ? `${hhmm(iv.start, tz)}–${hhmm(iv.end, tz)}` : modo === 'depois' ? `${PROXIMOS.esperaAte}${hhmm(iv.end, tz)}` : PROXIMOS.oDiaInteiro;
+    return { cabeca, hora, comportamento: PROXIMOS.comportamento(DADOS.modo[modo]), espera, texto: null, naoToca: rules.windows.length > 0 && !toca(iv.start, iv.end), cinza: false };
+  };
+  for (const it of itens) it.linha = linhaDe(it);
+  // Cancelled, postponed without a date, and a moved release on its old date: grey, no behaviour
+  const fim = now.getTime() + 14 * 86_400_000;
+  for (const r of nossas) {
+    const cinza = (at: Date, texto: string) =>
+      itens.push({
+        at: at.getTime(),
+        modo: null,
+        codes: [r.code],
+        atDate: at,
+        linha: { cabeca: PROXIMOS.cabeca(diaPalavra(dataEm(at, tz)), NOMES_DADOS[r.code].nome) + texto, hora: '', comportamento: null, espera: null, texto: null, naoToca: false, cinza: true },
+      });
+    if (r.status === 'cancelado' && r.at >= now) cinza(r.at, PROXIMOS.cancelado);
+    else if (r.status === 'adiado' && r.at >= now) cinza(r.at, PROXIMOS.adiadoSemData);
+    if (r.wasAt && r.wasAt.getTime() !== r.at.getTime() && r.wasAt >= now && r.wasAt.getTime() < fim && vivo(r)) {
+      cinza(r.wasAt, PROXIMOS.adiadoPara(diaComMes(dataEm(r.at, tz))));
+    }
+  }
+  itens.sort((a, b) => a.at - b.at);
+  return { linhas: itens.map((x) => x.linha), depoisDe: PROXIMOS.depoisDe(diaCurto(addDays(hoje, 3))) };
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -143,8 +461,14 @@ export function partesVersao(r: Rules): Partial<Record<Parte, string>> {
   o.gate = r.windowRule.on ? NOTA.soDentro : NOTA.podeFora;
   if (r.windowRule.on) o.fora = r.windowRule.outside === 'aviso' ? NOTA.foraAviso : NOTA.foraFora;
   if (caps.block) {
+    // Phase 5-1 (c3 §3.10): the note names the ready-made choice the map matches
     const b = r.block;
-    o.bloq = b && b.on && b.beforeMin + b.afterMin > 0 ? NOTA.bloqueio(b.beforeMin, b.afterMin) : NOTA.semBloqueio;
+    if (!b || !b.on) o.bloq = NOTA.dadosDesligados;
+    else {
+      const atalho = atalhoDoMapa(releasesOf(b), b.calendars);
+      const f = { fortes: NOTA.dadosFortes, depois0830: NOTA.dados0830, diaCpiPayrollFed: NOTA.dadosDia, personalizado: NOTA.dadosPorDado }[atalho];
+      o.bloq = f(b.beforeMin, b.afterMin);
+    }
   }
   o.lim = r.limit
     ? NOTA.limite(dinheiroCompacto(r.limit.cents, currencyOf(r.market))) +
