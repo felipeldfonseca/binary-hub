@@ -219,8 +219,8 @@ describe('liberado.until: the window\'s close or the next wait of the day, which
     expect(answerOf(gate('dentro', 'ok', free([later('08:25', '08:40')])))).toMatchObject({ until: T('11:00') });
   });
 
-  it('the window off: the next wait of the day, if any', () => {
-    expect(answerOf(gate('desligada', 'ok', free([later('13:55', '14:10')])))).toMatchObject({ kind: 'liberado', until: T('13:55') });
+  it('the window off: «Liberado» without an hour, a wait later today included (SPEC §7.2 LV: «sem hora»)', () => {
+    expect(answerOf(gate('desligada', 'ok', free([later('13:55', '14:10')])))).toMatchObject({ kind: 'liberado', until: null });
     expect(answerOf(gate('desligada', 'ok', free([])))).toMatchObject({ kind: 'liberado', until: null });
   });
 });

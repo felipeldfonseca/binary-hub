@@ -439,15 +439,19 @@ export function answerOf(r: GateResult): Answer {
   }
   // (6) No window saved and nothing to warn about: «Sem janela salva», whatever the block
   if (!w.evaluated && w.reason === 'sem_janela' && r.warnings.length === 0) return { kind: 'sem_janela', reason: 'sem_janela' };
-  // (7) «Liberado»: until the window closes or the next interval of the day starts, whichever comes first
+  // (7) «Liberado»: inside the window, until it closes or the next interval of the day starts,
+  // whichever comes first; outside it or with the window off, no hour (SPEC §7.2 l.1164, LV «sem hora»)
   const t = r.at.getTime();
-  const ends: number[] = [];
-  if (w.evaluated && w.current) ends.push(w.current.end.getTime());
-  if (b.evaluated) for (const iv of b.today) if (iv.start.getTime() > t) ends.push(iv.start.getTime());
+  let until: Date | null = null;
+  if (w.evaluated && w.current) {
+    const ends = [w.current.end.getTime()];
+    if (b.evaluated) for (const iv of b.today) if (iv.start.getTime() > t) ends.push(iv.start.getTime());
+    until = new Date(Math.min(...ends));
+  }
   return {
     kind: 'liberado',
     position: w.evaluated ? w.position : null,
-    until: ends.length ? new Date(Math.min(...ends)) : null,
+    until,
     next: w.evaluated ? w.next : null,
     warnings: r.warnings,
     semAgenda,
