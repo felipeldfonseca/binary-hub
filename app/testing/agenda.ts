@@ -136,28 +136,61 @@ export function semanaDe(day: string, clock: DayClock = RELOGIO_TOP): { weekOf: 
 // The rule configurations (one invented user each in the PG recording) and the frame states
 // ---------------------------------------------------------------------------------------------------------------
 
-export type ConfigQuadro = 'padrao' | 'cpi_depois' | 'cpi_dia' | 'cpi_normal' | 'ism_depois' | 'fed_depois' | 'risco';
+export type ConfigQuadro =
+  | 'padrao'
+  | 'cpi_depois'
+  | 'cpi_dia'
+  | 'cpi_normal'
+  | 'ism_depois'
+  | 'fed_depois'
+  | 'risco'
+  | 'atalho_0830'
+  | 'desligada'
+  | 'minutos_3_15'
+  | 'fed_dia';
+
+/** What a configuration saves on its Top One besides `releases` (account_rule_settings.rules.block, the JSON keys) */
+export interface BlocoProprio {
+  on?: boolean;
+  before_min?: number;
+  after_min?: number;
+}
 
 /**
- * What each configuration saves on its Top One «só nesta conta» (account_rule_settings.rules.block.releases), and the
- * closed losses of the day it carries (New York instants, US$): everything else is the world's.
+ * What each configuration saves on its Top One «só nesta conta» (account_rule_settings.rules.block: `releases`, written
+ * canonically against the world's futures default = the app's, and `bloco`'s switch and minutes), and the closed losses
+ * of the day it carries (New York instants, US$): everything else is the world's.
  */
-export const REGRAS_QUADRO: Readonly<Record<ConfigQuadro, { releases?: Partial<Record<ReleaseCode, ReleaseMode>>; perdas?: readonly { entrada: string; saida: string; usd: number }[] }>> = {
+export const REGRAS_QUADRO: Readonly<
+  Record<
+    ConfigQuadro,
+    { releases?: Partial<Record<ReleaseCode, ReleaseMode>>; bloco?: BlocoProprio; perdas?: readonly { entrada: string; saida: string; usd: number }[] }
+  >
+> = {
   padrao: {},
   cpi_depois: { releases: { cpi: 'depois' } },
   cpi_dia: { releases: { cpi: 'dia' } },
   cpi_normal: { releases: { cpi: 'normal' } },
   ism_depois: { releases: { ism_serv: 'depois' } },
-  // Q17: the Fed «só depois» and −US$ 530 by 10:40 on Wed 9 Dec (limit US$ 500)
+  // Q17: the Fed «só depois» and −US$ 530 by 10:38 on Wed 9 Dec (limit US$ 500: «limite atingido às 10:38»)
   fed_depois: {
     releases: { fomc_decisao: 'depois', fomc_entrevista: 'depois' },
     perdas: [
       { entrada: '2026-12-09 10:02', saida: '2026-12-09 10:20', usd: 300 },
-      { entrada: '2026-12-09 10:25', saida: '2026-12-09 10:40', usd: 230 },
+      { entrada: '2026-12-09 10:25', saida: '2026-12-09 10:38', usd: 230 },
     ],
   },
   // Q36: −US$ 345 earlier on Thu 3 Dec (US$ 155 left of the limit)
   risco: { perdas: [{ entrada: '2026-12-03 09:10', saida: '2026-12-03 09:30', usd: 345 }] },
+  // Q04: «Só opero depois dos dados das 08:30» saved on the account: the six of 08:30 in «Só opero depois do dado»
+  // (ISM, Fed and the others equal the default, so they stay out of the canonical map)
+  atalho_0830: { releases: { cpi: 'depois', ppi: 'depois', payroll: 'depois', pce: 'depois', pib_us: 'depois', varejo_us: 'depois' } },
+  // Q40: the rule off and saved on the account
+  desligada: { bloco: { on: false } },
+  // Q41: an old account with 3 min before and 15 after saved on it
+  minutos_3_15: { bloco: { before_min: 3, after_min: 15 } },
+  // Q42: the Fed's decision and press conference in «Não opero no dia» saved (the CPI change is the screen's draft)
+  fed_dia: { releases: { fomc_decisao: 'dia', fomc_entrevista: 'dia' } },
 };
 
 /** The frame states of contract §5 */
@@ -224,14 +257,14 @@ const E = (quadros: string[], agora: string, config: ConfigQuadro, fixtures: Est
 
 /**
  * Every state of contract §5. The Personalizar states (L5) carry the configuration their frame saves on the account
- * where it is one of REGRAS_QUADRO; frames whose choice is only a draft (Q04 «Só opero depois dos dados das 08:30», Q05
- * «Personalizado», Q40 off, Q42 «não salvo») start from `padrao` and the screen's test applies its edit (rascunho's
- * actions). The Diário states (L7) take their day from the diario-quadro exporter; the files here are the SQL's
+ * (REGRAS_QUADRO: Q04 the 08:30 choice, Q05 CPI «dia», Q40 off, Q41 3 and 15 min, Q42 the Fed «dia»); only the change
+ * a frame draws as «não salvo» is left to the screen's test, which applies it with rascunho's actions (Q42: CPI → «Não
+ * opero no dia»). The Diário states (L7) take their day from the diario-quadro exporter; the files here are the SQL's
  * answers for the same days.
  */
 export const ESTADOS_DADOS: Readonly<Record<EstadoDados, EstadoDoQuadro>> = {
   'q01-personalizar-padrao': E(['Q01', 'Q02', 'Q03'], '2026-12-10 09:00', 'padrao'),
-  'q04-personalizar-0830': E(['Q04'], '2026-12-09 09:00', 'padrao'),
+  'q04-personalizar-0830': E(['Q04'], '2026-12-09 09:00', 'atalho_0830'),
   'q05-personalizar-personalizado': E(['Q05'], '2026-12-10 09:00', 'cpi_dia'),
   'q06-posso-espera-ism': E(['Q06', 'Q13'], '2026-12-03 10:05', 'padrao', { agora: 'agora-q06-espera-ism' }),
   'q07-posso-depois-cpi': E(['Q07'], '2026-12-10 08:27', 'cpi_depois', { agora: 'agora-q07-depois-cpi' }),
@@ -265,9 +298,9 @@ export const ESTADOS_DADOS: Readonly<Record<EstadoDados, EstadoDoQuadro>> = {
   'q37-aviso-10min-diario': E(['Q37'], '2026-12-03 09:50', 'padrao', { agora: 'agora-q37-aviso-10min' }),
   'q38-aviso-10min-registrar': E(['Q38'], '2026-12-03 09:50', 'padrao', { agora: 'agora-q37-aviso-10min', entrada: 'entrada-q38-aviso-10min' }),
   'q39-preferencias-aviso': E(['Q39'], '2026-12-10 08:00', 'padrao'),
-  'q40-personalizar-desligada': E(['Q40'], '2026-12-10 09:00', 'padrao'),
-  'q41-personalizar-conta-antiga': E(['Q41'], '2026-12-10 09:00', 'padrao'),
-  'q42-personalizar-etiquetas': E(['Q42'], '2026-12-10 09:00', 'padrao'),
+  'q40-personalizar-desligada': E(['Q40'], '2026-12-10 09:00', 'desligada'),
+  'q41-personalizar-conta-antiga': E(['Q41'], '2026-12-03 09:00', 'minutos_3_15'),
+  'q42-personalizar-etiquetas': E(['Q42'], '2026-12-10 09:00', 'fed_dia'),
   'q43-personalizar-sem-agenda': E(['Q43'], '2026-12-10 09:00', 'padrao', {}, true),
 };
 

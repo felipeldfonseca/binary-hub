@@ -218,9 +218,38 @@ describe('the boards\' world: recorded answers and the screen reads agree', () =
     for (const e of estados) {
       const f = ESTADOS_DADOS[e].fixtures;
       if (f.agora) expect(parseRulesNow(agoraDoEstado(e)).accounts).toHaveLength(1);
-      if (f.entrada) expect(parseEntryDryRun(entradaDoEstado(e)).gate.status === null || typeof parseEntryDryRun(entradaDoEstado(e)).gate.status === 'string').toBe(true);
+      if (f.entrada) expect(parseEntryDryRun(entradaDoEstado(e))).toBeTruthy();
       if (f.dia) expect(fs.existsSync(path.join(__dirname, '../../testing/fixtures/agenda', `${f.dia}.json`))).toBe(true);
     }
+  });
+
+  it.each([
+    ['q33-registrar-espera', 'aguardar', 'espera'],
+    ['q34-registrar-depois', 'aguardar', 'espera'],
+    ['q35-registrar-dia', 'aguardar', 'dia'],
+    ['q36-registrar-dois-avisos', 'aguardar', 'espera'],
+    ['q38-aviso-10min-registrar', 'fora_janela', 'espera'],
+  ] as [EstadoDados, string, string][])('the Registrar dry run of %s: status %s, its block\'s first interval %s', (e, status, kind) => {
+    const json = entradaDoEstado(e) as { gate: { status: string; block: { today: { kind: string }[] } } };
+    expect(parseEntryDryRun(json).gate.status).toBe(status);
+    expect(json.gate.block.today[0].kind).toBe(kind);
+  });
+
+  it.each([
+    ['q04-personalizar-0830', { releases: { cpi: 'depois', ppi: 'depois', payroll: 'depois', pce: 'depois', pib_us: 'depois', varejo_us: 'depois' } }],
+    ['q40-personalizar-desligada', { on: false }],
+    ['q41-personalizar-conta-antiga', { before_min: 3, after_min: 15 }],
+    ['q42-personalizar-etiquetas', { releases: { fomc_decisao: 'dia', fomc_entrevista: 'dia' } }],
+  ] as [EstadoDados, Record<string, unknown>][])('%s: the choice the frame shows as saved is on the account (no «não salvo» from a draft)', (e, block) => {
+    const cfg = configDoQuadro(ESTADOS_DADOS[e].config) as { accounts: { settings: { rules: { block?: unknown } } }[] };
+    expect(cfg.accounts[0].settings.rules.block).toEqual(block);
+  });
+
+  it('Q41 is Thu 3 Dec (ISM de serviços) before its 09:57 wait; Q17\'s limit is hit at 10:38 ET', () => {
+    const q41 = ESTADOS_DADOS['q41-personalizar-conta-antiga'].agora;
+    expect(tradingDayOn(q41, RELOGIO_TOP)).toBe('2026-12-03');
+    expect(q41.getTime()).toBeLessThan(etQ('2026-12-03 09:57').getTime());
+    expect(JSON.stringify(agoraDoEstado('q17-posso-encerrado-na-espera'))).toContain('"hit_at":"2026-12-09T15:38:00+00:00"');
   });
 
   it.each([

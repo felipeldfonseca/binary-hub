@@ -107,7 +107,8 @@ delete from public.profiles where id in (${ids});`);
 insert into public.profiles (id, email) values ('${uid}', '${email}') on conflict (id) do nothing;
 ${c === 'fora' ? '' : `insert into public.hub_members (user_id) values ('${uid}');`}`);
       acc[c] = await createAccountAsUser(uid, { market: 'futures', label: 'Top One', platform: 'topone', firm: null, external_ref: null, phase: 'financiada', size: null, is_primary: true });
-      const releases = c === 'fora' ? undefined : REGRAS_QUADRO[c].releases;
+      const cfgQ = c === 'fora' ? {} : REGRAS_QUADRO[c];
+      const block = cfgQ.releases || cfgQ.bloco ? { ...cfgQ.bloco, ...(cfgQ.releases ? { releases: cfgQ.releases } : {}) } : undefined;
       asUser(
         uid,
         `public.save_rules(${lit({
@@ -115,7 +116,7 @@ ${c === 'fora' ? '' : `insert into public.hub_members (user_id) values ('${uid}'
           base_rev: (asUser(uid, 'public.rules_config()') as { rev: string }).rev,
           accounts: {
             [acc[c]]: {
-              rules: { v: 1, window_rule: { on: true, outside: 'fora' }, limit: { usd: 500, mode: 'conta', at_limit: 'encerrar' }, ...(releases ? { block: { releases } } : {}) },
+              rules: { v: 1, window_rule: { on: true, outside: 'fora' }, limit: { usd: 500, mode: 'conta', at_limit: 'encerrar' }, ...(block ? { block } : {}) },
               window: { tz: NY, start_min: 600, end_min: 660, weekdays: MON_TO_FRI },
               version: 'force',
             },
@@ -169,6 +170,13 @@ values ('${uid}', '${acc[c]}', 'MESZ6', 'futures', 'long', '${et(p.entrada).toIS
     expect(rec('agora-q11-mais-tarde', 'padrao', '2026-12-03 09:30')).toMatchObject({ kind: 'fora_janela' });
     expect(rec('agora-q15-espera-acabou', 'cpi_depois', '2026-12-10 08:45')).toMatchObject({ kind: 'fora_janela' });
     expect(rec('agora-q17-encerrado-na-espera', 'fed_depois', '2026-12-09 10:45')).toMatchObject({ kind: 'encerrado' });
+    // Q17's board: «limite atingido às 10:38»
+    expect(JSON.stringify(agoraJson('fed_depois', et('2026-12-09 10:45')))).toContain('"hit_at":"2026-12-09T15:38:00+00:00"');
+    // Q41's board: 3 and 15 min saved on the account, «você aguarda das 09:57 às 10:15» on Thu 3 Dec
+    const g41 = parseRulesNow(agoraJson('minutos_3_15', et('2026-12-03 09:00'))).accounts[0].gate.block;
+    expect(g41.evaluated && g41.today.map((i) => [i.kind, i.start.toISOString(), i.end.toISOString()])).toEqual([['espera', et('2026-12-03 09:57').toISOString(), et('2026-12-03 10:15').toISOString()]]);
+    // Q40's board: the rule off and saved: nothing to wait for on CPI day
+    expect(parseRulesNow(agoraJson('desligada', et('2026-12-10 08:27'))).accounts[0].gate.block).toMatchObject({ evaluated: false, reason: 'regra_desligada' });
     expect(rec('agora-q18-primeira-espera', 'padrao', '2026-12-03 09:57')).toMatchObject({ kind: 'aguardar', until: et('2026-12-03 10:10') });
     expect(rec('agora-q37-aviso-10min', 'padrao', '2026-12-03 09:50')).toMatchObject({ kind: 'fora_janela' });
     expect(rec('agora-q34-depois-ism', 'ism_depois', '2026-12-03 10:05')).toMatchObject({ kind: 'aguardar', until: et('2026-12-03 10:10') });
