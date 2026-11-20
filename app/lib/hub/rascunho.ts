@@ -8,8 +8,8 @@
  * silently revert what another tab saved.
  */
 import { MON_TO_FRI } from '@/lib/domain/tempo';
-import type { AccountMarket, AtLimit, CalendarCode, LimitMode, StateChoice, StateName } from '@/lib/domain/gate';
-import { ACCOUNT_MARKETS, CALENDAR_CODES, MARKET_SPEC, STATE_NAMES } from '@/lib/domain/gate';
+import type { AccountMarket, AtLimit, CalendarCode, LimitMode, ReleaseCode, ReleaseMode, StateChoice, StateName } from '@/lib/domain/gate';
+import { ACCOUNT_MARKETS, AGENDA_RELEASES, CALENDAR_CODES, MARKET_SPEC, STATE_NAMES } from '@/lib/domain/gate';
 import { SALVAR, ERRO_REGRAS } from '@/components/hub/personalizar/copy';
 import type { RegrasErrorCode } from './regrasDb';
 import { formatDiaMes } from './formato';
@@ -18,6 +18,8 @@ import {
   BREAKEVEN_OFF,
   STATE_TEXT_MAX,
   activeAccounts,
+  appReleaseMode,
+  canonMarketReleases,
   breakevenJson,
   canon,
   emptyAccountSettings,
@@ -254,6 +256,94 @@ export function restaurarMinutos(s: RulesSettings, saved: RulesSettings, e: Enti
   if (own === undefined) delete block[key];
   else block[key] = own;
   return withAccount(s, e.conta.id, { block });
+}
+
+// ---------------------------------------------------------------------------------------------
+// «Dados econômicos» per release (Phase 5-1, SPEC §3.3, §3.6, §7.1)
+// ---------------------------------------------------------------------------------------------
+
+/** The three ready-made choices of SPEC §7.1 (never stored: the screen marks the one the map matches) */
+export type AtalhoDados = 'fortes' | 'depois0830' | 'diaCpiPayrollFed';
+export const ATALHOS_DADOS: readonly AtalhoDados[] = ['fortes', 'depois0830', 'diaCpiPayrollFed'];
+
+/** «Só opero depois dos dados das 08:30»: the six of 08:30 (SPEC §7.1) */
+export const DADOS_0830: readonly ReleaseCode[] = ['cpi', 'ppi', 'payroll', 'pce', 'pib_us', 'varejo_us'];
+/** «Não opero em dia de CPI, Payroll e Fed»: CPI, Payroll and both Fed codes (SPEC §2, §7.1) */
+export const DADOS_CPI_PAYROLL_FED: readonly ReleaseCode[] = ['cpi', 'payroll', 'fomc_decisao', 'fomc_entrevista'];
+
+/**
+ * The whole map (all 20 codes) a ready-made choice puts in the list (SPEC §7.1 table): the strong
+ * data (LISTA_A_V1) in «volta» except the shortcut's own codes; every other code «normal».
+ */
+export function mapaDoAtalho(atalho: AtalhoDados): Record<ReleaseCode, ReleaseMode> {
+  const out = {} as Record<ReleaseCode, ReleaseMode>;
+  for (const r of AGENDA_RELEASES) {
+    let v: ReleaseMode = r.inListA ? 'volta' : 'normal';
+    if (atalho === 'depois0830' && DADOS_0830.includes(r.code)) v = 'depois';
+    if (atalho === 'diaCpiPayrollFed' && DADOS_CPI_PAYROLL_FED.includes(r.code)) v = 'dia';
+    out[r.code] = v;
+  }
+  return out;
+}
+
+/**
+ * What an entity does per release, as edited, for all 20 codes: on an account its own choice,
+ * else the futures default's, else the app's; on «Padrão Futuros» the default's, else the app's.
+ * `proprios` = the codes the account sets itself («só nesta conta» on the line), in list order.
+ */
+export function dadosEfetivos(s: RulesSettings, e: Entidade): { modos: Record<ReleaseCode, ReleaseMode>; proprios: ReleaseCode[] } {
+  const market = e.tipo === 'padrao' ? s.markets.futures : s.markets[e.conta.market];
+  const own = e.tipo === 'conta' ? s.accounts[e.conta.id]?.block.releases : undefined;
+  const modos = {} as Record<ReleaseCode, ReleaseMode>;
+  const proprios: ReleaseCode[] = [];
+  for (const r of AGENDA_RELEASES) {
+    const mine = own?.[r.code];
+    if (mine !== undefined) proprios.push(r.code);
+    modos[r.code] = mine ?? market.block?.releases?.[r.code] ?? appReleaseMode(r.code);
+  }
+  return { modos, proprios };
+}
+
+/**
+ * The ready-made choice a map matches (SPEC §3.6: the screen looks at the list), over the codes of
+ * the calendars followed (c3 §3.6: the euro and Brazil strong data count only when followed); a
+ * code absent from `map` reads «normal». 'personalizado' when none matches.
+ */
+export function atalhoDoMapa(
+  map: Partial<Record<ReleaseCode, ReleaseMode>>,
+  calendars: readonly CalendarCode[] = CALENDAR_CODES,
+): AtalhoDados | 'personalizado' {
+  const codes = AGENDA_RELEASES.filter((r) => calendars.includes(r.calendar)).map((r) => r.code);
+  for (const a of ATALHOS_DADOS) {
+    const want = mapaDoAtalho(a);
+    if (codes.every((c) => (map[c] ?? 'normal') === want[c])) return a;
+  }
+  return 'personalizado';
+}
+
+/** Sets codes of an entity: on «Padrão Futuros» canonical against the app's default, on an account per code (withAccountRule) */
+function comDados(s: RulesSettings, e: Entidade, patch: Partial<Record<ReleaseCode, ReleaseMode>>): RulesSettings {
+  if (e.tipo === 'conta') return withAccountRule(s, e.conta, { block: { releases: patch } });
+  const cur = s.markets.futures.block ?? DEFAULT_BLOCK;
+  const releases = canonMarketReleases({ ...cur.releases, ...patch });
+  const block: BlockSetting = { on: cur.on, beforeMin: cur.beforeMin, afterMin: cur.afterMin };
+  if (releases) block.releases = releases;
+  return withMarket(s, 'futures', { block });
+}
+
+/** One line of «Escolher dado por dado»: what the entity does in that release. Choosing the inherited value goes back to it. */
+export const escolherDado = (s: RulesSettings, e: Entidade, code: ReleaseCode, mode: ReleaseMode): RulesSettings => comDados(s, e, { [code]: mode });
+
+/** A ready-made choice: the whole list changes (c3 §3.6); nothing is saved before «Salvar» */
+export const aplicarAtalho = (s: RulesSettings, e: Entidade, atalho: AtalhoDados): RulesSettings => comDados(s, e, mapaDoAtalho(atalho));
+
+/**
+ * «Voltar ao padrão de Futuros» of «Dados econômicos» (c3 §3.8): the account's own choices of this
+ * rule go, minutes and the switch included; nothing on «Padrão Futuros».
+ */
+export function voltarAoPadraoDados(s: RulesSettings, e: Entidade): RulesSettings {
+  if (e.tipo === 'padrao') return s;
+  return withAccount(s, e.conta.id, { block: {} });
 }
 
 /** «Limite do dia» of an account (never inherited); null = «Sem limite» */
