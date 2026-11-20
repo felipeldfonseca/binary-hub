@@ -48,6 +48,31 @@ describe('relogioDados (pure)', () => {
     expect(relogioDados(et('2026-12-09 17:55'), entrada({ today: [diaCpi] })).avisoDezMin).toBeNull();
   });
 
+  it('a «Só depois» wait starts at the day\'s start (18:00 ET): no notice from the old day\'s answer, none once it is listed', () => {
+    const depoisCpi: BlockInterval = {
+      kind: 'espera',
+      start: et('2026-12-09 18:00'),
+      end: et('2026-12-10 08:40'),
+      releases: [{ code: 'cpi', at: et('2026-12-10 08:30'), mode: 'depois' }],
+    };
+    // Wed 17:50: the answer is Wed's, which lists no interval of Thu
+    expect(relogioDados(et('2026-12-09 17:50'), entrada({ today: [] })).avisoDezMin).toBeNull();
+    // Thu's answer, from 18:00 on: the wait is on, the notice is over
+    expect(relogioDados(et('2026-12-09 18:00'), entrada({ today: [depoisCpi] })).avisoDezMin).toBeNull();
+    expect(relogioDados(et('2026-12-10 08:00'), entrada({ today: [depoisCpi] })).avisoDezMin).toBeNull();
+  });
+
+  it('a wait «em volta» on the eve that runs across 18:00 ET gives the notice 10 min before its start', () => {
+    const vespera: BlockInterval = {
+      kind: 'espera',
+      start: et('2026-12-09 17:55'),
+      end: et('2026-12-09 18:10'),
+      releases: [{ code: 'ism_serv', at: et('2026-12-09 18:00'), mode: 'volta' }],
+    };
+    expect(relogioDados(et('2026-12-09 17:50'), entrada({ today: [vespera] })).avisoDezMin).toEqual({ start: vespera.start, end: vespera.end, releases: vespera.releases });
+    expect(relogioDados(et('2026-12-09 17:44'), entrada({ today: [vespera] })).proximo).toEqual(et('2026-12-09 17:45'));
+  });
+
   it('on with alerts absent, or before_block null or true; off only with before_block false', () => {
     const at = et('2026-12-03 09:50');
     expect(relogioDados(at, entrada({ preferences: null })).avisoDezMin).not.toBeNull();

@@ -221,10 +221,13 @@ export interface RelogioDados {
 }
 
 /**
- * The two clocks at the server's `now` (pure). The notice covers only waits that start in the
- * middle of the day (kind 'espera': c3 §8.2; a whole day and «Só depois» start at the day's start,
- * where the answer itself already says so), from start − 10 min until start; the earliest wins.
- * Neither clock is in changes_at (SPEC §5.7): the screen arms them itself.
+ * The two clocks at the server's `now` (pure). The notice covers the intervals of kind 'espera' of
+ * the answer's day (c3 §8.2), from start − 10 min until start; the earliest wins. A whole day is
+ * kind 'dia' and never gives it. A «Só depois» wait (kind 'espera' too, alone or merged with others)
+ * starts at the clock day's start (blockIntervals: min(S, R − before)): its 10 minutes fall on the
+ * day before, whose answer does not list it, and from its start on the notice is over; so it never
+ * gives the notice either, by its start and not by a filter. Neither clock is in changes_at
+ * (SPEC §5.7): the screen arms them itself.
  */
 export function relogioDados(now: Date, e: RelogioDadosEntrada): RelogioDados {
   const t = now.getTime();
