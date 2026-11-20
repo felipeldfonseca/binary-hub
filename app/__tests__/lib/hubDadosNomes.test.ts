@@ -131,13 +131,38 @@ describe('rotuloDia (SPEC §7.2, the whole day)', () => {
     expect(rotuloDia([rel('cpi', '2026-12-10 08:30', 'dia')], et('2026-12-09 18:30'), NY, { outraData: true })).toBe('dia de CPI, qui às 08:30');
   });
 
-  it('the two Fed codes are one day name; two day names: «e mais 1 dado»', () => {
+  it('the two Fed codes are one day name', () => {
     expect(rotuloDia([rel('fomc_decisao', '2026-12-16 14:00', 'dia'), rel('fomc_entrevista', '2026-12-16 14:30', 'dia')], et('2026-12-16 10:00'), NY)).toBe(
       'dia de Fed, às 14:00',
     );
-    expect(rotuloDia([rel('cpi', '2026-12-10 08:30', 'dia'), rel('payroll', '2026-12-10 08:30', 'dia')], et('2026-12-10 10:00'), NY)).toBe(
-      'dia de CPI, às 08:30, e mais 1 dado',
+  });
+
+  it('two day names (c3 §5.2 case 9): «dia de PCE e PIB dos EUA, às 08:30», in the answer\'s order', () => {
+    expect(rotuloDia([rel('pce', '2026-12-23 08:30', 'dia'), rel('pib_us', '2026-12-23 08:30', 'dia')], et('2026-12-23 10:00'), NY)).toBe(
+      'dia de PCE e PIB dos EUA, às 08:30',
     );
+    expect(rotuloDia([rel('pce', '2026-12-23 08:30', 'dia'), rel('pib_us', '2026-12-23 08:30', 'dia')], et('2026-12-22 19:00'), NY)).toBe(
+      'dia de PCE e PIB dos EUA, amanhã às 08:30',
+    );
+  });
+
+  it('three or more day names: «dia de A, às HH:MM, e mais N dados»', () => {
+    const xs = [rel('cpi', '2026-12-10 08:30', 'dia'), rel('payroll', '2026-12-10 08:30', 'dia'), rel('ism_serv', '2026-12-10 10:00', 'dia')];
+    expect(rotuloDia(xs, et('2026-12-10 07:00'), NY)).toBe('dia de CPI, às 08:30, e mais 2 dados');
+  });
+
+  it('«· o dia da conta começou às 18:00» only when the day started before the release\'s date (SPEC §7.2)', () => {
+    const cpi = [rel('cpi', '2026-12-10 08:30', 'dia')];
+    const inicio = et('2026-12-09 18:00');
+    expect(rotuloDia(cpi, et('2026-12-09 19:00'), NY, { inicioDoDia: inicio })).toBe('dia de CPI, amanhã às 08:30 · o dia da conta começou às 18:00');
+    expect(rotuloDia(cpi, et('2026-12-10 07:00'), NY, { inicioDoDia: inicio })).toBe('dia de CPI, às 08:30');
+    // On a Brasília window clock the hours move together
+    expect(rotuloDia(cpi, et('2026-12-09 21:30'), 'America/Sao_Paulo', { inicioDoDia: inicio })).toBe(
+      'dia de CPI, amanhã às 10:30 · o dia da conta começou às 20:00',
+    );
+    expect(rotuloDia(cpi, et('2026-12-09 22:30'), 'America/Sao_Paulo', { inicioDoDia: inicio })).toBe('dia de CPI, às 10:30');
+    // An entry of another date never says it
+    expect(rotuloDia(cpi, et('2026-12-09 19:00'), NY, { outraData: true, inicioDoDia: inicio })).toBe('dia de CPI, qui às 08:30');
   });
 });
 

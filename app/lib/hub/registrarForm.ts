@@ -80,10 +80,10 @@ import {
   TIPO_EUA,
   VSV,
 } from '@/components/hub/registrar/copy';
-import { PALAVRAS_DADOS, horaDeVolta, marcaDados, rotuloDados, rotuloDia } from './dadosEconomicos';
+import { PALAVRAS_DADOS, horaDeVolta, marcaDados, rotuloDados, rotuloDia, soDepois } from './dadosEconomicos';
 import { formatDiaMes, formatMoney } from './formato';
 import { formatDecimal, lerNumero } from './numero';
-import { dinheiroCompacto, horaNoRelogio, sufixoRelogio, type Tom } from './posso';
+import { LIBERADO_SEM_AGENDA, dinheiroCompacto, horaNoRelogio, sufixoRelogio, type Tom } from './posso';
 import type { AvisoDoLimite, RegistrarDefaults } from './registrar';
 import { COTACOES, CONTRACT_CHIPS, type Cotacao } from './registrar';
 import { buscarAtivos, chipsDoAtivo, formaDoAtivo, simboloRegistrado, statusBusca, type FormaAtivo } from './registrarAtivos';
@@ -1607,9 +1607,10 @@ export function linhaGate(conta: Pick<ContaReg, 'label' | 'currency'>, gate: Gat
       const avisos: string[] = [];
       if (a.warnings.includes('fora_janela')) avisos.push(a.position === 'nao_e_dia' ? GATE.avisoNaoEDia : GATE.avisoFora);
       if (a.warnings.includes('limite')) avisos.push(GATE.avisoLimite);
+      // Without the agenda «Liberado» is never green and always says why (SPEC §5.4 rule 4, §7.2); an
+      // entry that is not now never says «hoje»
+      if (a.semAgenda) avisos.push(`· ${o.presente ? LIBERADO_SEM_AGENDA : PALAVRAS_DADOS.naoConferidosSub}`);
       if (avisos.length) return { ...base, palavra: GATE.liberado, sub: avisos.join(' '), tom: a.semAgenda ? 'muted' : 'neutral' };
-      // Without the agenda «Liberado» is never green (SPEC §5.4 rule 4)
-      if (a.semAgenda) return { ...base, palavra: GATE.liberado, sub: '', tom: 'muted' };
       const wtz = rules?.windows[0]?.tz ?? dtz;
       return { ...base, palavra: GATE.liberado, sub: o.presente && a.until ? GATE.ate(`${horaNoRelogio(a.until, wtz)}${sufixoRelogio(wtz)}`) : '', tom: 'mint' };
     }
@@ -1627,14 +1628,15 @@ export function linhaGate(conta: Pick<ContaReg, 'label' | 'currency'>, gate: Gat
       return {
         ...base,
         palavra: PALAVRAS_DADOS.aguardarAte(horaDeVolta(a.until, gate.at, wtz, opts)),
-        sub: `· ${rotuloDados(a.releases, gate.at, wtz, opts)}`,
+        sub: `· ${rotuloDados(a.releases, gate.at, wtz, opts)}${soDepois(a.releases) ? ` · ${PALAVRAS_DADOS.soDepois}` : ''}`,
         tom: 'amber',
       };
     }
     case 'dia': {
       const wtz = rules?.windows[0]?.tz ?? dtz;
       const opts = { outraData: !o.presente };
-      const rotulo = a.source === 'dia' ? rotuloDia(a.releases, gate.at, wtz, opts) : rotuloDados(a.releases, gate.at, wtz, opts);
+      const inicioDoDia = gate.block.evaluated && gate.block.active?.kind === 'dia' ? gate.block.active.start : undefined;
+      const rotulo = a.source === 'dia' ? rotuloDia(a.releases, gate.at, wtz, { ...opts, inicioDoDia }) : rotuloDados(a.releases, gate.at, wtz, opts);
       return { ...base, palavra: o.presente ? PALAVRAS_DADOS.naoOperoHoje : PALAVRAS_DADOS.naoOperoNoDia, sub: `· ${rotulo}`, tom: 'amber' };
     }
   }

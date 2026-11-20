@@ -23,7 +23,7 @@ import {
   type Rules,
   type StateRuleCheck,
 } from '@/lib/domain/gate';
-import { horaDeVolta, rotuloDados, rotuloDia } from './dadosEconomicos';
+import { PALAVRAS_DADOS, horaDeVolta, rotuloDados, rotuloDia, soDepois } from './dadosEconomicos';
 import { formatMoney } from './formato';
 
 /** Board colour tokens: --mint, --amber, --red, --text (neutral), --text-2 (muted) */
@@ -96,7 +96,7 @@ function avisos(warnings: GateWarning[], naoEDia: boolean): string | null {
 }
 
 /** The sub of «Liberado» when the agenda was missing (SPEC §7.2 «Nunca verde») */
-export const LIBERADO_SEM_AGENDA = 'dados econômicos não conferidos · sem a agenda de hoje';
+export const LIBERADO_SEM_AGENDA = `${PALAVRAS_DADOS.naoConferidosSub} · sem a agenda de hoje`;
 
 /**
  * One account's line of «Posso operar hoje?» (Início card, Diário in Phase 2) from its answer
@@ -132,14 +132,22 @@ export function possoLinha(conta: string, r: GateResult, rules: Rules | null, ag
       };
     // «Dados econômicos»: the hours on the window clock (SPEC §5.6)
     case 'aguardar':
-      return { ...base, palavra: `Aguardar até ${horaDeVolta(a.until, agora, wtz)}`, tom: 'amber', sub: rotuloDados(a.releases, agora, wtz) };
-    case 'dia':
+      return {
+        ...base,
+        palavra: `Aguardar até ${horaDeVolta(a.until, agora, wtz)}`,
+        tom: 'amber',
+        sub: `${rotuloDados(a.releases, agora, wtz)}${soDepois(a.releases) ? ` · ${PALAVRAS_DADOS.soDepois}` : ''}`,
+      };
+    case 'dia': {
+      // The start of the account day: the `dia` interval's start (SPEC §4.1, [S(R), E(R)))
+      const inicioDoDia = r.block.evaluated && r.block.active?.kind === 'dia' ? r.block.active.start : undefined;
       return {
         ...base,
         palavra: 'Não opero hoje',
         tom: 'amber',
-        sub: a.source === 'dia' ? rotuloDia(a.releases, agora, wtz) : rotuloDados(a.releases, agora, wtz),
+        sub: a.source === 'dia' ? rotuloDia(a.releases, agora, wtz, { inicioDoDia }) : rotuloDados(a.releases, agora, wtz),
       };
+    }
     case 'fora_janela':
       return {
         ...base,
@@ -155,7 +163,7 @@ export function possoLinha(conta: string, r: GateResult, rules: Rules | null, ag
     case 'liberado': {
       const aviso = avisos(a.warnings, a.position === 'nao_e_dia');
       // Without the agenda «Liberado» is never green (SPEC §5.4 rule 4)
-      if (a.semAgenda) return { ...base, palavra: 'Liberado', tom: 'muted', sub: aviso ?? LIBERADO_SEM_AGENDA };
+      if (a.semAgenda) return { ...base, palavra: 'Liberado', tom: 'muted', sub: [aviso, LIBERADO_SEM_AGENDA].filter(Boolean).join(' · ') };
       return {
         ...base,
         palavra: 'Liberado',

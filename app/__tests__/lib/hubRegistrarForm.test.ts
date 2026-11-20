@@ -614,6 +614,36 @@ describe('«Dados econômicos» on the sheet (Phase 5 · base, SPEC §7.2; F2, F
     expect(linhaGate(top, comBloco(cpiDia, cpiDia.end), top1031.rules, { presente: false, outroDia: false }).palavra).toBe('Não opero no dia')
   })
 
+  it('a wait in «Só opero depois do dado» ends « · só opero depois do dado» (SPEC §7.2, the words of c3 §5)', () => {
+    const cpi = { ...ism, releases: [{ code: 'cpi' as const, at: min(-1), mode: 'depois' as const }] }
+    expect(linhaGate(top, comBloco(cpi, min(9)), top1031.rules, { presente: true, outroDia: false }).sub).toBe('· CPI às 10:30 · só opero depois do dado')
+  })
+
+  it('the whole day from 18:00 to midnight: « · o dia da conta começou às 18:00», only for an entry of now', () => {
+    // 19:00 ET the evening before a CPI at 08:30: the account day began at 18:00
+    const at = new Date(cpiDia.start.getTime() + 60 * 60_000)
+    const cpi = { ...cpiDia, releases: [{ ...cpiDia.releases[0], at: new Date(cpiDia.start.getTime() + 14.5 * 3600_000) }] }
+    const g = { ...comBloco(cpi, cpi.end), at }
+    expect(linhaGate(top, g, top1031.rules, { presente: true, outroDia: false }).sub).toBe('· dia de CPI, amanhã às 08:30 · o dia da conta começou às 18:00')
+    expect(linhaGate(top, g, top1031.rules, { presente: false, outroDia: false }).sub).toMatch(/^· dia de CPI, (seg|ter|qua|qui|sex|sáb|dom) às 08:30$/)
+  })
+
+  it('«Liberado» without the agenda is grey and says why (SPEC §7.2 «Nunca verde»), also with a warning', () => {
+    const sem = { ...g0, status: 'liberado' as const, warnings: [] as never[], block: { evaluated: false as const, reason: 'sem_agenda' as const } }
+    expect(linhaGate(top, sem, top1031.rules, { presente: true, outroDia: false })).toEqual({
+      palavra: 'Liberado',
+      sub: '· dados econômicos não conferidos · sem a agenda de hoje',
+      tom: 'muted',
+      acao: null,
+    })
+    // An entry of another moment never says «hoje»
+    expect(linhaGate(top, sem, top1031.rules, { presente: false, outroDia: true }).sub).toBe('· dados econômicos não conferidos')
+    const comAviso = { ...sem, warnings: ['limite' as const] }
+    expect(linhaGate(top, comAviso, top1031.rules, { presente: true, outroDia: false }).sub).toBe(
+      '· com aviso do limite · dados econômicos não conferidos · sem a agenda de hoje',
+    )
+  })
+
   it('the marks: the data break worded from block.active (no_bloqueio stays the stored code)', () => {
     expect(quebrasDoGate(comBloco(ism, min(9)))).toEqual(['no_bloqueio'])
     expect(textoQuebras(quebrasDoGate(comBloco(ism, min(9))), comBloco(ism, min(9)))).toBe('na espera do ISM')

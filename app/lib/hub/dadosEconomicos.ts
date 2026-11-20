@@ -151,16 +151,30 @@ export function rotuloDados(releases: readonly BlockRelease[], now: Date, clock:
 
 /**
  * The label of a whole day (SPEC §7.2): «dia de CPI, às 08:30», «dia de CPI, amanhã às 08:30»; two
- * releases with the same «dia de …» are one («dia de Fed, às 14:00»); more than one day name: «dia
- * de CPI, às 08:30, e mais 1 dado». The «· o dia da conta começou às 18:00» ending is the screen's.
+ * releases with the same «dia de …» are one («dia de Fed, às 14:00»); two day names «dia de PCE e PIB
+ * dos EUA, às 08:30» (c3 §5.2 case 9, in the answer's order); three or more «dia de CPI, às 08:30, e
+ * mais 2 dados». The hour is the first release's. With `inicioDoDia` (the start of the account day,
+ * the `dia` interval's start) and the release on the next date of the clock, the ending «· o dia da
+ * conta começou às 18:00» (SPEC §7.2, from 18:00 to midnight); never for an entry of another date.
  */
-export function rotuloDia(releases: readonly BlockRelease[], now: Date, clock: string, opts: OpcoesData = {}): string {
+export function rotuloDia(
+  releases: readonly BlockRelease[],
+  now: Date,
+  clock: string,
+  opts: OpcoesData & { inicioDoDia?: Date } = {},
+): string {
   if (releases.length === 0) return '';
   const first = releases[0];
   const nomes = Array.from(new Set(releases.map((r) => NOMES_DADOS[r.code].diaDe)));
-  const base = `${nomes[0]},${asHoras(first.at, now, clock, opts)}`;
-  const mais = nomes.length - 1;
-  return mais === 0 ? base : `${base}, e mais ${mais} ${mais === 1 ? 'dado' : 'dados'}`;
+  const horas = asHoras(first.at, now, clock, opts);
+  const base =
+    nomes.length === 1
+      ? `${nomes[0]},${horas}`
+      : nomes.length === 2
+        ? `${nomes[0]} e ${nomes[1].replace(/^dia de /, '')},${horas}`
+        : `${nomes[0]},${horas}, e mais ${nomes.length - 1} dados`;
+  const comecou = opts.inicioDoDia && !opts.outraData && diaDe(first.at, now, clock, opts) === 'amanhã';
+  return comecou ? `${base} · o dia da conta começou às ${hhmm(opts.inicioDoDia!, clock)}` : base;
 }
 
 /** The hour a wait ends, for «Aguardar até …»: «08:40», «amanhã às 08:40», «qui 09:15» (SPEC §5.6) */
@@ -194,4 +208,11 @@ export const PALAVRAS_DADOS = Object.freeze({
   /** An entry that is not «now» (SPEC §7.2 «O Registrar e a entrada de outra data») */
   naoOperoNoDia: 'Não opero no dia',
   naoConferidos: 'Dados econômicos não conferidos',
+  /** The second line of a grey «Liberado» (SPEC §7.2 «Nunca verde»), before « · sem a agenda de hoje» */
+  naoConferidosSub: 'dados econômicos não conferidos',
+  /** The ending of a wait whose releases are all in «Só opero depois do dado» (SPEC §7.2, c3 §5.2 case 2) */
+  soDepois: 'só opero depois do dado',
 });
+
+/** Every release of the wait is in «Só opero depois do dado» */
+export const soDepois = (releases: readonly BlockRelease[]) => releases.length > 0 && releases.every((x) => x.mode === 'depois');
