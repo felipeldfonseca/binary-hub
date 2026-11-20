@@ -217,9 +217,9 @@ function Grupo({ grupo, onEscolher, onIrCalendarios }: { grupo: GrupoDados; onEs
       <h4 className="hub-dd-grupo">{grupo.titulo}</h4>
       <div>
         {grupo.linhas.map((l) => (
-          <div key={l.code} className="hub-col-linha">
-            <div className="hub-col-nome">
-              <span className="hub-col-tit">
+          <div key={l.code} className="hub-col-linha hub-dd-linha">
+            <div className="hub-col-nome hub-dd-nome">
+              <span className="hub-col-tit hub-dd-tit">
                 <b>{l.nome}</b>
                 {l.propria && <TagOrigem propria />}
               </span>

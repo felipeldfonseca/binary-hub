@@ -18,18 +18,11 @@
   align-items: flex-start;
 }
 
-/* The minutes, then their two lines (in one line with them when there is room, Q03) */
+/* The minutes, then their two lines: stacked on a phone (Q01); beside each other from 900 px when there is room (Q03) */
 .hub .hub-dd-minutos {
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px 24px;
-}
-.hub .hub-dd-minutos > .hub-pz-campos-l {
-  flex: none;
-}
-.hub .hub-dd-minutos > div:last-child {
-  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 8px;
 }
 
 /* The summary sentence */
@@ -49,16 +42,16 @@
   line-height: 1.5;
 }
 
-/* «Escolher dado por dado» */
+/* «Escolher dado por dado»: the import's row pieces (hub-col-*), restyled only through this file's own classes */
 .hub .hub-dd-grupo {
   margin: 16px 0 0;
   font-size: 13px;
   font-weight: 700;
 }
-.hub .hub-dd-lista .hub-col-tit {
+.hub .hub-dd-lista .hub-dd-tit {
   gap: 4px 8px;
 }
-.hub .hub-dd-lista .hub-col-tit b {
+.hub .hub-dd-lista .hub-dd-tit b {
   font-family: inherit;
   font-size: 13px;
 }
@@ -96,6 +89,19 @@
     grid-template-columns: minmax(132px, max-content) minmax(0, 1fr);
     column-gap: 32px;
   }
+  .hub .hub-dd-minutos {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 24px;
+  }
+  .hub .hub-dd-minutos > .hub-pz-campos-l {
+    flex: none;
+    flex-wrap: nowrap;
+  }
+  .hub .hub-dd-minutos > div:last-child {
+    flex: 1 1 auto;
+  }
 }
 /* Two columns of choices and the three-column list only where the value column fits them (Q03 at 1280) */
 @media (min-width: 1200px) {
@@ -111,10 +117,10 @@
     white-space: nowrap;
   }
   /* The list as a table of three columns: Dado · Próxima · O que você faz (SPEC §7.1) */
-  .hub .hub-dd-lista .hub-col-linha {
+  .hub .hub-dd-lista .hub-dd-linha {
     grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) minmax(0, 1.4fr);
   }
-  .hub .hub-dd-lista .hub-col-nome {
+  .hub .hub-dd-lista .hub-dd-nome {
     display: contents;
   }
 }
