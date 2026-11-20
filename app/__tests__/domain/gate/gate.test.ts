@@ -434,6 +434,14 @@ describe('the data block (Phase 5 input)', () => {
     expect(codes(same.block.evaluated ? same.block.active : null)).toEqual(['pce', 'pib_us']);
   });
 
+  it('a release repeated at two instants: both kept, so the label names each (the label is the answer\'s, L2 owns dedupe)', () => {
+    const g = gate(et('2026-10-14 08:31'), topOneRules(), [], [ev('08:35', 'cpi'), ev('08:30', 'cpi')]);
+    expect(g.block.evaluated && g.block.active?.releases.map((r) => [r.code, r.at])).toEqual([
+      ['cpi', et('2026-10-14 08:30')],
+      ['cpi', et('2026-10-14 08:35')],
+    ]);
+  });
+
   it('lists as today\'s the blocks that touch the trading day (18:00 to 18:00 ET), and only those', () => {
     const today = (agenda: AgendaEntry[]) => {
       const b = gate(et('2026-10-14 12:00'), topOneRules(), [], agenda).block;
@@ -448,6 +456,19 @@ describe('the data block (Phase 5 input)', () => {
 
   it('events of calendars not marked do not block', () => {
     expect(gate(et('2026-10-14 08:30'), topOneRules(), [], [ev('08:30', 'bce_decisao')]).status).toBe('fora_janela');
+  });
+
+  it('the agenda input, transitional (contract §3.6): undefined → fase5; null → sem_agenda, after so_futuros and sem_calendario', () => {
+    const now = et('2026-10-14 08:30');
+    const r = topOneRules();
+    const day = dayUsage([], { tradingDay: '2026-10-14', until: now, limitCents: null });
+    const reason = (g: GateResult) => (g.block.evaluated ? 'evaluated' : g.block.reason);
+    expect(reason(evaluateGate(now, TOP_ONE, version(r), day, {}))).toBe('fase5');
+    expect(reason(evaluateGate(now, TOP_ONE, version(r), day, { agenda: null }))).toBe('sem_agenda');
+    const noCal = { ...r, block: { ...r.block!, calendars: [] } };
+    expect(reason(evaluateGate(now, TOP_ONE, version(noCal), day, { agenda: null }))).toBe('sem_calendario');
+    expect(reason(evaluateGate(brt('2026-10-14 10:00'), EBINEX, version(ebinexRules()), null, { agenda: null }))).toBe('so_futuros');
+    expect(reason(evaluateGate(now, TOP_ONE, version(r), day, { agenda: [] }))).toBe('evaluated');
   });
 
   it('no calendar marked: not evaluated (sem_calendario)', () => {
