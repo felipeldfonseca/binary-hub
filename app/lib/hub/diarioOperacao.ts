@@ -30,7 +30,7 @@ import {
   acaoAria,
 } from '@/components/hub/diario/copyDia'
 import { NOMES_DADOS, PALAVRAS_DADOS, horaDeVolta, soDepois } from './dadosEconomicos'
-import { diaCurto, dinheiro, hora, tomDe } from './diario'
+import { diaCurto, diaDeDados, dinheiro, hora, tomDe } from './diario'
 import type { DiaryDayTrade, OpenElsewhere } from './diarioDb'
 import { formatDecimal } from './numero'
 import { dinheiroCompacto, sufixoRelogio, type Tom } from './posso'
@@ -187,9 +187,7 @@ export function marcaDadosLonga(interval: { kind: 'espera' | 'dia'; releases: re
   if (!interval || interval.releases.length === 0) return interval?.kind === 'dia' ? 'em dia de dado' : 'na espera de dado'
   const codes = Array.from(new Set(interval.releases.map((r) => r.code)))
   if (interval.kind === 'dia') {
-    const nomes = Array.from(new Set(codes.map((c) => NOMES_DADOS[c].diaDe)))
-    if (nomes.length >= 3) return `em dia de ${nomes.length} dados`
-    return `em ${nomes[0]}${nomes[1] ? ` e ${nomes[1].replace(/^dia de /, '')}` : ''}`
+    return `em ${diaDeDados(interval.releases)}`
   }
   if (codes.length >= 3) return `na espera de ${codes.length} dados`
   return `na espera ${NOMES_DADOS[codes[0]].doDa}${codes[1] ? ` e ${NOMES_DADOS[codes[1]].frase}` : ''}`
@@ -531,12 +529,6 @@ function maisPerto(releases: readonly BlockRelease[], at: Date): BlockRelease[] 
 function doDado(releases: readonly BlockRelease[]): string {
   const codes = Array.from(new Set(releases.map((r) => r.code)))
   return `${NOMES_DADOS[codes[0]].doDa}${codes.slice(1).map((c) => ` e ${NOMES_DADOS[c].frase}`).join('')}`
-}
-
-/** «dia de CPI», «dia de PCE e PIB dos EUA» */
-function diaDeDados(releases: readonly BlockRelease[]): string {
-  const nomes = Array.from(new Set(releases.map((r) => NOMES_DADOS[r.code].diaDe)))
-  return nomes.length >= 3 ? `dia de ${nomes.length} dados` : `${nomes[0]}${nomes[1] ? ` e ${nomes[1].replace(/^dia de /, '')}` : ''}`
 }
 
 /**

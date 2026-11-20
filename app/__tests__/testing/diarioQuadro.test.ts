@@ -46,6 +46,8 @@ import {
   linhaDaData,
   linhaDaRevisao,
   linhaDoTopo,
+  entradasDosDados,
+  linhaDosDadosDoPlano,
   linhasDoPlano,
   listaE,
   mesTitulo,
@@ -88,6 +90,20 @@ const PERMITIDAS: { onde: RegExp; aceita: (app: string, quadro: string) => boole
       'B0-1: «Do pregão anterior» is the newest earlier day whose current review carries a «Levar para o próximo pregão» ' +
       '(diario_dia carry_in; lib/domain/diario carryInOf); the board looks only at the previous trading day and says ' +
       '«Nada trazido do pregão anterior.» when that day has no review',
+  },
+  {
+    onde: /\.infoPlano$/,
+    aceita: (app, quadro) =>
+      quadro.startsWith('Cada linha compara as regras que valiam neste dia, em Personalizar, com o que o diário registrou: janela e limite.') &&
+      app ===
+        quadro
+          .replace('registrou: janela e limite.', 'registrou: janela, dados econômicos e limite.')
+          .replace(
+            'Uma operação fora da janela ou depois do limite fica',
+            'Uma operação fora da janela, numa espera de dado econômico, em dia em que você escolheu não operar ou depois do limite fica',
+          )
+          .replace(' Bloqueio de dados, viés e regra do estado chegam na Fase 5.', ' Viés e regra do estado chegam na Fase 5.'),
+    motivo: 'Phase 5-1 (c3 §6.3, §9.2 item 17): the plan\'s ⓘ of a Futuros account names the data rule; the Phase 4 boards predate it',
   },
 ]
 
@@ -170,14 +186,28 @@ function compararDia(cen: string, out: Diferenca[], q: Quadro, d: DayRead, e: Es
   comparar(cen, out, `${onde}.comPlano`, temPlano, e.comPlano)
   if (temPlano && e.plano) {
     const rules = d.plan.rules!
+    const dados = linhaDosDadosDoPlano(entradasDosDados(d.trades), undefined, conta)
     comparar(cen, out, `${onde}.infoPlano`, comoLerOPlano(conta.market, !!rules.breakeven), e.infoPlano)
     comparar(
       cen,
       out,
       `${onde}.plano`,
-      linhasDoPlano(rules, d.facts, conta).map((l) => ({ item: l.item, plano: l.plano, fato: l.fato, marca: l.marca, tipo: l.tipo, link: l.link })),
+      linhasDoPlano(rules, d.facts, conta, dados)
+        // Phase 5-1's «Dados econômicos» line (below) is not on the Phase 4 boards
+        .filter((l) => l.item !== 'Dados econômicos')
+        .map((l) => ({ item: l.item, plano: l.plano, fato: l.fato, marca: l.marca, tipo: l.tipo, link: l.link })),
       e.plano,
     )
+    // Every entry of the boards' days was frozen before the rule (`fase5`) or recalculated without the agenda
+    // (`sem_agenda`): a Futuros day with entries says «não conferidos neste dia» (Q29); a day without any waits for
+    // the agenda read (G6), which this test does not make; another market has no line
+    const temEntradas = entradasDosDados(d.trades).length > 0
+    if (MARKET_SPEC[conta.market].rules.block && temEntradas) {
+      expect({ onde, dados }).toEqual({
+        onde,
+        dados: { item: 'Dados econômicos', plano: 'não conferidos neste dia', fato: '—', marca: 'Não conferido', tipo: 'neutro', link: null },
+      })
+    } else expect({ onde, dados }).toEqual({ onde, dados: null })
     comparar(cen, out, `${onde}.versao`, d.plan.changes.map((c) => versaoAnterior(c, rules, conta)), e.versao)
     if (e.antes?.ver) {
       comparar(cen, out, `${onde}.antes.txt`, d.note?.text ?? null, e.antes.txt)

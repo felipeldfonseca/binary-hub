@@ -11,9 +11,21 @@
  * the Diário's clock (`tz`: the account's window clock, ET for Futuros, Forex and Ações, Brasília
  * for binárias, Cripto and B3).
  */
-import { EVERY_DAY, MON_TO_FRI, formatHhMm, isoWeekdayOf, utcToLocal } from '@/lib/domain/tempo';
-import type { AccountMarket, Currency } from '@/lib/domain/markets';
-import type { PlanBreak, Rules } from '@/lib/domain/gate';
+import { EVERY_DAY, MON_TO_FRI, formatHhMm, isoWeekdayOf, tradingDayBounds, tradingDayOn, utcToLocal, type DayClock } from '@/lib/domain/tempo';
+import { MARKET_SPEC, type AccountMarket, type Currency } from '@/lib/domain/markets';
+import {
+  agendaFor,
+  evaluateGate,
+  type AgendaRead,
+  type AgendaRow,
+  type BlockCheck,
+  type BlockInterval,
+  type BlockRelease,
+  type CalendarCode,
+  type PlanBreak,
+  type Rules,
+} from '@/lib/domain/gate';
+import { cmeHolidayOn } from '@/lib/domain/agenda/feriados';
 import { abs, numeric, numericText, round, sign, sub } from '@/lib/domain/registro/numeric';
 import {
   COMMISSION_FROM_FILE,
@@ -41,6 +53,7 @@ import {
 } from '@/lib/domain/diario';
 import { formatMoney } from './formato';
 import { faixaJanela, resumoDias } from './janelas';
+import { NOMES_DADOS, rotuloDados, soDepois } from './dadosEconomicos';
 import { itensBreakeven } from './personalizarBreakeven';
 import { sufixoRelogio, type Tom } from './posso';
 
@@ -462,7 +475,12 @@ const SOMANDO_INFO =
  * plano» with the other trades' simple sum, and the misto day's history apart. Before the day's
  * first trade only the limit is explained (as the board's empty day).
  */
-export function comoLerOsNumeros(t: DayTiles, conta: ContaDiario, f: Pick<DayFacts, 'trades' | 'window' | 'limit'>): string {
+export function comoLerOsNumeros(
+  t: DayTiles,
+  conta: ContaDiario,
+  f: Pick<DayFacts, 'trades' | 'window' | 'limit'>,
+  o: { dados?: boolean } = {},
+): string {
   const m = conta.currency;
   const out: string[] = [];
   const temComissao = COMMISSION_FROM_FILE.includes(conta.market) && f.trades > 0;
@@ -484,7 +502,13 @@ export function comoLerOsNumeros(t: DayTiles, conta: ContaDiario, f: Pick<DayFac
     );
   } else out.push('Limite do dia: esta conta não tem limite nas suas regras.');
   if (f.trades && (f.window || f.limit)) {
-    let s = t.limit ? 'Fora do plano: operações fora da janela ou depois do limite.' : 'Fora do plano: operações fora da janela.';
+    let s = o.dados
+      ? t.limit
+        ? `Fora do plano: operações ${FORA_COM_DADOS}.`
+        : 'Fora do plano: operações fora da janela, numa espera de dado econômico ou em dia em que você escolheu não operar.'
+      : t.limit
+        ? 'Fora do plano: operações fora da janela ou depois do limite.'
+        : 'Fora do plano: operações fora da janela.';
     if (t.fora && t.others) s += ` As outras ${t.others.n} somaram ${dinheiro(t.others.net, m)}: conta simples, não é o que teria acontecido.`;
     out.push(s);
   }
@@ -512,7 +536,7 @@ export function comoLerOHistorico(h: HistoryPart, conta: ContaDiario): string {
 // ---------------------------------------------------------------------------------------------
 
 export interface LinhaDoPlano {
-  item: 'Janela' | 'Limite' | 'Breakeven';
+  item: 'Janela' | 'Dados econômicos' | 'Limite' | 'Breakeven';
   /** «10:00–11:00 ET», «US$ 400 · encerra o dia», «MES +8 pts · MNQ +30 pts», «Sem janela salva» */
   plano: string;
   /** «4 de 5 dentro», «atingido às 10:38, com US$ 426,66 de perda · 1 depois, às 10:52: −US$ 38,74» */
@@ -550,11 +574,11 @@ export function breakevenDoPlano(rule: NonNullable<Rules['breakeven']>): string 
 }
 
 /**
- * «O plano do dia»: Janela, Limite and (with the rule) Breakeven, from the rules of the version in
- * force at the day's end and the day's facts. The breakeven row only records (no verdict:
- * Análises judges it).
+ * «O plano do dia»: Janela, Dados econômicos (Futuros, Phase 5-1: `dados`, from linhaDosDadosDoPlano; null leaves it
+ * out), Limite and (with the rule) Breakeven, from the rules of the version in force at the day's end and the day's
+ * facts. The breakeven row only records (no verdict: Análises judges it).
  */
-export function linhasDoPlano(rules: Rules, f: DayFacts, conta: ContaDiario): LinhaDoPlano[] {
+export function linhasDoPlano(rules: Rules, f: DayFacts, conta: ContaDiario, dados: LinhaDoPlano | null = null): LinhaDoPlano[] {
   const m = conta.currency;
   const rows: LinhaDoPlano[] = [];
   const n = f.trades;
@@ -573,6 +597,7 @@ export function linhasDoPlano(rules: Rules, f: DayFacts, conta: ContaDiario): Li
       link: null,
     });
   }
+  if (dados) rows.push(dados);
   if (!rules.limit || !f.limit) rows.push({ item: 'Limite', plano: 'sem limite', fato: '', marca: 'Sem regra', tipo: 'neutro', link: null });
   else {
     const l = f.limit;
@@ -610,6 +635,194 @@ export function linhasDoPlano(rules: Rules, f: DayFacts, conta: ContaDiario): Li
   return rows;
 }
 
+// ---------------------------------------------------------------------------------------------
+// «Dados econômicos» (Phase 5-1): the plan's line, the words of «fora do plano», the day's labels
+// ---------------------------------------------------------------------------------------------
+
+/** «fora da janela, numa espera de dado, em dia em que você escolheu não operar ou depois do limite» (c3 §6.2, §6.3) */
+const FORA_COM_DADOS = 'fora da janela, numa espera de dado econômico, em dia em que você escolheu não operar ou depois do limite';
+
+/** The market has the data rule (Futuros): the plan shows the «Dados econômicos» line, the drill its sentences */
+export const temLinhaDeDados = (market: AccountMarket): boolean => MARKET_SPEC[market].rules.block;
+
+const cap = (x: string) => x.charAt(0).toUpperCase() + x.slice(1);
+
+/** «dia de CPI», «dia de PCE e PIB dos EUA», «dia de 3 dados» (each «dia de …» name once) */
+export function diaDeDados(releases: readonly Pick<BlockRelease, 'code'>[]): string {
+  const nomes = Array.from(new Set(releases.map((r) => NOMES_DADOS[r.code].diaDe)));
+  return nomes.length >= 3 ? `dia de ${nomes.length} dados` : `${nomes[0]}${nomes[1] ? ` e ${nomes[1].replace(/^dia de /, '')}` : ''}`;
+}
+
+/**
+ * One interval as the plan writes it (c3 §6.3): «ISM de serviços às 10:00 · espera 09:55–10:10», «CPI às 08:30 · só
+ * depois das 08:40», «dia de CPI (08:30) · não opero no dia»; hours on the Diário's clock
+ */
+export function intervaloDoPlano(iv: BlockInterval, tz: string): string {
+  const r0 = iv.releases[0];
+  if (iv.kind === 'dia') return `${diaDeDados(iv.releases)} (${hora(r0.at, tz)}) · não opero no dia`;
+  const nome = cap(rotuloDados(iv.releases, r0.at, tz, { outraData: true }));
+  return soDepois(iv.releases) ? `${nome} · só depois das ${hora(iv.end, tz)}` : `${nome} · espera ${hora(iv.start, tz)}–${hora(iv.end, tz)}`;
+}
+
+/** One entry of the day as the plan reads it: its instant and the data block of the gate answer of its plan */
+export interface EntradaDosDados {
+  at: Date;
+  block: BlockCheck;
+}
+
+/** The entries of a day (diario_dia's trades, history left out): the frozen answer, else the recalculated one */
+export function entradasDosDados(
+  trades: readonly { history: boolean; plan: unknown; gate: { at: Date; block: BlockCheck } | null; gateNow: { at: Date; block: BlockCheck } | null }[],
+): EntradaDosDados[] {
+  const out: EntradaDosDados[] = [];
+  for (const t of trades) {
+    if (t.history) continue;
+    const g = t.plan ? t.gate : t.gateNow;
+    if (g) out.push({ at: g.at, block: g.block });
+  }
+  return out;
+}
+
+/**
+ * G6: the data block of a day without entries, computed on screen as the gate would (SPEC §6 G6): the rules of the
+ * day's version (diario_dia's plan), the agenda read of that day (E5, `read`; null = not read or failed →
+ * `sem_agenda`) through agendaFor (a day not covered on D − 1, D, D + 1 → `sem_agenda`), evaluated at the start of the
+ * day on its clock, so `today` holds the day's intervals.
+ */
+export function blocoDoDia(
+  rules: Rules | null,
+  account: { market: AccountMarket; dayClock: DayClock },
+  day: Day,
+  read: AgendaRead | null,
+): BlockCheck {
+  const clock = rules ? rules.day : account.dayClock;
+  const at = tradingDayBounds(day, clock).start;
+  const agenda = rules && read ? agendaFor(rules, clock, at, read) : null;
+  return evaluateGate(at, account, rules ? { rules } : null, null, { agenda }).block;
+}
+
+const NAO_CONFERIDO: readonly string[] = ['sem_agenda', 'fase5'];
+const DESLIGADA: readonly string[] = ['regra_desligada', 'sem_calendario'];
+
+/**
+ * The «Dados econômicos» line of «O plano do dia» (c3 §6.3, Q27–Q29; SPEC §6 G6), in its eight states:
+ * - with entries (`entradas`): from the gate answers of their plans (frozen at the entry, or recalculated for a file):
+ *   the intervals of the first entry the app checked; «1 operação na espera, às 10:05», «2 operações, às 10:05 e
+ *   10:31» (a whole day), «… antes das 08:40» («Só opero depois do dado»), «Fora do plano»; none inside: «nenhuma
+ *   operação na espera» … «No plano»; an entry the app could not check (`sem_agenda`, frozen `fase5`) and none
+ *   outside the plan: «Não conferido»; no entry checked: «não conferidos neste dia» · «—» · «Não conferido» (or the
+ *   rule off: «regra desligada» · «—» · «Sem regra»);
+ * - without entries (`semEntrada`, G6): the block the screen computed for the day from its version and the agenda
+ *   read (evaluateGate with agendaFor's entries; `sem_agenda` when the day is not covered); undefined or null =
+ *   still reading: the line waits (null).
+ * Null for another market and whenever nothing applies (no version).
+ */
+export function linhaDosDadosDoPlano(
+  entradas: readonly EntradaDosDados[],
+  semEntrada: BlockCheck | null | undefined,
+  conta: ContaDiario,
+): LinhaDoPlano | null {
+  if (!temLinhaDeDados(conta.market)) return null;
+  const tz = conta.tz;
+  const linha = (plano: string, fato: string, marca: string, tipo: LinhaDoPlano['tipo']): LinhaDoPlano => ({
+    item: 'Dados econômicos',
+    plano,
+    fato,
+    marca,
+    tipo,
+    link: null,
+  });
+  const naoConferido = () => linha('não conferidos neste dia', '—', 'Não conferido', 'neutro');
+  const desligada = () => linha('regra desligada', '—', 'Sem regra', 'neutro');
+  const blocks = entradas.length ? entradas.map((e) => e.block) : semEntrada ? [semEntrada] : [];
+  if (!blocks.length) return null;
+  const avaliadas = entradas.length ? entradas.filter((e) => e.block.evaluated) : [];
+  const dia = blocks.find((b): b is Extract<BlockCheck, { evaluated: true }> => b.evaluated);
+  if (!dia) {
+    if (blocks.some((b) => !b.evaluated && NAO_CONFERIDO.includes(b.reason))) return naoConferido();
+    if (blocks.some((b) => !b.evaluated && DESLIGADA.includes(b.reason))) return desligada();
+    return null;
+  }
+  const ivs = dia.today;
+  const plano = ivs.length ? ivs.map((iv) => intervaloDoPlano(iv, tz)).join(' · ') : 'nenhum dado com espera neste dia';
+  const dentro = avaliadas.filter((e) => e.block.evaluated && e.block.state === 'no_bloqueio' && e.block.active);
+  const ativos = dentro.map((e) => (e.block as Extract<BlockCheck, { evaluated: true }>).active!);
+  const naoChecadas = entradas.some((e) => !e.block.evaluated && NAO_CONFERIDO.includes(e.block.reason));
+  const esperas = ivs.filter((iv) => iv.kind === 'espera');
+  const soDepoisDoDado = esperas.length > 0 && esperas.every((iv) => soDepois(iv.releases));
+  let fato: string;
+  if (dentro.length) {
+    const horas = listaE(dentro.map((e) => hora(e.at, tz)));
+    if (ativos.some((iv) => iv.kind === 'dia')) fato = `${pl(dentro.length, 'operação', 'operações')}, às ${horas}`;
+    else if (ativos.every((iv) => soDepois(iv.releases))) fato = `${pl(dentro.length, 'operação', 'operações')} antes das ${hora(ativos[0].end, tz)}`;
+    else fato = `${pl(dentro.length, 'operação', 'operações')} na espera, às ${horas}`;
+  } else if (!ivs.length) fato = '—';
+  else if (ivs.some((iv) => iv.kind === 'dia')) fato = 'nenhuma operação';
+  else if (soDepoisDoDado) fato = `nenhuma operação antes das ${hora(esperas[0].end, tz)}`;
+  else fato = 'nenhuma operação na espera';
+  if (dentro.length) return linha(plano, fato, 'Fora do plano', 'fora');
+  if (naoChecadas) return linha(plano, fato, 'Não conferido', 'neutro');
+  return linha(plano, fato, 'No plano', 'ok');
+}
+
+const WD_LONGO = ['Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado', 'Domingo'];
+
+/** «sex 18 dez» */
+const diaDaSemanaCurto = (day: Day) => `${WD3[isoWeekdayOf(day) - 1]} ${diaCurto(day)}`;
+
+/**
+ * The CME list's label of a day (c3 §6.5, SPEC §8 L4; lib/domain/agenda/feriados): «Quinta, 26 nov: feriado nos EUA»,
+ * «Sexta com sessão curta até 13:15 ET»; null on another day. Futuros only (the caller checks the market); whatever
+ * the calendars followed, also on a day without the agenda.
+ */
+export function feriadoDoDia(day: Day): string | null {
+  const h = cmeHolidayOn(day);
+  if (!h) return null;
+  const wd = WD_LONGO[isoWeekdayOf(day) - 1];
+  return h.kind === 'curta' && h.closeNy ? `${wd} com sessão curta até ${h.closeNy} ET` : `${wd}, ${diaCurto(day)}: feriado nos EUA`;
+}
+
+/** The holiday labels of a week's days (the «Semana» card), Futuros only */
+export function feriadosDaSemana(days: readonly Day[], market: AccountMarket): string[] {
+  if (!temLinhaDeDados(market)) return [];
+  return days.map(feriadoDoDia).filter((x): x is string => !!x);
+}
+
+/**
+ * The open day's grey line (c3 §6.5, Q27, Q28, Q32): the day's releases in the order of their hour, «ISM de serviços,
+ * 10:00»; two «CPI, 08:30 · Decisão do Fed, 14:00»; a cancelled one «CPI · cancelado»; postponed without a new date
+ * «CPI · adiado, sem data nova»; one moved to another date, on its first date (the row came by `was_at`) «CPI · adiado
+ * para sex 18 dez» (on the new date, the usual label); then the holiday or short session. `rows`: the week's read
+ * (null: not read, or failed: no release label, never «nenhum dado» unchecked); only the codes of the calendars the
+ * account follows; a day of the account's day clock; hours on the Diário's clock. Futuros only; null when empty.
+ */
+export function linhaCinzaDoDia(
+  rows: readonly AgendaRow[] | null,
+  day: Day,
+  o: { market: AccountMarket; tz: string; clock: DayClock; calendars: readonly CalendarCode[] },
+): string | null {
+  if (!temLinhaDeDados(o.market)) return null;
+  const itens: { t: number; texto: string }[] = [];
+  for (const r of rows ?? []) {
+    if (!r.code || !o.calendars.includes(r.calendar)) continue;
+    const nome = NOMES_DADOS[r.code].nome;
+    const noDia = tradingDayOn(r.at, o.clock) === day;
+    const antes = r.wasAt !== null && tradingDayOn(r.wasAt, o.clock) === day;
+    if (noDia) {
+      if (r.status === 'cancelado') itens.push({ t: r.at.getTime(), texto: `${nome} · cancelado` });
+      else if (r.status === 'adiado') itens.push({ t: r.at.getTime(), texto: `${nome} · adiado, sem data nova` });
+      else itens.push({ t: r.at.getTime(), texto: `${nome}, ${hora(r.at, o.tz)}` });
+    } else if (antes && r.status !== 'cancelado') {
+      itens.push({ t: r.wasAt!.getTime(), texto: `${nome} · adiado para ${diaDaSemanaCurto(tradingDayOn(r.at, o.clock))}` });
+    }
+  }
+  itens.sort((a, b) => a.t - b.t);
+  const partes = itens.map((x) => x.texto);
+  const feriado = feriadoDoDia(day);
+  if (feriado) partes.push(feriado);
+  return partes.length ? partes.join(' · ') : null;
+}
+
 /**
  * When the rules changed during the day: «Até 09:40 valia a versão 1: sem regra de breakeven.»,
  * naming what the earlier version had for the window, the limit and the breakeven rule where it
@@ -629,12 +842,18 @@ export function versaoAnterior(change: { versionNo: number; until: Date; rules: 
   return diffs.length ? `${quando}: ${listaE(diffs)}.` : `${quando}.`;
 }
 
-/** The plan's ⓘ (Futuros get the Phase 5 sentence) */
+/**
+ * The plan's ⓘ. Futuros (the plan has the «Dados econômicos» line, Phase 5-1; c3 §6.3): «janela, dados econômicos e
+ * limite», the data in «fora do plano», and the closing sentence without the data rule
+ */
 export function comoLerOPlano(market: AccountMarket, temBreakeven: boolean): string {
+  const dados = temLinhaDeDados(market);
   return (
-    'Cada linha compara as regras que valiam neste dia, em Personalizar, com o que o diário registrou: janela e limite. Uma operação fora da janela ou depois do limite fica fora do plano, mesmo quando a tela só avisava.' +
+    (dados
+      ? `Cada linha compara as regras que valiam neste dia, em Personalizar, com o que o diário registrou: janela, dados econômicos e limite. Uma operação ${FORA_COM_DADOS} fica fora do plano, mesmo quando a tela só avisava.`
+      : 'Cada linha compara as regras que valiam neste dia, em Personalizar, com o que o diário registrou: janela e limite. Uma operação fora da janela ou depois do limite fica fora do plano, mesmo quando a tela só avisava.') +
     (temBreakeven ? ' Breakeven: a sua regra e em quantas operações que chegaram ao ponto dela o stop foi para a entrada; quem confere é Análises.' : '') +
-    (market === 'futures' ? ' Bloqueio de dados, viés e regra do estado chegam na Fase 5.' : '')
+    (dados ? ' Viés e regra do estado chegam na Fase 5.' : '')
   );
 }
 
@@ -644,8 +863,8 @@ export function comoLerOPlano(market: AccountMarket, temBreakeven: boolean): str
 
 /**
  * «5 operações · −US$ 465,40 · limite atingido às 10:38 · 1 depois do limite, às 10:52 · limite:
- * US$ 465,40 de US$ 400 no pior momento» (live facts, or a review's frozen ones). Without
- * «bloqueio» and «viés» until Phase 5.
+ * US$ 465,40 de US$ 400 no pior momento» (live facts, or a review's frozen ones). Without the data
+ * marks (the day's facts carry no key for them, SPEC §6 G3) and «viés».
  */
 export function fatosTexto(f: DayFacts, conta: ContaDiario): string {
   const m = conta.currency;
@@ -753,7 +972,7 @@ export interface SemanaTexto {
 }
 
 /** The «Semana» card's words. `temLimite` / `temJanela`: the account's rules have them */
-export function semanaTexto(w: WeekCard, conta: ContaDiario, regras: { temLimite: boolean; temJanela: boolean }): SemanaTexto {
+export function semanaTexto(w: WeekCard, conta: ContaDiario, regras: { temLimite: boolean; temJanela: boolean; temDados?: boolean }): SemanaTexto {
   const m = conta.currency;
   const range = intervaloLongo(w.weekOf, w.lastShown);
   const titulo = w.inProgress
@@ -782,7 +1001,13 @@ export function semanaTexto(w: WeekCard, conta: ContaDiario, regras: { temLimite
     leitor: `Resultado por dia: ${leitor.join(' · ')}.`,
     info:
       `Pregões de ${range}. ` +
-      (regras.temLimite ? 'Fora do plano: fora da janela ou depois do limite. ' : regras.temJanela ? 'Fora do plano: fora da janela. ' : '') +
+      (regras.temDados && regras.temLimite
+        ? `Fora do plano: ${FORA_COM_DADOS}. `
+        : regras.temLimite
+          ? 'Fora do plano: fora da janela ou depois do limite. '
+          : regras.temJanela
+            ? 'Fora do plano: fora da janela. '
+            : '') +
       'Revisões: dos pregões com operação registrada no app ou com revisão, quantos têm revisão; hoje só entra depois que você escrever a revisão dele. A coluna Semana do calendário traz os mesmos números.',
   };
 }
@@ -790,7 +1015,8 @@ export function semanaTexto(w: WeekCard, conta: ContaDiario, regras: { temLimite
 const LADO: Record<ForaTrade['direction'], string> = { long: 'Compra', short: 'Venda', call: 'Alta', put: 'Baixa' };
 const QUEBRA: Record<PlanBreak, string> = {
   fora_da_janela: 'fora da janela',
-  no_bloqueio: 'no bloqueio',
+  // The month's list carries the break, not the gate: which data and which kind are unknown here (SPEC §6 G3)
+  no_bloqueio: 'dado econômico',
   depois_do_limite: 'depois do limite',
   contra_a_regra: 'contra a regra',
 };
