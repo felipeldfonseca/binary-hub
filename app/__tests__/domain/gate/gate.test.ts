@@ -449,9 +449,11 @@ describe('the data block (Phase 5 input)', () => {
     };
     const at = (text: string, code: AgendaEntry['code']): AgendaEntry => ({ code, at: et(text) });
     // 17:45–18:00 the day before ends as the day starts; 18:00–18:15 starts as it ends
-    expect(today([at('2026-10-13 17:50', 'ppi'), at('2026-10-14 08:30', 'cpi'), at('2026-10-14 18:05', 'jolts')])).toEqual(['cpi']);
+    expect(today([at('2026-10-13 17:50', 'ppi'), at('2026-10-14 08:30', 'cpi'), at('2026-10-14 18:05', 'payroll')])).toEqual(['cpi']);
     // 17:51–18:06 on either side of the day crosses a turn; the next day's 08:30 does not touch it
-    expect(today([at('2026-10-13 17:56', 'ppi'), at('2026-10-14 17:56', 'jolts'), at('2026-10-15 08:30', 'cpi')])).toEqual(['ppi', 'jolts']);
+    // (payroll, not jolts: in the short form only LISTA_A_V1 waits, so a jolts row makes nothing)
+    expect(today([at('2026-10-13 17:56', 'ppi'), at('2026-10-14 17:56', 'payroll'), at('2026-10-15 08:30', 'cpi')])).toEqual(['ppi', 'payroll']);
+    expect(today([at('2026-10-14 08:30', 'jolts')])).toEqual([]);
   });
 
   it('events of calendars not marked do not block', () => {

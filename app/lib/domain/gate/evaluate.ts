@@ -15,14 +15,15 @@
  */
 import { MARKET_SPEC, type AccountMarket } from '../markets';
 import {
+  addDays,
   tradingDayBounds,
   tradingDayFor,
   tradingDayOn,
   windowOccurrences,
   type DayClock,
 } from '../tempo';
-import { AGENDA_RELEASES, isReleaseCode, type AgendaEntry, type ReleaseCode, type WaitMode } from './agenda';
-import { usdToCents, versionAt, type AtLimit, type LimitMode, type RuleVersion } from './rules';
+import { isReleaseCode, releaseOrd, releasesOf, type AgendaEntry, type ReleaseCode, type WaitMode } from './agenda';
+import { usdToCents, versionAt, type AtLimit, type LimitMode, type RuleVersion, type Rules } from './rules';
 import type { DayResult } from './usage';
 
 export type CheckKey = 'janela' | 'bloqueio' | 'limite' | 'estado';
@@ -188,37 +189,144 @@ function ratio4(a: number, b: number): number {
   return Math.floor((20000 * a + b) / (2 * b)) / 10000;
 }
 
-const ORD: ReadonlyMap<ReleaseCode, number> = new Map(AGENDA_RELEASES.map((r) => [r.code, r.ord]));
-const byAtThenOrd = (a: BlockRelease, b: BlockRelease) => a.at.getTime() - b.at.getTime() || ORD.get(a.code)! - ORD.get(b.code)!;
+const MIN = 60_000;
+/** Text order of the modes, as Postgres sorts them ('depois' < 'dia' < 'volta') */
+const byMode = (a: WaitMode, b: WaitMode) => (a < b ? -1 : a > b ? 1 : 0);
 
-/**
- * Transitional (Phase 5 · base): every release as a wait around it («volta»), merged when they
- * overlap or touch. The four modes, the `dia` apart and `free_at`'s walk come with the domain lane.
- */
-function mergeBlocks(agenda: readonly AgendaEntry[], beforeMin: number, afterMin: number): BlockInterval[] {
-  const intervals = agenda
-    .map((e) => ({
-      kind: 'espera' as const,
-      start: new Date(e.at.getTime() - beforeMin * 60_000),
-      end: new Date(e.at.getTime() + afterMin * 60_000),
-      releases: [{ code: e.code, at: e.at, mode: 'volta' as const }],
-    }))
-    .sort((a, b) => a.start.getTime() - b.start.getTime());
-  const merged: BlockInterval[] = [];
-  for (const iv of intervals) {
-    const last = merged[merged.length - 1];
-    // Overlapping or touching intervals are one block, so «Aguardar até» names its real end
-    if (last && iv.start.getTime() <= last.end.getTime()) {
-      if (iv.end.getTime() > last.end.getTime()) last.end = iv.end;
-      last.releases = [...last.releases, ...iv.releases].sort(byAtThenOrd);
-    } else {
-      merged.push({ ...iv });
-    }
-  }
-  return merged;
+/** One wait before merging: [s, e) from one release */
+interface RawWait {
+  s: number;
+  e: number;
+  code: ReleaseCode;
+  at: number;
+  mode: WaitMode;
+  ord: number;
 }
 
-const CALENDAR_OF: ReadonlyMap<ReleaseCode, string> = new Map(AGENDA_RELEASES.map((r) => [r.code, r.calendar]));
+/**
+ * Every interval of the data block for these releases (gate_eval's intervals, SPEC §4.1 and §4.3),
+ * on the version's day clock `clock` (S and E = the bounds of a release's clock day):
+ * - «volta» [R − before, R + after); «depois» [min(S, R − before), R + after);
+ * - «dia»: the whole day [S, E) of the release's clock day, plus its leftovers [E, R + after) and
+ *   [R − before, S) as waits («espera» with mode «dia») when they pass the day;
+ * - waits (empty ones dropped) merge while the next starts at or before the running end; their
+ *   releases distinct, by `at`, then `ord`, then mode;
+ * - the «dia» releases of one clock day are one whole day (releases by `at`, then `ord`); days never
+ *   merge with waits or with each other.
+ * Ordered by start, then end, then kind («dia» first). Entries whose code is not in the version's
+ * map (releasesOf) make nothing. The intervals do not depend on `at` (kept in the contract's
+ * signature for the screens, which pass the instant they draw); `on` is not looked at.
+ */
+export function blockIntervals(
+  resolved: Rules,
+  clock: DayClock,
+  agenda: readonly AgendaEntry[],
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  at?: Date,
+): BlockInterval[] {
+  const block = resolved.block;
+  if (!block) return [];
+  const map = releasesOf(block);
+  const b = block.beforeMin * MIN;
+  const a = block.afterMin * MIN;
+  const raw: RawWait[] = [];
+  const days = new Map<string, { s: number; e: number; rel: { code: ReleaseCode; at: number; ord: number }[] }>();
+  for (const entry of agenda) {
+    const mode = map[entry.code];
+    if (!mode || !isReleaseCode(entry.code)) continue;
+    const r = entry.at.getTime();
+    const ord = releaseOrd(entry.code);
+    const one = { code: entry.code, at: r, mode, ord };
+    if (mode === 'volta') {
+      raw.push({ ...one, s: r - b, e: r + a });
+      continue;
+    }
+    const rday = tradingDayOn(entry.at, clock);
+    const bounds = tradingDayBounds(rday, clock);
+    const S = bounds.start.getTime();
+    const E = bounds.end.getTime();
+    if (mode === 'depois') {
+      raw.push({ ...one, s: Math.min(S, r - b), e: r + a });
+      continue;
+    }
+    if (r + a > E) raw.push({ ...one, s: E, e: r + a });
+    if (r - b < S) raw.push({ ...one, s: r - b, e: S });
+    const day = days.get(rday);
+    if (day) day.rel.push({ code: entry.code, at: r, ord });
+    else days.set(rday, { s: S, e: E, rel: [{ code: entry.code, at: r, ord }] });
+  }
+
+  const waits = raw
+    .filter((w) => w.s < w.e)
+    .sort((x, y) => x.s - y.s || x.e - y.e || x.at - y.at || x.ord - y.ord);
+  const groups: RawWait[][] = [];
+  let runningEnd = -Infinity;
+  for (const w of waits) {
+    if (groups.length === 0 || w.s > runningEnd) groups.push([w]);
+    else groups[groups.length - 1].push(w);
+    runningEnd = Math.max(runningEnd, w.e);
+  }
+
+  const out: BlockInterval[] = groups.map((g) => {
+    const seen = new Set<string>();
+    const rel = g
+      .filter((w) => {
+        const key = `${w.code}|${w.at}|${w.mode}`;
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      })
+      .sort((x, y) => x.at - y.at || x.ord - y.ord || byMode(x.mode, y.mode));
+    return {
+      kind: 'espera' as const,
+      start: new Date(Math.min(...g.map((w) => w.s))),
+      end: new Date(Math.max(...g.map((w) => w.e))),
+      releases: rel.map((w) => ({ code: w.code, at: new Date(w.at), mode: w.mode })),
+    };
+  });
+  for (const day of Array.from(days.values())) {
+    out.push({
+      kind: 'dia',
+      start: new Date(day.s),
+      end: new Date(day.e),
+      releases: day.rel
+        .sort((x, y) => x.at - y.at || x.ord - y.ord)
+        .map((x) => ({ code: x.code, at: new Date(x.at), mode: 'dia' as const })),
+    });
+  }
+  return out.sort(
+    (x, y) =>
+      x.start.getTime() - y.start.getTime() ||
+      x.end.getTime() - y.end.getTime() ||
+      (x.kind === y.kind ? 0 : x.kind === 'dia' ? -1 : 1),
+  );
+}
+
+/**
+ * When the account is free again (gate_eval's free_at, SPEC §5.3): from `at`, t := the latest end
+ * of the intervals holding t, until none holds t (→ t) or t reaches `horizon` (→ null). Null too
+ * when no interval holds `at` (state «ok»). The gate's horizon is E(D + 1) − before_min, D = the
+ * clock day of `at`.
+ */
+export function freeAtOf(intervals: readonly BlockInterval[], at: Date, horizon: Date): Date | null {
+  const holding = (t: number) => intervals.filter((iv) => iv.start.getTime() <= t && t < iv.end.getTime());
+  let t = at.getTime();
+  if (holding(t).length === 0) return null;
+  const h = horizon.getTime();
+  for (;;) {
+    const hold = holding(t);
+    if (hold.length === 0) break;
+    t = Math.max(...hold.map((iv) => iv.end.getTime()));
+    if (t >= h) break;
+  }
+  return t >= h ? null : new Date(t);
+}
+
+/** gate_eval's horizon for free_at: the end of the clock day after `at`'s, minus before_min */
+export function freeAtHorizon(at: Date, clock: DayClock, beforeMin: number): Date {
+  const next = addDays(tradingDayOn(at, clock), 1);
+  return new Date(tradingDayBounds(next, clock).end.getTime() - beforeMin * MIN);
+}
 
 /**
  * The answer at `now` for an account, from the version in force at `now` (versionAt; or a draft
@@ -260,33 +368,37 @@ export function evaluateGate(
     };
   }
 
-  // Data block (Phase 5)
-  const agenda = options.agenda;
-  // Every merged interval, not only today's: inside a window that opened before the day turned,
-  // the instant is past the day's bounds
-  let blocks: BlockInterval[] = [];
+  // Data block («Dados econômicos»): the reasons in the order of SPEC §5.1, then the intervals (§4)
+  const agenda = options.agenda ?? null;
+  let today: BlockInterval[] = [];
+  let clockDayEnd: number | null = null;
   let block: BlockCheck;
+  const blk = rules?.block ?? null;
+  const map = blk ? releasesOf(blk) : {};
+  const waits = Object.values(map);
+  const minutes = blk ? blk.beforeMin + blk.afterMin : 0;
   if (!rules) block = notEvaluated('sem_versao');
   else if (!MARKET_SPEC[rules.market].rules.block) block = notEvaluated('so_futuros');
-  else if (!rules.block || !rules.block.on || rules.block.beforeMin + rules.block.afterMin === 0) {
+  else if (!blk || !blk.on) block = notEvaluated('regra_desligada');
+  else if (!blk.releases && minutes === 0) block = notEvaluated('regra_desligada');
+  else if (blk.calendars.length === 0) block = notEvaluated('sem_calendario');
+  else if (waits.length === 0 || (minutes === 0 && !waits.some((m) => m === 'depois' || m === 'dia'))) {
     block = notEvaluated('regra_desligada');
-  } else if (rules.block.calendars.length === 0) block = notEvaluated('sem_calendario');
-  else if (agenda === undefined || agenda === null) block = notEvaluated('sem_agenda');
+  } else if (agenda === null) block = notEvaluated('sem_agenda');
   else {
-    const marked: readonly string[] = rules.block.calendars;
-    blocks = mergeBlocks(
-      agenda.filter((e) => marked.includes(CALENDAR_OF.get(e.code) ?? '')),
-      rules.block.beforeMin,
-      rules.block.afterMin,
-    );
-    const active = blocks.find((m) => m.start.getTime() <= t && t < m.end.getTime()) ?? null;
+    // The clock day of p (never the window-adjusted day): what «today» and the horizon are about
+    const cday = tradingDayBounds(tradingDayOn(now, rules.day), rules.day);
+    clockDayEnd = cday.end.getTime();
+    const all = blockIntervals(rules, rules.day, agenda, now);
+    today = all.filter((iv) => iv.start.getTime() < cday.end.getTime() && iv.end.getTime() > cday.start.getTime());
+    const holding = all.filter((iv) => iv.start.getTime() <= t && t < iv.end.getTime());
+    const active = holding.find((iv) => iv.kind === 'dia') ?? holding[0] ?? null;
     block = {
       evaluated: true,
       state: active ? 'no_bloqueio' : 'ok',
       active,
-      today: blocks.filter((m) => m.end.getTime() > bounds.start.getTime() && m.start.getTime() < bounds.end.getTime()),
-      // Merged intervals never overlap or touch: the end of the active one is the first free instant
-      freeAt: active ? active.end : null,
+      today,
+      freeAt: active ? freeAtOf(all, now, freeAtHorizon(now, rules.day, blk.beforeMin)) : null,
     };
   }
 
@@ -345,9 +457,9 @@ export function evaluateGate(
     if (window.current) edges.push(window.current.end.getTime());
     if (window.next) edges.push(window.next.start.getTime());
   }
-  // Every edge of the intervals `active` is looked for in, so «Aguardar até» ends on time even
-  // when the instant is past the day's bounds (a window open across the 18:00 turn)
-  for (const b of blocks) edges.push(b.start.getTime(), b.end.getTime());
+  // With the block evaluated: every edge of today's intervals and the clock day's end
+  for (const iv of today) edges.push(iv.start.getTime(), iv.end.getTime());
+  if (clockDayEnd !== null) edges.push(clockDayEnd);
   const future = edges.filter((x) => x > t);
 
   return {
