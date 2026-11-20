@@ -52,16 +52,25 @@ function confereNumeros(dia: HTMLElement, e: EsperadoDia) {
 }
 
 /** «Do pregão anterior»: the board's, or the database's carry_in where they differ (B0-1, reported to the owner) */
-function conferePlano(dia: HTMLElement, e: EsperadoDia, anterior?: string) {
+function conferePlano(dia: HTMLElement, e: EsperadoDia, anterior?: string, futuros = true) {
   if (!e.comPlano) {
     expect(within(dia).queryByRole('heading', { level: 3, name: 'O plano do dia' })).toBeNull()
     expect(within(dia).queryByText('chega na Fase 5')).toBeNull()
     return
   }
   const lista = within(dia).getByRole('list', { name: 'O plano do dia' })
-  const linhas = within(lista)
+  const todas = within(lista)
     .getAllByRole('listitem')
     .map((li) => Array.from(li.querySelectorAll('strong, .hub-dr-plano-meio > *, .hub-dr-plano-marca')).map(texto).join(' '))
+  // Phase 5-1: a Futuros day has the «Dados econômicos» line right after Janela (not on the Phase 4 boards). Every entry
+  // of the boards' days was frozen before the rule, and their days fall outside testing/agenda's coverage, or before
+  // it: «não conferidos neste dia»; another market has none
+  const dados = todas.filter((l) => l.startsWith('Dados econômicos'))
+  if (futuros) {
+    expect(dados).toEqual(['Dados econômicos não conferidos neste dia — Não conferido'])
+    expect(todas.indexOf(dados[0])).toBe(1)
+  } else expect(dados).toEqual([])
+  const linhas = todas.filter((l) => !l.startsWith('Dados econômicos'))
   expect(linhas).toEqual(e.plano!.map((l) => sem([l.item, l.plano, l.fato, l.link ?? '', l.marca].filter(Boolean).join(' '))))
   expect(Array.from(dia.querySelectorAll('.hub-dr-plano-versao')).map(texto)).toEqual(e.versao)
   if (e.anterior) expect(sem(within(dia).getByText('Do pregão anterior').parentElement?.textContent)).toBe(sem(`Do pregão anterior${anterior ?? e.anterior}`))
@@ -79,7 +88,7 @@ describe('E · the heading, its tags, the note and the tiles', () => {
     expect(Array.from(dia.querySelectorAll('.hub-dr-dia-cab .hub-dr-chip')).map(texto)).toEqual(e.dia.tags)
     expect(texto(dia.querySelector('.hub-dr-dia-nota')) || null).toBe(e.dia.nota)
     confereNumeros(dia, e)
-    conferePlano(dia, e, doPregaoAnterior(q.dias[q.info.dia].carryIn))
+    conferePlano(dia, e, doPregaoAnterior(q.dias[q.info.dia].carryIn), q.contas.find((c) => c.id === q.info.contaId)!.market === 'futures')
   })
 
   it('«Limite do dia» and «Fora do plano» in the regular font (E4): `--texto`; «Resultado» and «Operações» mono', async () => {
@@ -100,7 +109,13 @@ describe('E · the heading, its tags, the note and the tiles', () => {
       expect(info).toHaveAttribute('aria-expanded', 'false')
       await user.click(info)
       expect(info).toHaveAttribute('aria-expanded', 'true')
-      expect(texto(document.getElementById('info-resumo'))).toBe(sem(q.esperado.infoResumo))
+      // Phase 5-1: a Futuros day whose version has the data rule on names it in «fora do plano» (c3 §6.2)
+      expect(texto(document.getElementById('info-resumo'))).toBe(
+        sem(q.esperado.infoResumo).replace(
+          'Fora do plano: operações fora da janela ou depois do limite.',
+          'Fora do plano: operações fora da janela, numa espera de dado econômico, em dia em que você escolheu não operar ou depois do limite.',
+        ),
+      )
       unmount()
     }
   })
@@ -153,11 +168,13 @@ describe('DEV B0-1 · «Do pregão anterior» is the database’s carry_in (for 
 })
 
 describe('F · «O plano do dia»', () => {
-  it('the ⓘ: the board’s text with the breakeven sentence and Futuros’ Phase 5 one', async () => {
-    const { q, user } = await renderDiario('2')
+  it('the ⓘ: the breakeven sentence and, in Futuros, the data rule (Phase 5-1, c3 §6.3; the board predates it)', async () => {
+    const { user } = await renderDiario('2')
     const dia = await oDia()
     await user.click(within(dia).getByRole('button', { name: 'Como ler: O plano do dia' }))
-    expect(texto(document.getElementById('info-plano'))).toBe(q.esperado.infoPlano)
+    expect(texto(document.getElementById('info-plano'))).toBe(
+      'Cada linha compara as regras que valiam neste dia, em Personalizar, com o que o diário registrou: janela, dados econômicos e limite. Uma operação fora da janela, numa espera de dado econômico, em dia em que você escolheu não operar ou depois do limite fica fora do plano, mesmo quando a tela só avisava. Breakeven: a sua regra e em quantas operações que chegaram ao ponto dela o stop foi para a entrada; quem confere é Análises. Viés e regra do estado chegam na Fase 5.',
+    )
   })
 
   it('10b: «Sem janela salva» with «Definir em Personalizar» (a 44 px link to the windows) and «Sem regra»', async () => {
