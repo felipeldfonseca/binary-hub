@@ -470,7 +470,7 @@ describe('«Dados econômicos» in the Diário (Phase 5 · base; G1 and the Plan
   const min = (m: number) => new Date(g.at.getTime() + m * 60_000)
   const ism = { kind: 'espera' as const, start: min(-10), end: min(5), releases: [{ code: 'ism_serv' as const, at: min(-5), mode: 'volta' as const }] }
   const cpiDia = { kind: 'dia' as const, start: min(-12 * 60), end: min(12 * 60), releases: [{ code: 'cpi' as const, at: min(-90), mode: 'dia' as const }] }
-  const naEspera = (active: typeof ism | typeof cpiDia, freeAt: Date | null) => ({
+  const naEspera = (active: import('@/lib/domain/gate').BlockInterval, freeAt: Date | null) => ({
     ...g,
     status: 'aguardar' as const,
     block: { evaluated: true as const, state: 'no_bloqueio' as const, active, today: [active], freeAt },

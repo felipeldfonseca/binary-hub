@@ -582,7 +582,7 @@ describe('«Dados econômicos» on the sheet (Phase 5 · base, SPEC §7.2; F2, F
   // 10:31 ET: ISM de serviços at 10:30 in «volta» 5/10 → free at 10:40
   const ism = { kind: 'espera' as const, start: min(-6), end: min(9), releases: [{ code: 'ism_serv' as const, at: min(-1), mode: 'volta' as const }] }
   const cpiDia = { kind: 'dia' as const, start: min(-16 * 60 - 31), end: min(7 * 60 + 29), releases: [{ code: 'cpi' as const, at: min(-121), mode: 'dia' as const }] }
-  const comBloco = (active: typeof ism | typeof cpiDia, freeAt: Date | null) => ({
+  const comBloco = (active: import('@/lib/domain/gate').BlockInterval, freeAt: Date | null) => ({
     ...g0,
     status: 'aguardar' as const,
     checksEvaluated: ['janela', 'bloqueio', 'limite'] as ('janela' | 'bloqueio' | 'limite')[],
@@ -629,7 +629,7 @@ describe('«Dados econômicos» on the sheet (Phase 5 · base, SPEC §7.2; F2, F
   })
 
   it('«Liberado» without the agenda is grey and says why (SPEC §7.2 «Nunca verde»), also with a warning', () => {
-    const sem = { ...g0, status: 'liberado' as const, warnings: [] as never[], block: { evaluated: false as const, reason: 'sem_agenda' as const } }
+    const sem = { ...g0, status: 'liberado' as const, warnings: [] as never[], block: { evaluated: false as const, state: 'nao_avaliado' as const, reason: 'sem_agenda' as const } }
     expect(linhaGate(top, sem, top1031.rules, { presente: true, outroDia: false })).toEqual({
       palavra: 'Liberado',
       sub: '· dados econômicos não conferidos · sem a agenda de hoje',
