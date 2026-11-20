@@ -575,3 +575,51 @@ describe('3c · the exports C1 and the frozen files import (contract §6.1)', ()
     for (const v of valores) expect(v).toBeDefined()
   })
 })
+
+describe('«Dados econômicos» on the sheet (Phase 5 · base, SPEC §7.2; F2, F3): words only, never a block', () => {
+  const g0 = top1031.gate
+  const min = (m: number) => new Date(g0.at.getTime() + m * 60_000)
+  // 10:31 ET: ISM de serviços at 10:30 in «volta» 5/10 → free at 10:40
+  const ism = { kind: 'espera' as const, start: min(-6), end: min(9), releases: [{ code: 'ism_serv' as const, at: min(-1), mode: 'volta' as const }] }
+  const cpiDia = { kind: 'dia' as const, start: min(-16 * 60 - 31), end: min(7 * 60 + 29), releases: [{ code: 'cpi' as const, at: min(-121), mode: 'dia' as const }] }
+  const comBloco = (active: typeof ism | typeof cpiDia, freeAt: Date | null) => ({
+    ...g0,
+    status: 'aguardar' as const,
+    checksEvaluated: ['janela', 'bloqueio', 'limite'] as ('janela' | 'bloqueio' | 'limite')[],
+    block: { evaluated: true as const, state: 'no_bloqueio' as const, active, today: [active], freeAt },
+  })
+
+  it('a wait: «Aguardar até 10:40» · «ISM de serviços às 10:30», amber', () => {
+    expect(linhaGate(top, comBloco(ism, min(9)), top1031.rules, { presente: true, outroDia: false })).toEqual({
+      palavra: 'Aguardar até 10:40',
+      sub: '· ISM de serviços às 10:30',
+      tom: 'amber',
+      acao: null,
+    })
+  })
+
+  it('a wait ending on another date, for an entry that is not now: the weekday, never «amanhã»', () => {
+    const tomorrow = min(24 * 60 + 9)
+    expect(linhaGate(top, comBloco(ism, tomorrow), top1031.rules, { presente: false, outroDia: true }).palavra).toMatch(/^Aguardar até (seg|ter|qua|qui|sex|sáb|dom) 10:40$/)
+    expect(linhaGate(top, comBloco(ism, tomorrow), top1031.rules, { presente: true, outroDia: false }).palavra).toBe('Aguardar até amanhã às 10:40')
+  })
+
+  it('a whole day: «Não opero hoje» · «dia de CPI, às 08:30»; an entry of another moment: «Não opero no dia»', () => {
+    expect(linhaGate(top, comBloco(cpiDia, cpiDia.end), top1031.rules, { presente: true, outroDia: false })).toEqual({
+      palavra: 'Não opero hoje',
+      sub: '· dia de CPI, às 08:30',
+      tom: 'amber',
+      acao: null,
+    })
+    expect(linhaGate(top, comBloco(cpiDia, cpiDia.end), top1031.rules, { presente: false, outroDia: false }).palavra).toBe('Não opero no dia')
+  })
+
+  it('the marks: the data break worded from block.active (no_bloqueio stays the stored code)', () => {
+    expect(quebrasDoGate(comBloco(ism, min(9)))).toEqual(['no_bloqueio'])
+    expect(textoQuebras(quebrasDoGate(comBloco(ism, min(9))), comBloco(ism, min(9)))).toBe('na espera do ISM')
+    expect(textoQuebras(['no_bloqueio', 'depois_do_limite'], comBloco(cpiDia, cpiDia.end))).toBe('em dia de CPI · depois do limite')
+    expect(textoQuebras(['fora_da_janela', 'no_bloqueio'], null)).toBe('fora da janela · na espera de dado')
+    // Before Phase 5 (no evaluated block), as before
+    expect(textoQuebras(quebrasDoGate(g0), g0)).toBe(textoQuebras(quebrasDoGate(g0)))
+  })
+})

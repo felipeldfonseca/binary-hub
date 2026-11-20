@@ -460,3 +460,41 @@ describe('G14 · three open trades of one day', () => {
     expect(l.tradeId).toBe('primeira')
   })
 })
+
+describe('«Dados econômicos» in the Diário (Phase 5 · base; G1 and the Plan column)', () => {
+  const q1 = quadro('1')
+  const d1 = q1.dias['2026-11-12']
+  const conta1 = contaDa(q1, d1)
+  const aberta = d1.trades.find((t) => t.trade.status === 'open')!
+  const g = quadro('2').dias['2026-11-10'].trades[0].gate!
+  const min = (m: number) => new Date(g.at.getTime() + m * 60_000)
+  const ism = { kind: 'espera' as const, start: min(-10), end: min(5), releases: [{ code: 'ism_serv' as const, at: min(-5), mode: 'volta' as const }] }
+  const cpiDia = { kind: 'dia' as const, start: min(-12 * 60), end: min(12 * 60), releases: [{ code: 'cpi' as const, at: min(-90), mode: 'dia' as const }] }
+  const naEspera = (active: typeof ism | typeof cpiDia, freeAt: Date | null) => ({
+    ...g,
+    status: 'aguardar' as const,
+    block: { evaluated: true as const, state: 'no_bloqueio' as const, active, today: [active], freeAt },
+  })
+
+  it('possoNaEntrada: «Aguardar até HH:MM» (free_at on the Diário clock) and «Não opero hoje», never «Liberado»', () => {
+    const free = min(5)
+    const hh = new Intl.DateTimeFormat('pt-BR', { timeZone: conta1.tz, hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(free)
+    expect(possoNaEntrada(naEspera(ism, free), conta1.tz)).toBe(`Aguardar até ${hh}`)
+    expect(possoNaEntrada(naEspera(cpiDia, cpiDia.end), conta1.tz)).toBe('Não opero hoje')
+    expect(possoNaEntrada(naEspera(ism, null), conta1.tz)).toBe('Não opero hoje')
+  })
+
+  it('the Plan column: a trade only «no_bloqueio» shows its mark, not «—»', () => {
+    const p = (aberta.plan ?? aberta.planNow)!
+    const t = { ...aberta, plan: { ...p, verdict: 'fora_do_plano' as const, breaks: ['no_bloqueio'] as PlanBreak[] }, gate: naEspera(ism, min(5)) }
+    expect(planoDaLinha(t)).toEqual({ tipo: 'fora', texto: 'na espera do ISM', aria: 'fora do plano: na espera do ISM' })
+    const dia = { ...t, gate: naEspera(cpiDia, cpiDia.end), plan: { ...t.plan, breaks: ['fora_da_janela', 'no_bloqueio'] as PlanBreak[] } }
+    expect(planoDaLinha(dia)).toEqual({ tipo: 'fora', texto: 'fora da janela · em dia de CPI', aria: 'fora do plano: fora da janela e em dia de CPI' })
+  })
+
+  it('a recalculated plan reads the recalculated gate (gateNow)', () => {
+    const p = (aberta.plan ?? aberta.planNow)!
+    const t = { ...aberta, plan: null, planNow: { ...p, verdict: 'fora_do_plano' as const, breaks: ['no_bloqueio'] as PlanBreak[] }, gate: null, gateNow: naEspera(cpiDia, cpiDia.end) }
+    expect(planoDaLinha(t)).toMatchObject({ tipo: 'fora', texto: 'em dia de CPI' })
+  })
+})
