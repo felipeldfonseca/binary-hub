@@ -70,3 +70,10 @@ global.ResizeObserver = class {
 afterEach(() => {
   jest.clearAllMocks()
 })
+// React ends an async act() in a task on Node's real setImmediate, and that task clears the shared act queue. A
+// waitFor that rejects under fake timers leaves its act's task pending past the test's end; landing inside the next
+// test's first act, it would drop that test's queued renders. Let those tasks run before each test starts.
+const { setImmediate: realSetImmediate } = require('timers')
+beforeEach(async () => {
+  for (let turn = 0; turn < 3; turn++) await new Promise((resolve) => realSetImmediate(resolve))
+})

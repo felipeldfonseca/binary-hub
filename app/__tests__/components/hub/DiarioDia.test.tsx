@@ -298,17 +298,17 @@ describe('Phase 5 · telas-diario: «Dados econômicos» on a day without entrie
     })
     return r
   }
-  const linhaDados = async () => {
-    const lista = within(await oDia()).getByRole('list', { name: 'O plano do dia' })
-    return waitFor(() => {
-      const li = within(lista).getByText('Dados econômicos').closest('li')!
-      return Array.from(li.querySelectorAll('strong, .hub-dr-plano-meio > *, .hub-dr-plano-marca')).map(texto).join(' ')
-    })
+  // Synchronous on purpose: an async waitFor callback that waits again resolves the outer waitFor while its act() is
+  // still open, and that act's last task then lands inside the next test
+  const linhaDados = () => {
+    const lista = within(document.getElementById('dia')!).getByRole('list', { name: 'O plano do dia' })
+    const li = within(lista).getByText('Dados econômicos').closest('li')!
+    return Array.from(li.querySelectorAll('strong, .hub-dr-plano-meio > *, .hub-dr-plano-marca')).map(texto).join(' ')
   }
 
   it('reads that day\'s agenda (agendaKeys.dia, the day\'s calendars) and computes the wait: «No plano»', async () => {
     await semEntradas()
-    await waitFor(async () => expect(await linhaDados()).toBe('Dados econômicos ISM da indústria às 10:00 · espera 09:55–10:10 nenhuma operação na espera No plano'))
+    await waitFor(() => expect(linhaDados()).toBe('Dados econômicos ISM da indústria às 10:00 · espera 09:55–10:10 nenhuma operação na espera No plano'))
     const lida = mocks.fetchAgendaDoDia.mock.calls.find(([, o]) => o.calendars.join() === 'us')
     expect(lida).toBeTruthy()
     // The range «09:55–10:10» is kept on one line (Q27)
@@ -327,7 +327,7 @@ describe('Phase 5 · telas-diario: «Dados econômicos» on a day without entrie
       await r.queryClient.resetQueries({ queryKey: agendaKeys.all(USUARIO_DO_QUADRO) })
       await r.queryClient.refetchQueries({ queryKey: diarioKeys.dia(USUARIO_DO_QUADRO, r.q.info.contaId, r.q.info.dia) })
     })
-    await waitFor(async () => expect(await linhaDados()).toBe('Dados econômicos não conferidos neste dia — Não conferido'), { timeout: 4000 })
+    await waitFor(() => expect(linhaDados()).toBe('Dados econômicos não conferidos neste dia — Não conferido'), { timeout: 4000 })
   })
 
   it('the grey line of the open day: 1º dez «ISM da indústria, 10:00», between the numbers and «O plano do dia»', async () => {
