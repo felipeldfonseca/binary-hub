@@ -29,7 +29,7 @@ import { brt, EBINEX, ebinexRules, et, SP, TOP_ONE, topOneRules, trade, version 
 function linha(conta: string, now: Date, rules: Rules | null, account: GateAccount, trades: DayTrade[] = []) {
   const ver = rules && version(rules);
   const day = dayUsage(trades, { tradingDay: gateTradingDay(now, account, ver), until: now, limitCents: rules?.limit?.cents ?? null });
-  return possoLinha(conta, evaluateGate(now, account, ver, day), rules);
+  return possoLinha(conta, evaluateGate(now, account, ver, day, { agenda: [] }), rules);
 }
 
 describe('the owner\'s Phase 2 test, line by line (gate.md §7.4)', () => {
@@ -124,7 +124,8 @@ describe('«Liberado, com aviso» and the other answers', () => {
   });
 
   it('the window rule off and no limit: «Sem regra ativa · Ajustar»', () => {
-    const r = { ...topOneRules(), windowRule: { on: false, outside: 'fora' as const }, limit: null };
+    // Nothing evaluated: the data block off too (with a known agenda it would be evaluated)
+    const r = { ...topOneRules(), windowRule: { on: false, outside: 'fora' as const }, limit: null, block: { ...topOneRules().block!, on: false } };
     const l = linha('Top One', et('2026-10-19 10:30'), r, TOP_ONE);
     expect([possoTexto(l), l.acao?.href]).toEqual(['Sem regra ativa · Ajustar', '/personalizar#regras']);
   });

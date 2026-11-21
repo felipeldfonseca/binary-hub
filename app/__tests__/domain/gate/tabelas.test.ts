@@ -36,7 +36,8 @@ function gateRow(janela: string, bloqueio: string, limite: string) {
       limite === 'sem limite' ? null : { cents: 40000, mode: 'conta', atLimit: limite.endsWith('avisar') ? 'avisar' : 'encerrar' };
     if (bloqueio === 'desligado') rules.block!.on = false;
   }
-  // «Fase 5»: no agenda given (the transitional `fase5` of Phase 5 · base)
+  // «Fase 5» (the spec's column name): no agenda given, which is now an unknown agenda (`sem_agenda`,
+  // as the 4-argument gate_eval shell passes null); the gate's own 4-argument form
   const agenda: readonly AgendaEntry[] | undefined =
     bloqueio === 'Fase 5' ? undefined : bloqueio === 'ativo' ? [{ code: 'cpi', at: now }] : [];
   const trades = limite.startsWith('atingido')
@@ -78,6 +79,10 @@ describe('gate.md §A1: window × data block × limit', () => {
     // "Não avaliado" is never a pass: a check missing from the list says why
     for (const check of [gate.window, gate.limit, gate.block]) {
       if (!check.evaluated) expect(check).toEqual({ evaluated: false, state: 'nao_avaliado', reason: expect.any(String) });
+    }
+    // The «Fase 5» column means an absent agenda: with a version, the block says sem_agenda
+    if (r.bloqueio === 'Fase 5' && r.janela !== 'sem versão') {
+      expect(gate.block).toEqual({ evaluated: false, state: 'nao_avaliado', reason: 'sem_agenda' });
     }
   });
 });

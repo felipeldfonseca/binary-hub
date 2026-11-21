@@ -6,6 +6,7 @@
  * versions and the conversions.
  */
 import {
+  checkBlockSetting,
   centsToUsd,
   checkRules,
   MAX_LIMIT_CENTS,
@@ -261,5 +262,29 @@ describe('the limit codes Phase 2b changed for futures and binaries (40_markets.
     }
     expect(Object.fromEntries(changed)).toEqual({ 'brl: unknown_key → bad_limit': 144 });
     expect(Array.from(before).sort()).toEqual(codes);
+  });
+});
+
+describe('rules_check_block (SPEC §3.7 table 1) = checkBlockSetting', () => {
+  it.each([
+    ['a market default, whole', { on: true, before_min: 5, after_min: 10 }, false, null],
+    ['a market default with releases', { on: true, before_min: 5, after_min: 10, releases: { pce: 'normal', jolts: 'volta' } }, false, null],
+    ['an account setting, partial', { releases: { cpi: 'dia' } }, true, null],
+    ['an empty account setting', {}, true, null],
+    ['row 1: not an object', null, true, 'bad_block'],
+    ['row 2: an unknown key, before anything else', { on: 'x', label: 'y' }, true, 'unknown_key'],
+    ['row 2: calendars is not a setting key', { calendars: ['us'] }, true, 'unknown_key'],
+    ['row 3: whole and a key missing', { on: true, before_min: 5 }, false, 'bad_block'],
+    ['row 4: on not a boolean', { on: 1 }, true, 'bad_block'],
+    ['row 5: before_min over 60', { before_min: 61 }, true, 'bad_block'],
+    ['row 6: after_min not an integer', { after_min: 1.5 }, true, 'bad_block'],
+    ['rows 4–6 before 7–9', { after_min: 121, releases: null }, true, 'bad_block'],
+    ['row 7: releases null', { releases: null }, true, 'bad_releases'],
+    ['row 7: releases an array', { releases: [] }, true, 'bad_releases'],
+    ['row 8: an unknown code', { releases: { CPI: 'volta' } }, true, 'bad_releases'],
+    ['row 9: a value outside the four', { releases: { cpi: 'sempre' } }, true, 'bad_releases'],
+    ['row 9: a value that is not a string', { releases: { cpi: true } }, true, 'bad_releases'],
+  ])('%s', (_label, p, partial, want) => {
+    expect(checkBlockSetting(p, partial)).toBe(want);
   });
 });
