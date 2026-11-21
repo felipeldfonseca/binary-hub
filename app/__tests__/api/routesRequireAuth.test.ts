@@ -1,6 +1,7 @@
 /**
  * @jest-environment node
  */
+import { randomBytes } from 'crypto'
 import fs from 'fs'
 import path from 'path'
 import { NextRequest } from 'next/server'
@@ -14,6 +15,11 @@ const EXPECTED_HANDLERS = [
   'POST /api/market/analysis',
   'GET /api/market/quote',
 ]
+
+// Routes that check only a shared secret instead of a session: Vercel's daily cron (CRON_SECRET). They never
+// call getUser, so the two session tests below skip them; their own 401 tests are at the end of this file and in
+// cronAgenda.test.ts.
+const CRON_HANDLERS = ['GET /api/cron/agenda']
 
 const mockGetUser = jest.fn()
 
@@ -51,6 +57,8 @@ const handlers = findRouteFiles(APP_DIR).flatMap((file) => {
   }))
 })
 
+const sessionHandlers = handlers.filter((entry) => !CRON_HANDLERS.includes(entry.name))
+
 const call = (entry: (typeof handlers)[number], headers: Record<string, string> = {}) => {
   // Give every [segment] in the path a placeholder value
   const params = Object.fromEntries(
@@ -74,20 +82,56 @@ describe('route handlers require a session', () => {
   })
 
   it('covers exactly the handlers that exist on disk', () => {
-    expect(handlers.map((entry) => entry.name).sort()).toEqual([...EXPECTED_HANDLERS].sort())
+    expect(handlers.map((entry) => entry.name).sort()).toEqual([...EXPECTED_HANDLERS, ...CRON_HANDLERS].sort())
   })
 
-  it.each(handlers)('$name turns away a request without a token', async (entry) => {
+  it.each(sessionHandlers)('$name turns away a request without a token', async (entry) => {
     const response = await call(entry)
 
     expect(response.status).toBe(401)
     expect(mockGetUser).not.toHaveBeenCalled()
   })
 
-  it.each(handlers)('$name turns away a token Supabase does not recognise', async (entry) => {
+  it.each(sessionHandlers)('$name turns away a token Supabase does not recognise', async (entry) => {
     const response = await call(entry, { Authorization: 'Bearer forged' })
 
     expect(response.status).toBe(401)
     expect(mockGetUser).toHaveBeenCalledWith('forged')
+  })
+})
+
+describe('cron handlers require their secret', () => {
+  const env = { ...process.env }
+  beforeEach(() => mockGetUser.mockReset())
+  afterEach(() => {
+    process.env = env
+  })
+  const cron = () => handlers.filter((entry) => CRON_HANDLERS.includes(entry.name))
+  // made at run time: no secret-like literal in the public repository
+  const cronSecret = randomBytes(24).toString('hex')
+
+  it('lists only handlers that exist', () => {
+    expect(cron().map((entry) => entry.name).sort()).toEqual([...CRON_HANDLERS].sort())
+  })
+
+  it.each(CRON_HANDLERS)('%s turns away a request without the header', async (name) => {
+    process.env = { ...env, CRON_SECRET: cronSecret }
+    const response = await call(cron().find((entry) => entry.name === name)!)
+    expect(response.status).toBe(401)
+    expect(mockGetUser).not.toHaveBeenCalled()
+  })
+
+  it.each(CRON_HANDLERS)('%s turns away a wrong secret', async (name) => {
+    process.env = { ...env, CRON_SECRET: cronSecret }
+    const response = await call(cron().find((entry) => entry.name === name)!, { Authorization: 'Bearer forged' })
+    expect(response.status).toBe(401)
+    expect(mockGetUser).not.toHaveBeenCalled()
+  })
+
+  it.each(CRON_HANDLERS)('%s turns away everyone while CRON_SECRET is unset', async (name) => {
+    process.env = { ...env }
+    delete process.env.CRON_SECRET
+    const response = await call(cron().find((entry) => entry.name === name)!, { Authorization: 'Bearer ' })
+    expect(response.status).toBe(401)
   })
 })
