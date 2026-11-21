@@ -168,8 +168,8 @@ export async function renderDiario(cen: Cenario, { tema, estado }: OpcoesDoDiari
     )
   }
   const q = quadro(cen)
-  // Only the clock is faked. With fake timers that advance on their own, a real interval fires React Query's timers
-  // outside act() while waitFor's acts overlap, and a render queued in a dropped act queue is never drawn.
+  // Only the clock is faked. With every timer faked and advancing on its own, a drill's click sometimes never drew
+  // (DiarioDrill: 6 of 30 runs, 0 of 30 like this); the likely cause is waitFor's overlapping act() scopes.
   jest.useFakeTimers({ now: q.agora, advanceTimers: true, doNotFake: ALL_BUT_DATE })
   navegacao.reiniciar()
   navegacao.definir(`/diario?conta=${q.info.contaId}&dia=${q.info.dia}`)
