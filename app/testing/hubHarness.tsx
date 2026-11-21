@@ -3,6 +3,7 @@
  * as a suite. Every value here is invented; the CSV fixtures are the synthetic ones of
  * __tests__/domain/import/fixtures.
  */
+import type { Config } from '@jest/types'
 import fs from 'fs'
 import path from 'path'
 import { StrictMode } from 'react'
@@ -102,3 +103,21 @@ export function renderHub(ui: React.ReactElement, { strict = false }: { strict?:
   const view = render(strict ? <StrictMode>{tree}</StrictMode> : tree)
   return { ...view, queryClient }
 }
+
+/** Every API `jest.useFakeTimers` can fake, except Date */
+export const ALL_BUT_DATE: Config.FakeableAPI[] = [
+  'hrtime',
+  'nextTick',
+  'performance',
+  'queueMicrotask',
+  'requestAnimationFrame',
+  'cancelAnimationFrame',
+  'requestIdleCallback',
+  'cancelIdleCallback',
+  'setImmediate',
+  'clearImmediate',
+  'setInterval',
+  'clearInterval',
+  'setTimeout',
+  'clearTimeout',
+]

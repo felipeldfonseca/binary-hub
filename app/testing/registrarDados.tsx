@@ -58,7 +58,7 @@ export function renderRegistrarDados(
   const registrarDb = jest.requireMock('@/lib/hub/registrarDb')
   const real = jest.requireActual('@/lib/hub/registrarDb')
   const { parseRulesNow } = jest.requireActual('@/lib/hub/regras')
-  jest.useFakeTimers({ now: em ?? ESTADOS_DADOS[e].agora, advanceTimers: true })
+  jest.useFakeTimers({ now: em ?? ESTADOS_DADOS[e].agora })
   const conta = contaDoEstado(e)
   contasDb.fetchAccounts.mockReset().mockResolvedValue([conta])
   // prefsPendentes: the preferences' read never answers (the sheet while they load)

@@ -9,8 +9,8 @@
  *   await renderDiario('10d', { estado: 'erro' })         // every Diário read: PostgREST «function not found»
  *   await renderDiario('10e', { estado: 'offline' })      // loaded online, then the connection drops (board 10e)
  *
- * The clock is the scenario's (jest.useFakeTimers({ now, advanceTimers: true })), the URL '/diario?conta=&dia=' as
- * the scenario opens. The writes keep what they wrote (a review, a note), so a read after them shows it.
+ * The clock is the scenario's (only Date is faked, and it moves on its own), the URL '/diario?conta=&dia=' as the
+ * scenario opens. The writes keep what they wrote (a review, a note), so a read after them shows it.
  */
 import React from 'react'
 import { act, screen, within } from '@testing-library/react'
@@ -27,7 +27,7 @@ import { addDays } from '@/lib/domain/tempo'
 import { monthOf, type Day } from '@/lib/domain/diario'
 import { mesTitulo } from '@/lib/hub/diario'
 import DiarioPage from '@/app/(hub)/diario/page'
-import { renderHub } from './hubHarness'
+import { renderHub, ALL_BUT_DATE } from './hubHarness'
 import { navegacao, USUARIO_DO_QUADRO } from './diarioTelasMocks'
 import { nomeDaConta, quadro, quadroJson, type Cenario, type Quadro } from './diarioQuadro'
 import { leituraDoDia, proximosDoQuadro, semanaDoQuadro } from './agenda'
@@ -168,7 +168,9 @@ export async function renderDiario(cen: Cenario, { tema, estado }: OpcoesDoDiari
     )
   }
   const q = quadro(cen)
-  jest.useFakeTimers({ now: q.agora, advanceTimers: true })
+  // Only the clock is faked. With fake timers that advance on their own, a real interval fires React Query's timers
+  // outside act() while waitFor's acts overlap, and a render queued in a dropped act queue is never drawn.
+  jest.useFakeTimers({ now: q.agora, advanceTimers: true, doNotFake: ALL_BUT_DATE })
   navegacao.reiniciar()
   navegacao.definir(`/diario?conta=${q.info.contaId}&dia=${q.info.dia}`)
 
@@ -305,7 +307,7 @@ export async function renderDiario(cen: Cenario, { tema, estado }: OpcoesDoDiari
   // As the app's QueryProvider: an answer is fresh for a minute, so a region drawn after the first answers (the
   // regions wait for the calendar) shares them instead of reading again (renderHub's cache has no staleTime)
   view.queryClient.setDefaultOptions({ ...view.queryClient.getDefaultOptions(), queries: { ...view.queryClient.getDefaultOptions().queries, staleTime: 60_000 } })
-  const user = userEvent.setup({ advanceTimers: jest.advanceTimersByTime })
+  const user = userEvent.setup()
   if (estado === 'offline') {
     await esperar(() => {
       const cal = view.queryClient.getQueryData(diarioKeys.calendario(USUARIO_DO_QUADRO, q.info.contaId))

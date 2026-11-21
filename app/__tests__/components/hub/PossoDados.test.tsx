@@ -50,7 +50,7 @@ async function montar(
   e: EstadoDados,
   { em, edit, prefs = {}, agenda }: { em?: Date; edit?: (j: Json) => void; prefs?: Json; agenda?: LeituraDoDia } = {},
 ) {
-  jest.useFakeTimers({ now: em ?? ESTADOS_DADOS[e].agora, advanceTimers: true })
+  jest.useFakeTimers({ now: em ?? ESTADOS_DADOS[e].agora })
   contaAberta = (agoraDoEstado(e) as Json).accounts[0].account_id
   responder(e, edit)
   fetchPreferences.mockResolvedValue(prefs as contasDb.HubPreferences)
