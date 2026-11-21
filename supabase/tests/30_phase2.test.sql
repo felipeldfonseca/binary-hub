@@ -772,7 +772,7 @@ select tests.eq((select string_agg(label, '; ') from tests.gate_cases
 select tests.eq((select string_agg(label, '; ') from tests.gate_cases
                  where got#>>'{block,state}' <> 'nao_avaliado' or got#>>'{state_rule,state}' <> 'nao_avaliado'
                     or got->'checks_evaluated' ? 'bloqueio' or got->'checks_evaluated' ? 'estado'
-                    or got#>>'{block,reason}' <> case when w_case = 'sem_versao' then 'sem_versao' else 'fase5' end
+                    or got#>>'{block,reason}' <> case when w_case = 'sem_versao' then 'sem_versao' else 'sem_agenda' end
                     or got#>>'{state_rule,reason}' <> case when w_case = 'sem_versao' then 'sem_versao' else 'fase5' end),
                 null, 'the data block and the state rule are never evaluated in Phase 2');
 select tests.eq((select string_agg(distinct got#>>'{window,position}', ',' order by got#>>'{window,position}') from tests.gate_cases
