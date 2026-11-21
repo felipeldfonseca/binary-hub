@@ -1,12 +1,17 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { hubKeys, storeMergedPreferences, useHubDb } from '@/hooks/useContas';
+import type { BlockInterval, BlockRelease } from '@/lib/domain/gate';
+import { tradingDayBounds, tradingDayOn } from '@/lib/domain/tempo';
 import type { HubPreferences } from '@/lib/hub/contasDb';
+import { serverNowFrom, type ServerClock } from '@/lib/hub/relogio';
 import { nextChangeAt, type AccountConfig, type RulesConfig, type RulesNow, type SaveRulesPayload, type SaveRulesResult } from '@/lib/hub/regras';
 import {
   fetchRulesConfig,
   fetchRulesNow,
+  avisoAntesDaEsperaLigado,
   fetchTradesSince,
   mergePreferences,
   saveRules,
@@ -180,4 +185,82 @@ export function useTradesSinceRules(accounts: readonly AccountConfig[] | undefin
     queryFn: () => fetchTradesSince(db, items),
     enabled: !!userId && items.length > 0,
   });
+}
+
+// ---------------------------------------------------------------------------------------------
+// The screens' own clocks of «Dados econômicos» (Phase 5-1, SPEC §5.6, §5.7; E2)
+// ---------------------------------------------------------------------------------------------
+
+/** The notice shows this long before a wait starts (c3 §8.2: fixed in this delivery) */
+export const AVISO_DEZ_MIN_MS = 10 * 60_000;
+
+/** What the two clocks read of the answer on screen */
+export interface RelogioDadosEntrada {
+  /** The evaluated block's `today` of the answer drawn ([] when the block is not evaluated) */
+  today: readonly BlockInterval[];
+  /** The account's window clock (hours show on it): «amanhã» turns at its midnight */
+  tz: string;
+  /** profiles.preferences: the notice is on unless alerts.before_block === false (Q39) */
+  preferences?: Pick<HubPreferences, 'alerts'> | null;
+}
+
+/** «Às 09:55 começa a espera do ISM de serviços (10:00), até 10:10.»: the wait about to start */
+export interface AvisoDezMin {
+  start: Date;
+  end: Date;
+  releases: readonly BlockRelease[];
+}
+
+export interface RelogioDados {
+  /** From 10 minutes before a wait «em volta» starts until it starts; null otherwise or with the preference off */
+  avisoDezMin: AvisoDezMin | null;
+  /** The next midnight on the window clock (the day words «amanhã»/weekday are redrawn then) */
+  meiaNoite: Date;
+  /** The next instant the screen must redraw (a notice edge or midnight) */
+  proximo: Date;
+}
+
+/**
+ * The two clocks at the server's `now` (pure). The notice covers the intervals of kind 'espera' of
+ * the answer's day (c3 §8.2), from start − 10 min until start; the earliest wins. A whole day is
+ * kind 'dia' and never gives it. A «Só depois» wait (kind 'espera' too, alone or merged with others)
+ * starts at the clock day's start (blockIntervals: min(S, R − before)): its 10 minutes fall on the
+ * day before, whose answer does not list it, and from its start on the notice is over; so it never
+ * gives the notice either, by its start and not by a filter. Neither clock is in changes_at
+ * (SPEC §5.7): the screen arms them itself.
+ */
+export function relogioDados(now: Date, e: RelogioDadosEntrada): RelogioDados {
+  const t = now.getTime();
+  const midnightClock = { tz: e.tz, startMin: 0 };
+  const meiaNoite = tradingDayBounds(tradingDayOn(now, midnightClock), midnightClock).end;
+  const ligado = avisoAntesDaEsperaLigado(e.preferences);
+  let aviso: AvisoDezMin | null = null;
+  let proximo = meiaNoite.getTime();
+  for (const i of e.today) {
+    const start = i.start.getTime();
+    for (const edge of [start - AVISO_DEZ_MIN_MS, start]) if (edge > t && edge < proximo) proximo = edge;
+    if (ligado && i.kind === 'espera' && start - AVISO_DEZ_MIN_MS <= t && t < start && (!aviso || start < aviso.start.getTime())) {
+      aviso = { start: i.start, end: i.end, releases: i.releases };
+    }
+  }
+  return { avisoDezMin: aviso, meiaNoite, proximo: new Date(proximo) };
+}
+
+/**
+ * E2: the 10-minute notice and the window clock's midnight, on the server clock (`clock`, as
+ * useServerClock gives it; null = the device clock), as rulesNowRefetchDelay counts changes_at.
+ * The component redraws by itself at each `today[].start − 10 min`, at each start and at midnight,
+ * without a new answer.
+ */
+export function useRelogioDados(clock: ServerClock | null, entrada: RelogioDadosEntrada): RelogioDados & { agora: Date } {
+  const [tick, setTick] = useState(0);
+  const agora = serverNowFrom(clock);
+  const r = relogioDados(agora, entrada);
+  const wait = Math.min(RULES_NOW_MAX_DELAY_MS, Math.max(0, r.proximo.getTime() - agora.getTime()) + 50);
+  useEffect(() => {
+    const id = setTimeout(() => setTick((n) => n + 1), wait);
+    return () => clearTimeout(id);
+    // `tick` re-arms after each redraw; `wait` when the answer or the clock changes
+  }, [wait, tick]);
+  return { ...r, agora };
 }

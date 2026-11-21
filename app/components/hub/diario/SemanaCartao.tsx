@@ -5,7 +5,7 @@ import { monthColumns, monthOf, weekCard, weekOf, type CalendarRead } from '@/li
 import { InfoButton, InfoPanel, useToggle } from '@/components/hub/contas/ui'
 import { LOADING, TRY_AGAIN } from '@/components/hub/contas/copy'
 import { useDiarioMes } from '@/hooks/useDiario'
-import { foraDaSemanaItem, semanaTexto } from '@/lib/hub/diario'
+import { feriadosDaSemana, foraDaSemanaItem, semanaTexto, temLinhaDeDados } from '@/lib/hub/diario'
 import { mesDaSemana, proximoAnuncio, statusDaSemana, type AnuncioDaSemana, type VistoDaSemana } from '@/lib/hub/diarioMes'
 import { useDiarioPagina } from './useDiarioPagina'
 import { SECAO, TITULO } from './ids'
@@ -44,7 +44,16 @@ export default function SemanaCartao() {
     () => weekCard({ day: segunda, today: cal.today, market: cal.account.market, days: cal.days, weeks: cal.weeks, mesWeeks: doMes?.weeks }),
     [segunda, cal, doMes],
   )
-  const texto = semanaTexto(card, contaDiario, { temLimite: !!regras?.limit, temJanela: !!regras?.windows.length })
+  const texto = semanaTexto(card, contaDiario, {
+    temLimite: !!regras?.limit,
+    temJanela: !!regras?.windows.length,
+    temDados: temLinhaDeDados(contaDiario.market) && !!regras?.block?.on,
+  })
+  // Phase 5-1 (c3 §6.5): the week's holidays of the CME list, Futuros only
+  const feriados = feriadosDaSemana(
+    card.bars.map((b) => b.day),
+    contaDiario.market,
+  )
   const fora = useMemo(
     () =>
       (doMes?.foraTrades ?? [])
@@ -147,6 +156,15 @@ export default function SemanaCartao() {
         </div>
         <span className="hub-dr-sub">{texto.titulo}</span>
       </div>
+      {feriados.length > 0 && (
+        <div className="hub-dr-sem-feriados">
+          {feriados.map((f) => (
+            <p key={f} className="hub-dr-sub">
+              {f}
+            </p>
+          ))}
+        </div>
+      )}
       {infoAberto && <InfoPanel id="info-semana">{texto.info}</InfoPanel>}
       <div role="status" className="sr-only">
         {statusDaSemana(anuncio, card.weekOf)}

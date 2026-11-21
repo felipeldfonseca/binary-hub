@@ -3,6 +3,9 @@ import '@/styles/hub.css'
 // Phase 2: one file per lane, so the screens never edit the same stylesheet
 import '@/styles/hub-personalizar.css'
 import '@/styles/hub-posso.css'
+// Phase 5-1: «Dados econômicos», lane L5's Personalizar rule and lane L6's «Posso» and Registrar words
+import '@/styles/hub-dados.css'
+import '@/styles/hub-dados-posso.css'
 import '@/styles/hub-regras-conta.css'
 // Phase 3: lane A (the Registrar sheet) and lane B (/diario, entry points, Preferências)
 import '@/styles/hub-registrar.css'

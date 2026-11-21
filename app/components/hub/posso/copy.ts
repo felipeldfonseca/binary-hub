@@ -12,11 +12,11 @@ export { LOADING, TRY_AGAIN } from '@/components/hub/contas/copy'
 export const POSSO = {
   title: 'Posso operar hoje?',
   infoLabel: 'Como ler: Posso operar hoje?',
-  // ADAPTED (Início board v53 `#info-posso`, gate.md §6): the data block is not checked before
-  // Phase 5, and the board's CPI example and «A Ebinex e a IBKR ainda não têm janela nem limite»
-  // describe one moment of the prototype
+  // ADAPTED (Início board v53 `#info-posso`, gate.md §6; Phase 5-1, C3: the start is c3 §5.5 l.1030-1035, word for
+  // word; the rest, limit and currencies, stays)
   info:
-    'Cada conta responde pelas regras dela: janela e limite do dia. O bloqueio de dados fica ativo na Fase 5 e, por enquanto, vale só em Futuros. ' +
+    'Cada conta responde pelas regras dela: janela, dados econômicos e limite do dia. Dados econômicos: numa espera, a tela diz “Aguardar até” e a hora em que ela termina; ' +
+    'num dia que você marcou como “Não opero no dia”, diz “Não opero hoje”. Por enquanto, essa regra vale só em Futuros. O app nunca impede uma operação. ' +
     'Limite do dia: a maior perda do dia, no pior momento, contra o limite da conta, na moeda dela (R$ na B3; US$ nos outros mercados, com USDT e USDC contados como dólar). ' +
     'Contas de mercados diferentes nunca são somadas. Vem das suas regras, nunca da IA.',
   // ADAPTED (gate.md GG9): plain text in Phase 2, no link to the Diário (the card is on it)
@@ -24,6 +24,14 @@ export const POSSO = {
   separator: '·',
   // NEW: the last read of rules_now failed; older lines are not shown, they may be outdated
   loadError: 'Não foi possível carregar o “Posso operar hoje?”.',
+}
+
+/**
+ * Phase 5-1 (lane telas-posso): the card's own words around lib/hub/posso's sentences (notasDaConta). Board Q18: the
+ * first-wait notice's button (c3 §3.9 l.654; SPEC §7.2 l.1191).
+ */
+export const POSSO_DADOS = {
+  entendi: 'Entendi',
 }
 
 /**

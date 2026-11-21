@@ -8,7 +8,7 @@
  */
 import { act, screen, waitFor, within } from '@testing-library/react'
 import { regrasKeys } from '@/hooks/useRegras'
-import { POSSO_NO_DIARIO_INFO } from '@/lib/hub/posso'
+import { LIBERADO_SEM_AGENDA, POSSO_NO_DIARIO_INFO } from '@/lib/hub/posso'
 import { POSSO } from '@/components/hub/posso/copy'
 import { mocks, renderDiario } from '@/testing/diarioTelas'
 import { USUARIO_DO_QUADRO } from '@/testing/diarioTelasMocks'
@@ -21,6 +21,7 @@ jest.mock('@/lib/hub/diarioDb', () => require('@/testing/diarioTelasMocks').mock
 jest.mock('@/lib/hub/regrasDb', () => require('@/testing/diarioTelasMocks').mockRegrasDb())
 jest.mock('@/lib/hub/contasDb', () => require('@/testing/diarioTelasMocks').mockContasDb())
 jest.mock('@/lib/hub/registrarDb', () => require('@/testing/diarioTelasMocks').mockRegistrarDb())
+jest.mock('@/lib/hub/agendaDb', () => require('@/testing/diarioTelasMocks').mockAgendaDb())
 
 const NBSP = / /g
 const limpo = (s: string | null | undefined) => (s ?? '').replace(NBSP, ' ')
@@ -37,6 +38,30 @@ function falado(el: Element): string[] {
     if (t) out.push(limpo(t))
   }
   return out
+}
+
+/**
+ * Phase 5 · telas-diario: the boards' rules_now answers were re-exported with the data block `sem_agenda` in Futuros
+ * (the boards' days are outside the agenda, SPEC §5.10), so a Futuros «Liberado» is no longer green and says the data
+ * were not checked (SPEC §5.4; the words are the Posso lane's). Where the app says so, the board's line stands for the
+ * rest: same answer word, no longer green, the sentence names «não conferidos»; the board's sub and tone are then kept.
+ */
+function semAgenda<T extends { pal: string; sub: string | null; tom: string }>(app: T, quadro: T): T {
+  if (!app.sub?.endsWith(LIBERADO_SEM_AGENDA)) return app
+  // Exactly the Posso lane's words (posso.ts): the board's green «Liberado» («até 11:00 ET») in the text colour, the
+  // sentence alone as its sub (no «até»: the end depends on the agenda)
+  expect(quadro).toMatchObject({ pal: 'Liberado', tom: 'tom-mint' })
+  expect(quadro.sub === null || /^até /.test(quadro.sub)).toBe(true)
+  expect(app).toEqual({ ...quadro, sub: LIBERADO_SEM_AGENDA, tom: 'tom-neutral' })
+  return quadro
+}
+
+/** The others line: the board's «19 liberadas» (green) reads «19 liberadas, dados não conferidos», muted */
+function parteSemAgenda(app: [string, string | undefined], quadro: [string, string]): [string, string | undefined] {
+  if (!app[0].endsWith(', dados não conferidos')) return app
+  expect(quadro[1]).toBe('tom-mint')
+  expect(app).toEqual([quadro[0].replace(/liberadas?$/, (m) => `${m}, dados não conferidos`), 'tom-muted'])
+  return quadro
 }
 
 /** One line as the board's esperado holds it */
@@ -69,13 +94,17 @@ describe.each<Cenario>(['2', '1', '9', '9b', '10a', '6', '8'])('scenario %s', (c
     const { q } = await pronto(cen)
     const e = q.esperado
     const principal = within(cartao()).getByRole('list', { name: 'Posso operar hoje?' })
-    expect(linhas(principal).map(lerLinha)).toEqual(e.possoSel.map((p) => ({ ...p, lim: limpo(p.lim) || null })))
+    const sel = e.possoSel.map((p) => ({ ...p, lim: limpo(p.lim) || null }))
+    expect(linhas(principal).map((li, i) => semAgenda(lerLinha(li), sel[i] as any))).toEqual(sel)
     const resumo = cartao().querySelector('.hub-posso__resumo') as HTMLElement
     expect(resumo.querySelector('strong')?.textContent).toBe(e.outras!.titulo)
     const partes = Array.from(resumo.querySelectorAll('.hub-posso__parte'))
-    expect(partes.map((p) => [falado(p).join(''), Array.from(p.classList).find((c) => c.startsWith('hub-tom--'))?.replace('hub-tom--', 'tom-')])).toEqual(
-      e.outras!.partes.map((p) => [p.texto, p.tom]),
-    )
+    const esperadas = e.outras!.partes.map((p) => [p.texto, p.tom] as [string, string])
+    expect(
+      partes.map((p, i) =>
+        parteSemAgenda([falado(p).join(''), Array.from(p.classList).find((c) => c.startsWith('hub-tom--'))?.replace('hub-tom--', 'tom-')], esperadas[i]),
+      ),
+    ).toEqual(esperadas)
     // The «·» ends each part but the last (board revision of 25 Oct), only for the eye
     partes.forEach((p, i) => {
       const sep = p.querySelector('.hub-posso__sep')
@@ -100,7 +129,8 @@ describe.each<Cenario>(['2', '1', '9', '9b', '10a', '6', '8'])('scenario %s', (c
     expect(botao).toHaveTextContent('Ocultar')
     const lista = within(cartao()).getByRole('list', { name: 'Outras contas' })
     expect(lista).toHaveAttribute('id', 'posso-outras-lista')
-    expect(linhas(lista).map(lerLinha)).toEqual(q.esperado.possoOutras.map((p) => ({ ...p, lim: limpo(p.lim) || null, soma: false })))
+    const outras = q.esperado.possoOutras.map((p) => ({ ...p, lim: limpo(p.lim) || null, soma: false }))
+    expect(linhas(lista).map((li, i) => semAgenda(lerLinha(li), outras[i] as any))).toEqual(outras)
     await user.click(botao)
     expect(botao).toHaveFocus()
     expect(botao).toHaveTextContent('Ver todas')

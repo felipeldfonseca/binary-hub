@@ -44,6 +44,8 @@ export const RULES_RPC_ERROR_CODES = [
   'bad_state_text',
   /** «Mover para o breakeven» (Phase 3c, 20261023000001): not a setting of assets and numbers above zero */
   'bad_breakeven',
+  /** «Dados econômicos» per release (Phase 5-1, 20261120000001): a code or a value outside the list */
+  'bad_releases',
   'bad_preferences',
   'unknown_account',
   'archived_account',
@@ -162,6 +164,23 @@ export interface PreferencesPatch {
   theme?: 'claro' | 'escuro' | null;
   language?: 'pt' | 'en' | null;
   alerts?: Partial<Record<'state_change' | 'before_block' | 'limit_80', boolean | null>> | null;
+}
+
+/**
+ * The pt-BR words of the rules codes that have their own (contract §3.3, chosen there): the save's
+ * status line (rascunho's statusSalvar) takes these over ERRO_REGRAS' generic sentence (personalizar/copy.ts).
+ */
+export const MENSAGENS_REGRAS: Readonly<Partial<Record<RegrasErrorCode, string>>> = Object.freeze({
+  bad_releases: 'Escolha de dado econômico inválida. Recarregue a página e tente de novo.',
+});
+
+/**
+ * «Avisar 10 minutos antes de uma espera de dado econômico» (profiles.preferences.alerts.before_block,
+ * Q39): on unless saved as false («ligado de fábrica»). Unlike limit_80, which is off unless true.
+ * Written through merge_preferences (useMergePreferences), never through save_rules.
+ */
+export function avisoAntesDaEsperaLigado(prefs: Pick<HubPreferences, 'alerts'> | null | undefined): boolean {
+  return prefs?.alerts?.before_block !== false;
 }
 
 /** merge_preferences(patch): merges into profiles.preferences in one statement; returns the result */

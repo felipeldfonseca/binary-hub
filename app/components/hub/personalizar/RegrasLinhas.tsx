@@ -11,21 +11,19 @@ import {
   type StateChoice,
   type StateName,
 } from '@/lib/domain/gate'
-import { allowsSoAFavor, windowError, type AccountConfig, type BlockSetting, type RulesSettings } from '@/lib/hub/regras'
+import { allowsSoAFavor, windowError, type AccountConfig, type RulesSettings } from '@/lib/hub/regras'
 import { dinheiroCompacto } from '@/lib/hub/posso'
 import { SIMBOLO_MOEDA } from '@/lib/hub/formato'
 import { faixaJanela, resumoDias } from '@/lib/hub/janelas'
 import { lerLimite } from '@/lib/hub/personalizarRegras'
 import {
   comAoChegar,
-  comBloqueio,
   comEscolhaEstado,
   comLimite,
   comModoLimite,
   comRegraJanela,
   comTextoEstado,
   janelasEfetivas,
-  restaurarMinutos,
   temProprio,
   type Entidade,
 } from '@/lib/hub/rascunho'
@@ -41,7 +39,7 @@ type Editar = (fn: (draft: RulesSettings) => RulesSettings) => void
  * «padrão de Futuros» / «só nesta conta» (board `tagDe`, `janTag`): only on an account whose market
  * has a visible default («Padrão Futuros»: MARKET_SPEC[m].rules.padrao, futures only)
  */
-function TagOrigem({ propria }: { propria: boolean }) {
+export function TagOrigem({ propria }: { propria: boolean }) {
   return propria ? (
     <span className="hub-tag hub-tag--propria">{SO_NESTA_CONTA}</span>
   ) : (
@@ -49,11 +47,11 @@ function TagOrigem({ propria }: { propria: boolean }) {
   )
 }
 
-const temPadrao = (e: Entidade) => e.tipo === 'conta' && MARKET_SPEC[e.conta.market].rules.padrao
+export const temPadrao = (e: Entidade) => e.tipo === 'conta' && MARKET_SPEC[e.conta.market].rules.padrao
 
-function Regra({ nome, children }: { nome: React.ReactNode; children: React.ReactNode }) {
+export function Regra({ nome, children, className }: { nome: React.ReactNode; children: React.ReactNode; className?: string }) {
   return (
-    <li className="hub-pz-regra">
+    <li className={className ? `hub-pz-regra ${className}` : 'hub-pz-regra'}>
       <div className="hub-pz-regra__nome">{nome}</div>
       <div className="hub-pz-regra__val">{children}</div>
     </li>
@@ -174,7 +172,7 @@ export function RegraSoDentro({
  * Minutes before/after a release: digits only, clamped at once; an emptied field is allowed while
  * typing and goes back to the saved value (the draft takes it at once, the field on blur).
  */
-function CampoMinutos({
+export function CampoMinutos({
   id,
   rotulo,
   sufixo,
@@ -216,79 +214,6 @@ function CampoMinutos({
       />
       <span aria-hidden="true">{sufixo}</span>
     </span>
-  )
-}
-
-/** «Bloqueio de dados» (where MARKET_SPEC has a block: futures): saved and versioned, «ativo na Fase 5» */
-export function RegraBloqueio({
-  entidade,
-  draft,
-  salvo,
-  mudou,
-  onEditar,
-}: {
-  entidade: Entidade
-  draft: RulesSettings
-  salvo: RulesSettings
-  mudou: boolean
-  onEditar: Editar
-}) {
-  const mb = draft.markets.futures.block ?? { on: true, beforeMin: 5, afterMin: 10 }
-  const own: Partial<BlockSetting> = entidade.tipo === 'conta' ? (draft.accounts[entidade.conta.id]?.block ?? {}) : {}
-  const b = { on: own.on ?? mb.on, beforeMin: own.beforeMin ?? mb.beforeMin, afterMin: own.afterMin ?? mb.afterMin }
-  const hoje = !b.on
-    ? REGRAS.bloqDesligado
-    : b.beforeMin + b.afterMin === 0
-      ? REGRAS.bloqZero
-      : draft.calendars.length === 0
-        ? REGRAS.bloqSemCalendario
-        : REGRAS.bloqFase5
-  return (
-    <Regra
-      nome={
-        <>
-          <span id="r-bloq">{REGRAS.bloqueio}</span>
-          {temPadrao(entidade) && <TagOrigem propria={entidade.tipo === 'conta' && temProprio(draft, entidade.conta.id, 'block')} />}
-          {mudou && <TagNaoSalvo />}
-        </>
-      }
-    >
-      <div className="hub-pz-sw-linha">
-        <Interruptor
-          ligado={b.on}
-          rotuloId="r-bloq"
-          descricaoId="r-bloq-hoje"
-          onAlternar={() => onEditar((d) => comBloqueio(d, entidade, { on: !b.on }))}
-        />
-        <span className="hub-pz-fraco">{b.on ? REGRAS.ligado : REGRAS.desligado}</span>
-        <span className="hub-chip-fraco">{ATIVO_NA_FASE_5}</span>
-      </div>
-      {b.on && (
-        <div className="hub-pz-campos-l">
-          <CampoMinutos
-            id="r-antes"
-            rotulo={REGRAS.minAntesAria}
-            sufixo={REGRAS.minAntes}
-            valor={b.beforeMin}
-            max={60}
-            onValor={(n) => onEditar((d) => comBloqueio(d, entidade, { beforeMin: n }))}
-            onVazio={() => onEditar((d) => restaurarMinutos(d, salvo, entidade, 'beforeMin'))}
-          />
-          <CampoMinutos
-            id="r-depois"
-            rotulo={REGRAS.minDepoisAria}
-            sufixo={REGRAS.minDepois}
-            valor={b.afterMin}
-            max={120}
-            onValor={(n) => onEditar((d) => comBloqueio(d, entidade, { afterMin: n }))}
-            onVazio={() => onEditar((d) => restaurarMinutos(d, salvo, entidade, 'afterMin'))}
-          />
-        </div>
-      )}
-      <p id="r-bloq-hoje" role="status" className="hub-nota">
-        {hoje}
-      </p>
-    </Regra>
   )
 }
 

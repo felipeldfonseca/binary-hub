@@ -163,7 +163,11 @@ insert into public.hub_members (user_id) values ('${uid}');`)
     expect(sp(fatosDaOperacao(live, conta()))).toContainEqual(['Resultado', '+US$ 48,76 · bruto +US$ 50,00'])
     const arquivo = d.trades.find((t) => t.trade.id !== trades.live)!
     expect(origemDaOperacao(arquivo)).toBe('Do arquivo')
-    expect(linhasDaOperacao(arquivo, conta())).toEqual(['Sem registro no app: o “Posso operar hoje?” desta operação foi recalculado pelas regras do dia.'])
+    // Phase 5-1: the cluster has no agenda, so the recalculated gate is `sem_agenda` and the drill says so (c3 §6.4)
+    expect(linhasDaOperacao(arquivo, conta())).toEqual([
+      'Sem registro no app: o “Posso operar hoje?” desta operação foi recalculado pelas regras do dia.',
+      'Dados econômicos: não conferidos nesta entrada (o app estava sem a agenda).',
+    ])
 
     setClock('2026-10-16T21:05:05Z')
     await addMarks(db, arquivo.trade.id, marksPayload({ setup: 'C' }))

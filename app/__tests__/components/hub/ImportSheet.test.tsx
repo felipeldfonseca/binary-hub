@@ -1499,7 +1499,7 @@ describe('ImportSheet · the rules of a new account (step b)', () => {
 
     const select = within(dialog).getByLabelText('Copiar regras de')
     expect(select).toHaveDisplayValue('Top One #1')
-    expect(select).toHaveAccessibleDescription('Copia janela, limite do dia, bloqueio de dados e regra do estado.')
+    expect(select).toHaveAccessibleDescription('Copia janela, limite do dia, dados econômicos e regra do estado.')
     expect(linhaRegra(dialog)).toBe(`Janela 10:00–11:00 (Nova York)${SEP}padrão de Futuros${SEP}limite do dia: US$${NBSP}400 por conta`)
     expect(within(dialog).getByRole('button', { name: 'Mudar' })).toHaveAttribute('aria-expanded', 'false')
     expect(within(dialog).getByText('Regras valem desde hoje, 19 out')).toBeInTheDocument()

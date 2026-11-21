@@ -17,6 +17,7 @@ jest.mock('@/lib/hub/diarioDb', () => require('@/testing/diarioTelasMocks').mock
 jest.mock('@/lib/hub/regrasDb', () => require('@/testing/diarioTelasMocks').mockRegrasDb())
 jest.mock('@/lib/hub/contasDb', () => require('@/testing/diarioTelasMocks').mockContasDb())
 jest.mock('@/lib/hub/registrarDb', () => require('@/testing/diarioTelasMocks').mockRegistrarDb())
+jest.mock('@/lib/hub/agendaDb', () => require('@/testing/diarioTelasMocks').mockAgendaDb())
 
 const NBSP = / /g
 const limpo = (s: string | null | undefined) => (s ?? '').replace(NBSP, ' ')
@@ -70,7 +71,14 @@ describe.each<Cenario>(['11a', '11b', '5', '7', '8', '10b'])('scenario %s: the w
     }
     const info = within(semana()).getByRole('button', { name: 'Como ler: Semana' })
     await user.click(info)
-    expect(document.getElementById('info-semana')?.textContent).toBe(e.info)
+    // Phase 5-1: Top One's rules have the data rule on, so «Fora do plano» names it (c3 §6.2; the boards predate it)
+    const futuros = q.contas.find((c) => c.id === q.info.contaId)!.market === 'futures'
+    expect(document.getElementById('info-semana')?.textContent).toBe(
+      (futuros ? e.info : '').replace(
+        'Fora do plano: fora da janela ou depois do limite.',
+        'Fora do plano: fora da janela, numa espera de dado econômico, em dia em que você escolheu não operar ou depois do limite.',
+      ) || e.info,
+    )
     expect(within(semana()).getByRole('heading', { level: 2, name: 'Semana' })).toHaveAttribute('id', 't-sem')
   })
 })
@@ -138,5 +146,12 @@ describe('the week’s own month read (30 nov–4 dez, December shown)', () => {
     })
     expect(lerSemana().titulo).toBe(q.esperado.semana!.titulo)
     expect(lerSemana().fora).toEqual(q.esperado.semana!.fora)
+  })
+})
+
+describe('Phase 5 · telas-diario: the week\'s holidays (c3 §6.5, the CME list in the code)', () => {
+  it('11a (23–27 nov): «Quinta, 26 nov: feriado nos EUA» in grey under the title; 11b\'s week has none', async () => {
+    await pronto('11a')
+    expect(Array.from(semana().querySelectorAll('.hub-dr-sem-feriados p')).map((p) => p.textContent)).toEqual(['Quinta, 26 nov: feriado nos EUA'])
   })
 })

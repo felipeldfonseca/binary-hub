@@ -102,7 +102,7 @@ async function digitar(rotulo: string, texto: string) {
   await userEvent.clear(campo(rotulo))
   await userEvent.type(campo(rotulo), texto)
 }
-const linhaDoGate = () => screen.getByRole('button', { name: 'Como ler: Posso operar hoje?' }).parentElement as HTMLElement
+const linhaDoGate = () => screen.getByRole('button', { name: 'Como ler: Posso operar hoje?' }).closest('.hub-reg-ctx-linha') as HTMLElement
 const alertas = () => screen.queryAllByRole('alert').map((a) => a.textContent)
 /** A registration whose answer was not recorded: what it sends is checked; no answer comes */
 const semResposta = () => new Promise<never>(() => {})

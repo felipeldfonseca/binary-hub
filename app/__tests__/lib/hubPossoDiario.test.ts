@@ -39,7 +39,7 @@ function conta(accountId: string, label: string, market: AccountMarket, rules: R
   const account = { market, dayClock: MARKET_SPEC[market].day };
   const v = rules ? version(rules) : null;
   const day = dayUsage(trades, { tradingDay: gateTradingDay(now, account, v), until: now, limitCents: rules?.limit?.cents ?? null });
-  return { accountId, label, market, gate: evaluateGate(now, account, v, day), rules };
+  return { accountId, label, market, gate: evaluateGate(now, account, v, day, { agenda: [] }), rules };
 }
 
 /** The three sales the Apex 50k #5 and #6 copied, closing the day at 10:41 */
@@ -144,7 +144,8 @@ describe('the others line', () => {
   it('«liberadas com aviso» and «com outra resposta» keep their places', () => {
     const now = et('2026-12-01 09:00');
     const aviso: Rules = { ...MANHA(500), windowRule: { on: true, outside: 'aviso' } };
-    const desligada: Rules = { ...MANHA(500), windowRule: { on: false, outside: 'fora' }, limit: null };
+    // Nothing evaluated: the window rule and the data block off, no limit
+    const desligada: Rules = { ...MANHA(500), windowRule: { on: false, outside: 'fora' }, limit: null, block: { ...MANHA(500).block!, on: false } };
     const accounts = [
       conta('a', 'A', 'futures', PREGAO(500), [], et('2026-12-01 10:00')),
       conta('b', 'B', 'futures', aviso, [], now),

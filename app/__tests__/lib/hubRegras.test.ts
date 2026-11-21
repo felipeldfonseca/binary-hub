@@ -384,7 +384,7 @@ describe('parseRulesNow', () => {
 
   it('gives each account’s answer, with the words of lib/hub/posso', () => {
     expect(linha('agora-seg-0930-et', 'futures')).toBe('Fora da sua janela · abre às 10:00 ET');
-    expect(linha('agora-seg-1005-et', 'futures')).toBe('Liberado · até 11:00 ET');
+    expect(linha('agora-seg-1005-et', 'futures')).toBe('Liberado · dados econômicos não conferidos · sem a agenda de hoje');
     expect(linha('agora-seg-1045-et', 'futures')).toBe('Encerrado por hoje · limite atingido às 10:31');
     expect(linha('agora-seg-2030-brt', 'futures')).toBe('Fora da sua janela · abre amanhã às 10:00 ET');
     expect(linha('agora-seg-0930-et', 'binary')).toBe('Fora da sua janela · abre às 20:00 de Brasília');

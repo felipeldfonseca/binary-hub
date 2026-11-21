@@ -38,6 +38,9 @@ import {
   type SaidaRascunho,
 } from '@/lib/hub/registrarForm'
 import type { MarkEvent } from '@/lib/domain/registro'
+import { fraseDoPlano } from '@/lib/hub/registrarForm'
+import { parseEntryDryRun } from '@/lib/hub/registrarDb'
+import { agoraDoEstado, entradaDoEstado, et as etQuadro, type EstadoDados } from '@/testing/agenda'
 import { agoraTelas, contasTelas, entradaTelas, estadoTelas, idsTelas, recentesTelas, saidaTelas, telasJson } from '@/testing/registrarTelas'
 
 const ids = idsTelas()
@@ -211,8 +214,8 @@ describe('the gate line, the limit line, the plan', () => {
   })
 
   it('«Liberado até 11:00 ET» only on the current minute; «US$ 245 de US$ 400»', () => {
-    expect(linhaGate(top, top1031.gate, top1031.rules, { presente: true, outroDia: false }).sub).toBe('até 11:00 ET')
-    expect(linhaGate(top, top1031.gate, top1031.rules, { presente: false, outroDia: false }).sub).toBe('')
+    expect(linhaGate(top, top1031.gate, top1031.rules, { presente: true, outroDia: false }).sub).toBe('· dados econômicos não conferidos · sem a agenda de hoje')
+    expect(linhaGate(top, top1031.gate, top1031.rules, { presente: false, outroDia: false }).sub).toBe('· dados econômicos não conferidos')
     expect(linhaLimite(top, top1031.gate, top1031.rules)).toEqual({ usado: 'US$ 245', de: 'de US$ 400' })
     expect(linhaLimite(ebx, ebx2024.gate, ebx2024.rules)).toBeNull()
   })
@@ -651,5 +654,109 @@ describe('«Dados econômicos» on the sheet (Phase 5 · base, SPEC §7.2; F2, F
     expect(textoQuebras(['fora_da_janela', 'no_bloqueio'], null)).toBe('fora da janela · na espera de dado')
     // Before Phase 5 (no evaluated block), as before
     expect(textoQuebras(quebrasDoGate(g0), g0)).toBe(textoQuebras(quebrasDoGate(g0)))
+  })
+})
+
+describe('the plan sentence of «Dados econômicos» (Phase 5 · telas-posso; c3 §7.2, the six sentences; boards Q33–Q36)', () => {
+  /** A board's recorded dry run (register_entry, dry_run) and the rules of its rules_now */
+  const doQuadro = (e: EstadoDados) => {
+    const dry = parseEntryDryRun(entradaDoEstado(e))
+    const rules = parseRulesNow(agoraDoEstado(e)).accounts[0].rules
+    return { dry, rules, frase: fraseDoPlano(dry.plan.breaks, dry.gate, rules), marca: textoQuebras(dry.plan.breaks, dry.gate) }
+  }
+
+  it.each<[EstadoDados, string, string]>([
+    ['q33-registrar-espera', 'na espera do ISM', 'Na espera do ISM de serviços (09:55 às 10:10): fora do plano. Você pode registrar.'],
+    ['q34-registrar-depois', 'na espera do ISM', 'ISM de serviços às 10:00: pelo seu plano, você só opera a partir das 10:10. Você pode registrar.'],
+    ['q35-registrar-dia', 'em dia de CPI', 'Dia de CPI: pelo seu plano, você não opera neste dia. Você pode registrar.'],
+    ['q36-registrar-dois-avisos', 'na espera do ISM', 'Na espera do ISM de serviços (09:55 às 10:10): fora do plano. Você pode registrar.'],
+    ['q38-aviso-10min-registrar', 'fora da janela', 'Fora do plano, conferido pelo hub. Você pode registrar.'],
+  ])('%s: the mark «%s» beside «%s»', (e, marca, frase) => {
+    const q = doQuadro(e)
+    expect([q.marca, q.frase]).toEqual([marca, frase])
+  })
+
+  const q33 = doQuadro('q33-registrar-espera')
+  const g = q33.dry.gate
+
+  it('4 and 5: with the window, with the limit (no hours), and the three at once; every sentence ends «Você pode registrar.»', () => {
+    expect(fraseDoPlano(['fora_da_janela', 'no_bloqueio'], g, q33.rules)).toBe(
+      'Fora da janela e na espera do ISM de serviços (09:55 às 10:10): fora do plano. Você pode registrar.',
+    )
+    expect(fraseDoPlano(['no_bloqueio', 'depois_do_limite'], g, q33.rules)).toBe('Na espera do ISM de serviços e depois do limite: fora do plano. Você pode registrar.')
+    // The three at once: c3 writes no sentence for them; the first two breaks' sentence (4), the mark names the limit
+    expect(fraseDoPlano(['fora_da_janela', 'no_bloqueio', 'depois_do_limite'], g, q33.rules)).toBe(
+      'Fora da janela e na espera do ISM de serviços (09:55 às 10:10): fora do plano. Você pode registrar.',
+    )
+  })
+
+  it('6: the app without the agenda (alone, also beside another break: the mark names it); in the plan, nothing', () => {
+    const sem = { ...g, block: { evaluated: false as const, state: 'nao_avaliado' as const, reason: 'sem_agenda' as const } }
+    expect(fraseDoPlano([], sem, q33.rules)).toBe('Não foi possível conferir os dados econômicos agora. Você pode registrar; a operação fica sem essa conferência.')
+    expect(fraseDoPlano(['fora_da_janela'], sem, q33.rules)).toBe(
+      'Não foi possível conferir os dados econômicos agora. Você pode registrar; a operação fica sem essa conferência.',
+    )
+    const livre = { ...g, block: { evaluated: true as const, state: 'ok' as const, active: null, today: [], freeAt: null } }
+    expect(fraseDoPlano([], livre, q33.rules)).toBeNull()
+    // The rule off: not «sem_agenda», nothing to say
+    const desligada = { ...g, block: { evaluated: false as const, state: 'nao_avaliado' as const, reason: 'regra_desligada' as const } }
+    expect(fraseDoPlano([], desligada, q33.rules)).toBeNull()
+  })
+
+  it('two releases in one wait: «Na espera do PCE e do PIB dos EUA (08:25 às 08:40)»; a whole day of two: «Dia de PCE e PIB dos EUA»', () => {
+    const rel = [
+      { code: 'pce' as const, at: etQuadro('2026-12-23 08:30'), mode: 'volta' as const },
+      { code: 'pib_us' as const, at: etQuadro('2026-12-23 08:30'), mode: 'volta' as const },
+    ]
+    const espera = { kind: 'espera' as const, start: etQuadro('2026-12-23 08:25'), end: etQuadro('2026-12-23 08:40'), releases: rel }
+    const ge = { ...g, at: etQuadro('2026-12-23 08:31'), block: { evaluated: true as const, state: 'no_bloqueio' as const, active: espera, today: [espera], freeAt: espera.end } }
+    expect(fraseDoPlano(['no_bloqueio'], ge, q33.rules)).toBe('Na espera do PCE e do PIB dos EUA (08:25 às 08:40): fora do plano. Você pode registrar.')
+    const dia = { ...espera, kind: 'dia' as const, releases: rel.map((r) => ({ ...r, mode: 'dia' as const })) }
+    const gd = { ...ge, block: { ...ge.block, active: dia, today: [dia] } }
+    expect(fraseDoPlano(['no_bloqueio'], gd, q33.rules)).toBe('Dia de PCE e PIB dos EUA: pelo seu plano, você não opera neste dia. Você pode registrar.')
+  })
+
+  it('an entry of another date: «Não opero no dia», «Aguardar até qui 08:40» (never «hoje» nor «amanhã»)', () => {
+    // Wed 9 Dec 19:00 ET belongs to Thu 10's account day: the CPI «Só depois» wait runs from 18:00 to 08:40 Thu
+    const cpi = { kind: 'espera' as const, start: etQuadro('2026-12-09 18:00'), end: etQuadro('2026-12-10 08:40'), releases: [{ code: 'cpi' as const, at: etQuadro('2026-12-10 08:30'), mode: 'depois' as const }] }
+    const gc = { ...g, at: etQuadro('2026-12-09 19:00'), status: 'aguardar' as const, block: { evaluated: true as const, state: 'no_bloqueio' as const, active: cpi, today: [cpi], freeAt: cpi.end } }
+    const linha = linhaGate(top, gc, q33.rules, { presente: false, outroDia: true })
+    expect(linha.palavra).toBe('Aguardar até qui 08:40')
+    expect(linha.sub).toBe('· CPI qui às 08:30 · só opero depois do dado')
+    // Sentence 2's hour is free_at with the date rule, as the line's (SPEC §7.2: never active.end)
+    expect(fraseDoPlano(['no_bloqueio'], gc, q33.rules, { outraData: true })).toBe('CPI qui às 08:30: pelo seu plano, você só opera a partir de qui 08:40. Você pode registrar.')
+    const dia = { kind: 'dia' as const, start: etQuadro('2026-12-09 18:00'), end: etQuadro('2026-12-10 18:00'), releases: [{ code: 'cpi' as const, at: etQuadro('2026-12-10 08:30'), mode: 'dia' as const }] }
+    const gd = { ...gc, at: etQuadro('2026-12-10 10:05'), block: { ...gc.block, active: dia, today: [dia] } }
+    expect(linhaGate(top, gd, q33.rules, { presente: false, outroDia: true })).toMatchObject({ palavra: 'Não opero no dia', sub: '· dia de CPI, às 08:30' })
+  })
+
+  it('2 on the eve (an entry now): «amanhã» as the line says it, the hour from free_at', () => {
+    const cpi = { kind: 'espera' as const, start: etQuadro('2026-12-09 18:00'), end: etQuadro('2026-12-10 08:40'), releases: [{ code: 'cpi' as const, at: etQuadro('2026-12-10 08:30'), mode: 'depois' as const }] }
+    const gc = { ...g, at: etQuadro('2026-12-09 19:00'), status: 'aguardar' as const, block: { evaluated: true as const, state: 'no_bloqueio' as const, active: cpi, today: [cpi], freeAt: cpi.end } }
+    expect(linhaGate(top, gc, q33.rules, { presente: true, outroDia: false }).palavra).toBe('Aguardar até amanhã às 08:40')
+    expect(fraseDoPlano(['no_bloqueio'], gc, q33.rules)).toBe('CPI amanhã às 08:30: pelo seu plano, você só opera a partir de amanhã às 08:40. Você pode registrar.')
+  })
+
+  it('2 with a name that is a word: the sentence opens in capitals («Decisão do Fed às 14:00»); the hour is free_at, not the interval end', () => {
+    const fed = { kind: 'espera' as const, start: etQuadro('2026-12-09 18:00'), end: etQuadro('2026-12-10 14:10'), releases: [{ code: 'fomc_decisao' as const, at: etQuadro('2026-12-10 14:00'), mode: 'depois' as const }] }
+    // free_at later than the interval's end (a «volta» wait right after it): the sentence follows free_at
+    const gf = { ...g, at: etQuadro('2026-12-10 10:00'), status: 'aguardar' as const, block: { evaluated: true as const, state: 'no_bloqueio' as const, active: fed, today: [fed], freeAt: etQuadro('2026-12-10 14:25') } }
+    expect(fraseDoPlano(['no_bloqueio'], gf, q33.rules)).toBe('Decisão do Fed às 14:00: pelo seu plano, você só opera a partir das 14:25. Você pode registrar.')
+  })
+
+  it('R13b: a «Só depois» wait that runs into a whole day (free_at null) promises no hour: the built sentence', () => {
+    const fed = { kind: 'espera' as const, start: etQuadro('2026-12-09 17:00'), end: etQuadro('2026-12-09 18:08'), releases: [{ code: 'fomc_decisao' as const, at: etQuadro('2026-12-09 17:58'), mode: 'depois' as const }] }
+    const gf = { ...g, at: etQuadro('2026-12-09 17:59'), block: { evaluated: true as const, state: 'no_bloqueio' as const, active: fed, today: [fed], freeAt: null } }
+    expect(fraseDoPlano(['no_bloqueio'], gf, q33.rules)).toBe('Fora do plano, conferido pelo hub. Você pode registrar.')
+  })
+
+  it('3 in the «dia de …» form (c3 §2.2): «Dia de ISM», «Dia de Fed», two as one line «Dia de CPI e Fed»', () => {
+    const dia = (codes: readonly ('ism_serv' | 'fomc_decisao' | 'cpi')[]) => {
+      const iv = { kind: 'dia' as const, start: etQuadro('2026-12-09 18:00'), end: etQuadro('2026-12-10 18:00'), releases: codes.map((code) => ({ code, at: etQuadro('2026-12-10 10:00'), mode: 'dia' as const })) }
+      return { ...g, at: etQuadro('2026-12-10 09:00'), block: { evaluated: true as const, state: 'no_bloqueio' as const, active: iv, today: [iv], freeAt: null } }
+    }
+    expect(fraseDoPlano(['no_bloqueio'], dia(['ism_serv']), q33.rules)).toBe('Dia de ISM: pelo seu plano, você não opera neste dia. Você pode registrar.')
+    expect(fraseDoPlano(['no_bloqueio'], dia(['fomc_decisao']), q33.rules)).toBe('Dia de Fed: pelo seu plano, você não opera neste dia. Você pode registrar.')
+    expect(fraseDoPlano(['no_bloqueio'], dia(['cpi', 'fomc_decisao']), q33.rules)).toBe('Dia de CPI e Fed: pelo seu plano, você não opera neste dia. Você pode registrar.')
   })
 })

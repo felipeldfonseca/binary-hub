@@ -11,7 +11,9 @@
  *   jest.mock('@/lib/hub/regrasDb', () => require('@/testing/diarioTelasMocks').mockRegrasDb())
  *   jest.mock('@/lib/hub/contasDb', () => require('@/testing/diarioTelasMocks').mockContasDb())
  *   jest.mock('@/lib/hub/registrarDb', () => require('@/testing/diarioTelasMocks').mockRegistrarDb())
+ *   jest.mock('@/lib/hub/agendaDb', () => require('@/testing/diarioTelasMocks').mockAgendaDb())
  *
+ * (Eight lines since Phase 5-1: the agenda's three reads, answered from testing/agenda's world.)
  * Each data factory keeps the real module (jest.requireActual: errors, parsers, types) and replaces only its reads
  * and writes with jest.fn()s, which testing/diarioTelas' renderDiario answers with a scenario of the boards. This
  * module imports none of the mocked modules at top level. Invented data only.
@@ -173,5 +175,16 @@ export function mockRegistrarDb() {
     imageTrashDone: jest.fn(),
     drainImageTrash: jest.fn(),
     signedImageUrl: jest.fn(),
+  }
+}
+
+/** lib/hub/agendaDb (Phase 5-1): the screens' three reads of the agenda */
+export function mockAgendaDb() {
+  return {
+    ...jest.requireActual('@/lib/hub/agendaDb'),
+    __diarioTelas: true,
+    fetchAgendaDoDia: jest.fn(),
+    fetchProximosDados: jest.fn(),
+    fetchDadosDaSemana: jest.fn(),
   }
 }

@@ -26,6 +26,7 @@
  */
 import {
   ACCOUNT_MARKETS,
+  AGENDA_RELEASES,
   BREAKEVEN_N_DP,
   CALENDAR_CODES,
   MARKET_SPEC,
@@ -40,9 +41,11 @@ import {
   currencyOf,
   isAccountMarket,
   isBreakevenKey,
+  isReleaseCode,
   limitKey,
   parseRules,
   parseServerGate,
+  resolveBlockReleases,
   toResolvedJson,
   usdToCents,
   type AccountMarket,
@@ -52,6 +55,8 @@ import {
   type GateResult,
   type LimitMode,
   type OutsideShows,
+  type ReleaseCode,
+  type ReleaseMode,
   type RuleVersion,
   type Rules,
   type StateChoice,
@@ -97,11 +102,44 @@ export interface WindowRuleSetting {
   outside: OutsideShows;
 }
 
-/** «Bloqueio de dados»: minutes before (0–60) and after (0–120) a release */
+/** «Dados econômicos» (was «Bloqueio de dados»): minutes before (0–60) and after (0–120) a release */
 export interface BlockSetting {
   on: boolean;
   beforeMin: number;
   afterMin: number;
+  /**
+   * Phase 5-1: what the trader does per release (code → normal/volta/depois/dia), partial and
+   * canonical (SPEC §3.3): in a market default a code equal to the app's default
+   * (appReleaseMode) is left out; in an account a code equal to the inherited value is left out.
+   * Absent = nothing chosen (never an empty object). Shortcuts are never stored.
+   */
+  releases?: ReleaseChoices;
+}
+
+/** A per-release choice as stored in a market default or an account (the four values) */
+export type ReleaseChoices = Partial<Record<ReleaseCode, ReleaseMode>>;
+
+/** The app's default for a code (SPEC §3.3): «volta» in LISTA_A_V1, else «normal» */
+export function appReleaseMode(code: ReleaseCode): ReleaseMode {
+  return AGENDA_RELEASES.find((r) => r.code === code)?.inListA ? 'volta' : 'normal';
+}
+
+/** A per-release map with the codes in agenda_releases() order; undefined when empty */
+export function orderedReleases(map: ReleaseChoices | undefined): ReleaseChoices | undefined {
+  if (!map) return undefined;
+  const out: ReleaseChoices = {};
+  for (const r of AGENDA_RELEASES) if (map[r.code] !== undefined) out[r.code] = map[r.code];
+  return Object.keys(out).length ? out : undefined;
+}
+
+/** A market default's map, canonical: a code equal to the app's default leaves it */
+export function canonMarketReleases(map: ReleaseChoices | undefined): ReleaseChoices | undefined {
+  if (!map) return undefined;
+  const out: ReleaseChoices = {};
+  for (const [k, v] of Object.entries(map) as [ReleaseCode, ReleaseMode | undefined][]) {
+    if (v !== undefined && v !== appReleaseMode(k)) out[k] = v;
+  }
+  return orderedReleases(out);
 }
 
 /** One state of «Regra por estado». Only the choice enters a version; the text never does. */
@@ -247,8 +285,8 @@ export interface BreakevenJson {
 export interface MarketRulesJson {
   v: 1;
   window_rule: { on: boolean; outside: OutsideShows };
-  /** where the market has the data block (futures) */
-  block?: { on: boolean; before_min: number; after_min: number };
+  /** where the market has the data block (futures); `releases` only when a code differs from the app's default */
+  block?: { on: boolean; before_min: number; after_min: number; releases?: ReleaseChoices };
   /** where the market has the state rule (futures) */
   states?: Partial<Record<StateName, { choice: StateChoice | null; text?: string }>>;
   /** Phase 3c, only once set (every market but binaries) */
@@ -265,8 +303,8 @@ export type LimitJson = ({ usd: number; brl?: never } | { brl: number; usd?: nev
 export interface AccountRulesJson {
   v: 1;
   window_rule?: Partial<{ on: boolean; outside: OutsideShows }>;
-  /** where the market has the data block (futures) */
-  block?: Partial<{ on: boolean; before_min: number; after_min: number }>;
+  /** where the market has the data block (futures); `releases` only the codes chosen «só nesta conta» */
+  block?: Partial<{ on: boolean; before_min: number; after_min: number; releases: ReleaseChoices }>;
   limit?: LimitJson | null;
   /** Phase 3c: «só nesta conta» (the whole setting); absent = the market's */
   breakeven?: BreakevenJson;
@@ -316,12 +354,29 @@ function outside(x: unknown): OutsideShows {
   return x === 'fora' || x === 'aviso' ? x : bad();
 }
 
+const RELEASE_MODES: readonly unknown[] = ['normal', 'volta', 'depois', 'dia'];
+
+/** A stored per-release map (rules_check_block: an object of known codes → the four values) */
+function releasesFromJson(x: unknown): ReleaseChoices {
+  const r = obj(x);
+  const out: ReleaseChoices = {};
+  for (const [k, v] of Object.entries(r)) {
+    if (!isReleaseCode(k) || !RELEASE_MODES.includes(v)) bad();
+    out[k as ReleaseCode] = v as ReleaseMode;
+  }
+  return out;
+}
+
 function blockFromJson(x: unknown, partial: boolean): Partial<BlockSetting> {
   const b = obj(x);
   const out: Partial<BlockSetting> = {};
   if (b.on !== undefined || !partial) out.on = bool(b.on);
   if (b.before_min !== undefined || !partial) out.beforeMin = int(b.before_min);
   if (b.after_min !== undefined || !partial) out.afterMin = int(b.after_min);
+  if (b.releases !== undefined) {
+    const releases = orderedReleases(releasesFromJson(b.releases));
+    if (releases) out.releases = releases;
+  }
   return out;
 }
 
@@ -393,6 +448,8 @@ export function marketRulesJson(m: AccountMarket, s: MarketSettings): MarketRule
   if (caps.block) {
     const b = s.block ?? { on: true, beforeMin: 5, afterMin: 10 };
     out.block = { on: b.on, before_min: b.beforeMin, after_min: b.afterMin };
+    const releases = canonMarketReleases(b.releases);
+    if (releases) out.block.releases = releases;
   }
   if (caps.states) {
     const states: NonNullable<MarketRulesJson['states']> = {};
@@ -418,6 +475,8 @@ export function accountRulesJson(m: AccountMarket, s: AccountSettings): AccountR
     if (s.block.on !== undefined) b.on = s.block.on;
     if (s.block.beforeMin !== undefined) b.before_min = s.block.beforeMin;
     if (s.block.afterMin !== undefined) b.after_min = s.block.afterMin;
+    const releases = orderedReleases(s.block.releases);
+    if (releases) b.releases = releases;
     if (Object.keys(b).length) out.block = b;
   }
   out.limit = s.limit && limitJson(m, s.limit);
@@ -543,7 +602,11 @@ export function resolveRules(account: RulesAccount, s: RulesSettings): Rules {
     windowsFrom = windows.length ? 'market' : null;
   }
 
-  const mb = m.block ?? { on: true, beforeMin: 5, afterMin: 10 };
+  const mb: BlockSetting = m.block ?? { on: true, beforeMin: 5, afterMin: 10 };
+  const calendars = normCalendars(s.calendars);
+  // SPEC §3.3–3.4 (= rules_resolve): code by code app → market → account, filtered by the
+  // calendars, «normal» dropped; undefined = the short form (no `releases` key)
+  const releases = caps.block ? resolveBlockReleases(mb.releases, o.block.releases, calendars) : undefined;
   const breakeven = resolveBreakeven(account.market, effectiveBreakeven(s, account));
   return {
     market: account.market,
@@ -558,7 +621,8 @@ export function resolveRules(account: RulesAccount, s: RulesSettings): Rules {
           on: o.block.on ?? mb.on,
           beforeMin: o.block.beforeMin ?? mb.beforeMin,
           afterMin: o.block.afterMin ?? mb.afterMin,
-          calendars: normCalendars(s.calendars),
+          calendars,
+          ...(releases ? { releases } : {}),
         }
       : null,
     limit: o.limit && { ...o.limit },
@@ -614,7 +678,8 @@ export function effectiveDayAt(at: Date, r: Rules): string {
 
 /**
  * Sets «só nesta conta» keys of an account. A value equal to the market default's is removed, so
- * the account goes back to «padrão de Futuros» (board `setR`). `undefined` removes a key.
+ * the account goes back to «padrão de Futuros» (board `setR`). `undefined` removes a key. The
+ * block's `releases` is a patch per code, with the same rule per code (Phase 5-1, SPEC §3.3).
  */
 export function withAccountRule(
   s: RulesSettings,
@@ -639,8 +704,22 @@ export function withAccountRule(
   }
   const block: Partial<BlockSetting> = { ...cur.block };
   for (const [k, v] of Object.entries(patch.block ?? {}) as [keyof BlockSetting, unknown][]) {
+    if (k === 'releases') continue;
     if (v === undefined || (m.block && v === m.block[k])) delete block[k];
     else (block as Obj)[k] = v;
+  }
+  if (patch.block && 'releases' in patch.block) {
+    // Per code (SPEC §3.3): a code equal to the inherited value (the market default's, else the
+    // app's) leaves the account's map; `releases: undefined` removes them all
+    const own: ReleaseChoices = patch.block.releases === undefined ? {} : { ...cur.block.releases };
+    for (const [code, v] of Object.entries(patch.block.releases ?? {}) as [ReleaseCode, ReleaseMode | undefined][]) {
+      const inherited = m.block?.releases?.[code] ?? appReleaseMode(code);
+      if (v === undefined || v === inherited) delete own[code];
+      else own[code] = v;
+    }
+    const ordered = orderedReleases(own);
+    if (ordered) block.releases = ordered;
+    else delete block.releases;
   }
   const next: AccountSettings = { ...cur, windowRule, block };
   if (patch.breakeven !== undefined) {

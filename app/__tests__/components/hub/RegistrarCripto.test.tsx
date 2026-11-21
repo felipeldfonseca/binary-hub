@@ -94,7 +94,7 @@ const grupo = (nome: string) => screen.getByRole('group', { name: nome })
 const pill = (g: string, nome: string) => within(grupo(g)).getByRole('button', { name: nome })
 const rotulos = (g: string) => within(grupo(g)).getAllByRole('button').map((b) => b.textContent)
 const campo = (rotulo: string) => screen.getByLabelText(rotulo) as HTMLInputElement
-const linhaDoGate = () => screen.getByRole('button', { name: 'Como ler: Posso operar hoje?' }).parentElement as HTMLElement
+const linhaDoGate = () => screen.getByRole('button', { name: 'Como ler: Posso operar hoje?' }).closest('.hub-reg-ctx-linha') as HTMLElement
 const alertas = () => screen.queryAllByRole('alert').map((a) => a.textContent)
 /** A registration whose answer was not recorded: what it sends is checked; no answer comes */
 const semResposta = () => new Promise<never>(() => {})

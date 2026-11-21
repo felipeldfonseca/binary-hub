@@ -27,6 +27,15 @@ jest.mock('@/lib/hub/contasDb', () => ({
   fetchActivity: jest.fn(),
   fetchPreferences: jest.fn(),
 }))
+// Phase 5-1: the agenda reads of Personalizar (none written; an empty, uncovered agenda)
+jest.mock('@/lib/hub/agendaDb', () => ({
+  ...jest.requireActual('@/lib/hub/agendaDb'),
+  fetchAgendaDoDia: jest.fn(async () => ({ rows: [], covered: [] })),
+  fetchProximosDados: jest.fn(async () => []),
+  fetchProximasDatas: jest.fn(async () => []),
+  fetchCoberturaProxima: jest.fn(async () => ({ covered: [], ate: '' })),
+  fetchDadosDaSemana: jest.fn(async () => []),
+}))
 jest.mock('@/lib/hub/regrasDb', () => ({
   ...jest.requireActual('@/lib/hub/regrasDb'),
   fetchRulesConfig: jest.fn(),

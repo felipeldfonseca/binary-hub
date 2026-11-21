@@ -105,10 +105,10 @@ describe('Personalizar and «Posso operar hoje?» read a saved long form', () =>
     futures.versions[futures.versions.length - 1].resolved.block.releases = LONG
     const c = parseRulesConfig(j)
     const before = parseRulesConfig(regrasJson('config-depois'))
-    // The minutes and the switch read as before; the map is not part of the settings yet
-    expect(c.settings.markets.futures.block).toEqual(before.settings.markets.futures.block)
+    // The minutes and the switch read as before; since L4 (D1) the map is part of the settings, read as stored
+    expect(c.settings.markets.futures.block).toEqual({ ...before.settings.markets.futures.block, releases: { cpi: 'dia', jolts: 'volta' } })
     const id = futures.account_id as string
-    expect(c.settings.accounts[id].block).toEqual(before.settings.accounts[id].block)
+    expect(c.settings.accounts[id].block).toEqual({ ...before.settings.accounts[id].block, releases: { cpi: 'normal' } })
     const v = c.accounts.find((a) => a.id === id)!.versions
     expect(v[v.length - 1].rules.block?.releases).toEqual(LONG)
   })

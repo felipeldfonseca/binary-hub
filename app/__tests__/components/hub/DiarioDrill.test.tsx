@@ -21,6 +21,7 @@ jest.mock('@/lib/hub/diarioDb', () => require('@/testing/diarioTelasMocks').mock
 jest.mock('@/lib/hub/regrasDb', () => require('@/testing/diarioTelasMocks').mockRegrasDb())
 jest.mock('@/lib/hub/contasDb', () => require('@/testing/diarioTelasMocks').mockContasDb())
 jest.mock('@/lib/hub/registrarDb', () => require('@/testing/diarioTelasMocks').mockRegistrarDb())
+jest.mock('@/lib/hub/agendaDb', () => require('@/testing/diarioTelasMocks').mockAgendaDb())
 
 // No control of a drill opens the Registrar sheet: a stand-in that would say so
 const mockSheet = jest.fn()
@@ -58,7 +59,12 @@ describe('H1–H7 · every drill of the board days', () => {
       expect(within(drill).getByText('Sua operação')).toBeInTheDocument()
       expect({ i, fatos: fatos(drill) }).toEqual({ i, fatos: ed.fatos.map(([a, b]) => [a, sem(b)]) })
       const todas = linhas(drill)
-      expect({ i, linhas: todas.filter((l) => l !== ed.be) }).toEqual({ i, linhas: ed.linhas.map(sem) })
+      // Phase 5-1 (c3 §6.4): a Futuros entry frozen before the rule, or recalculated without the agenda, says the data
+      // were not checked; the Phase 4 boards predate that line
+      const dados = todas.filter((l) => l.startsWith('Dados econômicos: não conferidos nesta entrada'))
+      const futuros = r.q.contas.find((c) => c.id === r.q.info.contaId)!.market === 'futures'
+      expect(dados.length).toBe(futuros && e.trades[i].plano !== 'hist' ? 1 : 0)
+      expect({ i, linhas: todas.filter((l) => l !== ed.be && !dados.includes(l)) }).toEqual({ i, linhas: ed.linhas.map(sem) })
       const tempo = drill.querySelector('.hub-dr-drill-tempo')
       if (ed.tempo) {
         expect(within(drill).getByText('Linha do tempo da operação')).toBeInTheDocument()
