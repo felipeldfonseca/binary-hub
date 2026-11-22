@@ -49,7 +49,8 @@ describe('rules_now at the board’s moments', () => {
   it('Thu 10:31 ET: «Liberado · até 11:00 ET», «Limite do dia US$ 245 de US$ 400»', () => {
     const [top, ebx, ftmo] = agoraTelas('agora-qui-1031-et').accounts;
     const linha = possoLinha(top.label, top.gate, top.rules);
-    expect(linha).toMatchObject({ palavra: 'Liberado', sub: 'até 11:00 ET' });
+    // the Phase 5-1 SQL with an empty agenda: sem_agenda (L4's re-recording)
+    expect(linha).toMatchObject({ palavra: 'Liberado', sub: 'dados econômicos não conferidos · sem a agenda de hoje' });
     expect(linha.limite).toMatchObject({ usado: 'US$\u00a0245', de: 'de US$\u00a0400' });
     expect(ebx.gate.limit.evaluated).toBe(false);
     expect(ftmo.market).toBe('forex');

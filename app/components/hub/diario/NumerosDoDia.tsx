@@ -5,6 +5,7 @@ import { dayTiles, type CalendarDay } from '@/lib/domain/diario'
 import {
   comoLerOHistorico,
   comoLerOsNumeros,
+  temLinhaDeDados,
   numerosDoDia,
   numerosDoHistorico,
   numerosSemRegras,
@@ -19,8 +20,10 @@ import { NUMEROS } from './copyDia'
 export function numerosDe(d: DayRead, calDay: CalendarDay | null, conta: ContaDiario): { n: NumerosTexto; info: string } {
   if (d.kind === 'historico' && calDay?.history) return { n: numerosDoHistorico(calDay.history, conta), info: comoLerOHistorico(calDay.history, conta) }
   const t = dayTiles(d.facts, conta.market)
-  if (!d.desde) return { n: numerosSemRegras(conta), info: comoLerOsNumeros(t, conta, d.facts) }
-  return { n: numerosDoDia(t, conta), info: comoLerOsNumeros(t, conta, d.facts) }
+  // Phase 5-1: «fora do plano» names the data rule when the day's version has it on (c3 §6.2)
+  const o = { dados: temLinhaDeDados(conta.market) && !!d.plan.rules?.block?.on }
+  if (!d.desde) return { n: numerosSemRegras(conta), info: comoLerOsNumeros(t, conta, d.facts, o) }
+  return { n: numerosDoDia(t, conta), info: comoLerOsNumeros(t, conta, d.facts, o) }
 }
 
 /**

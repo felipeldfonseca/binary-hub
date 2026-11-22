@@ -86,7 +86,7 @@ describe('RegrasDaConta · «Copiar regras de»', () => {
     const select = screen.getByLabelText('Copiar regras de') as HTMLSelectElement
     expect(within(select).getAllByRole('option').map((o) => o.textContent)).toEqual(['Top One #1', 'Não copiar'])
     expect(select).toHaveDisplayValue('Top One #1')
-    expect(select).toHaveAccessibleDescription('Copia janela, limite do dia, bloqueio de dados e regra do estado.')
+    expect(select).toHaveAccessibleDescription('Copia janela, limite do dia, dados econômicos e regra do estado.')
     expect(linha().textContent).toBe(`Janela 10:00–11:00 (Nova York)${SEP}padrão de Futuros${SEP}limite do dia: US$${NBSP}400 por conta`)
 
     await userEvent.selectOptions(select, 'Não copiar')

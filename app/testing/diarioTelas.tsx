@@ -9,8 +9,8 @@
  *   await renderDiario('10d', { estado: 'erro' })         // every Diário read: PostgREST «function not found»
  *   await renderDiario('10e', { estado: 'offline' })      // loaded online, then the connection drops (board 10e)
  *
- * The clock is the scenario's (jest.useFakeTimers({ now, advanceTimers: true })), the URL '/diario?conta=&dia=' as
- * the scenario opens. The writes keep what they wrote (a review, a note), so a read after them shows it.
+ * The clock is the scenario's (only Date is faked, and it moves on its own), the URL '/diario?conta=&dia=' as the
+ * scenario opens. The writes keep what they wrote (a review, a note), so a read after them shows it.
  */
 import React from 'react'
 import { act, screen, within } from '@testing-library/react'
@@ -21,14 +21,16 @@ import * as diarioDb from '@/lib/hub/diarioDb'
 import * as regrasDb from '@/lib/hub/regrasDb'
 import * as contasDb from '@/lib/hub/contasDb'
 import * as registrarDb from '@/lib/hub/registrarDb'
+import * as agendaDb from '@/lib/hub/agendaDb'
 import { diarioKeys } from '@/hooks/useDiario'
 import { addDays } from '@/lib/domain/tempo'
 import { monthOf, type Day } from '@/lib/domain/diario'
 import { mesTitulo } from '@/lib/hub/diario'
 import DiarioPage from '@/app/(hub)/diario/page'
-import { renderHub } from './hubHarness'
+import { renderHub, ALL_BUT_DATE } from './hubHarness'
 import { navegacao, USUARIO_DO_QUADRO } from './diarioTelasMocks'
 import { nomeDaConta, quadro, quadroJson, type Cenario, type Quadro } from './diarioQuadro'
+import { leituraDoDia, proximosDoQuadro, semanaDoQuadro } from './agenda'
 
 type Json = Record<string, any>
 const m = <T extends (...a: any[]) => any>(f: T) => f as unknown as jest.MockedFunction<T>
@@ -61,6 +63,9 @@ export const mocks = {
   addMarks: m(registrarDb.addMarks),
   imageSlots: m(registrarDb.imageSlots),
   saveExtras: m(registrarDb.saveExtras),
+  fetchAgendaDoDia: m(agendaDb.fetchAgendaDoDia),
+  fetchProximosDados: m(agendaDb.fetchProximosDados),
+  fetchDadosDaSemana: m(agendaDb.fetchDadosDaSemana),
 }
 
 /** Whether the test file declared the mock block of testing/diarioTelasMocks */
@@ -72,6 +77,7 @@ function blocoDeclarado(): string[] {
     ['@/lib/hub/regrasDb', regrasDb],
     ['@/lib/hub/contasDb', contasDb],
     ['@/lib/hub/registrarDb', registrarDb],
+    ['@/lib/hub/agendaDb', agendaDb],
   ]
   for (const [nome, mod] of marcados) if (!(mod as { __diarioTelas?: boolean }).__diarioTelas) faltam.push(nome)
   return faltam
@@ -158,11 +164,13 @@ export async function renderDiario(cen: Cenario, { tema, estado }: OpcoesDoDiari
   if (faltam.length) {
     throw new Error(
       `renderDiario: this test file lacks the mock block of testing/diarioTelasMocks (contract §4.5) for ${faltam.join(', ')}; ` +
-        'copy the seven jest.mock lines of that file to its top',
+        'copy the eight jest.mock lines of that file to its top',
     )
   }
   const q = quadro(cen)
-  jest.useFakeTimers({ now: q.agora, advanceTimers: true })
+  // Only the clock is faked. With every timer faked and advancing on its own, a drill's click sometimes never drew
+  // (DiarioDrill: 6 of 30 runs, 0 of 30 like this); the likely cause is waitFor's overlapping act() scopes.
+  jest.useFakeTimers({ now: q.agora, advanceTimers: true, doNotFake: ALL_BUT_DATE })
   navegacao.reiniciar()
   navegacao.definir(`/diario?conta=${q.info.contaId}&dia=${q.info.dia}`)
 
@@ -282,6 +290,12 @@ export async function renderDiario(cen: Cenario, { tema, estado }: OpcoesDoDiari
   mocks.imageSlots.mockReset().mockRejectedValue(new registrarDb.RegistrarDataError('unknown'))
   mocks.saveExtras.mockReset().mockRejectedValue(new registrarDb.RegistrarDataError('unknown'))
 
+  // ---- the agenda (Phase 5-1): testing/agenda's world, as the reads filter it. The Phase 4 scenarios (October and
+  // November 2026) fall outside its coverage, so their day reads «não conferido», as the real app would
+  mocks.fetchAgendaDoDia.mockReset().mockImplementation(async (_db, o) => leituraDoDia(o.at, { calendars: o.calendars, clock: o.clock }))
+  mocks.fetchProximosDados.mockReset().mockImplementation(async (_db, o) => proximosDoQuadro(o.from, o.days))
+  mocks.fetchDadosDaSemana.mockReset().mockImplementation(async (_db, o) => semanaDoQuadro(o.start, o.end))
+
   const ui = tema ? (
     <div className="hub" data-tema={tema}>
       <DiarioPage />
@@ -293,7 +307,7 @@ export async function renderDiario(cen: Cenario, { tema, estado }: OpcoesDoDiari
   // As the app's QueryProvider: an answer is fresh for a minute, so a region drawn after the first answers (the
   // regions wait for the calendar) shares them instead of reading again (renderHub's cache has no staleTime)
   view.queryClient.setDefaultOptions({ ...view.queryClient.getDefaultOptions(), queries: { ...view.queryClient.getDefaultOptions().queries, staleTime: 60_000 } })
-  const user = userEvent.setup({ advanceTimers: jest.advanceTimersByTime })
+  const user = userEvent.setup()
   if (estado === 'offline') {
     await esperar(() => {
       const cal = view.queryClient.getQueryData(diarioKeys.calendario(USUARIO_DO_QUADRO, q.info.contaId))

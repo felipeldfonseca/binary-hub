@@ -14,6 +14,7 @@ import * as regrasDb from '@/lib/hub/regrasDb'
 import * as registrarDb from '@/lib/hub/registrarDb'
 import RegistrarSheet from '@/components/hub/registrar/RegistrarSheet'
 import type { Rules } from '@/lib/domain/gate'
+import { ALL_BUT_DATE } from '@/testing/hubHarness'
 import { idsParciais } from '@/testing/parciais'
 import { agoraEs12, agoraParciais, contasParciais, fechadaEs12, fechadaMgc, gateAtParciais, previaMgc } from '@/testing/saidasTelas'
 import { agoraMercados, contasMercados, idsMercados } from '@/testing/registrarMercados'
@@ -398,7 +399,7 @@ describe('scenario 12 · ES em duas saídas: the banner «Limite do dia atingido
   })
 
   it('without it (rules_now failed): the counting exit at hitAt is the one compared, not the last (10:20)', async () => {
-    jest.useFakeTimers({ now: new Date('2026-10-23T14:24:05.000Z'), doNotFake: ['queueMicrotask'], advanceTimers: true })
+    jest.useFakeTimers({ now: new Date('2026-10-23T14:24:05.000Z'), advanceTimers: true, doNotFake: ALL_BUT_DATE })
     fetchRulesNow.mockRejectedValue(new Error('offline'))
     abrir()
     await es12()

@@ -25,6 +25,7 @@ jest.mock('@/lib/hub/diarioDb', () => require('@/testing/diarioTelasMocks').mock
 jest.mock('@/lib/hub/regrasDb', () => require('@/testing/diarioTelasMocks').mockRegrasDb())
 jest.mock('@/lib/hub/contasDb', () => require('@/testing/diarioTelasMocks').mockContasDb())
 jest.mock('@/lib/hub/registrarDb', () => require('@/testing/diarioTelasMocks').mockRegistrarDb())
+jest.mock('@/lib/hub/agendaDb', () => require('@/testing/diarioTelasMocks').mockAgendaDb())
 
 // The probe: the top region's stub, replaced by one that keeps the shared state for the test
 let mockPagina: DiarioPaginaValor | null = null
@@ -241,6 +242,8 @@ describe('the account selector and the leave guard', () => {
   })
 
   it('confirmarSaida: true without a guard; a guard that says no keeps the URL and the account, and abrirDia does nothing', async () => {
+    // «o dia» registers its own guard when it mounts, which would replace the one under test
+    mockSemODia = true
     const { user, q } = await renderDiario('2')
     await carregada()
     await expect(pagina().confirmarSaida()).resolves.toBe(true)

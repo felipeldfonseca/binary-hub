@@ -8,7 +8,9 @@ export default function Calendarios({ marcados, onMarcar }: { marcados: readonly
   return (
     <div className="hub-pz-quadro">
       <div className="hub-pz-quadro__cab">
-        <h3 id="r-calendarios">{CALENDARIOS.titulo}</h3>
+        <h3 id="r-calendarios" tabIndex={-1}>
+          {CALENDARIOS.titulo}
+        </h3>
         <span className="hub-tag hub-tag--todas">{CALENDARIOS.todas}</span>
       </div>
       <p className="hub-nota hub-pz-quadro__nota">{CALENDARIOS.nota}</p>

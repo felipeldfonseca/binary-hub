@@ -103,7 +103,7 @@ async function digitar(rotulo: string, texto: string) {
   await userEvent.clear(campo(rotulo))
   await userEvent.type(campo(rotulo), texto)
 }
-const linhaDoGate = () => screen.getByRole('button', { name: 'Como ler: Posso operar hoje?' }).parentElement as HTMLElement
+const linhaDoGate = () => screen.getByRole('button', { name: 'Como ler: Posso operar hoje?' }).closest('.hub-reg-ctx-linha') as HTMLElement
 const busca = () => screen.getByRole('searchbox', { name: 'Buscar ativo' })
 const AVISO_1006 = 'Se o stop for atingido, o dia passa do limite: faltam R$ 320 e o stop arrisca R$ 360.'
 /** The plan pill under the fields («● depois do limite»), from the dry run once it answers */

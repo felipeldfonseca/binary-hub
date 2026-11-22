@@ -141,11 +141,12 @@ export function sqlArg(v: unknown): string {
 
 const OPS: Record<string, string> = { eq: '=', gte: '>=', gt: '>', lte: '<=', lt: '<', neq: '<>' };
 
-/** PostgREST's or=(…) logic tree, flat: «col.op.value» items, a value in double quotes when it holds reserved characters */
-function orFilter(expr: string): string {
+/** Splits PostgREST's logic list at the top-level commas, unquoting values (a value in double quotes may hold reserved characters) */
+function logicItems(expr: string): string[] {
   const items: string[] = [];
   let cur = '';
   let quoted = false;
+  let depth = 0;
   for (let i = 0; i < expr.length; i++) {
     const c = expr[i];
     if (c === '\\' && quoted) {
@@ -154,9 +155,12 @@ function orFilter(expr: string): string {
     }
     if (c === '"') {
       quoted = !quoted;
+      if (depth > 0) cur += c;
       continue;
     }
-    if (c === ',' && !quoted) {
+    if (!quoted && c === '(') depth++;
+    if (!quoted && c === ')') depth--;
+    if (c === ',' && !quoted && depth === 0) {
       items.push(cur);
       cur = '';
       continue;
@@ -164,13 +168,20 @@ function orFilter(expr: string): string {
     cur += c;
   }
   items.push(cur);
-  return `(${items
+  return items;
+}
+
+/** PostgREST's or=(…) logic tree: «col.op.value» items, and nested and(…)/or(…) groups (Phase 5-1: a row by at or was_at) */
+function orFilter(expr: string, join: 'or' | 'and' = 'or'): string {
+  return `(${logicItems(expr)
     .map((item) => {
+      const g = /^(and|or)\((.*)\)$/.exec(item);
+      if (g) return orFilter(g[2], g[1] as 'and' | 'or');
       const m = /^([a-z_]+)\.([a-z]+)\.(.*)$/.exec(item);
       if (!m || !OPS[m[2]]) throw new Error(`or(): ${item}`);
       return `${m[1]} ${OPS[m[2]]} ${sqlArg(m[3])}`;
     })
-    .join(' or ')})`;
+    .join(` ${join} `)})`;
 }
 
 /**
@@ -191,7 +202,8 @@ export function pgFrom(uid: string) {
       select: (c: string, o?: { count?: 'exact'; head?: boolean }) => ((cols = c), (count = o?.count === 'exact'), (head = !!o?.head), chain),
       eq: (c: string, v: unknown) => (where.push(`${c} = ${sqlArg(v)}`), chain),
       gte: (c: string, v: unknown) => (where.push(`${c} >= ${sqlArg(v)}`), chain),
-      in: (c: string, v: unknown[]) => (where.push(`${c} in (${v.map(sqlArg).join(', ')})`), chain),
+      lt: (c: string, v: unknown) => (where.push(`${c} < ${sqlArg(v)}`), chain),
+      in: (c: string, v: unknown[]) => (where.push(v.length ? `${c} in (${v.map(sqlArg).join(', ')})` : 'false'), chain),
       or: (expr: string) => (where.push(orFilter(expr)), chain),
       order: (c: string, o?: { ascending?: boolean }) => (order.push(`${c}${o?.ascending === false ? ' desc' : ''}`), chain),
       limit: (n: number) => ((limit = n), chain),
@@ -273,4 +285,98 @@ export function pgClient(uid: string, log: { name: string; args: Record<string, 
       }),
     },
   } as unknown as SupabaseClient;
+}
+
+// ---------------------------------------------------------------------------------------------
+// Phase 5-1: a stand-in for the service-role client of the daily route (lib/server/supabaseAdmin)
+// ---------------------------------------------------------------------------------------------
+
+/** SQL as `service_role` (bypassrls, as on Supabase): { out } or { error: { code: SQLSTATE } } */
+function asService(sql: string): { out: string; error: null } | { out: null; error: { code: string; message: string } } {
+  try {
+    const out = execFileSync(PSQL, [PG_URL as string, '-X', '-q', '-t', '-A', '-v', 'ON_ERROR_STOP=1', '-v', 'VERBOSITY=verbose', '-P', 'pager=off'], {
+      input: `begin;\nset local role service_role;\n${sql}\ncommit;`,
+      stdio: ['pipe', 'pipe', 'pipe'],
+      env: { ...process.env, LC_ALL: 'C', LANG: 'C', PGOPTIONS: '-c timezone=UTC' },
+    }).toString();
+    return { out, error: null };
+  } catch (e) {
+    const stderr = String((e as { stderr?: Buffer }).stderr ?? '');
+    const m = /ERROR:\s+([0-9A-Z]{5}):/.exec(stderr);
+    // Only the SQLSTATE travels (as PostgREST's `code`); the text stays here
+    return { out: null, error: { code: m ? m[1] : 'psql', message: m ? m[1] : 'psql' } };
+  }
+}
+
+const ident = (c: string) => {
+  if (!/^[a-z_][a-z0-9_]*$/.test(c)) throw new Error(`pgServiceClient: column ${c}`);
+  return c;
+};
+const columnsOf = (list: string) => list.split(',').map((c) => ident(c.trim()));
+
+/**
+ * A Supabase client as the service role, on the real SQL: the table calls lib/domain/agenda/carga.ts runLoad makes
+ * (select with order/range/limit, upsert with onConflict, update().eq()), each in its own transaction under
+ * `set role service_role` (so the table grants and the CHECK's function privileges are the ones the route meets).
+ * Errors carry only the SQLSTATE as `code` (42P01 for a table that does not exist).
+ */
+export function pgServiceClient(): SupabaseClient {
+  const from = (table: string) => {
+    const t = `public.${ident(table)}`;
+    let cols = '*';
+    let limit: number | null = null;
+    let offset = 0;
+    const where: string[] = [];
+    const order: string[] = [];
+    const answer = (sql: string, rows: boolean) => {
+      const r = asService(sql);
+      if (r.error) return { data: null, error: r.error };
+      if (!rows) return { data: null, error: null };
+      const line = r.out.split('\n').find((l) => l.startsWith('json:'));
+      return { data: line ? JSON.parse(line.slice(5)) : [], error: null };
+    };
+    const thenable = (run: () => unknown) => ({
+      then: (resolve: (v: unknown) => unknown, reject: (e: unknown) => unknown) => Promise.resolve().then(run).then(resolve, reject),
+    });
+    const select: Record<string, unknown> = {
+      order: (c: string, o?: { ascending?: boolean }) => (order.push(`${ident(c)}${o?.ascending === false ? ' desc' : ''}`), select),
+      range: (a: number, b: number) => ((offset = a), (limit = b - a + 1), select),
+      limit: (n: number) => ((limit = n), select),
+      eq: (c: string, v: unknown) => (where.push(`${ident(c)} = ${sqlArg(v)}`), select),
+      ...thenable(() =>
+        answer(
+          `select 'json:' || coalesce(jsonb_agg(to_jsonb(x)), '[]'::jsonb)::text from (select ${cols === '*' ? '*' : columnsOf(cols).join(', ')} from ${t}` +
+            `${where.length ? ` where ${where.join(' and ')}` : ''}${order.length ? ` order by ${order.join(', ')}` : ''}` +
+            `${limit !== null ? ` limit ${limit}` : ''}${offset ? ` offset ${offset}` : ''}) x;`,
+          true,
+        ),
+      ),
+    };
+    return {
+      select: (c: string) => ((cols = c), select),
+      upsert: (rows: readonly Record<string, unknown>[], o: { onConflict: string }) =>
+        thenable(() => {
+          if (rows.length === 0) return { data: null, error: null };
+          const c = Array.from(new Set(rows.flatMap((r) => Object.keys(r)))).map(ident);
+          const key = columnsOf(o.onConflict);
+          const set = c.filter((x) => !key.includes(x)).map((x) => `${x} = excluded.${x}`);
+          return answer(
+            `insert into ${t} (${c.join(', ')}) select ${c.join(', ')} from jsonb_populate_recordset(null::${t}, ${lit(rows)})` +
+              ` on conflict (${key.join(', ')}) do ${set.length ? `update set ${set.join(', ')}` : 'nothing'};`,
+            false,
+          );
+        }),
+      update: (patch: Record<string, unknown>) => ({
+        eq: (col: string, v: unknown) =>
+          thenable(() => {
+            const c = Object.keys(patch).map(ident);
+            return answer(
+              `update ${t} set (${c.join(', ')}) = (select ${c.join(', ')} from jsonb_populate_record(null::${t}, ${lit(patch)})) where ${ident(col)} = ${sqlArg(v)};`,
+              false,
+            );
+          }),
+      }),
+    };
+  };
+  return { from } as unknown as SupabaseClient;
 }

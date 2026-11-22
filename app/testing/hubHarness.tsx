@@ -102,3 +102,21 @@ export function renderHub(ui: React.ReactElement, { strict = false }: { strict?:
   const view = render(strict ? <StrictMode>{tree}</StrictMode> : tree)
   return { ...view, queryClient }
 }
+
+/** Every API `jest.useFakeTimers` can fake, except Date */
+export const ALL_BUT_DATE: FakeableAPI[] = [
+  'hrtime',
+  'nextTick',
+  'performance',
+  'queueMicrotask',
+  'requestAnimationFrame',
+  'cancelAnimationFrame',
+  'requestIdleCallback',
+  'cancelIdleCallback',
+  'setImmediate',
+  'clearImmediate',
+  'setInterval',
+  'clearInterval',
+  'setTimeout',
+  'clearTimeout',
+]

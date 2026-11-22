@@ -649,3 +649,11 @@
 .hub .hub-reg-grupo.hub-rs-be > .hub-reg-cab {
   margin-bottom: 0;
 }
+
+/* Board Q34's revision: the answer's last two words and the ⓘ never break apart */
+.hub .hub-reg-nowrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+}

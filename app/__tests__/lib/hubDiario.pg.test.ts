@@ -69,6 +69,8 @@ import {
   doPregaoAnterior,
   fatosTexto,
   linhaDoTopo,
+  entradasDosDados,
+  linhaDosDadosDoPlano,
   linhasDoPlano,
   notaAntesDeOperar,
   notaDoDia,
@@ -543,6 +545,10 @@ insert into public.hub_members (user_id) values ('${uid}');`);
       ['Breakeven', 'nenhuma chegou ao ponto da regra', 'Registrado'],
     ]);
     expect(d.facts.breakeven).toEqual({ by: { MES: { n: '8', un: 'pts' } }, trades: 4, reached: 0, moved: 0 });
+    // Phase 5 · telas-diario: the file's trades are recalculated by gate_at without an agenda (none loaded here):
+    // `sem_agenda` on each, so the plan's «Dados econômicos» line says «não conferidos neste dia» (c3 §6.3)
+    expect(d.trades.every((t) => t.gateNow && !t.gateNow.block.evaluated && t.gateNow.block.reason === 'sem_agenda')).toBe(true);
+    expect(linhaDosDadosDoPlano(entradasDosDados(d.trades), undefined, TOP)).toMatchObject({ plano: 'não conferidos neste dia', marca: 'Não conferido' });
     // Every exit came with its commission (two of them zero): net, the gross in the ⓘ
     expect([d.facts.commissionUnknown, dayTiles(d.facts, 'futures').money.pending]).toEqual([0, false]);
     expect(fatosTexto(d.facts, TOP).replace(/ /g, ' ')).toBe(

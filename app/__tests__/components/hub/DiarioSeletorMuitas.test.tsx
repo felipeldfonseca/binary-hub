@@ -21,6 +21,7 @@ jest.mock('@/lib/hub/diarioDb', () => require('@/testing/diarioTelasMocks').mock
 jest.mock('@/lib/hub/regrasDb', () => require('@/testing/diarioTelasMocks').mockRegrasDb())
 jest.mock('@/lib/hub/contasDb', () => require('@/testing/diarioTelasMocks').mockContasDb())
 jest.mock('@/lib/hub/registrarDb', () => require('@/testing/diarioTelasMocks').mockRegistrarDb())
+jest.mock('@/lib/hub/agendaDb', () => require('@/testing/diarioTelasMocks').mockAgendaDb())
 
 const lista = () => document.getElementById('lista-contas') as HTMLElement
 const busca = () => screen.getByRole('searchbox', { name: 'Buscar conta' })
@@ -115,7 +116,13 @@ describe('9b · Top One among 35 accounts', () => {
     const valores = Array.from(linha.querySelectorAll('.hub-posso__valores > span')).map((s) => (s.textContent ?? '').replace(/\u00a0/g, ' '))
     expect(valores.join(' ')).toBe(e.possoSel[0].lim)
     expect(linha).not.toHaveTextContent('somando as contas de Futuros')
-    expect(card.querySelector('.hub-posso__resumo')?.textContent).toBe(`${e.outras.titulo}${e.outras.partes.map((p) => p.texto).join('·')}`)
+    // Phase 5 · telas-diario: the re-exported rules_now has the Futuros block `sem_agenda`: the board's «19 liberadas»
+    // reads «19 liberadas, dados não conferidos» (posso.ts), muted
+    const comDados = (t: string) => t.replace(/liberadas?$/, (m) => `${m}, dados não conferidos`)
+    expect(card.querySelector('.hub-posso__resumo')?.textContent).toBe(`${e.outras.titulo}${e.outras.partes.map((p) => comDados(p.texto)).join('·')}`)
+    Array.from(card.querySelectorAll('.hub-posso__parte'))
+      .filter((p) => p.textContent?.includes('dados não conferidos'))
+      .forEach((p) => expect(p).toHaveClass('hub-tom--muted'))
     expect(await screen.findByText('Conta Apex 50k #5.')).toHaveAttribute('role', 'status')
   })
 

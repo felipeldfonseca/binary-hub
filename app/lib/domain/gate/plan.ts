@@ -57,7 +57,7 @@ export interface PlanInput {
   direction: 1 | -1;
   /** Phase 5: the state at entry (null = no fresh reading for the symbol) */
   state?: Phase5<StateAtEntry | null>;
-  /** The releases the gate waits for (GateOptions.agenda: null = not known; absent = transitional `fase5`) */
+  /** The releases the gate waits for (GateOptions.agenda: `[]` = none in range; absent or null = not known, `sem_agenda`) */
   agenda?: readonly AgendaEntry[] | null;
 }
 
@@ -95,7 +95,7 @@ export function evaluatePlan(input: PlanInput): PlanResult {
   const day = input.trades
     ? dayUsage(input.trades, { tradingDay, until: entryAt, limitCents: rules?.limit?.cents ?? null, excludeId: input.tradeId })
     : null;
-  const gate = evaluateGate(entryAt, account, version, day, input.agenda === undefined ? {} : { agenda: input.agenda });
+  const gate = evaluateGate(entryAt, account, version, day, { agenda: input.agenda ?? null });
 
   const state = input.state ?? NOT_YET;
   let stateRule: StateRuleCheck;

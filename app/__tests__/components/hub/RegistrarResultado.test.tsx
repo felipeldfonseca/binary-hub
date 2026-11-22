@@ -336,7 +336,7 @@ describe('lane B’s pieces in their places (IBKR, no window, Thu 09:52 ET)', ()
   it('«O que você operou?» above the instrument; «Opção»: the option block between the underlying and «Lado», with its model', async () => {
     abrir(ids.accounts.ibkr)
     await screen.findByRole('heading', { level: 3, name: 'Entrada' })
-    expect(screen.getByRole('button', { name: 'Como ler: Posso operar hoje?' }).parentElement).toHaveTextContent('Sem janela salva')
+    expect(screen.getByRole('button', { name: 'Como ler: Posso operar hoje?' }).closest('.hub-reg-ctx-linha')).toHaveTextContent('Sem janela salva')
     expect(screen.getByRole('link', { name: 'Definir a janela da IBKR em Personalizar' })).toBeInTheDocument()
     const oQue = screen.getByTestId('o-que-operou')
     expect(oQue).toHaveAttribute('data-valor', 'acao')
@@ -553,7 +553,7 @@ describe('the B3 account renders through the generic fields (R$)', () => {
     db.fetchTradeState.mockResolvedValue(fechadaMercados('bgix26').state)
     abrir(ids.accounts.clear)
     await screen.findByRole('heading', { level: 3, name: 'Entrada' })
-    expect(screen.getByRole('button', { name: 'Como ler: Posso operar hoje?' }).parentElement).toHaveTextContent(
+    expect(screen.getByRole('button', { name: 'Como ler: Posso operar hoje?' }).closest('.hub-reg-ctx-linha')).toHaveTextContent(
       'Encerrado por hoje· limite de R$ 500 atingido às 10:16 (pior momento −R$ 540)',
     )
     expect(within(grupo('Ativo')).getAllByRole('button').map((b) => b.textContent)).toEqual(['WIN', 'WDO', 'IND', 'DOL'])

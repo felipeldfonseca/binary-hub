@@ -88,7 +88,7 @@ export const OPERACOES = {
   titulo: 'Operações do dia',
   /** NEW (B dump dez 2) */
   infoAria: 'Como ler: Operações do dia',
-  info: 'Abra ▾ para ver as saídas, os preços e os pontos, o stop e o alvo, os movimentos do stop, a hora de cada marca (antes da saída ou depois do resultado), as suas imagens e nota (clipe na linha) e o “Posso operar hoje?” na entrada. Plano: “No plano” ou ● com o motivo (fora da janela ou depois do limite).',
+  info: 'Abra ▾ para ver as saídas, os preços e os pontos, o stop e o alvo, os movimentos do stop, a hora de cada marca (antes da saída ou depois do resultado), as suas imagens e nota (clipe na linha) e o “Posso operar hoje?” na entrada. Plano: “No plano” ou ● com o motivo (fora da janela, na espera de um dado, em dia sem operar ou depois do limite).',
   /** R (moved: OPERACOES_DIA.empty; RO l.270): today without trades, with «Registrar operação» */
   vazioHoje: 'Nenhuma operação registrada hoje.',
   /** NEW (B dump dez: a past day without trades) */
@@ -225,6 +225,40 @@ export const LINHAS = {
   encerrado: (hora: string) => `Na entrada, o “Posso operar hoje?” dizia “Encerrado por hoje” desde ${hora}: as operações anteriores já estavam registradas.`,
   /** NEW (B dump dez 3b) */
   avisava: (hora: string) => `Na entrada, o “Posso operar hoje?” avisava do limite desde ${hora}: pelas suas regras, é só um aviso.`,
+}
+
+const NB = '\u00a0'
+/** «5 min» with a no-break space (Q30) */
+const minutos = (n: number) => `${n}${NB}min`
+
+/**
+ * «Dados econômicos» in the drill (Phase 5-1, c3 §6.4; Q30, Q31): the sentence of an entry inside a wait or on a whole
+ * day, from the gate answer of the plan shown. `resposta` = the «Posso operar hoje?» at the entry («Aguardar até
+ * 10:10», «Não opero hoje»); `doDado` = «do ISM de serviços»; `diaDe` = «dia de CPI»; hours on the Diário's clock.
+ */
+export const DADOS_OP = {
+  /** «… a operação entrou 3 min antes do ISM de serviços (10:00), dentro da sua espera das 09:55 às 10:10.» */
+  espera: (resposta: string, min: number, quando: 'antes' | 'depois', doDado: string, hora: string, de: string, ate: string) =>
+    `Na entrada, o “Posso operar hoje?” dizia “${resposta}”: a operação entrou ${minutos(min)} ${quando} ${doDado} (${hora}), dentro da sua espera das ${de} às ${ate}.`,
+  /** NEW (c3 §6.4 has no 0-minute case): the entry on the release's own minute */
+  esperaNaHora: (resposta: string, doDado: string, hora: string, de: string, ate: string) =>
+    `Na entrada, o “Posso operar hoje?” dizia “${resposta}”: a operação entrou na hora ${doDado} (${hora}), dentro da sua espera das ${de} às ${ate}.`,
+  /** «Só opero depois do dado»: «… pelo seu plano, você só operava a partir das 08:40, 10 min depois do CPI (08:30).» */
+  soDepois: (resposta: string, ate: string, min: number, doDado: string, hora: string) =>
+    `Na entrada, o “Posso operar hoje?” dizia “${resposta}”: pelo seu plano, você só operava a partir das ${ate}, ${minutos(min)} depois ${doDado} (${hora}).`,
+  /**
+   * «… era dia de CPI (08:30), que você marcou como “Não opero no dia”.»; `diaDe` carries the hours (NEW, review
+   * 2026-11-20: two releases at different hours «era dia de CPI (08:30) e dia de Fed (14:00), …»)
+   */
+  dia: (resposta: string, diaDe: string) =>
+    `Na entrada, o “Posso operar hoje?” dizia “${resposta}”: era ${diaDe}, que você marcou como “Não opero no dia”.`,
+  /** A trade from a file or the old page, after «Sem registro no app: …»: «Pelas regras do dia, a entrada caiu na espera do ISM de serviços (09:55 às 10:10).» */
+  arquivoEspera: (doDado: string, de: string, ate: string) => `Pelas regras do dia, a entrada caiu na espera ${doDado} (${de} às ${ate}).`,
+  /** NEW (c3 §6.4 gives only the wait): the same on a whole day */
+  arquivoDia: (diaDe: string) => `Pelas regras do dia, a entrada caiu em ${diaDe}.`,
+  semAgenda: 'Dados econômicos: não conferidos nesta entrada (o app estava sem a agenda).',
+  /** An entry frozen before Phase 5 (`fase5`) */
+  antesDaRegra: 'Dados econômicos: não conferidos nesta entrada.',
 }
 
 export const TEMPO_OP = {

@@ -1,0 +1,200 @@
+{
+  "rev": "2026-11-30T17:00:06.094423Z",
+  "builtin": {
+    "b3": {
+      "v": 1,
+      "window_rule": {
+        "on": true,
+        "outside": "fora"
+      }
+    },
+    "forex": {
+      "v": 1,
+      "window_rule": {
+        "on": true,
+        "outside": "fora"
+      }
+    },
+    "binary": {
+      "v": 1,
+      "window_rule": {
+        "on": true,
+        "outside": "fora"
+      }
+    },
+    "crypto": {
+      "v": 1,
+      "window_rule": {
+        "on": true,
+        "outside": "fora"
+      }
+    },
+    "stocks": {
+      "v": 1,
+      "window_rule": {
+        "on": true,
+        "outside": "fora"
+      }
+    },
+    "futures": {
+      "v": 1,
+      "block": {
+        "on": true,
+        "after_min": 10,
+        "before_min": 5
+      },
+      "states": {},
+      "window_rule": {
+        "on": true,
+        "outside": "fora"
+      }
+    },
+    "options": {
+      "v": 1,
+      "window_rule": {
+        "on": true,
+        "outside": "fora"
+      }
+    }
+  },
+  "accounts": [
+    {
+      "day": {
+        "tz": "America/New_York",
+        "start_min": 1080
+      },
+      "label": "Top One",
+      "market": "futures",
+      "window": {
+        "tz": "America/New_York",
+        "end_min": 660,
+        "weekdays": 31,
+        "start_min": 600
+      },
+      "current": {
+        "v": 1,
+        "day": {
+          "tz": "America/New_York",
+          "start_min": 1080
+        },
+        "block": {
+          "on": false,
+          "after_min": 10,
+          "calendars": [
+            "us"
+          ],
+          "before_min": 5
+        },
+        "limit": {
+          "usd": 500,
+          "mode": "conta",
+          "at_limit": "encerrar"
+        },
+        "market": "futures",
+        "states": {
+          "alinhadas": null,
+          "so_tecnica": null,
+          "em_conflito": null,
+          "sem_direcao": null,
+          "so_fundamentos": null
+        },
+        "windows": [
+          {
+            "tz": "America/New_York",
+            "end_min": 660,
+            "weekdays": 31,
+            "start_min": 600
+          }
+        ],
+        "window_rule": {
+          "on": true,
+          "outside": "fora"
+        },
+        "windows_from": "account"
+      },
+      "settings": {
+        "rules": {
+          "v": 1,
+          "block": {
+            "on": false
+          },
+          "limit": {
+            "usd": 500,
+            "mode": "conta",
+            "at_limit": "encerrar"
+          },
+          "window_rule": {
+            "on": true,
+            "outside": "fora"
+          }
+        },
+        "updated_at": "2026-11-30T17:00:06.094423+00:00"
+      },
+      "versions": [
+        {
+          "id": "d5556de5-1856-4cda-80bd-dc1638fe3156",
+          "origin": "criar",
+          "resolved": {
+            "v": 1,
+            "day": {
+              "tz": "America/New_York",
+              "start_min": 1080
+            },
+            "block": {
+              "on": false,
+              "after_min": 10,
+              "calendars": [
+                "us"
+              ],
+              "before_min": 5
+            },
+            "limit": {
+              "usd": 500,
+              "mode": "conta",
+              "at_limit": "encerrar"
+            },
+            "market": "futures",
+            "states": {
+              "alinhadas": null,
+              "so_tecnica": null,
+              "em_conflito": null,
+              "sem_direcao": null,
+              "so_fundamentos": null
+            },
+            "windows": [
+              {
+                "tz": "America/New_York",
+                "end_min": 660,
+                "weekdays": 31,
+                "start_min": 600
+              }
+            ],
+            "window_rule": {
+              "on": true,
+              "outside": "fora"
+            },
+            "windows_from": "account"
+          },
+          "version_no": 1,
+          "copied_from": null,
+          "effective_day": "2026-11-30",
+          "effective_from": "2026-11-30T17:00:06.094423+00:00"
+        }
+      ],
+      "account_id": "712036b2-dfa7-4f31-848a-9f7ba5de5075",
+      "is_example": false,
+      "archived_at": null
+    }
+  ],
+  "defaults": {
+    "b3": null,
+    "forex": null,
+    "binary": null,
+    "crypto": null,
+    "stocks": null,
+    "futures": null,
+    "options": null
+  },
+  "server_now": "2026-11-30T17:00:06.113373+00:00",
+  "preferences": {}
+}

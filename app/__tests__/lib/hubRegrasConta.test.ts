@@ -80,7 +80,7 @@ describe('«Copiar regras de»', () => {
     const c = configDepois()
     const copia = regrasDaNovaConta(c, 'futures', form())
     expect(copia.copiar).toBe(ids.topOne)
-    expect(notaCopiar(copia)).toBe('Copia janela, limite do dia, bloqueio de dados e regra do estado.')
+    expect(notaCopiar(copia)).toBe('Copia janela, limite do dia, dados econômicos e regra do estado.')
     expect(notaCopiar(regrasDaNovaConta(c, 'binary', form()))).toBe('Copia janela e limite do dia.')
     const nao = regrasDaNovaConta(c, 'futures', form({ copiar: NAO_COPIAR }))
     expect(nao.copiar).toBeNull()

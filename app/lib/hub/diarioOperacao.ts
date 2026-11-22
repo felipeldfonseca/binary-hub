@@ -12,7 +12,7 @@
  */
 import { addDays, formatHhMm, utcToLocal } from '@/lib/domain/tempo'
 import type { AccountMarket, Currency } from '@/lib/domain/markets'
-import { answerOf, type GateResult, type PlanBreak } from '@/lib/domain/gate'
+import { answerOf, type BlockInterval, type BlockRelease, type GateResult, type PlanBreak } from '@/lib/domain/gate'
 import { COMMISSION_FROM_FILE, type Day } from '@/lib/domain/diario'
 import { averageExit, countingExits, firstExitCut, isClean, type MarkEvent } from '@/lib/domain/registro'
 import { abs, fromInt, mul, numeric, numericText, plainText, round, sign, sub, trimScale } from '@/lib/domain/registro/numeric'
@@ -20,6 +20,7 @@ import { EBINEX, FECHADA, GATE, MARCAS, PASSOS_PRECOS } from '@/components/hub/r
 import { FECHADA_3C } from '@/components/hub/registrar/copyParciais'
 import {
   ABERTAS_OUTROS,
+  DADOS_OP,
   DRILL,
   IMAGENS,
   LINHAS,
@@ -28,8 +29,8 @@ import {
   TEMPO_OP,
   acaoAria,
 } from '@/components/hub/diario/copyDia'
-import { PALAVRAS_DADOS, horaDeVolta } from './dadosEconomicos'
-import { diaCurto, dinheiro, hora, tomDe } from './diario'
+import { NOMES_DADOS, PALAVRAS_DADOS, horaDeVolta, soDepois } from './dadosEconomicos'
+import { diaCurto, diaDeDados, diaDeDadosComHoras, dinheiro, hora, listaE, tomDe, type EntradaDosDados } from './diario'
 import type { DiaryDayTrade, OpenElsewhere } from './diarioDb'
 import { formatDecimal } from './numero'
 import { dinheiroCompacto, sufixoRelogio, type Tom } from './posso'
@@ -171,10 +172,58 @@ export function planoDaLinha(
   if (!p) return { tipo: 'nada' }
   if (p.verdict === 'fora_do_plano') {
     const breaks = p.breaks.filter((b) => QUEBRAS_DA_LINHA.includes(b))
-    const texto = textoQuebras(breaks, (t.plan ? t.gate : t.gateNow) ?? null)
-    if (texto) return { tipo: 'fora', texto, aria: OPERACOES.foraAria(texto.split(' · ').join(' e ')) }
+    const g = (t.plan ? t.gate : t.gateNow) ?? null
+    const texto = textoQuebras(breaks, g)
+    if (texto) return { tipo: 'fora', texto, aria: OPERACOES.foraAria(textoQuebrasLongo(breaks, g)) }
   }
   return p.verdict === 'no_plano' ? { tipo: 'ok' } : { tipo: 'nada' }
+}
+
+/**
+ * The data mark with the releases' full names, for screen readers (the boards' words: «na espera do ISM de serviços»,
+ * «em dia de CPI», «na espera do PCE e PIB dos EUA»; three or more «na espera de 3 dados»); each code once
+ */
+export function marcaDadosLonga(interval: { kind: 'espera' | 'dia'; releases: readonly BlockRelease[] } | null): string {
+  if (!interval || interval.releases.length === 0) return interval?.kind === 'dia' ? 'em dia de dado' : 'na espera de dado'
+  const codes = Array.from(new Set(interval.releases.map((r) => r.code)))
+  if (interval.kind === 'dia') {
+    return `em ${diaDeDados(interval.releases)}`
+  }
+  if (codes.length >= 3) return `na espera de ${codes.length} dados`
+  return `na espera ${NOMES_DADOS[codes[0]].doDa}${codes[1] ? ` e ${NOMES_DADOS[codes[1]].frase}` : ''}`
+}
+
+/**
+ * The data part of the day's facts (c3 §6.2; review 2026-11-20): the entries inside a wait or on a whole day,
+ * one part per interval in the order of its start, with full names and the entries' hours on `tz`: «1 na espera do ISM
+ * de serviços, às 10:04», «2 em dia de CPI, às 10:04 e 10:31». From the gate answers of the day's entries
+ * (diario.entradasDosDados: frozen, or recalculated for a file); SPEC §6 G3 gives the facts no key for it.
+ */
+export function fatosDosDados(entradas: readonly EntradaDosDados[], tz: string): string[] {
+  const grupos = new Map<string, { iv: BlockInterval; horas: Date[] }>()
+  for (const e of entradas) {
+    const b = e.block
+    if (!b.evaluated || b.state !== 'no_bloqueio' || !b.active) continue
+    const k = `${b.active.kind}${b.active.start.getTime()}${b.active.end.getTime()}`
+    const g = grupos.get(k) ?? { iv: b.active, horas: [] }
+    g.horas.push(e.at)
+    grupos.set(k, g)
+  }
+  return Array.from(grupos.values())
+    .sort((a, b) => a.iv.start.getTime() - b.iv.start.getTime())
+    .map((g) => {
+      const hs = [...g.horas].sort((a, b) => a.getTime() - b.getTime()).map((h) => hora(h, tz))
+      return `${hs.length} ${marcaDadosLonga(g.iv)}, às ${listaE(hs)}`
+    })
+}
+
+/** «fora da janela e na espera do ISM de serviços»: the row's breaks for a screen reader, joined by « e » */
+function textoQuebrasLongo(breaks: readonly PlanBreak[], gate: GateResult | null): string {
+  const active = gate && gate.block.evaluated ? gate.block.active : null
+  return breaks
+    .map((b) => (b === 'no_bloqueio' ? marcaDadosLonga(active) : textoQuebras([b])))
+    .filter((w): w is string => !!w)
+    .join(' e ')
 }
 
 /** G11: «Registrar saída» / «Registrar resultado» on an open trade registered in the app; null otherwise */
@@ -475,6 +524,8 @@ export function linhasDaOperacao(t: DiaryDayTrade, conta: ContaDaOperacao, o: { 
   }
   const plano = t.plan ?? t.planNow
   const g = t.gate ?? t.gateNow
+  const dados = linhaDosDados(t, tz)
+  if (dados) out.push(...dados)
   if (!t.history && plano?.breaks.includes('depois_do_limite')) {
     const hit = (g && g.limit.evaluated ? g.limit.hitAt : null) ?? o.limiteAtingidoAs ?? null
     if (hit) out.push(g?.status === 'encerrado' ? LINHAS.encerrado(hora(hit, tz)) : LINHAS.avisava(hora(hit, tz)))
@@ -489,6 +540,55 @@ export function linhasDaOperacao(t: DiaryDayTrade, conta: ContaDaOperacao, o: { 
     if (be) out.push(be)
   }
   return out
+}
+
+/** The releases of a wait nearest to `at` (several at that same instant together) */
+function maisPerto(releases: readonly BlockRelease[], at: Date): BlockRelease[] {
+  const d = (r: BlockRelease) => Math.abs(r.at.getTime() - at.getTime())
+  const best = releases.reduce((a, r) => (d(r) < d(a) ? r : a), releases[0])
+  return releases.filter((r) => r.at.getTime() === best.at.getTime())
+}
+
+/** «do ISM de serviços», «do PCE e PIB dos EUA» (codes once) */
+function doDado(releases: readonly BlockRelease[]): string {
+  const codes = Array.from(new Set(releases.map((r) => r.code)))
+  return `${NOMES_DADOS[codes[0]].doDa}${codes.slice(1).map((c) => ` e ${NOMES_DADOS[c].frase}`).join('')}`
+}
+
+/**
+ * «Dados econômicos» in the drill (c3 §6.4, Q30, Q31), from the gate answer of the plan shown (the frozen one of a trade
+ * registered in the app, the recalculated one of a file): the entry inside a wait (before or after the release, or a
+ * «Só opero depois do dado» wait) or on a whole day; a file's trade says «Pelas regras do dia, …» after the line of
+ * its origin; an entry the app could not check says so (`sem_agenda`; `fase5` = frozen before the rule). Nothing on
+ * an entry outside every wait, a rule off, another market, a history trade. Hours on the Diário's clock.
+ */
+export function linhaDosDados(t: Pick<DiaryDayTrade, 'history' | 'plan' | 'planNow' | 'gate' | 'gateNow'>, tz: string): string[] | null {
+  if (t.history) return null
+  const g = (t.plan ? t.gate : t.gateNow) ?? null
+  if (!g) return null
+  const b = g.block
+  if (!b.evaluated) {
+    if (b.reason === 'sem_agenda') return [DADOS_OP.semAgenda]
+    if (b.reason === 'fase5') return [DADOS_OP.antesDaRegra]
+    return null
+  }
+  const iv: BlockInterval | null = b.state === 'no_bloqueio' ? b.active : null
+  if (!iv || iv.releases.length === 0) return null
+  const de = hora(iv.start, tz)
+  const ate = hora(iv.end, tz)
+  if (!t.plan) {
+    if (iv.kind === 'dia') return [DADOS_OP.arquivoDia(diaDeDadosComHoras(iv.releases, tz))]
+    return [DADOS_OP.arquivoEspera(doDado(maisPerto(iv.releases, g.at)), de, ate)]
+  }
+  const resposta = possoNaEntrada(g, tz)
+  if (iv.kind === 'dia') return [DADOS_OP.dia(resposta, diaDeDadosComHoras(iv.releases, tz))]
+  const rs = maisPerto(iv.releases, g.at)
+  const r = rs[0]
+  if (soDepois(iv.releases)) return [DADOS_OP.soDepois(resposta, ate, Math.round((iv.end.getTime() - r.at.getTime()) / 60_000), doDado(rs), hora(r.at, tz))]
+  // Whole minutes on the clock (10:05 − 10:00 = 5 min), as the hours the sentence shows
+  const min = Math.round((Math.floor(g.at.getTime() / 60_000) * 60_000 - r.at.getTime()) / 60_000)
+  if (min === 0) return [DADOS_OP.esperaNaHora(resposta, doDado(rs), hora(r.at, tz), de, ate)]
+  return [DADOS_OP.espera(resposta, Math.abs(min), min < 0 ? 'antes' : 'depois', doDado(rs), hora(r.at, tz), de, ate)]
 }
 
 // ---------------------------------------------------------------------------------------------

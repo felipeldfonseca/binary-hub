@@ -1,0 +1,145 @@
+{
+  "gate": {
+    "at": "2026-12-03T14:50:00.05908+00:00",
+    "block": {
+      "state": "ok",
+      "today": [
+        {
+          "end": "2026-12-03T15:10:00+00:00",
+          "kind": "espera",
+          "start": "2026-12-03T14:55:00+00:00",
+          "releases": [
+            {
+              "at": "2026-12-03T15:00:00+00:00",
+              "code": "ism_serv",
+              "mode": "volta"
+            }
+          ]
+        }
+      ],
+      "active": null,
+      "free_at": null
+    },
+    "desde": "2026-11-30T17:00:04.690842+00:00",
+    "label": "Top One",
+    "limit": {
+      "usd": 500,
+      "mode": "conta",
+      "near": false,
+      "used": 0,
+      "state": "ok",
+      "hit_at": null,
+      "reason": null,
+      "trades": 0,
+      "net_usd": 0,
+      "at_limit": "encerrar",
+      "worst_usd": 0
+    },
+    "today": {
+      "trades": 0,
+      "net_usd": 0,
+      "worst_usd": 0
+    },
+    "market": "futures",
+    "status": "fora_janela",
+    "window": {
+      "next": {
+        "opens_at": "2026-12-03T15:00:00+00:00",
+        "closes_at": "2026-12-03T16:00:00+00:00",
+        "trading_day": "2026-12-03"
+      },
+      "state": "fora",
+      "reason": null,
+      "current": null,
+      "position": "antes"
+    },
+    "version": {
+      "id": "e0389a55-3b17-41bc-8a32-a49d245eba10",
+      "origin": "criar",
+      "version_no": 1,
+      "effective_from": "2026-11-30T17:00:04.690842+00:00"
+    },
+    "warnings": [],
+    "desde_day": "2026-11-30",
+    "account_id": "b1bb5d6e-0a57-4d38-b2f8-4e7d62c6ae3e",
+    "changes_at": "2026-12-03T14:55:00+00:00",
+    "state_rule": {
+      "state": "nao_avaliado",
+      "reason": "fase5"
+    },
+    "trading_day": "2026-12-03",
+    "checks_evaluated": [
+      "janela",
+      "bloqueio",
+      "limite"
+    ]
+  },
+  "plan": {
+    "breaks": [
+      "fora_da_janela"
+    ],
+    "verdict": "fora_do_plano",
+    "checks_evaluated": [
+      "janela",
+      "bloqueio",
+      "limite"
+    ]
+  },
+  "context": {
+    "rule_ok": null,
+    "in_block": false,
+    "warnings": [],
+    "in_window": false,
+    "after_limit": false,
+    "gate_status": "fora_janela",
+    "state_choice": null,
+    "checks_evaluated": [
+      "janela",
+      "bloqueio",
+      "limite"
+    ],
+    "day_pnl_at_entry": 0,
+    "day_worst_at_entry": 0
+  },
+  "dry_run": true,
+  "preview": {
+    "risk": 20,
+    "reward": null,
+    "stop_points": 4,
+    "target_points": null
+  },
+  "similar": [],
+  "version": {
+    "id": "e0389a55-3b17-41bc-8a32-a49d245eba10",
+    "version_no": 1
+  },
+  "entry_at": "2026-12-03T14:50:00.05908+00:00",
+  "repeated": false,
+  "expires_at": null,
+  "instrument": {
+    "key": "MES",
+    "pip": null,
+    "pnl": "prices",
+    "mult": "5",
+    "tick": "0.25",
+    "costs": false,
+    "known": true,
+    "stops": "pts",
+    "qty_dp": 0,
+    "correct": false,
+    "price_dp": 8,
+    "asset_type": "futures"
+  },
+  "limit_room": {
+    "usd": 500,
+    "left": 500,
+    "risk": 20,
+    "above": false,
+    "net_usd": 0,
+    "reached": false
+  },
+  "server_now": "2026-12-03T14:50:00.05908+00:00",
+  "stop_price": 7908.25,
+  "trading_day": "2026-12-03",
+  "target_price": null
+}
