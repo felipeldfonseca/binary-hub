@@ -9,15 +9,14 @@
  */
 
 /**
- * The day «Dados econômicos» reaches the live database. SET IT TO THE DAY THE PHASE 5 SQL IS PASTED INTO THE LIVE
- * DATABASE (the orchestrator writes the final value on the paste day; today it is the day the build started). An
- * account whose first rules version took effect before it is «a conta antiga» (c3 §3.9): its rule was saved by the
+ * The day «Dados econômicos» reaches the live database: the day the Phase 5 SQL is pasted. An account whose first
+ * rules version took effect before it is «a conta antiga» (c3 §3.9): its rule was saved by the
  * old code, which never checked the data. Both notices read it, through `contaAntigaDesde`: Personalizar's
  * old-account notice (Q41, personalizar/regraDados.contaAntiga) and the first wait's notice in «Posso operar hoje?»
  * (Q18, lib/hub/posso.avisoPrimeiraEspera). Every account the hub creates gets a version on its creation day, so a
  * version count cannot tell an old account from a new one.
  */
-export const ENTREGA_DADOS_ECONOMICOS = '2026-11-20';
+export const ENTREGA_DADOS_ECONOMICOS = '2026-11-22';
 
 /** «A conta antiga»: the trading day of its first rules version ('YYYY-MM-DD') falls before the delivery */
 export function contaAntigaDesde(desdeDay: string | null | undefined, entrega: string = ENTREGA_DADOS_ECONOMICOS): boolean {
